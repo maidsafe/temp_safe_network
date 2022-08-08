@@ -216,7 +216,10 @@ async fn bootstrap_node(
         let node_name = ed25519::name(&keypair.public);
         info!("{} Bootstrapping as a new node.", node_name);
 
-        let prefix_map = read_prefix_map_from_disk().await?;
+        let path = config.network_contacts_file().ok_or_else(|| {
+            Error::Configuration("Could not obtain network contacts file path".to_string())
+        })?;
+        let prefix_map = read_prefix_map_from_disk(&path).await?;
         let section_elders = {
             let sap = prefix_map
                 .closest_or_opposite(&xor_name::rand::random(), None)

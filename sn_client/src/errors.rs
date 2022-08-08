@@ -26,6 +26,9 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
+    /// Failed to obtain network contacts to bootstrap to
+    #[error("Failed to obtain network contacts to bootstrap to: {0}")]
+    NetworkContacts(String),
     /// Message auth checks failed
     #[error("Message's authority could not be trusted.")]
     UntrustedMessage,

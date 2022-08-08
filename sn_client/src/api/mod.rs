@@ -26,7 +26,7 @@ use sn_interface::{
         data::{DataQuery, DataQueryVariant, RegisterQuery, ServiceMsg},
         ServiceAuth, WireMsg,
     },
-    network_knowledge::utils::read_prefix_map_from_disk,
+    network_knowledge::utils::{read_prefix_map_from_disk, write_prefix_map_to_disk},
     types::{Chunk, Keypair, PublicKey, RegisterAddress},
 };
 
@@ -36,6 +36,9 @@ use tokio::{sync::RwLock, time::Duration};
 use tracing::debug;
 use uluru::LRUCache;
 use xor_name::XorName;
+
+/// File name of the hardlink to the default prefix map the Client uses
+pub const DEFAULT_PREFIX_HARDLINK_NAME: &str = "default";
 
 // Maximum amount of Chunks to keep in our cal Chunks cache.
 // Each Chunk is maximum types::MAX_CHUNK_SIZE_IN_BYTES, i.e. ~1MB
@@ -73,7 +76,29 @@ impl Client {
         keypair: Keypair,
         dbc_owner: Owner,
     ) -> Result<Self, Error> {
-        let prefix_map = read_prefix_map_from_disk().await?;
+        // Use `$User/.safe/prefix_maps` directory
+        let prefix_maps_dir = dirs_next::home_dir()
+            .ok_or_else(|| {
+                Error::NetworkContacts("Could not read user's home directory".to_string())
+            })?
+            .join(".safe")
+            .join("prefix_maps");
+
+        let path = prefix_maps_dir.join(DEFAULT_PREFIX_HARDLINK_NAME);
+        let prefix_map = read_prefix_map_from_disk(&path).await.map_err(|err| {
+            Error::NetworkContacts(format!(
+                "Could not read prefix map from {}: {}",
+                path.display(),
+                err
+            ))
+        })?;
+
+        // Update the PrefixMap file for this genesis key on disk as well
+        write_prefix_map_to_disk(
+            &prefix_map,
+            &prefix_maps_dir.join(format!("{:?}", prefix_map.genesis_key())),
+        )
+        .await?;
 
         // Bootstrap to the network, connecting to a section based
         // on a public key of our choice.
@@ -92,6 +117,7 @@ impl Client {
             config.local_addr,
             config.cmd_ack_wait,
             prefix_map,
+            prefix_maps_dir,
         )?;
 
         let client = Self {

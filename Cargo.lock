@@ -75,9 +75,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.59"
+version = "1.0.60"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c91f1f46651137be86f3a2b9a8359f9ab421d04d941c62b5982e1ca21113adf9"
+checksum = "c794e162a5eff65c72ef524dfe393eb923c354e350bb78b9c7383df13f3bc142"
 
 [[package]]
 name = "arrayvec"
@@ -3575,7 +3575,6 @@ dependencies = [
  "crdts",
  "custom_debug",
  "dashmap",
- "dirs-next 2.0.0",
  "ed25519",
  "ed25519-dalek",
  "eyre",
@@ -3619,9 +3618,9 @@ dependencies = [
 
 [[package]]
 name = "sn_launch_tool"
-version = "0.10.1"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb24fcaae67df60c8fa1091bd6974291e746c8e64d334bcc892c570efb01cde1"
+checksum = "a66a546409d653118303474ceeeaf0c4760babf0d69b66f7d680bc76354565e5"
 dependencies = [
  "clap 3.2.16",
  "color-eyre",

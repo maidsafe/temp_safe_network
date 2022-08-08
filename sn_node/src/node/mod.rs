@@ -131,6 +131,9 @@ mod core {
 
     const BACKOFF_CACHE_LIMIT: usize = 100;
 
+    // File name where to cache this node's prefix map (stored at this node's set root storage dir)
+    const PREFIX_MAP_FILE_NAME: &str = "prefix_map";
+
     // How long to hold on to correlated `Peer`s for data queries. Since data queries are forwarded
     // from elders (with whom the client is connected) to adults (who hold the data), the elder handling
     // the query cannot reply immediately. For now, they stash a reference to the client `Peer` in
@@ -153,6 +156,7 @@ mod core {
     pub(crate) struct Node {
         pub(crate) addr: SocketAddr, // does this change? if so... when? only at node start atm?
         pub(crate) event_sender: EventSender,
+        root_storage_dir: PathBuf,
         pub(crate) data_storage: DataStorage, // Adult only before cache
         pub(crate) keypair: Arc<Keypair>,
         /// queue up all batch data to be replicated (as a result of churn events atm)
@@ -253,6 +257,7 @@ mod core {
                 keypair,
                 network_knowledge,
                 section_keys_provider,
+                root_storage_dir,
                 dkg_sessions: HashMap::default(),
                 proposal_aggregator: SignatureAggregator::default(),
                 split_barrier: SplitBarrier::new(),
@@ -275,6 +280,7 @@ mod core {
                 membership,
             };
 
+            // Write the prefix map to this node's root storage directory
             node.write_prefix_map().await;
 
             Ok(node)
@@ -727,13 +733,16 @@ mod core {
         }
 
         pub(crate) async fn write_prefix_map(&self) {
-            info!("Writing our latest PrefixMap to disk");
             let prefix_map = self.network_knowledge.prefix_map().clone();
+            let path = self.root_storage_dir.clone().join(PREFIX_MAP_FILE_NAME);
 
             let _ = tokio::spawn(async move {
-                // write Prefix to `~/.safe/prefix_maps` dir
-                if let Err(e) = write_prefix_map_to_disk(&prefix_map).await {
-                    error!("Error writing PrefixMap to `~/.safe` dir: {:?}", e);
+                if let Err(err) = write_prefix_map_to_disk(&prefix_map, &path).await {
+                    error!(
+                        "Error writing PrefixMap to `{}` dir: {:?}",
+                        path.display(),
+                        err
+                    );
                 }
             });
         }

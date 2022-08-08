@@ -629,12 +629,9 @@ pub mod test_utils {
     use crate::operations::config::Settings;
     use assert_fs::{prelude::*, TempDir};
     use color_eyre::{eyre::eyre, Result};
-    use sn_api::{NetworkPrefixMap, DEFAULT_PREFIX_HARDLINK_NAME, SN_PREFIX_MAP_DIR};
+    use sn_api::{NetworkPrefixMap, DEFAULT_PREFIX_HARDLINK_NAME};
     use std::collections::BTreeMap;
-    use std::{
-        env,
-        path::{Path, PathBuf},
-    };
+    use std::path::{Path, PathBuf};
     use tokio::fs;
 
     pub async fn store_dummy_prefix_maps(
@@ -666,8 +663,6 @@ pub mod test_utils {
             }
 
             let prefix_maps_dir = tmp_dir.child(".safe/prefix_maps");
-            let prefix_maps_dir_string = prefix_maps_dir.path().display().to_string();
-            env::set_var(SN_PREFIX_MAP_DIR, prefix_maps_dir_string);
             Config::new(
                 PathBuf::from(cli_config_file.path()),
                 PathBuf::from(prefix_maps_dir.path()),

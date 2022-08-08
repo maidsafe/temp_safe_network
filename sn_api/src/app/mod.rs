@@ -19,9 +19,8 @@ pub mod wallet;
 
 pub use crate::safeurl::*;
 pub use consts::DEFAULT_XORURL_BASE;
-pub use helpers::{
-    parse_tokens_amount, NetworkPrefixMap, DEFAULT_PREFIX_HARDLINK_NAME, SN_PREFIX_MAP_DIR,
-};
+pub use sn_client::DEFAULT_PREFIX_HARDLINK_NAME;
+pub use sn_interface::network_knowledge::prefix_map::NetworkPrefixMap;
 pub use xor_name::{XorName, XOR_NAME_LEN};
 
 // --------------------------------------------------------------------

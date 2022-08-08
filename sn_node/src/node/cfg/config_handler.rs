@@ -19,7 +19,7 @@ use tokio::{
     fs::{self, File},
     io::AsyncWriteExt,
 };
-use tracing::{debug, warn, Level};
+use tracing::{debug, error, warn, Level};
 
 const CONFIG_FILE: &str = "node.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
@@ -87,6 +87,12 @@ pub struct Config {
     /// connection info is stored.
     #[clap(long)]
     pub first: bool,
+    /// File with initial network contacts to bootstrap to if this node is not the first on
+    /// the network. This argument and the `--first` flag are mutually exclusive.
+    ///
+    /// This shall be set to the file path where a valid `PrefixMap` can be read from.
+    #[clap(short, long)]
+    pub network_contacts_file: Option<PathBuf>,
     /// Local address to be used for the node.
     ///
     /// When unspecified, the node will listen on `0.0.0.0` with a random unused port. If you're
@@ -138,12 +144,12 @@ impl Config {
         let mut config = Config::default();
 
         let cmd_line_args = Config::parse();
-        cmd_line_args.validate().map_err(Error::Configuration)?;
+        cmd_line_args.validate()?;
 
         config.merge(cmd_line_args);
 
         config.clear_data_from_disk().await.unwrap_or_else(|_| {
-            tracing::error!("Error deleting data file from disk");
+            error!("Error deleting data file from disk");
         });
 
         info!("Node config to be used: {:?}", config);
@@ -153,16 +159,25 @@ impl Config {
     /// Validate configuration that came from the cmd line.
     ///
     /// `StructOpt` doesn't support validation that crosses multiple field values.
-    fn validate(&self) -> Result<(), String> {
+    fn validate(&self) -> Result<(), Error> {
+        if !(self.first ^ self.network_contacts_file.is_some()) {
+            return Err(Error::Configuration(
+                "Either the --first or --network-contacts-file argument is required, and they \
+                are mutually exclusive. Please run the command again and use one or the other, \
+                but not both, of these arguments."
+                    .to_string(),
+            ));
+        }
+
         if let Some(local_addr) = self.local_addr {
             if local_addr.ip().is_loopback() && self.public_addr.is_some() {
-                return Err(
+                return Err(Error::Configuration(
                     "Cannot specify --public-addr when --local-addr uses a loopback IP. \
                     When local-addr uses a loopback IP, the node will never be reachable publicly. \
                     You can drop public-addr if this is a local-only node, or change local-addr to \
                     a public or unspecified IP."
                         .to_string(),
-                );
+                ));
             }
         }
 
@@ -171,11 +186,13 @@ impl Config {
             .map(|addr| addr.ip().is_unspecified())
             .unwrap_or(true);
         if local_ip_unspecified && self.first && self.public_addr.is_none() {
-            return Err("Must specify public address for --first node. \
+            return Err(Error::Configuration(
+                "Must specify public address for --first node. \
                 The first node cannot query its public address from peers, so one must be \
                 specifed. This can be specified with --public-addr, or by setting a concrete IP \
                 for --local-addr."
-                .to_string());
+                    .to_string(),
+            ));
         }
 
         Ok(())
@@ -216,6 +233,10 @@ impl Config {
         self.clear_data = config.clear_data || self.clear_data;
         self.first = config.first || self.first;
 
+        if let Some(path) = config.network_contacts_file {
+            self.network_contacts_file = Some(path);
+        }
+
         if let Some(local_addr) = config.local_addr {
             self.local_addr = Some(local_addr);
         }
@@ -254,6 +275,11 @@ impl Config {
     /// Is this the first node in a section?
     pub fn is_first(&self) -> bool {
         self.first
+    }
+
+    /// Network contacts to bootstrap to if this is not the first node in a network
+    pub fn network_contacts_file(&self) -> Option<PathBuf> {
+        self.network_contacts_file.clone()
     }
 
     /// Upper limit in bytes for allowed network storage on this node.
@@ -433,7 +459,7 @@ fn smoke() {
     // NOTE: IF this value is being changed due to a change in the config,
     // the change in config also be handled in Config::merge()
     // and in examples/config_handling.rs
-    let expected_size = 408;
+    let expected_size = 432;
 
     assert_eq!(std::mem::size_of::<Config>(), expected_size);
 }
