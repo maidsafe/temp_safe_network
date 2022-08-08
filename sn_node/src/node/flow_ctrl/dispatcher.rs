@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::comm::Comm;
+use crate::log_sleep;
 use crate::node::{
     messaging::{OutgoingMsg, Peers},
     Cmd, Error, Node, Result,
@@ -21,7 +22,7 @@ use sn_interface::{
 
 use bytes::Bytes;
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
-use tokio::{sync::watch, sync::RwLock, time};
+use tokio::{sync::watch, sync::RwLock};
 
 // Cmd Dispatcher.
 pub(crate) struct Dispatcher {
@@ -284,10 +285,14 @@ impl Dispatcher {
         }
 
         tokio::select! {
-            _ = time::sleep(duration) => Some(Cmd::HandleDkgTimeout(token)),
+            _ = sleep_facility(duration) => Some(Cmd::HandleDkgTimeout(token)),
             _ = cancel_rx.changed() => None,
         }
     }
+}
+
+async fn sleep_facility(duration: Duration) {
+    log_sleep!(Duration::from_millis(duration.as_millis() as u64));
 }
 
 // Serializes and signs the msg,

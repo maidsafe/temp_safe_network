@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::log_sleep;
 use crate::node::{
     flow_ctrl::cmds::Cmd,
     messaging::{OutgoingMsg, Peers},
@@ -410,7 +411,7 @@ impl Node {
             };
 
             if let Some(sleep_time) = sleep_time {
-                tokio::time::sleep(sleep_time).await;
+                log_sleep!(Duration::from_millis(sleep_time.as_millis() as u64));
             }
         } else {
             let _res = self

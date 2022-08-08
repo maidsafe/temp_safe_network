@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::log_sleep;
 use crate::node::{
     flow_ctrl::{
         cmds::{Cmd, CmdJob},
@@ -29,7 +30,8 @@ use tokio::{sync::RwLock, time::Instant};
 
 type Priority = i32;
 
-const SLEEP_TIME: Duration = Duration::from_millis(10);
+// In milliseconds
+const SLEEP_TIME: u64 = 10;
 
 const ORDER: Ordering = Ordering::SeqCst;
 
@@ -146,11 +148,10 @@ impl CmdCtrl {
             let actual_rate = self.attempted.value();
             if actual_rate > expected_rate {
                 let diff = actual_rate - expected_rate;
-                let diff_ms = Duration::from_millis((diff * 10_f64) as u64);
-                tokio::time::sleep(diff_ms).await;
+                log_sleep!(Duration::from_millis((diff * 10_f64) as u64));
                 continue;
             } else if self.cmd_queue.read().await.is_empty() {
-                tokio::time::sleep(SLEEP_TIME).await;
+                log_sleep!(Duration::from_millis(SLEEP_TIME));
                 continue;
             }
 
