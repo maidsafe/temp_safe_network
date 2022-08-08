@@ -251,39 +251,39 @@ impl Node {
             )
             .await?;
 
-        match to_resend {
-            None => Ok(vec![]),
-            Some((msg_to_resend, _)) => {
-                // TODO: we may need to check if 'bounced_msg' dst section pk is different
-                // from the received new SAP key, to prevent from endlessly resending a msg
-                // if a sybil/corrupt peer keeps sending us the same AE msg.
-                trace!(
-                    "{} resending {:?}",
-                    LogMarker::AeResendAfterRetry,
-                    msg_to_resend
-                );
+        let msg_to_resend = if let Some((msg, _)) = to_resend {
+            msg
+        } else {
+            return Ok(vec![]);
+        };
 
-                self.create_or_wait_for_backoff(&sender).await;
+        // TODO: we may need to check if 'bounced_msg' dst section pk is different
+        // from the received new SAP key, to prevent from endlessly resending a msg
+        // if a sybil/corrupt peer keeps sending us the same AE msg.
+        trace!(
+            "{} resending {msg_to_resend:?}",
+            LogMarker::AeResendAfterRetry
+        );
 
-                let mut result = Vec::new();
-                if let Ok(cmds) = self.update_on_elder_change(snapshot).await {
-                    result.extend(cmds);
-                }
+        self.create_or_wait_for_backoff(&sender).await;
 
-                if cfg!(feature = "traceroute") {
-                    result.push(self.trace_system_msg(
-                        msg_to_resend,
-                        Peers::Single(sender),
-                        #[cfg(feature = "traceroute")]
-                        traceroute,
-                    ));
-                } else {
-                    result.push(self.send_system_msg(msg_to_resend, Peers::Single(sender)));
-                }
-
-                Ok(result)
-            }
+        let mut cmds = Vec::new();
+        if let Ok(elder_cmds) = self.update_on_elder_change(snapshot).await {
+            cmds.extend(elder_cmds);
         }
+
+        if cfg!(feature = "traceroute") {
+            cmds.push(self.trace_system_msg(
+                msg_to_resend,
+                Peers::Single(sender),
+                #[cfg(feature = "traceroute")]
+                traceroute,
+            ));
+        } else {
+            cmds.push(self.send_system_msg(msg_to_resend, Peers::Single(sender)));
+        }
+
+        Ok(cmds)
     }
 
     pub(crate) async fn handle_anti_entropy_redirect_msg(
