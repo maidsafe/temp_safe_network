@@ -50,14 +50,21 @@ impl Dispatcher {
         self.node.clone()
     }
 
-    #[cfg(feature = "back-pressure")]
+    // #[cfg(feature = "back-pressure")]
     // Currently only used in cmd ctrl backpressure features
     pub(crate) fn comm(&self) -> &Comm {
         &self.comm
     }
 
+    pub(crate) fn dkg_timeout(&self) -> Arc<DkgTimeout> {
+        self.dkg_timeout.clone()
+    }
+
     /// Handles a single cmd.
-    pub(crate) async fn process_cmd(&self, cmd: Cmd) -> Result<Vec<Cmd>> {
+    pub(crate) async fn process_cmd(
+        &self,
+        cmd: Cmd,
+    ) -> Result<Vec<Cmd>> {
         match cmd {
             Cmd::CleanupPeerLinks => {
                 let members = { self.node.read().await.network_knowledge.section_members() };
@@ -265,8 +272,7 @@ impl Dispatcher {
                 )])
             }
             Cmd::TestConnectivity(name) => {
-                let node_state = self
-                    .node
+                let node_state = self.node
                     .read()
                     .await
                     .network_knowledge()
@@ -287,7 +293,11 @@ impl Dispatcher {
         }
     }
 
-    async fn handle_scheduled_dkg_timeout(&self, duration: Duration, token: u64) -> Option<Cmd> {
+    async fn handle_scheduled_dkg_timeout(
+        &self,
+        duration: Duration,
+        token: u64,
+    ) -> Option<Cmd> {
         let mut cancel_rx = self.dkg_timeout.cancel_timer_rx.clone();
 
         if *cancel_rx.borrow() {
@@ -394,7 +404,7 @@ impl Drop for Dispatcher {
     }
 }
 
-struct DkgTimeout {
+pub(crate) struct DkgTimeout {
     cancel_timer_tx: watch::Sender<bool>,
     cancel_timer_rx: watch::Receiver<bool>,
 }

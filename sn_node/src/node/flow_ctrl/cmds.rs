@@ -50,6 +50,20 @@ pub struct CmdJob {
     created_at: SystemTime,
 }
 
+impl PartialEq for CmdJob {
+    fn eq(&self, other: &Self) -> bool {
+        self.id() == other.id()
+    }
+}
+
+impl Eq for CmdJob {}
+
+impl std::hash::Hash for CmdJob {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id().hash(state);
+    }
+}
+
 impl CmdJob {
     pub(crate) fn new(
         id: usize,
@@ -77,6 +91,10 @@ impl CmdJob {
 
     pub(crate) fn cmd(&self) -> &Cmd {
         &self.cmd
+    }
+
+    pub(crate) fn into_cmd(self) -> Cmd {
+        self.cmd
     }
 
     pub(crate) fn priority(&self) -> i32 {

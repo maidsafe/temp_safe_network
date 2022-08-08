@@ -18,7 +18,7 @@ use crate::log_sleep;
 pub(crate) use self::cmd_ctrl::CmdCtrl;
 
 use crate::comm::MsgEvent;
-use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Error, Node, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Node, Result};
 
 use ed25519_dalek::Signer;
 #[cfg(feature = "traceroute")]
@@ -64,16 +64,17 @@ pub(crate) struct FlowCtrl {
     node: Arc<RwLock<Node>>,
     cmd_ctrl: CmdCtrl,
     incoming_msg_events: mpsc::Receiver<MsgEvent>,
-    incoming_cmds_from_apis: mpsc::Receiver<Cmd>,
+    incoming_cmds_from_apis: mpsc::Receiver<(Cmd, Option<usize>)>,
+    cmd_sender_channel: mpsc::Sender<(Cmd, Option<usize>)>,
 }
 
 impl FlowCtrl {
     pub(crate) fn new(
         cmd_ctrl: CmdCtrl,
         incoming_msg_events: mpsc::Receiver<MsgEvent>,
-    ) -> (Self, mpsc::Sender<Cmd>) {
+    ) -> (Self, mpsc::Sender<(Cmd, Option<usize>)>) {
         let node = cmd_ctrl.node();
-        let (cmd_sender, incoming_cmds_from_apis) = mpsc::channel(1);
+        let (cmd_sender_channel, incoming_cmds_from_apis) = mpsc::channel(1);
 
         (
             Self {
@@ -81,8 +82,9 @@ impl FlowCtrl {
                 node,
                 incoming_msg_events,
                 incoming_cmds_from_apis,
+                cmd_sender_channel: cmd_sender_channel.clone(),
             },
-            cmd_sender,
+            cmd_sender_channel,
         )
     }
 
@@ -104,11 +106,25 @@ impl FlowCtrl {
         // the internal process loop
         loop {
             // First things. Lets process the next cmd
-            debug!("pre process");
-            if let Err(error) = self.cmd_ctrl.process_next_cmd().await {
-                error!("Error during cmd processing: {error:?}");
+
+            if let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {
+                debug!("q lennn {}", self.cmd_ctrl.q_len());
+
+                debug!("pre process");
+                if let Err(error) = self
+                    .cmd_ctrl
+                    .process_cmd(
+                        next_cmd_job.id(),
+                        next_cmd_job.into_cmd(),
+                        self.cmd_sender_channel.clone(),
+                    )
+                    .await
+                {
+                    error!("Error during cmd processing: {error:?}");
+                }
+
+                debug!("post process");
             }
-            debug!("post process");
 
             let now = Instant::now();
             let mut cmds = vec![];
@@ -123,7 +139,8 @@ impl FlowCtrl {
             // Here we handle any incoming conn messages
             // via the API channel
             match self.incoming_cmds_from_apis.try_recv() {
-                Ok(cmd) => cmds.push(cmd),
+                // TODO: handle a passed if if that still makes sense here
+                Ok((cmd, _id)) => cmds.push(cmd),
                 Err(TryRecvError::Empty) => {
                     // do nothing
                 }
@@ -284,7 +301,7 @@ impl FlowCtrl {
                 CtrlStatus::Enqueued => {
                     // this block should be unreachable, as Enqueued is the initial state
                     // but let's handle it anyway..
-                    log_sleep!(Duration::from_millis(100));
+                    sleep(Duration::from_millis(100)).await;
                     continue;
                 }
                 CtrlStatus::WatcherDropped => {
