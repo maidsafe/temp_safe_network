@@ -64,6 +64,7 @@ pub(crate) struct FlowCtrl {
     cmd_ctrl: CmdCtrl,
     incoming_msg_events: mpsc::Receiver<MsgEvent>,
     incoming_cmds_from_apis: mpsc::Receiver<Cmd>,
+    cmd_channel: mpsc::Sender<Cmd>,
 }
 
 impl FlowCtrl {
@@ -72,7 +73,7 @@ impl FlowCtrl {
         incoming_msg_events: mpsc::Receiver<MsgEvent>,
     ) -> (Self, mpsc::Sender<Cmd>) {
         let node = cmd_ctrl.node();
-        let (cmd_sender, incoming_cmds_from_apis) = mpsc::channel(1);
+        let (cmd_channel, incoming_cmds_from_apis) = mpsc::channel(1);
 
         (
             Self {
@@ -80,8 +81,9 @@ impl FlowCtrl {
                 node,
                 incoming_msg_events,
                 incoming_cmds_from_apis,
+                cmd_channel: cmd_channel.clone(),
             },
-            cmd_sender,
+            cmd_channel,
         )
     }
 
@@ -123,10 +125,17 @@ impl FlowCtrl {
                 }
             }
 
-            // Finally, handle any incoming conn messages
+            // Handle any incoming conn messages
             // this requires mut self
             match self.incoming_msg_events.try_recv() {
-                Ok(msg) => cmds.push(self.handle_new_msg_event(info.clone(), msg).await),
+                Ok(msg) => {
+                    if let Err(error) = self
+                        .handle_new_msg_event(info.clone(), msg, self.cmd_channel.clone())
+                        .await
+                    {
+                        error!("Error handling incoming msg event {error}")
+                    }
+                }
                 Err(TryRecvError::Empty) => {
                     // do nothing
                 }
@@ -145,12 +154,13 @@ impl FlowCtrl {
             #[cfg(feature = "back-pressure")]
             if last_backpressure_check.elapsed() > BACKPRESSURE_INTERVAL {
                 last_backpressure_check = now;
-
-                if let Some(cmd) =
-                    Self::report_backpressure(self.node.clone(), &self.cmd_ctrl).await
-                {
-                    cmds.push(cmd)
-                }
+                if let Err(error) = Self::report_backpressure(
+                    self.node.clone(),
+                    &self.cmd_ctrl,
+                    self.cmd_channel.clone(),
+                )
+                .await
+                {}
             }
 
             // Things that should only happen to non elder nodes
@@ -158,9 +168,10 @@ impl FlowCtrl {
                 // if we've passed enough time, section probe
                 if last_section_probe.elapsed() > SECTION_PROBE_INTERVAL {
                     last_section_probe = now;
-                    if let Some(cmd) = Self::probe_the_section(self.node.clone()).await {
-                        cmds.push(cmd);
-                    }
+                    if let Err(error) =
+                        Self::probe_the_section(self.node.clone(), self.cmd_channel.clone()).await
+                    {
+                    };
                 }
 
                 let no_cmds = cmds.is_empty();
@@ -186,35 +197,38 @@ impl FlowCtrl {
             // if we've passed enough time, network probe
             if last_probe.elapsed() > PROBE_INTERVAL {
                 last_probe = now;
-                if let Some(cmd) = Self::probe_the_network(self.node.clone()).await {
-                    cmds.push(cmd);
+                if let Err(error) =
+                    Self::probe_the_network(self.node.clone(), self.cmd_channel.clone()).await
+                {
                 }
             }
 
             // if we've passed enough time, batch outgoing data
             if last_data_batch_check.elapsed() > DATA_BATCH_INTERVAL {
                 last_data_batch_check = now;
-                if let Some(cmd) = match Self::replicate_queued_data(self.node.clone()).await {
-                    Ok(cmd) => cmd,
-                    Err(error) => {
-                        error!("Error handling getting cmds for data queued for replication: {error:?}");
-                        None
-                    }
-                } {
-                    cmds.push(cmd);
+                if let Err(error) =
+                    Self::replicate_queued_data(self.node.clone(), self.cmd_channel.clone()).await
+                {
+                    error!(
+                        "Error handling getting cmds for data queued for replication: {error:?}"
+                    );
                 }
             }
 
             if last_adult_health_check.elapsed() > ADULT_HEALTH_CHECK_INTERVAL {
                 last_adult_health_check = now;
-                let health_cmds = match Self::perform_health_checks(self.node.clone()).await {
-                    Ok(cmds) => cmds,
-                    Err(error) => {
-                        error!("Error handling service msg to perform health check: {error:?}");
-                        vec![]
-                    }
-                };
-                cmds.extend(health_cmds);
+                if let Err(error) =
+                    Self::perform_health_checks(self.node.clone(), self.cmd_channel.clone()).await
+                {
+                }
+                //  {
+                //     Ok(cmds) => cmds,
+                //     Err(error) => {
+                //         error!("Error handling service msg to perform health check: {error:?}");
+                //         vec![]
+                //     }
+                // };
+                // cmds.extend(health_cmds);
             }
 
             // The above health check only queries for chunks
@@ -222,22 +236,28 @@ impl FlowCtrl {
             // track dysfunction
             if last_elder_health_check.elapsed() > ELDER_HEALTH_CHECK_INTERVAL {
                 last_elder_health_check = now;
-                for cmd in Self::health_check_elders_in_section(self.node.clone()).await {
-                    cmds.push(cmd);
-                }
+                if let Err(error) = Self::health_check_elders_in_section(
+                    self.node.clone(),
+                    self.cmd_channel.clone(),
+                )
+                .await
+                {}
             }
 
             if last_vote_check.elapsed() > MISSING_VOTE_INTERVAL {
                 last_vote_check = now;
-                if let Some(cmd) = Self::check_for_missed_votes(self.node.clone()).await {
-                    cmds.push(cmd);
-                };
+                if let Err(error) =
+                    Self::check_for_missed_votes(self.node.clone(), self.cmd_channel.clone()).await
+                {
+                }
             }
 
             if last_dysfunction_check.elapsed() > DYSFUNCTION_CHECK_INTERVAL {
                 last_dysfunction_check = now;
-                let dysf_cmds = Self::check_for_dysfunction(self.node.clone()).await;
-                cmds.extend(dysf_cmds);
+                if let Err(error) =
+                    Self::check_for_dysfunction(self.node.clone(), self.cmd_channel.clone()).await
+                {
+                }
             }
 
             let no_cmds = cmds.is_empty();
@@ -293,7 +313,10 @@ impl FlowCtrl {
     }
 
     /// Initiates and generates all the subsequent Cmds to perform a healthcheck
-    async fn perform_health_checks(node: Arc<RwLock<Node>>) -> Result<Vec<Cmd>> {
+    async fn perform_health_checks(
+        node: Arc<RwLock<Node>>,
+        cmd_channel: mpsc::Sender<Cmd>,
+    ) -> Result<()> {
         info!("Starting to check the section's health");
         let node = node.read().await;
         let our_prefix = node.network_knowledge.prefix();
@@ -317,20 +340,33 @@ impl FlowCtrl {
         let auth = auth(&node, &msg)?;
 
         // generate the cmds, and ensure we go through dysfunction tracking
-        node.handle_valid_service_msg(
-            msg_id,
-            msg,
-            auth,
-            origin,
-            #[cfg(feature = "traceroute")]
-            Traceroute(vec![]),
-        )
-        .await
+        let cmds = node
+            .handle_valid_service_msg(
+                msg_id,
+                msg,
+                auth,
+                origin,
+                #[cfg(feature = "traceroute")]
+                Traceroute(vec![]),
+            )
+            .await?;
+
+        for cmd in cmds {
+            cmd_channel
+                .send(cmd)
+                .await
+                .map_err(|_| Error::CmdSendError)?;
+        }
+
+        Ok(())
     }
 
     /// Generates a probe msg, which goes to a random section in order to
     /// passively maintain network knowledge over time
-    async fn probe_the_network(node: Arc<RwLock<Node>>) -> Option<Cmd> {
+    async fn probe_the_network(
+        node: Arc<RwLock<Node>>,
+        cmd_channel: mpsc::Sender<Cmd>,
+    ) -> Result<()> {
         let node = node.read().await;
         let prefix = node.network_knowledge().prefix();
 
@@ -339,20 +375,27 @@ impl FlowCtrl {
         if !prefix.is_empty() {
             info!("Probing network");
             match node.generate_probe_msg() {
-                Ok(cmd) => Some(cmd),
+                Ok(cmd) => {
+                    cmd_channel
+                        .send(cmd)
+                        .await
+                        .map_err(|_| Error::CmdSendError)?;
+                }
                 Err(error) => {
                     error!("Could not generate probe msg: {error:?}");
-                    None
                 }
             }
-        } else {
-            None
         }
+
+        Ok(())
     }
 
     /// Generates a probe msg, which goes to a random section in order to
     /// passively maintain network knowledge over time
-    async fn probe_the_section(node: Arc<RwLock<Node>>) -> Option<Cmd> {
+    async fn probe_the_section(
+        node: Arc<RwLock<Node>>,
+        cmd_channel: mpsc::Sender<Cmd>,
+    ) -> Result<()> {
         let node = node.read().await;
 
         // Send a probe message to an elder
@@ -362,16 +405,22 @@ impl FlowCtrl {
 
         // Send a probe message to an elder
         if !prefix.is_empty() {
-            Some(node.generate_section_probe_msg())
-        } else {
-            None
+            cmd_channel
+                .send(node.generate_section_probe_msg())
+                .await
+                .map_err(|_| Error::CmdSendError)?;
         }
+
+        Ok(())
     }
 
     /// Generates a probe msg, which goes to all section elders in order to
     /// passively maintain network knowledge over time and track dysfunction
     /// Tracking dysfunction while awaiting a response
-    async fn health_check_elders_in_section(node: Arc<RwLock<Node>>) -> Vec<Cmd> {
+    async fn health_check_elders_in_section(
+        node: Arc<RwLock<Node>>,
+        cmd_channel: mpsc::Sender<Cmd>,
+    ) -> Result<()> {
         let mut cmds = vec![];
         let node = node.read().await;
 
@@ -391,11 +440,21 @@ impl FlowCtrl {
         // Send a probe message to an elder
         cmds.push(node.generate_section_probe_msg());
 
-        cmds
+        for cmd in cmds {
+            cmd_channel
+                .send(cmd)
+                .await
+                .map_err(|_| Error::CmdSendError)?;
+        }
+
+        Ok(())
     }
 
     /// Checks the interval since last vote received during a generation
-    async fn check_for_missed_votes(node: Arc<RwLock<Node>>) -> Option<Cmd> {
+    async fn check_for_missed_votes(
+        node: Arc<RwLock<Node>>,
+        cmd_channel: mpsc::Sender<Cmd>,
+    ) -> Result<()> {
         info!("Checking for missed votes");
         let node = node.read().await;
         let membership = &node.membership;
@@ -407,16 +466,24 @@ impl FlowCtrl {
                 // we want to resend the prev vote
                 if time.elapsed() >= MISSING_VOTE_INTERVAL {
                     debug!("Vote consensus appears stalled...");
-                    return node.resend_our_last_vote_to_elders().await;
+                    if let Some(cmd) = node.resend_our_last_vote_to_elders().await {
+                        cmd_channel
+                            .send(cmd)
+                            .await
+                            .map_err(|_| Error::CmdSendError)?;
+                    }
                 }
             }
         }
 
-        None
+        Ok(())
     }
 
     /// Periodically loop over any pending data batches and queue up `send_msg` for those
-    async fn replicate_queued_data(node: Arc<RwLock<Node>>) -> Result<Option<Cmd>> {
+    async fn replicate_queued_data(
+        node: Arc<RwLock<Node>>,
+        cmd_channel: mpsc::Sender<Cmd>,
+    ) -> Result<()> {
         info!("Starting sending any queued data for replication in batches");
 
         use rand::seq::IteratorRandom;
@@ -450,7 +517,7 @@ impl FlowCtrl {
                 debug!("Data queued to be replicated");
 
                 if data_recipients.is_empty() {
-                    return Ok(None);
+                    return Ok(());
                 }
 
                 let data_to_send = node
@@ -469,18 +536,23 @@ impl FlowCtrl {
 
                 let msg = SystemMsg::NodeCmd(NodeCmd::ReplicateData(vec![data_to_send]));
                 let node = node.read().await;
-                return Ok(Some(
-                    node.send_system_msg(msg, Peers::Multiple(data_recipients)),
-                ));
+                let cmd = node.send_system_msg(msg, Peers::Multiple(data_recipients));
+                cmd_channel
+                    .send(cmd)
+                    .await
+                    .map_err(|_| Error::CmdSendError)?;
             }
         }
 
-        Ok(None)
+        Ok(())
     }
 
-    async fn check_for_dysfunction(node: Arc<RwLock<Node>>) -> Vec<Cmd> {
+    async fn check_for_dysfunction(
+        node: Arc<RwLock<Node>>,
+        cmd_channel: mpsc::Sender<Cmd>,
+    ) -> Result<()> {
         info!("Performing dysfunction checking");
-        let mut cmds = vec![];
+        // let mut cmds = vec![];
         let dysfunctional_nodes = node.write().await.get_dysfunctional_node_names();
         let unresponsive_nodes = match dysfunctional_nodes {
             Ok(nodes) => nodes,
@@ -493,12 +565,18 @@ impl FlowCtrl {
         if !unresponsive_nodes.is_empty() {
             debug!("{:?} : {unresponsive_nodes:?}", LogMarker::ProposeOffline);
             for name in &unresponsive_nodes {
-                cmds.push(Cmd::TellEldersToStartConnectivityTest(*name))
+                cmd_channel
+                    .send(Cmd::TellEldersToStartConnectivityTest(*name))
+                    .await
+                    .map_err(|_| Error::CmdSendError)?;
             }
-            cmds.push(Cmd::ProposeOffline(unresponsive_nodes))
+            cmd_channel
+                .send(Cmd::ProposeOffline(unresponsive_nodes))
+                .await
+                .map_err(|_| Error::CmdSendError)?;
         }
 
-        cmds
+        Ok(())
     }
 
     /// Periodically send back-pressure reports to our section.
@@ -509,7 +587,11 @@ impl FlowCtrl {
     /// know about our load just now. Though that would only be AE messages... and if backpressure is working we should
     /// not be overloaded...
     #[cfg(feature = "back-pressure")]
-    async fn report_backpressure(the_node: Arc<RwLock<Node>>, cmd_ctrl: &CmdCtrl) -> Option<Cmd> {
+    async fn report_backpressure(
+        the_node: Arc<RwLock<Node>>,
+        cmd_ctrl: &CmdCtrl,
+        cmd_channel: mpsc::Sender<Cmd>,
+    ) -> Result<()> {
         info!("Firing off backpressure reports");
         let node = the_node.read().await;
         let our_info = node.info();
@@ -526,14 +608,22 @@ impl FlowCtrl {
                 Peers::Multiple(members),
             );
 
-            Some(cmd)
-        } else {
-            None
+            cmd_channel
+                .send(cmd)
+                .await
+                .map_err(|_| Error::CmdSendError)?;
         }
+
+        Ok(())
     }
 
     // Listen for a new incoming connection event and handle it.
-    async fn handle_new_msg_event(&self, node_info: NodeInfo, event: MsgEvent) -> Cmd {
+    async fn handle_new_msg_event(
+        &self,
+        node_info: NodeInfo,
+        event: MsgEvent,
+        cmd_channel: mpsc::Sender<Cmd>,
+    ) -> Result<()> {
         match event {
             MsgEvent::Received {
                 sender,
@@ -566,11 +656,16 @@ impl FlowCtrl {
                     wire_msg
                 };
 
-                Cmd::ValidateMsg {
-                    origin: sender,
-                    wire_msg,
-                    original_bytes,
-                }
+                cmd_channel
+                    .send(Cmd::ValidateMsg {
+                        origin: sender,
+                        wire_msg,
+                        original_bytes,
+                    })
+                    .await
+                    .map_err(|_| Error::CmdSendError)?;
+
+                Ok(())
             }
         }
     }
