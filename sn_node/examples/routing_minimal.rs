@@ -225,7 +225,7 @@ async fn handle_event(index: usize, node: &mut NodeApi, event: Event) -> bool {
             MemberLeft { name, age } => {
                 info!("Node #{} member left - name: {}, age: {}", index, name, age);
             }
-            ChurnJoinMissError => {
+            RemovedFromSection => {
                 info!("Node #{} detected churn join miss and will restart", index);
             }
             SectionSplit {
