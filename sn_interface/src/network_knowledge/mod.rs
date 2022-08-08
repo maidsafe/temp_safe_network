@@ -336,24 +336,18 @@ impl NetworkKnowledge {
     /// Given a `NodeMsg` can we trust it (including verifying contents of an AE message)
     pub fn verify_node_msg_can_be_trusted(
         msg_authority: NodeMsgAuthority,
-        msg: SystemMsg,
+        msg: &SystemMsg,
         known_keys: &[BlsPublicKey],
     ) -> bool {
         if !msg_authority.verify_src_section_key_is_known(known_keys) {
             // In case the incoming message itself is trying to update our knowledge,
             // it shall be allowed.
-            if let SystemMsg::AntiEntropyUpdate {
-                ref proof_chain, ..
-            } = msg
-            {
+            if let SystemMsg::AntiEntropy { proof_chain, .. } = &msg {
                 // The attached chain shall contains a key known to us
                 if !proof_chain.check_trust(known_keys) {
                     return false;
                 } else {
-                    trace!(
-                        "Allows AntiEntropyUpdate msg({:?}) ahead of our knowledge",
-                        msg,
-                    );
+                    trace!("Allows AntiEntropyUpdate msg({msg:?}) ahead of our knowledge");
                 }
             } else {
                 return false;
