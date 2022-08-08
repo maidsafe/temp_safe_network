@@ -241,8 +241,49 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         let snapshot = self.state_snapshot();
 
-        self.update_network_knowledge(section_auth.clone(), section_signed, proof_chain, sender)
-            .await?;
+        info!("Anti-Entropy: message received from peer: {sender}");
+
+        let signed_sap = SectionAuth {
+            value: section_auth.clone(),
+            sig: section_signed.clone(),
+        };
+        let our_name = self.info().name();
+
+        // Update our network knowledge
+        let there_was_an_update = self.network_knowledge.update_knowledge_if_valid(
+            signed_sap.clone(),
+            &proof_chain,
+            None,
+            &our_name,
+            &self.section_keys_provider,
+        )?;
+
+        if there_was_an_update {
+            let prefix = section_auth.prefix();
+
+            self.write_prefix_map().await;
+
+            info!(
+                "PrefixMap written to disk with update for prefix {:?}",
+                prefix
+            );
+
+            // check for churn join miss
+            let is_in_current_section = section_auth
+                .members()
+                .any(|node_state| node_state.peer() == &self.info().peer());
+            let prefix_matches_our_name = prefix.matches(&our_name);
+            let equal_prefix = section_auth.prefix() == snapshot.prefix;
+            let is_extension_prefix = section_auth.prefix().is_extension_of(&snapshot.prefix);
+            let was_in_ancestor_section = equal_prefix || is_extension_prefix;
+
+            if was_in_ancestor_section && prefix_matches_our_name && !is_in_current_section {
+                error!("Detected churn join miss while processing AE, was in section {:?}, updated to {:?}, wasn't in members anymore even if name matches: {:?}", snapshot.prefix, prefix, our_name);
+                self.send_event(Event::Membership(MembershipEvent::ChurnJoinMissError))
+                    .await;
+                return Err(Error::ChurnJoinMiss);
+            }
+        }
 
         let (msg_to_resend, msg_id, dst) = match WireMsg::deserialize(bounced_msg)? {
             MsgType::System {
@@ -296,8 +337,47 @@ impl Node {
         sender: Peer,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
-        self.update_network_knowledge(section_auth.clone(), section_signed, section_chain, sender)
-            .await?;
+        let snapshot = self.state_snapshot();
+        info!("Anti-Entropy: message received from peer: {sender}");
+
+        let signed_sap = SectionAuth {
+            value: section_auth.clone(),
+            sig: section_signed.clone(),
+        };
+        let our_name = self.info().name();
+
+        // Update our network knowledge
+        let there_was_an_update = self.network_knowledge.update_knowledge_if_valid(
+            signed_sap.clone(),
+            &section_chain,
+            None,
+            &our_name,
+            &self.section_keys_provider,
+        )?;
+
+        if there_was_an_update {
+            self.write_prefix_map().await;
+            info!(
+                "PrefixMap written to disk with update for prefix {:?}",
+                section_auth.prefix()
+            );
+
+            // check for churn join miss
+            let is_in_current_section = section_auth
+                .members()
+                .any(|node_state| node_state.peer() == &self.info().peer());
+            let prefix_matches_our_name = section_auth.prefix().matches(&our_name);
+            let equal_prefix = section_auth.prefix() == snapshot.prefix;
+            let is_extension_prefix = section_auth.prefix().is_extension_of(&snapshot.prefix);
+            let was_in_ancestor_section = equal_prefix || is_extension_prefix;
+
+            if was_in_ancestor_section && prefix_matches_our_name && !is_in_current_section {
+                error!("Detected churn join miss while processing AE, was in section {:?}, updated to {:?}, wasn't in members anymore even if name matches: {:?}", snapshot.prefix, section_auth.prefix(), our_name);
+                self.send_event(Event::Membership(MembershipEvent::ChurnJoinMissError))
+                    .await;
+                return Err(Error::ChurnJoinMiss);
+            }
+        }
 
         let (msg_to_redirect, msg_id, dst) = match WireMsg::deserialize(bounced_msg)? {
             MsgType::System {
@@ -352,60 +432,6 @@ impl Node {
             self.send_system_msg(msg_to_redirect, Peers::Single(chosen_dst_elder))
         };
         Ok(vec![msg])
-    }
-
-    // Try to update network knowledge and return the 'SystemMsg' that needs to be resent.
-    async fn update_network_knowledge(
-        &mut self,
-        section_auth: SectionAuthorityProvider,
-        section_signed: KeyedSig,
-        proof_chain: SecuredLinkedList,
-        sender: Peer,
-    ) -> Result<()> {
-        info!("Anti-Entropy: message received from peer: {sender}");
-
-        let prefix = section_auth.prefix();
-        let signed_sap = SectionAuth {
-            value: section_auth.clone(),
-            sig: section_signed.clone(),
-        };
-        let our_name = self.info().name();
-        let our_section_prefix = self.network_knowledge.prefix();
-
-        // Update our network knowledge
-        let there_was_an_update = self.network_knowledge.update_knowledge_if_valid(
-            signed_sap.clone(),
-            &proof_chain,
-            None,
-            &our_name,
-            &self.section_keys_provider,
-        )?;
-
-        if there_was_an_update {
-            self.write_prefix_map().await;
-            info!(
-                "PrefixMap written to disk with update for prefix {:?}",
-                prefix
-            );
-
-            // check for churn join miss
-            let is_in_current_section = section_auth
-                .members()
-                .any(|node_state| node_state.peer() == &self.info().peer());
-            let prefix_matches_our_name = prefix.matches(&our_name);
-            let equal_prefix = section_auth.prefix() == our_section_prefix;
-            let is_extension_prefix = section_auth.prefix().is_extension_of(&our_section_prefix);
-            let was_in_ancestor_section = equal_prefix || is_extension_prefix;
-
-            if was_in_ancestor_section && prefix_matches_our_name && !is_in_current_section {
-                error!("Detected churn join miss while processing AE, was in section {:?}, updated to {:?}, wasn't in members anymore even if name matches: {:?}", our_section_prefix, prefix, our_name);
-                self.send_event(Event::Membership(MembershipEvent::ChurnJoinMissError))
-                    .await;
-                return Err(Error::ChurnJoinMiss);
-            }
-        }
-
-        Ok(())
     }
 
     /// Checks AE-BackoffCache for backoff, or creates a new instance

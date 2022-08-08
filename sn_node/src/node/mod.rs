@@ -739,9 +739,9 @@ mod core {
     }
 
     pub(crate) struct StateSnapshot {
-        is_elder: bool,
+        pub(crate) is_elder: bool,
         pub(crate) section_key: bls::PublicKey,
-        prefix: Prefix,
+        pub(crate) prefix: Prefix,
         pub(crate) elders: BTreeSet<XorName>,
     }
 }
