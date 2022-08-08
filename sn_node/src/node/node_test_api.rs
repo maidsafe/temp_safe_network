@@ -59,7 +59,7 @@ impl NodeTestApi {
 
     /// Returns the Section Signed Chain
     pub async fn section_chain(&self) -> SecuredLinkedList {
-        self.node.read().await.section_chain()
+        self.node.read().await.our_section_dag()
     }
 
     /// Returns the Section Chain's genesis key

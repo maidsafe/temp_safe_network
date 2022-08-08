@@ -86,7 +86,7 @@ pub fn elder_count() -> usize {
 /// The section will keep adding nodes when requested by the upper layers, until it can split.
 /// A split happens if both post-split sections would have at least this number of nodes.
 pub fn recommended_section_size() -> usize {
-    2 * crate::network_knowledge::elder_count()
+    2 * elder_count()
 }
 
 /// `SuperMajority` of a given group (i.e. > 2/3)
@@ -141,10 +141,6 @@ pub fn section_has_room_for_node(
 /// Container for storing information about the network, including our own section.
 #[derive(Clone, Debug)]
 pub struct NetworkKnowledge {
-    // TODO: get current section chain from NetworkPrefixMap::sections_dag once RwLock has been
-    // removed; else have to make a lot of fns as async
-    /// Current section chain of our own section, starting from genesis key
-    chain: SecuredLinkedList,
     /// Signed Section Authority Provider
     signed_sap: SectionAuth<SectionAuthorityProvider>,
     /// Members of our section
@@ -172,40 +168,6 @@ impl NetworkKnowledge {
             )));
         }
 
-        // Check the SAP's key is the last key of the section chain
-        if signed_sap.sig.public_key != *chain.last_key() {
-            error!("can't create section: SAP signed with incorrect key");
-            return Err(Error::UntrustedSectionAuthProvider(format!(
-                "section key doesn't match last key in proof chain: {:?}",
-                signed_sap.value
-            )));
-        }
-
-        // Check if SAP signature is valid
-        if !signed_sap.self_verify() {
-            return Err(Error::UntrustedSectionAuthProvider(format!(
-                "invalid signature: {:?}",
-                signed_sap.value
-            )));
-        }
-
-        // Check if SAP's section key matches SAP signature's key
-        if signed_sap.sig.public_key != signed_sap.section_key() {
-            return Err(Error::UntrustedSectionAuthProvider(format!(
-                "section key doesn't match signature's key: {:?}",
-                signed_sap.value
-            )));
-        }
-
-        // Make sure the section chain can be trusted, i.e. check that
-        // each key is signed by its parent/predecessor key.
-        if !chain.self_verify() {
-            return Err(Error::UntrustedProofChain(format!(
-                "invalid chain: {:?}",
-                chain
-            )));
-        }
-
         // Check if the genesis key in the provided prefix_map matches ours.
         // If no prefix map was provided, start afresh.
         let mut prefix_map = match passed_prefix_map {
@@ -222,11 +184,10 @@ impl NetworkKnowledge {
         // At this point we know the prefix map corresponds to the correct genesis key,
         // let's make sure the prefix map contains also our own prefix and SAP,
         if let Err(err) = prefix_map.update(signed_sap.clone(), &chain) {
-            debug!("Failed to update NetworkPrefixMap with SAP {:?} and chain {:?} upon creating new NetworkKnowledge intance: {:?}", signed_sap, chain, err);
+            debug!("Failed to update NetworkPrefixMap with SAP {:?} and chain {:?} upon creating new NetworkKnowledge instance: {:?}", signed_sap, chain, err);
         }
 
         Ok(Self {
-            chain: chain.clone(),
             signed_sap,
             section_peers: SectionPeers::default(),
             prefix_map,
@@ -234,14 +195,10 @@ impl NetworkKnowledge {
     }
 
     /// update all section info for our new section
-    pub fn relocated_to(&mut self, new_network_nowledge: Self) -> Result<()> {
-        debug!("Node was relocated to {:?}", new_network_nowledge);
-
-        self.chain = new_network_nowledge.section_chain();
-
-        self.signed_sap = new_network_nowledge.signed_sap();
-
-        let _updated = self.merge_members(new_network_nowledge.section_signed_members())?;
+    pub fn relocated_to(&mut self, new_network_knowledge: Self) -> Result<()> {
+        debug!("Node was relocated to {:?}", new_network_knowledge);
+        self.signed_sap = new_network_knowledge.signed_sap();
+        let _updated = self.merge_members(new_network_knowledge.section_signed_members())?;
 
         Ok(())
     }
@@ -309,7 +266,6 @@ impl NetworkKnowledge {
                         // Let's then update our current SAP and section chain
                         let our_prev_prefix = self.prefix();
                         self.signed_sap = signed_sap.clone();
-                        self.chain = section_chain;
 
                         info!("Switched our section's SAP ({our_prev_prefix:?} to {prefix:?}) with new one: {signed_sap:?}");
 
@@ -404,7 +360,7 @@ impl NetworkKnowledge {
                 );
 
                 // if we're an adult, we accept the validated sap
-                // if we have a keyshare, we're an eder and we shoud continue with this validated sap
+                // if we have a keyshare, we're an eder and we should continue with this validated sap
                 // if we are an elder candidate, only switch to the new sap when have the key share
                 let switch_to_new_sap =
                     we_have_a_share_of_this_key || (we_are_an_adult && !we_should_become_an_elder);
@@ -443,9 +399,8 @@ impl NetworkKnowledge {
                     // Prune list of archived members
                     self.section_peers.prune_members_archive(&section_chain);
 
-                    // Switch to new SAP and chain.
+                    // Switch to new SAP
                     self.signed_sap = signed_sap;
-                    self.chain = section_chain;
                 }
             }
             Ok(false) => {
@@ -532,7 +487,6 @@ impl NetworkKnowledge {
     // Try to merge this `NetworkKnowledge` members with `peers`.
     pub fn merge_members(&self, peers: BTreeSet<SectionAuth<NodeState>>) -> Result<bool> {
         let mut there_was_an_update = false;
-        let chain = self.chain.clone();
 
         for node_state in peers.iter() {
             trace!(
@@ -540,7 +494,7 @@ impl NetworkKnowledge {
                 node_state.name(),
                 node_state.state()
             );
-            if !node_state.verify(&chain) {
+            if !node_state.verify(&self.our_section_dag()) {
                 error!(
                     "Can't update section member, name: {:?}, new state: {:?}",
                     node_state.name(),
@@ -564,9 +518,8 @@ impl NetworkKnowledge {
             node_state.state()
         );
 
-        let the_chain = self.section_chain();
         // let's check the node state is properly signed by one of the keys in our chain
-        if !node_state.verify(&the_chain) {
+        if !node_state.verify(&self.our_section_dag()) {
             error!(
                 "Can't update section member, name: {node_name:?}, new state: {:?}",
                 node_state.state()
@@ -580,15 +533,21 @@ impl NetworkKnowledge {
         updated
     }
 
-    /// Return a copy of our section chain
-    pub fn section_chain(&self) -> SecuredLinkedList {
-        self.chain.clone()
+    /// Return a copy of our section_dag
+    pub fn our_section_dag(&self) -> SecuredLinkedList {
+        self.get_proof_chain_to_current(self.genesis_key())
+            // will never be an error since we will always have signed_sap's key in prefix map and
+            // also keep the fields in sync
+            .unwrap_or_else(|_| SecuredLinkedList::new(*self.genesis_key()))
     }
 
     /// Generate a proof chain from the provided key to our current section key
     pub fn get_proof_chain_to_current(&self, from_key: &BlsPublicKey) -> Result<SecuredLinkedList> {
         let our_section_key = self.signed_sap.section_key();
-        let proof_chain = self.chain.get_proof_chain(from_key, &our_section_key)?;
+        let proof_chain = self
+            .prefix_map
+            .get_sections_dag()
+            .get_proof_chain(from_key, &our_section_key)?;
 
         Ok(proof_chain)
     }
@@ -600,17 +559,17 @@ impl NetworkKnowledge {
 
     /// Return current section chain length
     pub fn chain_len(&self) -> u64 {
-        self.chain.main_branch_len() as u64
+        self.our_section_dag().main_branch_len() as u64
     }
 
     /// Return weather current section chain has the provided key
     pub fn has_chain_key(&self, key: &bls::PublicKey) -> bool {
-        self.chain.has_key(key)
+        self.our_section_dag().has_key(key)
     }
 
     /// Return a vec of all known keys
     pub fn known_keys(&self) -> Vec<bls::PublicKey> {
-        let mut known_keys: Vec<_> = self.section_chain().keys().copied().collect();
+        let mut known_keys: Vec<_> = self.our_section_dag().keys().copied().collect();
         known_keys.extend(self.prefix_map().section_keys());
         known_keys.push(*self.genesis_key());
         known_keys
