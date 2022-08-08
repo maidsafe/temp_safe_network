@@ -22,6 +22,7 @@ use self::{
     peer_session::{PeerSession, SendStatus, SendWatcher},
 };
 
+use crate::log_sleep;
 use crate::node::{Error, RateLimits, Result};
 
 use sn_interface::{
@@ -287,7 +288,7 @@ impl Comm {
                     // transient connection issue. We don't treat this as a failed recipient, but we sleep a little longer here.
                     // Retries are managed by the peer session, where it will open a new connection.
                     debug!("Transient error when sending to peer {}: {}", peer, error);
-                    tokio::time::sleep(Duration::from_millis(200)).await;
+                    log_sleep!(Duration::from_millis(200));
                     continue; // moves on to awaiting a new change
                 }
                 SendStatus::MaxRetriesReached => {

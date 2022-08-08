@@ -8,7 +8,7 @@
 
 use super::Link;
 
-use crate::node::Result;
+use crate::{log_sleep, node::Result};
 
 use qp2p::RetryConfig;
 use sn_interface::messaging::MsgId;
@@ -200,8 +200,7 @@ impl PeerSessionWorker {
         let actual_rate = self.attempted.value();
         if actual_rate > self.peer_desired_rate {
             let diff = actual_rate - self.peer_desired_rate;
-            let diff_ms = Duration::from_millis((diff * 10_f64) as u64);
-            tokio::time::sleep(diff_ms).await;
+            log_sleep!(Duration::from_millis((diff * 10_f64) as u64));
         }
 
         self.attempted.increment(); // both on fail and success

@@ -9,6 +9,7 @@
 use super::UsedRecipientSaps;
 
 use crate::comm::{Comm, MsgEvent};
+use crate::log_sleep;
 use crate::node::{messages::WireMsgUtils, Error, Result};
 
 use sn_interface::{
@@ -30,7 +31,7 @@ use resource_proof::ResourceProof as ChallengeSolver;
 use std::net::SocketAddr;
 use tokio::{
     sync::mpsc,
-    time::{sleep, Duration, Instant},
+    time::{Duration, Instant},
 };
 use tracing::Instrument;
 use xor_name::Prefix;
@@ -402,10 +403,12 @@ impl<'a> Joiner<'a> {
             let next_wait = self.backoff.next_backoff();
 
             if let Some(wait) = next_wait {
-                sleep(wait).await;
+                log_sleep!(Duration::from_millis(wait.as_millis() as u64));
             } else {
                 error!("Waiting before attempting to join again");
-                sleep(self.backoff.max_interval).await;
+                log_sleep!(Duration::from_millis(
+                    self.backoff.max_interval.as_millis() as u64
+                ));
                 self.backoff.reset();
             }
         }
