@@ -28,7 +28,6 @@ use sn_interface::{
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
-use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
 use std::{collections::BTreeSet, time::Duration};
 use xor_name::{Prefix, XorName};
@@ -301,17 +300,10 @@ impl Node {
         // We choose the Elder closest to the dst section key,
         // just to pick one of them in an arbitrary but deterministic fashion.
         let target_name = XorName::from(PublicKey::Bls(dst_section_key));
-        let chosen_dst_elder = section_auth
-            .elders()
-            .sorted_by(|lhs, rhs| target_name.cmp_distance(&lhs.name(), &rhs.name()))
-            .peekable()
-            .peek()
-            .copied()
-            .copied();
 
         let to_resend = self
             .update_network_knowledge(
-                section_auth,
+                section_auth.clone(),
                 section_signed,
                 section_chain,
                 bounced_msg,
@@ -319,43 +311,41 @@ impl Node {
             )
             .await?;
 
-        match to_resend {
-            None => Ok(vec![]),
-            Some((msg_to_redirect, msg_id)) => match chosen_dst_elder {
-                None => {
-                    error!(
-                            "Failed to find closest Elder to resend msg ({:?}) upon AE-Redirect response.",
-                            msg_id
-                        );
-                    Ok(vec![])
-                }
-                Some(elder) if elder.addr() == sender.addr() => {
-                    error!(
-                            "Failed to find an alternative Elder to resend msg ({:?}) upon AE-Redirect response.",
-                            msg_id
-                        );
-                    Ok(vec![])
-                }
-                Some(elder) => {
-                    trace!("{}", LogMarker::AeResendAfterAeRedirect);
+        let (msg_to_redirect, msg_id) = if let Some((msg, id)) = to_resend {
+            (msg, id)
+        } else {
+            return Ok(vec![]);
+        };
 
-                    self.create_or_wait_for_backoff(&elder).await;
+        let chosen_dst_elder = if let Some(dst) = section_auth
+            .elders()
+            .max_by(|lhs, rhs| target_name.cmp_distance(&lhs.name(), &rhs.name()))
+        {
+            *dst
+        } else {
+            error!("Failed to find closest Elder to resend msg ({msg_id:?}) upon AE-Redirect response.");
+            return Ok(vec![]);
+        };
 
-                    if cfg!(feature = "traceroute") {
-                        Ok(vec![self.trace_system_msg(
-                            msg_to_redirect,
-                            Peers::Single(elder),
-                            #[cfg(feature = "traceroute")]
-                            traceroute,
-                        )])
-                    } else {
-                        Ok(vec![
-                            self.send_system_msg(msg_to_redirect, Peers::Single(elder))
-                        ])
-                    }
-                }
-            },
+        if chosen_dst_elder.addr() == sender.addr() {
+            error!("Failed to find an alternative Elder to resend msg ({msg_id:?}) upon AE-Redirect response.");
+            return Ok(vec![]);
         }
+        trace!("{}", LogMarker::AeResendAfterAeRedirect);
+
+        self.create_or_wait_for_backoff(&chosen_dst_elder).await;
+
+        let msg = if cfg!(feature = "traceroute") {
+            self.trace_system_msg(
+                msg_to_redirect,
+                Peers::Single(chosen_dst_elder),
+                #[cfg(feature = "traceroute")]
+                traceroute,
+            )
+        } else {
+            self.send_system_msg(msg_to_redirect, Peers::Single(chosen_dst_elder))
+        };
+        Ok(vec![msg])
     }
 
     // Try to update network knowledge and return the 'SystemMsg' that needs to be resent.
@@ -377,10 +367,7 @@ impl Node {
             }
         };
 
-        info!(
-            "Anti-Entropy: message received from peer: {}",
-            sender.addr()
-        );
+        info!("Anti-Entropy: message received from peer: {sender}");
 
         let prefix = section_auth.prefix();
         let dst_section_key = section_auth.section_key();
