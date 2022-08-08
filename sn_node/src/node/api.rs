@@ -80,8 +80,8 @@ impl Node {
         &self.network_knowledge
     }
 
-    pub(crate) fn section_chain(&self) -> SecuredLinkedList {
-        self.network_knowledge.section_chain()
+    pub(crate) fn our_section_dag(&self) -> SecuredLinkedList {
+        self.network_knowledge.our_section_dag()
     }
 
     /// Is this node an elder?

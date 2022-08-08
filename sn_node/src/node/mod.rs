@@ -704,7 +704,7 @@ mod core {
                 // In case this assumption is not correct (because we already progressed more than one
                 // key since the split) then this key would be unknown to them and they would send
                 // us back their whole section chain. However, this situation should be rare.
-                *self.network_knowledge.section_chain().prev_key()
+                *self.network_knowledge.our_section_dag().prev_key()
             } else {
                 *self.network_knowledge.genesis_key()
             }

@@ -50,7 +50,7 @@ impl Node {
         }
 
         // The previous PK which is likely what adults know
-        let previous_pk = *self.section_chain().prev_key();
+        let previous_pk = *self.our_section_dag().prev_key();
         Some(self.send_ae_update_to_nodes(recipients, previous_pk))
     }
 
@@ -134,7 +134,7 @@ impl Node {
 
         let proof_chain = dst_section_key
             .and_then(|key| self.network_knowledge.get_proof_chain_to_current(&key).ok())
-            .unwrap_or_else(|| self.network_knowledge.section_chain());
+            .unwrap_or_else(|| self.network_knowledge.our_section_dag());
 
         SystemMsg::AntiEntropy {
             section_auth: signed_sap.value.to_msg(),
@@ -317,14 +317,14 @@ impl Node {
                 .network_knowledge
                 .get_closest_or_opposite_signed_sap(&dst_name)
             {
-                Some((signed_sap, section_chain)) => {
+                Some((signed_sap, section_dag)) => {
                     info!("Found a better matching prefix {:?}", signed_sap.prefix());
                     let bounced_msg = original_bytes;
                     // Redirect to the closest section
                     let ae_msg = SystemMsg::AntiEntropy {
                         section_auth: signed_sap.value.to_msg(),
                         section_signed: signed_sap.sig,
-                        proof_chain: section_chain,
+                        proof_chain: section_dag,
                         kind: AntiEntropyKind::Redirect { bounced_msg },
                     };
 
@@ -605,7 +605,7 @@ mod tests {
 
             assert_matches!(&msg, SystemMsg::AntiEntropy { section_auth, proof_chain, kind: AntiEntropyKind::Retry{..}, .. } => {
                 assert_eq!(section_auth, &env.node.network_knowledge().authority_provider().to_msg());
-                assert_eq!(proof_chain, &env.node.section_chain());
+                assert_eq!(proof_chain, &env.node.our_section_dag());
             });
             Ok(())
         }).await
@@ -647,7 +647,7 @@ mod tests {
 
             assert_matches!(&msg, SystemMsg::AntiEntropy { section_auth, proof_chain, kind: AntiEntropyKind::Retry {..}, .. } => {
                 assert_eq!(*section_auth, env.node.network_knowledge().authority_provider().to_msg());
-                assert_eq!(*proof_chain, env.node.section_chain());
+                assert_eq!(*proof_chain, env.node.our_section_dag());
             });
             Ok(())
         }).await

@@ -135,7 +135,7 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         trace!("{}", LogMarker::HandlingNewEldersAgreement);
         let snapshot = self.state_snapshot();
-        let old_chain = self.section_chain().clone();
+        let old_chain = self.our_section_dag().clone();
 
         let prefix = signed_section_auth.prefix();
         trace!("{}: for {:?}", LogMarker::NewSignedSap, prefix);

@@ -271,7 +271,7 @@ impl Node {
                 .network_knowledge
                 .section_signed_authority_provider()
                 .into_authed_msg(),
-            section_chain: self.network_knowledge.section_chain(),
+            section_chain: self.network_knowledge.our_section_dag(),
             decision,
         }));
 

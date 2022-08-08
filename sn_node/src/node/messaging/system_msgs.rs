@@ -621,7 +621,7 @@ impl Node {
                         "Cannot verify DkgSessionInfo: {:?}. Unknown key: {:?}!",
                         &session_id, auth.sig.public_key
                     );
-                    let chain = self.network_knowledge().section_chain();
+                    let chain = self.network_knowledge().our_section_dag();
                     warn!("Chain: {:?}", chain);
                     return Ok(cmds);
                 };
