@@ -113,9 +113,8 @@ pub enum CmdProcessEvent {
 /// Still mostly used in tests.
 #[derive(custom_debug::Debug)]
 pub enum MembershipEvent {
-    /// Join occured during section churn and new elders missed it,
-    /// therefore the node is not a section member anymore, it needs to rejoin the network.
-    ChurnJoinMissError,
+    /// Node was removed from the section
+    RemovedFromSection,
     /// A new peer joined our section.
     MemberJoined {
         /// Name of the node

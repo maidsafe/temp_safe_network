@@ -368,6 +368,12 @@ mod core {
                 section_key: self.network_knowledge.section_key(),
                 prefix: self.network_knowledge.prefix(),
                 elders: self.network_knowledge().authority_provider().names(),
+                members: self
+                    .network_knowledge()
+                    .members()
+                    .into_iter()
+                    .map(|p| p.name())
+                    .collect(),
             }
         }
 
@@ -748,5 +754,6 @@ mod core {
         pub(crate) section_key: bls::PublicKey,
         pub(crate) prefix: Prefix,
         pub(crate) elders: BTreeSet<XorName>,
+        pub(crate) members: BTreeSet<XorName>,
     }
 }
