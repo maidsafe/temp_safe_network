@@ -251,26 +251,23 @@ impl Node {
             )
             .await?;
 
-        let msg_to_resend = if let Some((msg, _)) = to_resend {
-            msg
-        } else {
-            return Ok(vec![]);
-        };
-
-        // TODO: we may need to check if 'bounced_msg' dst section pk is different
-        // from the received new SAP key, to prevent from endlessly resending a msg
-        // if a sybil/corrupt peer keeps sending us the same AE msg.
-        trace!(
-            "{} resending {msg_to_resend:?}",
-            LogMarker::AeResendAfterRetry
-        );
-
-        self.create_or_wait_for_backoff(&sender).await;
-
         let mut cmds = Vec::new();
         if let Ok(elder_cmds) = self.update_on_elder_change(snapshot).await {
             cmds.extend(elder_cmds);
         }
+
+        let (msg_to_resend, msg_id) = if let Some((msg, id)) = to_resend {
+            (msg, id)
+        } else {
+            return Ok(vec![]);
+        };
+
+        self.create_or_wait_for_backoff(&sender).await;
+
+        // TODO: we may need to check if 'bounced_msg' dst section pk is different
+        // from the received new SAP key, to prevent from endlessly resending a msg
+        // if a sybil/corrupt peer keeps sending us the same AE msg.
+        trace!("{} resending {msg_id:?}", LogMarker::AeResendAfterRetry);
 
         if cfg!(feature = "traceroute") {
             cmds.push(self.trace_system_msg(
@@ -327,13 +324,14 @@ impl Node {
             return Ok(vec![]);
         };
 
-        if chosen_dst_elder.addr() == sender.addr() {
+        if chosen_dst_elder.name() == sender.name() {
             error!("Failed to find an alternative Elder to resend msg ({msg_id:?}) upon AE-Redirect response.");
             return Ok(vec![]);
         }
-        trace!("{}", LogMarker::AeResendAfterAeRedirect);
 
         self.create_or_wait_for_backoff(&chosen_dst_elder).await;
+
+        trace!("{}", LogMarker::AeResendAfterAeRedirect);
 
         let msg = if cfg!(feature = "traceroute") {
             self.trace_system_msg(
