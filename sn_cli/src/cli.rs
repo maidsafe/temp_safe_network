@@ -30,11 +30,7 @@ use color_eyre::{eyre::eyre, Result};
 use sn_api::{Safe, XorUrlBase};
 use std::env;
 use std::path::PathBuf;
-use std::time::Duration;
 use tracing::debug;
-
-const DEFAULT_OPERATION_TIMEOUT_SECS: u64 = 120; // 2mins
-const SN_CLI_QUERY_TIMEOUT: &str = "SN_CLI_QUERY_TIMEOUT";
 
 #[derive(clap::StructOpt, Debug)]
 /// Interact with the Safe Network
@@ -128,23 +124,7 @@ pub async fn run() -> Result<()> {
             // otherwise the connection created will be with read-only access and some
             // of these commands will fail if they require write access.
             if !safe.dry_run_mode {
-                let timeout_secs: u64 = match env::var(SN_CLI_QUERY_TIMEOUT) {
-                    Ok(timeout) => timeout.parse::<u64>().map_err(|_| {
-                        eyre!(
-                            "Could not parse {} env var value: {}",
-                            SN_CLI_QUERY_TIMEOUT,
-                            timeout
-                        )
-                    })?,
-                    Err(_) => DEFAULT_OPERATION_TIMEOUT_SECS,
-                };
-
-                connect(
-                    &mut safe,
-                    &get_config().await?,
-                    Duration::from_secs(timeout_secs),
-                )
-                .await?;
+                connect(&mut safe, &get_config().await?).await?;
             }
 
             match other {
