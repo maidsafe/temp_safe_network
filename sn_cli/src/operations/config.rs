@@ -199,6 +199,16 @@ impl Config {
 
     /// Sync settings and the prefix_map_dir
     pub async fn sync(&mut self) -> Result<()> {
+        // if default hardlink is present, make sure its original file is also present; Else the
+        // default hardlink might be overwritten while switching networks
+        if let Ok(default_prefix) = self.read_default_prefix_map().await {
+            let path = self
+                .prefix_maps_dir
+                .clone()
+                .join(format!("{:?}", default_prefix.genesis_key()));
+            Self::write_prefix_map(&path, &default_prefix).await?;
+        };
+
         let mut dir_files_checklist: BTreeMap<String, bool> = BTreeMap::new();
         let mut prefix_maps_dir = fs::read_dir(&self.prefix_maps_dir).await?;
         while let Some(entry) = prefix_maps_dir.next_entry().await? {
@@ -915,6 +925,7 @@ mod sync_prefix_maps_and_settings {
     use crate::operations::config::{test_utils::store_dummy_prefix_maps, NetworkInfo, Settings};
     use color_eyre::eyre::eyre;
     use color_eyre::Result;
+    use sn_api::DEFAULT_PREFIX_HARDLINK_NAME;
     use tokio::fs;
 
     #[tokio::test]
@@ -1118,9 +1129,43 @@ mod sync_prefix_maps_and_settings {
                 .join(format!("{:?}", prefix_map.genesis_key())),
         )
         .await?;
+        fs::remove_file(config.prefix_maps_dir.join(DEFAULT_PREFIX_HARDLINK_NAME)).await?;
         config.sync().await?;
         assert_eq!(config.settings.networks.len(), 0);
         config.compare_settings_and_prefix_maps_dir().await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn original_file_of_the_default_hardlink_should_be_written() -> Result<()> {
+        // Switching networks can overwrite the default hardlink, so we make sure we have a copy
+        // of the default prefix map.
+        let tmp_dir = assert_fs::TempDir::new()?;
+        let mut config = Config::create_config(&tmp_dir, None).await?;
+        let prefix_map = config
+            .store_dummy_prefix_maps_and_set_default(1)
+            .await?
+            .pop()
+            .unwrap();
+        fs::remove_file(
+            config
+                .prefix_maps_dir
+                .join(format!("{:?}", prefix_map.genesis_key())),
+        )
+        .await?;
+
+        config.sync().await?;
+        assert_eq!(config.settings.networks.len(), 1);
+        let (network_name, network_info) = config
+            .networks_iter()
+            .next()
+            .ok_or_else(|| eyre!("failed to obtain item from networks list"))?;
+        assert_eq!(*network_name, format!("{:?}", prefix_map.genesis_key()));
+        assert!(matches!(
+            network_info,
+            NetworkInfo::Local(_, Some(genesis_key)) if genesis_key == prefix_map.genesis_key()
+        ));
 
         Ok(())
     }
