@@ -78,7 +78,8 @@ pub fn node_run(
     let mut sn_launch_tool_args =
         get_initial_sn_launch_args(node_directory_path, node_data_dir_name)?;
     sn_launch_tool_args.push("--interval".to_string());
-    sn_launch_tool_args.push(interval.clone().to_string());
+    let interval_msecs = 1000 * interval;
+    sn_launch_tool_args.push(interval_msecs.to_string());
     sn_launch_tool_args.push("--num-nodes".to_string());
     sn_launch_tool_args.push(num_of_nodes.to_string());
     if let Some(launch_ip) = ip {
@@ -102,6 +103,7 @@ pub fn node_join(
     clear_data: bool,
     local: bool,
     disable_port_forwarding: bool,
+    network_contacts_file: PathBuf,
 ) -> Result<()> {
     let mut sn_launch_tool_args =
         get_initial_sn_launch_args(node_directory_path, node_data_dir_name)?;
@@ -129,6 +131,9 @@ pub fn node_join(
         verbosity_arg.push_str(&v);
         sn_launch_tool_args.push(verbosity_arg);
     }
+
+    sn_launch_tool_args.push("--network-contacts-file".to_string());
+    sn_launch_tool_args.push(network_contacts_file.display().to_string());
 
     network_launcher.join(sn_launch_tool_args)?;
     Ok(())

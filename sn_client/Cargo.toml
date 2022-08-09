@@ -96,7 +96,7 @@ grep="~0.2.8"
 proptest = "1.0.0"
 rand = { version = "~0.8.5", features = ["small_rng"] }
 rand_xorshift = "~0.2.0"
-sn_launch_tool = "~0.11.0"
+sn_launch_tool = "~0.11.1"
 termcolor="1.1.2"
 tiny-keccak = { version = "2.0.2", features = ["sha3"] }
 tokio-util = { version = "~0.6.7", features = ["time"] }

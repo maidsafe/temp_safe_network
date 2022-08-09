@@ -171,6 +171,9 @@ pub async fn node_commander(
                 path.push("node");
                 path
             };
+
+            let default_prefix_map_path = config.prefix_maps_dir.join(DEFAULT_PREFIX_HARDLINK_NAME);
+
             node_join(
                 network_launcher,
                 node_directory_path,
@@ -181,6 +184,7 @@ pub async fn node_commander(
                 clear_data,
                 local,
                 disable_port_forwarding,
+                default_prefix_map_path,
             )
         }
         Some(NodeSubCommands::Run {
@@ -443,7 +447,7 @@ mod run_command {
 
         assert!(result.is_ok());
         assert!(launcher.launch_args.iter().any(|x| x == "--interval"));
-        assert!(launcher.launch_args.iter().any(|x| x == "10"));
+        assert!(launcher.launch_args.iter().any(|x| x == "10000"));
 
         Ok(())
     }
