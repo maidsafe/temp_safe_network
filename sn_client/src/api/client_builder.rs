@@ -1,4 +1,19 @@
-///! A builder to instantiate a [`Client`]
+//! A builder to instantiate a [`Client`]
+//!
+//! # Example
+//!
+//! ```no_run
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), sn_client::Error> {
+//! use sn_client::api::Client;
+//! use xor_name::XorName;
+//!
+//! let client = Client::builder().build().await?;
+//! let _bytes = client.read_bytes(XorName::from_content("example".as_bytes())).await?;
+//!
+//! # Ok(())
+//! # }
+//! ```
 use crate::{connections::Session, Client, DEFAULT_PREFIX_HARDLINK_NAME};
 
 use qp2p::Config as Qp2pConfig;
