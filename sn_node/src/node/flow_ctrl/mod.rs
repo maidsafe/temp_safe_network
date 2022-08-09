@@ -45,10 +45,11 @@ const BACKPRESSURE_INTERVAL: Duration = Duration::from_secs(60);
 const SECTION_PROBE_INTERVAL: Duration = Duration::from_secs(300);
 const LINK_CLEANUP_INTERVAL: Duration = Duration::from_secs(120);
 const DATA_BATCH_INTERVAL: Duration = Duration::from_millis(50);
-const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(5);
+const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_millis(50);
 // 30 adult nodes checked per minute., so each node should be queried 10x in 10 mins
 // Which should hopefully trigger dysfunction if we're not getting responses back
-const HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(2);
+const ADULT_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(2);
+const ELDER_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 
 #[derive(Clone)]
 pub(crate) struct FlowCtrl {
@@ -64,6 +65,7 @@ impl FlowCtrl {
         ctrl.clone().start_connection_listening(incoming_conns);
         ctrl.clone().start_network_probing();
         ctrl.clone().start_running_health_checks();
+        ctrl.clone().health_check_elders_in_section();
         ctrl.clone().start_checking_for_missed_votes();
         ctrl.clone().start_section_probing();
         ctrl.clone().start_data_replication();
@@ -118,7 +120,7 @@ impl FlowCtrl {
     fn start_running_health_checks(self) {
         info!("Starting to check the section's health");
         let _handle: JoinHandle<Result<()>> = tokio::task::spawn_local(async move {
-            let mut interval = tokio::time::interval(HEALTH_CHECK_INTERVAL);
+            let mut interval = tokio::time::interval(ADULT_HEALTH_CHECK_INTERVAL);
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
             loop {
@@ -163,6 +165,45 @@ impl FlowCtrl {
 
                 for cmd in cmds {
                     info!("Sending healthcheck chunk query {:?}", msg_id);
+                    if let Err(e) = self.cmd_ctrl.push(cmd).await {
+                        error!("Error sending a health check msg to the network: {:?}", e);
+                    }
+                }
+            }
+        });
+    }
+
+    /// Generates a probe msg, which goes to all section elders in order to
+    /// passively maintain network knowledge over time and track dysfunction
+    /// Tracking dysfunction while awaiting a response
+    fn health_check_elders_in_section(self) {
+        let _handle: JoinHandle<Result<()>> = tokio::task::spawn_local(async move {
+            let mut interval = tokio::time::interval(ELDER_HEALTH_CHECK_INTERVAL);
+            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+            loop {
+                let _instant = interval.tick().await;
+                let node = self.node.read().await;
+                let mut cmds = vec![];
+
+                // Send a probe message to an elder
+                debug!("Going to health check elders");
+
+                let elders = node.network_knowledge.elders();
+                for elder in elders {
+                    // we track a knowledge issue
+                    // whhich is countered when an AE-Update is
+                    cmds.push(Cmd::TrackNodeIssueInDysfunction {
+                        name: elder.name(),
+                        issue: sn_dysfunction::IssueType::AwaitingProbeResponse,
+                    });
+                }
+
+                // Send a probe message to an elder
+                cmds.push(node.generate_section_probe_msg());
+
+                for cmd in cmds {
+                    info!("Sending healthcheck elder probe {:?}", cmd);
                     if let Err(e) = self.cmd_ctrl.push(cmd).await {
                         error!("Error sending a health check msg to the network: {:?}", e);
                     }
