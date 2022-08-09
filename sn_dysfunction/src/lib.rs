@@ -46,7 +46,7 @@ extern crate tracing;
 mod detection;
 mod error;
 
-pub use detection::{DysfunctionSeverity, IssueType};
+pub use detection::IssueType;
 
 pub use crate::error::Error;
 use sn_interface::messaging::data::OperationId;
@@ -162,7 +162,7 @@ impl DysfunctionDetection {
         has_removed
     }
 
-    /// Removes a DKG session from the node liveness records. Returns true if a record was removed
+    /// Removes a DKG session from the node liveness records.
     pub fn dkg_ack_fulfilled(&mut self, node_id: &NodeIdentifier) {
         trace!("Attempting to remove logged dkg session for {:?}", node_id,);
 
@@ -177,7 +177,7 @@ impl DysfunctionDetection {
             }
         }
     }
-    /// Removes a probe tracker from the node liveness records. Returns true if a record was removed
+    /// Removes a probe tracker from the node liveness records.
     pub fn ae_update_msg_received(&mut self, node_id: &NodeIdentifier) {
         trace!(
             "Attempting to remove pending AEProbe response for {:?}",
@@ -314,7 +314,7 @@ mod tests {
         let current_nodes = dysfunctional_detection.current_nodes();
         assert_eq!(current_nodes.len(), 5);
         for member in current_nodes {
-            assert!(nodes_to_retain.contains(&member));
+            assert!(nodes_to_retain.contains(member));
         }
 
         Ok(())

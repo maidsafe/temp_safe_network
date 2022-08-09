@@ -19,16 +19,14 @@ static OUTDATED_PENDING_REQUEST_DURATION: Duration = Duration::from_secs(0);
 #[cfg(not(test))]
 static OUTDATED_PENDING_REQUEST_DURATION: Duration = Duration::from_secs(10);
 
-static CONN_WEIGHTING: f32 = 2.0;
+static CONN_WEIGHTING: f32 = 20.0;
 static OP_WEIGHTING: f32 = 1.0;
-static KNOWLEDGE_WEIGHTING: f32 = 3.0;
-static DKG_WEIGHTING: f32 = 5.0;
-static AE_PROBE_WEIGHTING: f32 = 7.0;
+static KNOWLEDGE_WEIGHTING: f32 = 30.0;
+static DKG_WEIGHTING: f32 = 10.0; // there are quite a lot of DKG msgs that go out atm, so can't weight this too heavily
+static AE_PROBE_WEIGHTING: f32 = 150.0;
 
-static DIFF_THRESHOLD: f32 = 1.0;
-
-/// Z-score value above which a node is dysfunctional
-static DYSFUNCTIONAL_DEVIATION: f32 = 2.0;
+/// Weighted score value above which a node is dysfunctional
+static DYSFUNCTION_SCORE_THRESHOLD: f32 = 500.0;
 
 #[derive(Clone, Debug)]
 /// Represents the different type of issues that can be recorded by the Dysfunction Detection
@@ -56,17 +54,6 @@ pub struct ScoreResults {
     pub probe_scores: BTreeMap<XorName, f32>,
 }
 
-/// Severity of dysfunction... Is it not yet fully dysfunctional? But out of line with neighbours?
-/// Then it's Suspicious, or, if it's gone too far we can check if it's Dysfunctional.
-/// These can be passed in to the `check_for_maliciousness` function.
-#[derive(Debug)]
-pub enum DysfunctionSeverity {
-    /// A node is deemed suspicous (more dysfunction than neighbours, but not yet fully dysfunctional)
-    Suspicious,
-    /// A node is deemed dysfunctional when it is clearly having more issues than it's beighbours
-    Dysfunctional,
-}
-
 impl DysfunctionDetection {
     /// Calculate the scores of all nodes being tracked and return them in a node -> score map.
     /// There is a map for each type of issue.
@@ -83,8 +70,7 @@ impl DysfunctionDetection {
         let mut dkg_scores = BTreeMap::new();
         let mut probe_scores = BTreeMap::new();
 
-        let nodes = &self.nodes;
-        for node in nodes.iter() {
+        for node in &self.nodes {
             let _ = dkg_scores.insert(
                 *node,
                 self.calculate_node_score_for_type(node, &IssueType::Dkg),
@@ -119,7 +105,7 @@ impl DysfunctionDetection {
         }
     }
 
-    /// get the node's score, relaative to the average for all nodes being tracked
+    /// get the node's score, relative to the average for all nodes being tracked
     fn calculate_node_score_for_type(&self, node: &XorName, issue_type: &IssueType) -> f32 {
         let node_issue_count = self.get_node_issue_count_for_type(node, issue_type);
 
@@ -128,7 +114,7 @@ impl DysfunctionDetection {
             return 0.0;
         }
 
-        debug!("node {node} issue count: {:?}", node_issue_count);
+        debug!("node {node} {issue_type:?} count: {:?}", node_issue_count);
         let all_tracked_nodes = &self.nodes;
         let mut other_node_counts = Vec::new();
         for itr in all_tracked_nodes {
@@ -243,23 +229,17 @@ impl DysfunctionDetection {
         let mut final_scores = BTreeMap::default();
 
         for (name, score) in pre_z_scores {
-            let zscore = match (mean, std_dev) {
-                (Some(mean), Some(std_deviation)) => {
-                    let diff = score - mean;
-                    let threshold = if (mean / 2.0) > DIFF_THRESHOLD {
-                        mean / 2.0
-                    } else {
-                        DIFF_THRESHOLD
-                    };
+            let zscore = {
+                // avg score + 1/2 std dev
+                let threshold = (std_dev.unwrap_or(1.0) / 2.0) + mean.unwrap_or(1.0);
 
-                    if diff < threshold {
-                        // small or negative diff mean nodes are doing well
-                        None
-                    } else {
-                        Some(diff / std_deviation)
-                    }
+                if score <= threshold {
+                    // small or negative diff mean nodes are doing well
+                    None
+                } else {
+                    // make the score relative to std_dev of nodes...
+                    Some(score)
                 }
-                _ => None,
             };
 
             debug!("Final Z-score for {name} is {zscore:?}");
@@ -294,10 +274,7 @@ impl DysfunctionDetection {
     /// TODO: order these to act upon _most_ dysfunctional first
     /// (the nodes must all `ProposeOffline` over a dysfunctional node and then _immediately_ vote it off. So any other membershipn changes in flight could block this.
     /// thus, we need to be callling this function often until nodes are removed.)
-    pub fn get_nodes_beyond_severity(
-        &mut self,
-        severity: DysfunctionSeverity,
-    ) -> Result<BTreeSet<XorName>> {
+    pub fn get_dysfunctional_nodes(&mut self) -> Result<BTreeSet<XorName>> {
         self.cleanup_time_sensistive_checks()?;
 
         let mut dysfunctional_nodes = BTreeSet::new();
@@ -306,8 +283,9 @@ impl DysfunctionDetection {
 
         for (name, node_zscore) in final_scores {
             if let Some(z) = node_zscore {
-                if z > DYSFUNCTIONAL_DEVIATION {
-                    info!("DysfunctionDetection: Adding {name} as {severity:?} node");
+                // if our weighted score is higher than this, then we're having a bad time
+                if z > DYSFUNCTION_SCORE_THRESHOLD {
+                    info!("DysfunctionDetection: Adding {name} as dysfuncitonal node");
                     let _existed = dysfunctional_nodes.insert(name);
                 }
             }
@@ -327,9 +305,7 @@ fn rand_op_id() -> OperationId {
 mod tests {
     use itertools::Itertools;
 
-    use crate::{
-        detection::IssueType, tests::init_test_logger, DysfunctionDetection, DysfunctionSeverity,
-    };
+    use crate::{detection::IssueType, tests::init_test_logger, DysfunctionDetection};
     use sn_interface::messaging::data::OperationId;
 
     use eyre::bail;
@@ -448,8 +424,8 @@ mod tests {
                     // 3 x as likely to have good nodes vs bad
                     // good nodes fail only 2.5% of the time
                     3 => Just(NodeQualityScored::Good(0.025)),
-                    // bad nodes fail 90% of the time
-                    1 => Just(NodeQualityScored::Bad(0.90)),
+                    // bad nodes fail 80% of the time
+                    1 => Just(NodeQualityScored::Bad(0.80)),
 
                 ],
             ),
@@ -660,7 +636,7 @@ mod tests {
                     }
                     // now we can see what we have...
                     let dysfunctional_nodes_found = match dysfunctional_detection
-                        .get_nodes_beyond_severity( DysfunctionSeverity::Dysfunctional) {
+                        .get_dysfunctional_nodes() {
                             Ok(nodes) => nodes,
                             Err(error) => bail!("Failed getting dysfunctional nodes from DysfunctionDetector: {error}")
                         };
@@ -754,7 +730,7 @@ mod tests {
                 }
                 // now we can see what we have...
                 let dysfunctional_nodes_found = match dysfunctional_detection
-                    .get_nodes_beyond_severity( DysfunctionSeverity::Dysfunctional) {
+                    .get_dysfunctional_nodes() {
                         Ok(nodes) => nodes,
                         Err(error) => bail!("Failed getting dysfunctional nodes from DysfunctionDetector: {error}")
                     };
@@ -831,7 +807,7 @@ mod tests {
 mod ops_tests {
     use super::*;
 
-    use crate::{error::Result, DysfunctionDetection, DysfunctionSeverity, IssueType};
+    use crate::{error::Result, tests::init_test_logger, DysfunctionDetection, IssueType};
     use xor_name::{rand::random as random_xorname, XorName};
 
     // some example numbers as guidance
@@ -840,6 +816,7 @@ mod ops_tests {
 
     #[tokio::test]
     async fn op_dysfunction() -> Result<()> {
+        init_test_logger();
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
         let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
         let mut pending_operations = Vec::new();
@@ -852,61 +829,32 @@ mod ops_tests {
             }
         }
 
-        assert_eq!(
-            dysfunctional_detection
-                .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)?
-                .len(),
-            0
-        );
-        assert_eq!(
-            dysfunctional_detection
-                .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)?
-                .len(),
-            0
-        );
-
-        // We now wait for a while for the pending operations
-        // to become outdated and counted towards issue score.
-        tokio::time::sleep(OUTDATED_PENDING_REQUEST_DURATION).await;
-        tokio::time::sleep(Duration::from_secs(1)).await;
-        assert_eq!(
-            dysfunctional_detection
-                .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)?
-                .len(),
-            0
-        );
-        assert_eq!(
-            dysfunctional_detection
-                .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)?
-                .len(),
-            0
-        );
+        assert_eq!(dysfunctional_detection.get_dysfunctional_nodes()?.len(), 0);
 
         // We now fulfill all operations except those for the nodes[0]
         // to create a deviation
         for op in pending_operations.iter().skip(NORMAL_OPERATIONS_ISSUES) {
             assert!(dysfunctional_detection.request_operation_fulfilled(op.0, op.1));
         }
-        assert_eq!(
-            dysfunctional_detection
-                .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)?
-                .len(),
-            1
-        );
-        assert_eq!(
-            dysfunctional_detection
-                .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)?
-                .len(),
-            1
-        );
+        // as this is normal, we should not detect anything off
+        assert_eq!(dysfunctional_detection.get_dysfunctional_nodes()?.len(), 0);
 
+        // for _ in 0..10000 {
+
+        // adding more issues though...
+        let op_id = rand_op_id();
+        dysfunctional_detection.track_issue(nodes[0], IssueType::PendingRequestOperation(op_id));
+        // }
+
+        // Now we should start detecting...
+        assert_eq!(dysfunctional_detection.get_dysfunctional_nodes()?.len(), 1);
         Ok(())
     }
 }
 
 #[cfg(test)]
 mod comm_tests {
-    use crate::{DysfunctionDetection, DysfunctionSeverity, IssueType};
+    use crate::{DysfunctionDetection, IssueType};
 
     use eyre::Error;
     use xor_name::{rand::random as random_xorname, XorName};
@@ -930,18 +878,9 @@ mod comm_tests {
         }
 
         assert_eq!(
-            dysfunctional_detection
-                .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)?
-                .len(),
+            dysfunctional_detection.get_dysfunctional_nodes()?.len(),
             0,
             "no nodes are dysfunctional"
-        );
-        assert_eq!(
-            dysfunctional_detection
-                .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)?
-                .len(),
-            0,
-            "no nodes are suspect"
         );
 
         Ok(())
@@ -951,7 +890,7 @@ mod comm_tests {
 #[cfg(test)]
 mod knowledge_tests {
     use crate::tests::init_test_logger;
-    use crate::{DysfunctionDetection, DysfunctionSeverity, IssueType};
+    use crate::{DysfunctionDetection, IssueType};
 
     use eyre::Error;
     use xor_name::{rand::random as random_xorname, XorName};
@@ -978,18 +917,9 @@ mod knowledge_tests {
         // Assert there are not any dysfuncitonal nodes
         // This is because all of them are within the tolerance ratio of each other
         assert_eq!(
-            dysfunctional_detection
-                .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)?
-                .len(),
+            dysfunctional_detection.get_dysfunctional_nodes()?.len(),
             0,
             "no nodes are dysfunctional"
-        );
-        assert_eq!(
-            dysfunctional_detection
-                .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)?
-                .len(),
-            0,
-            "no nodes are suspect"
         );
 
         Ok(())
@@ -998,30 +928,26 @@ mod knowledge_tests {
     #[tokio::test]
     async fn knowledge_dys_is_not_too_sharp() -> Result<()> {
         init_test_logger();
-        let _outer_span = tracing::info_span!("knowledge_dys_is_not_too_sharp").entered();
 
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
 
-        let mut dysfunctional_detection = DysfunctionDetection::new(nodes);
+        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
 
         // Add a new nodes
         let new_node = random_xorname();
-        // dysfunctional_detection.add_new_node(new_node);
+        dysfunctional_detection.add_new_node(new_node);
+
+        // Add just one issue to all, this gets us a baseline avg to not overly skew results
+        for node in nodes {
+            dysfunctional_detection.track_issue(node, IssueType::Knowledge);
+        }
 
         // Add just one knowledge issue...
         for _ in 0..1 {
             dysfunctional_detection.track_issue(new_node, IssueType::Knowledge);
         }
 
-        let sus =
-            dysfunctional_detection.get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)?;
-
-        // Assert that the new node is not detected as suspect.
-        assert!(!sus.contains(&new_node), "our node should not be sus");
-        assert_eq!(sus.len(), 0, "no node is sus");
-
-        let dysfunctional_nodes = dysfunctional_detection
-            .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)?;
+        let dysfunctional_nodes = dysfunctional_detection.get_dysfunctional_nodes()?;
 
         // Assert that the new node is not dysfuncitonal
         assert!(
@@ -1033,6 +959,68 @@ mod knowledge_tests {
             0,
             "no node is dysfunctional node"
         );
+
+        Ok(())
+    }
+    #[tokio::test]
+    async fn ae_probe_dys_is_not_too_sharp() -> Result<()> {
+        init_test_logger();
+
+        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+
+        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
+
+        // Add a new nodes
+        let new_node = random_xorname();
+        dysfunctional_detection.add_new_node(new_node);
+
+        // Add just one issue to all, this gets us a baseline avg to not overly skew results
+        for node in nodes.clone() {
+            dysfunctional_detection.track_issue(node, IssueType::AwaitingProbeResponse);
+        }
+        // and add one more for our "bad" node, which is first
+        dysfunctional_detection.track_issue(nodes[0], IssueType::AwaitingProbeResponse);
+
+        let dysfunctional_nodes = dysfunctional_detection.get_dysfunctional_nodes()?;
+
+        // Assert that the new node is not dysfuncitonal
+        assert!(
+            !dysfunctional_nodes.contains(&new_node),
+            "our node should not be dysfunctional"
+        );
+        assert_eq!(
+            dysfunctional_nodes.len(),
+            0,
+            "no node is dysfunctional node"
+        );
+
+        // and add another for our "bad" node, which is first
+        dysfunctional_detection.track_issue(nodes[0], IssueType::AwaitingProbeResponse);
+
+        let dysfunctional_nodes = dysfunctional_detection.get_dysfunctional_nodes()?;
+
+        // Assert that the new node is not dysfuncitonal
+        assert!(
+            !dysfunctional_nodes.contains(&new_node),
+            "our node should not be dysfunctional"
+        );
+        assert_eq!(
+            dysfunctional_nodes.len(),
+            0,
+            "no node is dysfunctional node"
+        );
+
+        // and add another for our "bad" node, which is first
+        dysfunctional_detection.track_issue(nodes[0], IssueType::AwaitingProbeResponse);
+
+        let dysfunctional_nodes = dysfunctional_detection.get_dysfunctional_nodes()?;
+
+        // Assert that the new node is not dysfuncitonal
+        assert!(
+            !dysfunctional_nodes.contains(&new_node),
+            "our node should be dysfunctional"
+        );
+        assert_eq!(dysfunctional_nodes.len(), 1, "one node is dysfunctional");
 
         Ok(())
     }

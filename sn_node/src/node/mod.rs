@@ -83,7 +83,7 @@ mod core {
         },
         UsedSpace,
     };
-    use sn_dysfunction::{DysfunctionDetection, DysfunctionSeverity, IssueType};
+    use sn_dysfunction::{DysfunctionDetection, IssueType};
     #[cfg(feature = "traceroute")]
     use sn_interface::messaging::Entity;
     use sn_interface::{
@@ -339,7 +339,7 @@ mod core {
         /// returns names that are relatively dysfunctional
         pub(crate) fn get_dysfunctional_node_names(&mut self) -> Result<BTreeSet<XorName>> {
             self.dysfunction_tracking
-                .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)
+                .get_dysfunctional_nodes()
                 .map_err(Error::from)
         }
 
