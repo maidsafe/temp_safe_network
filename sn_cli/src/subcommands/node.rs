@@ -12,7 +12,7 @@ use crate::operations::{
 };
 use clap::Subcommand;
 use color_eyre::{eyre::eyre, Result};
-use std::{net::SocketAddr, path::PathBuf};
+use std::{fs, net::SocketAddr, path::PathBuf};
 
 use sn_api::DEFAULT_PREFIX_HARDLINK_NAME;
 
@@ -205,15 +205,21 @@ pub async fn node_commander(
                 &num_of_nodes.to_string(),
                 ip,
             )?;
+
             // add the network
             let default_prefix_map_path = config.prefix_maps_dir.join(DEFAULT_PREFIX_HARDLINK_NAME);
             let prefix_map = Config::retrieve_local_prefix_map(&default_prefix_map_path).await?;
             let actual_path = config
                 .prefix_maps_dir
                 .join(format!("{:?}", prefix_map.genesis_key()));
+            if !actual_path.exists() {
+                fs::copy(default_prefix_map_path, &actual_path)?;
+            }
+
             config
                 .add_network("baby-fleming", NetworkInfo::Local(actual_path, None))
                 .await?;
+
             Ok(())
         }
         Some(NodeSubCommands::Killall { node_path }) => node_shutdown(node_path),
