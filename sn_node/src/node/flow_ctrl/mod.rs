@@ -45,11 +45,11 @@ const BACKPRESSURE_INTERVAL: Duration = Duration::from_secs(60);
 const SECTION_PROBE_INTERVAL: Duration = Duration::from_secs(300);
 const LINK_CLEANUP_INTERVAL: Duration = Duration::from_secs(120);
 const DATA_BATCH_INTERVAL: Duration = Duration::from_millis(50);
-const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_millis(50);
+const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 // 30 adult nodes checked per minute., so each node should be queried 10x in 10 mins
 // Which should hopefully trigger dysfunction if we're not getting responses back
 const ADULT_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(2);
-const ELDER_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(5);
+const ELDER_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(3);
 
 #[derive(Clone)]
 pub(crate) struct FlowCtrl {
@@ -429,7 +429,7 @@ impl FlowCtrl {
                     }
                     if let Err(e) = self
                         .cmd_ctrl
-                        .push(Cmd::ProposeOffline(unresponsive_nodes))
+                        .push(Cmd::ProposeVoteNodesOffline(unresponsive_nodes))
                         .await
                     {
                         error!("Error sending Propose Offline for dysfunctional nodes: {e:?}");

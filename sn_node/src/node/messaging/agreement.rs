@@ -24,7 +24,9 @@ impl Node {
     ) -> Result<Option<Cmd>> {
         debug!("{:?} {:?}", LogMarker::ProposalAgreed, proposal);
         match proposal {
-            Proposal::Offline(node_state) => Ok(self.handle_offline_agreement(node_state, sig)),
+            Proposal::VoteNodeOffline(node_state) => {
+                Ok(self.handle_offline_agreement(node_state, sig))
+            }
             Proposal::SectionInfo(sap) => self.handle_section_info_agreement(sap, sig).await,
             Proposal::NewElders(_) => {
                 error!("Elders agreement should be handled in a separate blocking fashion");
