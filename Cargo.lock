@@ -384,9 +384,9 @@ dependencies = [
 
 [[package]]
 name = "bls_dkg"
-version = "0.10.4"
+version = "0.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37c3ef085d692a85269dc03e10428993965d5b41743f5380575232880705c8df"
+checksum = "25098bcdb34e1d12570f3b218b52743c3ebbd9a54b7cb0b7befc983828c5da43"
 dependencies = [
  "aes 0.7.5",
  "bincode",
@@ -3095,9 +3095,9 @@ dependencies = [
 
 [[package]]
 name = "self_encryption"
-version = "0.27.4"
+version = "0.27.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "636472c0b4e0354c08736d6a3f86ddf2746c739cd6605d2d9dc4472ba28351cf"
+checksum = "fd6e0bb4adf6f555179dcbcf67ac1998517ca25b7acfd8bcf2fc3b6e99dbe84b"
 dependencies = [
  "aes 0.8.1",
  "bincode",
@@ -4776,9 +4776,9 @@ dependencies = [
 
 [[package]]
 name = "xor_name"
-version = "4.1.0"
+version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f36afbc2c601f713127a618e7ab9c537e9014d2a35b88452a255b820979bbad"
+checksum = "7fd9dddecfdbc7c17ae93da6d28a5a9c4f5564abe7b735d2530c7a159b6b55e8"
 dependencies = [
  "hex",
  "rand 0.8.5",
