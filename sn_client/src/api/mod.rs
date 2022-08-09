@@ -18,7 +18,7 @@ mod spentbook_apis;
 pub use client_builder::ClientBuilder;
 pub use register_apis::RegisterWriteAheadLog;
 
-use crate::{connections::Session, errors::Error, ClientConfig};
+use crate::{connections::Session, errors::Error};
 
 use sn_dbc::Owner;
 use sn_interface::{
@@ -26,7 +26,6 @@ use sn_interface::{
         data::{DataQuery, DataQueryVariant, RegisterQuery, ServiceMsg},
         ServiceAuth, WireMsg,
     },
-    network_knowledge::utils::{read_prefix_map_from_disk, write_prefix_map_to_disk},
     types::{Chunk, Keypair, PublicKey, RegisterAddress},
 };
 
@@ -66,69 +65,11 @@ pub struct Client {
 /// Supply an existing, `SecretKey` which holds a `SafeCoin` balance to be able to perform
 /// write operations.
 impl Client {
-    /// Create a Safe Network client instance. Either for an existing SecretKey (in which case) the client will attempt
-    /// to retrieve the history of the key's balance in order to be ready for any token operations. Or if no SecreteKey
-    /// is passed, a random keypair will be used, which provides a client that can only perform Read operations (at
-    /// least until the client's SecretKey receives some token).
-    #[instrument(skip_all, level = "debug", name = "New client")]
-    pub async fn new(
-        config: ClientConfig,
-        keypair: Keypair,
-        dbc_owner: Owner,
-    ) -> Result<Self, Error> {
-        // Use `$User/.safe/prefix_maps` directory
-        let prefix_maps_dir = dirs_next::home_dir()
-            .ok_or_else(|| {
-                Error::NetworkContacts("Could not read user's home directory".to_string())
-            })?
-            .join(".safe")
-            .join("prefix_maps");
-
-        let path = prefix_maps_dir.join(DEFAULT_PREFIX_HARDLINK_NAME);
-        let prefix_map = read_prefix_map_from_disk(&path).await.map_err(|err| {
-            Error::NetworkContacts(format!(
-                "Could not read prefix map from {}: {}",
-                path.display(),
-                err
-            ))
-        })?;
-
-        // Update the PrefixMap file for this genesis key on disk as well
-        write_prefix_map_to_disk(
-            &prefix_map,
-            &prefix_maps_dir.join(format!("{:?}", prefix_map.genesis_key())),
-        )
-        .await?;
-
-        // Bootstrap to the network, connecting to a section based
-        // on a public key of our choice.
-        debug!(
-            "Creating new session with genesis key: {:?} ",
-            prefix_map.genesis_key()
-        );
-        debug!(
-            "Creating new session with genesis key (in hex format): {} ",
-            hex::encode(prefix_map.genesis_key().to_bytes())
-        );
-
-        // Create a session with the network
-        let session = Session::new(
-            config.qp2p,
-            config.local_addr,
-            config.cmd_ack_wait,
-            prefix_map,
-            prefix_maps_dir,
-        )?;
-
-        let client = Self {
-            keypair,
-            dbc_owner,
-            session,
-            query_timeout: config.query_timeout,
-            cmd_timeout: config.cmd_timeout,
-            chunks_cache: Arc::new(RwLock::new(ChunksCache::default())),
-        };
-
+    /// Bootstrap this client to the network.
+    ///
+    /// In case of an existing SecretKey the client will attempt to retrieve the history of the key's balance in order to be ready for any token operations.
+    #[instrument(skip_all, level = "debug")]
+    pub async fn connect(&self) -> Result<(), Error> {
         // TODO: The message being sent below is a temporary solution to fetch network info for
         // the client. Ideally the client should be able to send proper AE-Probe messages to the
         // trigger the AE flows.
@@ -158,12 +99,12 @@ impl Client {
             Ok((random_dst_addr, auth, serialised_cmd))
         }
 
-        let client_pk = client.public_key();
-        let (random_dst_addr, auth, serialised_cmd) = generate_probe_msg(&client, client_pk)?;
+        let client_pk = self.public_key();
+        let (random_dst_addr, auth, serialised_cmd) = generate_probe_msg(self, client_pk)?;
 
         // get bootstrap nodes
         let (bootstrap_nodes, section_pk) = {
-            let sap = client
+            let sap = self
                 .session
                 .network
                 .read()
@@ -178,7 +119,7 @@ impl Client {
         );
 
         let mut attempts = 0;
-        let mut initial_probe = client
+        let mut initial_probe = self
             .session
             .make_contact_with_nodes(
                 bootstrap_nodes.clone(),
@@ -204,9 +145,9 @@ impl Client {
 
             tokio::time::sleep(Duration::from_secs(5)).await;
 
-            let (random_dst_addr, auth, serialised_cmd) = generate_probe_msg(&client, client_pk)?;
+            let (random_dst_addr, auth, serialised_cmd) = generate_probe_msg(self, client_pk)?;
 
-            initial_probe = client
+            initial_probe = self
                 .session
                 .make_contact_with_nodes(
                     bootstrap_nodes.clone(),
@@ -218,7 +159,7 @@ impl Client {
                 .await;
         }
 
-        Ok(client)
+        Ok(())
     }
 
     /// Return the client's keypair.
