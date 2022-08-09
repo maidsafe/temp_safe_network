@@ -294,7 +294,7 @@ impl Node {
                 .into_iter()
                 .collect()),
             SystemMsg::JoinRequest(join_request) => {
-                trace!("Handling msg: JoinRequest from {}", sender);
+                trace!("Handling msg {:?}: JoinRequest from {}", msg_id, sender);
                 self.handle_join_request(sender, join_request, comm)
                     .await
                     .map(|c| c.into_iter().collect())

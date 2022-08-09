@@ -259,7 +259,7 @@ impl DysfunctionDetection {
         Ok(())
     }
 
-    /// Get a list of nodes whose score is above mean * `DysfunctionalSeverity` weighting
+    /// Get a list of nodes whose score is  DYSFUNCTION_SCORE_THRESHOLD
     /// TODO: order these to act upon _most_ dysfunctional first
     /// (the nodes must all `ProposeOffline` over a dysfunctional node and then _immediately_ vote it off. So any other membershipn changes in flight could block this.
     /// thus, we need to be callling this function often until nodes are removed.)
@@ -456,7 +456,7 @@ mod tests {
         nodes: &[(XorName, NodeQualityScored)],
         elders_count: usize,
     ) -> Vec<(XorName, NodeQualityScored)> {
-        if matches!(issue, IssueType::Dkg) {
+        if matches!(issue, IssueType::Dkg) || matches!(issue, IssueType::AwaitingProbeResponse) {
             nodes
                 .iter()
                 .sorted_by(|lhs, rhs| root.clone().cmp_distance(&lhs.0, &rhs.0))
@@ -605,7 +605,6 @@ mod tests {
 
                     // Now we loop through each issue/msg
                     for (issue, issue_location, fail_test ) in issues {
-
                         let target_nodes = get_target_nodes_for_issue(issue.clone(), issue_location, random_xorname_root, &nodes, elders_in_dkg);
 
                         // now we track our issue, but only if that node fails to passes muster...
@@ -746,6 +745,90 @@ mod tests {
 
                 }
                 Ok(())
+            });
+        }
+        #[test]
+        /// Test to check if we have unresponded to AeProbe msgs
+        ///
+        /// "Nodes" are just random xornames,
+        /// each issue has a random xorname attached to it to, and is sent to 4 nodes... each of which will fail a % of the time, depending on the
+        /// NodeQuality (Good or Bad)
+        fn pt_detect_unresponsive_elders(
+            // ~1500 msgs total should get us ~500 dkg which would be representative
+            nodes in generate_nodes_and_quality(2,7), issues in generate_startup_issues(500,2500))
+            {
+                init_test_logger();
+                let _outer_span = tracing::info_span!("detect unresponsive elders").entered();
+                let mut good_len = 0;
+                let mut bad_len = 0;
+                let random_xorname_root = nodes[0].0;
+
+                for (_, quality) in &nodes {
+                    match quality {
+                        NodeQualityScored::Good(_) => good_len += 1,
+                        NodeQualityScored::Bad(_) => bad_len += 1,
+                    }
+                }
+
+                debug!("Good {good_len}");
+                debug!("Bad {bad_len}");
+
+                let _res = Runtime::new().unwrap().block_on(async {
+                    // add dysf to our all_nodes
+                    let all_node_names = nodes.clone().iter().map(|(name, _)| *name).collect::<Vec<XorName>>();
+
+                    let mut dysfunctional_detection = DysfunctionDetection::new(all_node_names);
+
+                    // Now we loop through each issue/msg
+                    for (issue, issue_location, fail_test ) in issues {
+                        // this will be all ndoes in this test as we have up to 7 elders
+                        let target_nodes = get_target_nodes_for_issue(issue.clone(), issue_location, random_xorname_root, &nodes, nodes.len());
+
+                        // we send each message to all nodes in this situation where we're looking at elder comms alone over dkg
+                        // now we track our issue, but only if that node fails to passes muster...
+                        for (node, quality) in target_nodes.clone() {
+                            // if our random fail test is less than the quality failure rate.
+                            let failure_chance = quality.get_failure_rate();
+                            let msg_failed = &fail_test < failure_chance;
+
+                            if msg_failed {
+                                dysfunctional_detection.track_issue(
+                                    node, issue.clone());
+                            }
+
+                        }
+                    }
+                    // now we can see what we have...
+                    let dysfunctional_nodes_found = match dysfunctional_detection
+                        .get_dysfunctional_nodes() {
+                            Ok(nodes) => nodes,
+                            Err(error) => bail!("Failed getting dysfunctional nodes from DysfunctionDetector: {error}")
+                        };
+
+                    info!("======================");
+                    info!("dysf found len {:?}:, expected {:}?", dysfunctional_nodes_found.len(), bad_len );
+                    info!("======================");
+
+                    // over a long enough time span, we should catch those bad nodes...
+                    // So long as dysfunction isn't returning _more_ than the bad node count, this can pass
+                    assert!(dysfunctional_nodes_found.len() <= bad_len, "checking {} dysf nodes found is less or equal to the {} actual bad nodes in test", dysfunctional_nodes_found.len(), bad_len);
+
+                    // check that these were indeed bad nodes
+                    for bad_node in dysfunctional_nodes_found {
+                        if let Some((_, quality)) = nodes.iter().find(|(name, _)| {name == &bad_node }) {
+                            match quality {
+                                NodeQualityScored::Good(_) => bail!("identified a good node as bad"),
+                                NodeQualityScored::Bad(_) => {
+                                    // everything is fine
+                                }
+                            }
+                        }
+                        else {
+                            bail!("bad node not found in our original node set!?")
+                        }
+
+                    }
+                    Ok(())
             });
         }
 
@@ -962,7 +1045,7 @@ mod knowledge_tests {
         dysfunctional_detection.add_new_node(new_node);
 
         // Add just one issue to all, this gets us a baseline avg to not overly skew results
-        for node in nodes.clone() {
+        for node in nodes {
             dysfunctional_detection.track_issue(node, IssueType::AwaitingProbeResponse);
         }
 
