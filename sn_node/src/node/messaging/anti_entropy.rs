@@ -144,8 +144,6 @@ impl Node {
         }
     }
 
-    // TODO: refactor this so that common AE handling is done once
-
     #[instrument(skip_all)]
     pub(crate) async fn handle_anti_entropy_msg(
         &mut self,
@@ -188,76 +186,44 @@ impl Node {
             cmds.push(self.ask_for_any_new_data());
         }
 
-        match kind {
-            AntiEntropyKind::Update { .. } => (),
-            AntiEntropyKind::Retry { bounced_msg } => {
-                cmds.extend(
-                    self.handle_anti_entropy_retry_msg(
-                        updated,
-                        snapshot,
-                        section_auth,
-                        bounced_msg,
-                        sender,
-                        #[cfg(feature = "traceroute")]
-                        traceroute,
-                    )
-                    .await?,
-                );
-            }
-            AntiEntropyKind::Redirect { bounced_msg } => {
-                cmds.extend(
-                    self.handle_anti_entropy_redirect_msg(
-                        updated,
-                        snapshot,
-                        section_auth,
-                        bounced_msg,
-                        sender,
-                        #[cfg(feature = "traceroute")]
-                        traceroute,
-                    )
-                    .await?,
-                );
-            }
-        }
-        Ok(cmds)
-    }
-
-    pub(crate) async fn handle_anti_entropy_retry_msg(
-        &mut self,
-        there_was_an_update: bool,
-        snapshot: StateSnapshot,
-        section_auth: SectionAuthorityProvider,
-        bounced_msg: Bytes,
-        sender: Peer,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
-    ) -> Result<Vec<Cmd>> {
-        info!("Anti-Entropy: message received from peer: {sender}");
-        if there_was_an_update {
-            let prefix = section_auth.prefix();
-
+        if updated {
             self.write_prefix_map().await;
+            let prefix = section_auth.prefix();
+            info!("PrefixMap written to disk with update for prefix {prefix:?}");
 
-            info!(
-                "PrefixMap written to disk with update for prefix {:?}",
-                prefix
-            );
-
-            // check for churn join miss
-            let is_in_current_section = section_auth
-                .members()
-                .any(|node_state| node_state.peer() == &self.info().peer());
-            let prefix_matches_our_name = prefix.matches(&self.name());
-            let equal_prefix = section_auth.prefix() == snapshot.prefix;
-            let is_extension_prefix = section_auth.prefix().is_extension_of(&snapshot.prefix);
-            let was_in_ancestor_section = equal_prefix || is_extension_prefix;
-
-            if was_in_ancestor_section && prefix_matches_our_name && !is_in_current_section {
-                error!("Detected churn join miss while processing AE, was in section {:?}, updated to {:?}, wasn't in members anymore even if name matches: {:?}", snapshot.prefix, prefix, self.name());
-                self.send_event(Event::Membership(MembershipEvent::ChurnJoinMissError))
+            // check if we've been kicked out of the section
+            if snapshot.members.contains(&self.name())
+                && !self.state_snapshot().members.contains(&self.name())
+            {
+                error!("Detected that we've been removed from the section");
+                self.send_event(Event::Membership(MembershipEvent::RemovedFromSection))
                     .await;
-                return Err(Error::ChurnJoinMiss);
+                return Err(Error::RemovedFromSection);
             }
         }
+
+        // Check if we need to resend any messsages and who should we send it to.
+        let (bounced_msg, response_peer) = match kind {
+            AntiEntropyKind::Update { .. } => return Ok(cmds), // Nope, bail early
+            AntiEntropyKind::Retry { bounced_msg } => (bounced_msg, sender),
+            AntiEntropyKind::Redirect { bounced_msg } => {
+                // We choose the Elder closest to the dst section key,
+                // just to pick one of them in an arbitrary but deterministic fashion.
+                let target_name = XorName::from(PublicKey::Bls(section_auth.section_key()));
+
+                let chosen_dst_elder = if let Some(dst) = section_auth
+                    .elders()
+                    .max_by(|lhs, rhs| target_name.cmp_distance(&lhs.name(), &rhs.name()))
+                {
+                    *dst
+                } else {
+                    error!("Failed to find closest Elder to resend msg upon AE-Redirect response.");
+                    return Ok(cmds);
+                };
+
+                (bounced_msg, chosen_dst_elder)
+            }
+        };
 
         let (msg_to_resend, msg_id, dst) = match WireMsg::deserialize(bounced_msg)? {
             MsgType::System {
@@ -265,131 +231,33 @@ impl Node {
             } => (msg, msg_id, dst),
             _ => {
                 warn!("Non System MsgType received in AE response. We do not handle any other type in AE msgs yet.");
-                return Ok(vec![]);
+                return Ok(cmds);
             }
         };
 
         // If the new SAP's section key is the same as the section key set when the
         // bounced message was originally sent, we just drop it.
         if dst.section_key == section_auth.section_key() {
-            error!("Dropping bounced msg ({:?}) received in AE-Retry from {msg_id:?} as suggested new dst section key is the same as previously sent: {:?}", sender,section_auth.section_key());
-            return Ok(vec![]);
+            error!("Dropping bounced msg ({sender:?}) received in AE-Retry from {msg_id:?} as suggested new dst section key is the same as previously sent: {:?}", section_auth.section_key());
+            return Ok(cmds);
         }
 
-        let mut cmds = Vec::new();
-        if let Ok(elder_cmds) = self.update_on_elder_change(&snapshot).await {
-            cmds.extend(elder_cmds);
-        }
+        self.create_or_wait_for_backoff(&response_peer).await;
 
-        self.create_or_wait_for_backoff(&sender).await;
-
-        // TODO: we may need to check if 'bounced_msg' dst section pk is different
-        // from the received new SAP key, to prevent from endlessly resending a msg
-        // if a sybil/corrupt peer keeps sending us the same AE msg.
-        trace!("{} resending {msg_id:?}", LogMarker::AeResendAfterRetry);
+        trace!("{}", LogMarker::AeResendAfterAeRedirect);
 
         if cfg!(feature = "traceroute") {
             cmds.push(self.trace_system_msg(
                 msg_to_resend,
-                Peers::Single(sender),
+                Peers::Single(response_peer),
                 #[cfg(feature = "traceroute")]
                 traceroute,
-            ));
+            ))
         } else {
-            cmds.push(self.send_system_msg(msg_to_resend, Peers::Single(sender)));
+            cmds.push(self.send_system_msg(msg_to_resend, Peers::Single(response_peer)))
         }
 
         Ok(cmds)
-    }
-
-    pub(crate) async fn handle_anti_entropy_redirect_msg(
-        &mut self,
-        there_was_an_update: bool,
-        snapshot: StateSnapshot,
-        section_auth: SectionAuthorityProvider,
-        bounced_msg: Bytes,
-        sender: Peer,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
-    ) -> Result<Vec<Cmd>> {
-        info!("Anti-Entropy: message received from peer: {sender}");
-
-        if there_was_an_update {
-            self.write_prefix_map().await;
-            info!(
-                "PrefixMap written to disk with update for prefix {:?}",
-                section_auth.prefix()
-            );
-
-            // check for churn join miss
-            let is_in_current_section = section_auth
-                .members()
-                .any(|node_state| node_state.peer() == &self.info().peer());
-            let prefix_matches_our_name = section_auth.prefix().matches(&self.name());
-            let equal_prefix = section_auth.prefix() == snapshot.prefix;
-            let is_extension_prefix = section_auth.prefix().is_extension_of(&snapshot.prefix);
-            let was_in_ancestor_section = equal_prefix || is_extension_prefix;
-
-            if was_in_ancestor_section && prefix_matches_our_name && !is_in_current_section {
-                error!("Detected churn join miss while processing AE, was in section {:?}, updated to {:?}, wasn't in members anymore even if name matches: {:?}", snapshot.prefix, section_auth.prefix(), self.name());
-                self.send_event(Event::Membership(MembershipEvent::ChurnJoinMissError))
-                    .await;
-                return Err(Error::ChurnJoinMiss);
-            }
-        }
-
-        let (msg_to_redirect, msg_id, dst) = match WireMsg::deserialize(bounced_msg)? {
-            MsgType::System {
-                msg, msg_id, dst, ..
-            } => (msg, msg_id, dst),
-            _ => {
-                warn!("Non System MsgType received in AE response. We do not handle any other type in AE msgs yet.");
-                return Ok(vec![]);
-            }
-        };
-
-        // If the new SAP's section key is the same as the section key set when the
-        // bounced message was originally sent, we just drop it.
-        if dst.section_key == section_auth.section_key() {
-            error!("Dropping bounced msg ({:?}) received in AE-Retry from {} as suggested new dst section key is the same as previously sent: {:?}", msg_id, sender,section_auth.section_key());
-            return Ok(vec![]);
-        }
-
-        let dst_section_key = section_auth.section_key();
-
-        // We choose the Elder closest to the dst section key,
-        // just to pick one of them in an arbitrary but deterministic fashion.
-        let target_name = XorName::from(PublicKey::Bls(dst_section_key));
-
-        let chosen_dst_elder = if let Some(dst) = section_auth
-            .elders()
-            .max_by(|lhs, rhs| target_name.cmp_distance(&lhs.name(), &rhs.name()))
-        {
-            *dst
-        } else {
-            error!("Failed to find closest Elder to resend msg ({msg_id:?}) upon AE-Redirect response.");
-            return Ok(vec![]);
-        };
-
-        if chosen_dst_elder.name() == sender.name() {
-            error!("Failed to find an alternative Elder to resend msg ({msg_id:?}) upon AE-Redirect response.");
-            return Ok(vec![]);
-        }
-
-        self.create_or_wait_for_backoff(&chosen_dst_elder).await;
-
-        trace!("{}", LogMarker::AeResendAfterAeRedirect);
-
-        let msg = if cfg!(feature = "traceroute") {
-            self.trace_system_msg(
-                msg_to_redirect,
-                Peers::Single(chosen_dst_elder),
-                #[cfg(feature = "traceroute")]
-                traceroute,
-            )
-        } else {
-            self.send_system_msg(msg_to_redirect, Peers::Single(chosen_dst_elder))
-        };
-        Ok(vec![msg])
     }
 
     /// Checks AE-BackoffCache for backoff, or creates a new instance
