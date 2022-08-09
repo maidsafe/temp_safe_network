@@ -623,13 +623,13 @@ impl Config {
     }
 
     fn deserialise_prefix_map(bytes: &[u8]) -> Result<NetworkPrefixMap> {
-        let prefix_map = rmp_serde::from_slice(bytes)
+        let prefix_map = serde_json::from_slice(bytes)
             .wrap_err_with(|| "Failed to deserialize NetworkPrefixMap")?;
         Ok(prefix_map)
     }
 
     fn serialise_prefix_map(prefix_map: &NetworkPrefixMap) -> Result<Vec<u8>> {
-        rmp_serde::to_vec(prefix_map).wrap_err_with(|| "Failed to serialise NetworkPrefixMap")
+        serde_json::to_vec(prefix_map).wrap_err_with(|| "Failed to serialise NetworkPrefixMap")
     }
 }
 
@@ -823,7 +823,11 @@ mod constructor {
         let mut settings = Settings::default();
         settings.networks.insert(
             "network_1".to_string(),
-            NetworkInfo::Remote("https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(08d5..60a1)".to_string(), None)
+            NetworkInfo::Remote(
+                "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/prefix_map"
+                    .to_string(),
+                None,
+            ),
         );
         settings.networks.insert(
             "network_2".to_string(),
@@ -949,11 +953,15 @@ mod sync_prefix_maps_and_settings {
         let mut settings = Settings::default();
         settings.networks.insert(
             "network_1".to_string(),
-            NetworkInfo::Remote("https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(08d5..60a1)".to_string(), None)
+            NetworkInfo::Remote(
+                "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/prefix_map"
+                    .to_string(),
+                None,
+            ),
         );
         settings.networks.insert(
             "network_2".to_string(),
-            NetworkInfo::Remote("https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(16b0..6ec8)".to_string(), None)
+            NetworkInfo::Remote("https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/prefix_map_1".to_string(), None)
         );
         prefix_maps
             .iter()
@@ -983,7 +991,11 @@ mod sync_prefix_maps_and_settings {
         let mut settings = Settings::default();
         settings.networks.insert(
             "network_1".to_string(),
-            NetworkInfo::Remote("https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(0000..0000)".to_string(), None)
+            NetworkInfo::Remote(
+                "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/error"
+                    .to_string(),
+                None,
+            ),
         );
         settings.networks.insert(
             "network_2".to_string(),
@@ -1008,7 +1020,11 @@ mod sync_prefix_maps_and_settings {
         let mut settings = Settings::default();
         settings.networks.insert(
             "network_1".to_string(),
-            NetworkInfo::Remote("https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(08d5..60a1)".to_string(), None)
+            NetworkInfo::Remote(
+                "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/prefix_map"
+                    .to_string(),
+                None,
+            ),
         );
         settings.networks.insert(
             "network_2".to_string(),
@@ -1187,7 +1203,8 @@ mod networks {
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let network_1 = NetworkInfo::Remote(
-            "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(08d5..60a1)".to_string(),
+            "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/prefix_map"
+                .to_string(),
             None,
         );
         let network_2 = NetworkInfo::Local(prefix_map_path, None);

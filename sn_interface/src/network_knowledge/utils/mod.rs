@@ -38,7 +38,7 @@ pub async fn write_prefix_map_to_disk(prefix_map: &NetworkPrefixMap, path: &Path
     })?;
 
     let serialized =
-        rmp_serde::to_vec(prefix_map).map_err(|e| Error::Serialisation(e.to_string()))?;
+        serde_json::to_vec(prefix_map).map_err(|e| Error::Serialisation(e.to_string()))?;
 
     temp_file
         .write_all(serialized.as_slice())
@@ -69,7 +69,7 @@ pub async fn read_prefix_map_from_disk(path: &Path) -> Result<NetworkPrefixMap> 
                     ))
                 })?;
 
-            let prefix_map: NetworkPrefixMap = rmp_serde::from_slice(&prefix_map_contents)
+            let prefix_map: NetworkPrefixMap = serde_json::from_slice(&prefix_map_contents)
                 .map_err(|err| {
                     Error::FileHandling(format!(
                         "Error deserializing PrefixMap from disk: {:?}",

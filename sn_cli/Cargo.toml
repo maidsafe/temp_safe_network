@@ -50,7 +50,7 @@ tempfile = "3.2.0"
 tracing = "~0.1.26"
 tracing-subscriber = "~0.2.15"
 url = "2.2.2"
-xor_name = "4.0.1"
+xor_name = "~5.0.0"
 
 [dependencies.self_update]
 version = "~0.28.0"
@@ -76,7 +76,7 @@ predicates = "2.0"
 criterion = "~0.3"
 walkdir = "2.3.1"
 multibase = "~0.9.1"
-xor_name = "4.0.1"
+xor_name = "~5.0.0"
 futures = "0.3.21"
 sn_api = { path = "../sn_api", version = "^0.66.3", features = ["app", "test-utils"] }
 
