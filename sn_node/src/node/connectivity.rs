@@ -43,7 +43,9 @@ impl Node {
         for name in names.iter() {
             if let Some(info) = self.network_knowledge.get_section_member(name) {
                 let info = info.leave()?;
-                if let Ok(cmds) = self.send_proposal(elders.clone(), Proposal::Offline(info)) {
+                if let Ok(cmds) =
+                    self.send_proposal(elders.clone(), Proposal::VoteNodeOffline(info))
+                {
                     result.extend(cmds);
                 }
             }

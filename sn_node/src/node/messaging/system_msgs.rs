@@ -17,6 +17,7 @@ use crate::{
     },
 };
 
+use bytes::Bytes;
 #[cfg(feature = "traceroute")]
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
@@ -38,8 +39,7 @@ use sn_interface::{
     network_knowledge::NetworkKnowledge,
     types::{log_markers::LogMarker, Keypair, Peer, PublicKey},
 };
-
-use bytes::Bytes;
+use std::collections::BTreeSet;
 use xor_name::XorName;
 
 impl Node {
@@ -67,7 +67,7 @@ impl Node {
         recipients: Peers,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Cmd {
-        trace!("{}", LogMarker::SendToNodes);
+        trace!("{}: {:?}", LogMarker::SendToNodes, msg);
         Cmd::send_traced_msg(
             OutgoingMsg::System(msg),
             recipients,
@@ -198,9 +198,17 @@ impl Node {
                 )
                 .await
             }
-            SystemMsg::AntiEntropyProbe => {
+            // Respond to a probe msg
+            // We always respond to probe msgs. Health checks use this to see if a node is alive
+            // and repsonsive, as well as being a method of keeping nodes up to date.
+            SystemMsg::AntiEntropyProbe(section_key) => {
+                let mut cmds = vec![];
                 trace!("Received Probe message from {}: {:?}", sender, msg_id);
-                Ok(vec![])
+                let mut recipients = BTreeSet::new();
+                let _existed = recipients.insert(sender);
+                cmds.push(self.send_ae_update_to_nodes(recipients, section_key));
+                trace!("cmds for responding to ae to {sender} formed");
+                Ok(cmds)
             }
             #[cfg(feature = "back-pressure")]
             SystemMsg::BackPressure(msgs_per_s) => {
@@ -329,12 +337,16 @@ impl Node {
                     trace!("Adult handling a Propose msg from {}: {:?}", sender, msg_id);
                 }
 
-                trace!("Handling msg: Propose from {}: {:?}", sender, msg_id);
+                trace!(
+                    "Handling proposal msg: {proposal:?} from {}: {:?}",
+                    sender,
+                    msg_id
+                );
 
                 // lets convert our message into a usable proposal for core
                 let core_proposal = match proposal {
-                    ProposalMsg::Offline(node_state) => {
-                        CoreProposal::Offline(node_state.into_state())
+                    ProposalMsg::VoteNodeOffline(node_state) => {
+                        CoreProposal::VoteNodeOffline(node_state.into_state())
                     }
                     ProposalMsg::SectionInfo(sap) => CoreProposal::SectionInfo(sap.into_state()),
                     ProposalMsg::NewElders(sap) => CoreProposal::NewElders(sap.into_authed_state()),

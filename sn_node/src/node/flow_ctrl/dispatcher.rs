@@ -168,7 +168,6 @@ impl Dispatcher {
                     .aggregate_system_msg(msg_id, msg_authority, wire_msg_payload)
                     .await
                 {
-
                     debug!("handling valid msg {:?}", msg_id);
 
                     node.handle_valid_system_msg(
@@ -247,7 +246,7 @@ impl Dispatcher {
                 .await
                 .into_iter()
                 .collect()),
-            Cmd::ProposeOffline(names) => {
+            Cmd::ProposeVoteNodesOffline(names) => {
                 let mut node = self.node.write().await;
                 node.cast_offline_proposals(&names)
             }

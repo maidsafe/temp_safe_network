@@ -206,9 +206,10 @@ impl Node {
         let (bounced_msg, response_peer) = match kind {
             AntiEntropyKind::Update { .. } => {
                 // log the msg as received. Elders track this for other elders in dysfunction
-                self.dysfunction_tracking.ae_update_msg_received(&sender.name());
-                return Ok(cmds)
-            }, // Nope, bail early
+                self.dysfunction_tracking
+                    .ae_update_msg_received(&sender.name());
+                return Ok(cmds);
+            } // Nope, bail early
             AntiEntropyKind::Retry { bounced_msg } => (bounced_msg, sender),
             AntiEntropyKind::Redirect { bounced_msg } => {
                 // We choose the Elder closest to the dst section key,

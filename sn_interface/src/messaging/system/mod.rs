@@ -13,6 +13,7 @@ mod msg_authority;
 mod node_msgs;
 mod node_state;
 mod signed;
+use bls::PublicKey as BlsPublicKey;
 
 pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, Proposal, SectionAuth};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProof};
@@ -70,7 +71,9 @@ pub enum SystemMsg {
         kind: AntiEntropyKind,
     },
     /// Probes the network by sending a message to a random or chosen dst triggering an AE flow.
-    AntiEntropyProbe,
+    /// Sends the current section key of target section which we know
+    /// This expects a response, even if we're up to date.
+    AntiEntropyProbe(BlsPublicKey),
     #[cfg(feature = "back-pressure")]
     /// Sent when a msg-consuming node wants to update a msg-producing node on the number of msgs per s it wants to receive.
     /// It tells the node to adjust msg sending rate according to the provided value in this msg.
@@ -196,7 +199,7 @@ impl SystemMsg {
         use super::msg_type::BACKPRESSURE_MSG_PRIORITY;
         use super::msg_type::{
             ANTIENTROPY_MSG_PRIORITY, DKG_MSG_PRIORITY, JOIN_RELOCATE_MSG_PRIORITY,
-            JOIN_RESPONSE_PRIORITY, NODE_DATA_MSG_PRIORITY,
+            JOIN_RESPONSE_PRIORITY, MEMBERSHIP_PRIORITY, NODE_DATA_MSG_PRIORITY,
         };
         match self {
             // DKG messages
@@ -210,23 +213,26 @@ impl SystemMsg {
             | SystemMsg::DkgFailureAgreement(_) => DKG_MSG_PRIORITY,
 
             // Inter-node comms for AE updates
-            SystemMsg::AntiEntropy { .. } | SystemMsg::AntiEntropyProbe => ANTIENTROPY_MSG_PRIORITY,
+            SystemMsg::AntiEntropy { .. } | SystemMsg::AntiEntropyProbe(_) => {
+                ANTIENTROPY_MSG_PRIORITY
+            }
 
             // Join responses
             SystemMsg::JoinResponse(_) | SystemMsg::JoinAsRelocatedResponse(_) => {
                 JOIN_RESPONSE_PRIORITY
             }
 
+            SystemMsg::Propose { .. }
+            | SystemMsg::MembershipVotes(_)
+            | SystemMsg::MembershipAE(_)
+            | SystemMsg::HandoverAE(_)
+            | SystemMsg::HandoverVotes(_) => MEMBERSHIP_PRIORITY,
+
             // Inter-node comms for joining, relocating etc.
             SystemMsg::Relocate(_)
             | SystemMsg::JoinRequest(_)
             | SystemMsg::JoinAsRelocatedRequest(_)
-            | SystemMsg::Propose { .. }
-            | SystemMsg::StartConnectivityTest(_)
-            | SystemMsg::MembershipVotes(_)
-            | SystemMsg::MembershipAE(_)
-            | SystemMsg::HandoverAE(_)
-            | SystemMsg::HandoverVotes(_) => JOIN_RELOCATE_MSG_PRIORITY,
+            | SystemMsg::StartConnectivityTest(_) => JOIN_RELOCATE_MSG_PRIORITY,
 
             #[cfg(feature = "back-pressure")]
             // Inter-node comms for backpressure

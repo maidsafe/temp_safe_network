@@ -117,6 +117,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
                 }
             }));
 
+
             Result::<()>::Ok(())
         })
         .await
@@ -423,6 +424,74 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         .await
 }
 
+// Handles a consensus-ed Online proposal.
+async fn handle_online_cmd(
+    peer: &Peer,
+    sk_set: &SecretKeySet,
+    dispatcher: &Dispatcher,
+    section_auth: &SectionAuthorityProvider,
+) -> Result<HandleOnlineStatus> {
+    let node_state = NodeState::joined(*peer, None);
+    let membership_decision = section_decision(sk_set, node_state.to_msg())?;
+
+    let all_cmds = run_and_collect_cmds(
+        Cmd::HandleMembershipDecision(membership_decision),
+        dispatcher,
+    )
+    .await?;
+
+    let mut status = HandleOnlineStatus {
+        node_approval_sent: false,
+        relocate_details: None,
+    };
+
+    for cmd in all_cmds {
+        let (msg, recipients) = match cmd {
+            Cmd::SendMsg {
+                recipients,
+                msg: OutgoingMsg::System(msg),
+                ..
+            } => (msg, recipients),
+            _ => continue,
+        };
+
+        match msg {
+            SystemMsg::JoinResponse(response) => {
+                if let JoinResponse::Approved {
+                    section_auth: signed_sap,
+                    ..
+                } = *response
+                {
+                    assert_eq!(signed_sap.value, section_auth.clone().to_msg());
+                    assert_matches!(recipients, Peers::Multiple(peers) => {
+                        assert_eq!(peers, BTreeSet::from([*peer]));
+                    });
+                    status.node_approval_sent = true;
+                }
+            }
+            SystemMsg::Propose {
+                proposal: sn_interface::messaging::system::Proposal::VoteNodeOffline(node_state),
+                ..
+            } => {
+                if let MembershipState::Relocated(details) = node_state.state {
+                    if details.previous_name != peer.name() {
+                        continue;
+                    }
+                    status.relocate_details = Some(*details.clone());
+                }
+            }
+            _ => continue,
+        }
+    }
+
+    Ok(status)
+}
+
+struct HandleOnlineStatus {
+    node_approval_sent: bool,
+    relocate_details: Option<RelocateDetails>,
+}
+
 #[tokio::test]
 async fn handle_join_request_of_rejoined_node() -> Result<()> {
     let local = tokio::task::LocalSet::new();
@@ -485,7 +554,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
                     .await?;
 
             let node_state = NodeState::left(existing_peer, None);
-            let proposal = Proposal::Offline(node_state.clone());
+            let proposal = Proposal::VoteNodeOffline(node_state.clone());
             let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
             let _cmds =
@@ -533,7 +602,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
                     .build()
                     .await?;
             // Handle agreement on the Offline proposal
-            let proposal = Proposal::Offline(remove_node_state.clone());
+            let proposal = Proposal::VoteNodeOffline(remove_node_state.clone());
             let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
             let _cmds =
@@ -839,7 +908,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
                 };
 
                 if let SystemMsg::Propose {
-                    proposal: sn_interface::messaging::system::Proposal::Offline(node_state),
+                    proposal: sn_interface::messaging::system::Proposal::VoteNodeOffline(node_state),
                     ..
                 } = msg
                 {
