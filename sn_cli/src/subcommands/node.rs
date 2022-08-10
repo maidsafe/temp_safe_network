@@ -12,9 +12,9 @@ use crate::operations::{
 };
 use clap::Subcommand;
 use color_eyre::{eyre::eyre, Result};
-use std::{fs, net::SocketAddr, path::PathBuf};
+use std::{net::SocketAddr, path::PathBuf};
 
-use sn_api::DEFAULT_PREFIX_HARDLINK_NAME;
+use sn_api::DEFAULT_PREFIX_MAP_FILE_NAME;
 
 const NODES_DATA_DIR_NAME: &str = "baby-fleming-nodes";
 const LOCAL_NODE_DIR_NAME: &str = "local-node";
@@ -172,7 +172,7 @@ pub async fn node_commander(
                 path
             };
 
-            let default_prefix_map_path = config.prefix_maps_dir.join(DEFAULT_PREFIX_HARDLINK_NAME);
+            let default_prefix_map_path = config.prefix_maps_dir.join(DEFAULT_PREFIX_MAP_FILE_NAME);
 
             node_join(
                 network_launcher,
@@ -210,16 +210,13 @@ pub async fn node_commander(
                 ip,
             )?;
 
-            // add the network
-            let default_prefix_map_path = config.prefix_maps_dir.join(DEFAULT_PREFIX_HARDLINK_NAME);
-            let prefix_map = Config::retrieve_local_prefix_map(&default_prefix_map_path).await?;
+            // add the network using default prefix map file
+            let prefix_map = config.read_default_prefix_map().await?;
+            config.write_prefix_map(&prefix_map).await?;
+
             let actual_path = config
                 .prefix_maps_dir
                 .join(format!("{:?}", prefix_map.genesis_key()));
-            if !actual_path.exists() {
-                fs::copy(default_prefix_map_path, &actual_path)?;
-            }
-
             config
                 .add_network("baby-fleming", NetworkInfo::Local(actual_path, None))
                 .await?;

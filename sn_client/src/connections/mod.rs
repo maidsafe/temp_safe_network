@@ -21,7 +21,7 @@ use sn_interface::{
 
 use dashmap::DashMap;
 use qp2p::{Config as QuicP2pConfig, Endpoint};
-use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::sync::{mpsc::Sender, RwLock};
 
 // Here we dont track the msg_id across the network, but just use it as a local identifier to remove the correct listener
@@ -53,8 +53,6 @@ pub(super) struct Session {
     cmd_ack_wait: Duration,
     /// Links to nodes
     peer_links: PeerLinks,
-    /// Path where to read/store cached PrefixMaps
-    prefix_maps_dir: PathBuf,
 }
 
 impl Session {
@@ -65,7 +63,6 @@ impl Session {
         local_addr: SocketAddr,
         cmd_ack_wait: Duration,
         prefix_map: NetworkPrefixMap,
-        prefix_maps_dir: PathBuf,
     ) -> Result<Session> {
         let endpoint = Endpoint::new_client(local_addr, qp2p_config)?;
         let peer_links = PeerLinks::new(endpoint.clone());
@@ -78,7 +75,6 @@ impl Session {
             initial_connection_check_msg_id: Arc::new(RwLock::new(None)),
             cmd_ack_wait,
             peer_links,
-            prefix_maps_dir,
         };
 
         Ok(session)
