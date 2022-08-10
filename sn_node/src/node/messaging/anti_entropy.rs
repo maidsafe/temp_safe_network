@@ -400,7 +400,7 @@ mod tests {
 
     use crate::node::{
         cfg::create_test_max_capacity_and_root_storage,
-        flow_ctrl::{event_channel, tests::create_comm},
+        flow_ctrl::{event_channel, tests::network_utils::create_comm},
         MIN_ADULT_AGE,
     };
     use crate::UsedSpace;
