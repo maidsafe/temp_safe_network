@@ -26,6 +26,7 @@ use sn_interface::{
         data::{DataQuery, DataQueryVariant, RegisterQuery, ServiceMsg},
         ServiceAuth, WireMsg,
     },
+    network_knowledge::prefix_map::NetworkPrefixMap,
     types::{Chunk, Keypair, PublicKey, RegisterAddress},
 };
 
@@ -36,8 +37,10 @@ use tracing::debug;
 use uluru::LRUCache;
 use xor_name::XorName;
 
-/// File name of the hardlink to the default prefix map the Client uses
-pub const DEFAULT_PREFIX_HARDLINK_NAME: &str = "default";
+/// File name of the default prefix map file the Client uses. The file is
+/// expected to be found at user's OS home directory, e.g. in Linux this
+/// path would become: $HOME/.safe/prefix_maps/default
+pub const DEFAULT_PREFIX_MAP_FILE_NAME: &str = "default";
 
 // Maximum amount of Chunks to keep in our cal Chunks cache.
 // Each Chunk is maximum types::MAX_CHUNK_SIZE_IN_BYTES, i.e. ~1MB
@@ -190,6 +193,15 @@ impl Client {
             .await
             .get_sections_dag()
             .has_key(section_key)
+    }
+
+    /// NetworkPrefixMap used to bootstrap the client on the network.
+    ///
+    /// This is updated by the client as it receives Anti-Entropy/update messages from the network.
+    /// Any user of this API is responsible for caching it so it can use it for any new `Client`
+    /// instance not needing to obtain all this information from the network all over again.
+    pub async fn get_prefix_map(&self) -> NetworkPrefixMap {
+        self.session.network.read().await.clone()
     }
 
     /// Create a builder to instantiate a [`Client`]

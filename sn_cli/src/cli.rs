@@ -30,7 +30,7 @@ use color_eyre::{eyre::eyre, Result};
 use sn_api::{Safe, XorUrlBase};
 use std::env;
 use std::path::PathBuf;
-use tracing::debug;
+use tracing::{debug, warn};
 
 #[derive(clap::StructOpt, Debug)]
 /// Interact with the Safe Network
@@ -57,13 +57,50 @@ pub struct CmdArgs {
 }
 
 pub async fn run() -> Result<()> {
-    // Let's first get all the arguments passed in, either as function's args, or CLI args
+    // Let's first get all the arguments passed in as CLI args
     let args = CmdArgs::from_args();
 
     let mut safe = Safe::dry_runner(None);
     if let Some(base) = args.xorurl_base {
         safe.xorurl_base = base;
     }
+
+    let mut config = get_config().await?;
+
+    let result = process_commands(&mut safe, args, &mut config).await;
+
+    // If we were connected to a network, cache the up to date PrefixMap to disk before exiting
+    if safe.is_connected() {
+        match safe.get_prefix_map().await {
+            Ok(prefix_map) => {
+                if let Err(err) = config.update_default_prefix_map(&prefix_map).await {
+                    warn!(
+                        "Failed to cache up to date PrefixMap for genesis key {:?} to '{}': {:?}",
+                        prefix_map.genesis_key(),
+                        config.prefix_maps_dir.display(),
+                        err
+                    );
+                } else {
+                    debug!(
+                        "Up to date PrefixMap for genesis key {:?} was cached at '{}'",
+                        prefix_map.genesis_key(),
+                        config.prefix_maps_dir.display(),
+                    );
+                }
+            }
+            Err(err) => warn!(
+                "Failed to cache updated PrefixMap for genesis key {:?}: {:?}",
+                config.read_default_prefix_map().await?.genesis_key(),
+                err
+            ),
+        }
+    }
+
+    result
+}
+
+async fn process_commands(mut safe: &mut Safe, args: CmdArgs, config: &mut Config) -> Result<()> {
+    debug!("Processing command: {:?}", args);
 
     let output_fmt = if args.output_json {
         OutputFmt::Json
@@ -73,11 +110,9 @@ pub async fn run() -> Result<()> {
         OutputFmt::Pretty
     };
 
-    debug!("Processing command: {:?}", args);
-
     match args.cmd {
-        SubCommands::Config { cmd } => config_commander(cmd, &mut get_config().await?).await,
-        SubCommands::Networks { cmd } => networks_commander(cmd, &mut get_config().await?).await,
+        SubCommands::Config { cmd } => config_commander(cmd, config).await,
+        SubCommands::Networks { cmd } => networks_commander(cmd, config).await,
         SubCommands::Update { no_confirm } => {
             // We run this command in a separate thread to overcome a conflict with
             // the self_update crate as it seems to be creating its own runtime.
@@ -96,7 +131,7 @@ pub async fn run() -> Result<()> {
             let mut launcher = Box::new(SnLaunchToolNetworkLauncher::default());
             node_commander(cmd, &mut get_config().await?, &mut launcher).await
         }
-        SubCommands::Keys(cmd) => key_commander(cmd, output_fmt, &get_config().await?),
+        SubCommands::Keys(cmd) => key_commander(cmd, output_fmt, config),
         SubCommands::Xorurl {
             cmd,
             location,
@@ -124,17 +159,15 @@ pub async fn run() -> Result<()> {
             // otherwise the connection created will be with read-only access and some
             // of these commands will fail if they require write access.
             if !safe.dry_run_mode {
-                connect(&mut safe, &get_config().await?).await?;
+                connect(safe, config).await?;
             }
 
             match other {
-                SubCommands::Cat(cmd) => cat_commander(cmd, output_fmt, &safe).await,
-                SubCommands::Dog(cmd) => dog_commander(cmd, output_fmt, &safe).await,
-                SubCommands::Files(cmd) => files_commander(cmd, output_fmt, &safe).await,
-                SubCommands::Nrs(cmd) => nrs_commander(cmd, output_fmt, &safe).await,
-                SubCommands::Wallet(cmd) => {
-                    wallet_commander(cmd, output_fmt, &safe, &get_config().await?).await
-                }
+                SubCommands::Cat(cmd) => cat_commander(cmd, output_fmt, safe).await,
+                SubCommands::Dog(cmd) => dog_commander(cmd, output_fmt, safe).await,
+                SubCommands::Files(cmd) => files_commander(cmd, output_fmt, safe).await,
+                SubCommands::Nrs(cmd) => nrs_commander(cmd, output_fmt, safe).await,
+                SubCommands::Wallet(cmd) => wallet_commander(cmd, output_fmt, safe, config).await,
                 _ => Err(eyre!("Unknown safe subcommand")),
             }
         }

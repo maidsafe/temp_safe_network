@@ -14,7 +14,7 @@
 //! # Ok(())
 //! # }
 //! ```
-use crate::{connections::Session, Client, DEFAULT_PREFIX_HARDLINK_NAME};
+use crate::{connections::Session, Client, DEFAULT_PREFIX_MAP_FILE_NAME};
 
 use qp2p::Config as Qp2pConfig;
 use sn_dbc::Owner;
@@ -143,10 +143,12 @@ impl ClientBuilder {
         let cmd_timeout = self.cmd_timeout.unwrap_or(DEFAULT_QUERY_CMD_TIMEOUT);
         let cmd_ack_wait = self.cmd_ack_wait.unwrap_or(DEFAULT_ACK_WAIT);
 
-        let prefix_map_dir = default_prefix_map_path()?;
         let prefix_map = match self.prefix_map {
             Some(pm) => pm,
-            None => read_prefix_map_from_disk(&prefix_map_dir).await?,
+            None => {
+                let prefix_map_dir = default_prefix_map_path()?;
+                read_prefix_map_from_disk(&prefix_map_dir).await?
+            }
         };
 
         let session = Session::new(
@@ -155,7 +157,6 @@ impl ClientBuilder {
                 .unwrap_or_else(|| SocketAddr::from(DEFAULT_LOCAL_ADDR)),
             cmd_ack_wait,
             prefix_map,
-            prefix_map_dir,
         )?;
 
         let keypair = self.keypair.unwrap_or_else(Keypair::new_ed25519);
@@ -188,14 +189,14 @@ fn env_parse<F: FromStr>(s: &str) -> Result<Option<F>, F::Err> {
 }
 
 fn default_prefix_map_path() -> Result<PathBuf, crate::Error> {
-    // Use `$User/.safe/prefix_maps` directory
-    let prefix_maps_dir = dirs_next::home_dir()
+    // Use `$HOME/.safe/prefix_maps` directory
+    let path = dirs_next::home_dir()
         .ok_or_else(|| {
             crate::Error::NetworkContacts("Could not read user's home directory".to_string())
         })?
         .join(".safe")
-        .join("prefix_maps");
-    let path = prefix_maps_dir.join(DEFAULT_PREFIX_HARDLINK_NAME);
+        .join("prefix_maps")
+        .join(DEFAULT_PREFIX_MAP_FILE_NAME);
 
     Ok(path)
 }

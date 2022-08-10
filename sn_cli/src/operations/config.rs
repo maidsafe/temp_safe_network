@@ -13,7 +13,7 @@ use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Help, Report, Result};
 use comfy_table::Table;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
-use sn_api::{NetworkPrefixMap, Safe, DEFAULT_PREFIX_HARDLINK_NAME};
+use sn_api::{NetworkPrefixMap, Safe, DEFAULT_PREFIX_MAP_FILE_NAME};
 use sn_dbc::Owner;
 use std::{
     collections::BTreeMap,
@@ -51,7 +51,7 @@ pub struct SnLaunchToolNetworkLauncher {}
 impl NetworkLauncher for SnLaunchToolNetworkLauncher {
     fn launch(&mut self, args: Vec<String>, interval: u64) -> Result<(), Report> {
         debug!("Running network launch tool with args: {:?}", args);
-        println!("Starting a node to join a Safe network...");
+        println!("Starting nodes to join the Safe network...");
         sn_launch_tool::Launch::from_iter_safe(&args)
             .map_err(|e| eyre!(e))
             .and_then(|launch| launch.run())
@@ -202,11 +202,7 @@ impl Config {
         // if default hardlink is present, make sure its original file is also present; Else the
         // default hardlink might be overwritten while switching networks
         if let Ok(default_prefix) = self.read_default_prefix_map().await {
-            let path = self
-                .prefix_maps_dir
-                .clone()
-                .join(format!("{:?}", default_prefix.genesis_key()));
-            Self::write_prefix_map(&path, &default_prefix).await?;
+            self.write_prefix_map(&default_prefix).await?;
         };
 
         let mut dir_files_checklist: BTreeMap<String, bool> = BTreeMap::new();
@@ -217,7 +213,7 @@ impl Config {
                     .file_name()
                     .into_string()
                     .map_err(|_| eyre!("Error converting OsString to String"))?;
-                if filename != *DEFAULT_PREFIX_HARDLINK_NAME {
+                if filename != *DEFAULT_PREFIX_MAP_FILE_NAME {
                     dir_files_checklist.insert(filename, false);
                 }
             }
@@ -253,10 +249,7 @@ impl Config {
                             None => {
                                 if let Ok(prefix_map) = Self::retrieve_local_prefix_map(path).await
                                 {
-                                    let path = self
-                                        .prefix_maps_dir
-                                        .join(format!("{:?}", prefix_map.genesis_key()));
-                                    Self::write_prefix_map(&path, &prefix_map).await?;
+                                    write_prefix_map(&self.prefix_maps_dir, &prefix_map).await?;
                                     *genesis_key = Some(*prefix_map.genesis_key());
                                 } else {
                                     remove_list.push(network_name.clone());
@@ -266,10 +259,7 @@ impl Config {
                         // NetworkPrefixMap has not been fetched, fetch it
                         None => {
                             if let Ok(prefix_map) = Self::retrieve_local_prefix_map(path).await {
-                                let path = self
-                                    .prefix_maps_dir
-                                    .join(format!("{:?}", prefix_map.genesis_key()));
-                                Self::write_prefix_map(&path, &prefix_map).await?;
+                                write_prefix_map(&self.prefix_maps_dir, &prefix_map).await?;
                                 *genesis_key = Some(*prefix_map.genesis_key());
                             } else {
                                 remove_list.push(network_name.clone());
@@ -283,10 +273,7 @@ impl Config {
                         None => {
                             let url = Url::parse(url)?;
                             if let Ok(prefix_map) = Self::retrieve_remote_prefix_map(&url).await {
-                                let path = self
-                                    .prefix_maps_dir
-                                    .join(format!("{:?}", prefix_map.genesis_key()));
-                                Self::write_prefix_map(&path, &prefix_map).await?;
+                                write_prefix_map(&self.prefix_maps_dir, &prefix_map).await?;
                                 *genesis_key = Some(*prefix_map.genesis_key());
                             } else {
                                 remove_list.push(network_name.clone());
@@ -296,10 +283,7 @@ impl Config {
                     None => {
                         let url = Url::parse(url)?;
                         if let Ok(prefix_map) = Self::retrieve_remote_prefix_map(&url).await {
-                            let path = self
-                                .prefix_maps_dir
-                                .join(format!("{:?}", prefix_map.genesis_key()));
-                            Self::write_prefix_map(&path, &prefix_map).await?;
+                            write_prefix_map(&self.prefix_maps_dir, &prefix_map).await?;
                             *genesis_key = Some(*prefix_map.genesis_key());
                         } else {
                             remove_list.push(network_name.clone());
@@ -331,7 +315,7 @@ impl Config {
     }
 
     pub async fn read_default_prefix_map(&self) -> Result<NetworkPrefixMap> {
-        let default_path = self.prefix_maps_dir.join(DEFAULT_PREFIX_HARDLINK_NAME);
+        let default_path = self.prefix_maps_dir.join(DEFAULT_PREFIX_MAP_FILE_NAME);
         let prefix_map = Self::retrieve_local_prefix_map(&default_path)
             .await
             .wrap_err_with(|| {
@@ -357,19 +341,13 @@ impl Config {
                     *path = fs::canonicalize(&path).await?
                 }
                 let prefix_map = Self::retrieve_local_prefix_map(path).await?;
-                let path = self
-                    .prefix_maps_dir
-                    .join(format!("{:?}", prefix_map.genesis_key()));
-                Self::write_prefix_map(&path, &prefix_map).await?;
+                self.write_prefix_map(&prefix_map).await?;
                 *genesis_key = Some(*prefix_map.genesis_key());
             }
             NetworkInfo::Remote(ref url, ref mut genesis_key) => {
                 let url = Url::parse(url)?;
                 let prefix_map = Self::retrieve_remote_prefix_map(&url).await?;
-                let path = self
-                    .prefix_maps_dir
-                    .join(format!("{:?}", prefix_map.genesis_key()));
-                Self::write_prefix_map(&path, &prefix_map).await?;
+                self.write_prefix_map(&prefix_map).await?;
                 *genesis_key = Some(*prefix_map.genesis_key());
             }
         };
@@ -412,7 +390,7 @@ impl Config {
             }
             None => println!("No network with name '{}' was found in config", name),
         }
-        if fs::remove_file(&self.prefix_maps_dir.join(DEFAULT_PREFIX_HARDLINK_NAME))
+        if fs::remove_file(&self.prefix_maps_dir.join(DEFAULT_PREFIX_MAP_FILE_NAME))
             .await
             .is_err()
         {
@@ -439,14 +417,14 @@ impl Config {
         match self.settings.networks.get(name) {
             Some(NetworkInfo::Local(_, genesis_key)) => {
                 match genesis_key {
-                    Some(gk) => self.set_default_prefix_map(format!("{:?}", gk)).await?,
+                    Some(gk) => self.set_default_prefix_map(gk).await?,
                     //  can't be none since we sync during get_config
                     None => bail!("Cannot switch to {}, since the network file is not found! Please re-run the same command!", name)
                 }
             }
             Some(NetworkInfo::Remote(_, genesis_key)) => {
                 match genesis_key {
-                    Some(gk) => self.set_default_prefix_map(format!("{:?}", gk)).await?,
+                    Some(gk) => self.set_default_prefix_map(gk).await?,
                     None => bail!("Cannot switch to {}, since the network file is not found! Please re-run the same command!", name)
                 }
             }
@@ -478,9 +456,9 @@ impl Config {
         println!("{table}");
     }
 
-    pub async fn set_default_prefix_map(&self, genesis_key: String) -> Result<()> {
-        let prefix_map_file = self.prefix_maps_dir.join(genesis_key);
-        let default_prefix = self.prefix_maps_dir.join(DEFAULT_PREFIX_HARDLINK_NAME);
+    pub async fn set_default_prefix_map(&self, genesis_key: &BlsPublicKey) -> Result<()> {
+        let prefix_map_file = self.prefix_maps_dir.join(format!("{:?}", genesis_key));
+        let default_prefix = self.prefix_maps_dir.join(DEFAULT_PREFIX_MAP_FILE_NAME);
 
         if default_prefix.exists() {
             fs::remove_file(&default_prefix).await.wrap_err_with(|| {
@@ -507,33 +485,13 @@ impl Config {
         Ok(())
     }
 
-    pub async fn write_prefix_map(path: &PathBuf, prefix_map: &NetworkPrefixMap) -> Result<()> {
-        let prefix_map_dir = path
-            .parent()
-            .ok_or_else(|| eyre!("Path {:?} should be inside a folder", path.display()))?;
-        let mut temp_file = NamedTempFile::new_in(prefix_map_dir)
-            .wrap_err_with(|| "Error creating temp file".to_string())?;
+    pub async fn update_default_prefix_map(&self, prefix_map: &NetworkPrefixMap) -> Result<()> {
+        self.write_prefix_map(prefix_map).await?;
+        self.set_default_prefix_map(prefix_map.genesis_key()).await
+    }
 
-        let serialized = Self::serialise_prefix_map(prefix_map)
-            .wrap_err("Failed to serialise NetworkPrefixMap")?;
-        temp_file
-            .write_all(serialized.as_slice())
-            .wrap_err_with(|| {
-                format!(
-                    "Unable to write temp NetworkPrefixMap to '{}'",
-                    temp_file.path().display()
-                )
-            })?;
-        fs::rename(temp_file.path(), path).await.wrap_err_with(|| {
-            format!(
-                "Error while renaming NetworkPrefixMap file from {:?} to {:?}",
-                temp_file.path().display(),
-                path.display()
-            )
-        })?;
-        debug!("NetworkPrefixMap written at {:?}", path.display());
-
-        Ok(())
+    pub async fn write_prefix_map(&self, prefix_map: &NetworkPrefixMap) -> Result<()> {
+        write_prefix_map(&self.prefix_maps_dir, prefix_map).await
     }
 
     pub async fn retrieve_local_prefix_map(location: &Path) -> Result<NetworkPrefixMap> {
@@ -633,13 +591,46 @@ impl Config {
     }
 }
 
+async fn write_prefix_map(path: &Path, prefix_map: &NetworkPrefixMap) -> Result<()> {
+    let mut temp_file =
+        NamedTempFile::new_in(path).wrap_err_with(|| "Error creating temp file".to_string())?;
+
+    let serialized = Config::serialise_prefix_map(prefix_map)
+        .wrap_err("Failed to serialise NetworkPrefixMap")?;
+    temp_file
+        .write_all(serialized.as_slice())
+        .wrap_err_with(|| {
+            format!(
+                "Unable to write temp NetworkPrefixMap to '{}'",
+                temp_file.path().display()
+            )
+        })?;
+
+    let target_filepath = path.join(format!("{:?}", prefix_map.genesis_key()));
+    fs::rename(temp_file.path(), &target_filepath)
+        .await
+        .wrap_err_with(|| {
+            format!(
+                "Error while renaming NetworkPrefixMap file from {:?} to {:?}",
+                temp_file.path().display(),
+                target_filepath.display()
+            )
+        })?;
+    debug!(
+        "NetworkPrefixMap written at {:?}",
+        target_filepath.display()
+    );
+
+    Ok(())
+}
+
 #[cfg(test)]
 pub mod test_utils {
-    use super::{Config, NetworkInfo};
+    use super::{write_prefix_map, Config, NetworkInfo};
     use crate::operations::config::Settings;
     use assert_fs::{prelude::*, TempDir};
     use color_eyre::{eyre::eyre, Result};
-    use sn_api::{NetworkPrefixMap, DEFAULT_PREFIX_HARDLINK_NAME};
+    use sn_api::{NetworkPrefixMap, DEFAULT_PREFIX_MAP_FILE_NAME};
     use std::collections::BTreeMap;
     use std::path::{Path, PathBuf};
     use tokio::fs;
@@ -653,9 +644,8 @@ pub mod test_utils {
         for _ in 0..n_prefix_maps {
             let sk = bls::SecretKey::random();
             let prefix_map = NetworkPrefixMap::new(sk.public_key());
-            let filename = format!("{:?}", prefix_map.genesis_key());
 
-            Config::write_prefix_map(&path.join(filename), &prefix_map).await?;
+            write_prefix_map(path, &prefix_map).await?;
             prefix_maps.push(prefix_map);
         }
         Ok(prefix_maps)
@@ -687,7 +677,7 @@ pub mod test_utils {
             let prefix_maps = store_dummy_prefix_maps(&self.prefix_maps_dir, n_prefix_maps).await?;
             // set one as default
             let prefix_map = prefix_maps.clone().pop().unwrap();
-            self.set_default_prefix_map(format!("{:?}", prefix_map.genesis_key()))
+            self.set_default_prefix_map(prefix_map.genesis_key())
                 .await?;
             Ok(prefix_maps)
         }
@@ -720,7 +710,7 @@ pub mod test_utils {
                         .file_name()
                         .into_string()
                         .map_err(|_| eyre!("Error converting OsString to String"))?;
-                    if filename != *DEFAULT_PREFIX_HARDLINK_NAME {
+                    if filename != *DEFAULT_PREFIX_MAP_FILE_NAME {
                         let already_present = prefix_map_checklist.insert(filename, true);
                         // cannot insert new entries. Denotes that an extra network is found in
                         // prefix_maps_dir
@@ -880,7 +870,7 @@ mod constructor {
 mod read_prefix_map {
     use super::Config;
     use color_eyre::Result;
-    use sn_api::DEFAULT_PREFIX_HARDLINK_NAME;
+    use sn_api::DEFAULT_PREFIX_MAP_FILE_NAME;
     use tokio::fs;
 
     #[tokio::test]
@@ -904,7 +894,7 @@ mod read_prefix_map {
         let tmp_dir = assert_fs::TempDir::new()?;
         let config = Config::create_config(&tmp_dir, None).await?;
         let _ = config.store_dummy_prefix_maps_and_set_default(1).await?;
-        fs::remove_file(&config.prefix_maps_dir.join(DEFAULT_PREFIX_HARDLINK_NAME)).await?;
+        fs::remove_file(&config.prefix_maps_dir.join(DEFAULT_PREFIX_MAP_FILE_NAME)).await?;
 
         let retrieved_prefix_map = config.read_default_prefix_map().await;
         assert!(retrieved_prefix_map.is_err(), "Hardlink should not exist");
@@ -929,7 +919,7 @@ mod sync_prefix_maps_and_settings {
     use crate::operations::config::{test_utils::store_dummy_prefix_maps, NetworkInfo, Settings};
     use color_eyre::eyre::eyre;
     use color_eyre::Result;
-    use sn_api::DEFAULT_PREFIX_HARDLINK_NAME;
+    use sn_api::DEFAULT_PREFIX_MAP_FILE_NAME;
     use tokio::fs;
 
     #[tokio::test]
@@ -1145,7 +1135,7 @@ mod sync_prefix_maps_and_settings {
                 .join(format!("{:?}", prefix_map.genesis_key())),
         )
         .await?;
-        fs::remove_file(config.prefix_maps_dir.join(DEFAULT_PREFIX_HARDLINK_NAME)).await?;
+        fs::remove_file(config.prefix_maps_dir.join(DEFAULT_PREFIX_MAP_FILE_NAME)).await?;
         config.sync().await?;
         assert_eq!(config.settings.networks.len(), 0);
         config.compare_settings_and_prefix_maps_dir().await?;

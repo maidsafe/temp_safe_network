@@ -19,7 +19,7 @@ pub mod wallet;
 
 pub use crate::safeurl::*;
 pub use consts::DEFAULT_XORURL_BASE;
-pub use sn_client::DEFAULT_PREFIX_HARDLINK_NAME;
+pub use sn_client::DEFAULT_PREFIX_MAP_FILE_NAME;
 pub use sn_interface::network_knowledge::prefix_map::NetworkPrefixMap;
 pub use xor_name::{XorName, XOR_NAME_LEN};
 
@@ -110,6 +110,16 @@ impl Safe {
     /// Returns true if we already have a connection with the network
     pub fn is_connected(&self) -> bool {
         self.client.is_some()
+    }
+
+    /// NetworkPrefixMap used to bootstrap on the network.
+    ///
+    /// This is updated by as Anti-Entropy/update messages are received from the network.
+    /// Any user of this API is responsible for caching it so it can use it for any new `Safe`
+    /// instance, preventing it from learning all this information from the network all over again.
+    pub async fn get_prefix_map(&self) -> Result<NetworkPrefixMap> {
+        let prefix_map = self.get_safe_client()?.get_prefix_map().await;
+        Ok(prefix_map)
     }
 
     // Private helper to obtain the Client instance

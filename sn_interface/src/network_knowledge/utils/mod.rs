@@ -40,44 +40,56 @@ pub async fn write_prefix_map_to_disk(prefix_map: &NetworkPrefixMap, path: &Path
     let serialized =
         serde_json::to_vec(prefix_map).map_err(|e| Error::Serialisation(e.to_string()))?;
 
-    temp_file
-        .write_all(serialized.as_slice())
-        .map_err(|e| Error::FileHandling(e.to_string()))?;
+    temp_file.write_all(serialized.as_slice()).map_err(|e| {
+        Error::FileHandling(format!(
+            "Error writing tempfile at {}: {:?}",
+            temp_file.path().display(),
+            e
+        ))
+    })?;
 
-    fs::rename(temp_file.path(), &path)
-        .await
-        .map_err(|e| Error::FileHandling(e.to_string()))?;
+    fs::rename(temp_file.path(), &path).await.map_err(|e| {
+        Error::FileHandling(format!(
+            "Error renaming tempfile from {} to {}: {:?}",
+            temp_file.path().display(),
+            path.display(),
+            e
+        ))
+    })?;
 
-    trace!("Wrote prefix_map to disk: {}", path.display());
+    trace!("Wrote PrefixMap to disk: {}", path.display());
 
     Ok(())
 }
 
 /// Read the default NetworkPrefixMap from disk
 pub async fn read_prefix_map_from_disk(path: &Path) -> Result<NetworkPrefixMap> {
-    match fs::File::open(path).await {
-        Ok(mut prefix_map_file) => {
-            let mut prefix_map_contents = vec![];
-            let _ = prefix_map_file
-                .read_to_end(&mut prefix_map_contents)
-                .await
-                .map_err(|err| {
-                    Error::FileHandling(format!(
-                        "Error reading PrefixMap from {}: {:?}",
-                        path.display(),
-                        err
-                    ))
-                })?;
+    let mut prefix_map_file = fs::File::open(path).await.map_err(|err| {
+        Error::FileHandling(format!(
+            "Error opening PrefixMap file from {}: {:?}",
+            path.display(),
+            err
+        ))
+    })?;
 
-            let prefix_map: NetworkPrefixMap = serde_json::from_slice(&prefix_map_contents)
-                .map_err(|err| {
-                    Error::FileHandling(format!(
-                        "Error deserializing PrefixMap from disk: {:?}",
-                        err
-                    ))
-                })?;
-            Ok(prefix_map)
-        }
-        Err(e) => Err(Error::FailedToParse(e.to_string())),
-    }
+    let mut prefix_map_contents = vec![];
+    let _ = prefix_map_file
+        .read_to_end(&mut prefix_map_contents)
+        .await
+        .map_err(|err| {
+            Error::FileHandling(format!(
+                "Error reading PrefixMap from {}: {:?}",
+                path.display(),
+                err
+            ))
+        })?;
+
+    let prefix_map: NetworkPrefixMap =
+        serde_json::from_slice(&prefix_map_contents).map_err(|err| {
+            Error::FailedToParse(format!(
+                "Error deserializing PrefixMap from disk: {:?}",
+                err
+            ))
+        })?;
+    Ok(prefix_map)
 }

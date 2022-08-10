@@ -13,7 +13,7 @@ use crate::{
         messaging::{send_msg, NUM_OF_ELDERS_SUBSET_FOR_QUERIES},
         PendingCmdAcks,
     },
-    Error, Result, DEFAULT_PREFIX_HARDLINK_NAME,
+    Error, Result,
 };
 
 use sn_interface::{
@@ -23,9 +23,7 @@ use sn_interface::{
         system::{AntiEntropyKind, KeyedSig, SectionAuth, SystemMsg},
         AuthKind, AuthorityProof, Dst, MsgId, MsgType, NodeMsgAuthority, ServiceAuth, WireMsg,
     },
-    network_knowledge::{
-        utils::write_prefix_map_to_disk, NetworkKnowledge, SectionAuthorityProvider,
-    },
+    network_knowledge::{NetworkKnowledge, SectionAuthorityProvider},
     types::{log_markers::LogMarker, Peer},
 };
 
@@ -35,8 +33,7 @@ use itertools::Itertools;
 use qp2p::{Close, ConnectionError, ConnectionIncoming as IncomingMsgs, SendError};
 use rand::{rngs::OsRng, seq::SliceRandom};
 use secured_linked_list::SecuredLinkedList;
-use std::{net::SocketAddr, path::Path};
-use tokio::fs;
+use std::net::SocketAddr;
 use tracing::Instrument;
 
 impl Session {
@@ -376,27 +373,12 @@ impl Session {
             &proof_chain,
         );
 
-        let prefix_map = session.network.read().await.clone();
         match result {
             Ok(true) => {
                 debug!(
                     "Anti-Entropy: updated remote section SAP updated for {:?}",
                     sap.prefix()
                 );
-                let path_with_genesis_key = session
-                    .prefix_maps_dir
-                    .join(format!("{:?}", prefix_map.genesis_key()));
-
-                // Update the PrefixMap on disk
-                if let Err(e) = write_prefix_map_to_disk(&prefix_map, &path_with_genesis_key).await
-                {
-                    error!(
-                        "Error writing freshly updated PrefixMap to client dir: {:?}",
-                        e
-                    );
-                }
-
-                set_default_prefix_map(&session.prefix_maps_dir, &path_with_genesis_key).await;
             }
             Ok(false) => {
                 debug!(
@@ -504,39 +486,5 @@ impl Session {
         }
 
         Ok(Some((msg_id, target_elders, service_msg, dst, auth)))
-    }
-}
-
-// Create hardlink '.safe/prefix_maps/default' that points to the PrefixMap corresponding to
-// the given genesis_key
-async fn set_default_prefix_map(prefix_maps_dir: &Path, path_with_genesis_key: &Path) {
-    let prefix_map_hardlink = prefix_maps_dir.join(DEFAULT_PREFIX_HARDLINK_NAME);
-
-    if prefix_map_hardlink.exists() {
-        trace!(
-            "Remove default prefix_map hardlink since it already exists: '{}'",
-            prefix_map_hardlink.display()
-        );
-        if let Err(e) = fs::remove_file(&prefix_map_hardlink).await {
-            error!(
-                "Error removing previous PrefixMap hardlink from '{}': {:?}",
-                prefix_map_hardlink.display(),
-                e
-            );
-            return;
-        }
-    }
-
-    trace!(
-        "Creating hardlink for PrefixMap from {} to {}",
-        path_with_genesis_key.display(),
-        prefix_map_hardlink.display()
-    );
-    if let Err(e) = fs::hard_link(&path_with_genesis_key, &prefix_map_hardlink).await {
-        error!(
-            "Error creating default PrefixMap hardlink '{}': {:?}",
-            prefix_map_hardlink.display(),
-            e
-        );
     }
 }
