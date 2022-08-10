@@ -7,6 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 #![allow(dead_code, unused_imports)]
+pub(crate) mod cmd_utils;
+pub(crate) mod network_utils;
 
 use crate::comm::{Comm, MsgEvent};
 use crate::dbs::UsedSpace;
@@ -15,8 +17,8 @@ use crate::node::{
     flow_ctrl::{dispatcher::Dispatcher, event_channel},
     messages::WireMsgUtils,
     messaging::{OutgoingMsg, Peers},
-    relocation_check, ChurnId, Cmd, Error, Event, MembershipEvent, Node, Proposal, RateLimits,
-    Result as RoutingResult, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
+    Cmd, Error, Event, MembershipEvent, Node, Proposal, RateLimits, Result as RoutingResult,
+    RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
 };
 
 use sn_consensus::Decision;
@@ -31,19 +33,17 @@ use sn_interface::{
             NodeMsgAuthorityUtils, NodeState as NodeStateMsg, RelocateDetails, ResourceProof,
             SectionAuth, SystemMsg,
         },
-        AuthKind, AuthorityProof, Dst, MsgId, MsgType, NodeAuth, SectionAuth as MsgKindSectionAuth,
-        WireMsg,
+        Dst, MsgId, MsgType, SectionAuth as MsgKindSectionAuth, WireMsg,
     },
     network_knowledge::{
         recommended_section_size, supermajority, test_utils::*, NetworkKnowledge, NodeInfo,
         NodeState, SectionAuthorityProvider, SectionKeyShare, FIRST_SECTION_MAX_AGE,
         FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
     },
-    types::{keyed_signed, keys::ed25519, Keypair, Peer, PublicKey, SecretKeySet},
+    types::{keyed_signed, keys::ed25519, Peer, PublicKey, SecretKeySet},
 };
 
 use assert_matches::assert_matches;
-use bls::Signature;
 use bls_dkg::message::Message;
 use ed25519_dalek::Signer;
 use eyre::{bail, eyre, Context, Result};
@@ -66,40 +66,19 @@ use tokio::{
 };
 use xor_name::{Prefix, XorName};
 
-static TEST_EVENT_CHANNEL_SIZE: usize = 20;
-
 #[tokio::test]
 async fn receive_join_request_without_resource_proof_response() -> Result<()> {
     let local = tokio::task::LocalSet::new();
-
-    // Run the local task set.
     local
         .run_until(async move {
             let prefix1 = Prefix::default().pushed(true);
-            let (section_auth, mut nodes, sk_set) = random_sap(prefix1, elder_count());
+            let (dispatcher, _, _, sk_set) =
+                network_utils::TestNodeBuilder::new(prefix1, elder_count())
+                    .build()
+                    .await?;
+            let section_key = sk_set.public_keys().public_key();
 
-            let pk_set = sk_set.public_keys();
-            let section_key = pk_set.public_key();
-
-            let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
-            let node = nodes.remove(0);
-            let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-
-            let comm = create_comm().await?;
-
-            let node = Node::new(
-                comm.socket_addr(),
-                node.keypair.clone(),
-                section,
-                Some(section_key_share),
-                event_channel::new(TEST_EVENT_CHANNEL_SIZE).0,
-                UsedSpace::new(max_capacity),
-                root_storage_dir,
-            )
-            .await?;
-            let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
-
-            let new_node_comm = create_comm().await?;
+            let new_node_comm = network_utils::create_comm().await?;
             let new_node = NodeInfo::new(
                 ed25519::gen_keypair(&prefix1.range_inclusive(), MIN_ADULT_AGE),
                 new_node_comm.socket_addr(),
@@ -117,7 +96,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
 
             let original_bytes = wire_msg.serialize()?;
 
-            let all_cmds = run_and_collect_cmds(
+            let all_cmds = cmd_utils::run_and_collect_cmds(
                 Cmd::ValidateMsg {
                     origin: new_node.peer(),
                     wire_msg,
@@ -144,34 +123,16 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
 
 #[tokio::test]
 async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result<()> {
-    // Construct a local task set that can run `!Send` futures.
     let local = tokio::task::LocalSet::new();
-
-    // Run the local task set.
     local
         .run_until(async move {
             let prefix1 = Prefix::default().pushed(true);
-            let (section_auth, mut nodes, sk_set) = random_sap(prefix1, elder_count());
-
-            let pk_set = sk_set.public_keys();
-            let section_key = pk_set.public_key();
-
-            let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
-            let node = nodes.remove(0);
-            let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-            let comm = create_comm().await?;
-            let node = Node::new(
-                comm.socket_addr(),
-                node.keypair.clone(),
-                section,
-                Some(section_key_share),
-                event_channel::new(TEST_EVENT_CHANNEL_SIZE).0,
-                UsedSpace::new(max_capacity),
-                root_storage_dir,
-            )
-            .await?;
-            let node = Arc::new(RwLock::new(node));
-            let dispatcher = Dispatcher::new(node.clone(), comm);
+            let (dispatcher, _, _, sk_set) =
+                network_utils::TestNodeBuilder::new(prefix1, elder_count())
+                    .build()
+                    .await?;
+            let section_key = sk_set.public_keys().public_key();
+            let node = dispatcher.node();
 
             let new_node = NodeInfo::new(
                 ed25519::gen_keypair(&prefix1.range_inclusive(), MIN_ADULT_AGE),
@@ -207,7 +168,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
 
             let original_bytes = wire_msg.serialize()?;
 
-            let _ = run_and_collect_cmds(
+            let _ = cmd_utils::run_and_collect_cmds(
                 Cmd::ValidateMsg {
                     origin: new_node.peer(),
                     wire_msg,
@@ -238,36 +199,20 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
 #[tokio::test]
 async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result<()> {
     let local = tokio::task::LocalSet::new();
-
-    // Run the local task set.
     local
         .run_until(async move {
             init_logger();
             let _span = tracing::info_span!("receive_join_request_from_relocated_node").entered();
 
-            let (section_auth, mut nodes, sk_set) = create_section_auth();
-
-            let pk_set = sk_set.public_keys();
-            let section_key = pk_set.public_key();
-
-            let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
-            let node = nodes.remove(0);
-            let relocated_node_old_name = node.name();
-            let relocated_node_old_keypair = node.keypair.clone();
-            let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-            let comm = create_comm().await?;
-            let node = Node::new(
-                comm.socket_addr(),
-                node.keypair.clone(),
-                section,
-                Some(section_key_share),
-                event_channel::new(TEST_EVENT_CHANNEL_SIZE).0,
-                UsedSpace::new(max_capacity),
-                root_storage_dir,
-            )
-            .await?;
-            let node = Arc::new(RwLock::new(node));
-            let dispatcher = Dispatcher::new(node.clone(), comm);
+            let (dispatcher, _, _, sk_set) =
+                network_utils::TestNodeBuilder::new(Prefix::default(), elder_count())
+                    .build()
+                    .await?;
+            let section_key = sk_set.public_keys().public_key();
+            let node = dispatcher.node();
+            let node_info = node.read().await.info();
+            let relocated_node_old_name = node_info.name();
+            let relocated_node_old_keypair = node_info.keypair.clone();
 
             let relocated_node = NodeInfo::new(
                 ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE + 1),
@@ -307,7 +252,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
 
             let original_bytes = wire_msg.serialize()?;
 
-            let _ = run_and_collect_cmds(
+            let _ = cmd_utils::run_and_collect_cmds(
                 Cmd::ValidateMsg {
                     origin: relocated_node.peer(),
                     wire_msg,
@@ -332,42 +277,32 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
 
 #[tokio::test]
 async fn handle_agreement_on_online() -> Result<()> {
-    let (event_sender, mut event_receiver) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
-
-    // Construct a local task set that can run `!Send` futures.
+    let (event_sender, mut event_receiver) =
+        event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE);
     let local = tokio::task::LocalSet::new();
-
-    // Run the local task set.
     local
         .run_until(async move {
-            let prefix = Prefix::default();
+            let (dispatcher, section, _, sk_set) =
+                network_utils::TestNodeBuilder::new(Prefix::default(), elder_count())
+                    .event_sender(event_sender)
+                    .build()
+                    .await?;
 
-            let (section_auth, mut nodes, sk_set) =
-                random_sap(prefix, elder_count());
-            let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
-            let node = nodes.remove(0);
-            let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-            let comm = create_comm().await?;
-            let node = Node::new(
-                comm.socket_addr(),
-                node.keypair.clone(),
-                section,
-                Some(section_key_share),
-                event_sender,
-                UsedSpace::new(max_capacity),
-                root_storage_dir,
+            let new_peer = network_utils::create_peer(MIN_ADULT_AGE);
+            let status = cmd_utils::handle_online_cmd(
+                &new_peer,
+                &sk_set,
+                &dispatcher,
+                &section.authority_provider(),
             )
             .await?;
-            let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
-
-            let new_peer = create_peer(MIN_ADULT_AGE);
-
-            let status = handle_online_cmd(&new_peer, &sk_set, &dispatcher, &section_auth).await?;
             assert!(status.node_approval_sent);
 
-            assert_matches!(event_receiver.next().await, Some(Event::Membership(MembershipEvent::MemberJoined { name, age, .. })) => {
-                assert_eq!(name, new_peer.name());
-                assert_eq!(age, MIN_ADULT_AGE);
+            assert_matches!(
+                event_receiver.next().await,
+                Some(Event::Membership(MembershipEvent::MemberJoined { name, age, .. })) => {
+                    assert_eq!(name, new_peer.name());
+                    assert_eq!(age, MIN_ADULT_AGE);
             });
 
             Result::<()>::Ok(())
@@ -378,11 +313,7 @@ async fn handle_agreement_on_online() -> Result<()> {
 #[tokio::test]
 async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     init_logger();
-
-    // Construct a local task set that can run `!Send` futures.
     let local = tokio::task::LocalSet::new();
-
-    // Run the local task set.
     local
         .run_until(async move {
             let sk_set = SecretKeySet::random();
@@ -419,38 +350,30 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
 
             let node = nodes.remove(0);
             let node_name = node.name();
-            let section_key_share = create_section_key_share(&sk_set, 0);
-            let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-            let comm = create_comm().await?;
-            let node = Node::new(
-                comm.socket_addr(),
-                node.keypair.clone(),
-                section,
-                Some(section_key_share),
-                event_channel::new(TEST_EVENT_CHANNEL_SIZE).0,
-                UsedSpace::new(max_capacity),
-                root_storage_dir,
-            )
-            .await?;
-            let node = Arc::new(RwLock::new(node));
-            let dispatcher = Dispatcher::new(node.clone(), comm);
+            let (dispatcher, _, _, _) =
+                network_utils::TestNodeBuilder::new(Prefix::default(), elder_count())
+                    .section(section.clone(), sk_set.clone(), node.clone())
+                    .build()
+                    .await?;
 
             // Handle agreement on Online of a peer that is older than the youngest
             // current elder - that means this peer is going to be promoted.
-            let new_peer = create_peer(MIN_ADULT_AGE + 1);
+            let new_peer = network_utils::create_peer(MIN_ADULT_AGE + 1);
             let node_state = NodeState::joined(new_peer, Some(xor_name::rand::random()));
 
             let membership_decision = section_decision(&sk_set, node_state.to_msg())?;
 
             // Force this node to join
-            node.write()
+            dispatcher
+                .node()
+                .write()
                 .await
                 .membership
                 .as_mut()
                 .unwrap()
                 .force_bootstrap(node_state.to_msg());
 
-            let cmds = run_and_collect_cmds(
+            let cmds = cmd_utils::run_and_collect_cmds(
                 Cmd::HandleMembershipDecision(membership_decision),
                 &dispatcher,
             )
@@ -474,7 +397,6 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                     Ok(SystemMsg::DkgStart(session)) => session.elders,
                     _ => continue,
                 };
-
                 itertools::assert_equal(
                     actual_elder_candidates,
                     expected_new_elders.iter().map(|p| (p.name(), p.addr())),
@@ -500,106 +422,20 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         .await
 }
 
-// Handles a consensus-ed Online proposal.
-async fn handle_online_cmd(
-    peer: &Peer,
-    sk_set: &SecretKeySet,
-    dispatcher: &Dispatcher,
-    section_auth: &SectionAuthorityProvider,
-) -> Result<HandleOnlineStatus> {
-    let node_state = NodeState::joined(*peer, None);
-    let membership_decision = section_decision(sk_set, node_state.to_msg())?;
-
-    let all_cmds = run_and_collect_cmds(
-        Cmd::HandleMembershipDecision(membership_decision),
-        dispatcher,
-    )
-    .await?;
-
-    let mut status = HandleOnlineStatus {
-        node_approval_sent: false,
-        relocate_details: None,
-    };
-
-    for cmd in all_cmds {
-        let (msg, recipients) = match cmd {
-            Cmd::SendMsg {
-                recipients,
-                msg: OutgoingMsg::System(msg),
-                ..
-            } => (msg, recipients),
-            _ => continue,
-        };
-
-        match msg {
-            SystemMsg::JoinResponse(response) => {
-                if let JoinResponse::Approved {
-                    section_auth: signed_sap,
-                    ..
-                } = *response
-                {
-                    assert_eq!(signed_sap.value, section_auth.clone().to_msg());
-                    assert_matches!(recipients, Peers::Multiple(peers) => {
-                        assert_eq!(peers, BTreeSet::from([*peer]));
-                    });
-                    status.node_approval_sent = true;
-                }
-            }
-            SystemMsg::Propose {
-                proposal: sn_interface::messaging::system::Proposal::Offline(node_state),
-                ..
-            } => {
-                if let MembershipState::Relocated(details) = node_state.state {
-                    if details.previous_name != peer.name() {
-                        continue;
-                    }
-                    status.relocate_details = Some(*details.clone());
-                }
-            }
-            _ => continue,
-        }
-    }
-
-    Ok(status)
-}
-
-struct HandleOnlineStatus {
-    node_approval_sent: bool,
-    relocate_details: Option<RelocateDetails>,
-}
-
 #[tokio::test]
 async fn handle_join_request_of_rejoined_node() -> Result<()> {
-    // Construct a local task set that can run `!Send` futures.
     let local = tokio::task::LocalSet::new();
-
-    // Run the local task set.
     local
         .run_until(async move {
             init_logger();
             let prefix = Prefix::default();
-            let (sap, mut node_infos, sk_set) = random_sap(prefix, elder_count());
-            let (section, section_key_share) = create_section(&sk_set, &sap)?;
-
-            // Make a Node
-            let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
-            let info = node_infos.remove(0);
-            let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-            let comm = create_comm().await?;
-            let node = Node::new(
-                comm.socket_addr(),
-                info.keypair.clone(),
-                section,
-                Some(section_key_share),
-                event_sender,
-                UsedSpace::new(max_capacity),
-                root_storage_dir,
-            )
-            .await?;
-            let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
+            let (dispatcher, _, _, _) =
+                network_utils::TestNodeBuilder::new(Prefix::default(), elder_count())
+                    .build()
+                    .await?;
 
             // Make a left peer.
-            let peer = create_peer_in_prefix(&prefix, MIN_ADULT_AGE);
+            let peer = network_utils::create_peer_in_prefix(&prefix, MIN_ADULT_AGE);
             dispatcher
                 .node()
                 .write()
@@ -634,50 +470,31 @@ async fn handle_join_request_of_rejoined_node() -> Result<()> {
 
 #[tokio::test]
 async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
-    // Construct a local task set that can run `!Send` futures.
     let local = tokio::task::LocalSet::new();
-
-    // Run the local task set.
     local
         .run_until(async move {
             init_logger();
             let _span = tracing::info_span!("handle_agreement_on_offline_of_non_elder").entered();
+            let existing_peer = network_utils::create_peer(MIN_ADULT_AGE);
 
-            let (section_auth, mut nodes, sk_set) = create_section_auth();
-
-            let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
-
-            let existing_peer = create_peer(MIN_ADULT_AGE);
-
-            let node_state = NodeState::joined(existing_peer, None);
-            let node_state = section_signed(sk_set.secret_key(), node_state)?;
-            let _updated = section.update_member(node_state);
-
-            let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
-            let node = nodes.remove(0);
-            let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-            let comm = create_comm().await?;
-            let node = Node::new(
-                comm.socket_addr(),
-                node.keypair.clone(),
-                section,
-                Some(section_key_share),
-                event_sender,
-                UsedSpace::new(max_capacity),
-                root_storage_dir,
-            )
-            .await?;
-            let node = Arc::new(RwLock::new(node));
-            let dispatcher = Dispatcher::new(node.clone(), comm);
+            let (dispatcher, _, _, sk_set) =
+                network_utils::TestNodeBuilder::new(Prefix::default(), elder_count())
+                    .custom_peer(existing_peer)
+                    .build()
+                    .await?;
 
             let node_state = NodeState::left(existing_peer, None);
             let proposal = Proposal::Offline(node_state.clone());
             let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
-            let _cmds =
-                run_and_collect_cmds(Cmd::HandleAgreement { proposal, sig }, &dispatcher).await?;
+            let _cmds = cmd_utils::run_and_collect_cmds(
+                Cmd::HandleAgreement { proposal, sig },
+                &dispatcher,
+            )
+            .await?;
 
-            assert!(!node
+            assert!(!dispatcher
+                .node()
                 .read()
                 .await
                 .network_knowledge()
@@ -690,17 +507,14 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
 
 #[tokio::test]
 async fn handle_agreement_on_offline_of_elder() -> Result<()> {
-    // Construct a local task set that can run `!Send` futures.
     let local = tokio::task::LocalSet::new();
-
-    // Run the local task set.
     local
         .run_until(async move {
-            let (section_auth, mut nodes, sk_set) = create_section_auth();
+            let (section_auth, mut nodes, sk_set) = network_utils::create_section_auth();
 
-            let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
+            let (section, _) = network_utils::create_section(&sk_set, &section_auth)?;
 
-            let existing_peer = create_peer(MIN_ADULT_AGE);
+            let existing_peer = network_utils::create_peer(MIN_ADULT_AGE);
             let node_state = NodeState::joined(existing_peer, None);
             let node_state = section_signed(sk_set.secret_key(), node_state)?;
             let _updated = section.update_member(node_state);
@@ -714,34 +528,25 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
                 .expect("member not found")
                 .leave()?;
 
-            // Create our node
-            let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
-            let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let node = nodes.remove(0);
-            let comm = create_comm().await?;
-            let node = Node::new(
-                comm.socket_addr(),
-                node.keypair.clone(),
-                section,
-                Some(section_key_share),
-                event_sender,
-                UsedSpace::new(max_capacity),
-                root_storage_dir,
-            )
-            .await?;
-            let node = Arc::new(RwLock::new(node));
-            let dispatcher = Dispatcher::new(node.clone(), comm);
-
+            let (dispatcher, _, _, _) =
+                network_utils::TestNodeBuilder::new(Prefix::default(), elder_count())
+                    .section(section.clone(), sk_set.clone(), node.clone())
+                    .build()
+                    .await?;
             // Handle agreement on the Offline proposal
             let proposal = Proposal::Offline(remove_node_state.clone());
             let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
-            let _cmds =
-                run_and_collect_cmds(Cmd::HandleAgreement { proposal, sig }, &dispatcher).await?;
+            let _cmds = cmd_utils::run_and_collect_cmds(
+                Cmd::HandleAgreement { proposal, sig },
+                &dispatcher,
+            )
+            .await?;
 
             // Verify we initiated a membership churn
-
-            assert!(node
+            assert!(dispatcher
+                .node()
                 .read()
                 .await
                 .membership
@@ -760,12 +565,9 @@ enum UntrustedMessageSource {
 }
 
 #[tokio::test]
-// Checking when we get AE info that is ahead of us we should handle it.
 async fn ae_msg_from_the_future_is_handled() -> Result<()> {
-    // Construct a local task set that can run `!Send` futures.
+    // The setup here is too complex for the TestNodeBuilder.
     let local = tokio::task::LocalSet::new();
-
-    // Run the local task set.
     local
         .run_until(async move {
             init_logger();
@@ -775,9 +577,9 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             let sk0 = bls::SecretKey::random();
             let pk0 = sk0.public_key();
 
-            let (old_sap, mut elders, sk_set1) = create_section_auth();
+            let (old_sap, mut nodes, sk_set1) = network_utils::create_section_auth();
             let members =
-                BTreeSet::from_iter(elders.iter().map(|n| NodeState::joined(n.peer(), None)));
+                BTreeSet::from_iter(nodes.iter().map(|n| NodeState::joined(n.peer(), None)));
             let pk1 = sk_set1.secret_key().public_key();
             let pk1_signature = sk0.sign(bincode::serialize(&pk1)?);
 
@@ -789,14 +591,15 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
                 NetworkKnowledge::new(pk0, chain.clone(), signed_old_sap, None)?;
 
             // Create our node
-            let (event_sender, mut event_receiver) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
-            let section_key_share = create_section_key_share(&sk_set1, 0);
-            let elder = elders.remove(0);
+            let (event_sender, mut event_receiver) =
+                event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE);
+            let section_key_share = network_utils::create_section_key_share(&sk_set1, 0);
+            let node = nodes.remove(0);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-            let comm = create_comm().await?;
-            let mut elder = Node::new(
+            let comm = network_utils::create_comm().await?;
+            let mut node = Node::new(
                 comm.socket_addr(),
-                elder.keypair.clone(),
+                node.keypair.clone(),
                 network_knowledge,
                 Some(section_key_share),
                 event_sender,
@@ -812,11 +615,11 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             let pk2_signature = sk_set1.secret_key().sign(bincode::serialize(&pk2)?);
             chain.insert(&pk1, pk2, pk2_signature)?;
 
-            let old_elder = elders.remove(0);
+            let old_node = nodes.remove(0);
             let src_section_pk = pk2;
 
             // Create the new `SectionAuthorityProvider` by replacing the last peer with a new one.
-            let new_peer = create_peer(MIN_ADULT_AGE);
+            let new_peer = network_utils::create_peer(MIN_ADULT_AGE);
             let new_elders = old_sap
                 .elders()
                 .take(old_sap.elder_count() - 1)
@@ -835,7 +638,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
             // Create the `Sync` message containing the new `Section`.
             let wire_msg = WireMsg::single_src(
-                &old_elder,
+                &old_node,
                 Dst {
                     name: XorName::from(PublicKey::Bls(pk1)),
                     section_key: pk1,
@@ -853,17 +656,16 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
             // Simulate DKG round finished succesfully by adding
             // the new section key share to our cache
-            elder
-                .section_keys_provider
-                .insert(create_section_key_share(&sk_set2, 0));
+            node.section_keys_provider
+                .insert(network_utils::create_section_key_share(&sk_set2, 0));
 
-            let dispatcher = Dispatcher::new(Arc::new(RwLock::new(elder)), comm);
+            let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
             let original_bytes = wire_msg.serialize()?;
 
-            let _cmds = run_and_collect_cmds(
+            let _cmds = cmd_utils::run_and_collect_cmds(
                 Cmd::ValidateMsg {
-                    origin: old_elder.peer(),
+                    origin: old_node.peer(),
                     wire_msg,
                     original_bytes,
                 },
@@ -886,60 +688,35 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
         .await
 }
 
+/// Checking when we send AE info to a section from untrusted section, we do not handle it and
+/// error out.
 #[tokio::test]
-// Checking when we send AE info to a section from untrusted section, we do not handle it and error out
 async fn untrusted_ae_msg_errors() -> Result<()> {
-    // Construct a local task set that can run `!Send` futures.
     let local = tokio::task::LocalSet::new();
-
-    // Run the local task set.
     local
         .run_until(async move {
             init_logger();
             let _span = tracing::info_span!("untrusted_ae_msg_errors").entered();
 
-            let (our_section_auth, _, sk_set0) = create_section_auth();
-            let sk0 = sk_set0.secret_key();
-            let pk0 = sk0.public_key();
-
-            let section_signed_our_section_auth = section_signed(sk0, our_section_auth.clone())?;
-            let our_section = NetworkKnowledge::new(
-                pk0,
-                SecuredLinkedList::new(pk0),
-                section_signed_our_section_auth.clone(),
-                None,
-            )?;
+            let (dispatcher, section, _, sk_set) =
+                network_utils::TestNodeBuilder::new(Prefix::default(), elder_count())
+                    .build()
+                    .await?;
+            let pk = sk_set.secret_key().public_key();
 
             // a valid AE msg but with a non-verifiable SAP...
             let bogus_section_pk = bls::SecretKey::random().public_key();
+            let signed_sap = section.signed_sap();
             let node_msg = SystemMsg::AntiEntropy {
-                section_auth: section_signed_our_section_auth.value.clone().to_msg(),
-                section_signed: section_signed_our_section_auth.sig,
+                section_auth: signed_sap.value.clone().to_msg(),
+                section_signed: signed_sap.sig,
                 proof_chain: SecuredLinkedList::new(bogus_section_pk),
                 kind: AntiEntropyKind::Update {
                     members: BTreeSet::default(),
                 },
             };
 
-            let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
-            let info = gen_info(MIN_ADULT_AGE, None);
-            let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-            let comm = create_comm().await?;
-            let node = Node::new(
-                comm.socket_addr(),
-                info.keypair.clone(),
-                our_section,
-                None,
-                event_sender,
-                UsedSpace::new(max_capacity),
-                root_storage_dir,
-            )
-            .await?;
-
-            let node = Arc::new(RwLock::new(node));
-            let dispatcher = Dispatcher::new(node.clone(), comm);
-
-            let sender = gen_info(MIN_ADULT_AGE, None);
+            let sender = network_utils::gen_info(MIN_ADULT_AGE, None);
             let wire_msg = WireMsg::single_src(
                 &sender,
                 Dst {
@@ -953,7 +730,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
 
             let original_bytes = wire_msg.serialize()?;
 
-            let _cmds = run_and_collect_cmds(
+            let _cmds = cmd_utils::run_and_collect_cmds(
                 Cmd::ValidateMsg {
                     origin: sender.peer(),
                     wire_msg,
@@ -963,10 +740,24 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
             )
             .await?;
 
-            assert_eq!(node.read().await.network_knowledge().genesis_key(), &pk0);
             assert_eq!(
-                node.read().await.network_knowledge().prefix_map().all(),
-                vec![section_signed_our_section_auth.value]
+                dispatcher
+                    .node()
+                    .read()
+                    .await
+                    .network_knowledge()
+                    .genesis_key(),
+                &pk
+            );
+            assert_eq!(
+                dispatcher
+                    .node()
+                    .read()
+                    .await
+                    .network_knowledge()
+                    .prefix_map()
+                    .all(),
+                vec![signed_sap.value]
             );
             Result::<()>::Ok(())
         })
@@ -988,10 +779,7 @@ enum RelocatedPeerRole {
 }
 
 async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
-    // Construct a local task set that can run `!Send` futures.
     let local = tokio::task::LocalSet::new();
-
-    // Run the local task set.
     local
         .run_until(async move {
             let prefix: Prefix = "0".parse().unwrap();
@@ -1000,30 +788,31 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
                 RelocatedPeerRole::NonElder => recommended_section_size(),
             };
             let (section_auth, mut nodes, sk_set) = random_sap(prefix, elder_count());
-            let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
+            let (section, section_key_share) =
+                network_utils::create_section(&sk_set, &section_auth)?;
 
             let mut adults = section_size - elder_count();
             while adults > 0 {
                 adults -= 1;
-                let non_elder_peer = create_peer(MIN_ADULT_AGE);
+                let non_elder_peer = network_utils::create_peer(MIN_ADULT_AGE);
                 let node_state = NodeState::joined(non_elder_peer, None);
                 let node_state = section_signed(sk_set.secret_key(), node_state)?;
                 assert!(section.update_member(node_state));
             }
 
-            let non_elder_peer = create_peer(MIN_ADULT_AGE - 1);
+            let non_elder_peer = network_utils::create_peer(MIN_ADULT_AGE - 1);
             let node_state = NodeState::joined(non_elder_peer, None);
             let node_state = section_signed(sk_set.secret_key(), node_state)?;
             assert!(section.update_member(node_state));
             let node = nodes.remove(0);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-            let comm = create_comm().await?;
+            let comm = network_utils::create_comm().await?;
             let node = Node::new(
                 comm.socket_addr(),
                 node.keypair.clone(),
                 section,
                 Some(section_key_share),
-                event_channel::new(TEST_EVENT_CHANNEL_SIZE).0,
+                event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE).0,
                 UsedSpace::new(max_capacity),
                 root_storage_dir,
             )
@@ -1035,8 +824,9 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
                 RelocatedPeerRole::NonElder => non_elder_peer,
             };
 
-            let membership_decision = create_relocation_trigger(&sk_set, relocated_peer.age())?;
-            let cmds = run_and_collect_cmds(
+            let membership_decision =
+                network_utils::create_relocation_trigger(&sk_set, relocated_peer.age())?;
+            let cmds = cmd_utils::run_and_collect_cmds(
                 Cmd::HandleMembershipDecision(membership_decision),
                 &dispatcher,
             )
@@ -1074,14 +864,11 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
 
 #[tokio::test]
 async fn msg_to_self() -> Result<()> {
-    // Construct a local task set that can run `!Send` futures.
     let local = tokio::task::LocalSet::new();
-
-    // Run the local task set.
     local.run_until(async move {
-        let info = gen_info(MIN_ADULT_AGE, None);
-        let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
-        let (comm_tx, mut comm_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+        let info = network_utils::gen_info(MIN_ADULT_AGE, None);
+        let (event_sender, _) = event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE);
+        let (comm_tx, mut comm_rx) = mpsc::channel(network_utils::TEST_EVENT_CHANNEL_SIZE);
         let comm = Comm::first_node(
             (Ipv4Addr::LOCALHOST, 0).into(),
             Default::default(),
@@ -1135,22 +922,19 @@ async fn msg_to_self() -> Result<()> {
 
 #[tokio::test]
 async fn handle_elders_update() -> Result<()> {
-    // Construct a local task set that can run `!Send` futures.
+    // The setup here is too complex for the TestNodeBuilder.
     let local = tokio::task::LocalSet::new();
-
-    // Run the local task set.
     local.run_until(async move {
-
         init_logger();
         let _span = tracing::info_span!("handle_elders_update").entered();
         // Start with section that has `elder_count()` elders with age 6, 1 non-elder with age 5 and one
         // to-be-elder with age 7:
-        let info = gen_info(MIN_ADULT_AGE + 1, None);
-        let mut other_elder_peers: Vec<_> = iter::repeat_with(|| create_peer(MIN_ADULT_AGE + 1))
+        let info = network_utils::gen_info(MIN_ADULT_AGE + 1, None);
+        let mut other_elder_peers: Vec<_> = iter::repeat_with(|| network_utils::create_peer(MIN_ADULT_AGE + 1))
             .take(elder_count() - 1)
             .collect();
-        let adult_peer = create_peer(MIN_ADULT_AGE);
-        let promoted_peer = create_peer(MIN_ADULT_AGE + 2);
+        let adult_peer = network_utils::create_peer(MIN_ADULT_AGE);
+        let promoted_peer = network_utils::create_peer(MIN_ADULT_AGE + 2);
 
         let members = BTreeSet::from_iter(
             [info.peer(), adult_peer, promoted_peer]
@@ -1169,7 +953,7 @@ async fn handle_elders_update() -> Result<()> {
             0,
         );
 
-        let (section0, section_key_share) = create_section(&sk_set0, &sap0)?;
+        let (section0, section_key_share) = network_utils::create_section(&sk_set0, &sap0)?;
 
         for peer in [&adult_peer, &promoted_peer] {
             let node_state = NodeState::joined(*peer, None);
@@ -1203,13 +987,13 @@ async fn handle_elders_update() -> Result<()> {
             public_key: pk0,
         };
 
-        let (event_sender, mut event_receiver) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
+        let (event_sender, mut event_receiver) = event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE);
         let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-        let comm = create_comm().await?;
+        let comm = network_utils::create_comm().await?;
         let mut node = Node::new(
             comm.socket_addr(),
             info.keypair.clone(),
-            section0,
+            section0.clone(),
             Some(section_key_share),
             event_sender,
             UsedSpace::new(max_capacity),
@@ -1220,11 +1004,11 @@ async fn handle_elders_update() -> Result<()> {
         // Simulate DKG round finished succesfully by adding
         // the new section key share to our cache
         node.section_keys_provider
-            .insert(create_section_key_share(&sk_set1, 0));
+            .insert(network_utils::create_section_key_share(&sk_set1, 0));
 
         let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
-        let cmds = run_and_collect_cmds(Cmd::HandleNewEldersAgreement { new_elders: signed_sap1, sig }, &dispatcher).await?;
+        let cmds = cmd_utils::run_and_collect_cmds(Cmd::HandleNewEldersAgreement { new_elders: signed_sap1, sig }, &dispatcher).await?;
 
         let mut update_actual_recipients = HashSet::new();
 
@@ -1244,6 +1028,7 @@ async fn handle_elders_update() -> Result<()> {
             };
 
             assert_eq!(proof_chain.last_key(), &pk1);
+
 
             // Merging the section contained in the message with the original section succeeds.
             // TODO: how to do this here?
@@ -1274,13 +1059,11 @@ async fn handle_elders_update() -> Result<()> {
    }).await
 }
 
-// Test that demoted node still sends `Sync` messages on split.
+/// Test that demoted node still sends `Sync` messages on split.
 #[tokio::test]
 async fn handle_demote_during_split() -> Result<()> {
-    // Construct a local task set that can run `!Send` futures.
+    // The setup here is too complex for the TestNodeBuilder.
     let local = tokio::task::LocalSet::new();
-
-    // Run the local task set.
     local
         .run_until(async move {
             init_logger();
@@ -1290,22 +1073,22 @@ async fn handle_demote_during_split() -> Result<()> {
             let prefix1 = Prefix::default().pushed(true);
 
             //right not info/node could be in either section...
-            let info = gen_info(MIN_ADULT_AGE, None);
+            let info = network_utils::gen_info(MIN_ADULT_AGE, None);
             let node_name = info.name();
 
             // These peers together with `node` are pre-split elders.
             // These peers together with `peer_c` are prefix-0 post-split elders.
             let peers_a: Vec<_> =
-                iter::repeat_with(|| create_peer_in_prefix(&prefix0, MIN_ADULT_AGE))
+                iter::repeat_with(|| network_utils::create_peer_in_prefix(&prefix0, MIN_ADULT_AGE))
                     .take(elder_count() - 1)
                     .collect();
             // These peers are prefix-1 post-split elders.
             let peers_b: Vec<_> =
-                iter::repeat_with(|| create_peer_in_prefix(&prefix1, MIN_ADULT_AGE))
+                iter::repeat_with(|| network_utils::create_peer_in_prefix(&prefix1, MIN_ADULT_AGE))
                     .take(elder_count())
                     .collect();
             // This peer is a prefix-0 post-split elder.
-            let peer_c = create_peer_in_prefix(&prefix0, MIN_ADULT_AGE);
+            let peer_c = network_utils::create_peer_in_prefix(&prefix0, MIN_ADULT_AGE);
 
             // all members
             let members = BTreeSet::from_iter(
@@ -1326,7 +1109,8 @@ async fn handle_demote_during_split() -> Result<()> {
                 sk_set_v0.public_keys(),
                 0,
             );
-            let (section, section_key_share) = create_section(&sk_set_v0, &section_auth_v0)?;
+            let (section, section_key_share) =
+                network_utils::create_section(&sk_set_v0, &section_auth_v0)?;
 
             // all peers b are added
             for peer in peers_b.iter().chain(iter::once(&peer_c)).cloned() {
@@ -1336,9 +1120,9 @@ async fn handle_demote_during_split() -> Result<()> {
             }
 
             // we make a new full node from info, to see what it does
-            let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
+            let (event_sender, _) = event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-            let comm = create_comm().await?;
+            let comm = network_utils::create_comm().await?;
             let mut node = Node::new(
                 comm.socket_addr(),
                 info.keypair.clone(),
@@ -1357,10 +1141,10 @@ async fn handle_demote_during_split() -> Result<()> {
             // key share to our cache (according to which split section we'll belong to).
             if prefix0.matches(&node_name) {
                 node.section_keys_provider
-                    .insert(create_section_key_share(&sk_set_v1_p0, 0));
+                    .insert(network_utils::create_section_key_share(&sk_set_v1_p0, 0));
             } else {
                 node.section_keys_provider
-                    .insert(create_section_key_share(&sk_set_v1_p1, 0));
+                    .insert(network_utils::create_section_key_share(&sk_set_v1_p1, 0));
             }
 
             let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
@@ -1392,7 +1176,7 @@ async fn handle_demote_during_split() -> Result<()> {
 
             let signed_sap = section_signed(sk_set_v1_p0.secret_key(), section_auth)?;
             let cmd = create_our_elders_cmd(signed_sap)?;
-            let mut cmds = run_and_collect_cmds(cmd, &dispatcher).await?;
+            let mut cmds = cmd_utils::run_and_collect_cmds(cmd, &dispatcher).await?;
 
             // Handle agreement on `NewElders` for prefix-1.
             let section_auth = SectionAuthorityProvider::new(
@@ -1406,7 +1190,7 @@ async fn handle_demote_during_split() -> Result<()> {
             let signed_sap = section_signed(sk_set_v1_p1.secret_key(), section_auth)?;
             let cmd = create_our_elders_cmd(signed_sap)?;
 
-            let new_cmds = run_and_collect_cmds(cmd, &dispatcher).await?;
+            let new_cmds = cmd_utils::run_and_collect_cmds(cmd, &dispatcher).await?;
 
             cmds.extend(new_cmds);
 
@@ -1440,110 +1224,4 @@ async fn handle_demote_during_split() -> Result<()> {
             Result::<()>::Ok(())
         })
         .await
-}
-
-fn create_peer(age: u8) -> Peer {
-    let name = ed25519::gen_name_with_age(age);
-    Peer::new(name, gen_addr())
-}
-
-fn create_peer_in_prefix(prefix: &Prefix, age: u8) -> Peer {
-    let name = ed25519::gen_name_with_age(age);
-    Peer::new(prefix.substituted_in(name), gen_addr())
-}
-
-fn gen_info(age: u8, prefix: Option<Prefix>) -> NodeInfo {
-    NodeInfo::new(
-        ed25519::gen_keypair(&prefix.unwrap_or_default().range_inclusive(), age),
-        gen_addr(),
-    )
-}
-
-pub(crate) async fn create_comm() -> Result<Comm> {
-    let (tx, _rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
-    Ok(Comm::first_node(
-        (Ipv4Addr::LOCALHOST, 0).into(),
-        Default::default(),
-        RateLimits::new(),
-        tx,
-    )
-    .await?)
-}
-
-// Generate random SectionAuthorityProvider and the corresponding Nodes.
-fn create_section_auth() -> (SectionAuthorityProvider, Vec<NodeInfo>, SecretKeySet) {
-    let (section_auth, elders, secret_key_set) = random_sap(Prefix::default(), elder_count());
-    (section_auth, elders, secret_key_set)
-}
-
-fn create_section_key_share(sk_set: &bls::SecretKeySet, index: usize) -> SectionKeyShare {
-    SectionKeyShare {
-        public_key_set: sk_set.public_keys(),
-        index,
-        secret_key_share: sk_set.secret_key_share(index),
-    }
-}
-
-fn create_section(
-    sk_set: &SecretKeySet,
-    section_auth: &SectionAuthorityProvider,
-) -> Result<(NetworkKnowledge, SectionKeyShare)> {
-    let section_chain = SecuredLinkedList::new(sk_set.public_keys().public_key());
-    let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
-
-    let section =
-        NetworkKnowledge::new(*section_chain.root_key(), section_chain, signed_sap, None)?;
-
-    for peer in section_auth.elders() {
-        let node_state = NodeState::joined(*peer, None);
-        let node_state = section_signed(sk_set.secret_key(), node_state)?;
-        let _updated = section.update_member(node_state);
-    }
-
-    let section_key_share = create_section_key_share(sk_set, 0);
-
-    Ok((section, section_key_share))
-}
-
-// Create a `Proposal::Online` whose agreement handling triggers relocation of a node with the
-// given age.
-// NOTE: recommended to call this with low `age` (4 or 5), otherwise it might take very long time
-// to complete because it needs to generate a signature with the number of trailing zeroes equal to
-// (or greater that) `age`.
-fn create_relocation_trigger(
-    sk_set: &bls::SecretKeySet,
-    age: u8,
-) -> Result<Decision<NodeStateMsg>> {
-    loop {
-        let node_state =
-            NodeState::joined(create_peer(MIN_ADULT_AGE), Some(xor_name::rand::random())).to_msg();
-        let decision = section_decision(sk_set, node_state.clone())?;
-
-        let sig: Signature = decision.proposals[&node_state].clone();
-        let churn_id = ChurnId(sig.to_bytes());
-
-        if relocation_check(age, &churn_id) && !relocation_check(age + 1, &churn_id) {
-            return Ok(decision);
-        }
-    }
-}
-
-async fn run_and_collect_cmds(cmd: Cmd, dispatcher: &Dispatcher) -> Result<Vec<Cmd>> {
-    let mut all_cmds = vec![];
-
-    let mut cmds = dispatcher.process_cmd(cmd).await?;
-
-    while !cmds.is_empty() {
-        all_cmds.extend(cmds.clone());
-        let mut new_cmds = vec![];
-        for cmd in cmds {
-            println!("cmd: {:?}", cmd);
-            if !matches!(cmd, Cmd::SendMsg { .. }) {
-                new_cmds.extend(dispatcher.process_cmd(cmd).await?);
-            }
-        }
-        cmds = new_cmds;
-    }
-
-    Ok(all_cmds)
 }

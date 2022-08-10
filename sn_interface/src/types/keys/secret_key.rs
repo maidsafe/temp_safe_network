@@ -98,6 +98,7 @@ pub mod test_utils {
     // Wrapper for `bls::SecretKeySet` that also allows to retrieve the corresponding `bls::SecretKey`.
     // Note: `bls::SecretKeySet` does have a `secret_key` method, but it's test-only and not available
     // for the consumers of the crate.
+    #[derive(Clone)]
     pub struct SecretKeySet {
         set: bls::SecretKeySet,
         key: bls::SecretKey,
