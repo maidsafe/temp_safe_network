@@ -39,7 +39,7 @@ use tokio::{
 };
 
 const PROBE_INTERVAL: Duration = Duration::from_secs(30);
-const MISSING_VOTE_INTERVAL: Duration = Duration::from_secs(15);
+const MISSING_VOTE_INTERVAL: Duration = Duration::from_secs(5);
 #[cfg(feature = "back-pressure")]
 const BACKPRESSURE_INTERVAL: Duration = Duration::from_secs(60);
 const SECTION_PROBE_INTERVAL: Duration = Duration::from_secs(300);
