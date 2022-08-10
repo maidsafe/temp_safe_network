@@ -12,8 +12,7 @@ use crate::{
     node::{
         flow_ctrl::cmds::Cmd,
         messaging::{OutgoingMsg, Peers},
-        DkgSessionInfo, Error, Event, MembershipEvent, Node, Proposal as CoreProposal, Result,
-        MIN_LEVEL_WHEN_FULL,
+        Error, Event, MembershipEvent, Node, Proposal as CoreProposal, Result, MIN_LEVEL_WHEN_FULL,
     },
 };
 
@@ -36,7 +35,7 @@ use sn_interface::{
             Proposal as ProposalMsg,
             SystemMsg,
         },
-        AuthorityProof, MsgId, NodeMsgAuthority, SectionAuth, WireMsg,
+        MsgId, NodeMsgAuthority, SectionAuth,
     },
     network_knowledge::NetworkKnowledge,
     types::{log_markers::LogMarker, Keypair, Peer, PublicKey},
@@ -129,7 +128,6 @@ impl Node {
             }
         }
 
-        let src_name = msg_authority.name();
         match msg {
             SystemMsg::Relocate(node_state) => {
                 trace!("Handling msg: Relocate from {}: {:?}", sender, msg_id);
@@ -371,14 +369,10 @@ impl Node {
                 if !session_id.contains_elder(our_name) {
                     return Ok(vec![]);
                 }
-                if let NodeMsgAuthority::Section(authority) = msg_authority {
-                    let _existing = self.dkg_sessions_info.insert(
-                        session_id.hash(),
-                        DkgSessionInfo {
-                            session_id: session_id.clone(),
-                            authority,
-                        },
-                    );
+                if let NodeMsgAuthority::Section(_authority) = msg_authority {
+                    let _existing = self
+                        .dkg_sessions_info
+                        .insert(session_id.hash(), session_id.clone());
                 }
                 self.handle_dkg_start(session_id)
             }
@@ -387,7 +381,12 @@ impl Node {
                 pub_key,
                 sig,
             } => {
-                trace!("{} {:?} from {}", LogMarker::DkgBroadcastEphemeralPubKey, session_id, sender);
+                trace!(
+                    "{} {:?} from {}",
+                    LogMarker::DkgBroadcastEphemeralPubKey,
+                    session_id,
+                    sender
+                );
                 self.handle_dkg_ephemeral_pubkey(&session_id, pub_key, sig, sender)
             }
             SystemMsg::DkgVotes {
@@ -395,7 +394,13 @@ impl Node {
                 pub_keys,
                 votes,
             } => {
-                trace!("{} {:?} from {}: {:?}", LogMarker::DkgVotesHandling, session_id, sender, votes);
+                trace!(
+                    "{} {:?} from {}: {:?}",
+                    LogMarker::DkgVotesHandling,
+                    session_id,
+                    sender,
+                    votes
+                );
                 self.log_dkg_session(&sender.name());
                 self.handle_dkg_votes(&session_id, pub_keys, votes, sender)
             }

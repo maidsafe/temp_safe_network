@@ -33,8 +33,8 @@ mod split_barrier;
 use self::{
     bootstrap::join_network,
     core::{
-        DkgSessionInfo, Node, StateSnapshot, DATA_QUERY_LIMIT, GENESIS_DBC_AMOUNT,
-        MAX_WAITING_PEERS_PER_QUERY, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
+        Node, StateSnapshot, DATA_QUERY_LIMIT, GENESIS_DBC_AMOUNT, MAX_WAITING_PEERS_PER_QUERY,
+        RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
     },
     data::MIN_LEVEL_WHEN_FULL,
     flow_ctrl::{
@@ -92,7 +92,7 @@ mod core {
             data::OperationId,
             signature_aggregator::SignatureAggregator,
             system::{DkgSessionId, NodeState, SystemMsg},
-            AuthorityProof, SectionAuth, SectionAuthorityProvider,
+            SectionAuthorityProvider,
         },
         network_knowledge::{
             supermajority, utils::write_prefix_map_to_disk, NetworkKnowledge, NodeInfo,
@@ -148,12 +148,6 @@ mod core {
     // the section).
     const DATA_QUERY_TIMEOUT: Duration = Duration::from_secs(15);
 
-    #[derive(Debug, Clone)]
-    pub(crate) struct DkgSessionInfo {
-        pub(crate) session_id: DkgSessionId,
-        pub(crate) authority: AuthorityProof<SectionAuth>,
-    }
-
     // Store up to 100 in use backoffs
     pub(crate) type AeBackoffCache = LRUCache<(Peer, ExponentialBackoff), BACKOFF_CACHE_LIMIT>;
 
@@ -177,7 +171,7 @@ mod core {
         pub(crate) proposal_aggregator: SignatureAggregator,
         // DKG/Split/Churn modules
         pub(crate) split_barrier: SplitBarrier,
-        pub(crate) dkg_sessions_info: HashMap<Digest256, DkgSessionInfo>,
+        pub(crate) dkg_sessions_info: HashMap<Digest256, DkgSessionId>,
         pub(crate) dkg_voter: DkgVoter,
         pub(crate) relocate_state: Option<Box<JoiningAsRelocated>>,
         // ======================== Elder only ========================

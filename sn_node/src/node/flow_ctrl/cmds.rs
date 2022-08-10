@@ -27,12 +27,7 @@ use sn_interface::{
 
 use bytes::Bytes;
 use custom_debug::Debug;
-use std::{
-    collections::BTreeSet,
-    fmt,
-    sync::atomic::{AtomicU64, Ordering},
-    time::SystemTime,
-};
+use std::{collections::BTreeSet, fmt, time::SystemTime};
 
 /// A struct for the job of controlling the flow
 /// of a [`Cmd`] in the system.
@@ -287,10 +282,4 @@ impl fmt::Display for Cmd {
             Cmd::Comm(comm) => write!(f, "Comm({:?})", comm),
         }
     }
-}
-
-/// Generate unique timer token.
-pub(crate) fn next_timer_token() -> u64 {
-    static NEXT: AtomicU64 = AtomicU64::new(0);
-    NEXT.fetch_add(1, Ordering::Relaxed)
 }

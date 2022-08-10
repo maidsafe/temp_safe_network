@@ -11,19 +11,16 @@ use super::Prefix;
 use crate::node::handover::Error as HandoverError;
 
 use sn_interface::{
-    messaging::{
-        data::Error as ErrorMsg,
-        system::DkgSessionId,
-    },
+    messaging::{data::Error as ErrorMsg, system::DkgSessionId},
     types::{convert_dt_error_to_error_msg, Peer, PublicKey, ReplicatedDataAddress as DataAddress},
 };
 
+use bls::PublicKey as BlsPublicKey;
+use ed25519::Signature;
 use secured_linked_list::error::Error as SecuredLinkedListError;
 use std::{io, net::SocketAddr};
 use thiserror::Error;
 use xor_name::XorName;
-use bls::PublicKey as BlsPublicKey;
-use ed25519::Signature;
 
 /// The type returned by the `sn_routing` message handling methods.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -126,7 +123,13 @@ pub enum Error {
     NoDkgKeysForSession(DkgSessionId),
     /// Double Key Attack Detected, node is faulty, error contains proof: sigs and signed bls keys
     #[error("Double Key Attack Detected from: {0:?}")]
-    DoubleKeyAttackDetected(XorName, BlsPublicKey, Signature, BlsPublicKey, Signature),
+    DoubleKeyAttackDetected(
+        XorName,
+        Box<BlsPublicKey>,
+        Signature,
+        Box<BlsPublicKey>,
+        Signature,
+    ),
     /// Dkg error
     #[error("DKG error: {0}")]
     DkgError(#[from] sn_sdkg::Error),

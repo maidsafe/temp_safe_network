@@ -30,13 +30,13 @@ use sn_consensus::{Generation, SignedVote};
 
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
+use ed25519::Signature;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeSet, BTreeMap};
+use sn_sdkg::DkgSignedVote;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Display, Formatter};
 use xor_name::XorName;
-use ed25519::Signature;
-use sn_sdkg::DkgSignedVote;
 
 /// List of peers of a section
 pub type SectionPeers = BTreeSet<SectionAuth<NodeState>>;
@@ -101,7 +101,7 @@ pub enum SystemMsg {
         /// The ephemeral bls key chosen by candidate
         pub_key: BlsPublicKey,
         /// The ed25519 signature of the candidate
-        sig: Signature
+        sig: Signature,
     },
     /// Votes exchanged for DKG process.
     DkgVotes {
@@ -113,7 +113,7 @@ pub enum SystemMsg {
         votes: Vec<DkgSignedVote>,
     },
     /// Dkg Anti-Entropy request when receiving votes that are ahead of our knowledge
-    DkgAE (DkgSessionId),
+    DkgAE(DkgSessionId),
     /// Section handover consensus vote message
     HandoverVotes(Vec<SignedVote<SapCandidate>>),
     /// Handover Anti-Entropy request

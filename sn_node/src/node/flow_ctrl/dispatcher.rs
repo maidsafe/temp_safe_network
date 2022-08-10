@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::comm::Comm;
-use crate::log_sleep;
 use crate::node::{
     messaging::{OutgoingMsg, Peers},
     Cmd, Error, Node, Result,
@@ -32,10 +31,7 @@ pub(crate) struct Dispatcher {
 
 impl Dispatcher {
     pub(crate) fn new(node: Arc<RwLock<Node>>, comm: Comm) -> Self {
-        Self {
-            node,
-            comm,
-        }
+        Self { node, comm }
     }
 
     pub(crate) fn node(&self) -> Arc<RwLock<Node>> {
@@ -346,16 +342,4 @@ fn wire_msg(
     #[cfg(feature = "test-utils")]
     let wire_msg = wire_msg.set_payload_debug(msg);
     wire_msg
-}
-
-impl Drop for Dispatcher {
-    fn drop(&mut self) {
-        // Cancel all scheduled timers including any future ones.
-        let _res = self.dkg_timeout.cancel_timer_tx.send(true);
-    }
-}
-
-struct DkgTimeout {
-    cancel_timer_tx: watch::Sender<bool>,
-    cancel_timer_rx: watch::Receiver<bool>,
 }
