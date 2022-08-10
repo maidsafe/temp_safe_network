@@ -130,9 +130,17 @@ impl<'a> Joiner<'a> {
             } else {
                 (genesis_key, vec![bootstrap_peer])
             };
-
-        self.join(genesis_key, target_section_key, recipients, join_timeout)
-            .await
+        tokio::time::timeout(
+            join_timeout,
+            self.join(
+                genesis_key,
+                target_section_key,
+                recipients,
+                join_timeout / 10,
+            ),
+        )
+        .await
+        .map_err(|_| Error::JoinTimeout)?
     }
 
     #[tracing::instrument(skip(self))]
@@ -141,7 +149,7 @@ impl<'a> Joiner<'a> {
         network_genesis_key: BlsPublicKey,
         target_section_key: BlsPublicKey,
         recipients: Vec<Peer>,
-        mut join_timeout: Duration,
+        response_timeout: Duration,
     ) -> Result<(NodeInfo, NetworkKnowledge)> {
         // We first use genesis key as the target section key, we'll be getting
         // a response with the latest section key for us to retry with.
@@ -154,21 +162,13 @@ impl<'a> Joiner<'a> {
         // `JoinRequest` again with it.
         let msg = JoinRequest::Initiate { section_key };
 
-        let mut timer = Instant::now(); // start right before sending msgs
-
         self.send(msg, &recipients, section_key, false).await?;
 
         // Avoid sending more than one duplicated request (with same SectionKey) to the same peer.
         let mut used_recipient_saps = UsedRecipientSaps::new();
 
         loop {
-            // Breaks the loop raising an error, if join_timeout time elapses.
-            join_timeout = join_timeout
-                .checked_sub(timer.elapsed())
-                .ok_or(Error::JoinTimeout)?;
-            timer = Instant::now(); // reset timer
-
-            let (response, sender) = self.receive_join_response(join_timeout).await?;
+            let (response, sender) = self.receive_join_response(response_timeout).await?;
 
             match response {
                 JoinResponse::ResourceChallenge {
@@ -438,17 +438,17 @@ impl<'a> Joiner<'a> {
     #[tracing::instrument(skip(self))]
     async fn receive_join_response(
         &mut self,
-        mut join_timeout: Duration,
+        mut response_timeout: Duration,
     ) -> Result<(JoinResponse, Peer)> {
         let mut timer = Instant::now();
 
         // Awaits at most the time left of join_timeout.
-        while let Some(event) = tokio::time::timeout(join_timeout, self.incoming_msgs.recv())
+        while let Some(event) = tokio::time::timeout(response_timeout, self.incoming_msgs.recv())
             .await
             .map_err(|_| Error::JoinTimeout)?
         {
-            // Breaks the loop raising an error, if join_timeout time elapses.
-            join_timeout = join_timeout
+            // Breaks the loop raising an error, if response_timeout time elapses.
+            response_timeout = response_timeout
                 .checked_sub(timer.elapsed())
                 .ok_or(Error::JoinTimeout)?;
             timer = Instant::now(); // reset timer

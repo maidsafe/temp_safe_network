@@ -38,7 +38,7 @@ use std::{io::Write, process::exit};
 use tokio::time::{sleep, Duration};
 use tracing::{self, error, info, trace, warn};
 
-const JOIN_TIMEOUT_SEC: u64 = 30;
+const JOIN_TIMEOUT_SEC: u64 = 100;
 const BOOTSTRAP_RETRY_TIME_SEC: u64 = 5;
 
 mod log;
