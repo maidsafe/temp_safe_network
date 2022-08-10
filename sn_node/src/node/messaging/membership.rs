@@ -48,14 +48,13 @@ impl Node {
     /// Get our latest vote if any at this generation, and get cmds to resend to all elders
     /// (which should in turn trigger them to resend their votes)
     #[instrument(skip_all)]
-    pub(crate) async fn resend_our_last_vote_to_elders(&self) -> Option<Cmd> {
+    pub(crate) async fn membership_gossip_votes(&self) -> Option<Cmd> {
         let membership = self.membership.clone();
 
         if let Some(membership) = membership {
-            if let Some(prev_vote) = membership.get_our_latest_vote() {
-                trace!("{}", LogMarker::ResendingLastMembershipVote);
-                let cmd = self
-                    .send_msg_to_our_elders(SystemMsg::MembershipVotes(vec![prev_vote.clone()]));
+            trace!("{}", LogMarker::GossippingMembershipVotes);
+            if let Ok(ae_votes) = membership.anti_entropy(membership.generation()) {
+                let cmd = self.send_msg_to_our_elders(SystemMsg::MembershipVotes(ae_votes));
                 return Some(cmd);
             }
         }

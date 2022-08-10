@@ -177,11 +177,6 @@ impl Membership {
         let _ = self.bootstrap_members.insert(state);
     }
 
-    /// Return the current generation vote we have made
-    pub(crate) fn get_our_latest_vote(&self) -> Option<&SignedVote<NodeState>> {
-        self.consensus.votes.get(&self.id())
-    }
-
     fn consensus_at_gen(&self, gen: Generation) -> Result<&Consensus<NodeState>> {
         if gen == self.gen + 1 {
             Ok(&self.consensus)
@@ -406,6 +401,7 @@ impl Membership {
         &mut self,
         signed_vote: SignedVote<NodeState>,
     ) -> Result<SignedVote<NodeState>> {
+        self.last_received_vote_time = Some(Instant::now());
         Ok(self.consensus.cast_vote(signed_vote)?)
     }
 
