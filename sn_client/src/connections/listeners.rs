@@ -13,15 +13,15 @@ use crate::{
         messaging::{send_msg, NUM_OF_ELDERS_SUBSET_FOR_QUERIES},
         PendingCmdAcks,
     },
-    Error, Result,
+    Error, Result, DEFAULT_PREFIX_HARDLINK_NAME,
 };
 
 use sn_interface::{
     at_least_one_correct_elder,
     messaging::{
         data::{CmdError, ServiceMsg},
-        system::{KeyedSig, SectionAuth, SystemMsg},
-        AuthKind, AuthorityProof, Dst, MsgId, MsgType, ServiceAuth, WireMsg,
+        system::{AntiEntropyKind, KeyedSig, SectionAuth, SystemMsg},
+        AuthKind, AuthorityProof, Dst, MsgId, MsgType, NodeMsgAuthority, ServiceAuth, WireMsg,
     },
     network_knowledge::{
         utils::write_prefix_map_to_disk, NetworkKnowledge, SectionAuthorityProvider,
@@ -35,7 +35,8 @@ use itertools::Itertools;
 use qp2p::{Close, ConnectionError, ConnectionIncoming as IncomingMsgs, SendError};
 use rand::{rngs::OsRng, seq::SliceRandom};
 use secured_linked_list::SecuredLinkedList;
-use std::net::SocketAddr;
+use std::{net::SocketAddr, path::Path};
+use tokio::fs;
 use tracing::Instrument;
 
 impl Session {
@@ -134,88 +135,56 @@ impl Session {
                 Self::handle_client_msg(session, msg_id, msg, src_peer)
             }
             MsgType::System {
-                msg:
-                    SystemMsg::AntiEntropyRedirect {
-                        section_auth,
-                        section_signed,
-                        section_chain,
-                        bounced_msg,
-                    },
-                msg_authority,
-                ..
+                msg, msg_authority, ..
             } => {
-                let sys_msg = SystemMsg::AntiEntropyRedirect {
-                    section_auth: section_auth.clone(),
-                    section_signed: section_signed.clone(),
-                    section_chain: section_chain.clone(),
-                    bounced_msg: bounced_msg.clone(),
-                };
-                // check that the message can be trusted based upon our network knowledge
-
-                // Let's now verify the section key in the msg authority is trusted
-                // based on our current knowledge of the network and sections chains.
-                let known_keys: Vec<BlsPublicKey> = session
-                    .network
-                    .read()
+                session
+                    .handle_system_msg(msg, msg_authority, src_peer)
                     .await
-                    .get_sections_dag()
-                    .keys()
-                    .cloned()
-                    .collect();
-
-                if !NetworkKnowledge::verify_node_msg_can_be_trusted(
-                    msg_authority.clone(),
-                    sys_msg,
-                    &known_keys,
-                ) {
-                    warn!(
-                        "Untrusted message has been dropped, from {:?}: {:?} ",
-                        src_peer, msg
-                    );
-                    return Err(Error::UntrustedMessage);
-                }
-
-                // Okay, we can carry on
-                debug!("AE-Redirect msg received");
-                let result = Self::handle_ae_msg(
-                    session,
-                    section_auth.into_state(),
-                    section_signed,
-                    section_chain,
-                    bounced_msg,
-                    src_peer,
-                )
-                .await;
-                if result.is_err() {
-                    error!(
-                        "Failed to handle AE-Redirect msg from {:?}, {result:?}",
-                        src_peer.addr()
-                    );
-                }
-                result
             }
-            MsgType::System {
-                msg:
-                    SystemMsg::AntiEntropyRetry {
-                        section_auth,
-                        section_signed,
-                        bounced_msg,
-                        proof_chain,
-                    },
-                ..
+        }
+    }
+
+    async fn handle_system_msg(
+        self,
+        msg: SystemMsg,
+        msg_authority: NodeMsgAuthority,
+        sender: Peer,
+    ) -> Result<(), Error> {
+        // Check that the message can be trusted w.r.t. our known keys
+        let known_keys: Vec<BlsPublicKey> = self
+            .network
+            .read()
+            .await
+            .get_sections_dag()
+            .keys()
+            .cloned()
+            .collect();
+
+        if !NetworkKnowledge::verify_node_msg_can_be_trusted(msg_authority, &msg, &known_keys) {
+            warn!("Untrusted message has been dropped, from {sender:?}: {msg:?} ");
+            return Err(Error::UntrustedMessage);
+        }
+
+        match msg {
+            SystemMsg::AntiEntropy {
+                section_auth,
+                section_signed,
+                proof_chain,
+                kind:
+                    AntiEntropyKind::Redirect { bounced_msg } | AntiEntropyKind::Retry { bounced_msg },
             } => {
-                debug!("AE-Retry msg received");
+                debug!("AE-Redirect/Retry msg received");
                 let result = Self::handle_ae_msg(
-                    session,
+                    self,
                     section_auth.into_state(),
                     section_signed,
                     proof_chain,
                     bounced_msg,
-                    src_peer,
+                    sender,
                 )
                 .await;
                 if result.is_err() {
-                    error!("Failed to handle AE-Retry msg from {:?}", src_peer.addr());
+                    error!("Failed to handle AE msg from {sender:?}, {result:?}");
                 }
                 result
             }
@@ -403,25 +372,35 @@ impl Session {
         sender: Peer,
     ) {
         // Update our network PrefixMap based upon passed in knowledge
-        match session.network.write().await.update(
+        let result = session.network.write().await.update(
             SectionAuth {
                 value: sap.clone(),
                 sig: section_signed,
             },
             &proof_chain,
-        ) {
+        );
+
+        let prefix_map = session.network.read().await.clone();
+        match result {
             Ok(true) => {
                 debug!(
                     "Anti-Entropy: updated remote section SAP updated for {:?}",
                     sap.prefix()
                 );
+                let path_with_genesis_key = session
+                    .prefix_maps_dir
+                    .join(format!("{:?}", prefix_map.genesis_key()));
+
                 // Update the PrefixMap on disk
-                if let Err(e) = write_prefix_map_to_disk(&*session.network.read().await).await {
+                if let Err(e) = write_prefix_map_to_disk(&prefix_map, &path_with_genesis_key).await
+                {
                     error!(
                         "Error writing freshly updated PrefixMap to client dir: {:?}",
                         e
                     );
                 }
+
+                set_default_prefix_map(&session.prefix_maps_dir, &path_with_genesis_key).await;
             }
             Ok(false) => {
                 debug!(
@@ -529,5 +508,39 @@ impl Session {
         }
 
         Ok(Some((msg_id, target_elders, service_msg, dst, auth)))
+    }
+}
+
+// Create hardlink '.safe/prefix_maps/default' that points to the PrefixMap corresponding to
+// the given genesis_key
+async fn set_default_prefix_map(prefix_maps_dir: &Path, path_with_genesis_key: &Path) {
+    let prefix_map_hardlink = prefix_maps_dir.join(DEFAULT_PREFIX_HARDLINK_NAME);
+
+    if prefix_map_hardlink.exists() {
+        trace!(
+            "Remove default prefix_map hardlink since it already exists: '{}'",
+            prefix_map_hardlink.display()
+        );
+        if let Err(e) = fs::remove_file(&prefix_map_hardlink).await {
+            error!(
+                "Error removing previous PrefixMap hardlink from '{}': {:?}",
+                prefix_map_hardlink.display(),
+                e
+            );
+            return;
+        }
+    }
+
+    trace!(
+        "Creating hardlink for PrefixMap from {} to {}",
+        path_with_genesis_key.display(),
+        prefix_map_hardlink.display()
+    );
+    if let Err(e) = fs::hard_link(&path_with_genesis_key, &prefix_map_hardlink).await {
+        error!(
+            "Error creating default PrefixMap hardlink '{}': {:?}",
+            prefix_map_hardlink.display(),
+            e
+        );
     }
 }

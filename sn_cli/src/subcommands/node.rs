@@ -12,7 +12,7 @@ use crate::operations::{
 };
 use clap::Subcommand;
 use color_eyre::{eyre::eyre, Result};
-use std::{net::SocketAddr, path::PathBuf};
+use std::{fs, net::SocketAddr, path::PathBuf};
 
 use sn_api::DEFAULT_PREFIX_HARDLINK_NAME;
 
@@ -171,6 +171,9 @@ pub async fn node_commander(
                 path.push("node");
                 path
             };
+
+            let default_prefix_map_path = config.prefix_maps_dir.join(DEFAULT_PREFIX_HARDLINK_NAME);
+
             node_join(
                 network_launcher,
                 node_directory_path,
@@ -181,6 +184,7 @@ pub async fn node_commander(
                 clear_data,
                 local,
                 disable_port_forwarding,
+                default_prefix_map_path,
             )
         }
         Some(NodeSubCommands::Run {
@@ -205,15 +209,21 @@ pub async fn node_commander(
                 &num_of_nodes.to_string(),
                 ip,
             )?;
+
             // add the network
             let default_prefix_map_path = config.prefix_maps_dir.join(DEFAULT_PREFIX_HARDLINK_NAME);
             let prefix_map = Config::retrieve_local_prefix_map(&default_prefix_map_path).await?;
             let actual_path = config
                 .prefix_maps_dir
                 .join(format!("{:?}", prefix_map.genesis_key()));
+            if !actual_path.exists() {
+                fs::copy(default_prefix_map_path, &actual_path)?;
+            }
+
             config
                 .add_network("baby-fleming", NetworkInfo::Local(actual_path, None))
                 .await?;
+
             Ok(())
         }
         Some(NodeSubCommands::Killall { node_path }) => node_shutdown(node_path),
@@ -437,7 +447,7 @@ mod run_command {
 
         assert!(result.is_ok());
         assert!(launcher.launch_args.iter().any(|x| x == "--interval"));
-        assert!(launcher.launch_args.iter().any(|x| x == "10"));
+        assert!(launcher.launch_args.iter().any(|x| x == "10000"));
 
         Ok(())
     }

@@ -149,9 +149,7 @@ impl Node {
 
                 if self.is_not_elder() {
                     trace!("Redirecting from adult to section elders");
-                    return Ok(vec![
-                        self.ae_redirect_to_our_elders(origin, &original_bytes)?
-                    ]);
+                    return Ok(vec![self.ae_redirect_to_our_elders(origin, original_bytes)?]);
                 }
 
                 // First we check if it's query and we have too many on the go at the moment...
@@ -188,11 +186,7 @@ impl Node {
     #[instrument(skip_all)]
     async fn verify_section_key(&self, msg_authority: &NodeMsgAuthority, msg: &SystemMsg) -> bool {
         let known_keys = self.network_knowledge.known_keys();
-        NetworkKnowledge::verify_node_msg_can_be_trusted(
-            msg_authority.clone(),
-            msg.clone(),
-            &known_keys,
-        )
+        NetworkKnowledge::verify_node_msg_can_be_trusted(msg_authority.clone(), msg, &known_keys)
     }
 
     /// Check if the origin needs to be updated on network structure/members.
@@ -219,9 +213,7 @@ impl Node {
         // TODO: consider changing the join and "join as relocated" flows to
         // make use of AntiEntropy retry/redirect responses.
         match msg {
-            SystemMsg::AntiEntropyRetry { .. }
-            | SystemMsg::AntiEntropyUpdate { .. }
-            | SystemMsg::AntiEntropyRedirect { .. }
+            SystemMsg::AntiEntropy { .. }
             | SystemMsg::JoinRequest(_)
             | SystemMsg::JoinAsRelocatedRequest(_) => {
                 trace!(

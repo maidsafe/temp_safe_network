@@ -206,8 +206,8 @@ async fn run_node(config: &Config) -> Result<()> {
     // This loop keeps the node going
     while let Some(event) = event_stream.next().await {
         trace!("Node event! {}", event);
-        if let Event::Membership(MembershipEvent::ChurnJoinMissError) = event {
-            return Err(NodeError::ChurnJoinMiss).map_err(ErrReport::msg);
+        if let Event::Membership(MembershipEvent::RemovedFromSection) = event {
+            return Err(NodeError::RemovedFromSection).map_err(ErrReport::msg);
         }
     }
 

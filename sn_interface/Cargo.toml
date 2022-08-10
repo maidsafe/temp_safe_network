@@ -24,12 +24,11 @@ backoff = { version = "~0.4.0", features = ["tokio"] }
 base64 = "~0.13.0"
 bincode = "1.3.1"
 bls = { package = "blsttc", version = "7.0.0" }
-bls_dkg = "~0.10.4"
+bls_dkg = "~0.10.5"
 bytes = { version = "1.0.1", features = ["serde"] }
 crdts = { version = "7.1", default-features=false, features = ["merkle"] }
 custom_debug = "~0.5.0"
 dashmap = {version = "5.1.0", features = ["serde"]}
-dirs-next = "2.0.0"
 ed25519 = { version = "1.2.0", features = ["serde_bytes"] }
 ed25519-dalek = { version = "1.0.0", features = ["serde"] }
 eyre = "~0.6.5"
@@ -48,7 +47,7 @@ rand-07 = { package = "rand", version = "0.7.3" } # required till ed25519-dalek 
 rayon = "1.5.1"
 rmp-serde = "1.0.0"
 secured_linked_list = "~0.5.3"
-self_encryption = "~0.27.1"
+self_encryption = "~0.27.5"
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_bytes = "~0.11.5"
 serde_json = "1.0.53"
@@ -65,7 +64,7 @@ tracing-core = "~0.1.21"
 tracing-subscriber = { version = "0.3.1", features = ["env-filter", "json"] }
 uluru="3.0.0"
 url = "2.2.0"
-xor_name = "4.0.1"
+xor_name = "~5.0.0"
 
 [dependencies.tokio]
 version = "~1.17.0"

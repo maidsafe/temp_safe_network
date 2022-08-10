@@ -33,7 +33,10 @@ use eyre::{eyre, Result, WrapErr as _};
 use sn_launch_tool::Launch;
 #[cfg(not(target_os = "windows"))]
 use std::process::{Command, Stdio};
-use std::{io, path::PathBuf};
+use std::{
+    io,
+    path::{Path, PathBuf},
+};
 use tokio::fs::{create_dir_all, remove_dir_all};
 use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
@@ -77,17 +80,22 @@ async fn main() -> Result<()> {
     color_eyre::install()?;
     init_tracing()?;
 
-    let path = std::path::Path::new("nodes");
-    remove_dir_all(&path)
-        .await
-        .or_else(|error| match error.kind() {
-            io::ErrorKind::NotFound => Ok(()),
-            _ => Err(error),
-        })
-        .wrap_err("Failed to remove existing nodes directory")?;
-    create_dir_all(&path)
-        .await
-        .wrap_err("Cannot create nodes directory")?;
+    let cmd_args = Cmd::from_args();
+
+    // setup dirs for flamegraph output
+    if cmd_args.flame {
+        let path = Path::new("nodes");
+        remove_dir_all(&path)
+            .await
+            .or_else(|error| match error.kind() {
+                io::ErrorKind::NotFound => Ok(()),
+                _ => Err(error),
+            })
+            .wrap_err("Failed to remove existing nodes directory")?;
+        create_dir_all(&path)
+            .await
+            .wrap_err("Cannot create nodes directory")?;
+    }
 
     // TODO:: Remove this conditional compilation once the issue on Windows
     // got resoved within the new version of Rust.
@@ -96,7 +104,6 @@ async fn main() -> Result<()> {
     // `cargo build --release --bins`
     // before executing the testnet.exe.
     {
-        let cmd_args = Cmd::from_args();
         let mut build_args = vec!["build", "--release"];
 
         // Keep features consistent to avoid recompiling when possible
@@ -118,10 +125,18 @@ async fn main() -> Result<()> {
             build_args.push("unstable-wiremsg-debuginfo");
         }
 
-        info!("Building current sn_node");
-        debug!("Building current sn_node with args: {:?}", build_args);
+        if cmd_args.flame {
+            println!("*** Building testnet with cargo FLAMEGRAPH ***");
+            println!(
+                "!!! Ensure you have cargo flamegraph installed: `cargo install flamegraph` !!!"
+            );
+            println!("!!! Ensure you have pre-built the sn_node binary with flamegraph `cargo flamegraph --bin sn_node --root` !!!");
+            println!("(root perms are needed to track the node processes");
+        }
 
         if !cmd_args.flame {
+            info!("Building current sn_node");
+            debug!("Building current sn_node with args: {:?}", build_args);
             Command::new("cargo")
                 .args(build_args.clone())
                 .current_dir("sn_node")

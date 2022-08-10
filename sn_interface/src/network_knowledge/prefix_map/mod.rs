@@ -239,7 +239,7 @@ impl NetworkPrefixMap {
         }
 
         // Check the SAP's key is the last key of the proof chain
-        if proof_chain.last_key() != &signed_sap.section_key() {
+        if *proof_chain.last_key() != signed_sap.section_key() {
             return Err(Error::UntrustedSectionAuthProvider(format!(
                 "section key ({:?}, from prefix {:?}) isn't in the last key in the proof chain provided. (Which ends with ({:?}))",
                 signed_sap.section_key(),

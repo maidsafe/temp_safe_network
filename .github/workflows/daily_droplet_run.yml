@@ -148,6 +148,11 @@ jobs:
       - shell: bash
         name: copy node to temp location
         run: cp sn_node/sn_node /tmp
+      - name: Set TESTNET_ID env
+        shell: bash
+        run: |
+          short_commit_hash=$(echo "${{ github.event.pull_request.head.sha || github.sha }}" | cut -c 1-7)
+          echo "TESTNET_ID=gha-testnet-$short_commit_hash" >> $GITHUB_ENV
       - name: launch testnet
         uses: maidsafe/sn_testnet_action@main
         with:
@@ -157,6 +162,7 @@ jobs:
           ssh-secret-key: ${{ secrets.SSH_SECRET_KEY  }}
           node-count: ${{ github.event.inputs.node-count || 30 }}
           node-path: /tmp/sn_node
+          testnet-id: ${{ env.TESTNET_ID }}
       # The other jobs in the workflow have the testnet launch as a dependency, but they go ahead
       # even if this job fails. It would be better if the whole workflow is abandoned if we don't
       # have a testnet to run the tests against.
@@ -342,6 +348,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: [launch-testnet, client, api, cli]
     steps:
+      - name: Set TESTNET_ID env
+        shell: bash
+        run: |
+          short_commit_hash=$(echo "${{ github.event.pull_request.head.sha || github.sha }}" | cut -c 1-7)
+          echo "TESTNET_ID=gha-testnet-$short_commit_hash" >> $GITHUB_ENV
       - name: kill testnet
         uses: maidsafe/sn_testnet_action@main
         with:
@@ -349,6 +360,7 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-access-key-secret: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           action: 'destroy'
+          testnet-id: ${{ env.TESTNET_ID }}
 
   bump_version:
     runs-on: ubuntu-22.04
@@ -394,7 +406,46 @@ jobs:
        needs.api.result=='failure' ||
        needs.cli.result=='failure')
     needs: [launch-testnet, client, api, cli]
+    env:
+      SSH_SECRET_KEY: ${{ secrets.SSH_SECRET_KEY  }}
     steps:
+      - name: Set TESTNET_ID env
+        shell: bash
+        run: |
+          short_commit_hash=$(echo "${{ github.event.pull_request.head.sha || github.sha }}" | cut -c 1-7)
+          echo "TESTNET_ID=gha-testnet-$short_commit_hash" >> $GITHUB_ENV
+      - name: package and upload logs
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_SECRET_KEY" > ~/.ssh/id_rsa
+          chmod 0600 ~/.ssh/id_rsa
+          cd /tmp
+          aws s3 cp \
+            "s3://safe-testnet-tool/$TESTNET_ID-ip-list" \
+            "$TESTNET_ID-ip-list"
+          aws s3 cp \
+            "s3://safe-testnet-tool/$TESTNET_ID-genesis-dbc" \
+            "$TESTNET_ID-genesis-dbc"
+          aws s3 cp \
+            "s3://safe-testnet-tool/$TESTNET_ID-genesis-key" \
+            "$TESTNET_ID-genesis-key"
+          aws s3 cp \
+            "s3://safe-testnet-tool/$TESTNET_ID-prefix-map" \
+            "$TESTNET_ID-prefix-map"
+
+          wget https://raw.githubusercontent.com/maidsafe/sn_testnet_tool/main/scripts/logs-sync.sh
+          chmod +x logs-sync.sh
+          ./logs-sync.sh "$TESTNET_ID"
+          mv $TESTNET_ID-genesis-dbc logs
+          mv $TESTNET_ID-genesis-key logs
+          mv $TESTNET_ID-prefix-map logs
+          tar -C logs -zcvf $TESTNET_ID-run.tar.gz .
+          aws s3 cp \
+            "$TESTNET_ID-run.tar.gz" \
+            "s3://safe-testnet-tool/$TESTNET_ID-run.tar.gz" \
+            --acl public-read
+
       - name: Kill testnet
         uses: maidsafe/sn_testnet_action@main
         with:
@@ -402,6 +453,7 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-access-key-secret: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           action: 'destroy'
+          testnet-id: ${{ env.TESTNET_ID }}
       - name: Upload event file
         uses: actions/upload-artifact@main
         with:

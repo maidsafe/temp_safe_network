@@ -37,7 +37,7 @@ backoff = { version = "~0.4.0", features = [ "tokio" ] }
 base64 = "~0.13.0"
 bincode = "1.3.1"
 bls = { package = "blsttc", version = "7.0.0" }
-bls_dkg = "~0.10.4"
+bls_dkg = "~0.10.5"
 bytes = { version = "1.0.1", features = ["serde"] }
 chrono = "0.4.19"
 color-eyre = "~0.6.0"
@@ -68,7 +68,7 @@ rayon = "1.5.1"
 resource_proof = "1.0.39"
 rmp-serde = "1.0.0"
 secured_linked_list = "~0.5.3"
-self_encryption = "~0.27.4"
+self_encryption = "~0.27.5"
 sn_consensus = "3.1.2"
 sn_dbc = { version = "7.2.0", features = ["serdes"] }
 sn_dysfunction = { path = "../sn_dysfunction", version = "^0.7.1" }
@@ -93,7 +93,7 @@ tracing-subscriber = { version = "0.3.1", features = ["env-filter", "json"] }
 uluru="3.0.0"
 url = "2.2.0"
 walkdir = "2"
-xor_name = "4.0.1"
+xor_name = "~5.0.0"
 
 [dependencies.self_update]
 version = "~0.28.0"

@@ -102,8 +102,8 @@ pub enum Error {
     #[error("Timeout when trying to join the network")]
     JoinTimeout,
     /// Join occured during section churn and new elders missed it, need to re-join the network
-    #[error("Join occured during section churn and new elders missed it")]
-    ChurnJoinMiss,
+    #[error("Node was removed from the section")]
+    RemovedFromSection,
     /// Database error.
     #[error("Database error:: {0}")]
     Database(#[from] crate::dbs::Error),

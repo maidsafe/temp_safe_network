@@ -69,7 +69,7 @@ mod tests {
     use crate::utils::test_utils::{
         create_test_client_with, init_logger, read_genesis_dbc_from_first_node,
     };
-    use eyre::Result;
+    use eyre::{bail, Result};
     use sn_dbc::{rng, Hash, OwnerOnce, TransactionBuilder};
     use tokio::time::Duration;
 
@@ -111,34 +111,35 @@ mod tests {
             )
             .await?;
 
-        // Get spent proof shares for the key_image.
-        let spent_proof_shares = client.spent_proof_shares(*key_image).await?;
-
         // The query could be too close to the spend which make adult only accumulated
         // part of shares. To avoid assertion faiure, more attempts are needed.
         let mut attempts = 0;
-
-        // Note this test could have been run more than once thus the genesis DBC
-        // could have been spent a few times already, so we filter
-        // the SpentProofShares that belong to the TX we just spent in this run.
-        // TODO: once we have our Spentbook which prevents double spents
-        // we shouldnt't need this filtering.
         loop {
-            let valid_spent_proof_shares = spent_proof_shares
+            attempts += 1;
+
+            // Get spent proof shares for the key_image.
+            let spent_proof_shares = client.spent_proof_shares(*key_image).await?;
+
+            // Note this test could have been run more than once thus the genesis DBC
+            // could have been spent a few times already, so we filter
+            // the SpentProofShares that belong to the TX we just spent in this run.
+            // TODO: once we have our Spentbook which prevents double spents
+            // we shouldnt't need this filtering.
+            let num_of_spent_proof_shares = spent_proof_shares
                 .iter()
                 .filter(|proof| proof.content.transaction_hash == Hash::from(tx.hash()))
                 .count();
-            if (5..=7).contains(&valid_spent_proof_shares) {
-                break;
+
+            if (5..=7).contains(&num_of_spent_proof_shares) {
+                break Ok(());
+            } else if attempts == MAX_ATTEMPTS {
+                bail!(
+                    "Failed to obtained enough spent proof shares after {} attempts, {} retrieved in last attempt",
+                    MAX_ATTEMPTS, num_of_spent_proof_shares
+                );
             }
-            attempts += 1;
-            if attempts > MAX_ATTEMPTS {
-                break;
-            }
+
             tokio::time::sleep(SLEEP_DURATION).await;
         }
-        assert!(attempts <= MAX_ATTEMPTS);
-
-        Ok(())
     }
 }

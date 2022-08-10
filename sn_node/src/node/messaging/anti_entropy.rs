@@ -13,12 +13,13 @@ use crate::node::{
     Error, Event, MembershipEvent, Node, Result, StateSnapshot,
 };
 
+use sn_interface::messaging::system::AntiEntropyKind;
 #[cfg(feature = "traceroute")]
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
-        system::{KeyedSig, NodeCmd, SectionAuth, SectionPeers, SystemMsg},
-        MsgId, MsgType, WireMsg,
+        system::{KeyedSig, NodeCmd, SectionAuth, SystemMsg},
+        MsgType, WireMsg,
     },
     network_knowledge::SectionAuthorityProvider,
     types::{log_markers::LogMarker, Peer, PublicKey},
@@ -27,13 +28,12 @@ use sn_interface::{
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
-use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
 use std::{collections::BTreeSet, time::Duration};
 use xor_name::{Prefix, XorName};
 
 impl Node {
-    /// Send `AntiEntropyUpdate` message to all nodes in our own section.
+    /// Send `AntiEntropy` update message to all nodes in our own section.
     pub(crate) fn send_ae_update_to_our_section(&self) -> Option<Cmd> {
         let our_name = self.info().name();
         let recipients: BTreeSet<_> = self
@@ -50,17 +50,25 @@ impl Node {
         }
 
         // The previous PK which is likely what adults know
-        let previous_pk = *self.section_chain().prev_key();
+        let previous_pk = *self.our_section_dag().prev_key();
         Some(self.send_ae_update_to_nodes(recipients, previous_pk))
     }
 
-    /// Send `AntiEntropyUpdate` message to the specified nodes.
+    /// Send `AntiEntropy` update message to the specified nodes.
     pub(crate) fn send_ae_update_to_nodes(
         &self,
         recipients: BTreeSet<Peer>,
         section_pk: BlsPublicKey,
     ) -> Cmd {
-        let ae_msg = self.generate_ae_update_msg(section_pk);
+        let members = self
+            .network_knowledge
+            .section_signed_members()
+            .iter()
+            .map(|state| state.clone().into_authed_msg())
+            .collect();
+
+        let ae_msg = self.generate_ae_msg(Some(section_pk), AntiEntropyKind::Update { members });
+
         self.send_system_msg(ae_msg, Peers::Multiple(recipients))
     }
 
@@ -74,7 +82,7 @@ impl Node {
     }
 
     #[instrument(skip_all)]
-    /// Send AntiEntropyUpdate message to the nodes in our sibling section.
+    /// Send AntiEntropy update message to the nodes in our sibling section.
     pub(crate) fn send_updates_to_sibling_section(
         &self,
         our_prev_state: &StateSnapshot,
@@ -115,43 +123,36 @@ impl Node {
         }
     }
 
-    // Private helper to generate AntiEntropyUpdate message to update
+    // Private helper to generate AntiEntropy message to update
     // a peer abot our SAP, with proof_chain and members list.
-    fn generate_ae_update_msg(&self, dst_section_key: BlsPublicKey) -> SystemMsg {
+    fn generate_ae_msg(
+        &self,
+        dst_section_key: Option<BlsPublicKey>,
+        kind: AntiEntropyKind,
+    ) -> SystemMsg {
         let signed_sap = self.network_knowledge.section_signed_authority_provider();
 
-        let proof_chain = if let Ok(chain) = self
-            .network_knowledge
-            .get_proof_chain_to_current(&dst_section_key)
-        {
-            chain
-        } else {
-            // error getting chain from key, so let's send the whole chain from genesis
-            self.network_knowledge.section_chain()
-        };
+        let proof_chain = dst_section_key
+            .and_then(|key| self.network_knowledge.get_proof_chain_to_current(&key).ok())
+            .unwrap_or_else(|| self.network_knowledge.our_section_dag());
 
-        let members = self
-            .network_knowledge
-            .section_signed_members()
-            .iter()
-            .map(|state| state.clone().into_authed_msg())
-            .collect();
-
-        SystemMsg::AntiEntropyUpdate {
+        SystemMsg::AntiEntropy {
             section_auth: signed_sap.value.to_msg(),
             section_signed: signed_sap.sig,
             proof_chain,
-            members,
+            kind,
         }
     }
 
     #[instrument(skip_all)]
-    pub(crate) async fn handle_anti_entropy_update_msg(
+    pub(crate) async fn handle_anti_entropy_msg(
         &mut self,
         section_auth: SectionAuthorityProvider,
         section_signed: KeyedSig,
         proof_chain: SecuredLinkedList,
-        members: SectionPeers,
+        kind: AntiEntropyKind,
+        sender: Peer,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         let snapshot = self.state_snapshot();
 
@@ -161,16 +162,22 @@ impl Node {
             sig: section_signed.clone(),
         };
 
+        let members = if let AntiEntropyKind::Update { members } = kind.clone() {
+            Some(members)
+        } else {
+            None
+        };
+
         let updated = self.network_knowledge.update_knowledge_if_valid(
             signed_sap.clone(),
             &proof_chain,
-            Some(members),
+            members,
             &our_name,
             &self.section_keys_provider,
         )?;
 
         // always run this, only changes will trigger events
-        let mut cmds = self.update_on_elder_change(snapshot).await?;
+        let mut cmds = self.update_on_elder_change(&snapshot).await?;
 
         // Only trigger reorganize data when there is a membership change happens.
         if updated && self.is_not_elder() {
@@ -179,211 +186,78 @@ impl Node {
             cmds.push(self.ask_for_any_new_data());
         }
 
-        Ok(cmds)
-    }
+        if updated {
+            self.write_prefix_map().await;
+            let prefix = section_auth.prefix();
+            info!("PrefixMap written to disk with update for prefix {prefix:?}");
 
-    pub(crate) async fn handle_anti_entropy_retry_msg(
-        &mut self,
-        section_auth: SectionAuthorityProvider,
-        section_signed: KeyedSig,
-        proof_chain: SecuredLinkedList,
-        bounced_msg: Bytes,
-        sender: Peer,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
-    ) -> Result<Vec<Cmd>> {
-        let snapshot = self.state_snapshot();
-
-        let to_resend = self
-            .update_network_knowledge(
-                section_auth,
-                section_signed,
-                proof_chain,
-                bounced_msg,
-                sender,
-            )
-            .await?;
-
-        match to_resend {
-            None => Ok(vec![]),
-            Some((msg_to_resend, _)) => {
-                // TODO: we may need to check if 'bounced_msg' dst section pk is different
-                // from the received new SAP key, to prevent from endlessly resending a msg
-                // if a sybil/corrupt peer keeps sending us the same AE msg.
-                trace!(
-                    "{} resending {:?}",
-                    LogMarker::AeResendAfterRetry,
-                    msg_to_resend
-                );
-
-                self.create_or_wait_for_backoff(&sender).await;
-
-                let mut result = Vec::new();
-                if let Ok(cmds) = self.update_on_elder_change(snapshot).await {
-                    result.extend(cmds);
-                }
-
-                if cfg!(feature = "traceroute") {
-                    result.push(self.trace_system_msg(
-                        msg_to_resend,
-                        Peers::Single(sender),
-                        #[cfg(feature = "traceroute")]
-                        traceroute,
-                    ));
-                } else {
-                    result.push(self.send_system_msg(msg_to_resend, Peers::Single(sender)));
-                }
-
-                Ok(result)
+            // check if we've been kicked out of the section
+            if snapshot.members.contains(&self.name())
+                && !self.state_snapshot().members.contains(&self.name())
+            {
+                error!("Detected that we've been removed from the section");
+                self.send_event(Event::Membership(MembershipEvent::RemovedFromSection))
+                    .await;
+                return Err(Error::RemovedFromSection);
             }
         }
-    }
 
-    pub(crate) async fn handle_anti_entropy_redirect_msg(
-        &mut self,
-        section_auth: SectionAuthorityProvider,
-        section_signed: KeyedSig,
-        section_chain: SecuredLinkedList,
-        bounced_msg: Bytes,
-        sender: Peer,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
-    ) -> Result<Vec<Cmd>> {
-        let dst_section_key = section_auth.section_key();
+        // Check if we need to resend any messsages and who should we send it to.
+        let (bounced_msg, response_peer) = match kind {
+            AntiEntropyKind::Update { .. } => return Ok(cmds), // Nope, bail early
+            AntiEntropyKind::Retry { bounced_msg } => (bounced_msg, sender),
+            AntiEntropyKind::Redirect { bounced_msg } => {
+                // We choose the Elder closest to the dst section key,
+                // just to pick one of them in an arbitrary but deterministic fashion.
+                let target_name = XorName::from(PublicKey::Bls(section_auth.section_key()));
 
-        // We choose the Elder closest to the dst section key,
-        // just to pick one of them in an arbitrary but deterministic fashion.
-        let target_name = XorName::from(PublicKey::Bls(dst_section_key));
-        let chosen_dst_elder = section_auth
-            .elders()
-            .sorted_by(|lhs, rhs| target_name.cmp_distance(&lhs.name(), &rhs.name()))
-            .peekable()
-            .peek()
-            .copied()
-            .copied();
+                let chosen_dst_elder = if let Some(dst) = section_auth
+                    .elders()
+                    .max_by(|lhs, rhs| target_name.cmp_distance(&lhs.name(), &rhs.name()))
+                {
+                    *dst
+                } else {
+                    error!("Failed to find closest Elder to resend msg upon AE-Redirect response.");
+                    return Ok(cmds);
+                };
 
-        let to_resend = self
-            .update_network_knowledge(
-                section_auth,
-                section_signed,
-                section_chain,
-                bounced_msg,
-                sender,
-            )
-            .await?;
+                (bounced_msg, chosen_dst_elder)
+            }
+        };
 
-        match to_resend {
-            None => Ok(vec![]),
-            Some((msg_to_redirect, msg_id)) => match chosen_dst_elder {
-                None => {
-                    error!(
-                            "Failed to find closest Elder to resend msg ({:?}) upon AE-Redirect response.",
-                            msg_id
-                        );
-                    Ok(vec![])
-                }
-                Some(elder) if elder.addr() == sender.addr() => {
-                    error!(
-                            "Failed to find an alternative Elder to resend msg ({:?}) upon AE-Redirect response.",
-                            msg_id
-                        );
-                    Ok(vec![])
-                }
-                Some(elder) => {
-                    trace!("{}", LogMarker::AeResendAfterAeRedirect);
-
-                    self.create_or_wait_for_backoff(&elder).await;
-
-                    if cfg!(feature = "traceroute") {
-                        Ok(vec![self.trace_system_msg(
-                            msg_to_redirect,
-                            Peers::Single(elder),
-                            #[cfg(feature = "traceroute")]
-                            traceroute,
-                        )])
-                    } else {
-                        Ok(vec![
-                            self.send_system_msg(msg_to_redirect, Peers::Single(elder))
-                        ])
-                    }
-                }
-            },
-        }
-    }
-
-    // Try to update network knowledge and return the 'SystemMsg' that needs to be resent.
-    async fn update_network_knowledge(
-        &mut self,
-        section_auth: SectionAuthorityProvider,
-        section_signed: KeyedSig,
-        proof_chain: SecuredLinkedList,
-        bounced_msg: Bytes,
-        sender: Peer,
-    ) -> Result<Option<(SystemMsg, MsgId)>> {
-        let (bounced_msg, msg_id, dst) = match WireMsg::deserialize(bounced_msg)? {
+        let (msg_to_resend, msg_id, dst) = match WireMsg::deserialize(bounced_msg)? {
             MsgType::System {
                 msg, msg_id, dst, ..
             } => (msg, msg_id, dst),
             _ => {
                 warn!("Non System MsgType received in AE response. We do not handle any other type in AE msgs yet.");
-                return Ok(None);
+                return Ok(cmds);
             }
         };
-
-        info!(
-            "Anti-Entropy: message received from peer: {}",
-            sender.addr()
-        );
-
-        let prefix = section_auth.prefix();
-        let dst_section_key = section_auth.section_key();
-        let signed_sap = SectionAuth {
-            value: section_auth.clone(),
-            sig: section_signed.clone(),
-        };
-        let our_name = self.info().name();
-        let our_section_prefix = self.network_knowledge.prefix();
-        let equal_prefix = section_auth.prefix() == our_section_prefix;
-        let is_extension_prefix = section_auth.prefix().is_extension_of(&our_section_prefix);
-        let our_peer_info = self.info().peer();
-
-        // Update our network knowledge
-        let there_was_an_update = self.network_knowledge.update_knowledge_if_valid(
-            signed_sap.clone(),
-            &proof_chain,
-            None,
-            &our_name,
-            &self.section_keys_provider,
-        )?;
-
-        if there_was_an_update {
-            self.write_prefix_map().await;
-            info!(
-                "PrefixMap written to disk with update for prefix {:?}",
-                prefix
-            );
-
-            // check for churn join miss
-            let is_in_current_section = section_auth
-                .members()
-                .any(|node_state| node_state.peer() == &our_peer_info);
-            let prefix_matches_our_name = prefix.matches(&our_name);
-            let was_in_ancestor_section = equal_prefix || is_extension_prefix;
-
-            if was_in_ancestor_section && prefix_matches_our_name && !is_in_current_section {
-                error!("Detected churn join miss while processing msg ({:?}), was in section {:?}, updated to {:?}, wasn't in members anymore even if name matches: {:?}", msg_id, our_section_prefix, prefix, our_name);
-                self.send_event(Event::Membership(MembershipEvent::ChurnJoinMissError))
-                    .await;
-                return Err(Error::ChurnJoinMiss);
-            }
-        }
 
         // If the new SAP's section key is the same as the section key set when the
         // bounced message was originally sent, we just drop it.
-        if dst.section_key == dst_section_key {
-            error!("Dropping bounced msg ({:?}) received in AE-Retry from {} as suggested new dst section key is the same as previously sent: {:?}", msg_id, sender,dst_section_key);
-            Ok(None)
-        } else {
-            Ok(Some((bounced_msg, msg_id)))
+        if dst.section_key == section_auth.section_key() {
+            error!("Dropping bounced msg ({sender:?}) received in AE-Retry from {msg_id:?} as suggested new dst section key is the same as previously sent: {:?}", section_auth.section_key());
+            return Ok(cmds);
         }
+
+        self.create_or_wait_for_backoff(&response_peer).await;
+
+        trace!("{}", LogMarker::AeResendAfterAeRedirect);
+
+        if cfg!(feature = "traceroute") {
+            cmds.push(self.trace_system_msg(
+                msg_to_resend,
+                Peers::Single(response_peer),
+                #[cfg(feature = "traceroute")]
+                traceroute,
+            ))
+        } else {
+            cmds.push(self.send_system_msg(msg_to_resend, Peers::Single(response_peer)))
+        }
+
+        Ok(cmds)
     }
 
     /// Checks AE-BackoffCache for backoff, or creates a new instance
@@ -443,15 +317,15 @@ impl Node {
                 .network_knowledge
                 .get_closest_or_opposite_signed_sap(&dst_name)
             {
-                Some((signed_sap, section_chain)) => {
+                Some((signed_sap, section_dag)) => {
                     info!("Found a better matching prefix {:?}", signed_sap.prefix());
                     let bounced_msg = original_bytes;
                     // Redirect to the closest section
-                    let ae_msg = SystemMsg::AntiEntropyRedirect {
+                    let ae_msg = SystemMsg::AntiEntropy {
                         section_auth: signed_sap.value.to_msg(),
                         section_signed: signed_sap.sig,
-                        section_chain,
-                        bounced_msg,
+                        proof_chain: section_dag,
+                        kind: AntiEntropyKind::Redirect { bounced_msg },
                     };
 
                     trace!("{}", LogMarker::AeSendRedirect);
@@ -489,50 +363,12 @@ impl Node {
             return Ok(None);
         }
 
-        let ae_msg = match self
-            .network_knowledge
-            .get_proof_chain_to_current(dst_section_key)
-        {
-            Ok(proof_chain) => {
-                info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg for AE-Retry with up to date SAP info.", sender);
+        let bounced_msg = original_bytes;
 
-                let signed_sap = self.network_knowledge.section_signed_authority_provider();
-
-                trace!(
-                    "Sending AE-Retry with: proofchain last key: {:?} and  section key: {:?}",
-                    proof_chain.last_key(),
-                    &signed_sap.value.section_key()
-                );
-                trace!("{}", LogMarker::AeSendRetryAsOutdated);
-
-                SystemMsg::AntiEntropyRetry {
-                    section_auth: signed_sap.value.to_msg(),
-                    section_signed: signed_sap.sig,
-                    proof_chain,
-                    bounced_msg: original_bytes,
-                }
-            }
-            Err(_) => {
-                trace!(
-                    "Anti-Entropy: cannot find dst_section_key {:?} sent by {} in our chain",
-                    dst_section_key,
-                    sender
-                );
-
-                let proof_chain = self.network_knowledge.section_chain();
-
-                let signed_sap = self.network_knowledge.section_signed_authority_provider();
-
-                trace!("{}", LogMarker::AeSendRetryDstPkFail);
-
-                SystemMsg::AntiEntropyRetry {
-                    section_auth: signed_sap.value.to_msg(),
-                    section_signed: signed_sap.sig,
-                    proof_chain,
-                    bounced_msg: original_bytes,
-                }
-            }
-        };
+        let ae_msg = self.generate_ae_msg(
+            Some(*dst_section_key),
+            AntiEntropyKind::Retry { bounced_msg },
+        );
 
         Ok(Some(Cmd::send_msg(
             OutgoingMsg::System(ae_msg),
@@ -544,18 +380,11 @@ impl Node {
     pub(crate) fn ae_redirect_to_our_elders(
         &self,
         sender: Peer,
-        original_wire_msg: &Bytes,
+        bounced_msg: Bytes,
     ) -> Result<Cmd> {
-        let signed_sap = self.network_knowledge.section_signed_authority_provider();
+        trace!("{} in ae_redirect ", LogMarker::AeSendRedirect);
 
-        let ae_msg = SystemMsg::AntiEntropyRedirect {
-            section_auth: signed_sap.value.to_msg(),
-            section_signed: signed_sap.sig,
-            section_chain: self.network_knowledge.section_chain(),
-            bounced_msg: original_wire_msg.clone(),
-        };
-
-        trace!("{} in ae_redirect", LogMarker::AeSendRedirect);
+        let ae_msg = self.generate_ae_msg(None, AntiEntropyKind::Redirect { bounced_msg });
 
         Ok(Cmd::send_msg(
             OutgoingMsg::System(ae_msg),
@@ -643,7 +472,7 @@ mod tests {
                 // AeUpdate message shall get pass through.
                 assert!(NetworkKnowledge::verify_node_msg_can_be_trusted(
                     msg_authority.clone(),
-                    msg,
+                    &msg,
                     &known_keys
                 ));
 
@@ -653,7 +482,7 @@ mod tests {
                     env.create_update_msg(other_env.proof_chain)?;
                 assert!(!NetworkKnowledge::verify_node_msg_can_be_trusted(
                     msg_authority.clone(),
-                    corrupted_msg,
+                    &corrupted_msg,
                     &known_keys
                 ));
 
@@ -661,7 +490,7 @@ mod tests {
                 let other_msg = SystemMsg::StartConnectivityTest(xor_name::rand::random());
                 assert!(!NetworkKnowledge::verify_node_msg_can_be_trusted(
                     msg_authority,
-                    other_msg,
+                    &other_msg,
                     &known_keys
                 ));
                 Result::<()>::Ok(())
@@ -702,7 +531,7 @@ mod tests {
                 msg
             });
 
-            assert_matches!(msg, SystemMsg::AntiEntropyRedirect { section_auth, .. } => {
+            assert_matches!(msg, SystemMsg::AntiEntropy { section_auth, kind: AntiEntropyKind::Redirect {..}, .. } => {
                 assert_eq!(section_auth, env.node.network_knowledge().authority_provider().to_msg());
             });
 
@@ -734,7 +563,7 @@ mod tests {
                 msg
             });
 
-            assert_matches!(msg, SystemMsg::AntiEntropyRedirect { section_auth, .. } => {
+            assert_matches!(msg, SystemMsg::AntiEntropy { section_auth, kind: AntiEntropyKind::Redirect {..}, .. } => {
                 assert_eq!(section_auth, env.other_sap.value.to_msg());
             });
             Result::<()>::Ok(())
@@ -774,11 +603,11 @@ mod tests {
                 msg
             });
 
-            assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
+            assert_matches!(&msg, SystemMsg::AntiEntropy { section_auth, proof_chain, kind: AntiEntropyKind::Retry{..}, .. } => {
                 assert_eq!(section_auth, &env.node.network_knowledge().authority_provider().to_msg());
-                assert_eq!(proof_chain, &env.node.section_chain());
+                assert_eq!(proof_chain, &env.node.our_section_dag());
             });
-            Result::<()>::Ok(())
+            Ok(())
         }).await
     }
 
@@ -816,11 +645,11 @@ mod tests {
                 msg
             });
 
-            assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
+            assert_matches!(&msg, SystemMsg::AntiEntropy { section_auth, proof_chain, kind: AntiEntropyKind::Retry {..}, .. } => {
                 assert_eq!(*section_auth, env.node.network_knowledge().authority_provider().to_msg());
-                assert_eq!(*proof_chain, env.node.section_chain());
+                assert_eq!(*proof_chain, env.node.our_section_dag());
             });
-            Result::<()>::Ok(())
+            Ok(())
         }).await
     }
 
@@ -920,11 +749,13 @@ mod tests {
             &self,
             proof_chain: SecuredLinkedList,
         ) -> Result<(SystemMsg, NodeMsgAuthority)> {
-            let payload_msg = SystemMsg::AntiEntropyUpdate {
+            let payload_msg = SystemMsg::AntiEntropy {
                 section_auth: self.other_sap.value.to_msg(),
                 section_signed: self.other_sap.sig.clone(),
                 proof_chain,
-                members: BTreeSet::new(),
+                kind: AntiEntropyKind::Update {
+                    members: BTreeSet::new(),
+                },
             };
 
             let auth_proof = AuthorityProof(SectionAuthMsg {

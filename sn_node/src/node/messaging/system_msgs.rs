@@ -130,21 +130,6 @@ impl Node {
 
         let src_name = msg_authority.name();
         match msg {
-            SystemMsg::AntiEntropyUpdate {
-                section_auth,
-                section_signed,
-                proof_chain,
-                members,
-            } => {
-                trace!("Handling msg: AE-Update from {}: {:?}", sender, msg_id,);
-                self.handle_anti_entropy_update_msg(
-                    section_auth.into_state(),
-                    section_signed,
-                    proof_chain,
-                    members,
-                )
-                .await
-            }
             SystemMsg::Relocate(node_state) => {
                 trace!("Handling msg: Relocate from {}: {:?}", sender, msg_id);
                 Ok(self
@@ -195,40 +180,18 @@ impl Node {
                 );
                 Ok(vec![])
             }
-            SystemMsg::AntiEntropyRetry {
+            SystemMsg::AntiEntropy {
                 section_auth,
                 section_signed,
                 proof_chain,
-                bounced_msg,
+                kind,
             } => {
-                trace!("Handling msg: AE-Retry from {}: {:?}", sender, msg_id,);
-
-                #[cfg(feature = "traceroute")]
-                info!("Handling AE-Retry message with trace {:?}", traceroute);
-
-                self.handle_anti_entropy_retry_msg(
+                trace!("Handling msg: AE from {sender}: {msg_id:?}");
+                self.handle_anti_entropy_msg(
                     section_auth.into_state(),
                     section_signed,
                     proof_chain,
-                    bounced_msg,
-                    sender,
-                    #[cfg(feature = "traceroute")]
-                    traceroute,
-                )
-                .await
-            }
-            SystemMsg::AntiEntropyRedirect {
-                section_auth,
-                section_signed,
-                section_chain,
-                bounced_msg,
-            } => {
-                trace!("Handling msg: AE-Redirect from {}: {:?}", sender, msg_id);
-                self.handle_anti_entropy_redirect_msg(
-                    section_auth.into_state(),
-                    section_signed,
-                    section_chain,
-                    bounced_msg,
+                    kind,
                     sender,
                     #[cfg(feature = "traceroute")]
                     traceroute,
@@ -658,7 +621,7 @@ impl Node {
                         "Cannot verify DkgSessionInfo: {:?}. Unknown key: {:?}!",
                         &session_id, auth.sig.public_key
                     );
-                    let chain = self.network_knowledge().section_chain();
+                    let chain = self.network_knowledge().our_section_dag();
                     warn!("Chain: {:?}", chain);
                     return Ok(cmds);
                 };

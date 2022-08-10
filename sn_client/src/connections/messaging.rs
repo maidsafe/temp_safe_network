@@ -658,6 +658,7 @@ mod tests {
     use eyre::{eyre, Result};
     use qp2p::Config;
     use std::{
+        env::temp_dir,
         net::{Ipv4Addr, SocketAddr},
         time::Duration,
     };
@@ -692,6 +693,7 @@ mod tests {
             SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0)),
             Duration::from_secs(10),
             prefix_map,
+            temp_dir(),
         )?;
 
         let mut rng = rand::thread_rng();

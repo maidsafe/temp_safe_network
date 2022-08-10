@@ -131,6 +131,9 @@ mod core {
 
     const BACKOFF_CACHE_LIMIT: usize = 100;
 
+    // File name where to cache this node's prefix map (stored at this node's set root storage dir)
+    const PREFIX_MAP_FILE_NAME: &str = "prefix_map";
+
     // How long to hold on to correlated `Peer`s for data queries. Since data queries are forwarded
     // from elders (with whom the client is connected) to adults (who hold the data), the elder handling
     // the query cannot reply immediately. For now, they stash a reference to the client `Peer` in
@@ -153,6 +156,7 @@ mod core {
     pub(crate) struct Node {
         pub(crate) addr: SocketAddr, // does this change? if so... when? only at node start atm?
         pub(crate) event_sender: EventSender,
+        root_storage_dir: PathBuf,
         pub(crate) data_storage: DataStorage, // Adult only before cache
         pub(crate) keypair: Arc<Keypair>,
         /// queue up all batch data to be replicated (as a result of churn events atm)
@@ -253,6 +257,7 @@ mod core {
                 keypair,
                 network_knowledge,
                 section_keys_provider,
+                root_storage_dir,
                 dkg_sessions: HashMap::default(),
                 proposal_aggregator: SignatureAggregator::default(),
                 split_barrier: SplitBarrier::new(),
@@ -275,6 +280,7 @@ mod core {
                 membership,
             };
 
+            // Write the prefix map to this node's root storage directory
             node.write_prefix_map().await;
 
             Ok(node)
@@ -284,6 +290,10 @@ mod core {
             let keypair = self.keypair.clone();
             let addr = self.addr;
             NodeInfo { keypair, addr }
+        }
+
+        pub(crate) fn name(&self) -> XorName {
+            self.info().name()
         }
 
         ////////////////////////////////////////////////////////////////////////////
@@ -364,6 +374,12 @@ mod core {
                 section_key: self.network_knowledge.section_key(),
                 prefix: self.network_knowledge.prefix(),
                 elders: self.network_knowledge().authority_provider().names(),
+                members: self
+                    .network_knowledge()
+                    .members()
+                    .into_iter()
+                    .map(|p| p.name())
+                    .collect(),
             }
         }
 
@@ -440,7 +456,7 @@ mod core {
                 elder_candidates
             );
 
-            let res = if elder_candidates
+            if elder_candidates
                 .iter()
                 .map(NodeState::peer)
                 .eq(current_elders.iter())
@@ -478,9 +494,7 @@ mod core {
                 }
 
                 vec![session_id]
-            };
-
-            res
+            }
         }
 
         fn initialize_membership(&mut self, sap: SectionAuthorityProvider) -> Result<()> {
@@ -530,7 +544,7 @@ mod core {
         /// Updates various state if elders changed.
         pub(crate) async fn update_on_elder_change(
             &mut self,
-            old: StateSnapshot,
+            old: &StateSnapshot,
         ) -> Result<Vec<Cmd>> {
             let new = self.state_snapshot();
 
@@ -632,7 +646,7 @@ mod core {
                     info!("{}: {:?}", LogMarker::StillElderAfterSplit, new.prefix);
                 }
 
-                cmds.extend(self.send_updates_to_sibling_section(&old)?);
+                cmds.extend(self.send_updates_to_sibling_section(old)?);
                 self.liveness_retain_only(
                     self.network_knowledge
                         .adults()
@@ -690,7 +704,7 @@ mod core {
                 // In case this assumption is not correct (because we already progressed more than one
                 // key since the split) then this key would be unknown to them and they would send
                 // us back their whole section chain. However, this situation should be rare.
-                *self.network_knowledge.section_chain().prev_key()
+                *self.network_knowledge.our_section_dag().prev_key()
             } else {
                 *self.network_knowledge.genesis_key()
             }
@@ -719,13 +733,16 @@ mod core {
         }
 
         pub(crate) async fn write_prefix_map(&self) {
-            info!("Writing our latest PrefixMap to disk");
             let prefix_map = self.network_knowledge.prefix_map().clone();
+            let path = self.root_storage_dir.clone().join(PREFIX_MAP_FILE_NAME);
 
             let _ = tokio::spawn(async move {
-                // write Prefix to `~/.safe/prefix_maps` dir
-                if let Err(e) = write_prefix_map_to_disk(&prefix_map).await {
-                    error!("Error writing PrefixMap to `~/.safe` dir: {:?}", e);
+                if let Err(err) = write_prefix_map_to_disk(&prefix_map, &path).await {
+                    error!(
+                        "Error writing PrefixMap to `{}` dir: {:?}",
+                        path.display(),
+                        err
+                    );
                 }
             });
         }
@@ -740,10 +757,12 @@ mod core {
         }
     }
 
+    #[derive(Clone)]
     pub(crate) struct StateSnapshot {
-        is_elder: bool,
+        pub(crate) is_elder: bool,
         pub(crate) section_key: bls::PublicKey,
-        prefix: Prefix,
+        pub(crate) prefix: Prefix,
         pub(crate) elders: BTreeSet<XorName>,
+        pub(crate) members: BTreeSet<XorName>,
     }
 }
