@@ -460,11 +460,7 @@ impl<'a> Joiner<'a> {
                 } => match wire_msg.auth() {
                     AuthKind::Service(_) => continue,
                     AuthKind::NodeBlsShare(_) => {
-                        trace!(
-                            "Bootstrap message discarded: sender: {:?} wire_msg: {:?}",
-                            sender,
-                            wire_msg
-                        );
+                        trace!("Bootstrap message discarded: sender: {sender:?} wire_msg: {wire_msg:?}");
                         continue;
                     }
                     AuthKind::Node(NodeAuth { .. }) => match wire_msg.into_msg() {
@@ -473,11 +469,7 @@ impl<'a> Joiner<'a> {
                             ..
                         }) => (*resp, sender),
                         Ok(MsgType::Service { msg_id, .. } | MsgType::System { msg_id, .. }) => {
-                            trace!(
-                                "Bootstrap message discarded: sender: {:?} msg_id: {:?}",
-                                sender,
-                                msg_id
-                            );
+                            trace!("Bootstrap message discarded: sender: {sender:?} msg_id: {msg_id:?}");
                             continue;
                         }
                         Err(err) => {

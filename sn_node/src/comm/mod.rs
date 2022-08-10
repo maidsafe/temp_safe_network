@@ -150,15 +150,13 @@ impl Comm {
         }
 
         // cleanup any and all conns that are not active section members
-        if !peers_to_cleanup.is_empty() {
-            for peer in peers_to_cleanup {
-                trace!("Cleaning up peer's sessions: {peer:?}");
-                let perhaps_peer = self.sessions.remove(&peer);
+        for peer in peers_to_cleanup {
+            trace!("Cleaning up peer's sessions: {peer:?}");
+            let perhaps_peer = self.sessions.remove(&peer);
 
-                if let Some((_peer, session)) = perhaps_peer {
-                    session.disconnect().await
-                };
-            }
+            if let Some((_peer, session)) = perhaps_peer {
+                session.disconnect().await
+            };
         }
 
         debug!("PeerSessions count post-cleanup: {:?}", self.sessions.len());
