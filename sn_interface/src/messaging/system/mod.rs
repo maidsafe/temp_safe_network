@@ -15,7 +15,7 @@ mod node_state;
 mod signed;
 use bls::PublicKey as BlsPublicKey;
 
-pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, Proposal, SectionAuth};
+pub use agreement::{DkgSessionId, Proposal, SectionAuth};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProof};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use msg_authority::NodeMsgAuthorityUtils;
@@ -23,20 +23,20 @@ pub use node_msgs::{NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse};
 pub use node_state::{MembershipState, NodeState, RelocateDetails};
 pub use signed::{KeyedSig, SigShare};
 
-use super::{authority::SectionAuth as SectionAuthProof, AuthorityProof};
-
 use crate::messaging::{EndUser, MsgId, SectionAuthorityProvider};
 use crate::network_knowledge::SapCandidate;
 
 use sn_consensus::{Generation, SignedVote};
 
-use bls_dkg::key_gen::message::Message as DkgMessage;
+use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, BTreeMap};
 use std::fmt::{Display, Formatter};
 use xor_name::XorName;
+use ed25519::Signature;
+use sn_sdkg::DkgSignedVote;
 
 /// List of peers of a section
 pub type SectionPeers = BTreeSet<SectionAuth<NodeState>>;
@@ -94,60 +94,26 @@ pub enum SystemMsg {
     JoinAsRelocatedResponse(Box<JoinAsRelocatedResponse>),
     /// Sent to the new elder candidates to start the DKG process.
     DkgStart(DkgSessionId),
-    /// Message sent when a DKG session has not started
-    DkgSessionUnknown {
+    /// Sent when DKG is triggered to other participant
+    DkgEphemeralPubKey {
         /// The identifier of the DKG session this message is for.
         session_id: DkgSessionId,
-        /// DKG message that came in
-        message: DkgMessage,
+        /// The ephemeral bls key chosen by candidate
+        pub_key: BlsPublicKey,
+        /// The ed25519 signature of the candidate
+        sig: Signature
     },
-    /// DKG session info along with section authority
-    DkgSessionInfo {
-        /// The identifier of the DKG session to start.
-        session_id: DkgSessionId,
-        /// Section authority for the DKG start message
-        section_auth: AuthorityProof<SectionAuthProof>,
-        /// Messages processed in the session so far
-        message_cache: Vec<DkgMessage>,
-        /// The original DKG message
-        message: DkgMessage,
-    },
-    /// Message exchanged for DKG process.
-    DkgMessage {
+    /// Votes exchanged for DKG process.
+    DkgVotes {
         /// The identifier of the DKG session this message is for.
         session_id: DkgSessionId,
+        /// The ephemeral bls public keys used for this Dkg round
+        pub_keys: BTreeMap<XorName, (BlsPublicKey, Signature)>,
         /// The DKG message.
-        message: DkgMessage,
+        votes: Vec<DkgSignedVote>,
     },
-    /// Message signalling that the node is not ready for the
-    /// DKG message yet
-    DkgNotReady {
-        /// The identifier of the DKG session this message is for.
-        session_id: DkgSessionId,
-        /// The sent DKG message.
-        message: DkgMessage,
-    },
-    /// Message containing a history of received DKG messages so other nodes can catch-up
-    DkgRetry {
-        /// History of messages received at the sender's end
-        message_history: Vec<DkgMessage>,
-        /// The identifier of the DKG session this message is for.
-        session_id: DkgSessionId,
-        /// The originally sent DKG message.
-        message: DkgMessage,
-    },
-    /// Broadcast to the other DKG participants when a DKG failure is observed.
-    DkgFailureObservation {
-        /// The DKG key
-        session_id: DkgSessionId,
-        /// Signature over the failure
-        sig: DkgFailureSig,
-        /// Nodes that failed to participate
-        failed_participants: BTreeSet<XorName>,
-    },
-    /// Sent to the current elders by the DKG participants when at least majority of them observe
-    /// a DKG failure.
-    DkgFailureAgreement(DkgFailureSigSet),
+    /// Dkg Anti-Entropy request when receiving votes that are ahead of our knowledge
+    DkgAE (DkgSessionId),
     /// Section handover consensus vote message
     HandoverVotes(Vec<SignedVote<SapCandidate>>),
     /// Handover Anti-Entropy request
@@ -204,13 +170,9 @@ impl SystemMsg {
         match self {
             // DKG messages
             SystemMsg::DkgStart { .. }
-            | SystemMsg::DkgSessionUnknown { .. }
-            | SystemMsg::DkgSessionInfo { .. }
-            | SystemMsg::DkgNotReady { .. }
-            | SystemMsg::DkgRetry { .. }
-            | SystemMsg::DkgMessage { .. }
-            | SystemMsg::DkgFailureObservation { .. }
-            | SystemMsg::DkgFailureAgreement(_) => DKG_MSG_PRIORITY,
+            | SystemMsg::DkgEphemeralPubKey { .. }
+            | SystemMsg::DkgVotes { .. }
+            | SystemMsg::DkgAE { .. } => DKG_MSG_PRIORITY,
 
             // Inter-node comms for AE updates
             SystemMsg::AntiEntropy { .. } | SystemMsg::AntiEntropyProbe(_) => {
@@ -267,15 +229,9 @@ impl Display for SystemMsg {
                 write!(f, "SystemMsg::JoinAsRelocatedResponse")
             }
             SystemMsg::DkgStart { .. } => write!(f, "SystemMsg::DkgStart"),
-            SystemMsg::DkgSessionUnknown { .. } => write!(f, "SystemMsg::DkgSessionUnknown"),
-            SystemMsg::DkgSessionInfo { .. } => write!(f, "SystemMsg::DkgSessionInfo"),
-            SystemMsg::DkgMessage { .. } => write!(f, "SystemMsg::DkgMessage"),
-            SystemMsg::DkgNotReady { .. } => write!(f, "SystemMsg::DkgNotReady"),
-            SystemMsg::DkgRetry { .. } => write!(f, "SystemMsg::DkgRetry"),
-            SystemMsg::DkgFailureObservation { .. } => {
-                write!(f, "SystemMsg::DkgFailureObservation")
-            }
-            SystemMsg::DkgFailureAgreement { .. } => write!(f, "SystemMsg::DkgFailureAgreement"),
+            SystemMsg::DkgEphemeralPubKey { .. } => write!(f, "SystemMsg::DkgEphemeralPubKey"),
+            SystemMsg::DkgVotes { .. } => write!(f, "SystemMsg::DkgVotes"),
+            SystemMsg::DkgAE { .. } => write!(f, "SystemMsg::DkgAE"),
             SystemMsg::HandoverVotes { .. } => write!(f, "SystemMsg::HandoverVotes"),
             SystemMsg::HandoverAE { .. } => write!(f, "SystemMsg::HandoverAE"),
             SystemMsg::Propose { .. } => write!(f, "SystemMsg::Propose"),

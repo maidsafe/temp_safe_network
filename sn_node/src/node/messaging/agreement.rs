@@ -79,10 +79,10 @@ impl Node {
         //       elders excluded, this check here uses the empty set for the
         //       excluded_candidates which would prevent a dkg-retry from
         //       succeeding.
-        let dkg_sessions = self.promote_and_demote_elders(&BTreeSet::new());
+        let dkg_sessions_info = self.promote_and_demote_elders(&BTreeSet::new())?;
 
         let agreeing_elders = BTreeSet::from_iter(signed_section_auth.names());
-        if dkg_sessions
+        if dkg_sessions_info
             .iter()
             .all(|session| !session.elder_names().eq(agreeing_elders.iter().copied()))
         {

@@ -317,7 +317,7 @@ mod tests {
     /// In a standard network startup (as of 24/06/22)
     /// we see:
     /// 0 op requests
-    /// 2407 `DkgBroadcastMsg` DKG (each are tracked as an eror until a respnose comes in...) this is total across all nodes...
+    /// 2407 `DkgBroadcastVote` DKG (each are tracked as an eror until a respnose comes in...) this is total across all nodes...
     ///
     /// This includes:
     /// 510 "tracker: Dkg..." (the initial black mark)

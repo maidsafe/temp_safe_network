@@ -21,27 +21,19 @@ use sn_interface::{
 };
 
 use bytes::Bytes;
-use std::{collections::BTreeSet, sync::Arc, time::Duration};
-use tokio::{sync::watch, sync::RwLock};
+use std::{collections::BTreeSet, sync::Arc};
+use tokio::sync::RwLock;
 
 // Cmd Dispatcher.
 pub(crate) struct Dispatcher {
     node: Arc<RwLock<Node>>,
     comm: Comm,
-    dkg_timeout: Arc<DkgTimeout>,
 }
 
 impl Dispatcher {
     pub(crate) fn new(node: Arc<RwLock<Node>>, comm: Comm) -> Self {
-        let (cancel_timer_tx, cancel_timer_rx) = watch::channel(false);
-        let dkg_timeout = Arc::new(DkgTimeout {
-            cancel_timer_tx,
-            cancel_timer_rx,
-        });
-
         Self {
             node,
-            dkg_timeout,
             comm,
         }
     }
@@ -192,10 +184,6 @@ impl Dispatcher {
                     Ok(vec![])
                 }
             }
-            Cmd::HandleDkgTimeout(token) => {
-                let node = self.node.read().await;
-                node.handle_dkg_timeout(token)
-            }
             Cmd::HandleAgreement { proposal, sig } => {
                 let mut node = self.node.write().await;
                 node.handle_general_agreements(proposal, sig)
@@ -222,10 +210,6 @@ impl Dispatcher {
                 let mut node = self.node.write().await;
                 node.handle_dkg_outcome(section_auth, outcome).await
             }
-            Cmd::HandleDkgFailure(signeds) => {
-                let mut node = self.node.write().await;
-                Ok(vec![node.handle_dkg_failure(signeds)])
-            }
             Cmd::EnqueueDataForReplication {
                 // throttle_duration,
                 recipient,
@@ -249,11 +233,6 @@ impl Dispatcher {
                 }
                 Ok(vec![])
             }
-            Cmd::ScheduleDkgTimeout { duration, token } => Ok(self
-                .handle_scheduled_dkg_timeout(duration, token)
-                .await
-                .into_iter()
-                .collect()),
             Cmd::ProposeVoteNodesOffline(names) => {
                 let mut node = self.node.write().await;
                 node.cast_offline_proposals(&names)
@@ -286,24 +265,6 @@ impl Dispatcher {
             }
         }
     }
-
-    async fn handle_scheduled_dkg_timeout(&self, duration: Duration, token: u64) -> Option<Cmd> {
-        let mut cancel_rx = self.dkg_timeout.cancel_timer_rx.clone();
-
-        if *cancel_rx.borrow() {
-            // Timers are already cancelled, do nothing.
-            return None;
-        }
-
-        tokio::select! {
-            _ = sleep_facility(duration) => Some(Cmd::HandleDkgTimeout(token)),
-            _ = cancel_rx.changed() => None,
-        }
-    }
-}
-
-async fn sleep_facility(duration: Duration) {
-    log_sleep!(Duration::from_millis(duration.as_millis() as u64));
 }
 
 // Serializes and signs the msg,

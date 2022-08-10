@@ -54,6 +54,7 @@ serde_json = "1.0.53"
 signature = "1.1.10"
 sn_consensus = "3.1.2"
 sn_dbc = { version = "7.2.0", features = ["serdes"] }
+sn_sdkg = { git = "https://github.com/maidsafe/sn_sdkg" }
 strum = "~0.23.0"
 strum_macros = "~0.23.1"
 tempfile = "3.2.0"

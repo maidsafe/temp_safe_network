@@ -177,7 +177,7 @@ mod core {
         pub(crate) proposal_aggregator: SignatureAggregator,
         // DKG/Split/Churn modules
         pub(crate) split_barrier: SplitBarrier,
-        pub(crate) dkg_sessions: HashMap<Digest256, DkgSessionInfo>,
+        pub(crate) dkg_sessions_info: HashMap<Digest256, DkgSessionInfo>,
         pub(crate) dkg_voter: DkgVoter,
         pub(crate) relocate_state: Option<Box<JoiningAsRelocated>>,
         // ======================== Elder only ========================
@@ -263,7 +263,7 @@ mod core {
                 network_knowledge,
                 section_keys_provider,
                 root_storage_dir,
-                dkg_sessions: HashMap::default(),
+                dkg_sessions_info: HashMap::default(),
                 proposal_aggregator: SignatureAggregator::default(),
                 split_barrier: SplitBarrier::new(),
                 message_aggregator: SignatureAggregator::default(),

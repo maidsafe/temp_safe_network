@@ -18,7 +18,7 @@ use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         data::{OperationId, ServiceMsg},
-        system::{DkgFailureSigSet, KeyedSig, NodeState, SectionAuth, SystemMsg},
+        system::{KeyedSig, NodeState, SectionAuth, SystemMsg},
         AuthorityProof, MsgId, NodeMsgAuthority, ServiceAuth, WireMsg,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
@@ -31,7 +31,7 @@ use std::{
     collections::BTreeSet,
     fmt,
     sync::atomic::{AtomicU64, Ordering},
-    time::{Duration, SystemTime},
+    time::SystemTime,
 };
 
 /// A struct for the job of controlling the flow
@@ -137,8 +137,6 @@ pub(crate) enum Cmd {
         #[cfg(feature = "traceroute")]
         traceroute: Traceroute,
     },
-    /// Handle a timeout previously scheduled with `ScheduleDkgTimeout`.
-    HandleDkgTimeout(u64),
     /// Handle peer that's been detected as lost.
     HandlePeerFailedSend(Peer),
     /// Handle agreement on a proposal.
@@ -156,8 +154,6 @@ pub(crate) enum Cmd {
         section_auth: SectionAuthorityProvider,
         outcome: SectionKeyShare,
     },
-    /// Handle a DKG failure that was observed by a majority of the DKG participants.
-    HandleDkgFailure(DkgFailureSigSet),
     /// Send the batch of data messages in a throttled/controlled fashion to the given `recipients`.
     /// chunks addresses are provided, so that we only retrieve the data right before we send it,
     /// hopefully reducing memory impact or data replication
@@ -175,9 +171,6 @@ pub(crate) enum Cmd {
         #[cfg(feature = "traceroute")]
         traceroute: Traceroute,
     },
-    /// Schedule a timeout after the given duration. When the timeout expires, a `HandleDkgTimeout`
-    /// cmd is raised. The token is used to identify the timeout.
-    ScheduleDkgTimeout { duration: Duration, token: u64 },
     /// Proposes peers as offline
     ProposeVoteNodesOffline(BTreeSet<XorName>),
     /// Send a signal to all Elders to
@@ -226,8 +219,6 @@ impl Cmd {
             HandleAgreement { .. } => 10,
             HandleNewEldersAgreement { .. } => 10,
             HandleDkgOutcome { .. } => 10,
-            HandleDkgFailure(_) => 10,
-            HandleDkgTimeout(_) => 10,
             ProposeVoteNodesOffline(_) => 10,
 
             HandlePeerFailedSend(_) => 9,
@@ -236,7 +227,6 @@ impl Cmd {
             EnqueueDataForReplication { .. } => 9,
             CleanupPeerLinks => 9,
 
-            ScheduleDkgTimeout { .. } => 8,
             TellEldersToStartConnectivityTest(_) => 8,
             TestConnectivity(_) => 8,
 
@@ -259,8 +249,6 @@ impl fmt::Display for Cmd {
             Cmd::CleanupPeerLinks => {
                 write!(f, "CleanupPeerLinks")
             }
-            Cmd::HandleDkgTimeout(_) => write!(f, "HandleDkgTimeout"),
-            Cmd::ScheduleDkgTimeout { .. } => write!(f, "ScheduleDkgTimeout"),
             #[cfg(not(feature = "test-utils"))]
             Cmd::ValidateMsg { wire_msg, .. } => {
                 write!(f, "ValidateMsg {:?}", wire_msg.msg_id())
@@ -285,7 +273,6 @@ impl fmt::Display for Cmd {
             Cmd::HandleNewEldersAgreement { .. } => write!(f, "HandleNewEldersAgreement"),
             Cmd::HandleMembershipDecision(_) => write!(f, "HandleMembershipDecision"),
             Cmd::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
-            Cmd::HandleDkgFailure(_) => write!(f, "HandleDkgFailure"),
             Cmd::SendMsg { .. } => write!(f, "SendMsg"),
             Cmd::EnqueueDataForReplication { .. } => write!(f, "ThrottledSendBatchMsgs"),
             Cmd::TrackNodeIssueInDysfunction { name, issue } => {
