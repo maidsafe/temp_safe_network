@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1660139670839,
+  "lastUpdate": 1660140314774,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -15635,6 +15635,144 @@ window.BENCHMARK_DATA = {
             "name": "generating keys",
             "value": 22860984,
             "range": "± 253789",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "joshuef@gmail.com",
+            "name": "Josh Wilson",
+            "username": "joshuef"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "a5afec84bc687327df3951eefc6c566c898f2332",
+          "message": "fix(node): Add braces around expected age calc; use membership\n\nPreviously we were occasionally seeing _large_ expected ages (246 eg),\nhere we add braces for clarity and hopefully prevent such calculatory oddness.\n\nWe also use membership to know the current section size instead of SAP which\nmay well be outdated.",
+          "timestamp": "2022-08-10T15:21:50+02:00",
+          "tree_id": "bcaaed2c4b69b0ac82d8b783ffd6b8d9ac4d9413",
+          "url": "https://github.com/maidsafe/safe_network/commit/a5afec84bc687327df3951eefc6c566c898f2332"
+        },
+        "date": 1660140313452,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 476957973,
+            "range": "± 82629670",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 523846162,
+            "range": "± 18830730",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 979603469,
+            "range": "± 77855951",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 328966849,
+            "range": "± 10115744",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 342292021,
+            "range": "± 4140999",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 806597036,
+            "range": "± 64755741",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 9041738,
+            "range": "± 1149003",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 1342596920,
+            "range": "± 402760270",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 7059554061,
+            "range": "± 1674391754",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 255209434,
+            "range": "± 102213408",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 968827787,
+            "range": "± 176608073",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 4041648934,
+            "range": "± 342535435",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 10976749,
+            "range": "± 235258",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 98732632,
+            "range": "± 12280063",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 341970453,
+            "range": "± 24604341",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 10728928,
+            "range": "± 247476",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 97622032,
+            "range": "± 9484013",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 339347407,
+            "range": "± 18166437",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "generating keys",
+            "value": 21541824,
+            "range": "± 243045",
             "unit": "ns/iter"
           }
         ]
