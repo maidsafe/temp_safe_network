@@ -532,7 +532,6 @@ pub(super) async fn send_msg(
     wire_msg: WireMsg,
     msg_id: MsgId,
 ) -> Result<()> {
-    let priority = wire_msg.priority();
     let msg_bytes = wire_msg.serialize()?;
 
     let mut last_error = None;
@@ -558,10 +557,7 @@ pub(super) async fn send_msg(
             let mut retries = 0;
 
             let send_and_retry = || async {
-                match link
-                    .send_with(msg_bytes_clone.clone(), priority, None, listen)
-                    .await
-                {
+                match link.send_with(msg_bytes_clone.clone(), None, listen).await {
                     Ok(()) => Ok(()),
                     Err(error) => match error {
                         SendToOneError::Connection(err) => Err(Error::QuicP2pConnection(err)),

@@ -79,13 +79,8 @@ impl PeerSession {
         }
     }
 
-    #[instrument(skip(self, msg_bytes, _msg_priority))]
-    pub(crate) async fn send(
-        &self,
-        msg_id: MsgId,
-        _msg_priority: i32, // TODO: priority is temporarily disabled
-        msg_bytes: Bytes,
-    ) -> Result<SendWatcher> {
+    #[instrument(skip(self, msg_bytes))]
+    pub(crate) async fn send(&self, msg_id: MsgId, msg_bytes: Bytes) -> Result<SendWatcher> {
         let (watcher, reporter) = status_watching();
 
         let job = SendJob {

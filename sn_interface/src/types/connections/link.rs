@@ -112,7 +112,7 @@ impl Link {
         msg: Bytes,
         listen: F,
     ) -> Result<(), SendToOneError> {
-        self.send_with(msg, 0, None, listen).await
+        self.send_with(msg, None, listen).await
     }
 
     /// Send a message to the peer using the given configuration.
@@ -122,10 +122,10 @@ impl Link {
     pub async fn send_with<F: Fn(qp2p::Connection, IncomingMsgs)>(
         &self,
         msg: Bytes,
-        priority: i32,
         retry_config: Option<&RetryConfig>,
         listen: F,
     ) -> Result<(), SendToOneError> {
+        let default_priority = 10;
         let conn = self.get_or_connect(listen).await?;
         let queue_len = { self.queue.read().await.len() };
         trace!(
@@ -133,7 +133,7 @@ impl Link {
             queue_len,
             self.peer
         );
-        match conn.send_with(msg, priority, retry_config).await {
+        match conn.send_with(msg, default_priority, retry_config).await {
             Ok(()) => {
                 self.remove_expired().await;
                 Ok(())
