@@ -6,225 +6,207 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{
-    dkg::session::Session,
-    flow_ctrl::cmds::Cmd,
-    messaging::{OutgoingMsg, Peers},
-    Result,
-};
+use crate::node::{Result, Error};
+use ed25519::Signature;
+use ed25519_dalek::Verifier;
 
 use sn_interface::{
-    messaging::system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
-    network_knowledge::{supermajority, NodeInfo, SectionAuthorityProvider, SectionKeyShare},
-    types::{
-        keys::ed25519::{self, Digest256},
-        Peer,
-    },
+    messaging::system::DkgSessionId,
+    network_knowledge::threshold,
+    types::keys::ed25519::{Digest256, pub_key},
 };
 
-use bls::PublicKey as BlsPublicKey;
-use bls_dkg::key_gen::{message::Message as DkgMessage, KeyGen};
-use dashmap::DashMap;
-use std::{collections::BTreeSet, sync::Arc};
+use bls::{SecretKey as BlsSecretKey, PublicKey as BlsPublicKey};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+use sn_sdkg::{DkgState, DkgSignedVote, NodeId, VoteResponse};
 use xor_name::XorName;
 
-/// DKG voter carries out the work of participating and/or observing a DKG.
-///
-/// # Usage
-///
-/// 1. First the current elders propose the new elder candidates in the form of
-///    `SectionAuthorityProvider`structure.
-/// 2. They send an accumulating message `DkgStart` containing this proposed
-///    `SectionAuthorityProvider` to the new elders candidates (DKG participants).
-/// 3. When the `DkgStart` message accumulates, the participants call `start`.
-/// 4. The participants keep exchanging the DKG messages and calling `process_message`.
-/// 5. On DKG completion, the participants send `DkgResult` vote to the current elders (observers)
-/// 6. When the observers accumulate the votes, they can proceed with voting for the section update.
-///
-/// Note: in case of heavy churn, it can happen that more than one DKG session completes
-/// successfully. Some kind of disambiguation strategy needs to be employed in that case, but that
-/// is currently not a responsibility of this module.
-#[derive(Clone)]
-pub(crate) struct DkgVoter {
-    sessions: Arc<DashMap<Digest256, Session>>,
+pub type DkgPubKeys = BTreeMap<XorName, (BlsPublicKey, Signature)>;
+
+pub struct DkgEphemeralKeys {
+    secret_key: BlsSecretKey,
+    pub_keys: DkgPubKeys,
 }
 
-impl Default for DkgVoter {
-    fn default() -> Self {
-        Self {
-            sessions: Arc::new(DashMap::default()),
+#[derive(Default)]
+pub(crate) struct DkgVoter {
+    /// Ephemeral keys used by participants for each DKG session
+    /// keyed by DkgSessionId hash
+    dkg_ephemeral_keys: HashMap<Digest256, DkgEphemeralKeys>,
+    /// Once we've got our ephemeral keys, we can go on with DKG with DKG states
+    /// keyed by DkgSessionId hash
+    dkg_states: HashMap<Digest256, DkgState<bls::rand::rngs::OsRng>>,
+}
+
+/// Helper that creates a dkg state
+fn create_dkg_state(
+    session_id: &DkgSessionId,
+    participant_index: usize,
+    secret_key: BlsSecretKey,
+    pub_keys: DkgPubKeys,
+) -> Result<DkgState<bls::rand::rngs::OsRng>> {
+    let mut rng = bls::rand::rngs::OsRng;
+    let threshold = threshold(session_id.elders.len());
+    let mut public_keys:BTreeMap<NodeId, BlsPublicKey>;
+    for (xorname, (pubkey, _)) in pub_keys.iter() {
+        if let Some(index) = session_id.elder_index(*xorname) {
+            public_keys.insert(index as u8, *pubkey);
+        } else {
+            return Err(Error::NodeNotInDkgSession(*xorname));
         }
     }
+    Ok(DkgState::new(
+        participant_index as u8,
+        secret_key,
+        public_keys,
+        threshold,
+        &mut rng,
+    )?)
 }
 
 impl DkgVoter {
-    // Starts a new DKG session.
-    pub(crate) fn start(
-        &self,
-        node: &NodeInfo,
-        session_id: DkgSessionId,
-        section_pk: BlsPublicKey,
-    ) -> Result<Vec<Cmd>> {
-        if self.sessions.contains_key(&session_id.hash()) {
-            trace!("DKG already in progress for {session_id:?}");
-            return Ok(vec![]);
-        }
-
-        let name = ed25519::name(&node.keypair.public);
-        let participant_index = if let Some(index) = session_id.elder_index(name) {
-            index
-        } else {
-            error!("DKG failed to start for {session_id:?}: {name} is not a participant");
-            return Ok(vec![]);
+    /// Generate ephemeral secret key and save it
+    /// If we already have a key for the current session_id, don't generate a new one
+    /// return the pub key for our secret key
+    pub(crate) fn gen_ephemeral_key(&mut self, session_id_hash: Digest256) -> BlsPublicKey {
+        let new_key = DkgEphemeralKeys {
+            secret_key: bls::rand::random(),
+            pub_keys: BTreeMap::new(),
         };
-
-        // Special case: only one participant.
-        if session_id.elders.len() == 1 {
-            let secret_key_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
-            let section_auth = SectionAuthorityProvider::from_dkg_session(
-                &session_id,
-                secret_key_set.public_keys(),
-            );
-            return Ok(vec![Cmd::HandleDkgOutcome {
-                section_auth,
-                outcome: SectionKeyShare {
-                    public_key_set: secret_key_set.public_keys(),
-                    index: participant_index,
-                    secret_key_share: secret_key_set.secret_key_share(0u64),
-                },
-            }]);
-        }
-
-        let threshold = supermajority(session_id.elders.len()) - 1;
-        let participants = session_id.elder_names().collect();
-
-        match KeyGen::initialize(name, threshold, participants) {
-            Ok((key_gen, messages)) => {
-                trace!("DKG starting for {session_id:?}");
-
-                let mut session = Session {
-                    key_gen,
-                    session_id: session_id.clone(),
-                    participant_index,
-                    timer_token: 0,
-                    failures: DkgFailureSigSet::from(session_id.clone()),
-                    complete: false,
-                    last_message_broadcast: vec![],
-                    retries: 0,
-                };
-
-                let mut cmds = vec![];
-                cmds.extend(session.broadcast(node, messages, section_pk)?);
-
-                // This is to avoid the case that between the above existence check
-                // and the insertion, there is another thread created and updated the session.
-                if self.sessions.contains_key(&session_id.hash()) {
-                    warn!("DKG already in progress for {:?}", session_id);
-                    return Ok(vec![]);
-                } else {
-                    let _prev = self.sessions.insert(session_id.hash(), session);
-                }
-
-                // Remove unneeded old sessions.
-                self.sessions.retain(|_, existing_session| {
-                    existing_session.session_id.section_chain_len >= session_id.section_chain_len
-                });
-
-                Ok(cmds)
-            }
-            Err(error) => {
-                // TODO: return a separate error here.
-                error!("DKG failed to start for {session_id:?}: {error}");
-                Ok(vec![])
-            }
-        }
+        self.dkg_ephemeral_keys.entry(session_id_hash).or_insert(new_key).secret_key.public_key()
     }
 
-    // Make key generator progress with timed phase.
-    pub(crate) fn handle_timeout(
-        &self,
-        node: &NodeInfo,
-        timer_token: u64,
-        section_pk: BlsPublicKey,
-    ) -> Result<Vec<Cmd>> {
-        if let Some(mut ref_mut_multi) = self.sessions.iter_mut().find(|ref_mut_multi| {
-            let session = ref_mut_multi.value();
-            session.timer_token() == timer_token
-        }) {
-            let (_, session) = ref_mut_multi.pair_mut();
-            session.handle_timeout(node, section_pk)
-        } else {
-            Ok(vec![])
-        }
-    }
-
-    // Handle a received DkgMessage.
-    pub(crate) fn process_msg(
-        &self,
-        sender: Peer,
-        node: &NodeInfo,
+    /// Initializes our DKG state and returns our first vote and dkg keys
+    /// If we already have a DKG state, this function does nothing
+    pub(crate) fn initialize_dkg_state(
+        &mut self,
         session_id: &DkgSessionId,
-        message: DkgMessage,
-        section_pk: BlsPublicKey,
-    ) -> Result<Vec<Cmd>> {
-        let mut cmds = Vec::new();
+        participant_index: usize,
+    ) -> Result<(DkgSignedVote, DkgPubKeys)> {
+        // get our keys
+        let our_keys = self.dkg_ephemeral_keys
+            .get(&session_id.hash())
+            .ok_or(Error::NoDkgKeysForSession(session_id.clone()))?;
 
-        if let Some(mut session) = self.sessions.get_mut(&session_id.hash()) {
-            cmds.extend(session.process_msg(node, sender.name(), message, section_pk)?)
-        } else {
-            trace!(
-                "Sending DkgSessionUnknown {{ {:?} }} to {}",
-                &session_id,
-                &sender
-            );
-            let msg = SystemMsg::DkgSessionUnknown {
-                session_id: session_id.clone(),
-                message,
-            };
-            cmds.push(Cmd::send_msg(
-                OutgoingMsg::System(msg),
-                Peers::Single(sender),
-            ));
-        }
-        Ok(cmds)
+        // initialize dkg state if it doesn't exist yet
+        let dkg_state = self
+            .dkg_states
+            .entry(session_id.hash())
+            .or_insert(create_dkg_state(session_id, participant_index, our_keys.secret_key.clone(), our_keys.pub_keys.clone())?);
+
+        // return our vote along with the dkg keys
+        let first_vote = dkg_state.first_vote()?;
+
+        Ok((first_vote, our_keys.pub_keys.clone()))
     }
 
-    pub(crate) fn process_failure(
-        &self,
+    /// Try to initialize DKG with given key, and return first vote
+    pub(crate) fn try_init_dkg(
+        &mut self,
         session_id: &DkgSessionId,
-        failed_participants: &BTreeSet<XorName>,
-        signed: DkgFailureSig,
-    ) -> Option<Cmd> {
-        let hash = session_id.hash();
-        self.sessions
-            .get_mut(&hash)?
-            .process_failure(session_id, failed_participants, signed)
-    }
-
-    pub(crate) fn get_cached_msgs(&self, session_id: &DkgSessionId) -> Vec<DkgMessage> {
-        if let Some(session) = self.sessions.get_mut(&session_id.hash()) {
-            session.get_cached_msgs()
-        } else {
-            Vec::new()
-        }
-    }
-
-    pub(crate) fn handle_dkg_history(
-        &self,
-        node: &NodeInfo,
-        session_id: &DkgSessionId,
-        message_history: Vec<DkgMessage>,
+        participant_index: usize,
+        ephemeral_pub_key: BlsPublicKey,
+        sig: Signature,
         sender: XorName,
-        section_pk: BlsPublicKey,
-    ) -> Result<Vec<Cmd>> {
-        if let Some(mut session) = self.sessions.get_mut(&session_id.hash()) {
-            session.handle_dkg_history(node, message_history, section_pk)
-        } else {
-            warn!(
-                "Recieved DKG message cache from {} without an active DKG session: {:?}",
-                &sender, &session_id,
-            );
-            Ok(vec![])
+    ) -> Result<Option<(DkgSignedVote, DkgPubKeys)>> {
+        // check and save key
+        let just_completed = self.save_key(session_id, sender, ephemeral_pub_key, sig)?;
+        if !just_completed {
+            return Ok(None)
+        }
+
+        let (first_vote, pub_keys) = self.initialize_dkg_state(session_id, participant_index)?;
+
+        Ok(Some((first_vote, pub_keys.clone())))
+    }
+
+    /// Check and save ephemeral bls keys
+    /// Returns true if we just completed the set (and need to initialize DKG state)
+    pub(crate) fn save_key(
+        &mut self,
+        session_id: &DkgSessionId,
+        key_owner: XorName,
+        key: BlsPublicKey,
+        sig: Signature,
+    ) -> Result<bool> {
+        // check key owner is in dkg session
+        if !session_id.elders.contains_key(&key_owner) {
+            return Err(Error::NodeNotInDkgSession(key_owner));
+        }
+
+        // check sig
+        let sender_pubkey = pub_key(&key_owner).map_err(|_| Error::InvalidXorname(key_owner))?;
+        let serialized = bincode::serialize(&key)?;
+        if !sender_pubkey.verify(&serialized, &sig).is_ok() {
+            return Err(Error::InvalidSignature);
+        }
+
+        // check if we have our secret key yet
+        let our_keys = self.dkg_ephemeral_keys
+            .get_mut(&session_id.hash())
+            .ok_or(Error::NoDkgKeysForSession(session_id.clone()))?;
+
+        // check for double key attack
+        if let Some((already_had, old_sig)) = our_keys.pub_keys.get(&key_owner) {
+            if already_had != &key {
+                return Err(Error::DoubleKeyAttackDetected(
+                    key_owner,
+                    key, sig,
+                    *already_had, *old_sig,
+                ))
+            }
+        }
+
+        let did_insert = our_keys.pub_keys.insert(key_owner, (key, sig)).is_some();
+        let we_are_full = our_keys.pub_keys.keys().collect::<BTreeSet<_>>() == session_id.elders.keys().collect::<BTreeSet<_>>();
+        Ok(did_insert && we_are_full)
+    }
+
+    /// Checks the given keys and returns them
+    /// Catches if we have missing keys locally
+    /// Tell caller if that update helped us complete the set
+    pub(crate) fn check_keys(&mut self, session_id: &DkgSessionId, keys: DkgPubKeys) -> Result<(DkgPubKeys, bool)> {
+        let our_keys = self.dkg_ephemeral_keys
+            .get(&session_id.hash())
+            .ok_or(Error::NoDkgKeysForSession(session_id.clone()))?
+            .pub_keys;
+
+        // check if our keys match
+        if keys == our_keys {
+            return Ok((keys, false));
+        }
+
+        // catch up with their keys
+        let completed = keys.iter().map(|(name, (key, sig))| {
+            self.save_key(session_id, *name, *key, *sig)
+        }).collect::<Result<Vec<bool>>>()?;
+
+        // we should now have the same keys, tell caller if update helped us complete the set
+        Ok((keys, completed.iter().any(|b| *b)))
+    }
+
+    /// Get the dkg keys for a given session
+    pub(crate) fn get_dkg_keys(&self, session_id: &DkgSessionId) -> Result<DkgPubKeys> {
+        let our_keys = self.dkg_ephemeral_keys
+            .get(&session_id.hash())
+            .ok_or(Error::NoDkgKeysForSession(session_id.clone()))?
+            .pub_keys;
+        Ok(our_keys)
+    }
+
+    /// Get all the votes we received for a given session
+    pub(crate) fn get_all_votes(&self, session_id: &DkgSessionId) -> Result<Vec<DkgSignedVote>> {
+        match self.dkg_states.get(&session_id.hash()) {
+            Some(state) => Ok(state.all_votes()),
+            None => Err(Error::NoDkgStateForSession(session_id.clone())),
+        }
+    }
+
+    /// Handles Dkg vote
+    pub(crate) fn handle_dkg_vote(&mut self, session_id: &DkgSessionId, vote: DkgSignedVote) -> Result<VoteResponse> {
+        match self.dkg_states.get_mut(&session_id.hash()) {
+            Some(state) => Ok(state.handle_signed_vote(vote)?),
+            None => Err(Error::NoDkgStateForSession(session_id.clone())),
         }
     }
 }

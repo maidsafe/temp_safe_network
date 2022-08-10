@@ -13,11 +13,15 @@ use crate::node::handover::Error as HandoverError;
 use sn_dbc::Error as DbcError;
 use sn_interface::{
     messaging::data::{DataQuery, Error as ErrorMsg},
-    types::{convert_dt_error_to_error_msg, DataAddress, Peer},
+    messaging::system::DkgSessionId,
+    types::{convert_dt_error_to_error_msg, DataAddress, Peer, PublicKey},
 };
 
 use std::{io, net::SocketAddr};
 use thiserror::Error;
+use xor_name::XorName;
+use bls::PublicKey as BlsPublicKey;
+use ed25519::Signature;
 
 /// The type returned by the `sn_routing` message handling methods.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -94,6 +98,24 @@ pub enum Error {
         /// Actual number of Adults found to hold the data.
         found: u8,
     },
+    /// Received a dkg message from an invalid Xorname
+    #[error("Invalid Xorname: {0:?}")]
+    InvalidXorname(XorName),
+    /// Received a dkg message from a node that is not in dkg session
+    #[error("Node not in dkg session: {0:?}")]
+    NodeNotInDkgSession(XorName),
+    /// We don't have a bls key for this dkg session id
+    #[error("No dkg keys for session: {0:?}")]
+    NoDkgKeysForSession(DkgSessionId),
+    /// Double Key Attack Detected, node is faulty, error contains proof: sigs and signed bls keys
+    #[error("Double Key Attack Detected from: {0:?}")]
+    DoubleKeyAttackDetected(XorName, BlsPublicKey, Signature, BlsPublicKey, Signature),
+    /// Dkg error
+    #[error("DKG error: {0}")]
+    DkgError(#[from] sn_sdkg::Error),
+    /// We don't have a dkg state for this dkg session id
+    #[error("No dkg state for session: {0:?}")]
+    NoDkgStateForSession(DkgSessionId),
     /// Chunk already exists for this node
     #[error("Data already exists at this node: {0:?}")]
     DataExists(DataAddress),

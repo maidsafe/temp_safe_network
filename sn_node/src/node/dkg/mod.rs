@@ -6,8 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod session;
 mod voter;
 
-pub(crate) use self::voter::DkgVoter;
-pub(crate) use sn_interface::messaging::system::{KeyedSig, SigShare};
+pub(crate) use self::voter::{DkgVoter, DkgPubKeys};

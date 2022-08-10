@@ -6,10 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::dkg::KeyedSig;
-
 use sn_consensus::Generation;
-use sn_interface::{messaging::system::SectionAuth, network_knowledge::SectionAuthorityProvider};
+use sn_interface::{messaging::system::{SectionAuth, KeyedSig}, network_knowledge::SectionAuthorityProvider};
 
 use std::collections::BTreeMap;
 use xor_name::Prefix;
