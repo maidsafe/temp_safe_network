@@ -12,7 +12,7 @@ use crate::messaging::{
     system::SystemMsg,
     AuthKind, AuthorityProof, Dst, Error, MsgId, MsgType, NodeMsgAuthority, Result, ServiceAuth,
 };
-use bytes::{Bytes, BytesMut};
+use bytes::{BufMut, Bytes, BytesMut};
 use custom_debug::Debug;
 use serde::Serialize;
 
@@ -99,14 +99,15 @@ impl WireMsg {
     /// Once the caller obtains both the serialized payload and `MsgKind`,
     /// it can invoke the `new_msg` function to instantiate a `WireMsg`.
     pub fn serialize_msg_payload<T: Serialize>(msg: &T) -> Result<Bytes> {
-        let payload_vec = rmp_serde::to_vec_named(&msg).map_err(|err| {
+        let mut bytes_writer = BytesMut::new().writer();
+        rmp_serde::encode::write(&mut bytes_writer, &msg).map_err(|err| {
             Error::Serialisation(format!(
                 "could not serialize message payload with Msgpack: {}",
                 err
             ))
         })?;
 
-        Ok(Bytes::from(payload_vec))
+        Ok(bytes_writer.into_inner().freeze())
     }
 
     /// Creates a new `WireMsg` with the provided serialized payload and `MsgKind`.
