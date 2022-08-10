@@ -57,9 +57,14 @@ macro_rules! log_sleep {
         let duration = $duration_expr;
         let mut rng = rand::thread_rng();
         let sleep_id = xor_name::XorName::random(&mut rng);
-        debug!("Sleep ID {sleep_id} going to sleep for {:?}", duration);
+        // To reduce the logs, only log long time sleeps.
+        if duration > Duration::from_millis(500) {
+            debug!("Sleep ID {sleep_id} going to sleep for {:?}", duration);
+        }
         tokio::time::sleep(duration).await;
-        debug!("Sleep ID {sleep_id} completed");
+        if duration > Duration::from_millis(500) {
+            debug!("Sleep ID {sleep_id} completed");
+        }
     };
 }
 
