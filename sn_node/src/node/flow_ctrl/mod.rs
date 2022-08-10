@@ -250,7 +250,7 @@ impl FlowCtrl {
                         // we want to resend the prev vote
                         if time.elapsed() >= MISSING_VOTE_INTERVAL {
                             debug!("Vote consensus appears stalled...");
-                            if let Some(cmd) = node.resend_our_last_vote_to_elders().await {
+                            if let Some(cmd) = node.membership_gossip_votes().await {
                                 trace!("Vote resending cmd");
                                 if let Err(e) = self.cmd_ctrl.push(cmd).await {
                                     error!("Error resending a vote msg to the network: {:?}", e);
