@@ -323,7 +323,7 @@ mod tests {
     use sn_interface::types::{log_markers::LogMarker, utils::random_bytes};
 
     use bytes::Bytes;
-    use eyre::Result;
+    use eyre::{eyre, Result};
     use futures::future::join_all;
     use std::time::Duration;
     use tokio::time::Instant;
@@ -461,7 +461,7 @@ mod tests {
         debug!("======> Data uploaded");
 
         let reader_count = 25;
-        let clients = create_clients(reader_count).await;
+        let clients = create_clients(reader_count).await?;
         assert_eq!(reader_count, clients.len());
 
         let mut tasks = vec![];
@@ -509,7 +509,7 @@ mod tests {
         Ok(())
     }
 
-    async fn create_clients(count: usize) -> Vec<Client> {
+    async fn create_clients(count: usize) -> Result<Vec<Client>> {
         let mut tasks = vec![];
 
         for i in 0..count {
@@ -518,20 +518,34 @@ mod tests {
                 tokio::spawn(async move {
                     debug!("starting client #{:?}..", i);
                     // use a fresh client
-                    let client = create_test_client().await?;
-                    debug!("client #{:?} started", i);
-                    Ok(client)
+                    let client = create_test_client().await;
+                    debug!("client #{:?} created ok?: {}", i, client.is_ok());
+                    client
                 })
                 .in_current_span();
             tasks.push(handle);
         }
 
-        join_all(tasks)
-            .await
-            .into_iter()
-            .flatten()
-            .flatten()
-            .collect()
+        let (clients, errors) = join_all(tasks).await.into_iter().flatten().fold(
+            (vec![], vec![]),
+            |(mut clients, mut errors), result| {
+                match result {
+                    Ok(client) => clients.push(client),
+                    Err(err) => errors.push(err.to_string()),
+                }
+                (clients, errors)
+            },
+        );
+
+        if errors.is_empty() {
+            Ok(clients)
+        } else {
+            Err(eyre!(
+                "Failed to create {} out of {} clients, due to the following respective errors: {:?}",
+                errors.len(), count,
+                errors
+            ))
+        }
     }
 
     #[tokio::test(flavor = "multi_thread")]
