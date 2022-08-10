@@ -273,8 +273,9 @@ impl Node {
             let sleep_time = if let Some(mut next_wait) = next_backoff {
                 // The default setup start with around 400ms
                 // then increases to around 50s after 25 calls.
-                next_wait /= 100;
-                if next_wait > Duration::from_secs(1) {
+                // with `next_wait /= 100`, the sleep_time still rise to over 800ms quickly.
+                next_wait /= 200;
+                if next_wait > Duration::from_millis(500) {
                     backoff.reset();
                 }
                 Some(next_wait)
