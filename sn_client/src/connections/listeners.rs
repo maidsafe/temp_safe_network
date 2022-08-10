@@ -316,11 +316,7 @@ impl Session {
         bounced_msg: Bytes,
         src_peer: Peer,
     ) -> Result<(), Error> {
-        debug!(
-            "Received Anti-Entropy from {}, with SAP: {:?}",
-            src_peer.addr(),
-            target_sap
-        );
+        debug!("Received Anti-Entropy from {src_peer}, with SAP: {target_sap:?}");
 
         // Try to update our network knowledge first
         Self::update_network_knowledge(
