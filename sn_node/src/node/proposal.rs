@@ -9,7 +9,7 @@
 use crate::node::Result;
 
 use sn_interface::{
-    messaging::system::{SigShare, Proposal as ProposalMsg, SectionAuth},
+    messaging::system::{Proposal as ProposalMsg, SectionAuth, SigShare},
     network_knowledge::{NodeState, SectionAuthorityProvider},
 };
 

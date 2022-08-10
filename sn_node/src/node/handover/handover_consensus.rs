@@ -178,7 +178,7 @@ impl Handover {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bls_dkg::blsttc::SecretKeySet;
+    use bls::SecretKeySet;
     use rand::{prelude::StdRng, SeedableRng};
     use std::collections::BTreeSet;
 

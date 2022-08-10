@@ -18,20 +18,21 @@ use bytes::Bytes;
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
-        system::{DkgSessionId, SystemMsg, SigShare},
+        system::{DkgSessionId, SigShare, SystemMsg},
         AuthorityProof, BlsShareAuth, NodeMsgAuthority, WireMsg,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
     types::{self, log_markers::LogMarker, Peer},
 };
 
-use bls::{PublicKeySet, SecretKeyShare, PublicKey as BlsPublicKey};
-use xor_name::{XorName, Prefix};
+use bls::{PublicKey as BlsPublicKey, PublicKeySet, SecretKeyShare};
 use ed25519::Signature;
 use sn_sdkg::{DkgSignedVote, VoteResponse};
+use std::collections::BTreeSet;
+use xor_name::XorName;
 
 /// Helper to our DKG peers (excluding us)
-fn dkg_peers(our_index: usize, session_id: &DkgSessionId) -> Vec<Peer> {
+fn dkg_peers(our_index: usize, session_id: &DkgSessionId) -> BTreeSet<Peer> {
     session_id
         .elder_peers()
         .enumerate()
@@ -49,13 +50,11 @@ fn acknowledge_dkg_oucome(
         "{} {:?}: {:?}",
         LogMarker::DkgSessionComplete,
         session_id,
-        pub_key_set.clone().public_key(),
+        pub_key_set.public_key(),
     );
 
-    let section_auth = SectionAuthorityProvider::from_dkg_session(
-        session_id.clone(),
-        pub_key_set.clone(),
-    );
+    let section_auth =
+        SectionAuthorityProvider::from_dkg_session(session_id.clone(), pub_key_set.clone());
 
     let outcome = SectionKeyShare {
         public_key_set: pub_key_set,
@@ -154,7 +153,7 @@ impl Node {
         pub_keys: DkgPubKeys,
         participant_index: usize,
         vote: DkgSignedVote,
-    ) -> Result<Vec<Cmd>> {
+    ) -> Cmd {
         let recipients = dkg_peers(participant_index, session_id);
         let node_msg = SystemMsg::DkgVotes {
             session_id: session_id.clone(),
@@ -164,11 +163,7 @@ impl Node {
         self.send_system_msg(node_msg, Peers::Multiple(recipients))
     }
 
-    fn request_dkg_ae(
-        &self,
-        session_id: &DkgSessionId,
-        sender: Peer,
-    ) -> Result<Vec<Cmd>> {
+    fn request_dkg_ae(&self, session_id: &DkgSessionId, sender: Peer) -> Cmd {
         let node_msg = SystemMsg::DkgAE(session_id.clone());
         self.send_system_msg(node_msg, Peers::Single(sender))
     }
@@ -186,13 +181,14 @@ impl Node {
         let serialized = bincode::serialize(&ephemeral_pub_key)?;
 
         // broadcast signed pub key
-        let peers = Vec::from_iter(session_id.elder_peers());
-        let node_msg = SystemMsg::DkgEphemeralPubKey{
-            session_id: session_id.clone(),
+        let peers = BTreeSet::from_iter(session_id.elder_peers());
+        let node_msg = SystemMsg::DkgEphemeralPubKey {
+            session_id,
             pub_key: ephemeral_pub_key,
             sig: types::keys::ed25519::sign(&serialized, &self.keypair),
         };
-        self.send_system_msg(node_msg, Peers::Multiple(peers))
+        let cmd = self.send_system_msg(node_msg, Peers::Multiple(peers));
+        Ok(vec![cmd])
     }
 
     pub(crate) fn handle_dkg_ephemeral_pubkey(
@@ -226,13 +222,14 @@ impl Node {
         };
 
         // send first vote
-        let peers = Vec::from_iter(session_id.elder_peers());
-        let node_msg = SystemMsg::DkgVotes{
+        let peers = BTreeSet::from_iter(session_id.elder_peers());
+        let node_msg = SystemMsg::DkgVotes {
             session_id: session_id.clone(),
             pub_keys,
             votes: vec![vote],
         };
-        self.send_system_msg(node_msg, Peers::Multiple(peers))
+        let cmd = self.send_system_msg(node_msg, Peers::Multiple(peers));
+        Ok(vec![cmd])
     }
 
     pub(crate) fn handle_dkg_votes(
@@ -252,34 +249,37 @@ impl Node {
         };
 
         // make sure the keys are valid
-        let (pub_keys, just_completed) = self.dkg_voter.check_keys(&session_id, msg_keys)?;
+        let (pub_keys, just_completed) = self.dkg_voter.check_keys(session_id, msg_keys)?;
 
         // if we just completed our keyset thanks to the incoming keys, bcast 1st vote
         let mut cmds = Vec::new();
         if just_completed {
             let (first_vote, _) = self.dkg_voter.initialize_dkg_state(session_id, our_id)?;
-            cmds.extend(self.broadcast_dkg_vote(session_id, pub_keys, our_id, first_vote));
+            cmds.push(self.broadcast_dkg_vote(session_id, pub_keys.clone(), our_id, first_vote));
         }
 
         // handle vote
         let mut cmds: Vec<Cmd> = Vec::new();
         let mut ae_cmds: Vec<Cmd> = Vec::new();
         for v in votes {
-            match self.dkg_voter.handle_dkg_vote(session_id, v) {
+            match self.dkg_voter.handle_dkg_vote(session_id, v.clone()) {
                 Ok(VoteResponse::WaitingForMoreVotes) => {}
                 Ok(VoteResponse::RequestAntiEntropy) => {
-                    cmds.append(&mut self.request_dkg_ae(session_id, sender)?)
-                    // TODO deal with errs above dont break
+                    cmds.push(self.request_dkg_ae(session_id, sender))
                 }
                 Ok(VoteResponse::BroadcastVote(vote)) => {
-                    cmds.append(&mut self.broadcast_dkg_vote(session_id, pub_keys, our_id, *vote)?)
-                    // TODO deal with errs above dont break
+                    cmds.push(self.broadcast_dkg_vote(session_id, pub_keys.clone(), our_id, *vote))
                 }
                 Ok(VoteResponse::DkgComplete(new_pubs, new_sec)) => {
-                    cmds.push(acknowledge_dkg_oucome(session_id, our_id, new_pubs, new_sec));
+                    cmds.push(acknowledge_dkg_oucome(
+                        session_id, our_id, new_pubs, new_sec,
+                    ));
                 }
                 Err(error) => {
-                    error!("Error processing DKG vote {:?} from {:?}: {:?}", v, sender, error);
+                    error!(
+                        "Error processing DKG vote {:?} from {:?}: {:?}",
+                        v, sender, error
+                    );
                 }
             }
         }
@@ -296,12 +296,15 @@ impl Node {
         session_id: DkgSessionId,
         sender: Peer,
     ) -> Result<Vec<Cmd>> {
-        let node_msg = SystemMsg::DkgVotes{
-            session_id: session_id,
-            pub_keys: self.dkg_voter.get_dkg_keys(&session_id)?,
-            votes: self.dkg_voter.get_all_votes(&session_id)?,
+        let pub_keys = self.dkg_voter.get_dkg_keys(&session_id)?;
+        let votes = self.dkg_voter.get_all_votes(&session_id)?;
+        let node_msg = SystemMsg::DkgVotes {
+            session_id,
+            pub_keys,
+            votes,
         };
-        self.send_system_msg(node_msg, Peers::Single(sender))
+        let cmd = self.send_system_msg(node_msg, Peers::Single(sender));
+        Ok(vec![cmd])
     }
 
     pub(crate) async fn handle_dkg_outcome(

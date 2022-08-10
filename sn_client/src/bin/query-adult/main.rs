@@ -161,7 +161,7 @@ fn init() -> Result<(Args, Bytes)> {
 
             bytes
         }
-        Err(err) => Err(err)?,
+        Err(err) => return Err(err.into()),
     };
 
     Ok((args, bytes))

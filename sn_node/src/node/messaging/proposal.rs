@@ -11,7 +11,7 @@ use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Node, Proposal, Result
 use sn_interface::{
     messaging::{
         signature_aggregator::{Error as AggregatorError, SignatureAggregator},
-        system::{SystemMsg, SigShare},
+        system::{SigShare, SystemMsg},
         MsgId,
     },
     network_knowledge::{NetworkKnowledge, SectionKeyShare},

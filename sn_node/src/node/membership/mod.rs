@@ -5,7 +5,7 @@
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
-use bls_dkg::{PublicKeySet, SecretKeyShare};
+use bls::{PublicKeySet, SecretKeyShare};
 use core::fmt::Debug;
 use sn_consensus::{
     Ballot, Consensus, Decision, Generation, NodeId, SignedVote, Vote, VoteResponse,

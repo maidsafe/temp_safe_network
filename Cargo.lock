@@ -19,24 +19,12 @@ checksum = "f26201604c87b1e01bd3d98f8d5d9a8fcbb815e8cedb41ffccbeb4bf593a35fe"
 
 [[package]]
 name = "aes"
-version = "0.7.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e8b47f52ea9bae42228d07ec09eb676433d7c4ed1ebdf0f1d1c29ed446f1ab8"
-dependencies = [
- "cfg-if",
- "cipher 0.3.0",
- "cpufeatures",
- "opaque-debug",
-]
-
-[[package]]
-name = "aes"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bfe0133578c0986e1fe3dfcd4af1cc5b2dd6c3dbf534d69916ce16a2701d40ba"
 dependencies = [
  "cfg-if",
- "cipher 0.4.3",
+ "cipher",
  "cpufeatures",
 ]
 
@@ -522,16 +510,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "block-modes"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2cb03d1bed155d89dce0f845b7899b18a9a163e148fd004e1c28421a783e2d8e"
-dependencies = [
- "block-padding 0.2.1",
- "cipher 0.3.0",
-]
-
-[[package]]
 name = "block-padding"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -579,26 +557,6 @@ dependencies = [
  "sha3",
  "subtle",
  "thiserror",
-]
-
-[[package]]
-name = "bls_dkg"
-version = "0.10.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25098bcdb34e1d12570f3b218b52743c3ebbd9a54b7cb0b7befc983828c5da43"
-dependencies = [
- "aes 0.7.5",
- "bincode",
- "block-modes",
- "blsttc",
- "log",
- "rand 0.8.5",
- "rand_core 0.6.3",
- "serde",
- "serde_derive",
- "thiserror",
- "tiny-keccak",
- "xor_name 5.0.0",
 ]
 
 [[package]]
@@ -759,7 +717,7 @@ version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "26b52a9543ae338f279b96b0b9fed9c8093744685043739079ce85cd58f289a6"
 dependencies = [
- "cipher 0.4.3",
+ "cipher",
 ]
 
 [[package]]
@@ -787,15 +745,6 @@ dependencies = [
  "time 0.1.44",
  "wasm-bindgen",
  "winapi",
-]
-
-[[package]]
-name = "cipher"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ee52072ec15386f770805afd189a01c8841be8696bed250fa2f13c4c0d6dfb7"
-dependencies = [
- "generic-array",
 ]
 
 [[package]]
@@ -3729,7 +3678,7 @@ version = "0.27.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd6e0bb4adf6f555179dcbcf67ac1998517ca25b7acfd8bcf2fc3b6e99dbe84b"
 dependencies = [
- "aes 0.8.1",
+ "aes",
  "bincode",
  "brotli",
  "bytes",
@@ -3743,7 +3692,7 @@ dependencies = [
  "serde",
  "tiny-keccak",
  "tokio",
- "xor_name 5.0.0",
+ "xor_name",
 ]
 
 [[package]]
@@ -4043,7 +3992,7 @@ dependencies = [
  "url",
  "urlencoding",
  "walkdir",
- "xor_name 4.1.0",
+ "xor_name",
 ]
 
 [[package]]
@@ -4096,7 +4045,7 @@ dependencies = [
  "tracing-subscriber 0.2.25",
  "url",
  "walkdir",
- "xor_name 4.1.0",
+ "xor_name",
 ]
 
 [[package]]
@@ -4106,7 +4055,6 @@ dependencies = [
  "backoff 0.4.0",
  "base64",
  "bincode",
- "bls_dkg",
  "blsttc",
  "bytes",
  "cargo-husky",
@@ -4154,7 +4102,7 @@ dependencies = [
  "uluru",
  "url",
  "walkdir",
- "xor_name 4.1.0",
+ "xor_name",
 ]
 
 [[package]]
@@ -4219,7 +4167,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber 0.3.15",
- "xor_name 4.1.0",
+ "xor_name",
 ]
 
 [[package]]
@@ -4228,7 +4176,6 @@ version = "0.15.0"
 dependencies = [
  "base64",
  "bincode",
- "bls_dkg",
  "blsttc",
  "bytes",
  "cargo-husky",
@@ -4272,7 +4219,7 @@ dependencies = [
  "tracing-subscriber 0.3.15",
  "uluru",
  "url",
- "xor_name 4.1.0",
+ "xor_name",
 ]
 
 [[package]]
@@ -4297,7 +4244,6 @@ dependencies = [
  "backoff 0.4.0",
  "base64",
  "bincode",
- "bls_dkg",
  "blsttc",
  "bytes",
  "cargo-husky",
@@ -4361,7 +4307,7 @@ dependencies = [
  "uluru",
  "url",
  "walkdir",
- "xor_name 4.1.0",
+ "xor_name",
  "yansi",
 ]
 

@@ -7,7 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use sn_consensus::Generation;
-use sn_interface::{messaging::system::{SectionAuth, KeyedSig}, network_knowledge::SectionAuthorityProvider};
+use sn_interface::{
+    messaging::system::{KeyedSig, SectionAuth},
+    network_knowledge::SectionAuthorityProvider,
+};
 
 use std::collections::BTreeMap;
 use xor_name::Prefix;

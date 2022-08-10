@@ -17,11 +17,11 @@ use sn_interface::{
     types::{convert_dt_error_to_error_msg, DataAddress, Peer, PublicKey},
 };
 
+use bls::PublicKey as BlsPublicKey;
+use ed25519::Signature;
 use std::{io, net::SocketAddr};
 use thiserror::Error;
 use xor_name::XorName;
-use bls::PublicKey as BlsPublicKey;
-use ed25519::Signature;
 
 /// The type returned by the `sn_routing` message handling methods.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -109,7 +109,13 @@ pub enum Error {
     NoDkgKeysForSession(DkgSessionId),
     /// Double Key Attack Detected, node is faulty, error contains proof: sigs and signed bls keys
     #[error("Double Key Attack Detected from: {0:?}")]
-    DoubleKeyAttackDetected(XorName, BlsPublicKey, Signature, BlsPublicKey, Signature),
+    DoubleKeyAttackDetected(
+        XorName,
+        Box<BlsPublicKey>,
+        Signature,
+        Box<BlsPublicKey>,
+        Signature,
+    ),
     /// Dkg error
     #[error("DKG error: {0}")]
     DkgError(#[from] sn_sdkg::Error),

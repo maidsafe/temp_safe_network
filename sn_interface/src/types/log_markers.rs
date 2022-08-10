@@ -76,7 +76,6 @@ pub enum LogMarker {
     DkgBroadcastVote,
     DkgVotesHandling,
     DkgSessionComplete,
-    DkgSessionAlreadyCompleted,
     HandlingDkgSuccessfulOutcome,
     HandlingNewEldersAgreement,
     NewSignedSap,
@@ -99,7 +98,6 @@ pub enum LogMarker {
     SendJoinRetryAgeIssue,
     SendJoinRetryNotAdult,
     SendJoinsDisallowed,
-    SendDKGUnderway,
     SendNodeApproval,
     // Approved to join
     ReceivedJoinApproval,
