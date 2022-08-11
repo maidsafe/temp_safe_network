@@ -548,6 +548,19 @@ mod core {
 
             let mut cmds = vec![];
 
+            // clean up old DKG sessions
+            let old_chain_len = self.network_knowledge.chain_len();
+            let mut old_hashes = vec![];
+            for (hash, session_id) in self.dkg_sessions_info.iter() {
+                if session_id.section_chain_len <= old_chain_len {
+                    old_hashes.push(*hash);
+                }
+            }
+            for hash in old_hashes {
+                let _ = self.dkg_sessions_info.remove(&hash);
+                self.dkg_voter.remove(&hash);
+            }
+
             if new.is_elder {
                 let sap = self.network_knowledge.section_auth();
                 info!(
