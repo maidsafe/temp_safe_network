@@ -117,8 +117,8 @@ impl Safe {
     /// This is updated by as Anti-Entropy/update messages are received from the network.
     /// Any user of this API is responsible for caching it so it can use it for any new `Safe`
     /// instance, preventing it from learning all this information from the network all over again.
-    pub async fn get_prefix_map(&self) -> Result<NetworkPrefixMap> {
-        let prefix_map = self.get_safe_client()?.prefix_map().clone();
+    pub async fn prefix_map(&self) -> Result<&NetworkPrefixMap> {
+        let prefix_map = self.get_safe_client()?.prefix_map();
         Ok(prefix_map)
     }
 
