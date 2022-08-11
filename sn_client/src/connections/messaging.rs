@@ -92,7 +92,7 @@ impl Session {
         let _ = self.pending_cmds.insert(msg_id, sender);
         trace!("Inserted channel for cmd {:?}", msg_id);
 
-        send_msg(self.clone(), elders, wire_msg, msg_id).await?;
+        self.send_msg(elders, wire_msg, msg_id).await?;
 
         let expected_acks = elders_len * 2 / 3 + 1;
 
@@ -217,7 +217,7 @@ impl Session {
         #[cfg(feature = "traceroute")]
         wire_msg.append_trace(&mut Traceroute(vec![Entity::Client(client_pk)]));
 
-        send_msg_in_bg(self.clone(), elders, wire_msg, msg_id)?;
+        self.clone().send_msg_in_bg(elders, wire_msg, msg_id)?;
 
         // TODO:
         // We are now simply accepting the very first valid response we receive,
@@ -347,7 +347,8 @@ impl Session {
             .take(NODES_TO_CONTACT_PER_STARTUP_BATCH)
             .collect();
 
-        send_msg_in_bg(self.clone(), initial_contacts, wire_msg.clone(), msg_id)?;
+        self.clone()
+            .send_msg_in_bg(initial_contacts, wire_msg.clone(), msg_id)?;
 
         let mut knowledge_checks = 0;
         let mut outgoing_msg_rounds = 1;
@@ -409,7 +410,8 @@ impl Session {
                 };
 
                 trace!("Sending out another batch of initial contact msgs to new nodes");
-                send_msg_in_bg(self.clone(), next_contacts, wire_msg.clone(), msg_id)?;
+                self.clone()
+                    .send_msg_in_bg(next_contacts, wire_msg.clone(), msg_id)?;
 
                 let next_wait = backoff.next_backoff();
                 trace!(
@@ -489,144 +491,145 @@ impl Session {
             Err(Error::NoNetworkKnowledge)
         }
     }
-}
 
-#[instrument(skip_all, level = "trace")]
-/// Pushes a send_msg call into a background thread. Errors will be logged
-pub(super) fn send_msg_in_bg(
-    session: Session,
-    nodes: Vec<Peer>,
-    wire_msg: WireMsg,
-    msg_id: MsgId,
-) -> Result<()> {
-    trace!("Sending client message in bg thread so as not to block");
+    #[instrument(skip_all, level = "trace")]
+    /// Pushes a send_msg call into a background thread. Errors will be logged
+    pub(super) fn send_msg_in_bg(
+        self,
+        nodes: Vec<Peer>,
+        wire_msg: WireMsg,
+        msg_id: MsgId,
+    ) -> Result<()> {
+        trace!("Sending client message in bg thread so as not to block");
 
-    let _handle = tokio::spawn(async move {
-        let send_res = send_msg(session, nodes, wire_msg, msg_id).await;
+        let _handle = tokio::spawn(async move {
+            let send_res = self.send_msg(nodes, wire_msg, msg_id).await;
 
-        if send_res.is_err() {
-            error!("Error sending msg in the bg: {:?}", send_res);
-        }
-    });
-
-    Ok(())
-}
-#[instrument(skip_all, level = "trace")]
-pub(super) async fn send_msg(
-    session: Session,
-    nodes: Vec<Peer>,
-    wire_msg: WireMsg,
-    msg_id: MsgId,
-) -> Result<()> {
-    let msg_bytes = wire_msg.serialize()?;
-
-    let mut last_error = None;
-    drop(wire_msg);
-
-    // Send message to all Elders concurrently
-    let mut tasks = Vec::default();
-
-    let mut successful_sends = 0usize;
-
-    for peer in nodes.clone() {
-        let session = session.clone();
-        let msg_bytes_clone = msg_bytes.clone();
-        let peer_name = peer.name();
-
-        let task_handle: JoinHandle<(XorName, Result<()>)> = tokio::spawn(async move {
-            let link = session.peer_links.get_or_create(&peer).await;
-
-            let listen = |conn, incoming_msgs| {
-                Session::spawn_msg_listener_thread(session.clone(), peer, conn, incoming_msgs);
-            };
-
-            let mut retries = 0;
-
-            let send_and_retry = || async {
-                match link.send_with(msg_bytes_clone.clone(), None, listen).await {
-                    Ok(()) => Ok(()),
-                    Err(error) => match error {
-                        SendToOneError::Connection(err) => Err(Error::QuicP2pConnection(err)),
-                        SendToOneError::Send(err) => Err(Error::QuicP2pSend(err)),
-                    },
-                }
-            };
-            let mut result = send_and_retry().await;
-
-            while result.is_err() && retries < CLIENT_SEND_RETRIES {
-                warn!(
-                    "Attempting to send msg again {msg_id:?}, attempt #{:?}",
-                    retries.clone()
-                );
-                retries += 1;
-                result = send_and_retry().await;
+            if send_res.is_err() {
+                error!("Error sending msg in the bg: {:?}", send_res);
             }
-
-            (peer_name, result)
         });
 
-        tasks.push(task_handle);
+        Ok(())
     }
 
-    // Let's await for all messages to be sent
-    let results = join_all(tasks).await;
+    #[instrument(skip_all, level = "trace")]
+    pub(super) async fn send_msg(
+        &self,
+        nodes: Vec<Peer>,
+        wire_msg: WireMsg,
+        msg_id: MsgId,
+    ) -> Result<()> {
+        let msg_bytes = wire_msg.serialize()?;
 
-    for r in results {
-        match r {
-            Ok((peer_name, send_result)) => match send_result {
-                Err(Error::QuicP2pSend(SendError::ConnectionLost(ConnectionError::Closed(
-                    Close::Application { reason, error_code },
-                )))) => {
+        let mut last_error = None;
+        drop(wire_msg);
+
+        // Send message to all Elders concurrently
+        let mut tasks = Vec::default();
+
+        let mut successful_sends = 0usize;
+
+        for peer in nodes.clone() {
+            let session = self.clone();
+            let msg_bytes_clone = msg_bytes.clone();
+            let peer_name = peer.name();
+
+            let task_handle: JoinHandle<(XorName, Result<()>)> = tokio::spawn(async move {
+                let link = session.peer_links.get_or_create(&peer).await;
+
+                let listen = |conn, incoming_msgs| {
+                    Session::spawn_msg_listener_thread(session.clone(), peer, conn, incoming_msgs);
+                };
+
+                let mut retries = 0;
+
+                let send_and_retry = || async {
+                    match link.send_with(msg_bytes_clone.clone(), None, listen).await {
+                        Ok(()) => Ok(()),
+                        Err(error) => match error {
+                            SendToOneError::Connection(err) => Err(Error::QuicP2pConnection(err)),
+                            SendToOneError::Send(err) => Err(Error::QuicP2pSend(err)),
+                        },
+                    }
+                };
+                let mut result = send_and_retry().await;
+
+                while result.is_err() && retries < CLIENT_SEND_RETRIES {
                     warn!(
-                        "Connection was closed by node {}, reason: {:?}",
-                        peer_name,
-                        String::from_utf8(reason.to_vec())
+                        "Attempting to send msg again {msg_id:?}, attempt #{:?}",
+                        retries.clone()
                     );
-                    last_error = Some(Error::QuicP2pSend(SendError::ConnectionLost(
+                    retries += 1;
+                    result = send_and_retry().await;
+                }
+
+                (peer_name, result)
+            });
+
+            tasks.push(task_handle);
+        }
+
+        // Let's await for all messages to be sent
+        let results = join_all(tasks).await;
+
+        for r in results {
+            match r {
+                Ok((peer_name, send_result)) => match send_result {
+                    Err(Error::QuicP2pSend(SendError::ConnectionLost(
                         ConnectionError::Closed(Close::Application { reason, error_code }),
-                    )));
+                    ))) => {
+                        warn!(
+                            "Connection was closed by node {}, reason: {:?}",
+                            peer_name,
+                            String::from_utf8(reason.to_vec())
+                        );
+                        last_error = Some(Error::QuicP2pSend(SendError::ConnectionLost(
+                            ConnectionError::Closed(Close::Application { reason, error_code }),
+                        )));
+                    }
+                    Err(Error::QuicP2pSend(SendError::ConnectionLost(error))) => {
+                        warn!("Connection to {} was lost: {:?}", peer_name, error);
+                        last_error = Some(Error::QuicP2pSend(SendError::ConnectionLost(error)));
+                    }
+                    Err(error) => {
+                        warn!(
+                            "Issue during {:?} send to {}: {:?}",
+                            msg_id, peer_name, error
+                        );
+                        last_error = Some(error);
+                    }
+                    Ok(_) => successful_sends += 1,
+                },
+                Err(join_error) => {
+                    warn!("Tokio join error as we send: {:?}", join_error)
                 }
-                Err(Error::QuicP2pSend(SendError::ConnectionLost(error))) => {
-                    warn!("Connection to {} was lost: {:?}", peer_name, error);
-                    last_error = Some(Error::QuicP2pSend(SendError::ConnectionLost(error)));
-                }
-                Err(error) => {
-                    warn!(
-                        "Issue during {:?} send to {}: {:?}",
-                        msg_id, peer_name, error
-                    );
-                    last_error = Some(error);
-                }
-                Ok(_) => successful_sends += 1,
-            },
-            Err(join_error) => {
-                warn!("Tokio join error as we send: {:?}", join_error)
             }
         }
-    }
 
-    let failures = nodes.len() - successful_sends;
+        let failures = nodes.len() - successful_sends;
 
-    if failures > 0 {
-        trace!(
-            "Sending the message ({:?}) from {} to {}/{} of the nodes failed: {:?}",
-            msg_id,
-            session.endpoint.public_addr(),
-            failures,
-            nodes.len(),
-            nodes,
-        );
-    }
-
-    if failures > successful_sends {
-        warn!("More errors when sending a message than successes");
-        if let Some(error) = last_error {
-            warn!("The relevant error is: {error}");
-            return Err(error);
+        if failures > 0 {
+            trace!(
+                "Sending the message ({:?}) from {} to {}/{} of the nodes failed: {:?}",
+                msg_id,
+                self.endpoint.public_addr(),
+                failures,
+                nodes.len(),
+                nodes,
+            );
         }
-    }
 
-    Ok(())
+        if failures > successful_sends {
+            warn!("More errors when sending a message than successes");
+            if let Some(error) = last_error {
+                warn!("The relevant error is: {error}");
+                return Err(error);
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
