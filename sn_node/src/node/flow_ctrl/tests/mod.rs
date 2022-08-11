@@ -117,7 +117,6 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
                 }
             }));
 
-
             Result::<()>::Ok(())
         })
         .await
