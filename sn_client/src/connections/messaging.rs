@@ -349,8 +349,6 @@ impl Session {
 
         send_msg_in_bg(self.clone(), initial_contacts, wire_msg.clone(), msg_id)?;
 
-        *self.initial_connection_check_msg_id.write().await = Some(msg_id);
-
         let mut knowledge_checks = 0;
         let mut outgoing_msg_rounds = 1;
         let mut last_start_pos = 0;
