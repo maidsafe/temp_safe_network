@@ -70,6 +70,16 @@ fn acknowledge_dkg_oucome(
 
 impl Node {
     /// Send a `DkgStart` message to the provided set of candidates
+    /// Before a DKG session kicks off, the `DkgStart { ... }` message is individually signed
+    /// by the current _set of elders_ and sent to the _new elder candidates_ to be accumulated.
+    /// This is to prevent nodes from spamming `DkgStart` messages which might lead to unnecessary
+    /// DKG sessions.
+    /// Whenever there is a change in Elders in the network Distributed Key Generation
+    /// is used to generate a new set of BLS key shares for individual Elders along with the
+    /// SectionKey which will represent the section.
+    /// DKG is triggered by the following events:
+    /// - A change in the Elders
+    /// - Section Split
     pub(crate) fn send_dkg_start(&self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
         // Send DKG start to all candidates
         let recipients = Vec::from_iter(session_id.elder_peers());
@@ -169,6 +179,15 @@ impl Node {
     }
 
     pub(crate) fn handle_dkg_start(&mut self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
+        // make sure we are in this dkg session
+        let our_name = types::keys::ed25519::name(&self.keypair.public);
+        let our_id = if let Some(index) = session_id.elder_index(our_name) {
+            index
+        } else {
+            error!("DKG failed to start for {session_id:?}: {our_name} is not a participant");
+            return Ok(vec![]);
+        };
+
         // ignore DkgStart from old chains
         let current_chain_len = self.network_knowledge.chain_len();
         if session_id.section_chain_len < current_chain_len {
@@ -177,16 +196,22 @@ impl Node {
         }
 
         // gen key
-        let ephemeral_pub_key = self.dkg_voter.gen_ephemeral_key(session_id.hash());
-        let serialized = bincode::serialize(&ephemeral_pub_key)?;
+        let (ephemeral_pub_key, sig) =
+            self.dkg_voter
+                .gen_ephemeral_key(session_id.hash(), our_name, &self.keypair)?;
 
         // broadcast signed pub key
-        let peers = BTreeSet::from_iter(session_id.elder_peers());
+        trace!(
+            "{} from {our_id:?} with {session_id:?}",
+            LogMarker::DkgBroadcastEphemeralPubKey
+        );
+        let peers = dkg_peers(our_id, &session_id);
         let node_msg = SystemMsg::DkgEphemeralPubKey {
             session_id,
             pub_key: ephemeral_pub_key,
-            sig: types::keys::ed25519::sign(&serialized, &self.keypair),
+            sig,
         };
+
         let cmd = self.send_system_msg(node_msg, Peers::Multiple(peers));
         Ok(vec![cmd])
     }
@@ -198,23 +223,20 @@ impl Node {
         sig: Signature,
         sender: Peer,
     ) -> Result<Vec<Cmd>> {
-        // get our index
+        // make sure we are in this dkg session
         let name = types::keys::ed25519::name(&self.keypair.public);
-        let participant_index = if let Some(index) = session_id.elder_index(name) {
+        let our_id = if let Some(index) = session_id.elder_index(name) {
             index
         } else {
-            error!("DKG failed to start for {session_id:?}: {name} is not a participant");
+            error!("DKG ephemeral key ignored for {session_id:?}: {name} is not a participant");
             return Ok(vec![]);
         };
 
         // try to start DKG if we've got all the keys
-        let (vote, pub_keys) = if let Some(start) = self.dkg_voter.try_init_dkg(
-            session_id,
-            participant_index,
-            pub_key,
-            sig,
-            sender.name(),
-        )? {
+        let (vote, pub_keys) = if let Some(start) =
+            self.dkg_voter
+                .try_init_dkg(session_id, our_id, pub_key, sig, sender.name())?
+        {
             start
         } else {
             // we don't have all the keys yet
@@ -222,7 +244,7 @@ impl Node {
         };
 
         // send first vote
-        let peers = BTreeSet::from_iter(session_id.elder_peers());
+        let peers = dkg_peers(our_id, session_id);
         let node_msg = SystemMsg::DkgVotes {
             session_id: session_id.clone(),
             pub_keys,

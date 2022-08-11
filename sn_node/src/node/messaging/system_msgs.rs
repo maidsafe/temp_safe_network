@@ -383,7 +383,7 @@ impl Node {
             } => {
                 trace!(
                     "{} {:?} from {}",
-                    LogMarker::DkgBroadcastEphemeralPubKey,
+                    LogMarker::DkgHandleEphemeralPubKey,
                     session_id,
                     sender
                 );
