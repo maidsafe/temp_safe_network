@@ -70,8 +70,8 @@ impl FileRotateAppender {
         max_log_size: ContentLimit,
         compression: Compression,
     ) -> Self {
-        let log_directory = directory.as_ref().to_str().unwrap();
-        let log_filename_prefix = file_name_prefix.as_ref().to_str().unwrap();
+        let log_directory = directory.as_ref();
+        let log_filename_prefix = file_name_prefix.as_ref();
         let path = Path::new(&log_directory).join(&log_filename_prefix);
         let writer = FileRotate::new(&Path::new(&path), file_limit, max_log_size, compression);
 
