@@ -8,17 +8,21 @@
 
 use crate::node::{Error, Result};
 use ed25519::Signature;
-use ed25519_dalek::Verifier;
+use ed25519_dalek::{Keypair, Verifier};
 
 use sn_interface::{
     messaging::system::DkgSessionId,
     network_knowledge::threshold,
-    types::keys::ed25519::{pub_key, Digest256},
+    types::{
+        self,
+        keys::ed25519::{pub_key, Digest256},
+    },
 };
 
 use bls::{PublicKey as BlsPublicKey, SecretKey as BlsSecretKey};
 use sn_sdkg::{DkgSignedVote, DkgState, NodeId, VoteResponse};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::sync::Arc;
 use xor_name::XorName;
 
 pub(crate) type DkgPubKeys = BTreeMap<XorName, (BlsPublicKey, Signature)>;
@@ -65,19 +69,30 @@ fn create_dkg_state(
 }
 
 impl DkgVoter {
-    /// Generate ephemeral secret key and save it
-    /// If we already have a key for the current session_id, don't generate a new one
-    /// return the pub key for our secret key
-    pub(crate) fn gen_ephemeral_key(&mut self, session_id_hash: Digest256) -> BlsPublicKey {
+    /// Generate ephemeral secret key and save the key pair
+    /// If we already have a key for the current session_id, this function mutates nothing
+    /// In both cases it returns the pub key for our secret key and a signature over this pub key
+    pub(crate) fn gen_ephemeral_key(
+        &mut self,
+        session_id_hash: Digest256,
+        our_name: XorName,
+        keypair: &Arc<Keypair>,
+    ) -> Result<(BlsPublicKey, Signature)> {
+        let new_secret_key: BlsSecretKey = bls::rand::random();
+        let new_pub_key = new_secret_key.public_key();
+        let serialized = bincode::serialize(&new_pub_key)?;
+        let sig = types::keys::ed25519::sign(&serialized, keypair);
         let new_key = DkgEphemeralKeys {
-            secret_key: bls::rand::random(),
-            pub_keys: BTreeMap::new(),
+            secret_key: new_secret_key,
+            pub_keys: BTreeMap::from_iter([(our_name, (new_pub_key, sig))]),
         };
-        self.dkg_ephemeral_keys
+        let pub_key = self
+            .dkg_ephemeral_keys
             .entry(session_id_hash)
             .or_insert(new_key)
             .secret_key
-            .public_key()
+            .public_key();
+        Ok((pub_key, sig))
     }
 
     /// Initializes our DKG state and returns our first vote and dkg keys
