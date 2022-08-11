@@ -250,4 +250,11 @@ impl DkgVoter {
             None => Err(Error::NoDkgStateForSession(session_id.clone())),
         }
     }
+
+    /// Permanently removes a session from the DkgVoter
+    /// Make sure this function is only called for outdated DKG sessions!
+    pub(crate) fn remove(&mut self, sessions_hash: &Digest256) {
+        let _ = self.dkg_ephemeral_keys.remove(sessions_hash);
+        let _ = self.dkg_states.remove(sessions_hash);
+    }
 }

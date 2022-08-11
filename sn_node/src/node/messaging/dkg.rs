@@ -31,7 +31,7 @@ use sn_sdkg::{DkgSignedVote, VoteResponse};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
-/// Helper to our DKG peers (excluding us)
+/// Helper to get our DKG peers (excluding us)
 fn dkg_peers(our_index: usize, session_id: &DkgSessionId) -> BTreeSet<Peer> {
     session_id
         .elder_peers()
