@@ -324,7 +324,7 @@ impl Node {
                     // Redirect to the closest section
                     let ae_msg = SystemMsg::AntiEntropy {
                         section_auth: signed_sap.value.to_msg(),
-                        section_signed: signed_sap.sig,
+                        section_signed: signed_sap.sig.clone(),
                         proof_chain: section_dag,
                         kind: AntiEntropyKind::Redirect { bounced_msg },
                     };

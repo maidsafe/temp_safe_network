@@ -461,7 +461,7 @@ impl NetworkKnowledge {
     pub fn get_closest_or_opposite_signed_sap(
         &self,
         name: &XorName,
-    ) -> Option<(SectionAuth<SectionAuthorityProvider>, SecuredLinkedList)> {
+    ) -> Option<(&SectionAuth<SectionAuthorityProvider>, SecuredLinkedList)> {
         let closest_sap = self
             .prefix_map
             .closest_or_opposite(name, Some(&self.prefix()));
