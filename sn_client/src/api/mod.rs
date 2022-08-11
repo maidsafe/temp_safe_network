@@ -200,7 +200,7 @@ impl Client {
     /// This is updated by the client as it receives Anti-Entropy/update messages from the network.
     /// Any user of this API is responsible for caching it so it can use it for any new `Client`
     /// instance not needing to obtain all this information from the network all over again.
-    pub async fn get_prefix_map(&self) -> NetworkPrefixMap {
+    pub async fn prefix_map(&self) -> NetworkPrefixMap {
         self.session.network.read().await.clone()
     }
 
