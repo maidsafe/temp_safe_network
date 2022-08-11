@@ -199,10 +199,16 @@ impl Node {
                 .await
             }
             // Respond to a probe msg
-            // We always respond to probe msgs. Health checks use this to see if a node is alive
+            // We always respond to probe msgs if we're an elder as health checks use this to see if a node is alive
             // and repsonsive, as well as being a method of keeping nodes up to date.
             SystemMsg::AntiEntropyProbe(section_key) => {
                 let mut cmds = vec![];
+                if !self.is_elder() {
+                    // early return here as we do not get health checks as adults,
+                    // normal AE rules should have applied
+                    return Ok(cmds);
+                }
+
                 trace!("Received Probe message from {}: {:?}", sender, msg_id);
                 let mut recipients = BTreeSet::new();
                 let _existed = recipients.insert(sender);
