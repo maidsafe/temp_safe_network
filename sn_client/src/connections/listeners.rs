@@ -148,14 +148,8 @@ impl Session {
         sender: Peer,
     ) -> Result<(), Error> {
         // Check that the message can be trusted w.r.t. our known keys
-        let known_keys: Vec<BlsPublicKey> = self
-            .network
-            .read()
-            .await
-            .get_sections_dag()
-            .keys()
-            .cloned()
-            .collect();
+        let known_keys: Vec<BlsPublicKey> =
+            self.network.get_sections_dag().keys().cloned().collect();
 
         if !NetworkKnowledge::verify_node_msg_can_be_trusted(msg_authority, &msg, &known_keys) {
             warn!("Untrusted message has been dropped, from {sender:?}: {msg:?} ");
@@ -306,7 +300,7 @@ impl Session {
     // Handle Anti-Entropy Redirect or Retry msgs
     #[instrument(skip_all, level = "debug")]
     async fn handle_ae_msg(
-        session: Session,
+        mut session: Session,
         target_sap: SectionAuthorityProvider,
         section_signed: KeyedSig,
         provided_section_chain: SecuredLinkedList,
@@ -317,7 +311,7 @@ impl Session {
 
         // Try to update our network knowledge first
         Self::update_network_knowledge(
-            &session,
+            &mut session,
             target_sap.clone(),
             section_signed,
             provided_section_chain,
@@ -358,14 +352,14 @@ impl Session {
     /// Update our network knowledge making sure proof chain validates the
     /// new SAP based on currently known remote section SAP or genesis key.
     async fn update_network_knowledge(
-        session: &Session,
+        session: &mut Session,
         sap: SectionAuthorityProvider,
         section_signed: KeyedSig,
         proof_chain: SecuredLinkedList,
         sender: Peer,
     ) {
         // Update our network PrefixMap based upon passed in knowledge
-        let result = session.network.write().await.update(
+        let result = session.network.update(
             SectionAuth {
                 value: sap.clone(),
                 sig: section_signed,
