@@ -174,6 +174,8 @@ async fn run_node(config: &Config) -> Result<()> {
                     "unknown".to_string()
                 };
 
+                error!("{}", &message);
+
                 return Err(e).wrap_err(format!(
                     "Cannot start node (log path: {}). If this is the first node on the network pass the local \
                     address to be used using --first", log_path)
