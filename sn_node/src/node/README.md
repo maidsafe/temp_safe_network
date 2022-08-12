@@ -2,7 +2,7 @@
 
 sn_node - a Safe Network Node.
 
-This produces a `bin` which can be used to run a ndoe on The Safe Network. It also provides APIs to do the same.
+This produces a `bin` which can be used to run a node on The Safe Network. It also provides APIs to do the same.
 
 ## License
 
