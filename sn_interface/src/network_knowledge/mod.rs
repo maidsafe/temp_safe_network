@@ -458,13 +458,11 @@ impl NetworkKnowledge {
 
     // Get SectionAuthorityProvider of a known section with the given prefix,
     // along with its section chain.
-    pub fn get_closest_or_opposite_signed_sap(
+    pub fn closest_signed_sap(
         &self,
         name: &XorName,
     ) -> Option<(&SectionAuth<SectionAuthorityProvider>, SecuredLinkedList)> {
-        let closest_sap = self
-            .prefix_map
-            .closest_or_opposite(name, Some(&self.prefix()));
+        let closest_sap = self.prefix_map.closest(name, Some(&self.prefix()));
 
         if let Some(signed_sap) = closest_sap {
             if let Ok(proof_chain) = self
