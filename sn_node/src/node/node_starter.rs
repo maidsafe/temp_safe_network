@@ -222,7 +222,7 @@ async fn bootstrap_node(
         let prefix_map = read_prefix_map_from_disk(&path).await?;
         let section_elders = {
             let sap = prefix_map
-                .closest_or_opposite(&xor_name::rand::random(), None)
+                .closest(&xor_name::rand::random(), None)
                 .ok_or_else(|| Error::Configuration("Could not obtain closest SAP".to_string()))?;
             sap.elders_vec()
         };

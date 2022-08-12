@@ -314,10 +314,7 @@ impl Node {
                 "AE: prefix not matching. We are: {:?}, they sent to: {:?}",
                 our_prefix, dst_name
             );
-            return match self
-                .network_knowledge
-                .get_closest_or_opposite_signed_sap(&dst_name)
-            {
+            return match self.network_knowledge.closest_signed_sap(&dst_name) {
                 Some((signed_sap, section_dag)) => {
                     info!("Found a better matching prefix {:?}", signed_sap.prefix());
                     let bounced_msg = original_bytes;

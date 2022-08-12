@@ -110,7 +110,7 @@ impl Client {
             let sap = self
                 .session
                 .network
-                .closest_or_opposite(&random_dst_addr, None)
+                .closest(&random_dst_addr, None)
                 .ok_or(Error::NoNetworkKnowledge)?;
             (sap.elders_vec(), sap.section_key())
         };
