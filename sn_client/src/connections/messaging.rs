@@ -45,7 +45,7 @@ pub(crate) const NODES_TO_CONTACT_PER_STARTUP_BATCH: usize = 3;
 const INITIAL_WAIT: u64 = 1;
 
 // Number of retries for sending a message due to a connection issue.
-const CLIENT_SEND_RETRIES: usize = 1;
+const CLIENT_SEND_RETRIES: usize = 3; // nodes will clean up connections reasonably often, so we try a few times here.
 
 impl Session {
     #[instrument(
