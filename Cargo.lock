@@ -84,9 +84,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.60"
+version = "1.0.61"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c794e162a5eff65c72ef524dfe393eb923c354e350bb78b9c7383df13f3bc142"
+checksum = "508b352bb5c066aac251f6daf6b36eccd03e8a88e8081cd44959ea277a3af9a8"
 
 [[package]]
 name = "arrayvec"
@@ -743,21 +743,21 @@ dependencies = [
 
 [[package]]
 name = "console-api"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06c5fd425783d81668ed68ec98408a80498fb4ae2fd607797539e1a9dfa3618f"
+checksum = "e57ff02e8ad8e06ab9731d5dc72dc23bef9200778eae1a89d555d8c42e5d4a86"
 dependencies = [
- "prost 0.10.4",
- "prost-types 0.10.1",
- "tonic 0.7.2",
+ "prost 0.11.0",
+ "prost-types 0.11.1",
+ "tonic 0.8.0",
  "tracing-core",
 ]
 
 [[package]]
 name = "console-subscriber"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31432bc31ff8883bf6a693a79371862f73087822470c82d6a1ec778781ee3978"
+checksum = "e933c43a5db3779b3600cdab18856af2411ca2237e33ba8ab476d5d5b1a6c1e7"
 dependencies = [
  "console-api",
  "crossbeam-channel",
@@ -765,26 +765,16 @@ dependencies = [
  "futures",
  "hdrhistogram",
  "humantime",
- "prost-types 0.10.1",
+ "prost-types 0.11.1",
  "serde",
  "serde_json",
  "thread_local",
  "tokio",
  "tokio-stream",
- "tonic 0.7.2",
+ "tonic 0.8.0",
  "tracing",
  "tracing-core",
  "tracing-subscriber 0.3.15",
-]
-
-[[package]]
-name = "core-foundation"
-version = "0.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "194a7a9e6de53fa55116934067c844d9d749312f75c6f6d0980e8c252f8c2146"
-dependencies = [
- "core-foundation-sys",
- "libc",
 ]
 
 [[package]]
@@ -1770,12 +1760,12 @@ dependencies = [
 
 [[package]]
 name = "iana-time-zone"
-version = "0.1.41"
+version = "0.1.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1779539f58004e5dba1c1f093d44325ebeb244bfc04b791acdc0aaeca9c04570"
+checksum = "808cf7d67cf4a22adc5be66e75ebdf769b3f2ea032041437a7061f97a63dad4b"
 dependencies = [
  "android_system_properties",
- "core-foundation",
+ "core-foundation-sys",
  "js-sys",
  "wasm-bindgen",
  "winapi",
@@ -1934,9 +1924,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.128"
+version = "0.2.131"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95f2a930906a03d4ee59113b31586c057c94f4d40c9fe90f21597a8b6822bfd8"
+checksum = "04c3b4822ccebfa39c02fc03d1534441b22ead323fa0f48bb7ddd8e6ba076a40"
 
 [[package]]
 name = "linked-hash-map"
@@ -2014,9 +2004,9 @@ checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 
 [[package]]
 name = "memmap2"
-version = "0.5.5"
+version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a79b39c93a7a5a27eeaf9a23b5ff43f1b9e0ad6b1cdd441140ae53c35613fc7"
+checksum = "8e2e4455be2010e8c5e77f0d10234b30f3a636a5305725609b5a71ad00d22577"
 dependencies = [
  "libc",
 ]
@@ -2542,12 +2532,12 @@ dependencies = [
 
 [[package]]
 name = "prost"
-version = "0.10.4"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71adf41db68aa0daaefc69bb30bcd68ded9b9abaad5d1fbb6304c4fb390e083e"
+checksum = "399c3c31cdec40583bb68f0b18403400d01ec4289c383aa047560439952c4dd7"
 dependencies = [
  "bytes",
- "prost-derive 0.10.1",
+ "prost-derive 0.11.0",
 ]
 
 [[package]]
@@ -2585,9 +2575,9 @@ dependencies = [
 
 [[package]]
 name = "prost-derive"
-version = "0.10.1"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b670f45da57fb8542ebdbb6105a925fe571b67f9e7ed9f47a06a84e72b4e7cc"
+checksum = "7345d5f0e08c0536d7ac7229952590239e77abf0a0100a1b1d890add6ea96364"
 dependencies = [
  "anyhow",
  "itertools 0.10.3",
@@ -2608,12 +2598,12 @@ dependencies = [
 
 [[package]]
 name = "prost-types"
-version = "0.10.1"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d0a014229361011dc8e69c8a1ec6c2e8d0f2af7c91e3ea3f5b2170298461e68"
+checksum = "4dfaa718ad76a44b3415e6c4d53b17c8f99160dcb3a99b10470fce8ad43f6e3e"
 dependencies = [
  "bytes",
- "prost 0.10.4",
+ "prost 0.11.0",
 ]
 
 [[package]]
@@ -4158,9 +4148,9 @@ dependencies = [
 
 [[package]]
 name = "tonic"
-version = "0.7.2"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5be9d60db39854b30b835107500cf0aca0b0d14d6e1c3de124217c23a29c2ddb"
+checksum = "498f271adc46acce75d66f639e4d35b31b2394c295c82496727dafa16d465dd2"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -4176,8 +4166,8 @@ dependencies = [
  "hyper-timeout",
  "percent-encoding",
  "pin-project",
- "prost 0.10.4",
- "prost-derive 0.10.1",
+ "prost 0.11.0",
+ "prost-derive 0.11.0",
  "tokio",
  "tokio-stream",
  "tokio-util 0.7.2",
