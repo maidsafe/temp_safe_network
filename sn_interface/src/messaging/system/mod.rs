@@ -40,7 +40,7 @@ use xor_name::XorName;
 /// List of peers of a section
 pub type SectionPeers = BTreeSet<SectionAuth<NodeState>>;
 
-#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug)]
 pub enum AntiEntropyKind {
     /// This AE message is sent to a peer when a message with outdated section
     /// information was received, attaching the bounced message so
