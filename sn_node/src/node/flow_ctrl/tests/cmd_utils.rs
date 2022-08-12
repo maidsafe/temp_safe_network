@@ -1,17 +1,23 @@
 use crate::node::{
+    flow_ctrl::cmds::Cmd::HandleValidServiceMsg,
     flow_ctrl::dispatcher::Dispatcher,
     messaging::{OutgoingMsg, Peers},
     Cmd,
 };
 use assert_matches::assert_matches;
+use eyre::eyre;
 use eyre::Result;
+#[cfg(feature = "traceroute")]
+use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
-        system::{JoinResponse, MembershipState, RelocateDetails, SystemMsg},
-        MsgType,
+        data::ServiceMsg,
+        serialisation::WireMsg,
+        system::{JoinResponse, MembershipState, NodeCmd, RelocateDetails, SystemMsg},
+        AuthorityProof, MsgId, MsgType, ServiceAuth,
     },
     network_knowledge::{test_utils::*, NodeState, SectionAuthorityProvider},
-    types::{Peer, SecretKeySet},
+    types::{Keypair, Peer, ReplicatedData, SecretKeySet},
 };
 use std::collections::BTreeSet;
 
@@ -99,4 +105,80 @@ pub(crate) async fn run_and_collect_cmds(cmd: Cmd, dispatcher: &Dispatcher) -> R
     }
 
     Ok(all_cmds)
+}
+
+pub(crate) fn wrap_service_msg_for_handling(msg: ServiceMsg, peer: Peer) -> Result<Cmd> {
+    let payload = WireMsg::serialize_msg_payload(&msg)?;
+    let src_client_keypair = Keypair::new_ed25519();
+    let auth = ServiceAuth {
+        public_key: src_client_keypair.public_key(),
+        signature: src_client_keypair.sign(&payload),
+    };
+    let auth_proof = AuthorityProof::verify(auth, &payload).unwrap();
+    Ok(HandleValidServiceMsg {
+        msg_id: MsgId::new(),
+        msg,
+        origin: peer,
+        auth: auth_proof,
+        #[cfg(feature = "traceroute")]
+        traceroute: Traceroute(Vec::new()),
+    })
+}
+
+/// Extend the `Cmd` enum with some utilities for testing.
+///
+/// Since this is in a module marked as #[test], this functionality will only be present in the
+/// testing context.
+impl Cmd {
+    /// Get the recipients for a `SendMsg` command.
+    pub(crate) fn recipients(&self) -> Result<BTreeSet<Peer>> {
+        match self {
+            Cmd::SendMsg { recipients, .. } => match recipients {
+                Peers::Single(peer) => {
+                    let mut set = BTreeSet::new();
+                    let _ = set.insert(*peer);
+                    Ok(set)
+                }
+                Peers::Multiple(peers) => Ok(peers.clone()),
+            },
+            _ => Err(eyre!("A Cmd::SendMsg variant was expected")),
+        }
+    }
+
+    /// Get the replicated data from a `NodeCmd` message.
+    pub(crate) fn get_replicated_data(&self) -> Result<ReplicatedData> {
+        match self {
+            Cmd::SendMsg { msg, .. } => match msg {
+                OutgoingMsg::System(sys_msg) => match sys_msg {
+                    SystemMsg::NodeCmd(node_cmd) => match node_cmd {
+                        NodeCmd::ReplicateData(data) => {
+                            if data.len() != 1 {
+                                return Err(eyre!("Only 1 replicated data instance is expected"));
+                            }
+                            Ok(data[0].clone())
+                        }
+                        _ => {
+                            return Err(eyre!("A NodeCmd::ReplicateData variant was expected"));
+                        }
+                    },
+                    _ => return Err(eyre!("An SystemMsg::NodeCmd variant was expected")),
+                },
+                _ => return Err(eyre!("An OutgoingMsg::System variant was expected")),
+            },
+            _ => {
+                return Err(eyre!("A Cmd::SendMsg variant was expected"));
+            }
+        }
+    }
+
+    /// Get a `ServiceMsg` from a `Cmd::SendMsg` enum variant.
+    pub(crate) fn get_service_msg(&self) -> Result<ServiceMsg> {
+        match self {
+            Cmd::SendMsg { msg, .. } => match msg {
+                OutgoingMsg::Service(service_msg) => Ok(service_msg.clone()),
+                _ => Err(eyre!("A OutgoingMsg::Service variant was expected")),
+            },
+            _ => Err(eyre!("A Cmd::SendMsg variant was expected")),
+        }
+    }
 }

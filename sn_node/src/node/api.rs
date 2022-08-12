@@ -145,7 +145,7 @@ impl Node {
 }
 
 // Helper to generate the (currently bearer) genesis DBC to be owned by the provided key.
-fn gen_genesis_dbc(input_sk_set: &bls::SecretKeySet) -> Result<Dbc> {
+pub(crate) fn gen_genesis_dbc(input_sk_set: &bls::SecretKeySet) -> Result<Dbc> {
     // Use the same key as the input and output of Genesis Tx.
     let output_sk = input_sk_set.secret_key();
     let output_owner = OwnerOnce::from_owner_base(Owner::from(output_sk), &mut rng::thread_rng());

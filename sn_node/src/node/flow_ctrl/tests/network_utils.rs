@@ -177,7 +177,12 @@ impl TestNodeBuilder {
                     sk_set,
                 )
             } else {
-                let (sap, mut nodes, sk_set) = random_sap(self.prefix, self.elder_count);
+                let (sap, mut nodes, sk_set) = random_sap(
+                    self.prefix,
+                    self.elder_count,
+                    self.adult_count,
+                    Some(self.section_sk_threshold),
+                );
                 let (section, section_key_share) = create_section(&sk_set, &sap)?;
                 let node = nodes.remove(0);
                 let keypair = node.keypair.clone();
@@ -208,7 +213,34 @@ impl TestNodeBuilder {
     }
 }
 
+/// Creates a section where all elders and adults are marked as joined members.
+///
+/// Can be used for tests requiring adults to be members of the section, e.g., when you expect
+/// replication to occur after handling a message.
 pub(crate) fn create_section(
+    sk_set: &SecretKeySet,
+    section_auth: &SectionAuthorityProvider,
+) -> Result<(NetworkKnowledge, SectionKeyShare)> {
+    let section_chain = SecuredLinkedList::new(sk_set.public_keys().public_key());
+    let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
+
+    let section =
+        NetworkKnowledge::new(*section_chain.root_key(), section_chain, signed_sap, None)?;
+
+    for ns in section_auth.members() {
+        let auth_ns = section_signed(sk_set.secret_key(), ns.clone())?;
+        let _updated = section.update_member(auth_ns);
+    }
+
+    let section_key_share = create_section_key_share(sk_set, 0);
+
+    Ok((section, section_key_share))
+}
+
+/// Creates a section where only elders are marked as joined members.
+///
+/// Some tests require the condition where only the elders were marked as joined members.
+pub(crate) fn create_section_with_elders(
     sk_set: &SecretKeySet,
     section_auth: &SectionAuthorityProvider,
 ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
@@ -241,7 +273,8 @@ pub(crate) fn create_section_key_share(
 }
 
 pub(crate) fn create_section_auth() -> (SectionAuthorityProvider, Vec<NodeInfo>, SecretKeySet) {
-    let (section_auth, elders, secret_key_set) = random_sap(Prefix::default(), elder_count());
+    let (section_auth, elders, secret_key_set) =
+        random_sap(Prefix::default(), elder_count(), 0, None);
     (section_auth, elders, secret_key_set)
 }
 

@@ -27,6 +27,7 @@ use sn_interface::{
         system::{NodeQueryResponse, SystemMsg},
         AuthorityProof, EndUser, MsgId, ServiceAuth,
     },
+    network_knowledge::{SectionAuthorityProvider, SectionKeysProvider},
     types::{
         log_markers::LogMarker,
         register::{Permissions, Policy, Register, User},
@@ -317,47 +318,20 @@ impl Node {
         Ok(cmds)
     }
 
-    // Private helper to generate spent proof share
-    fn gen_spent_proof_share(
-        &self,
-        key_image: &KeyImage,
+    /// Get the public commitments for the transaction for this key image spend.
+    ///
+    /// They will be assigned to the spent proof share that is generated.
+    ///
+    /// In the process of doing so, we verify the correct set of spent proofs and transactions have
+    /// been sent by the client.
+    ///
+    /// This is in its own function because we share this code between the message handler and a
+    /// test utility. It may be moved inside on of the `sn_dbc` APIs.
+    pub(crate) fn get_public_commitments_from_transaction(
         tx: &RingCtTransaction,
         spent_proofs: &BTreeSet<SpentProof>,
         spent_transactions: &BTreeSet<RingCtTransaction>,
-    ) -> Result<Option<SpentProofShare>> {
-        trace!(
-            "Processing DBC spend request for key image: {:?}",
-            key_image
-        );
-
-        // Verify the SpentProofs signatures are all valid
-        let mut spent_proofs_keys = BTreeSet::new();
-        for proof in spent_proofs.iter() {
-            if !proof
-                .spentbook_pub_key
-                .verify(&proof.spentbook_sig, proof.content.hash().as_ref())
-            {
-                debug!(
-                    "Dropping DBC spend request since a SpentProof signature is invalid: {:?}",
-                    proof.spentbook_pub_key
-                );
-                return Ok(None);
-            }
-            let _ = spent_proofs_keys.insert(proof.spentbook_pub_key);
-        }
-
-        // ...and verify the SpentProofs are signed by section keys known to us,
-        // unless the public key of the SpentProof is the genesis key
-        spent_proofs_keys
-            .iter()
-            .for_each(|pk| if !self.network_knowledge.verify_section_key_is_known(pk) {
-                warn!("Invalid DBC spend request (key_image: {:?}) since a SpentProof is not signed by a section known to us: {:?}", key_image, pk);
-                // TODO: temporarily allowing spent proofs signed by section keys we are not aware of.
-                // We shall return an error to the client so it can update us with a valid proof chain.
-                //return Ok(None);
-            });
-
-        // Obtain Commitments from the TX
+    ) -> Result<Vec<(KeyImage, Vec<Commitment>)>> {
         let mut public_commitments_info = Vec::<(KeyImage, Vec<Commitment>)>::new();
         for mlsag in tx.mlsags.iter() {
             // For each public key in ring, look up the matching Commitment
@@ -386,15 +360,93 @@ impl Node {
                 .collect();
 
             if commitments.len() != mlsag.public_keys().len() {
-                debug!("Dropping DBC spend request since the number of SpentProofs ({}) does not match the number of input public keys ({:?})",
-                        commitments.len(),
-                        mlsag.public_keys(),
-                    );
-                return Ok(None);
+                let error_msg = format!(
+                    "the number of spent proofs ({}) does not match the number \
+                    of input public keys ({})",
+                    commitments.len(),
+                    mlsag.public_keys().len()
+                );
+                debug!("Dropping spend request: {}", error_msg);
+                return Err(Error::SpentbookError(error_msg));
             }
 
             public_commitments_info.push((mlsag.key_image.into(), commitments));
         }
+        Ok(public_commitments_info)
+    }
+
+    /// Builds the spent proof share based on the given inputs.
+    ///
+    /// This is in its own function because we share this code between the message handler and a
+    /// test utility.
+    pub(crate) fn build_spent_proof_share(
+        key_image: &bls::PublicKey,
+        tx: &RingCtTransaction,
+        sap: &SectionAuthorityProvider,
+        skp: &SectionKeysProvider,
+        public_commitments: Vec<Commitment>,
+    ) -> Result<SpentProofShare> {
+        let content = SpentProofContent {
+            key_image: *key_image,
+            transaction_hash: Hash::from(tx.hash()),
+            public_commitments,
+        };
+        let (index, sig_share) = skp.sign_with(content.hash().as_ref(), &sap.section_key())?;
+        Ok(SpentProofShare {
+            content,
+            spentbook_pks: sap.public_key_set(),
+            spentbook_sig_share: IndexedSignatureShare::new(index as u64, sig_share),
+        })
+    }
+
+    // Private helper to generate spent proof share
+    fn gen_spent_proof_share(
+        &self,
+        key_image: &KeyImage,
+        tx: &RingCtTransaction,
+        spent_proofs: &BTreeSet<SpentProof>,
+        spent_transactions: &BTreeSet<RingCtTransaction>,
+    ) -> Result<Option<SpentProofShare>> {
+        info!("Processing spend request for key image: {:?}", key_image);
+
+        // Verify spent proof signatures are valid.
+        let mut spent_proofs_keys = BTreeSet::new();
+        for proof in spent_proofs.iter() {
+            if !proof
+                .spentbook_pub_key
+                .verify(&proof.spentbook_sig, proof.content.hash().as_ref())
+            {
+                debug!(
+                    "Dropping spend request: spent proof signature {:?} is invalid",
+                    proof.spentbook_pub_key
+                );
+                return Ok(None);
+            }
+            let _ = spent_proofs_keys.insert(proof.spentbook_pub_key);
+        }
+
+        // Verify each spent proof is signed by a known section key (or the genesis key).
+        for pk in spent_proofs_keys.iter() {
+            if !self.network_knowledge.verify_section_key_is_known(pk) {
+                warn!(
+                    "Dropping spend request: spent proof is signed by unknown section with public \
+                    key {:?}",
+                    pk
+                );
+                return Ok(None);
+            }
+        }
+
+        let public_commitments_info = match Self::get_public_commitments_from_transaction(
+            tx,
+            spent_proofs,
+            spent_transactions,
+        ) {
+            Ok(pci) => pci,
+            Err(_) => {
+                return Ok(None);
+            }
+        };
 
         // Do not sign invalid TX.
         let tx_public_commitments: Vec<Vec<Commitment>> = public_commitments_info
@@ -404,39 +456,33 @@ impl Node {
             .collect();
 
         if let Err(err) = tx.verify(&tx_public_commitments) {
-            debug!(
-                "Dropping DBC spend request since TX failed to verify: {:?}",
-                err
-            );
+            debug!("Dropping spend request: {:?}", err.to_string());
             return Ok(None);
         }
 
         // TODO:
         // Check the key_image wasn't already spent with a different TX (i.e. double spent)
 
-        // Grab the commitments specific to the spent KeyImage
+        // Grab the commitments specific to the spent key image.
         let public_commitments: Vec<Commitment> = public_commitments_info
             .into_iter()
             .flat_map(|(k, v)| if &k == key_image { v } else { vec![] })
             .collect();
-
-        let content = SpentProofContent {
-            key_image: *key_image,
-            transaction_hash: Hash::from(tx.hash()),
+        if public_commitments.is_empty() {
+            debug!(
+                "Dropping spend request: there are no commitments for the given key image {:?}",
+                key_image
+            );
+            return Ok(None);
+        }
+        let spent_proof_share = Self::build_spent_proof_share(
+            key_image,
+            tx,
+            &self.network_knowledge.authority_provider(),
+            &self.section_keys_provider,
             public_commitments,
-        };
-
-        let sap = self.network_knowledge.authority_provider();
-
-        let (index, sig_share) = self
-            .section_keys_provider
-            .sign_with(content.hash().as_ref(), &sap.section_key())?;
-
-        Ok(Some(SpentProofShare {
-            content,
-            spentbook_pks: sap.public_key_set(),
-            spentbook_sig_share: IndexedSignatureShare::new(index as u64, sig_share),
-        }))
+        )?;
+        Ok(Some(spent_proof_share))
     }
 
     // Private helper to generate the RegisterCmd to write the SpentProofShare

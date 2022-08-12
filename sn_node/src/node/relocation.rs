@@ -161,7 +161,7 @@ mod tests {
     }
 
     fn proptest_actions_impl(peers: Vec<Peer>, signature_trailing_zeros: u8) -> Result<()> {
-        let sk_set = SecretKeySet::random();
+        let sk_set = SecretKeySet::random(None);
         let sk = sk_set.secret_key();
         let genesis_pk = sk.public_key();
 

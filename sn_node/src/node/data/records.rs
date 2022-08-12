@@ -239,6 +239,7 @@ impl Node {
     /// Used to fetch the list of holders for given name of data. Excludes full nodes
     pub(crate) fn target_data_holders(&self, target: XorName) -> BTreeSet<Peer> {
         let full_adults = self.full_adults();
+        trace!("full_adults = {}", full_adults.len());
         // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
         let adults = self.network_knowledge().adults();
 

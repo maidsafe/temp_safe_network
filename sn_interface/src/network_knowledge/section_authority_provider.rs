@@ -321,21 +321,28 @@ pub mod test_utils {
             .collect()
     }
 
-    // Generate random `SectionAuthorityProvider` for testing purposes.
+    /// Generate a random `SectionAuthorityProvider` for testing.
+    ///
+    /// The total number of members in the section will be `elder_count` + `adult_count`. A lot of
+    /// tests don't require adults in the section, so zero is an acceptable value for
+    /// `adult_count`.
+    ///
+    /// An optional `sk_threshold_size` can be passed to specify the threshold when the secret key
+    /// set is generated for the section key. Some tests require a low threshold.
     pub fn random_sap(
         prefix: Prefix,
-        count: usize,
+        elder_count: usize,
+        adult_count: usize,
+        sk_threshold_size: Option<usize>,
     ) -> (SectionAuthorityProvider, Vec<NodeInfo>, SecretKeySet) {
-        let elder_nodes = gen_sorted_nodes(&prefix, count, false);
-        let elders = elder_nodes.iter().map(NodeInfo::peer);
-        let members = elder_nodes
-            .iter()
-            .map(|i| NodeState::joined(i.peer(), None));
-        let secret_key_set = SecretKeySet::random();
+        let nodes = gen_sorted_nodes(&prefix, elder_count + adult_count, false);
+        let elders = nodes.iter().map(NodeInfo::peer).take(elder_count);
+        let members = nodes.iter().map(|i| NodeState::joined(i.peer(), None));
+        let secret_key_set = SecretKeySet::random(sk_threshold_size);
         let section_auth =
             SectionAuthorityProvider::new(elders, prefix, members, secret_key_set.public_keys(), 0);
 
-        (section_auth, elder_nodes, secret_key_set)
+        (section_auth, nodes, secret_key_set)
     }
 
     // Create signature for the given payload using the given secret key.

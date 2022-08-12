@@ -8,10 +8,12 @@
 
 #![allow(dead_code, unused_imports)]
 pub(crate) mod cmd_utils;
+pub(crate) mod dbc_utils;
 pub(crate) mod network_utils;
 
 use crate::comm::{Comm, MsgEvent};
 use crate::node::{
+    api::gen_genesis_dbc,
     cfg::create_test_max_capacity_and_root_storage,
     flow_ctrl::{dispatcher::Dispatcher, event_channel},
     messages::WireMsgUtils,
@@ -21,14 +23,16 @@ use crate::node::{
 };
 use crate::storage::UsedSpace;
 
-use cmd_utils::run_and_collect_cmds;
+use cmd_utils::{handle_online_cmd, run_and_collect_cmds, wrap_service_msg_for_handling};
 use sn_consensus::Decision;
+use sn_dbc::{Hash, OwnerOnce, SpentProofShare, TransactionBuilder};
 use sn_interface::messaging::system::AntiEntropyKind;
 #[cfg(feature = "traceroute")]
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
     elder_count, init_logger,
     messaging::{
+        data::{DataCmd, RegisterCmd, ServiceMsg, SpentbookCmd},
         system::{
             JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState,
             NodeMsgAuthorityUtils, NodeState as NodeStateMsg, RelocateDetails, ResourceProof,
@@ -41,7 +45,7 @@ use sn_interface::{
         NodeState, SectionAuthorityProvider, SectionKeyShare, FIRST_SECTION_MAX_AGE,
         FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
     },
-    types::{keyed_signed, keys::ed25519, Peer, PublicKey, SecretKeySet},
+    types::{keyed_signed, keys::ed25519, Peer, PublicKey, ReplicatedData, SecretKeySet},
 };
 
 use assert_matches::assert_matches;
@@ -290,7 +294,7 @@ async fn handle_agreement_on_online() -> Result<()> {
                     .await?;
 
             let new_peer = network_utils::create_peer(MIN_ADULT_AGE);
-            let status = cmd_utils::handle_online_cmd(
+            let status = handle_online_cmd(
                 &new_peer,
                 &sk_set,
                 &dispatcher,
@@ -317,7 +321,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let local = tokio::task::LocalSet::new();
     local
         .run_until(async move {
-            let sk_set = SecretKeySet::random();
+            let sk_set = SecretKeySet::random(None);
             let chain = SecuredLinkedList::new(sk_set.secret_key().public_key());
 
             // Creates nodes where everybody has age 6 except one has 5.
@@ -421,74 +425,6 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             Result::<()>::Ok(())
         })
         .await
-}
-
-// Handles a consensus-ed Online proposal.
-async fn handle_online_cmd(
-    peer: &Peer,
-    sk_set: &SecretKeySet,
-    dispatcher: &Dispatcher,
-    section_auth: &SectionAuthorityProvider,
-) -> Result<HandleOnlineStatus> {
-    let node_state = NodeState::joined(*peer, None);
-    let membership_decision = section_decision(sk_set, node_state.to_msg())?;
-
-    let all_cmds = run_and_collect_cmds(
-        Cmd::HandleMembershipDecision(membership_decision),
-        dispatcher,
-    )
-    .await?;
-
-    let mut status = HandleOnlineStatus {
-        node_approval_sent: false,
-        relocate_details: None,
-    };
-
-    for cmd in all_cmds {
-        let (msg, recipients) = match cmd {
-            Cmd::SendMsg {
-                recipients,
-                msg: OutgoingMsg::System(msg),
-                ..
-            } => (msg, recipients),
-            _ => continue,
-        };
-
-        match msg {
-            SystemMsg::JoinResponse(response) => {
-                if let JoinResponse::Approved {
-                    section_auth: signed_sap,
-                    ..
-                } = *response
-                {
-                    assert_eq!(signed_sap.value, section_auth.clone().to_msg());
-                    assert_matches!(recipients, Peers::Multiple(peers) => {
-                        assert_eq!(peers, BTreeSet::from([*peer]));
-                    });
-                    status.node_approval_sent = true;
-                }
-            }
-            SystemMsg::Propose {
-                proposal: sn_interface::messaging::system::Proposal::VoteNodeOffline(node_state),
-                ..
-            } => {
-                if let MembershipState::Relocated(details) = node_state.state {
-                    if details.previous_name != peer.name() {
-                        continue;
-                    }
-                    status.relocate_details = Some(*details.clone());
-                }
-            }
-            _ => continue,
-        }
-    }
-
-    Ok(status)
-}
-
-struct HandleOnlineStatus {
-    node_approval_sent: bool,
-    relocate_details: Option<RelocateDetails>,
 }
 
 #[tokio::test]
@@ -672,7 +608,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             .await?;
 
             // Create new `Section` as a successor to the previous one.
-            let sk_set2 = SecretKeySet::random();
+            let sk_set2 = SecretKeySet::random(None);
             let sk2 = sk_set2.secret_key();
             let pk2 = sk2.public_key();
             let pk2_signature = sk_set1.secret_key().sign(bincode::serialize(&pk2)?);
@@ -850,7 +786,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
                 RelocatedPeerRole::Elder => elder_count(),
                 RelocatedPeerRole::NonElder => recommended_section_size(),
             };
-            let (section_auth, mut nodes, sk_set) = random_sap(prefix, elder_count());
+            let (section_auth, mut nodes, sk_set) = random_sap(prefix, elder_count(), 0, None);
             let (section, section_key_share) =
                 network_utils::create_section(&sk_set, &section_auth)?;
 
@@ -1005,7 +941,7 @@ async fn handle_elders_update() -> Result<()> {
                 .map(|p| NodeState::joined(p, None)),
         );
 
-        let sk_set0 = SecretKeySet::random();
+        let sk_set0 = SecretKeySet::random(None);
         let pk0 = sk_set0.secret_key().public_key();
 
         let sap0 = SectionAuthorityProvider::new(
@@ -1016,7 +952,7 @@ async fn handle_elders_update() -> Result<()> {
             0,
         );
 
-        let (section0, section_key_share) = network_utils::create_section(&sk_set0, &sap0)?;
+        let (section0, section_key_share) = network_utils::create_section_with_elders(&sk_set0, &sap0)?;
 
         for peer in [&adult_peer, &promoted_peer] {
             let node_state = NodeState::joined(*peer, None);
@@ -1026,7 +962,7 @@ async fn handle_elders_update() -> Result<()> {
 
         let demoted_peer = other_elder_peers.remove(0);
 
-        let sk_set1 = SecretKeySet::random();
+        let sk_set1 = SecretKeySet::random(None);
 
         let pk1 = sk_set1.secret_key().public_key();
         // Create `HandleAgreement` cmd for an `NewElders` proposal. This will demote one of the
@@ -1164,7 +1100,7 @@ async fn handle_demote_during_split() -> Result<()> {
             );
 
             // Create the pre-split section
-            let sk_set_v0 = SecretKeySet::random();
+            let sk_set_v0 = SecretKeySet::random(None);
             let section_auth_v0 = SectionAuthorityProvider::new(
                 iter::once(info.peer()).chain(peers_a.iter().cloned()),
                 Prefix::default(),
@@ -1173,7 +1109,7 @@ async fn handle_demote_during_split() -> Result<()> {
                 0,
             );
             let (section, section_key_share) =
-                network_utils::create_section(&sk_set_v0, &section_auth_v0)?;
+                network_utils::create_section_with_elders(&sk_set_v0, &section_auth_v0)?;
 
             // all peers b are added
             for peer in peers_b.iter().chain(iter::once(&peer_c)).cloned() {
@@ -1197,8 +1133,8 @@ async fn handle_demote_during_split() -> Result<()> {
             )
             .await?;
 
-            let sk_set_v1_p0 = SecretKeySet::random();
-            let sk_set_v1_p1 = SecretKeySet::random();
+            let sk_set_v1_p0 = SecretKeySet::random(None);
+            let sk_set_v1_p1 = SecretKeySet::random(None);
 
             // Simulate DKG round finished succesfully by adding the new section
             // key share to our cache (according to which split section we'll belong to).
@@ -1284,6 +1220,308 @@ async fn handle_demote_during_split() -> Result<()> {
 
             // our node's whole section
             assert_eq!(update_recipients.len(), elder_count());
+            Result::<()>::Ok(())
+        })
+        .await
+}
+
+#[tokio::test]
+async fn spentbook_spend_service_message_should_replicate_to_adults_and_send_ack() -> Result<()> {
+    let local = tokio::task::LocalSet::new();
+    local
+        .run_until(async move {
+            init_logger();
+            let replication_count = 5;
+            let (dispatcher, _, peer, sk_set) =
+                network_utils::TestNodeBuilder::new(Prefix::default().pushed(true), elder_count())
+                    .adult_count(6)
+                    .section_sk_threshold(0)
+                    .data_copy_count(replication_count)
+                    .build()
+                    .await?;
+
+            let (key_image, tx, spent_proofs, spent_transactions) =
+                dbc_utils::get_genesis_dbc_spend_info(&sk_set)?;
+
+            let cmds = run_and_collect_cmds(
+                wrap_service_msg_for_handling(
+                    ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                        key_image,
+                        tx: tx.clone(),
+                        spent_proofs,
+                        spent_transactions,
+                    })),
+                    peer,
+                )?,
+                &dispatcher,
+            )
+            .await?;
+
+            assert_eq!(cmds.len(), 2);
+
+            let replicate_cmd = cmds[0].clone();
+            let recipients = replicate_cmd.recipients()?;
+            assert_eq!(recipients.len(), replication_count);
+
+            let replicated_data = replicate_cmd.get_replicated_data()?;
+            assert_matches!(replicated_data, ReplicatedData::SpentbookWrite(_));
+
+            let spent_proof_share =
+                dbc_utils::get_spent_proof_share_from_replicated_data(replicated_data)?;
+            assert_eq!(key_image.to_hex(), spent_proof_share.key_image().to_hex());
+            assert_eq!(Hash::from(tx.hash()), spent_proof_share.transaction_hash());
+            assert_eq!(
+                sk_set.public_keys().public_key().to_hex(),
+                spent_proof_share.spentbook_pks().public_key().to_hex()
+            );
+
+            let service_msg = cmds[1].clone().get_service_msg()?;
+            assert_matches!(service_msg, ServiceMsg::CmdAck { .. });
+
+            Result::<()>::Ok(())
+        })
+        .await
+}
+
+#[tokio::test]
+async fn spentbook_spend_spentproof_with_invalid_pk_should_return_no_commands() -> Result<()> {
+    let local = tokio::task::LocalSet::new();
+    local
+        .run_until(async move {
+            init_logger();
+            let replication_count = 5;
+            let (dispatcher, _, peer, sk_set) =
+                network_utils::TestNodeBuilder::new(Prefix::default().pushed(true), elder_count())
+                    .adult_count(6)
+                    .section_sk_threshold(0)
+                    .data_copy_count(replication_count)
+                    .build()
+                    .await?;
+
+            let (key_image, tx, mut spent_proofs, spent_transactions) =
+                dbc_utils::get_genesis_dbc_spend_info(&sk_set)?;
+            let pk = bls::SecretKey::random().public_key();
+            spent_proofs = spent_proofs
+                .into_iter()
+                .map(|mut proof| {
+                    proof.spentbook_pub_key = pk;
+                    proof
+                })
+                .collect();
+
+            let cmds = run_and_collect_cmds(
+                wrap_service_msg_for_handling(
+                    ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                        key_image,
+                        tx,
+                        spent_proofs,
+                        spent_transactions,
+                    })),
+                    peer,
+                )?,
+                &dispatcher,
+            )
+            .await?;
+
+            assert_eq!(cmds.len(), 0);
+
+            Result::<()>::Ok(())
+        })
+        .await
+}
+
+#[tokio::test]
+async fn spentbook_spend_spentproof_with_key_not_in_section_chain_should_return_no_commands(
+) -> Result<()> {
+    let local = tokio::task::LocalSet::new();
+    local
+        .run_until(async move {
+            init_logger();
+            let replication_count = 5;
+            let (dispatcher, _, peer, _) =
+                network_utils::TestNodeBuilder::new(Prefix::default().pushed(true), elder_count())
+                    .adult_count(6)
+                    .section_sk_threshold(0)
+                    .data_copy_count(replication_count)
+                    .build()
+                    .await?;
+
+            let sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
+            let (key_image, tx, spent_proofs, spent_transactions) =
+                dbc_utils::get_genesis_dbc_spend_info(&sk_set)?;
+
+            let cmds = run_and_collect_cmds(
+                wrap_service_msg_for_handling(
+                    ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                        key_image,
+                        tx,
+                        spent_proofs,
+                        spent_transactions,
+                    })),
+                    peer,
+                )?,
+                &dispatcher,
+            )
+            .await?;
+
+            assert_eq!(cmds.len(), 0);
+
+            Result::<()>::Ok(())
+        })
+        .await
+}
+
+#[tokio::test]
+async fn spentbook_spend_spent_proofs_do_not_relate_to_input_dbcs_should_return_no_commands(
+) -> Result<()> {
+    let local = tokio::task::LocalSet::new();
+    local
+        .run_until(async move {
+            init_logger();
+            let replication_count = 5;
+            let (dispatcher, section, peer, sk_set) =
+                network_utils::TestNodeBuilder::new(Prefix::default().pushed(true), elder_count())
+                    .adult_count(6)
+                    .section_sk_threshold(0)
+                    .data_copy_count(replication_count)
+                    .build()
+                    .await?;
+
+            // The idea for this test case is to pass the wrong spent proofs and transactions for
+            // the key image we're trying to spend. To do so, we reissue `new_dbc` from
+            // `genesis_dbc`, then reissue `new_dbc2` from `new_dbc`, then when we try to spend
+            // `new_dbc2`, we use the spent proofs/transactions from `genesis_dbc`. This should
+            // not be permitted. The correct way would be to pass the spent proofs/transactions
+            // from `new_dbc`, which was our input to `new_dbc2`.
+            let sap = section.authority_provider();
+            let keys_provider = dispatcher.node().read().await.section_keys_provider.clone();
+            let genesis_dbc = gen_genesis_dbc(&sk_set)?;
+            let new_dbc = dbc_utils::reissue_dbc(
+                &genesis_dbc,
+                10,
+                &bls::SecretKey::random(),
+                &sap,
+                &keys_provider,
+            )?;
+            let new_dbc2_sk = bls::SecretKey::random();
+            let new_dbc2 = dbc_utils::reissue_dbc(&new_dbc, 5, &new_dbc2_sk, &sap, &keys_provider)?;
+
+            let cmds = run_and_collect_cmds(
+                wrap_service_msg_for_handling(
+                    ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                        key_image: new_dbc2_sk.public_key(),
+                        tx: new_dbc2.transaction.clone(),
+                        spent_proofs: genesis_dbc.spent_proofs.clone(),
+                        spent_transactions: genesis_dbc.spent_transactions.clone(),
+                    })),
+                    peer,
+                )?,
+                &dispatcher,
+            )
+            .await?;
+
+            assert_eq!(cmds.len(), 0);
+
+            Result::<()>::Ok(())
+        })
+        .await
+}
+
+#[tokio::test]
+async fn spentbook_spend_transaction_with_no_inputs_should_return_no_commands() -> Result<()> {
+    let local = tokio::task::LocalSet::new();
+    local
+        .run_until(async move {
+            init_logger();
+            let replication_count = 5;
+            let (dispatcher, section, peer, sk_set) =
+                network_utils::TestNodeBuilder::new(Prefix::default().pushed(true), elder_count())
+                    .adult_count(6)
+                    .section_sk_threshold(0)
+                    .data_copy_count(replication_count)
+                    .build()
+                    .await?;
+
+            // These conditions will produce a failure on `tx.verify` in the message handler.
+            let sap = section.authority_provider();
+            let keys_provider = dispatcher.node().read().await.section_keys_provider.clone();
+            let genesis_dbc = gen_genesis_dbc(&sk_set)?;
+            let new_dbc = dbc_utils::reissue_dbc(
+                &genesis_dbc,
+                10,
+                &bls::SecretKey::random(),
+                &sap,
+                &keys_provider,
+            )?;
+            let new_dbc2_sk = bls::SecretKey::random();
+            let new_dbc2 =
+                dbc_utils::reissue_invalid_dbc_with_no_inputs(&new_dbc, 5, &new_dbc2_sk)?;
+
+            let cmds = run_and_collect_cmds(
+                wrap_service_msg_for_handling(
+                    ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                        key_image: new_dbc2_sk.public_key(),
+                        tx: new_dbc2.transaction.clone(),
+                        spent_proofs: new_dbc.spent_proofs.clone(),
+                        spent_transactions: new_dbc.spent_transactions.clone(),
+                    })),
+                    peer,
+                )?,
+                &dispatcher,
+            )
+            .await?;
+
+            assert_eq!(cmds.len(), 0);
+
+            Result::<()>::Ok(())
+        })
+        .await
+}
+
+#[tokio::test]
+async fn spentbook_spend_with_random_key_image_should_return_no_commands() -> Result<()> {
+    let local = tokio::task::LocalSet::new();
+    local
+        .run_until(async move {
+            init_logger();
+            let replication_count = 5;
+            let (dispatcher, section, peer, sk_set) =
+                network_utils::TestNodeBuilder::new(Prefix::default().pushed(true), elder_count())
+                    .adult_count(6)
+                    .section_sk_threshold(0)
+                    .data_copy_count(replication_count)
+                    .build()
+                    .await?;
+
+            let sap = section.authority_provider();
+            let keys_provider = dispatcher.node().read().await.section_keys_provider.clone();
+            let genesis_dbc = gen_genesis_dbc(&sk_set)?;
+            let new_dbc = dbc_utils::reissue_dbc(
+                &genesis_dbc,
+                10,
+                &bls::SecretKey::random(),
+                &sap,
+                &keys_provider,
+            )?;
+            let new_dbc2_sk = bls::SecretKey::random();
+            let new_dbc2 = dbc_utils::reissue_dbc(&new_dbc, 5, &new_dbc2_sk, &sap, &keys_provider)?;
+
+            let cmds = run_and_collect_cmds(
+                wrap_service_msg_for_handling(
+                    ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                        key_image: bls::SecretKey::random().public_key(),
+                        tx: new_dbc2.transaction.clone(),
+                        spent_proofs: new_dbc.spent_proofs.clone(),
+                        spent_transactions: new_dbc.spent_transactions.clone(),
+                    })),
+                    peer,
+                )?,
+                &dispatcher,
+            )
+            .await?;
+
+            assert_eq!(cmds.len(), 0);
+
             Result::<()>::Ok(())
         })
         .await
