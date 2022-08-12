@@ -962,7 +962,7 @@ mod knowledge_tests {
         dysfunctional_detection.add_new_node(new_node);
 
         // Add just one issue to all, this gets us a baseline avg to not overly skew results
-        for node in nodes.clone() {
+        for node in nodes {
             dysfunctional_detection.track_issue(node, IssueType::AwaitingProbeResponse);
         }
 
