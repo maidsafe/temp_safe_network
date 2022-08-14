@@ -5,11 +5,467 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.65.0 (2022-08-14)
+
+### Chore
+
+ - <csr-id-1af888c09b2f5a49d04a7068b7f948cf096da8f3/> add README docs for join process and traceroute
+ - <csr-id-aea5782e583ae353566abb0f10d94132bd9b14fe/> print full error during node startup fail
+ - <csr-id-6d60525874dc4efeb658433f1f253d54e0cba2d4/> remove wiremsg.priority as uneeded
+ - <csr-id-52ed23049c83e0da0b4dfefa7b30713a52f3c73a/> reduce AE sleep further
+ - <csr-id-68d28d5591c5ccc6a241832f9b7855827958372a/> avoid logging short sleeps
+ - <csr-id-42bde15e9a96dbe759575d4bccf4f769e13a695d/> misc. fixes
+ - <csr-id-3cf903367bfcd805ceff2f2508cd2b12eddc3ca5/> remove unused severity; refactor weighted score
+   Prev weighted score related everything to the std_deviation, but this
+   has the effect of nullifying outliers and decreasing the impact of
+   weighting.
+   
+   Instead we opt for a simple "threshold" score, above which, we're
+   dysfunctional. So the sum of all issues tracked is used, and if
+   we reach above this point, our node is deemed dysfunctional.
+ - <csr-id-29de67f1e3583eab867d517cb50ed2e404bd63fd/> serialize NetworkPrefixMap into JSON
+ - <csr-id-a8b0631a396ac96e000db22141ffd5d83fd7e987/> semantic tweaks
+ - <csr-id-8242f2f1035b1c0718e53954951badffa30f3393/> organise usings, cleanup
+ - <csr-id-848dba48e5959d0b9cfe182fde2f12ede71ba9c2/> use matches! macros, minor refactoring
+ - <csr-id-35483b3f322eeea2c10427e94e4750a8269811c0/> remove unused async/await
+ - <csr-id-820fcc9a77f756fca308f247c3ea1b82f65d30b9/> remove NetworkPrefxiMap::genesis_key, NetworkKnowledge::genesis_key
+   Remove the feilds as they can be obtained from NetworkPrefixMap::sections_dag
+ - <csr-id-afcf083469c732f10c7c80f4a45e4c33ab111101/> remove RwLock from NetworkPrefixMap
+ - <csr-id-72db95a092ea33f29e77b6101b16e219fadd47ab/> refactor CmdCtrl, naming and remove retries
+ - <csr-id-aafc560d3b3b1e375f7be224e0e63a3b567bbd86/> rename traceroute fns
+ - <csr-id-7394030fe5aeeb88f4524d2da2a71e36334c831d/> traceroute update after cmds flow rebase
+ - <csr-id-73dc9b4a1757393270e62d265328bab0c0aa3b35/> make traceroute a default feature
+ - <csr-id-0a653e4becc4a8e14ffd6d0752cf035430067ce9/> improve Display, Debug impl for Traceroute
+ - <csr-id-9789797e3f773285f23bd22957fe45a67aabec24/> improve traceroute readability and other improvements
+   - simplfies creating identites for traceroute to avoid locking
+   - implements Display and Debug for traceroute
+   - add clearer logs for traceroute
+ - <csr-id-8e626f9fabbb07a126199ea5481e2ac524cbae0d/> add traceroute for AE system messages
+ - <csr-id-db22c6c8c1aedb347bea52199a5673695eff86f8/> cleanup unnecessary options and results
+ - <csr-id-2809ed1177c416f933f3869bd11607c4e5e6a908/> reduce file db error logs
+ - <csr-id-08af2a6ac3485a696d2a1e799af588943f207e6b/> clarify fn signatures
+ - <csr-id-080f9ef83005ebda9e1c96b228f3d5096fd79b81/> delete commented out tests
+ - <csr-id-1b37f4bbf266c21d795bff6b4e6f2e1885405697/> dont send health checks as an adult
+ - <csr-id-feaf3ef88b140a0f530082e851831b736320de59/> simplify the send funcitonality
+   Previously we've had a send to client and a send ot nodes, the latter
+   which would only send to a subset (with the delivery group setting), and
+   reported errors.
+   
+   We've stripped out the delivery group stuff already as unnecessary. So here
+   we just have one function to send from nodes, any errors are handled
+   appropriately if the recipient is in our section, otherwise ignored.
+ - <csr-id-7157ed27ddfc0d987272f1285b44faa9709a4c8f/> use Cmd::TrackDysf in read_data_from_adults
+ - <csr-id-2ea069543dbe6ffebac663d4d8d7e0bc33cfc566/> remove RwLock over Cache type
+ - <csr-id-322c69845e2e14eb029fdbebb24e08063a2323b0/> remove write lock around non query service msg handling
+ - <csr-id-5a5f0f4608c27f463178f4a560f1f9b4c020e764/> remove the write lock on node while validating msgs
+   This adds a new Cmd for tracking dysfunction, so we can pull the
+   write locks out of longer running Cmd processes
+ - <csr-id-83a3a98a6972c9a1824e41cb87325b037b65938c/> make Sign of SystemMsgs higher prio as this could hold them back before sending
+ - <csr-id-9c855c187465a0594cf18fb359a082742593a4d4/> log parent job id during processing
+ - <csr-id-f8b6ff0edd7a64389439081b6306296402887ab1/> simplify data replication msg sending
+ - <csr-id-c6fa7735a5e48a4caa6ee3aac000785a9da9413a/> temporarily allow DBC spent proofs singed by sections keys unknown to the Elder
+ - <csr-id-302fb954360521d40efab0e26fd31f8278a74755/> make `&mut self` methods `&self`
+ - <csr-id-70f3ecc367ca9450be038f8ff806f40c324d1b00/> removed unused lru_cache module
+ - <csr-id-8efbd96a5fd3907ace5ca6ac282027595fefd8ef/> Cleanup non-joined member sessions, regardless of connected state
+ - <csr-id-ea490ddf749ac9e0c7962c3c21c053663e6b6ee7/> reflect the semantics not the type
+ - <csr-id-bf2902c18b900b8b4a8abae5f966d1e08d547910/> whitespace + typo fix
+ - <csr-id-6f03b93bd2d02f0ffe54b69fbf25070fbe64eab0/> upgrade blsttc to 7.0.0
+   This version has a more helpful error message for the shares interpolation problem.
+ - <csr-id-934bf6cbc86e252eb3859c757a0b66c02f7826d9/> Cleanup non-joined member sessions, regardless of connected state.
+   We've seen that we can get a crazy number of sessions (almost 1k), with no network activity if they are
+   never cleaned up. They may well still be conncted (but the node name cycles... so the conn lives on).
+   
+   So here, anything not currently joined, is cleaned up. nodes we can reconnect to. clients can retry.
+ - <csr-id-214adedc31bca576c7f28ff52a1f4ff0a2676757/> improve traceroute redability and resolve clippy
+ - <csr-id-893b4af340b0ced1a2b38dda07bd82cf833be776/> fix outdated comm tests
+   - `sn_node::comm::send_to_subset` test was failing because of the changes to delivery_group_size
+   where we do not have subset sends anymore. Therefore this test has been removed.
+   
+   - this commit also removes old filters from GHA workflow which prevented running
+   all the tests under sn_node and sn_interface.
+ - <csr-id-feaca15b7c44297c16a4665ceec738226bb860ba/> increase Send priority, and tweak depending on DstLocation
+ - <csr-id-7d060f0e92e3b250e3fe1e0523aa0c30b439e0be/> reduce number of Send retries in PeerSession
+ - <csr-id-7a675f4889c4ef01b9040773184ab2e0ed78b208/> remove SendMsgDeliveryGroup Cmd
+   This is not needed or really utilised in any real way.
+   
+   We can just use SendMsg cmds
+ - <csr-id-c3778cd77e0c9cbc407449afe713ff7cdb4b9909/> use SendMsg for send_node_msg_to_nodes
+   As it always results in a delivery group of 1. Which is pointless
+ - <csr-id-fba2f76ec23a00ca1da857e63af160a11904288c/> increase CleanUpPeerLinks prio
+ - <csr-id-5a121c19d395130e40df0134be36e4264b60972a/> fix benchamrking groups in data_storage bench
+ - <csr-id-67c82cae6654423cae3567d8417a442a40ce1e5e/> update data_storage benchmark ranges
+ - <csr-id-1e8180c23fab27ac92c93f201efd050cff00db10/> re-enable registers benchmark and tidy sled residue
+ - <csr-id-900fa8c4803e9e45a1471a32fb4fe5b8cdd5112b/> reduce service msg response SendMsg cmds
+   We can now have one command to many recipients...
+ - <csr-id-a95be6277a9ee8d66eccd40711392325fac986e2/> tweak some WireMsg.serialize calls to minimize them
+   Refactors some client send flow so we can now send the same msg
+   to many clients at once (as is baked in elsewhere...
+   this logic would have scuppered some client optimisations
+ - <csr-id-a856d788131ef85414ee1f42a868abcbbfc0d2b6/> use timestamp for log files
+   This means that once written a log file's name will not change.
+   This hould make debugging a live network easier (your log file is less likely to change while viewing), and also pulling logs from a network via rsync fafster (as the namess/content aren't changing all the time).
+ - <csr-id-00fae4d5fd5dbad5696888f0c796fbd39b7e49ed/> formatting with cargo fmt
+ - <csr-id-549c4b169547e620471c416c1506afc6e3ee265b/> increase wait on ci & decrease delay before node retry
+ - <csr-id-847db2c487cd102af0cf9a477b4c1b65fc2c8aa6/> remove locking from section key cache
+ - <csr-id-0a5593b0512d6f059c6a8003634b07e7d2d3e514/> remove refcell on NetworkKnowledge::all_section_chains
+ - <csr-id-707b80c3526ae727a7e91330dc386cdb41c51f4c/> remove refcell around NetworkKnowledge::signed_sap
+ - <csr-id-9bd6ae20c1207f99420093fd5c9f4eb53836e3c1/> remove refcell on NetworkKnowledge::chain
+ - <csr-id-31d9f9f99b4e166986b8e51c3d41e0eac55621a4/> remove awaits from tests as well
+ - <csr-id-30a7028dd702e2f6575e299a609a2416439cbaed/> remove locking around signature aggregation
+ - <csr-id-dedec486f85c1cf6cf2d538238f32e826e08da0a/> remove unused async
+ - <csr-id-3bef795923863d977f70c95647444ebbc97c5cf5/> remove logs in looping data replication
+ - <csr-id-f142bbb0030233add4808427a2819ca386fef503/> relax when we track DkgIssues
+   Previously we did this on any outgoing msg.
+   Now we only track on start/failure.
+   This should hopefully prevent false positives over short times
+   during intensive DKG rounds
+ - <csr-id-e39917d0635a071625f7961ce6d40cb44cc65da0/> Tweak dysf interval, reducing to report on issues more rapidly
+   If not, we can only ever propose one node for a membership change
+   (lost), every 30s... which may not succeed under churn...
+ - <csr-id-879678e986a722d216ee9a4f37e8ae398221a394/> logging sn_consensus in CI, tweak section min and max elder age
+
+### Documentation
+
+ - <csr-id-e3c90998e1abd10768e861370a65a934f52e2ec3/> broken links
+
+### New Features
+
+ - <csr-id-f817fa5917f48faaeb3714c7faeaee5392b82f55/> log with unique id around sleep
+ - <csr-id-366719f9e158fb35093382739d48cdb8dac65b60/> make the content explicit
+ - <csr-id-005b84cab0ca91762cbedd208b022d4c4983fe26/> retry twice if it fails spending inputs when reissuing DBCs
+ - <csr-id-47179e695a7f351d9298c5bdbea006abb26b8e89/> consolidate join / leave into decision handling
+ - <csr-id-175d1b909dff8c6729ac7f156ce1d0d22be8cc12/> make traceroute default for now
+ - <csr-id-df8ea32f9218d344cd1f291359969b38a05b4642/> join approval has membership decision
+ - <csr-id-7f40e89f9c0aa767bd372278e1d50de5a8e7869b/> add intermitent health checks
+   We now periodically send a random chunk query to the section to check if
+   all our members respond in some fashion.
+ - <csr-id-4f2cf267ee030e5924a2fa999a2a46dbc072d208/> impl traceroute for client cmds and cmd responses
+ - <csr-id-a6fb1fc516a9ef6dae7aa236f3dd440d50697ae2/> impl traceroute feature to trace a message's flow in the network
+   - implements traceroute for Client queries and is logged at the client on return
+ - <csr-id-01ea9c0bdb88da4f181d8f1638f2f2ad692d0ca3/> add OTLP support to sn_node bin
+ - <csr-id-c6999a92d06f275f7506a24492bec50042466459/> validate w low prio before handling
+ - <csr-id-6f781b96da745839206352ae02c18b759b49f1f2/> validate w low prio before handling
+
+### Bug Fixes
+
+ - <csr-id-f531c62b0d82f14b6aa6df4f1f82bcd0ce95b9ce/> modify the join process timeout mechanism
+ - <csr-id-26ad7578f0d224528a1be6509453f695f6530eb4/> reduce to 5s
+ - <csr-id-8bf0aeed0af193322f341bd718f7a5f84fa2d02f/> gossip all votes and start timer after first vote
+ - <csr-id-a5afec84bc687327df3951eefc6c566c898f2332/> Add braces around expected age calc; use membership
+   Previously we were occasionally seeing _large_ expected ages (246 eg),
+   here we add braces for clarity and hopefully prevent such calculatory oddness.
+   
+   We also use membership to know the current section size instead of SAP which
+   may well be outdated.
+ - <csr-id-98279c2243ec2c5351947e26650d64dc5bf81797/> gradually slowdown when send to peer too fast
+ - <csr-id-0d5ddf04001fc65c05865cf2a2ea08cd3cd45615/> make cmd ctrl response quicker
+ - <csr-id-0ed5075304b090597f7760fb51c4a33435a853f1/> fix deadlock introduced after removal of Arc from NetworkPrefixMap
+   Removing the checks in compare_and_write_prefix_map and directly
+   writing the prefix_map fixed the issue
+ - <csr-id-cebf37ea8ef44c51ce84646a83a5d1e6dcab3e7a/> use correct data address type
+ - <csr-id-ec625349494b267d24c80fd4c8b176b4524f48cd/> add actual id of parent
+ - <csr-id-22f4f1512da8f9a2245addf379477823364edd6c/> create query cmd for healthcheck
+ - <csr-id-5a83a4ff08b7a3c2be0e3532589d209e72367d92/> only do connectivity test for failed sends via dysfunction
+   This means we dont message around for every failed send (it may just be
+   due to _us_ cleaning up comms).
+   
+   Instead we tie this check to a node we see as dysfunctional and then ask
+   all elders to check it
+ - <csr-id-f200909516739769d087b20712a33b5047858ba9/> improve the accuracy of data_storage bench tests
+ - <csr-id-6ca512e7adc6681bc85122847fa8ac08550cfb09/> remove unused get mut access
+ - <csr-id-a5028c551d1b3db2c4c912c2897490e9a4b34a0d/> disable rejoins
+   It seems that we may have not fully thought through the implications
+   of nodes rejoining.
+   
+   The flow was:
+   1. a node leaves the section (reason is not tracked)
+   2. the node rejoins
+   3. the section accepts them back and attempts to relocate them
+   
+   This seems fine until you realize that relocating the node may fail
+   for some reason and now we're stuck holding this re-joined node.
+   
+   Also we don't track why this node was removed from the section.
+   
+   They could have been a faulty elder that now is back in the same
+   section it had attacked with the same age which will likely cause it
+   to become an elder again.
+ - <csr-id-b492cc25cfadf7dd3aaf3584cd5dbbd0dc8532ce/> reduce re-join tests to one case
+ - <csr-id-1694c1566ac562216447eb491cc3b2b00b0c5979/> prevent rejoins of archived nodes
+ - <csr-id-6dbc032907bcb1fc6e3e9034f794643097260e17/> update rejoin tests to test proposal validation
+   Rather then testing the decision handling code, a lot of the logic we
+   care about is now frontloaded in the proposal validations
+ - <csr-id-7fc6231f241bcae4447839989b712b1b410a2523/> support the traceroute feature flag
+ - <csr-id-19bb0b99afee53dd7b6e109919249b25e0a55e48/> adds unique conn info validation to membership
+ - <csr-id-e1a0474e78fd00a881b13ad036c1aabc9ce2f02a/> avoid un-necessary dysfunction log_dkg_issue
+ - <csr-id-f0d1abf6dd8731310b7749cd6cc7077886215997/> remove redundant generation field
+ - <csr-id-640b64d2b5f19df5f5439a8fce31a848a47526cd/> drop RwLock guards after job is done
+ - <csr-id-38d25d6df71e3bb71e8efda50a4bf64345f69f81/> update for the split of HandleCmd
+ - <csr-id-ae38fdce6499d8245025d7bd82fa6c583f04060d/> update for the split of HandleCmd
+ - <csr-id-6d237e5e7d8306cb955f436910aa01ed7221cd84/> unused async in CLI
+ - <csr-id-78be9fb24cf66d9f8f06ac31895302eae875661e/> unused async in node/dkg etc
+ - <csr-id-abddc53df9fbbd5c35b6ce473646f3183bf423df/> more node messaging async removal
+ - <csr-id-8f3d3f7acf62f0f5c50cc68280214a4119801abd/> node messaging unused async removal
+ - <csr-id-e12479f8db891107215192e4824df92999fb23af/> more async removal from node/mod.rs
+ - <csr-id-4a277b6a290ee7b8ec99dba4e421ac19023fe08e/> unused async in comm/node methods
+ - <csr-id-4773e185302ada27cd08c8dfd04582e7fdaf42aa/> removed unused async at dysfunction
+ - <csr-id-f6ea1da4a57e40a051c7d1ee3b87fe9b442c537b/> cleanup unused async
+ - <csr-id-4e44e373da9ee75b2563b39c26794299e607f48f/> only process each membership decision once
+
+### Other
+
+ - <csr-id-ca5120885e3e28229f298b81edf6090542e0e3f9/> increase dysfunciton test timeout
+
+### Refactor
+
+ - <csr-id-12360a6dcc204153a81adbf842a64dc018c750f9/> reorganise flow control unit tests
+   The unit tests in the `flow_ctrl` module provide coverage for messaging handling in the node. To run
+   each test, a `Node` must constructed, and this involves a lot of tedious setup code.
+   
+   A `network_utils` testing module is introduced to organise the code related to this setup and to
+   also provide a `TestNodeBuilder` to reduce duplication and hopefully make it easier to provide more
+   coverage for message handlers. The doc comments should hopefully make clear how the struct can be
+   used in various different testing contexts. I will also be looking to extend its functionality a bit
+   further when I come to unit testing the message handlers for the DBC spentbook commands.
+   
+   There were a few tests whose setup was too complex to use the builder because they require too much
+   customisation and seem best left alone.
+   
+   A `cmd_utils` module is also introduced to organise the code for processing commands. I again also
+   plan on extending this when considering the DBC tests.
+ - <csr-id-6e65ed8e6c5872bd2c49a1ed2837b1fb16523af1/> remove NetworkKnowledge::chain
+ - <csr-id-24227673b57954b1c53b9b88d714e42c39d8f000/> consolidate AE retry/redirect logic
+ - <csr-id-a9885a8d0e3e59dc630cf605fc9e353e152a5bb3/> expand churn-join-miss check to all AE msgs
+ - <csr-id-2e865cf211a91bef3caaded6310eaddd7e03e997/> pull out common AE update code
+ - <csr-id-c77f686e132f1ac58a113392bc65087bfb650bb9/> inline handle_network_update
+ - <csr-id-a184ebe3f07b86a53c7e8b36b3d86034558a99fb/> handle_network_update doesn't deal with msg
+ - <csr-id-8eebc01007a49f1debaede519324d920e9628d46/> move lines around to prepare for merge
+ - <csr-id-46b6e53d220ebc7f60bb754a4c7ebf4ec7d83e58/> reduce nesting in ae-retry handling
+ - <csr-id-13fc65dc634348740095226e1da0af1866f5b3a8/> reducing nesting in ae-redirect/retry handler
+ - <csr-id-6b1fee8cf3d0b2995f4b81e59dd684547593b5fa/> reduce AE msgs to one msg with a kind field
+ - <csr-id-ed37bb56e5e17d4cba7c1b2165746c193241d618/> move SectionChain into NetworkPrefixMap
+ - <csr-id-a0c89ff0e451d2e5dd13fc29635075097f2c7b94/> do not require node write lock on query
+ - <csr-id-0f07efd9ef0b75de79f27772566b013bc886bcc8/> remove optional field
+ - <csr-id-db4f4d07b155d732ad76d263563d81b5fee535f7/> remove more unused code
+ - <csr-id-ff1a10b4aa2b41b7028949101504a29b52927e71/> simplify send msg
+ - <csr-id-e0fb940b24e87d86fe920095176362f73503ce79/> use sn_dbc::SpentProof API for verifying SpentProofShares
+ - <csr-id-81f5e252501174cb6367474a980b8a2a5da58dc2/> remove one level of indentation
+ - <csr-id-35ebd8e872f9d9db16c42cbe8d61702f9660aece/> expose known keys on network knowledge
+ - <csr-id-042503a7d44f94ed3f0ce482984744e175d7752b/> check for dst location to send to clients instead of msg authority type
+ - <csr-id-3f577d2a6fe70792d7d02e231b599ca3d44a5ed2/> rename gen_section_authority_provider to random_sap
+ - <csr-id-a1d74e894975d67f3293dbb0db73f6b62b9c378a/> mv join handler to membership module
+ - <csr-id-3a74f59269f57a50a14de9a35f7e725014ec8f0e/> pull inner loop of join handling into helper
+ - <csr-id-a727daea6e5a01a24c9bcdbeef033d0622f4ba39/> allow more log layers in future
+ - <csr-id-1db6648954987ebce4c91f8e29bbec4e54b75edf/> remove cfg() directives
+   And use a vec to collect log layers that are eventually added to a
+   subscriber/registry.
+ - <csr-id-fa7dfa342e90acd0a681110e149df4400a8f392e/> split logging init into functions
+ - <csr-id-28c0a1063194eea66910c7d18653c558595ec17e/> further modularize logging
+ - <csr-id-f467d5f45452244d2f8e3e81910b76d0d4b0f7cb/> move log rotater into own module
+ - <csr-id-f45afa221a18638bbbbad5cf6121a68825ed3ff3/> move sn_node binary into own dir
+ - <csr-id-9895a2b9e82bdbf110a9805972290841860d1a49/> remove one dir layer
+ - <csr-id-1c7b47f48635bb7b0a8a13d01bb41b148e343ce8/> extract test only used fns
+ - <csr-id-f06a0260b058519ec858abf654cbce102eb00147/> remove one layer of indirection
+ - <csr-id-5c82df633e7c062fdf761a8e6e0a7ae8d26cc73a/> setup step for tests to reissue a set of DBCs from genesis only once
+ - <csr-id-24676dadb771bbd966b6a3e1aa53d1c736c90627/> replace sled with filestore for storing registers
+ - <csr-id-93614b18b4316af04ab8c74358a5c86510590b85/> make chunk_store accept all datatypes
+
+### Chore (BREAKING)
+
+ - <csr-id-d3a05a728be8752ea9ebff4e38e7c4c85e5db09b/> having spent proofs and Txs within SpentbookCmd::Send msg to be a set instead of a vec
+
+### Refactor (BREAKING)
+
+ - <csr-id-96da1171d0cac240f772e5d6a15c56f63441b4b3/> nodes to cache their own individual prefix map file on disk
+ - <csr-id-dd2eb21352223f6340064e0021f4a7df402cd5c9/> removing Token from sn_interfaces::type as it is now exposed by sn_dbc
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 157 commits contributed to the release over the course of 29 calendar days.
+ - 31 days passed between releases.
+ - 153 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - add README docs for join process and traceroute ([`1af888c`](https://github.com/maidsafe/safe_network/commit/1af888c09b2f5a49d04a7068b7f948cf096da8f3))
+    - print full error during node startup fail ([`aea5782`](https://github.com/maidsafe/safe_network/commit/aea5782e583ae353566abb0f10d94132bd9b14fe))
+    - reorganise flow control unit tests ([`12360a6`](https://github.com/maidsafe/safe_network/commit/12360a6dcc204153a81adbf842a64dc018c750f9))
+    - remove wiremsg.priority as uneeded ([`6d60525`](https://github.com/maidsafe/safe_network/commit/6d60525874dc4efeb658433f1f253d54e0cba2d4))
+    - modify the join process timeout mechanism ([`f531c62`](https://github.com/maidsafe/safe_network/commit/f531c62b0d82f14b6aa6df4f1f82bcd0ce95b9ce))
+    - reduce AE sleep further ([`52ed230`](https://github.com/maidsafe/safe_network/commit/52ed23049c83e0da0b4dfefa7b30713a52f3c73a))
+    - avoid logging short sleeps ([`68d28d5`](https://github.com/maidsafe/safe_network/commit/68d28d5591c5ccc6a241832f9b7855827958372a))
+    - reduce to 5s ([`26ad757`](https://github.com/maidsafe/safe_network/commit/26ad7578f0d224528a1be6509453f695f6530eb4))
+    - gossip all votes and start timer after first vote ([`8bf0aee`](https://github.com/maidsafe/safe_network/commit/8bf0aeed0af193322f341bd718f7a5f84fa2d02f))
+    - misc. fixes ([`42bde15`](https://github.com/maidsafe/safe_network/commit/42bde15e9a96dbe759575d4bccf4f769e13a695d))
+    - remove unused severity; refactor weighted score ([`3cf9033`](https://github.com/maidsafe/safe_network/commit/3cf903367bfcd805ceff2f2508cd2b12eddc3ca5))
+    - Add braces around expected age calc; use membership ([`a5afec8`](https://github.com/maidsafe/safe_network/commit/a5afec84bc687327df3951eefc6c566c898f2332))
+    - remove NetworkKnowledge::chain ([`6e65ed8`](https://github.com/maidsafe/safe_network/commit/6e65ed8e6c5872bd2c49a1ed2837b1fb16523af1))
+    - serialize NetworkPrefixMap into JSON ([`29de67f`](https://github.com/maidsafe/safe_network/commit/29de67f1e3583eab867d517cb50ed2e404bd63fd))
+    - nodes to cache their own individual prefix map file on disk ([`96da117`](https://github.com/maidsafe/safe_network/commit/96da1171d0cac240f772e5d6a15c56f63441b4b3))
+    - consolidate AE retry/redirect logic ([`2422767`](https://github.com/maidsafe/safe_network/commit/24227673b57954b1c53b9b88d714e42c39d8f000))
+    - expand churn-join-miss check to all AE msgs ([`a9885a8`](https://github.com/maidsafe/safe_network/commit/a9885a8d0e3e59dc630cf605fc9e353e152a5bb3))
+    - pull out common AE update code ([`2e865cf`](https://github.com/maidsafe/safe_network/commit/2e865cf211a91bef3caaded6310eaddd7e03e997))
+    - inline handle_network_update ([`c77f686`](https://github.com/maidsafe/safe_network/commit/c77f686e132f1ac58a113392bc65087bfb650bb9))
+    - handle_network_update doesn't deal with msg ([`a184ebe`](https://github.com/maidsafe/safe_network/commit/a184ebe3f07b86a53c7e8b36b3d86034558a99fb))
+    - move lines around to prepare for merge ([`8eebc01`](https://github.com/maidsafe/safe_network/commit/8eebc01007a49f1debaede519324d920e9628d46))
+    - reduce nesting in ae-retry handling ([`46b6e53`](https://github.com/maidsafe/safe_network/commit/46b6e53d220ebc7f60bb754a4c7ebf4ec7d83e58))
+    - reducing nesting in ae-redirect/retry handler ([`13fc65d`](https://github.com/maidsafe/safe_network/commit/13fc65dc634348740095226e1da0af1866f5b3a8))
+    - reduce AE msgs to one msg with a kind field ([`6b1fee8`](https://github.com/maidsafe/safe_network/commit/6b1fee8cf3d0b2995f4b81e59dd684547593b5fa))
+    - semantic tweaks ([`a8b0631`](https://github.com/maidsafe/safe_network/commit/a8b0631a396ac96e000db22141ffd5d83fd7e987))
+    - log with unique id around sleep ([`f817fa5`](https://github.com/maidsafe/safe_network/commit/f817fa5917f48faaeb3714c7faeaee5392b82f55))
+    - gradually slowdown when send to peer too fast ([`98279c2`](https://github.com/maidsafe/safe_network/commit/98279c2243ec2c5351947e26650d64dc5bf81797))
+    - removing Token from sn_interfaces::type as it is now exposed by sn_dbc ([`dd2eb21`](https://github.com/maidsafe/safe_network/commit/dd2eb21352223f6340064e0021f4a7df402cd5c9))
+    - make cmd ctrl response quicker ([`0d5ddf0`](https://github.com/maidsafe/safe_network/commit/0d5ddf04001fc65c05865cf2a2ea08cd3cd45615))
+    - organise usings, cleanup ([`8242f2f`](https://github.com/maidsafe/safe_network/commit/8242f2f1035b1c0718e53954951badffa30f3393))
+    - use matches! macros, minor refactoring ([`848dba4`](https://github.com/maidsafe/safe_network/commit/848dba48e5959d0b9cfe182fde2f12ede71ba9c2))
+    - remove unused async/await ([`35483b3`](https://github.com/maidsafe/safe_network/commit/35483b3f322eeea2c10427e94e4750a8269811c0))
+    - remove NetworkPrefxiMap::genesis_key, NetworkKnowledge::genesis_key ([`820fcc9`](https://github.com/maidsafe/safe_network/commit/820fcc9a77f756fca308f247c3ea1b82f65d30b9))
+    - fix deadlock introduced after removal of Arc from NetworkPrefixMap ([`0ed5075`](https://github.com/maidsafe/safe_network/commit/0ed5075304b090597f7760fb51c4a33435a853f1))
+    - remove RwLock from NetworkPrefixMap ([`afcf083`](https://github.com/maidsafe/safe_network/commit/afcf083469c732f10c7c80f4a45e4c33ab111101))
+    - move SectionChain into NetworkPrefixMap ([`ed37bb5`](https://github.com/maidsafe/safe_network/commit/ed37bb56e5e17d4cba7c1b2165746c193241d618))
+    - refactor CmdCtrl, naming and remove retries ([`72db95a`](https://github.com/maidsafe/safe_network/commit/72db95a092ea33f29e77b6101b16e219fadd47ab))
+    - rename traceroute fns ([`aafc560`](https://github.com/maidsafe/safe_network/commit/aafc560d3b3b1e375f7be224e0e63a3b567bbd86))
+    - traceroute update after cmds flow rebase ([`7394030`](https://github.com/maidsafe/safe_network/commit/7394030fe5aeeb88f4524d2da2a71e36334c831d))
+    - make traceroute a default feature ([`73dc9b4`](https://github.com/maidsafe/safe_network/commit/73dc9b4a1757393270e62d265328bab0c0aa3b35))
+    - improve Display, Debug impl for Traceroute ([`0a653e4`](https://github.com/maidsafe/safe_network/commit/0a653e4becc4a8e14ffd6d0752cf035430067ce9))
+    - improve traceroute readability and other improvements ([`9789797`](https://github.com/maidsafe/safe_network/commit/9789797e3f773285f23bd22957fe45a67aabec24))
+    - add traceroute for AE system messages ([`8e626f9`](https://github.com/maidsafe/safe_network/commit/8e626f9fabbb07a126199ea5481e2ac524cbae0d))
+    - make the content explicit ([`366719f`](https://github.com/maidsafe/safe_network/commit/366719f9e158fb35093382739d48cdb8dac65b60))
+    - use correct data address type ([`cebf37e`](https://github.com/maidsafe/safe_network/commit/cebf37ea8ef44c51ce84646a83a5d1e6dcab3e7a))
+    - cleanup unnecessary options and results ([`db22c6c`](https://github.com/maidsafe/safe_network/commit/db22c6c8c1aedb347bea52199a5673695eff86f8))
+    - reduce file db error logs ([`2809ed1`](https://github.com/maidsafe/safe_network/commit/2809ed1177c416f933f3869bd11607c4e5e6a908))
+    - add actual id of parent ([`ec62534`](https://github.com/maidsafe/safe_network/commit/ec625349494b267d24c80fd4c8b176b4524f48cd))
+    - do not require node write lock on query ([`a0c89ff`](https://github.com/maidsafe/safe_network/commit/a0c89ff0e451d2e5dd13fc29635075097f2c7b94))
+    - remove optional field ([`0f07efd`](https://github.com/maidsafe/safe_network/commit/0f07efd9ef0b75de79f27772566b013bc886bcc8))
+    - remove more unused code ([`db4f4d0`](https://github.com/maidsafe/safe_network/commit/db4f4d07b155d732ad76d263563d81b5fee535f7))
+    - clarify fn signatures ([`08af2a6`](https://github.com/maidsafe/safe_network/commit/08af2a6ac3485a696d2a1e799af588943f207e6b))
+    - simplify send msg ([`ff1a10b`](https://github.com/maidsafe/safe_network/commit/ff1a10b4aa2b41b7028949101504a29b52927e71))
+    - Merge #1427 ([`949ee11`](https://github.com/maidsafe/safe_network/commit/949ee111717c8f07487f3f4db6fbc0043583916d))
+    - delete commented out tests ([`080f9ef`](https://github.com/maidsafe/safe_network/commit/080f9ef83005ebda9e1c96b228f3d5096fd79b81))
+    - use sn_dbc::SpentProof API for verifying SpentProofShares ([`e0fb940`](https://github.com/maidsafe/safe_network/commit/e0fb940b24e87d86fe920095176362f73503ce79))
+    - create query cmd for healthcheck ([`22f4f15`](https://github.com/maidsafe/safe_network/commit/22f4f1512da8f9a2245addf379477823364edd6c))
+    - dont send health checks as an adult ([`1b37f4b`](https://github.com/maidsafe/safe_network/commit/1b37f4bbf266c21d795bff6b4e6f2e1885405697))
+    - simplify the send funcitonality ([`feaf3ef`](https://github.com/maidsafe/safe_network/commit/feaf3ef88b140a0f530082e851831b736320de59))
+    - use Cmd::TrackDysf in read_data_from_adults ([`7157ed2`](https://github.com/maidsafe/safe_network/commit/7157ed27ddfc0d987272f1285b44faa9709a4c8f))
+    - remove RwLock over Cache type ([`2ea0695`](https://github.com/maidsafe/safe_network/commit/2ea069543dbe6ffebac663d4d8d7e0bc33cfc566))
+    - remove write lock around non query service msg handling ([`322c698`](https://github.com/maidsafe/safe_network/commit/322c69845e2e14eb029fdbebb24e08063a2323b0))
+    - retry twice if it fails spending inputs when reissuing DBCs ([`005b84c`](https://github.com/maidsafe/safe_network/commit/005b84cab0ca91762cbedd208b022d4c4983fe26))
+    - remove the write lock on node while validating msgs ([`5a5f0f4`](https://github.com/maidsafe/safe_network/commit/5a5f0f4608c27f463178f4a560f1f9b4c020e764))
+    - Revert "feat: make traceroute default for now" ([`e9b97c7`](https://github.com/maidsafe/safe_network/commit/e9b97c72b860053285ba866b098937f6b25d99bf))
+    - having spent proofs and Txs within SpentbookCmd::Send msg to be a set instead of a vec ([`d3a05a7`](https://github.com/maidsafe/safe_network/commit/d3a05a728be8752ea9ebff4e38e7c4c85e5db09b))
+    - make Sign of SystemMsgs higher prio as this could hold them back before sending ([`83a3a98`](https://github.com/maidsafe/safe_network/commit/83a3a98a6972c9a1824e41cb87325b037b65938c))
+    - consolidate join / leave into decision handling ([`47179e6`](https://github.com/maidsafe/safe_network/commit/47179e695a7f351d9298c5bdbea006abb26b8e89))
+    - make traceroute default for now ([`175d1b9`](https://github.com/maidsafe/safe_network/commit/175d1b909dff8c6729ac7f156ce1d0d22be8cc12))
+    - log parent job id during processing ([`9c855c1`](https://github.com/maidsafe/safe_network/commit/9c855c187465a0594cf18fb359a082742593a4d4))
+    - simplify data replication msg sending ([`f8b6ff0`](https://github.com/maidsafe/safe_network/commit/f8b6ff0edd7a64389439081b6306296402887ab1))
+    - temporarily allow DBC spent proofs singed by sections keys unknown to the Elder ([`c6fa773`](https://github.com/maidsafe/safe_network/commit/c6fa7735a5e48a4caa6ee3aac000785a9da9413a))
+    - make `&mut self` methods `&self` ([`302fb95`](https://github.com/maidsafe/safe_network/commit/302fb954360521d40efab0e26fd31f8278a74755))
+    - removed unused lru_cache module ([`70f3ecc`](https://github.com/maidsafe/safe_network/commit/70f3ecc367ca9450be038f8ff806f40c324d1b00))
+    - only do connectivity test for failed sends via dysfunction ([`5a83a4f`](https://github.com/maidsafe/safe_network/commit/5a83a4ff08b7a3c2be0e3532589d209e72367d92))
+    - Cleanup non-joined member sessions, regardless of connected state ([`8efbd96`](https://github.com/maidsafe/safe_network/commit/8efbd96a5fd3907ace5ca6ac282027595fefd8ef))
+    - improve the accuracy of data_storage bench tests ([`f200909`](https://github.com/maidsafe/safe_network/commit/f200909516739769d087b20712a33b5047858ba9))
+    - remove one level of indentation ([`81f5e25`](https://github.com/maidsafe/safe_network/commit/81f5e252501174cb6367474a980b8a2a5da58dc2))
+    - reflect the semantics not the type ([`ea490dd`](https://github.com/maidsafe/safe_network/commit/ea490ddf749ac9e0c7962c3c21c053663e6b6ee7))
+    - expose known keys on network knowledge ([`35ebd8e`](https://github.com/maidsafe/safe_network/commit/35ebd8e872f9d9db16c42cbe8d61702f9660aece))
+    - check for dst location to send to clients instead of msg authority type ([`042503a`](https://github.com/maidsafe/safe_network/commit/042503a7d44f94ed3f0ce482984744e175d7752b))
+    - remove unused get mut access ([`6ca512e`](https://github.com/maidsafe/safe_network/commit/6ca512e7adc6681bc85122847fa8ac08550cfb09))
+    - whitespace + typo fix ([`bf2902c`](https://github.com/maidsafe/safe_network/commit/bf2902c18b900b8b4a8abae5f966d1e08d547910))
+    - disable rejoins ([`a5028c5`](https://github.com/maidsafe/safe_network/commit/a5028c551d1b3db2c4c912c2897490e9a4b34a0d))
+    - reduce re-join tests to one case ([`b492cc2`](https://github.com/maidsafe/safe_network/commit/b492cc25cfadf7dd3aaf3584cd5dbbd0dc8532ce))
+    - prevent rejoins of archived nodes ([`1694c15`](https://github.com/maidsafe/safe_network/commit/1694c1566ac562216447eb491cc3b2b00b0c5979))
+    - update rejoin tests to test proposal validation ([`6dbc032`](https://github.com/maidsafe/safe_network/commit/6dbc032907bcb1fc6e3e9034f794643097260e17))
+    - rename gen_section_authority_provider to random_sap ([`3f577d2`](https://github.com/maidsafe/safe_network/commit/3f577d2a6fe70792d7d02e231b599ca3d44a5ed2))
+    - mv join handler to membership module ([`a1d74e8`](https://github.com/maidsafe/safe_network/commit/a1d74e894975d67f3293dbb0db73f6b62b9c378a))
+    - pull inner loop of join handling into helper ([`3a74f59`](https://github.com/maidsafe/safe_network/commit/3a74f59269f57a50a14de9a35f7e725014ec8f0e))
+    - join approval has membership decision ([`df8ea32`](https://github.com/maidsafe/safe_network/commit/df8ea32f9218d344cd1f291359969b38a05b4642))
+    - Revert "chore: Cleanup non-joined member sessions, regardless of connected state." ([`7d12399`](https://github.com/maidsafe/safe_network/commit/7d12399edec6c1191c521528c1d569afc96bca99))
+    - upgrade blsttc to 7.0.0 ([`6f03b93`](https://github.com/maidsafe/safe_network/commit/6f03b93bd2d02f0ffe54b69fbf25070fbe64eab0))
+    - support the traceroute feature flag ([`7fc6231`](https://github.com/maidsafe/safe_network/commit/7fc6231f241bcae4447839989b712b1b410a2523))
+    - add intermitent health checks ([`7f40e89`](https://github.com/maidsafe/safe_network/commit/7f40e89f9c0aa767bd372278e1d50de5a8e7869b))
+    - adds unique conn info validation to membership ([`19bb0b9`](https://github.com/maidsafe/safe_network/commit/19bb0b99afee53dd7b6e109919249b25e0a55e48))
+    - avoid un-necessary dysfunction log_dkg_issue ([`e1a0474`](https://github.com/maidsafe/safe_network/commit/e1a0474e78fd00a881b13ad036c1aabc9ce2f02a))
+    - Cleanup non-joined member sessions, regardless of connected state. ([`934bf6c`](https://github.com/maidsafe/safe_network/commit/934bf6cbc86e252eb3859c757a0b66c02f7826d9))
+    - impl traceroute for client cmds and cmd responses ([`4f2cf26`](https://github.com/maidsafe/safe_network/commit/4f2cf267ee030e5924a2fa999a2a46dbc072d208))
+    - improve traceroute redability and resolve clippy ([`214aded`](https://github.com/maidsafe/safe_network/commit/214adedc31bca576c7f28ff52a1f4ff0a2676757))
+    - impl traceroute feature to trace a message's flow in the network ([`a6fb1fc`](https://github.com/maidsafe/safe_network/commit/a6fb1fc516a9ef6dae7aa236f3dd440d50697ae2))
+    - fix outdated comm tests ([`893b4af`](https://github.com/maidsafe/safe_network/commit/893b4af340b0ced1a2b38dda07bd82cf833be776))
+    - add OTLP support to sn_node bin ([`01ea9c0`](https://github.com/maidsafe/safe_network/commit/01ea9c0bdb88da4f181d8f1638f2f2ad692d0ca3))
+    - allow more log layers in future ([`a727dae`](https://github.com/maidsafe/safe_network/commit/a727daea6e5a01a24c9bcdbeef033d0622f4ba39))
+    - remove cfg() directives ([`1db6648`](https://github.com/maidsafe/safe_network/commit/1db6648954987ebce4c91f8e29bbec4e54b75edf))
+    - split logging init into functions ([`fa7dfa3`](https://github.com/maidsafe/safe_network/commit/fa7dfa342e90acd0a681110e149df4400a8f392e))
+    - further modularize logging ([`28c0a10`](https://github.com/maidsafe/safe_network/commit/28c0a1063194eea66910c7d18653c558595ec17e))
+    - move log rotater into own module ([`f467d5f`](https://github.com/maidsafe/safe_network/commit/f467d5f45452244d2f8e3e81910b76d0d4b0f7cb))
+    - move sn_node binary into own dir ([`f45afa2`](https://github.com/maidsafe/safe_network/commit/f45afa221a18638bbbbad5cf6121a68825ed3ff3))
+    - broken links ([`e3c9099`](https://github.com/maidsafe/safe_network/commit/e3c90998e1abd10768e861370a65a934f52e2ec3))
+    - increase Send priority, and tweak depending on DstLocation ([`feaca15`](https://github.com/maidsafe/safe_network/commit/feaca15b7c44297c16a4665ceec738226bb860ba))
+    - remove one dir layer ([`9895a2b`](https://github.com/maidsafe/safe_network/commit/9895a2b9e82bdbf110a9805972290841860d1a49))
+    - extract test only used fns ([`1c7b47f`](https://github.com/maidsafe/safe_network/commit/1c7b47f48635bb7b0a8a13d01bb41b148e343ce8))
+    - reduce number of Send retries in PeerSession ([`7d060f0`](https://github.com/maidsafe/safe_network/commit/7d060f0e92e3b250e3fe1e0523aa0c30b439e0be))
+    - remove SendMsgDeliveryGroup Cmd ([`7a675f4`](https://github.com/maidsafe/safe_network/commit/7a675f4889c4ef01b9040773184ab2e0ed78b208))
+    - use SendMsg for send_node_msg_to_nodes ([`c3778cd`](https://github.com/maidsafe/safe_network/commit/c3778cd77e0c9cbc407449afe713ff7cdb4b9909))
+    - remove redundant generation field ([`f0d1abf`](https://github.com/maidsafe/safe_network/commit/f0d1abf6dd8731310b7749cd6cc7077886215997))
+    - remove one layer of indirection ([`f06a026`](https://github.com/maidsafe/safe_network/commit/f06a0260b058519ec858abf654cbce102eb00147))
+    - drop RwLock guards after job is done ([`640b64d`](https://github.com/maidsafe/safe_network/commit/640b64d2b5f19df5f5439a8fce31a848a47526cd))
+    - setup step for tests to reissue a set of DBCs from genesis only once ([`5c82df6`](https://github.com/maidsafe/safe_network/commit/5c82df633e7c062fdf761a8e6e0a7ae8d26cc73a))
+    - increase CleanUpPeerLinks prio ([`fba2f76`](https://github.com/maidsafe/safe_network/commit/fba2f76ec23a00ca1da857e63af160a11904288c))
+    - fix benchamrking groups in data_storage bench ([`5a121c1`](https://github.com/maidsafe/safe_network/commit/5a121c19d395130e40df0134be36e4264b60972a))
+    - update data_storage benchmark ranges ([`67c82ca`](https://github.com/maidsafe/safe_network/commit/67c82cae6654423cae3567d8417a442a40ce1e5e))
+    - re-enable registers benchmark and tidy sled residue ([`1e8180c`](https://github.com/maidsafe/safe_network/commit/1e8180c23fab27ac92c93f201efd050cff00db10))
+    - replace sled with filestore for storing registers ([`24676da`](https://github.com/maidsafe/safe_network/commit/24676dadb771bbd966b6a3e1aa53d1c736c90627))
+    - make chunk_store accept all datatypes ([`93614b1`](https://github.com/maidsafe/safe_network/commit/93614b18b4316af04ab8c74358a5c86510590b85))
+    - Merge #1324 #1345 #1346 ([`f664d79`](https://github.com/maidsafe/safe_network/commit/f664d797b56e7cbf03893c98d6c27d9c6d882be4))
+    - reduce service msg response SendMsg cmds ([`900fa8c`](https://github.com/maidsafe/safe_network/commit/900fa8c4803e9e45a1471a32fb4fe5b8cdd5112b))
+    - tweak some WireMsg.serialize calls to minimize them ([`a95be62`](https://github.com/maidsafe/safe_network/commit/a95be6277a9ee8d66eccd40711392325fac986e2))
+    - update for the split of HandleCmd ([`38d25d6`](https://github.com/maidsafe/safe_network/commit/38d25d6df71e3bb71e8efda50a4bf64345f69f81))
+    - validate w low prio before handling ([`c6999a9`](https://github.com/maidsafe/safe_network/commit/c6999a92d06f275f7506a24492bec50042466459))
+    - update for the split of HandleCmd ([`ae38fdc`](https://github.com/maidsafe/safe_network/commit/ae38fdce6499d8245025d7bd82fa6c583f04060d))
+    - validate w low prio before handling ([`6f781b9`](https://github.com/maidsafe/safe_network/commit/6f781b96da745839206352ae02c18b759b49f1f2))
+    - use timestamp for log files ([`a856d78`](https://github.com/maidsafe/safe_network/commit/a856d788131ef85414ee1f42a868abcbbfc0d2b6))
+    - unused async in CLI ([`6d237e5`](https://github.com/maidsafe/safe_network/commit/6d237e5e7d8306cb955f436910aa01ed7221cd84))
+    - unused async in node/dkg etc ([`78be9fb`](https://github.com/maidsafe/safe_network/commit/78be9fb24cf66d9f8f06ac31895302eae875661e))
+    - more node messaging async removal ([`abddc53`](https://github.com/maidsafe/safe_network/commit/abddc53df9fbbd5c35b6ce473646f3183bf423df))
+    - formatting with cargo fmt ([`00fae4d`](https://github.com/maidsafe/safe_network/commit/00fae4d5fd5dbad5696888f0c796fbd39b7e49ed))
+    - node messaging unused async removal ([`8f3d3f7`](https://github.com/maidsafe/safe_network/commit/8f3d3f7acf62f0f5c50cc68280214a4119801abd))
+    - more async removal from node/mod.rs ([`e12479f`](https://github.com/maidsafe/safe_network/commit/e12479f8db891107215192e4824df92999fb23af))
+    - unused async in comm/node methods ([`4a277b6`](https://github.com/maidsafe/safe_network/commit/4a277b6a290ee7b8ec99dba4e421ac19023fe08e))
+    - removed unused async at dysfunction ([`4773e18`](https://github.com/maidsafe/safe_network/commit/4773e185302ada27cd08c8dfd04582e7fdaf42aa))
+    - cleanup unused async ([`f6ea1da`](https://github.com/maidsafe/safe_network/commit/f6ea1da4a57e40a051c7d1ee3b87fe9b442c537b))
+    - only process each membership decision once ([`4e44e37`](https://github.com/maidsafe/safe_network/commit/4e44e373da9ee75b2563b39c26794299e607f48f))
+    - increase wait on ci & decrease delay before node retry ([`549c4b1`](https://github.com/maidsafe/safe_network/commit/549c4b169547e620471c416c1506afc6e3ee265b))
+    - remove locking from section key cache ([`847db2c`](https://github.com/maidsafe/safe_network/commit/847db2c487cd102af0cf9a477b4c1b65fc2c8aa6))
+    - remove refcell on NetworkKnowledge::all_section_chains ([`0a5593b`](https://github.com/maidsafe/safe_network/commit/0a5593b0512d6f059c6a8003634b07e7d2d3e514))
+    - remove refcell around NetworkKnowledge::signed_sap ([`707b80c`](https://github.com/maidsafe/safe_network/commit/707b80c3526ae727a7e91330dc386cdb41c51f4c))
+    - remove refcell on NetworkKnowledge::chain ([`9bd6ae2`](https://github.com/maidsafe/safe_network/commit/9bd6ae20c1207f99420093fd5c9f4eb53836e3c1))
+    - remove awaits from tests as well ([`31d9f9f`](https://github.com/maidsafe/safe_network/commit/31d9f9f99b4e166986b8e51c3d41e0eac55621a4))
+    - remove locking around signature aggregation ([`30a7028`](https://github.com/maidsafe/safe_network/commit/30a7028dd702e2f6575e299a609a2416439cbaed))
+    - remove unused async ([`dedec48`](https://github.com/maidsafe/safe_network/commit/dedec486f85c1cf6cf2d538238f32e826e08da0a))
+    - remove logs in looping data replication ([`3bef795`](https://github.com/maidsafe/safe_network/commit/3bef795923863d977f70c95647444ebbc97c5cf5))
+    - increase dysfunciton test timeout ([`ca51208`](https://github.com/maidsafe/safe_network/commit/ca5120885e3e28229f298b81edf6090542e0e3f9))
+    - relax when we track DkgIssues ([`f142bbb`](https://github.com/maidsafe/safe_network/commit/f142bbb0030233add4808427a2819ca386fef503))
+    - Tweak dysf interval, reducing to report on issues more rapidly ([`e39917d`](https://github.com/maidsafe/safe_network/commit/e39917d0635a071625f7961ce6d40cb44cc65da0))
+    - logging sn_consensus in CI, tweak section min and max elder age ([`879678e`](https://github.com/maidsafe/safe_network/commit/879678e986a722d216ee9a4f37e8ae398221a394))
+</details>
+
 ## v0.64.3 (2022-07-12)
+
+<csr-id-0dcd4917c9a7bfbf6706f3b8a18e68d010c9b50d/>
+<csr-id-5523e237464a76ef682ae2dbc183692502018682/>
 
 ### Other
 
  - <csr-id-0dcd4917c9a7bfbf6706f3b8a18e68d010c9b50d/> unit tests for JoiningAsRelocated
+
+### Chore
+
+ - <csr-id-5068b155ce42f0902f9f3847e8069dc415910f34/> sn_node-0.64.3
 
 ### Refactor
 
@@ -23,9 +479,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
+ - 3 commits contributed to the release.
  - 1 day passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -35,6 +491,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_node-0.64.3 ([`5068b15`](https://github.com/maidsafe/safe_network/commit/5068b155ce42f0902f9f3847e8069dc415910f34))
     - unit tests for JoiningAsRelocated ([`0dcd491`](https://github.com/maidsafe/safe_network/commit/0dcd4917c9a7bfbf6706f3b8a18e68d010c9b50d))
     - move core one level up ([`5523e23`](https://github.com/maidsafe/safe_network/commit/5523e237464a76ef682ae2dbc183692502018682))
 </details>
@@ -45,6 +502,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-49e223e2c07695b4c63e253ba19ce43ec24d7112/>
 <csr-id-5cff2c5325a854f04788f9111439bca75b21c60f/>
 <csr-id-dce3ba214354ad007900efce78273670cfb725d5/>
+<csr-id-34bd9bd01a3f042c35e0432df2f0cfcebc32a8a8/>
 
 ### Chore
 

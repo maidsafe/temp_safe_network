@@ -8,7 +8,7 @@ license = "GPL-3.0"
 name = "sn_interface"
 readme = "README.md"
 repository = "https://github.com/maidsafe/safe_network"
-version = "0.8.2"
+version = "0.9.0"
 
 [features]
 default = ["chunks", "registers", "spentbook", "traceroute"]

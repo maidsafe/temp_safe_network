@@ -5,7 +5,87 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.8.0 (2022-08-14)
+
+### Chore
+
+ - <csr-id-a4a39b421103af7c143280ad3860b3cbd3016386/> further tweak dysf, reduce score by std dev for better avg.
+   Also adjusts tests to this, which now feels a bit saner too
+ - <csr-id-3cf903367bfcd805ceff2f2508cd2b12eddc3ca5/> remove unused severity; refactor weighted score
+   Prev weighted score related everything to the std_deviation, but this
+   has the effect of nullifying outliers and decreasing the impact of
+   weighting.
+   
+   Instead we opt for a simple "threshold" score, above which, we're
+   dysfunctional. So the sum of all issues tracked is used, and if
+   we reach above this point, our node is deemed dysfunctional.
+ - <csr-id-29de67f1e3583eab867d517cb50ed2e404bd63fd/> serialize NetworkPrefixMap into JSON
+ - <csr-id-db22c6c8c1aedb347bea52199a5673695eff86f8/> cleanup unnecessary options and results
+ - <csr-id-7c109a0e22b2032ad5ad3b10f828f855091bec67/> rename DysfunctionDetection::adults to nodes
+ - <csr-id-2f38be726cf493c89d452b6faa50ab8284048798/> relax knowledge penalty.
+   We've seen some CI nodes being booted due to knowledge issues, so relaxing
+   this should help there'
+ - <csr-id-bbb77f0c34e9d4c263be1c5362f1115ecee1da57/> relax knowledge penalty.
+   We've seen some CI nodes being booted due to knowledge issues, so relaxing
+   this should help there'
+ - <csr-id-31d9f9f99b4e166986b8e51c3d41e0eac55621a4/> remove awaits from tests as well
+ - <csr-id-dedec486f85c1cf6cf2d538238f32e826e08da0a/> remove unused async
+ - <csr-id-e39917d0635a071625f7961ce6d40cb44cc65da0/> Tweak dysf interval, reducing to report on issues more rapidly
+   If not, we can only ever propose one node for a membership change
+   (lost), every 30s... which may not succeed under churn...
+
+### New Features
+
+ - <csr-id-b2c6b2164fbf6679edea0157217dc946d5f9d318/> add AeProbe dysfunction. Refactor score calculation
+
+### Bug Fixes
+
+ - <csr-id-4a17a1dcf858b5daf96e5b9f69ac33c10a988c27/> make the diff proportional to mean to be reported
+ - <csr-id-3befae39e3dbc93c4187092e7abe3c6e21893184/> newly inserted operation shall not count towards issue
+ - <csr-id-4773e185302ada27cd08c8dfd04582e7fdaf42aa/> removed unused async at dysfunction
+
+### Refactor
+
+ - <csr-id-9fde534277f359dfa0a1d91d917864776edb5138/> reissuing DBCs for all sn_cli tests only once as a setup stage
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 15 commits contributed to the release over the course of 29 calendar days.
+ - 36 days passed between releases.
+ - 15 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - further tweak dysf, reduce score by std dev for better avg. ([`a4a39b4`](https://github.com/maidsafe/safe_network/commit/a4a39b421103af7c143280ad3860b3cbd3016386))
+    - remove unused severity; refactor weighted score ([`3cf9033`](https://github.com/maidsafe/safe_network/commit/3cf903367bfcd805ceff2f2508cd2b12eddc3ca5))
+    - add AeProbe dysfunction. Refactor score calculation ([`b2c6b21`](https://github.com/maidsafe/safe_network/commit/b2c6b2164fbf6679edea0157217dc946d5f9d318))
+    - serialize NetworkPrefixMap into JSON ([`29de67f`](https://github.com/maidsafe/safe_network/commit/29de67f1e3583eab867d517cb50ed2e404bd63fd))
+    - cleanup unnecessary options and results ([`db22c6c`](https://github.com/maidsafe/safe_network/commit/db22c6c8c1aedb347bea52199a5673695eff86f8))
+    - make the diff proportional to mean to be reported ([`4a17a1d`](https://github.com/maidsafe/safe_network/commit/4a17a1dcf858b5daf96e5b9f69ac33c10a988c27))
+    - rename DysfunctionDetection::adults to nodes ([`7c109a0`](https://github.com/maidsafe/safe_network/commit/7c109a0e22b2032ad5ad3b10f828f855091bec67))
+    - newly inserted operation shall not count towards issue ([`3befae3`](https://github.com/maidsafe/safe_network/commit/3befae39e3dbc93c4187092e7abe3c6e21893184))
+    - reissuing DBCs for all sn_cli tests only once as a setup stage ([`9fde534`](https://github.com/maidsafe/safe_network/commit/9fde534277f359dfa0a1d91d917864776edb5138))
+    - relax knowledge penalty. ([`2f38be7`](https://github.com/maidsafe/safe_network/commit/2f38be726cf493c89d452b6faa50ab8284048798))
+    - relax knowledge penalty. ([`bbb77f0`](https://github.com/maidsafe/safe_network/commit/bbb77f0c34e9d4c263be1c5362f1115ecee1da57))
+    - removed unused async at dysfunction ([`4773e18`](https://github.com/maidsafe/safe_network/commit/4773e185302ada27cd08c8dfd04582e7fdaf42aa))
+    - remove awaits from tests as well ([`31d9f9f`](https://github.com/maidsafe/safe_network/commit/31d9f9f99b4e166986b8e51c3d41e0eac55621a4))
+    - remove unused async ([`dedec48`](https://github.com/maidsafe/safe_network/commit/dedec486f85c1cf6cf2d538238f32e826e08da0a))
+    - Tweak dysf interval, reducing to report on issues more rapidly ([`e39917d`](https://github.com/maidsafe/safe_network/commit/e39917d0635a071625f7961ce6d40cb44cc65da0))
+</details>
+
 ## v0.7.1 (2022-07-07)
+
+<csr-id-46262268fc167c05963e5b7bd6261310496e2379/>
+<csr-id-6b574bd53f7e51839380b7be914dbab015726d1e/>
+<csr-id-2f6fff23a29cc4f04415a9a606fec88167551268/>
 
 ### Chore
 
@@ -18,13 +98,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-6b574bd53f7e51839380b7be914dbab015726d1e/> Remove registerStorage cache
  - <csr-id-2f6fff23a29cc4f04415a9a606fec88167551268/> remove dysfunction arc/rwlock
 
+### Chore
+
+ - <csr-id-2b00cec961561281f6b927e13e501342843f6a0f/> sn_interface-0.8.1/sn_dysfunction-0.7.1/sn_client-0.68.1/sn_node-0.64.1/sn_api-0.66.1/sn_cli-0.59.1
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 5 commits contributed to the release over the course of 1 calendar day.
+ - 6 commits contributed to the release over the course of 1 calendar day.
  - 2 days passed between releases.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -34,6 +118,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.8.1/sn_dysfunction-0.7.1/sn_client-0.68.1/sn_node-0.64.1/sn_api-0.66.1/sn_cli-0.59.1 ([`2b00cec`](https://github.com/maidsafe/safe_network/commit/2b00cec961561281f6b927e13e501342843f6a0f))
     - Merge #1315 ([`67686f7`](https://github.com/maidsafe/safe_network/commit/67686f73f9e7b18bb6fbf1eadc3fd3a256285396))
     - Merge #1313 ([`7fe7be3`](https://github.com/maidsafe/safe_network/commit/7fe7be336799dec811c5b17e6d753ebe31e625f1))
     - `try!` macro is deprecated ([`4626226`](https://github.com/maidsafe/safe_network/commit/46262268fc167c05963e5b7bd6261310496e2379))
@@ -45,6 +130,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-id-9314a2db5dc1ae91bc4d80a65c1a8825492fc7c7/>
 <csr-id-ddb7798a7b0c5e60960e123414277d58f3da27eb/>
+<csr-id-e4e2eb56611a328806c59ed8bc80ca2567206bbb/>
 
 ### Chore
 
