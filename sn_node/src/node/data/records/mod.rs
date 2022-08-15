@@ -60,7 +60,7 @@ impl Node {
         query: DataQuery,
         msg_id: MsgId,
         auth: AuthorityProof<ServiceAuth>,
-        origin: Peer,
+        source_client: Peer,
         #[cfg(feature = "traceroute")] mut traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         let address = query.variant.address();
@@ -86,7 +86,7 @@ impl Node {
 
             return Ok(vec![self.send_cmd_error_response(
                 CmdError::Data(error),
-                origin,
+                source_client,
                 msg_id,
                 #[cfg(feature = "traceroute")]
                 traceroute,
@@ -94,13 +94,18 @@ impl Node {
         };
 
         let mut cmds = vec![Cmd::AddToPendingQueries {
-            origin,
+            origin: source_client,
             operation_id,
+            target_adult: target.name(),
         }];
 
-        if let Some(peers) = self.pending_data_queries.get(&operation_id) {
+        // here we conflate adults targetted!!
+        if let Some(peers) = self
+            .pending_data_queries
+            .get(&(operation_id, target.name()))
+        {
             if peers.len() > MAX_WAITING_PEERS_PER_QUERY {
-                warn!("Dropping query from {origin:?}, there are more than {MAX_WAITING_PEERS_PER_QUERY} waiting already");
+                warn!("Dropping query from {source_client:?}, there are more than {MAX_WAITING_PEERS_PER_QUERY} waiting already");
                 return Ok(vec![]);
             } else {
                 // we don't respond to the actual query, as we're still within data query timeout
@@ -109,7 +114,7 @@ impl Node {
             }
         }
 
-        // we only add a pending request when we're actually sending out requests
+        // we only add a pending request when we're actually sending out requests to new adults
         trace!("adding pending req for {target:?} in dysfunction tracking");
         cmds.push(Cmd::TrackNodeIssueInDysfunction {
             name: target.name(),
@@ -119,7 +124,7 @@ impl Node {
         let msg = SystemMsg::NodeQuery(NodeQuery::Data {
             query: query.variant,
             auth: auth.into_inner(),
-            origin: EndUser(origin.name()),
+            origin: EndUser(source_client.name()),
             correlation_id: msg_id,
         });
 

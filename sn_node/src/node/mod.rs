@@ -127,6 +127,8 @@ mod core {
     // This prevents pending query limit unbound growth
     pub(crate) const DATA_QUERY_LIMIT: usize = 100;
     // per query we can have this many peers, so the total peers waiting can be QUERY_LIMIT * MAX_WAITING_PEERS_PER_QUERY
+    // It's worth noting that nodes clean up all connections every two mins, so this max can only last that long.
+    // (and yes, some clients may unfortunately be disconnected quickly)
     pub(crate) const MAX_WAITING_PEERS_PER_QUERY: usize = 100;
 
     const BACKOFF_CACHE_LIMIT: usize = 100;
@@ -184,7 +186,8 @@ mod core {
         // Trackers
         pub(crate) capacity: Capacity,
         pub(crate) dysfunction_tracking: DysfunctionDetection,
-        pub(crate) pending_data_queries: Cache<OperationId, BTreeSet<Peer>>,
+        /// Cache the request combo,  (OperationId -> An adult xorname), to waiting Clients peers for that combo
+        pub(crate) pending_data_queries: Cache<(OperationId, XorName), BTreeSet<Peer>>,
         // Caches
         pub(crate) ae_backoff_cache: AeBackoffCache,
     }
