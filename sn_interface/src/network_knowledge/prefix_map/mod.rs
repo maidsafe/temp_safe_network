@@ -121,12 +121,12 @@ impl NetworkPrefixMap {
     /// Get `SectionAuthorityProvider` of a known section with the given prefix.
     #[allow(unused)]
     pub fn get(&self, prefix: &Prefix) -> Option<SectionAuthorityProvider> {
-        self.get_signed(prefix).map(|sap| sap.value)
+        self.get_signed(prefix).map(|sap| sap.value.clone())
     }
 
     /// Get signed `SectionAuthorityProvider` of a known section with the given prefix.
-    pub fn get_signed(&self, prefix: &Prefix) -> Option<SectionAuth<SectionAuthorityProvider>> {
-        self.sections.get(prefix).cloned()
+    pub fn get_signed(&self, prefix: &Prefix) -> Option<&SectionAuth<SectionAuthorityProvider>> {
+        self.sections.get(prefix)
     }
 
     /// Update our knowledge on the remote section's SAP and our sections DAG
@@ -177,7 +177,7 @@ impl NetworkPrefixMap {
         }
 
         match self.get_signed(incoming_prefix) {
-            Some(sap) if sap == signed_sap => {
+            Some(sap) if sap == &signed_sap => {
                 // It's the same SAP we are already aware of
                 return Ok(false);
             }

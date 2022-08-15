@@ -462,16 +462,18 @@ impl NetworkKnowledge {
         &self,
         name: &XorName,
     ) -> Option<(&SectionAuth<SectionAuthorityProvider>, SecuredLinkedList)> {
-        let closest_sap = self.prefix_map.closest(name, Some(&self.prefix()));
+        let closest_sap = self
+            .prefix_map
+            .closest(name, Some(&self.prefix()))
+            // In case the only prefix is ours, we fallback to it.
+            .unwrap_or(self.prefix_map.get_signed(&self.prefix())?);
 
-        if let Some(signed_sap) = closest_sap {
-            if let Ok(proof_chain) = self
-                .prefix_map
-                .get_sections_dag()
-                .get_proof_chain(self.genesis_key(), &signed_sap.value.section_key())
-            {
-                return Some((signed_sap, proof_chain));
-            }
+        if let Ok(proof_chain) = self
+            .prefix_map
+            .get_sections_dag()
+            .get_proof_chain(self.genesis_key(), &closest_sap.value.section_key())
+        {
+            return Some((closest_sap, proof_chain));
         }
 
         None
