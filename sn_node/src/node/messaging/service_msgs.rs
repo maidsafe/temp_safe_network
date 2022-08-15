@@ -242,14 +242,41 @@ impl Node {
                 spent_transactions,
             })) => {
                 // Generate and sign spent proof share
-                if let Some(spent_proof_share) =
-                    self.gen_spent_proof_share(&key_image, &tx, &spent_proofs, &spent_transactions)?
-                {
-                    // Store spent proof share to adults
-                    let reg_cmd = self.gen_register_cmd(&key_image, &spent_proof_share)?;
-                    ReplicatedData::SpentbookWrite(reg_cmd)
-                } else {
-                    return Ok(vec![]);
+                match self.gen_spent_proof_share(
+                    &key_image,
+                    &tx,
+                    &spent_proofs,
+                    &spent_transactions,
+                ) {
+                    Ok(spent_proof_share) => {
+                        // Store spent proof share to adults
+                        match self.gen_register_cmd(&key_image, &spent_proof_share) {
+                            Ok(reg_cmd) => ReplicatedData::SpentbookWrite(reg_cmd),
+                            Err(err) => {
+                                let error =
+                                    CmdError::Data(crate::node::error::convert_to_error_msg(err));
+                                let cmd = self.send_cmd_error_response(
+                                    error,
+                                    origin,
+                                    msg_id,
+                                    #[cfg(feature = "traceroute")]
+                                    traceroute,
+                                );
+                                return Ok(vec![cmd]);
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        let error = CmdError::Data(crate::node::error::convert_to_error_msg(err));
+                        let cmd = self.send_cmd_error_response(
+                            error,
+                            origin,
+                            msg_id,
+                            #[cfg(feature = "traceroute")]
+                            traceroute,
+                        );
+                        return Ok(vec![cmd]);
+                    }
                 }
             }
             ServiceMsg::Cmd(DataCmd::StoreChunk(chunk)) => ReplicatedData::Chunk(chunk),
@@ -324,7 +351,7 @@ impl Node {
         tx: &RingCtTransaction,
         spent_proofs: &BTreeSet<SpentProof>,
         spent_transactions: &BTreeSet<RingCtTransaction>,
-    ) -> Result<Option<SpentProofShare>> {
+    ) -> Result<SpentProofShare> {
         trace!(
             "Processing DBC spend request for key image: {:?}",
             key_image
@@ -341,21 +368,28 @@ impl Node {
                     "Dropping DBC spend request since a SpentProof signature is invalid: {:?}",
                     proof.spentbook_pub_key
                 );
-                return Ok(None);
+                return Err(Error::SpentbookError(format!(
+                    "Dropping DBC spend request since a SpentProof signature is invalid: {:?}",
+                    proof.spentbook_pub_key
+                )));
             }
             let _ = spent_proofs_keys.insert(proof.spentbook_pub_key);
         }
 
         // ...and verify the SpentProofs are signed by section keys known to us,
         // unless the public key of the SpentProof is the genesis key
-        spent_proofs_keys
-            .iter()
-            .for_each(|pk| if !self.network_knowledge.verify_section_key_is_known(pk) {
+        for pk in spent_proofs_keys.iter() {
+            if !self.network_knowledge.verify_section_key_is_known(pk) {
                 warn!("Invalid DBC spend request (key_image: {:?}) since a SpentProof is not signed by a section known to us: {:?}", key_image, pk);
                 // TODO: temporarily allowing spent proofs signed by section keys we are not aware of.
                 // We shall return an error to the client so it can update us with a valid proof chain.
-                //return Ok(None);
-            });
+                return Err(Error::SpentbookError(format!(
+                    "SpentProof signed by {:?} unknown to us: {}",
+                    pk,
+                    self.network_knowledge.sections_dag()
+                )));
+            }
+        }
 
         // Obtain Commitments from the TX
         let mut public_commitments_info = Vec::<(KeyImage, Vec<Commitment>)>::new();
@@ -390,7 +424,11 @@ impl Node {
                         commitments.len(),
                         mlsag.public_keys(),
                     );
-                return Ok(None);
+                return Err(Error::SpentbookError(format!(
+                    "Dropping DBC spend request since the number of SpentProofs ({}) does not match the number of input public keys ({:?})",
+                            commitments.len(),
+                            mlsag.public_keys()
+                )));
             }
 
             public_commitments_info.push((mlsag.key_image.into(), commitments));
@@ -408,7 +446,10 @@ impl Node {
                 "Dropping DBC spend request since TX failed to verify: {:?}",
                 err
             );
-            return Ok(None);
+            return Err(Error::SpentbookError(format!(
+                "Dropping DBC spend request since TX failed to verify: {:?}",
+                err
+            )));
         }
 
         // TODO:
@@ -432,11 +473,11 @@ impl Node {
             .section_keys_provider
             .sign_with(content.hash().as_ref(), &sap.section_key())?;
 
-        Ok(Some(SpentProofShare {
+        Ok(SpentProofShare {
             content,
             spentbook_pks: sap.public_key_set(),
             spentbook_sig_share: IndexedSignatureShare::new(index as u64, sig_share),
-        }))
+        })
     }
 
     // Private helper to generate the RegisterCmd to write the SpentProofShare

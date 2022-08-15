@@ -289,6 +289,11 @@ impl NetworkKnowledge {
         self.prefix_map.get_sections_dag().has_key(section_key)
     }
 
+    ///
+    pub fn sections_dag(&self) -> String {
+        format!("{:?}", self.prefix_map.get_sections_dag())
+    }
+
     /// Given a `NodeMsg` can we trust it (including verifying contents of an AE message)
     pub fn verify_node_msg_can_be_trusted(
         msg_authority: NodeMsgAuthority,

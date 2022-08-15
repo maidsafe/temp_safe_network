@@ -51,13 +51,13 @@ impl sn_dbc::SpentProofKeyVerifier for SpentProofKeyVerifier<'_> {
                 "Failed to verify SpentProof signature with key: {}",
                 key.to_hex()
             )))
-        } else if !futures::executor::block_on(self.client.is_known_section_key(key)) {
-            // FIXME: there is a WIP task to change the way sn_client keeps track of sections DAG,
-            // that will allow us to remove the futures block on sn_client::is_known_section_key.
+        } else if !self.client.is_known_section_key(key) {
+            let dag = format!("{:?}", self.client.prefix_map().get_sections_dag());
 
             Err(Error::DbcVerificationFailed(format!(
-                "SpentProof key is an unknown section key: {}",
-                key.to_hex()
+                "SpentProof key is an unknown section key: {:?} ==== LOCAL NET KNOWLEDGE WHEN VERIFYING: {}",
+                key,
+                dag
             )))
         } else {
             Ok(())
@@ -483,6 +483,8 @@ impl Safe {
         // Let's build the output DBCs
         let mut dbc_builder = tx_builder.build(&mut rng::thread_rng())?;
 
+        let dag = format!("{:?}", client.prefix_map().get_sections_dag());
+
         // Spend all the input DBCs, collecting the spent proof shares for each of them
         for (key_image, tx) in dbc_builder.inputs() {
             let tx_hash = Hash::from(tx.hash());
@@ -497,7 +499,13 @@ impl Safe {
                         spent_proofs.clone(),
                         spent_transactions.clone(),
                     )
-                    .await?;
+                    .await
+                    .map_err(|err| {
+                        Error::DbcReissueError(format!(
+                            "{:?} ==== LOCAL NET KNOWLEDGE: {}",
+                            err, dag
+                        ))
+                    })?;
 
                 let spent_proof_shares = client.spent_proof_shares(key_image).await?;
 
@@ -507,6 +515,11 @@ impl Safe {
                 let shares_for_current_tx: HashSet<SpentProofShare> = spent_proof_shares
                     .into_iter()
                     .filter(|proof_share| proof_share.content.transaction_hash == tx_hash)
+                    .collect();
+
+                let elders_index: Vec<u64> = shares_for_current_tx
+                    .iter()
+                    .map(|proof| proof.spentbook_sig_share.threshold_crypto().0)
                     .collect();
 
                 match verify_spent_proof_shares_for_tx(
@@ -524,13 +537,19 @@ impl Safe {
                     }
                     Err(err) if attempts == NUM_OF_DBC_REISSUE_ATTEMPTS => {
                         return Err(Error::DbcReissueError(format!(
-                            "Failed to spend input, {} proof shares obtained from spentbook: {}",
+                            "Failed to spend input, {} proof shares obtained from spentbook ( PROOFS FROM ELDERS index: {:?} ): {}",
                             shares_for_current_tx.len(),
+                            elders_index,
                             err
                         )));
                     }
                     Err(_) => {}
                 }
+
+                println!(
+                    "RETRIED FOR {:?}: {} - elders index: {:?}",
+                    key_image, attempts, elders_index
+                );
             }
         }
 
@@ -1183,6 +1202,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_wallet_reissue_dbc_verification_fails() -> Result<()> {
         let (safe, mut dbc, _) = new_safe_instance_with_dbc().await?;
         let wallet_xorurl = safe.wallet_create().await?;

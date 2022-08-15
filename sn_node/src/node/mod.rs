@@ -230,7 +230,7 @@ mod core {
 
             let section_keys_provider = SectionKeysProvider::new(section_key_share.clone());
 
-            let data_storage = DataStorage::new(&root_storage_dir, used_space.clone())?;
+            let data_storage = DataStorage::new(&root_storage_dir, used_space)?;
 
             info!("Creating DysfunctionDetection checks");
             let node_dysfunction_detector = DysfunctionDetection::new(
