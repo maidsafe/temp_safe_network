@@ -116,6 +116,7 @@ pub(crate) enum Cmd {
     AddToPendingQueries {
         operation_id: OperationId,
         origin: Peer,
+        target_adult: XorName,
     },
     HandleValidSystemMsg {
         msg_id: MsgId,
