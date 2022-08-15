@@ -126,7 +126,8 @@ mod core {
     pub(crate) const RESOURCE_PROOF_DIFFICULTY: u8 = 10;
 
     // This prevents pending query limit unbound growth
-    pub(crate) const DATA_QUERY_LIMIT: usize = 100;
+    // One insert per OpId/Adult.
+    pub(crate) const DATA_QUERY_LIMIT: usize = 10_000;
     // per query we can have this many peers, so the total peers waiting can be QUERY_LIMIT * MAX_WAITING_PEERS_PER_QUERY
     // It's worth noting that nodes clean up all connections every two mins, so this max can only last that long.
     // (and yes, some clients may unfortunately be disconnected quickly)
