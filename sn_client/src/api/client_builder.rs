@@ -151,8 +151,14 @@ impl ClientBuilder {
             }
         };
 
+        let mut qp2p = self.qp2p.unwrap_or_default();
+        // If `idle_timeout` is not set, set it to 6 seconds (instead of 18s default).
+        if qp2p.idle_timeout.is_none() {
+            qp2p.idle_timeout = Some(Duration::from_secs(6));
+        }
+
         let session = Session::new(
-            self.qp2p.unwrap_or_default(),
+            qp2p,
             self.local_addr
                 .unwrap_or_else(|| SocketAddr::from(DEFAULT_LOCAL_ADDR)),
             cmd_ack_wait,
