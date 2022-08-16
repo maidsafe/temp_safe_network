@@ -96,9 +96,11 @@ where
         let module = event.metadata().module_path().unwrap_or("<unknown module>");
         let time = SystemTime::default();
 
+        write!(writer, "[")?;
         time.format_time(&mut writer)?;
-
-        write!(writer, " [{module}] {level} ")?;
+        write!(writer, " {level} {module}")?;
+        ctx.visit_spans(|span| write!(writer, "/{}", span.name()))?;
+        write!(writer, "] ")?;
 
         // Add the log message and any fields associated with the event
         ctx.field_format().format_fields(writer.by_ref(), event)?;
