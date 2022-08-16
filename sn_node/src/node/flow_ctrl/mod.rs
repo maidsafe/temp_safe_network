@@ -105,15 +105,14 @@ impl FlowCtrl {
 
         // the internal process loop
         loop {
-            // First things. Lets process the next cmd
+            // if we want to throttle cmd throughput, we do that here.
+            // if there is nothing in the cmd queue, we wait here too.
+            self.cmd_ctrl
+                .wait_if_not_processing_at_expected_rate()
+                .await;
 
+            // Lets kick off processing any pending cmds
             if let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {
-                // if we want to throttle cmd throughput, we do that here.
-                // if there is nothing in the cmd queue, we wait here too.
-                self.cmd_ctrl
-                    .wait_if_not_processing_at_expected_rate()
-                    .await;
-
                 if let Err(error) = self
                     .cmd_ctrl
                     .process_cmd_job(
@@ -399,8 +398,6 @@ impl FlowCtrl {
 
     /// Periodically loop over any pending data batches and queue up `send_msg` for those
     async fn replicate_queued_data(node: Arc<RwLock<Node>>) -> Result<Option<Cmd>> {
-        info!("Starting sending any queued data for replication in batches");
-
         use rand::seq::IteratorRandom;
         let mut rng = rand::rngs::OsRng;
         let data_queued = {
