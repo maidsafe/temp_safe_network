@@ -71,8 +71,8 @@ jobs:
       - name: Download network config
         shell: bash
         run: |
-          mkdir -p ~/.safe/prefix_maps
-          wget https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-prefix-map -O ~/.safe/prefix_maps/default
+          mkdir -p ~/.safe/network_contacts
+          wget https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-network-contacts -O ~/.safe/network_contacts/default
 
       # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
       - name: Initital client tests...
@@ -137,4 +137,3 @@ jobs:
           github_token: ${{ secrets.VERSION_BUMP_COMMIT_PAT }}
           branch: main
           tags: true
-

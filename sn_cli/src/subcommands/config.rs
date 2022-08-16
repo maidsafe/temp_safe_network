@@ -33,7 +33,7 @@ pub enum SettingAddCmd {
         /// Network name
         network_name: String,
         /// Local path or a remote URL to fetch the network map from
-        prefix_location: String,
+        contacts_file_location: String,
     },
     // #[clap(name = "contact")]
     // Contact {
@@ -62,14 +62,17 @@ pub async fn config_commander(cmd: Option<ConfigSubCommands>, config: &mut Confi
     match cmd {
         Some(ConfigSubCommands::Add(SettingAddCmd::Network {
             network_name,
-            prefix_location,
+            contacts_file_location,
         })) => {
-            if Url::parse(prefix_location.as_str()).is_ok() {
+            if Url::parse(contacts_file_location.as_str()).is_ok() {
                 config
-                    .add_network(&network_name, NetworkInfo::Remote(prefix_location, None))
+                    .add_network(
+                        &network_name,
+                        NetworkInfo::Remote(contacts_file_location, None),
+                    )
                     .await?;
             } else {
-                let path = PathBuf::from(prefix_location);
+                let path = PathBuf::from(contacts_file_location);
                 config
                     .add_network(&network_name, NetworkInfo::Local(path, None))
                     .await?;

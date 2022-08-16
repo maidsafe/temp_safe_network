@@ -39,14 +39,14 @@ use xor_name::{Prefix, XorName};
 
 /// Container for storing information about other sections in the network.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NetworkPrefixMap {
+pub struct SectionTree {
     /// Map of sections prefixes to their latest signed section authority providers.
     sections: BTreeMap<Prefix, SectionAuth<SectionAuthorityProvider>>,
     /// A DAG containing all section chains of the whole network that we are aware of
     sections_dag: SecuredLinkedList,
 }
 
-impl NetworkPrefixMap {
+impl SectionTree {
     /// Create an empty container
     pub fn new(genesis_pk: BlsPublicKey) -> Self {
         Self {
@@ -55,34 +55,34 @@ impl NetworkPrefixMap {
         }
     }
 
-    /// Create a new NetworkPrefixMap deserialised from bytes
+    /// Create a new SectionTree deserialised from bytes
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         serde_json::from_slice(bytes).map_err(|err| Error::Deserialisation(err.to_string()))
     }
 
-    /// Create a new NetworkPrefixMap deserialised from a file
+    /// Create a new SectionTree deserialised from a file
     pub async fn from_disk(path: &Path) -> Result<Self> {
-        let mut prefix_map_file = fs::File::open(path).await.map_err(|err| {
+        let mut section_tree_file = fs::File::open(path).await.map_err(|err| {
             Error::FileHandling(format!(
-                "Error opening PrefixMap file from {}: {:?}",
+                "Error opening SectionTree file from {}: {:?}",
                 path.display(),
                 err
             ))
         })?;
 
-        let mut prefix_map_content = vec![];
-        let _ = prefix_map_file
-            .read_to_end(&mut prefix_map_content)
+        let mut section_tree_content = vec![];
+        let _ = section_tree_file
+            .read_to_end(&mut section_tree_content)
             .await
             .map_err(|err| {
                 Error::FileHandling(format!(
-                    "Error reading PrefixMap from {}: {:?}",
+                    "Error reading SectionTree from {}: {:?}",
                     path.display(),
                     err
                 ))
             })?;
 
-        NetworkPrefixMap::from_bytes(&prefix_map_content)
+        SectionTree::from_bytes(&section_tree_content)
     }
 
     /// Returns the genesis key of the Network
@@ -124,7 +124,7 @@ impl NetworkPrefixMap {
         true
     }
 
-    /// For testing purpose, we may need to populate a `prefix_map` without a proof chain.
+    /// For testing purpose, we may need to populate a `section_tree` without a proof chain.
     #[cfg(any(test, feature = "test-utils"))]
     pub fn insert_without_chain(&mut self, sap: SectionAuth<SectionAuthorityProvider>) -> bool {
         self.insert(sap)
@@ -299,7 +299,7 @@ impl NetworkPrefixMap {
         self.sections.len()
     }
 
-    /// Is the prefix map empty?
+    /// Is the section tree empty?
     pub fn is_empty(&self) -> bool {
         self.sections.is_empty()
     }
@@ -358,7 +358,7 @@ impl NetworkPrefixMap {
 
     /// Serialise and write it to disk on the provided file path
     pub async fn write_to_disk(&self, path: &Path) -> Result<()> {
-        trace!("Writing prefix map to disk at {}", path.display());
+        trace!("Writing section tree to disk at {}", path.display());
         let parent_path = if let Some(parent_path) = path.parent() {
             fs::create_dir_all(parent_path).await.map_err(|err| {
                 Error::DirectoryHandling(format!(
@@ -400,7 +400,7 @@ impl NetworkPrefixMap {
             ))
         })?;
 
-        trace!("Wrote PrefixMap to disk: {}", path.display());
+        trace!("Wrote SectionTree to disk: {}", path.display());
 
         Ok(())
     }
@@ -419,25 +419,25 @@ impl NetworkPrefixMap {
     }
 }
 
-impl Ord for NetworkPrefixMap {
+impl Ord for SectionTree {
     fn cmp(&self, other: &Self) -> Ordering {
         self.len().cmp(&other.len())
     }
 }
 
-impl PartialOrd for NetworkPrefixMap {
+impl PartialOrd for SectionTree {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl PartialEq for NetworkPrefixMap {
+impl PartialEq for SectionTree {
     fn eq(&self, other: &Self) -> bool {
         self.len() == other.len()
     }
 }
 
-impl Eq for NetworkPrefixMap {}
+impl Eq for SectionTree {}
 
 #[cfg(test)]
 mod tests {
@@ -460,7 +460,7 @@ mod tests {
 
     #[test]
     fn insert_existing_prefix() -> Result<()> {
-        let (mut map, _, _) = new_network_prefix_map();
+        let (mut map, _, _) = new_network_section_tree();
         let p0 = prefix("0")?;
         let sap0 = gen_section_auth(p0)?;
         let new_sap0 = gen_section_auth(p0)?;
@@ -475,7 +475,7 @@ mod tests {
 
     #[test]
     fn insert_direct_descendants_of_existing_prefix() -> Result<()> {
-        let (mut map, _, _) = new_network_prefix_map();
+        let (mut map, _, _) = new_network_section_tree();
         let p0 = prefix("0")?;
         let p00 = prefix("00")?;
         let p01 = prefix("01")?;
@@ -504,7 +504,7 @@ mod tests {
 
     #[test]
     fn return_opposite_prefix_if_none_matching() -> Result<()> {
-        let (mut map, _, _) = new_network_prefix_map();
+        let (mut map, _, _) = new_network_section_tree();
         let p0 = prefix("0")?;
         let p1 = prefix("1")?;
 
@@ -536,7 +536,7 @@ mod tests {
 
     #[test]
     fn insert_indirect_descendants_of_existing_prefix() -> Result<()> {
-        let (mut map, _, _) = new_network_prefix_map();
+        let (mut map, _, _) = new_network_section_tree();
         let p0 = prefix("0")?;
         let p000 = prefix("000")?;
         let p001 = prefix("001")?;
@@ -576,7 +576,7 @@ mod tests {
 
     #[test]
     fn insert_ancestor_of_existing_prefix() -> Result<()> {
-        let (mut map, _, _) = new_network_prefix_map();
+        let (mut map, _, _) = new_network_section_tree();
         let p0 = prefix("0")?;
         let p00 = prefix("00")?;
 
@@ -593,7 +593,7 @@ mod tests {
 
     #[test]
     fn get_matching() -> Result<()> {
-        let (mut map, _, _) = new_network_prefix_map();
+        let (mut map, _, _) = new_network_section_tree();
         let p = prefix("")?;
         let p0 = prefix("0")?;
         let p1 = prefix("1")?;
@@ -642,7 +642,7 @@ mod tests {
 
     #[test]
     fn get_matching_prefix() -> Result<()> {
-        let (mut map, _, _) = new_network_prefix_map();
+        let (mut map, _, _) = new_network_section_tree();
         let p0 = prefix("0")?;
         let p1 = prefix("1")?;
         let p10 = prefix("10")?;
@@ -670,7 +670,7 @@ mod tests {
     #[test]
     fn closest() -> Result<()> {
         // Create map containing sections (00), (01) and (10)
-        let (mut map, genesis_sk, genesis_pk) = new_network_prefix_map();
+        let (mut map, genesis_sk, genesis_pk) = new_network_section_tree();
         let chain = SecuredLinkedList::new(genesis_pk);
         let p01 = prefix("01")?;
         let p10 = prefix("10")?;
@@ -706,13 +706,13 @@ mod tests {
             cases: 20, .. ProptestConfig::default()
         })]
         #[test]
-        fn proptest_prefix_map_fields_should_stay_in_sync((main_chain, update_variations_list) in arb_sll_and_proof_chains(25, 3)) {
+        fn proptest_section_tree_fields_should_stay_in_sync((main_chain, update_variations_list) in arb_sll_and_proof_chains(25, 3)) {
             for variation in update_variations_list {
-                let mut prefix_map = NetworkPrefixMap::new(*main_chain.root_key());
+                let mut section_tree = SectionTree::new(*main_chain.root_key());
                 for (proof_chain, sap) in &variation {
-                    let _ = prefix_map.update(sap.clone(), proof_chain)?;
+                    let _ = section_tree.update(sap.clone(), proof_chain)?;
                 }
-                let synced = is_synced(&prefix_map).unwrap();
+                let synced = is_synced(&section_tree).unwrap();
                 prop_assert!(synced);
             }
         }
@@ -730,7 +730,7 @@ mod tests {
         ),
     > {
         (any::<u64>(), 0..max_sections).prop_map(move |(seed, size)| {
-            let (map, main_chain) = generate_random_prefix_map(Some(seed as u64), size).unwrap();
+            let (map, main_chain) = generate_random_section_tree(Some(seed as u64), size).unwrap();
             let mut rng = SmallRng::seed_from_u64(seed);
             let mut update_variations_list = Vec::new();
 
@@ -767,10 +767,10 @@ mod tests {
                         .get(rng.gen::<usize>() % possible_roots.len())
                         .expect("Cannot be None");
 
-                    // Consider the prefix_map is aware of the prefix 011 with keys A->B->C
+                    // Consider the section_tree is aware of the prefix 011 with keys A->B->C
                     // Now, our proof_chain can be [A/B/C to C/D/E/F]
                     // i.e., B->C->D is valid, C->D is valid, C is also valid
-                    // but A->B is invalid since we are providing old information to the prefix_map
+                    // but A->B is invalid since we are providing old information to the section_tree
                     // Since proof_chain is a single branch, we can skip directly to "C" by len - 1
                     let possible_last_keys: Vec<bls::PublicKey> = proof_chain
                         .keys()
@@ -817,11 +817,11 @@ mod tests {
             .context(format!("Failed to generate SAP for prefix {:?}", prefix))
     }
 
-    fn new_network_prefix_map() -> (NetworkPrefixMap, bls::SecretKey, BlsPublicKey) {
+    fn new_network_section_tree() -> (SectionTree, bls::SecretKey, BlsPublicKey) {
         let genesis_sk = bls::SecretKey::random();
         let genesis_pk = genesis_sk.public_key();
 
-        let map = NetworkPrefixMap::new(genesis_pk);
+        let map = SectionTree::new(genesis_pk);
 
         (map, genesis_sk, genesis_pk)
     }
@@ -829,20 +829,21 @@ mod tests {
     // Check if the 'sections' and 'sections_dag' fields are in sync
     // Get the leaves of the 'sections_dag' from 'sections' and verify that the added
     // lengths from the leaves matches the actual length of the 'sections_dag'
-    fn is_synced(prefix_map: &NetworkPrefixMap) -> Result<bool> {
+    fn is_synced(section_tree: &SectionTree) -> Result<bool> {
         let mut count: BTreeSet<bls::PublicKey> = BTreeSet::new();
 
-        for leaf_sap in prefix_map.all() {
-            let chain = prefix_map
-                .sections_dag
-                .get_proof_chain(prefix_map.sections_dag.root_key(), &leaf_sap.section_key())?;
+        for leaf_sap in section_tree.all() {
+            let chain = section_tree.sections_dag.get_proof_chain(
+                section_tree.sections_dag.root_key(),
+                &leaf_sap.section_key(),
+            )?;
 
             for key in chain.keys() {
                 count.insert(*key);
             }
         }
 
-        Ok(prefix_map.sections_dag.len() == count.len())
+        Ok(section_tree.sections_dag.len() == count.len())
     }
 
     type SectionInfo = (
@@ -852,7 +853,7 @@ mod tests {
     );
 
     // Generate a random SectionChain and the sap for all the sections
-    fn generate_random_prefix_map(
+    fn generate_random_section_tree(
         seed: Option<u64>,
         n_sections: usize,
     ) -> Result<(BTreeMap<bls::PublicKey, SectionInfo>, SecuredLinkedList)> {

@@ -95,8 +95,7 @@ mod core {
             AuthorityProof, SectionAuth, SectionAuthorityProvider,
         },
         network_knowledge::{
-            supermajority, NetworkKnowledge, NetworkPrefixMap, NodeInfo, SectionKeyShare,
-            SectionKeysProvider,
+            supermajority, NetworkKnowledge, NodeInfo, SectionKeyShare, SectionKeysProvider,
         },
         types::{
             keys::ed25519::Digest256, log_markers::LogMarker, Cache, Peer, ReplicatedDataAddress,
@@ -135,8 +134,8 @@ mod core {
 
     const BACKOFF_CACHE_LIMIT: usize = 100;
 
-    // File name where to cache this node's prefix map (stored at this node's set root storage dir)
-    const PREFIX_MAP_FILE_NAME: &str = "prefix_map";
+    // File name where to cache this node's section tree (stored at this node's set root storage dir)
+    const SECTION_TREE_FILE_NAME: &str = "section_tree";
 
     // How long to hold on to correlated `Peer`s for data queries. Since data queries are forwarded
     // from elders (with whom the client is connected) to adults (who hold the data), the elder handling
@@ -285,8 +284,8 @@ mod core {
                 membership,
             };
 
-            // Write the prefix map to this node's root storage directory
-            node.write_prefix_map().await;
+            // Write the section tree to this node's root storage directory
+            node.write_section_tree().await;
 
             Ok(node)
         }
@@ -728,7 +727,7 @@ mod core {
 
         pub(crate) fn print_network_stats(&self) {
             self.network_knowledge
-                .prefix_map()
+                .section_tree()
                 .network_stats(&self.network_knowledge.authority_provider())
                 .print();
         }
@@ -748,14 +747,14 @@ mod core {
             };
         }
 
-        pub(crate) async fn write_prefix_map(&self) {
-            let prefix_map = self.network_knowledge.prefix_map().clone();
-            let path = self.root_storage_dir.clone().join(PREFIX_MAP_FILE_NAME);
+        pub(crate) async fn write_section_tree(&self) {
+            let section_tree = self.network_knowledge.section_tree().clone();
+            let path = self.root_storage_dir.clone().join(SECTION_TREE_FILE_NAME);
 
             let _ = tokio::spawn(async move {
-                if let Err(err) = NetworkPrefixMap::write_to_disk(&prefix_map, &path).await {
+                if let Err(err) = section_tree.write_to_disk(&path).await {
                     error!(
-                        "Error writing PrefixMap to `{}` dir: {:?}",
+                        "Error writing SectionTree to `{}` dir: {:?}",
                         path.display(),
                         err
                     );

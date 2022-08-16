@@ -205,8 +205,8 @@ jobs:
       - name: Download network config
         shell: bash
         run: |
-          mkdir -p ~/.safe/prefix_maps
-          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-prefix-map > ~/.safe/prefix_maps/default
+          mkdir -p ~/.safe/network_contacts
+          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-network-contacts > ~/.safe/network_contacts/default
 
       - name: Build all client tests before running
         run: cd sn_client && cargo test --no-run --release
@@ -249,12 +249,12 @@ jobs:
       - name: Set TESTNET_ID env
         shell: bash
         run: echo "TESTNET_ID=gha-testnet-$(echo ${{ github.event.pull_request.head.sha || github.sha }} | cut -c 1-7)" >> $GITHUB_ENV
-      - name: Download network prefix map
+      - name: Download network contacts file
         shell: bash
         run: |
-          mkdir -p ~/.safe/prefix_maps
-          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-prefix-map \
-            > ~/.safe/prefix_maps/default
+          mkdir -p ~/.safe/network_contacts
+          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-network-contacts \
+            > ~/.safe/network_contacts/default
 
       - uses: Swatinem/rust-cache@v1
         continue-on-error: true
@@ -315,8 +315,8 @@ jobs:
       - name: Download network config
         shell: bash
         run: |
-          mkdir -p ~/.safe/prefix_maps
-          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-prefix-map > ~/.safe/prefix_maps/default
+          mkdir -p ~/.safe/network_contacts
+          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-network-contacts > ~/.safe/network_contacts/default
       - name: Download genesis DBC
         shell: bash
         run: |
@@ -431,15 +431,15 @@ jobs:
             "s3://safe-testnet-tool/$TESTNET_ID-genesis-key" \
             "$TESTNET_ID-genesis-key"
           aws s3 cp \
-            "s3://safe-testnet-tool/$TESTNET_ID-prefix-map" \
-            "$TESTNET_ID-prefix-map"
+            "s3://safe-testnet-tool/$TESTNET_ID-network-contacts" \
+            "$TESTNET_ID-network-contacts"
 
           wget https://raw.githubusercontent.com/maidsafe/sn_testnet_tool/main/scripts/logs-sync.sh
           chmod +x logs-sync.sh
           ./logs-sync.sh "$TESTNET_ID"
           mv $TESTNET_ID-genesis-dbc logs
           mv $TESTNET_ID-genesis-key logs
-          mv $TESTNET_ID-prefix-map logs
+          mv $TESTNET_ID-network-contacts logs
           tar -C logs -zcvf $TESTNET_ID-run.tar.gz .
           aws s3 cp \
             "$TESTNET_ID-run.tar.gz" \

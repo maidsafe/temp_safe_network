@@ -90,7 +90,7 @@ pub struct Config {
     /// File with initial network contacts to bootstrap to if this node is not the first on
     /// the network. This argument and the `--first` flag are mutually exclusive.
     ///
-    /// This shall be set to the file path where a valid `PrefixMap` can be read from.
+    /// This shall be set to the file path where a valid `SectionTree` can be read from.
     #[clap(short, long)]
     pub network_contacts_file: Option<PathBuf>,
     /// Local address to be used for the node.

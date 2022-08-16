@@ -358,7 +358,7 @@ impl Session {
         proof_chain: SecuredLinkedList,
         sender: Peer,
     ) {
-        // Update our network PrefixMap based upon passed in knowledge
+        // Update our network knowledge based upon passed in knowledge
         let result = session.network.update(
             SectionAuth {
                 value: sap.clone(),

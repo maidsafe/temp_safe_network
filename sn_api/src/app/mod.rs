@@ -19,8 +19,8 @@ pub mod wallet;
 
 pub use crate::safeurl::*;
 pub use consts::DEFAULT_XORURL_BASE;
-pub use sn_client::DEFAULT_PREFIX_MAP_FILE_NAME;
-pub use sn_interface::network_knowledge::prefix_map::NetworkPrefixMap;
+pub use sn_client::DEFAULT_NETWORK_CONTACTS_FILE_NAME;
+pub use sn_interface::network_knowledge::SectionTree;
 pub use xor_name::{XorName, XOR_NAME_LEN};
 
 // --------------------------------------------------------------------
@@ -112,14 +112,14 @@ impl Safe {
         self.client.is_some()
     }
 
-    /// NetworkPrefixMap used to bootstrap on the network.
+    /// SectionTree used to bootstrap on the network.
     ///
     /// This is updated by as Anti-Entropy/update messages are received from the network.
     /// Any user of this API is responsible for caching it so it can use it for any new `Safe`
     /// instance, preventing it from learning all this information from the network all over again.
-    pub async fn prefix_map(&self) -> Result<&NetworkPrefixMap> {
-        let prefix_map = self.get_safe_client()?.prefix_map();
-        Ok(prefix_map)
+    pub async fn section_tree(&self) -> Result<&SectionTree> {
+        let section_tree = self.get_safe_client()?.section_tree();
+        Ok(section_tree)
     }
 
     // Private helper to obtain the Client instance

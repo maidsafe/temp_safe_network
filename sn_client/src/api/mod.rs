@@ -26,7 +26,7 @@ use sn_interface::{
         data::{DataQuery, DataQueryVariant, RegisterQuery, ServiceMsg},
         ServiceAuth, WireMsg,
     },
-    network_knowledge::prefix_map::NetworkPrefixMap,
+    network_knowledge::SectionTree,
     types::{Chunk, Keypair, PublicKey, RegisterAddress},
 };
 
@@ -37,12 +37,12 @@ use tracing::debug;
 use uluru::LRUCache;
 use xor_name::XorName;
 
-/// File name of the default prefix map file the Client uses. The file is
+/// Name of the default network contacts file the Client uses. The file is
 /// expected to be found at user's OS home directory, e.g. in Linux this
-/// path would become: $HOME/.safe/prefix_maps/default
-pub const DEFAULT_PREFIX_MAP_FILE_NAME: &str = "default";
+/// path would become: $HOME/.safe/network_contacts/default
+pub const DEFAULT_NETWORK_CONTACTS_FILE_NAME: &str = "default";
 
-// Maximum amount of Chunks to keep in our cal Chunks cache.
+// Maximum amount of Chunks to keep in our local Chunks cache.
 // Each Chunk is maximum types::MAX_CHUNK_SIZE_IN_BYTES, i.e. ~1MB
 const CHUNK_CACHE_SIZE: usize = 50;
 
@@ -188,12 +188,12 @@ impl Client {
         self.session.network.get_sections_dag().has_key(section_key)
     }
 
-    /// NetworkPrefixMap used to bootstrap the client on the network.
+    /// SectionTree used to bootstrap the client on the network.
     ///
     /// This is updated by the client as it receives Anti-Entropy/update messages from the network.
     /// Any user of this API is responsible for caching it so it can use it for any new `Client`
     /// instance not needing to obtain all this information from the network all over again.
-    pub fn prefix_map(&self) -> &NetworkPrefixMap {
+    pub fn section_tree(&self) -> &SectionTree {
         &self.session.network
     }
 

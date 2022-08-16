@@ -91,7 +91,7 @@ impl Node {
         let sibling_prefix = self.network_knowledge.prefix().sibling();
         if let Some(sibling_sap) = self
             .network_knowledge
-            .prefix_map()
+            .section_tree()
             .get_signed(&sibling_prefix)
         {
             let promoted_sibling_elders: BTreeSet<_> = sibling_sap
@@ -187,9 +187,9 @@ impl Node {
         }
 
         if updated {
-            self.write_prefix_map().await;
+            self.write_section_tree().await;
             let prefix = section_auth.prefix();
-            info!("PrefixMap written to disk with update for prefix {prefix:?}");
+            info!("SectionTree written to disk with update for prefix {prefix:?}");
 
             // check if we've been kicked out of the section
             if snapshot.members.contains(&self.name())
@@ -339,7 +339,7 @@ impl Node {
                     )));
                 }
                 None => {
-                    warn!("Our PrefixMap is empty");
+                    warn!("Our SectionTree is empty");
                     // TODO: instead of just dropping the message, don't we actually need
                     // to get up to date info from other Elders in our section as it may be
                     // a section key we are not aware of yet?

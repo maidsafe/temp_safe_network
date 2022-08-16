@@ -174,7 +174,7 @@ impl Node {
                     Ok(true) => {
                         info!("Updated our network knowledge for {:?}", prefix);
                         info!("Writing updated knowledge to disk");
-                        self.write_prefix_map().await
+                        self.write_section_tree().await
                     }
                     _ => {}
                 }
@@ -183,7 +183,7 @@ impl Node {
 
         info!(
             "Prefixes we know about: {:?}",
-            self.network_knowledge.prefix_map()
+            self.network_knowledge.section_tree()
         );
 
         self.update_on_elder_change(&snapshot).await

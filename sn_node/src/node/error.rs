@@ -52,8 +52,6 @@ pub enum Error {
     UntrustedSectionAuthProvider(String),
     #[error("Proof chain cannot be trusted: {0}")]
     UntrustedProofChain(String),
-    #[error("Invalid genesis key of provided prefix map: {}", hex::encode(_0.to_bytes()))]
-    InvalidGenesisKey(bls::PublicKey),
     #[error("Cannot route. Delivery group size: {}, candidates: {}.", _0, _1)]
     CannotRoute(usize, usize),
     #[error("Empty recipient list")]

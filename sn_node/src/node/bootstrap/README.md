@@ -2,16 +2,16 @@
 For a node to successfully join a network, it requires the below-mentioned things beforehand to start the joining process:
 a) The Node Config: Config - which contains all the tweakables
 b) Directories: These are derived from the config to generate various dirs where node_data and logs will be stored
-d) Network PrefixMap - An address book for the SAFE Network
+d) Network contacts file - An address book for the SAFE Network
 e) Join duration timeout - Timeout to not wait forever looping on a response during bootstrapping
 
 ## Overview
-For a node to successfully join the network it first needs to contact a node that is actively a member of the SAFE Network. Contacts can be picked up from the provided Network PrefixMap where details about various sections of the network are available.
+For a node to successfully join the network it first needs to contact a node that is actively a member of the SAFE Network. Contacts can be picked up from the provided Network contacts file where details about various sections of the network are available.
 
 Once contacted the Joining node and the Network go through a set of verifications after which the Network gives a thumbs up to the joining node along with details for it to function as a part of the SAFE Network.
 
 ## The Process
-1. The joining node fetches its closest section from the PrefixMap.
+1. The joining node fetches its closest section from the network contacts file.
 2. A JoinRequest::Initiate is then sent to that closest section’s elders with their respective section PK.
 3. The Elders then run the below set of verifications in sequence on the joining node:
    1. If the prefix of the joining node does not match the section prefix that the request processing node is in, it sends a Joinresponse::Redirect response which contains the latest SAP of the closest section back to the joining node. This allows the joining node to start the join process again with the correct contacts this time.
