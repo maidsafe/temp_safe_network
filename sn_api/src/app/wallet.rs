@@ -18,7 +18,7 @@ use log::{debug, warn};
 use sn_client::Client;
 use sn_dbc::{
     rng, AmountSecrets, Error as DbcError, Hash, KeyImage, Owner, OwnerOnce, PublicKey,
-    RingCtTransaction, Signature, SpentProof, SpentProofShare, TransactionBuilder,
+    RingCtTransaction, SpentProof, SpentProofShare, TransactionBuilder,
 };
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
@@ -36,7 +36,7 @@ pub type WalletSpendableDbcs = BTreeMap<String, (Dbc, EntryHash)>;
 const NUM_OF_DBC_REISSUE_ATTEMPTS: u8 = 5;
 
 /// Verifier required by sn_dbc API to check a SpentProof
-/// is validly signed by known sections keys.
+/// is signed by known sections keys.
 struct SpentProofKeyVerifier<'a> {
     client: &'a Client,
 }
@@ -44,14 +44,10 @@ struct SpentProofKeyVerifier<'a> {
 impl sn_dbc::SpentProofKeyVerifier for SpentProofKeyVerifier<'_> {
     type Error = crate::Error;
 
-    // Called by sn_dbc API when it needs to verify a SpentProof is valid
-    fn verify(&self, proof_hash: &Hash, key: &PublicKey, signature: &Signature) -> Result<()> {
-        if !key.verify(signature, proof_hash) {
-            Err(Error::DbcVerificationFailed(format!(
-                "Failed to verify SpentProof signature with key: {}",
-                key.to_hex()
-            )))
-        } else if !self.client.is_known_section_key(key) {
+    // Called by sn_dbc API when it needs to verify a SpentProof is signed by a known key,
+    // we check if the key is any of the network sections keys we are aware of
+    fn verify_known_key(&self, key: &PublicKey) -> Result<()> {
+        if !self.client.is_known_section_key(key) {
             Err(Error::DbcVerificationFailed(format!(
                 "SpentProof key is an unknown section key: {}",
                 key.to_hex()
@@ -1168,10 +1164,13 @@ mod tests {
             .await
         {
             Err(Error::DbcError(DbcError::InvalidSpentProofSignature(_, msg))) => {
-                assert_eq!(msg, format!(
-                    "DBC validity verification failed: Failed to verify SpentProof signature with key: {}",
-                    random_pk.to_hex()
-                ));
+                assert_eq!(
+                    msg,
+                    format!(
+                        "Failed to verify SpentProof signature with key: {}",
+                        random_pk.to_hex()
+                    )
+                );
                 Ok(())
             }
             Err(err) => Err(anyhow!("Error returned is not the expected: {:?}", err)),
