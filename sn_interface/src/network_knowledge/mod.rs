@@ -9,10 +9,10 @@
 mod errors;
 mod node_info;
 pub mod node_state;
-pub mod prefix_map;
 pub mod section_authority_provider;
 pub mod section_keys;
 mod section_peers;
+mod section_tree;
 
 #[cfg(any(test, feature = "test-utils"))]
 pub use self::section_authority_provider::test_utils;
@@ -21,9 +21,9 @@ pub use self::{
     errors::{Error, Result},
     node_info::NodeInfo,
     node_state::NodeState,
-    prefix_map::NetworkPrefixMap,
     section_authority_provider::{SapCandidate, SectionAuthUtils, SectionAuthorityProvider},
     section_keys::{SectionKeyShare, SectionKeysProvider},
+    section_tree::SectionTree,
 };
 
 use crate::{
@@ -143,8 +143,8 @@ pub struct NetworkKnowledge {
     signed_sap: SectionAuth<SectionAuthorityProvider>,
     /// Members of our section
     section_peers: SectionPeers,
-    /// The network prefix map, i.e. a map from prefix to SAPs
-    prefix_map: NetworkPrefixMap,
+    /// The network section tree, i.e. a map from prefix to SAPs plus all sections keys
+    section_tree: SectionTree,
 }
 
 impl NetworkKnowledge {
@@ -156,7 +156,7 @@ impl NetworkKnowledge {
         genesis_key: bls::PublicKey,
         chain: SecuredLinkedList,
         signed_sap: SectionAuth<SectionAuthorityProvider>,
-        passed_prefix_map: Option<NetworkPrefixMap>,
+        passed_section_tree: Option<SectionTree>,
     ) -> Result<Self, Error> {
         // Let's check the section chain's genesis key matches ours.
         if genesis_key != *chain.root_key() {
@@ -166,29 +166,29 @@ impl NetworkKnowledge {
             )));
         }
 
-        // Check if the genesis key in the provided prefix_map matches ours.
-        // If no prefix map was provided, start afresh.
-        let mut prefix_map = match passed_prefix_map {
-            Some(prefix_map) => {
-                if *prefix_map.genesis_key() != genesis_key {
-                    return Err(Error::InvalidGenesisKey(*prefix_map.genesis_key()));
+        // Check if the genesis key in the provided section_tree matches ours.
+        // If no section tree was provided, start afresh.
+        let mut section_tree = match passed_section_tree {
+            Some(section_tree) => {
+                if *section_tree.genesis_key() != genesis_key {
+                    return Err(Error::InvalidGenesisKey(*section_tree.genesis_key()));
                 } else {
-                    prefix_map
+                    section_tree
                 }
             }
-            None => NetworkPrefixMap::new(genesis_key),
+            None => SectionTree::new(genesis_key),
         };
 
-        // At this point we know the prefix map corresponds to the correct genesis key,
-        // let's make sure the prefix map contains also our own prefix and SAP,
-        if let Err(err) = prefix_map.update(signed_sap.clone(), &chain) {
-            debug!("Failed to update NetworkPrefixMap with SAP {:?} and chain {:?} upon creating new NetworkKnowledge instance: {:?}", signed_sap, chain, err);
+        // At this point we know the section tree corresponds to the correct genesis key,
+        // let's make sure the section tree contains also our own prefix and SAP,
+        if let Err(err) = section_tree.update(signed_sap.clone(), &chain) {
+            debug!("Failed to update SectionTree with SAP {:?} and chain {:?} upon creating new NetworkKnowledge instance: {:?}", signed_sap, chain, err);
         }
 
         Ok(Self {
             signed_sap,
             section_peers: SectionPeers::default(),
-            prefix_map,
+            section_tree,
         })
     }
 
@@ -246,10 +246,10 @@ impl NetworkKnowledge {
     /// Note this function assumes we already have the key share for the provided section key.
     pub fn try_update_current_sap(&mut self, section_key: BlsPublicKey, prefix: &Prefix) -> bool {
         // Let's try to find the signed SAP corresponding to the provided prefix and section key
-        match self.prefix_map.get_signed(prefix) {
+        match self.section_tree.get_signed(prefix) {
             Some(signed_sap) if signed_sap.value.section_key() == section_key => {
                 let proof = self
-                    .prefix_map
+                    .section_tree
                     .get_sections_dag()
                     .get_proof_chain(self.genesis_key(), &section_key);
                 // We have the signed SAP for the provided prefix and section key,
@@ -284,7 +284,7 @@ impl NetworkKnowledge {
 
     /// Verify the given public key corresponds to any (current/old) section known to us
     pub fn verify_section_key_is_known(&self, section_key: &BlsPublicKey) -> bool {
-        self.prefix_map.get_sections_dag().has_key(section_key)
+        self.section_tree.get_sections_dag().has_key(section_key)
     }
 
     /// Given a `NodeMsg` can we trust it (including verifying contents of an AE message)
@@ -325,12 +325,12 @@ impl NetworkKnowledge {
         let mut there_was_an_update = false;
         let provided_sap = signed_sap.value.clone();
 
-        // Update the network prefix map
-        match self.prefix_map.update(signed_sap.clone(), proof_chain) {
+        // Update the network section tree
+        match self.section_tree.update(signed_sap.clone(), proof_chain) {
             Ok(true) => {
                 there_was_an_update = true;
                 debug!(
-                    "Updated network prefix map with SAP for {:?}",
+                    "Updated network section tree with SAP for {:?}",
                     provided_sap.prefix()
                 );
 
@@ -390,7 +390,7 @@ impl NetworkKnowledge {
                     );
 
                     let section_chain = self
-                        .prefix_map
+                        .section_tree
                         .get_sections_dag()
                         .get_proof_chain(self.genesis_key(), &provided_sap.section_key())?;
 
@@ -409,7 +409,7 @@ impl NetworkKnowledge {
             }
             Err(err) => {
                 debug!(
-                    "Anti-Entropy: discarded SAP for {:?} since we failed to update prefix map with: {:?}",
+                    "Anti-Entropy: discarded SAP for {:?} since we failed to update section tree with: {:?}",
                     provided_sap.prefix(), err
                 );
             }
@@ -435,19 +435,19 @@ impl NetworkKnowledge {
         Ok(there_was_an_update)
     }
 
-    // Returns reference to network prefix map
-    pub fn prefix_map(&self) -> &NetworkPrefixMap {
-        &self.prefix_map
+    // Returns reference to network section tree
+    pub fn section_tree(&self) -> &SectionTree {
+        &self.section_tree
     }
 
-    // Returns mutable reference to network prefix map
-    pub fn prefix_map_mut(&mut self) -> &mut NetworkPrefixMap {
-        &mut self.prefix_map
+    // Returns mutable reference to network section tree
+    pub fn section_tree_mut(&mut self) -> &mut SectionTree {
+        &mut self.section_tree
     }
 
     // Returns the section authority provider for the prefix that matches name.
     pub fn section_by_name(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
-        self.prefix_map.section_by_name(name)
+        self.section_tree.section_by_name(name)
     }
     // Returns the signed sap
     pub fn signed_sap(&self) -> SectionAuth<SectionAuthorityProvider> {
@@ -461,13 +461,13 @@ impl NetworkKnowledge {
         name: &XorName,
     ) -> Option<(&SectionAuth<SectionAuthorityProvider>, SecuredLinkedList)> {
         let closest_sap = self
-            .prefix_map
+            .section_tree
             .closest(name, Some(&self.prefix()))
             // In case the only prefix is ours, we fallback to it.
-            .unwrap_or(self.prefix_map.get_signed(&self.prefix())?);
+            .unwrap_or(self.section_tree.get_signed(&self.prefix())?);
 
         if let Ok(proof_chain) = self
-            .prefix_map
+            .section_tree
             .get_sections_dag()
             .get_proof_chain(self.genesis_key(), &closest_sap.value.section_key())
         {
@@ -479,7 +479,7 @@ impl NetworkKnowledge {
 
     // Return the network genesis key
     pub fn genesis_key(&self) -> &bls::PublicKey {
-        self.prefix_map.genesis_key()
+        self.section_tree.genesis_key()
     }
 
     /// Try to merge this `NetworkKnowledge` members with `peers`.
@@ -540,7 +540,7 @@ impl NetworkKnowledge {
     /// Return a copy of our section_dag
     pub fn our_section_dag(&self) -> SecuredLinkedList {
         self.get_proof_chain_to_current(self.genesis_key())
-            // will never be an error since we will always have signed_sap's key in prefix map and
+            // will never be an error since we will always have signed_sap's key in section tree and
             // also keep the fields in sync
             .unwrap_or_else(|_| SecuredLinkedList::new(*self.genesis_key()))
     }
@@ -549,7 +549,7 @@ impl NetworkKnowledge {
     pub fn get_proof_chain_to_current(&self, from_key: &BlsPublicKey) -> Result<SecuredLinkedList> {
         let our_section_key = self.signed_sap.section_key();
         let proof_chain = self
-            .prefix_map
+            .section_tree
             .get_sections_dag()
             .get_proof_chain(from_key, &our_section_key)?;
 
@@ -574,7 +574,7 @@ impl NetworkKnowledge {
     /// Return a vec of all known keys
     pub fn known_keys(&self) -> Vec<bls::PublicKey> {
         let mut known_keys: Vec<_> = self.our_section_dag().keys().copied().collect();
-        known_keys.extend(self.prefix_map().section_keys());
+        known_keys.extend(self.section_tree().section_keys());
         known_keys.push(*self.genesis_key());
         known_keys
     }

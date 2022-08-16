@@ -15,7 +15,7 @@ use sn_interface::{
         data::{CmdError, OperationId, QueryResponse},
         MsgId,
     },
-    network_knowledge::prefix_map::NetworkPrefixMap,
+    network_knowledge::SectionTree,
     types::PeerLinks,
 };
 
@@ -46,7 +46,7 @@ pub(super) struct Session {
     // Channels for sending CmdAck to upper layers
     pending_cmds: PendingCmdAcks,
     /// All elders we know about from AE messages
-    pub(super) network: NetworkPrefixMap,
+    pub(super) network: SectionTree,
     /// Standard time to await potential AE messages:
     cmd_ack_wait: Duration,
     /// Links to nodes
@@ -60,7 +60,7 @@ impl Session {
         qp2p_config: QuicP2pConfig,
         local_addr: SocketAddr,
         cmd_ack_wait: Duration,
-        prefix_map: NetworkPrefixMap,
+        network_contacts: SectionTree,
     ) -> Result<Session> {
         let endpoint = Endpoint::new_client(local_addr, qp2p_config)?;
         let peer_links = PeerLinks::new(endpoint.clone());
@@ -69,7 +69,7 @@ impl Session {
             pending_queries: Arc::new(DashMap::default()),
             pending_cmds: Arc::new(DashMap::default()),
             endpoint,
-            network: prefix_map,
+            network: network_contacts,
             cmd_ack_wait,
             peer_links,
         };

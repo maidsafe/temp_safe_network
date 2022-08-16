@@ -13,7 +13,7 @@ use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Help, Report, Result};
 use comfy_table::Table;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
-use sn_api::{NetworkPrefixMap, Safe, DEFAULT_PREFIX_MAP_FILE_NAME};
+use sn_api::{Safe, SectionTree, DEFAULT_NETWORK_CONTACTS_FILE_NAME};
 use sn_dbc::Owner;
 use std::{
     collections::BTreeMap,
@@ -77,10 +77,10 @@ impl NetworkLauncher for SnLaunchToolNetworkLauncher {
 #[derive(Deserialize, Debug, Serialize, Clone)]
 pub enum NetworkInfo {
     /// The Local path pointing to a network map. The optional genesis key denotes that the network map has been copied
-    /// to prefix_maps_dir
+    /// to network_contacts_dir
     Local(PathBuf, Option<BlsPublicKey>),
     /// The remote url pointing to a network map. The optional genesis key denotes that the network map has been copied
-    /// to prefix_maps_dir
+    /// to network_contacts_dir
     Remote(String, Option<BlsPublicKey>),
 }
 
@@ -129,12 +129,12 @@ pub struct Settings {
 pub struct Config {
     settings: Settings,
     pub cli_config_path: PathBuf,
-    pub prefix_maps_dir: PathBuf,
+    pub network_contacts_dir: PathBuf,
     pub dbc_owner: Option<Owner>,
 }
 
 impl Config {
-    pub async fn new(cli_config_path: PathBuf, prefix_maps_dir: PathBuf) -> Result<Config> {
+    pub async fn new(cli_config_path: PathBuf, network_contacts_dir: PathBuf) -> Result<Config> {
         let mut pb = cli_config_path.clone();
         pb.pop();
         fs::create_dir_all(pb.as_path()).await?;
@@ -180,7 +180,7 @@ impl Config {
             Settings::default()
         };
 
-        fs::create_dir_all(prefix_maps_dir.as_path()).await?;
+        fs::create_dir_all(network_contacts_dir.as_path()).await?;
         let mut dbc_owner_sk_path = pb.clone();
         dbc_owner_sk_path.push("credentials");
         let dbc_owner = Config::get_dbc_owner(&dbc_owner_sk_path)?;
@@ -188,7 +188,7 @@ impl Config {
         let config = Config {
             settings,
             cli_config_path: cli_config_path.clone(),
-            prefix_maps_dir,
+            network_contacts_dir,
             dbc_owner,
         };
         config.write_settings_to_file().await.wrap_err_with(|| {
@@ -197,23 +197,24 @@ impl Config {
         Ok(config)
     }
 
-    /// Sync settings and the prefix_map_dir
+    /// Sync settings and the network_contacts_dir
     pub async fn sync(&mut self) -> Result<()> {
         // if default hardlink is present, make sure its original file is also present; Else the
         // default hardlink might be overwritten while switching networks
-        if let Ok(default_prefix) = self.read_default_prefix_map().await {
-            self.write_prefix_map(&default_prefix).await?;
+        if let Ok(default_network_contacts) = self.read_default_network_contacts().await {
+            self.write_network_contacts(&default_network_contacts)
+                .await?;
         };
 
         let mut dir_files_checklist: BTreeMap<String, bool> = BTreeMap::new();
-        let mut prefix_maps_dir = fs::read_dir(&self.prefix_maps_dir).await?;
-        while let Some(entry) = prefix_maps_dir.next_entry().await? {
+        let mut network_contacts_dir = fs::read_dir(&self.network_contacts_dir).await?;
+        while let Some(entry) = network_contacts_dir.next_entry().await? {
             if entry.metadata().await?.is_file() {
                 let filename = entry
                     .file_name()
                     .into_string()
                     .map_err(|_| eyre!("Error converting OsString to String"))?;
-                if filename != *DEFAULT_PREFIX_MAP_FILE_NAME {
+                if filename != *DEFAULT_NETWORK_CONTACTS_FILE_NAME {
                     dir_files_checklist.insert(filename, false);
                 }
             }
@@ -237,7 +238,7 @@ impl Config {
             })?
         };
 
-        // get NetworkPrefixMap from cli_config if they are not in prefix_maps_dir
+        // get SectionTree from cli_config if they are not in network_contacts_dir
         let mut remove_list: Vec<String> = Vec::new();
         for (network_name, net_info) in self.settings.networks.iter_mut() {
             match net_info {
@@ -247,25 +248,31 @@ impl Config {
                         {
                             Some(present) => *present = true,
                             None => {
-                                if let Ok(prefix_map) = Self::retrieve_local_prefix_map(path).await
+                                if let Ok(network_contacts) =
+                                    Self::retrieve_local_network_contacts(path).await
                                 {
-                                    Self::write_prefix_map_to_dir(
-                                        &self.prefix_maps_dir,
-                                        &prefix_map,
+                                    Self::write_network_contacts_to_dir(
+                                        &self.network_contacts_dir,
+                                        &network_contacts,
                                     )
                                     .await?;
-                                    *genesis_key = Some(*prefix_map.genesis_key());
+                                    *genesis_key = Some(*network_contacts.genesis_key());
                                 } else {
                                     remove_list.push(network_name.clone());
                                 }
                             }
                         },
-                        // NetworkPrefixMap has not been fetched, fetch it
+                        // SectionTree has not been fetched, fetch it
                         None => {
-                            if let Ok(prefix_map) = Self::retrieve_local_prefix_map(path).await {
-                                Self::write_prefix_map_to_dir(&self.prefix_maps_dir, &prefix_map)
-                                    .await?;
-                                *genesis_key = Some(*prefix_map.genesis_key());
+                            if let Ok(network_contacts) =
+                                Self::retrieve_local_network_contacts(path).await
+                            {
+                                Self::write_network_contacts_to_dir(
+                                    &self.network_contacts_dir,
+                                    &network_contacts,
+                                )
+                                .await?;
+                                *genesis_key = Some(*network_contacts.genesis_key());
                             } else {
                                 remove_list.push(network_name.clone());
                             }
@@ -277,10 +284,15 @@ impl Config {
                         Some(present) => *present = true,
                         None => {
                             let url = Url::parse(url)?;
-                            if let Ok(prefix_map) = Self::retrieve_remote_prefix_map(&url).await {
-                                Self::write_prefix_map_to_dir(&self.prefix_maps_dir, &prefix_map)
-                                    .await?;
-                                *genesis_key = Some(*prefix_map.genesis_key());
+                            if let Ok(network_contacts) =
+                                Self::retrieve_remote_network_contacts(&url).await
+                            {
+                                Self::write_network_contacts_to_dir(
+                                    &self.network_contacts_dir,
+                                    &network_contacts,
+                                )
+                                .await?;
+                                *genesis_key = Some(*network_contacts.genesis_key());
                             } else {
                                 remove_list.push(network_name.clone());
                             }
@@ -288,10 +300,15 @@ impl Config {
                     },
                     None => {
                         let url = Url::parse(url)?;
-                        if let Ok(prefix_map) = Self::retrieve_remote_prefix_map(&url).await {
-                            Self::write_prefix_map_to_dir(&self.prefix_maps_dir, &prefix_map)
-                                .await?;
-                            *genesis_key = Some(*prefix_map.genesis_key());
+                        if let Ok(network_contacts) =
+                            Self::retrieve_remote_network_contacts(&url).await
+                        {
+                            Self::write_network_contacts_to_dir(
+                                &self.network_contacts_dir,
+                                &network_contacts,
+                            )
+                            .await?;
+                            *genesis_key = Some(*network_contacts.genesis_key());
                         } else {
                             remove_list.push(network_name.clone());
                         }
@@ -303,34 +320,36 @@ impl Config {
             self.settings.networks.remove(network.as_str());
         }
 
-        // add unaccounted NetworkPrefixMap from prefix_maps_dir to cli_config
+        // add unaccounted SectionTree from network_contacts_dir to cli_config
         for (filename, present) in dir_files_checklist.iter() {
             if !present {
-                let path = self.prefix_maps_dir.join(filename);
-                if let Ok(prefix_map) = Self::retrieve_local_prefix_map(&path).await {
-                    let genesis_key = *prefix_map.genesis_key();
+                let path = self.network_contacts_dir.join(filename);
+                if let Ok(network_contacts) = Self::retrieve_local_network_contacts(&path).await {
+                    let genesis_key = *network_contacts.genesis_key();
                     self.settings.networks.insert(
                         format!("{:?}", genesis_key),
                         NetworkInfo::Local(path, Some(genesis_key)),
                     );
                 }
-                // else remove the prefix_map if not NetworkPrefixMap type?
+                // else remove the network_contacts if not SectionTree type?
             }
         }
         self.write_settings_to_file().await?;
         Ok(())
     }
 
-    pub async fn read_default_prefix_map(&self) -> Result<NetworkPrefixMap> {
-        let default_path = self.prefix_maps_dir.join(DEFAULT_PREFIX_MAP_FILE_NAME);
-        let prefix_map = Self::retrieve_local_prefix_map(&default_path)
+    pub async fn read_default_network_contacts(&self) -> Result<SectionTree> {
+        let default_path = self
+            .network_contacts_dir
+            .join(DEFAULT_NETWORK_CONTACTS_FILE_NAME);
+        let network_contacts = Self::retrieve_local_network_contacts(&default_path)
             .await
             .wrap_err_with(|| {
                 eyre!("There doesn't seem to be any default Network Map").suggestion(
                     "A Network Map will be created if you join a network or launch your own.",
                 )
             })?;
-        Ok(prefix_map)
+        Ok(network_contacts)
     }
 
     pub fn networks_iter(&self) -> impl Iterator<Item = (&String, &NetworkInfo)> {
@@ -347,15 +366,15 @@ impl Config {
                 if !path.is_absolute() {
                     *path = fs::canonicalize(&path).await?
                 }
-                let prefix_map = Self::retrieve_local_prefix_map(path).await?;
-                self.write_prefix_map(&prefix_map).await?;
-                *genesis_key = Some(*prefix_map.genesis_key());
+                let network_contacts = Self::retrieve_local_network_contacts(path).await?;
+                self.write_network_contacts(&network_contacts).await?;
+                *genesis_key = Some(*network_contacts.genesis_key());
             }
             NetworkInfo::Remote(ref url, ref mut genesis_key) => {
                 let url = Url::parse(url)?;
-                let prefix_map = Self::retrieve_remote_prefix_map(&url).await?;
-                self.write_prefix_map(&prefix_map).await?;
-                *genesis_key = Some(*prefix_map.genesis_key());
+                let network_contacts = Self::retrieve_remote_network_contacts(&url).await?;
+                self.write_network_contacts(&network_contacts).await?;
+                *genesis_key = Some(*network_contacts.genesis_key());
             }
         };
         self.settings
@@ -373,11 +392,11 @@ impl Config {
             Some(NetworkInfo::Local(_, genesis_key)) => {
                 self.write_settings_to_file().await?;
                 if let Some(gk) = genesis_key {
-                    let prefix_map_path = self.prefix_maps_dir.join(format!("{:?}", gk));
-                    if fs::remove_file(&prefix_map_path).await.is_err() {
+                    let network_contacts_path = self.network_contacts_dir.join(format!("{:?}", gk));
+                    if fs::remove_file(&network_contacts_path).await.is_err() {
                         println!(
                             "Failed to remove network map from {}",
-                            prefix_map_path.display()
+                            network_contacts_path.display()
                         )
                     }
                 }
@@ -386,22 +405,26 @@ impl Config {
             Some(NetworkInfo::Remote(_, genesis_key)) => {
                 self.write_settings_to_file().await?;
                 if let Some(gk) = genesis_key {
-                    let prefix_map_path = self.prefix_maps_dir.join(format!("{:?}", gk));
-                    if fs::remove_file(&prefix_map_path).await.is_err() {
+                    let network_contacts_path = self.network_contacts_dir.join(format!("{:?}", gk));
+                    if fs::remove_file(&network_contacts_path).await.is_err() {
                         println!(
                             "Failed to remove network map from {}",
-                            prefix_map_path.display()
+                            network_contacts_path.display()
                         )
                     }
                 }
             }
             None => println!("No network with name '{}' was found in config", name),
         }
-        if fs::remove_file(&self.prefix_maps_dir.join(DEFAULT_PREFIX_MAP_FILE_NAME))
-            .await
-            .is_err()
+        if fs::remove_file(
+            &self
+                .network_contacts_dir
+                .join(DEFAULT_NETWORK_CONTACTS_FILE_NAME),
+        )
+        .await
+        .is_err()
         {
-            debug!("Cannot remove default NetworkPrefixMap!");
+            debug!("Cannot remove default SectionTree!");
         };
         debug!("Network '{}' removed from config", name);
         println!("Network '{}' was removed from the config", name);
@@ -412,9 +435,9 @@ impl Config {
     pub async fn clear(&mut self) -> Result<()> {
         self.settings = Settings::default();
         self.write_settings_to_file().await?;
-        // delete all prefix maps
-        let mut prefix_maps_dir = fs::read_dir(&self.prefix_maps_dir).await?;
-        while let Some(entry) = prefix_maps_dir.next_entry().await? {
+        // delete all network contacts files
+        let mut network_contacts_dir = fs::read_dir(&self.network_contacts_dir).await?;
+        while let Some(entry) = network_contacts_dir.next_entry().await? {
             fs::remove_file(entry.path()).await?;
         }
         Ok(())
@@ -424,14 +447,14 @@ impl Config {
         match self.settings.networks.get(name) {
             Some(NetworkInfo::Local(_, genesis_key)) => {
                 match genesis_key {
-                    Some(gk) => self.set_default_prefix_map(gk).await?,
+                    Some(gk) => self.set_default_network_contacts(gk).await?,
                     //  can't be none since we sync during get_config
                     None => bail!("Cannot switch to {}, since the network file is not found! Please re-run the same command!", name)
                 }
             }
             Some(NetworkInfo::Remote(_, genesis_key)) => {
                 match genesis_key {
-                    Some(gk) => self.set_default_prefix_map(gk).await?,
+                    Some(gk) => self.set_default_network_contacts(gk).await?,
                     None => bail!("Cannot switch to {}, since the network file is not found! Please re-run the same command!", name)
                 }
             }
@@ -449,12 +472,12 @@ impl Config {
             "Genesis Key",
             "Network map info",
         ]);
-        let current_prefix_map = self.read_default_prefix_map().await;
+        let current_network_contacts = self.read_default_network_contacts().await;
 
         for (network_name, net_info) in self.networks_iter() {
             let mut current = "";
-            if let Ok(prefix_map) = &current_prefix_map {
-                if net_info.matches(prefix_map.genesis_key()) {
+            if let Ok(network_contacts) = &current_network_contacts {
+                if net_info.matches(network_contacts.genesis_key()) {
                     current = "*";
                 }
             }
@@ -478,50 +501,58 @@ impl Config {
         println!("{table}");
     }
 
-    pub async fn set_default_prefix_map(&self, genesis_key: &BlsPublicKey) -> Result<()> {
-        let prefix_map_file = self.prefix_maps_dir.join(format!("{:?}", genesis_key));
-        let default_prefix = self.prefix_maps_dir.join(DEFAULT_PREFIX_MAP_FILE_NAME);
+    pub async fn set_default_network_contacts(&self, genesis_key: &BlsPublicKey) -> Result<()> {
+        let network_contacts_file = self.network_contacts_dir.join(format!("{:?}", genesis_key));
+        let default_network_contacts = self
+            .network_contacts_dir
+            .join(DEFAULT_NETWORK_CONTACTS_FILE_NAME);
 
-        if default_prefix.exists() {
-            fs::remove_file(&default_prefix).await.wrap_err_with(|| {
-                format!(
-                    "Error removing default NetworkPrefixMap hardlink: {:?}",
-                    default_prefix.display()
-                )
-            })?;
+        if default_network_contacts.exists() {
+            fs::remove_file(&default_network_contacts)
+                .await
+                .wrap_err_with(|| {
+                    format!(
+                        "Error removing default SectionTree hardlink: {:?}",
+                        default_network_contacts.display()
+                    )
+                })?;
         }
         debug!(
-            "Creating hardlink for NetworkPrefixMap from {:?} to {:?}",
-            prefix_map_file.display(),
-            default_prefix.display()
+            "Creating hardlink for SectionTree from {:?} to {:?}",
+            network_contacts_file.display(),
+            default_network_contacts.display()
         );
-        fs::hard_link(&prefix_map_file, &default_prefix)
+        fs::hard_link(&network_contacts_file, &default_network_contacts)
             .await
             .wrap_err_with(|| {
                 format!(
                     "Error creating hardlink from {:?} to {:?}",
-                    prefix_map_file.display(),
-                    default_prefix.display()
+                    network_contacts_file.display(),
+                    default_network_contacts.display()
                 )
             })?;
         Ok(())
     }
 
-    pub async fn update_default_prefix_map(&self, prefix_map: &NetworkPrefixMap) -> Result<()> {
-        self.write_prefix_map(prefix_map).await?;
-        self.set_default_prefix_map(prefix_map.genesis_key()).await
+    pub async fn update_default_network_contacts(
+        &self,
+        network_contacts: &SectionTree,
+    ) -> Result<()> {
+        self.write_network_contacts(network_contacts).await?;
+        self.set_default_network_contacts(network_contacts.genesis_key())
+            .await
     }
 
-    pub async fn write_prefix_map(&self, prefix_map: &NetworkPrefixMap) -> Result<()> {
-        Self::write_prefix_map_to_dir(&self.prefix_maps_dir, prefix_map).await
+    pub async fn write_network_contacts(&self, network_contacts: &SectionTree) -> Result<()> {
+        Self::write_network_contacts_to_dir(&self.network_contacts_dir, network_contacts).await
     }
 
-    pub async fn retrieve_local_prefix_map(location: &Path) -> Result<NetworkPrefixMap> {
-        let pm = NetworkPrefixMap::from_disk(location).await?;
+    pub async fn retrieve_local_network_contacts(location: &Path) -> Result<SectionTree> {
+        let pm = SectionTree::from_disk(location).await?;
         Ok(pm)
     }
 
-    pub async fn retrieve_remote_prefix_map(url: &Url) -> Result<NetworkPrefixMap> {
+    pub async fn retrieve_remote_network_contacts(url: &Url) -> Result<SectionTree> {
         let mut retry = REMOTE_RETRY_COUNT;
         let mut bytes: Option<Bytes> = None;
         let mut status: StatusCode;
@@ -541,7 +572,7 @@ impl Config {
         }
         match bytes {
             Some(b) => {
-                let pm = NetworkPrefixMap::from_bytes(&b[..])?;
+                let pm = SectionTree::from_bytes(&b[..])?;
                 Ok(pm)
             }
             None => Err(eyre!(
@@ -557,11 +588,14 @@ impl Config {
     /// Private helpers
     ///
 
-    // Write the prefix map within the provided directory path, using the
-    // prefix map's genesis key as the filename.
-    async fn write_prefix_map_to_dir(dir: &Path, prefix_map: &NetworkPrefixMap) -> Result<()> {
-        let path = dir.join(format!("{:?}", prefix_map.genesis_key()));
-        prefix_map.write_to_disk(&path).await?;
+    // Write the network contacts file within the provided directory path,
+    // using the genesis key as the filename.
+    async fn write_network_contacts_to_dir(
+        dir: &Path,
+        network_contacts: &SectionTree,
+    ) -> Result<()> {
+        let path = dir.join(format!("{:?}", network_contacts.genesis_key()));
+        network_contacts.write_to_disk(&path).await?;
         Ok(())
     }
 
@@ -618,26 +652,26 @@ pub mod test_utils {
     use crate::operations::config::Settings;
     use assert_fs::{prelude::*, TempDir};
     use color_eyre::{eyre::eyre, Result};
-    use sn_api::{NetworkPrefixMap, DEFAULT_PREFIX_MAP_FILE_NAME};
+    use sn_api::{SectionTree, DEFAULT_NETWORK_CONTACTS_FILE_NAME};
     use std::collections::BTreeMap;
     use std::path::{Path, PathBuf};
     use tokio::fs;
 
-    pub async fn store_dummy_prefix_maps(
+    pub async fn store_dummy_network_contacts(
         path: &Path,
-        n_prefix_maps: usize,
-    ) -> Result<Vec<NetworkPrefixMap>> {
-        let mut prefix_maps: Vec<NetworkPrefixMap> = Vec::new();
+        n_network_contacts: usize,
+    ) -> Result<Vec<SectionTree>> {
+        let mut dummy_network_contacts: Vec<SectionTree> = Vec::new();
 
-        for _ in 0..n_prefix_maps {
+        for _ in 0..n_network_contacts {
             let sk = bls::SecretKey::random();
-            let prefix_map = NetworkPrefixMap::new(sk.public_key());
-            let filename = format!("{:?}", prefix_map.genesis_key());
+            let network_contacts = SectionTree::new(sk.public_key());
+            let filename = format!("{:?}", network_contacts.genesis_key());
 
-            prefix_map.write_to_disk(&path.join(filename)).await?;
-            prefix_maps.push(prefix_map);
+            network_contacts.write_to_disk(&path.join(filename)).await?;
+            dummy_network_contacts.push(network_contacts);
         }
-        Ok(prefix_maps)
+        Ok(dummy_network_contacts)
     }
 
     impl Config {
@@ -651,32 +685,34 @@ pub mod test_utils {
                 cli_config_file.write_str(serde_json::to_string(&settings)?.as_str())?;
             }
 
-            let prefix_maps_dir = tmp_dir.child(".safe/prefix_maps");
+            let network_contacts_dir = tmp_dir.child(".safe/network_contacts");
             Config::new(
                 PathBuf::from(cli_config_file.path()),
-                PathBuf::from(prefix_maps_dir.path()),
+                PathBuf::from(network_contacts_dir.path()),
             )
             .await
         }
 
-        pub async fn store_dummy_prefix_maps_and_set_default(
+        pub async fn store_dummy_network_contacts_and_set_default(
             &self,
-            n_prefix_maps: usize,
-        ) -> Result<Vec<NetworkPrefixMap>> {
-            let prefix_maps = store_dummy_prefix_maps(&self.prefix_maps_dir, n_prefix_maps).await?;
+            n_network_contacts: usize,
+        ) -> Result<Vec<SectionTree>> {
+            let dummy_network_contacts =
+                store_dummy_network_contacts(&self.network_contacts_dir, n_network_contacts)
+                    .await?;
             // set one as default
-            let prefix_map = prefix_maps.clone().pop().unwrap();
-            self.set_default_prefix_map(prefix_map.genesis_key())
+            let default_network_contacts = dummy_network_contacts.clone().pop().unwrap();
+            self.set_default_network_contacts(default_network_contacts.genesis_key())
                 .await?;
-            Ok(prefix_maps)
+            Ok(dummy_network_contacts)
         }
 
         /// Compare the network entries by creating a checklist using the settings and marking
         /// them as 'true' if the network is present in the system.
-        pub async fn compare_settings_and_prefix_maps_dir(&self) -> Result<()> {
-            let mut prefix_map_checklist: BTreeMap<String, bool> = BTreeMap::new();
+        pub async fn compare_settings_and_network_contacts_dir(&self) -> Result<()> {
+            let mut network_contacts_checklist: BTreeMap<String, bool> = BTreeMap::new();
 
-            // get list of all NetworkPrefixMaps from settings
+            // get list of all networks from settings
             for (_, net_info) in self.networks_iter() {
                 let genesis_key =
                     match net_info {
@@ -686,23 +722,23 @@ pub mod test_utils {
                             .ok_or_else(|| eyre!("gk should must be present after sync"))?,
                     };
 
-                // same gk can be present if multiple network entries in settings points to the same
-                // prefix map
-                let _ = prefix_map_checklist.insert(format!("{:?}", genesis_key), false);
+                // same gk can be present if multiple network entries in settings points
+                // to the same network contacts file
+                let _ = network_contacts_checklist.insert(format!("{:?}", genesis_key), false);
             }
 
-            // mark them as true if the same entries are found in the prefix_maps_dir
-            let mut prefix_maps_dir = fs::read_dir(&self.prefix_maps_dir).await?;
-            while let Some(entry) = prefix_maps_dir.next_entry().await? {
+            // mark them as true if the same entries are found in the network_contacts_dir
+            let mut network_contacts_dir = fs::read_dir(&self.network_contacts_dir).await?;
+            while let Some(entry) = network_contacts_dir.next_entry().await? {
                 if entry.metadata().await?.is_file() {
                     let filename = entry
                         .file_name()
                         .into_string()
                         .map_err(|_| eyre!("Error converting OsString to String"))?;
-                    if filename != *DEFAULT_PREFIX_MAP_FILE_NAME {
-                        let already_present = prefix_map_checklist.insert(filename, true);
+                    if filename != *DEFAULT_NETWORK_CONTACTS_FILE_NAME {
+                        let already_present = network_contacts_checklist.insert(filename, true);
                         // cannot insert new entries. Denotes that an extra network is found in
-                        // prefix_maps_dir
+                        // network_contacts_dir
                         if already_present.is_none() {
                             return Err(eyre!("Extra network found in the system!"));
                         }
@@ -710,7 +746,7 @@ pub mod test_utils {
                 }
             }
 
-            for (_, present) in prefix_map_checklist.iter() {
+            for (_, present) in network_contacts_checklist.iter() {
                 if !present {
                     return Err(eyre!("Extra network found in the settings!"));
                 }
@@ -723,7 +759,7 @@ pub mod test_utils {
 #[cfg(test)]
 mod constructor {
     use super::{Config, NetworkInfo};
-    use crate::operations::config::{test_utils::store_dummy_prefix_maps, Settings};
+    use crate::operations::config::{test_utils::store_dummy_network_contacts, Settings};
     use assert_fs::prelude::*;
     use bls::SecretKey;
     use color_eyre::{eyre::eyre, Result};
@@ -736,7 +772,7 @@ mod constructor {
         let tmp_dir = assert_fs::TempDir::new()?;
         let cli_config_dir = tmp_dir.child(".safe/cli");
         cli_config_dir.create_dir_all()?;
-        let prefix_maps_dir = tmp_dir.child(".safe/prefix_maps");
+        let network_contacts_dir = tmp_dir.child(".safe/network_contacts");
 
         let cli_config_file = cli_config_dir.child("config.json");
         let dbc_owner_sk_file = cli_config_dir.child("credentials");
@@ -745,12 +781,12 @@ mod constructor {
 
         let config = Config::new(
             PathBuf::from(cli_config_file.path()),
-            PathBuf::from(prefix_maps_dir.path()),
+            PathBuf::from(network_contacts_dir.path()),
         )
         .await?;
 
         assert_eq!(config.cli_config_path, cli_config_file.path());
-        assert_eq!(config.prefix_maps_dir, prefix_maps_dir.path());
+        assert_eq!(config.network_contacts_dir, network_contacts_dir.path());
         assert_eq!(config.settings.networks.len(), 0);
         assert!(config.dbc_owner.is_some());
         Ok(())
@@ -761,16 +797,16 @@ mod constructor {
         let tmp_dir = assert_fs::TempDir::new()?;
         let cli_config_dir = tmp_dir.child(".safe/cli");
         let cli_config_file = cli_config_dir.child("config.json");
-        let prefix_maps_dir = tmp_dir.child(".safe/prefix_maps");
+        let network_contacts_dir = tmp_dir.child(".safe/network_contacts");
 
         let _ = Config::new(
             PathBuf::from(cli_config_file.path()),
-            PathBuf::from(prefix_maps_dir.path()),
+            PathBuf::from(network_contacts_dir.path()),
         )
         .await?;
 
         cli_config_dir.assert(predicate::path::is_dir());
-        prefix_maps_dir.assert(predicate::path::is_dir());
+        network_contacts_dir.assert(predicate::path::is_dir());
         Ok(())
     }
 
@@ -778,11 +814,11 @@ mod constructor {
     async fn given_config_file_does_not_exist_then_it_should_be_created() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
         let cli_config_file = tmp_dir.child(".safe/cli/config.json");
-        let prefix_maps_dir = tmp_dir.child(".safe/prefix_maps");
+        let network_contacts_dir = tmp_dir.child(".safe/network_contacts");
 
         let _ = Config::new(
             PathBuf::from(cli_config_file.path()),
-            PathBuf::from(prefix_maps_dir.path()),
+            PathBuf::from(network_contacts_dir.path()),
         )
         .await?;
 
@@ -795,22 +831,25 @@ mod constructor {
     async fn given_config_file_exists_then_the_settings_should_be_read() -> Result<()> {
         // write cli/config.json file
         let tmp_dir = assert_fs::TempDir::new()?;
-        let prefix_map = store_dummy_prefix_maps(&tmp_dir, 1).await?.pop().unwrap();
-        let prefix_map_path = tmp_dir
+        let network_contacts = store_dummy_network_contacts(&tmp_dir, 1)
+            .await?
+            .pop()
+            .unwrap();
+        let network_contacts_path = tmp_dir
             .path()
-            .join(format!("{:?}", prefix_map.genesis_key()));
+            .join(format!("{:?}", network_contacts.genesis_key()));
         let mut settings = Settings::default();
         settings.networks.insert(
             "network_1".to_string(),
             NetworkInfo::Remote(
-                "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/prefix_map"
+                "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/network_contacts"
                     .to_string(),
                 None,
             ),
         );
         settings.networks.insert(
             "network_2".to_string(),
-            NetworkInfo::Local(prefix_map_path, Some(*prefix_map.genesis_key())),
+            NetworkInfo::Local(network_contacts_path, Some(*network_contacts.genesis_key())),
         );
         let config = Config::create_config(&tmp_dir, Some(settings)).await?;
 
@@ -830,7 +869,7 @@ mod constructor {
         assert_eq!(network_name, "network_2");
         assert!(matches!(
                 network_info,
-                NetworkInfo::Local(_, Some(genesis_key)) if genesis_key == prefix_map.genesis_key()
+                NetworkInfo::Local(_, Some(genesis_key)) if genesis_key == network_contacts.genesis_key()
         ));
         Ok(())
     }
@@ -840,125 +879,149 @@ mod constructor {
         let tmp_dir = assert_fs::TempDir::new()?;
         let cli_config_file = tmp_dir.child(".safe/cli/config.json");
         cli_config_file.touch()?;
-        let prefix_maps_dir = tmp_dir.child(".safe/prefix_maps");
+        let network_contacts_dir = tmp_dir.child(".safe/network_contacts");
         let config = Config::new(
             PathBuf::from(cli_config_file.path()),
-            PathBuf::from(prefix_maps_dir.path()),
+            PathBuf::from(network_contacts_dir.path()),
         )
         .await?;
 
         assert_eq!(0, config.settings.networks.len());
         assert_eq!(cli_config_file.path(), config.cli_config_path.as_path());
-        assert_eq!(prefix_maps_dir.path(), config.prefix_maps_dir.as_path());
+        assert_eq!(
+            network_contacts_dir.path(),
+            config.network_contacts_dir.as_path()
+        );
 
         Ok(())
     }
 }
 
 #[cfg(test)]
-mod read_prefix_map {
+mod read_network_contacts {
     use super::Config;
     use color_eyre::Result;
-    use sn_api::DEFAULT_PREFIX_MAP_FILE_NAME;
+    use sn_api::DEFAULT_NETWORK_CONTACTS_FILE_NAME;
     use tokio::fs;
 
     #[tokio::test]
-    async fn given_default_prefix_map_it_should_be_read() -> Result<()> {
+    async fn given_default_network_contacts_it_should_be_read() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
         let config = Config::create_config(&tmp_dir, None).await?;
-        let prefix_map = config
-            .store_dummy_prefix_maps_and_set_default(1)
+        let network_contacts = config
+            .store_dummy_network_contacts_and_set_default(1)
             .await?
             .pop()
             .unwrap();
 
-        let retrieved_prefix_map = config.read_default_prefix_map().await?;
-        assert_eq!(retrieved_prefix_map, prefix_map);
+        let retrieved_network_contacts = config.read_default_network_contacts().await?;
+        assert_eq!(retrieved_network_contacts, network_contacts);
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn given_no_default_prefix_map_hardlink_it_should_be_an_error() -> Result<()> {
+    async fn given_no_default_network_contacts_hardlink_it_should_be_an_error() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
         let config = Config::create_config(&tmp_dir, None).await?;
-        let _ = config.store_dummy_prefix_maps_and_set_default(1).await?;
-        fs::remove_file(&config.prefix_maps_dir.join(DEFAULT_PREFIX_MAP_FILE_NAME)).await?;
+        let _ = config
+            .store_dummy_network_contacts_and_set_default(1)
+            .await?;
+        fs::remove_file(
+            &config
+                .network_contacts_dir
+                .join(DEFAULT_NETWORK_CONTACTS_FILE_NAME),
+        )
+        .await?;
 
-        let retrieved_prefix_map = config.read_default_prefix_map().await;
-        assert!(retrieved_prefix_map.is_err(), "Hardlink should not exist");
+        let retrieved_network_contacts = config.read_default_network_contacts().await;
+        assert!(
+            retrieved_network_contacts.is_err(),
+            "Hardlink should not exist"
+        );
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn given_no_prefix_map_file_it_should_be_an_error() -> Result<()> {
+    async fn given_no_network_contacts_file_it_should_be_an_error() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
         let config = Config::create_config(&tmp_dir, None).await?;
-        let retrieved_prefix_map = config.read_default_prefix_map().await;
-        assert!(retrieved_prefix_map.is_err(), "PrefixMap should not exist");
+        let retrieved_network_contacts = config.read_default_network_contacts().await;
+        assert!(
+            retrieved_network_contacts.is_err(),
+            "Network contacts file should not exist"
+        );
 
         Ok(())
     }
 }
 
 #[cfg(test)]
-mod sync_prefix_maps_and_settings {
+mod sync_network_contacts_and_settings {
     use super::Config;
-    use crate::operations::config::{test_utils::store_dummy_prefix_maps, NetworkInfo, Settings};
+    use crate::operations::config::{
+        test_utils::store_dummy_network_contacts, NetworkInfo, Settings,
+    };
     use color_eyre::eyre::eyre;
     use color_eyre::Result;
-    use sn_api::DEFAULT_PREFIX_MAP_FILE_NAME;
+    use sn_api::DEFAULT_NETWORK_CONTACTS_FILE_NAME;
     use tokio::fs;
 
     #[tokio::test]
-    async fn empty_cli_config_file_should_be_populated_by_existing_prefix_maps() -> Result<()> {
+    async fn empty_cli_config_file_should_be_populated_by_existing_network_contacts() -> Result<()>
+    {
         let tmp_dir = assert_fs::TempDir::new()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
-        let _ = config.store_dummy_prefix_maps_and_set_default(4).await?;
+        let _ = config
+            .store_dummy_network_contacts_and_set_default(4)
+            .await?;
 
         config.sync().await?;
         // sync should not read "default" file; hence 4 networks as expected
         assert_eq!(config.settings.networks.len(), 4);
-        config.compare_settings_and_prefix_maps_dir().await?;
+        config.compare_settings_and_network_contacts_dir().await?;
         Ok(())
     }
 
     #[tokio::test]
-    async fn prefix_maps_should_be_fetched_from_cli_config_file() -> Result<()> {
+    async fn network_contacts_should_be_fetched_from_cli_config_file() -> Result<()> {
         // write cli/config.json file
         let tmp_dir = assert_fs::TempDir::new()?;
-        let prefix_maps = store_dummy_prefix_maps(&tmp_dir, 2).await?;
+        let network_contacts = store_dummy_network_contacts(&tmp_dir, 2).await?;
         let mut settings = Settings::default();
         settings.networks.insert(
             "network_1".to_string(),
             NetworkInfo::Remote(
-                "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/prefix_map"
+                "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/network_contacts"
                     .to_string(),
                 None,
             ),
         );
         settings.networks.insert(
             "network_2".to_string(),
-            NetworkInfo::Remote("https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/prefix_map_1".to_string(), None)
+            NetworkInfo::Remote("https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/network_contacts_1".to_string(), None)
         );
-        prefix_maps
+        network_contacts
             .iter()
             .enumerate()
-            .for_each(|(idx, prefix_map)| {
-                let prefix_map_path = tmp_dir
+            .for_each(|(idx, network_contacts)| {
+                let network_contacts_path = tmp_dir
                     .path()
-                    .join(format!("{:?}", prefix_map.genesis_key()));
+                    .join(format!("{:?}", network_contacts.genesis_key()));
                 settings.networks.insert(
                     format!("local_network_{}", idx + 1),
-                    NetworkInfo::Local(prefix_map_path, Some(*prefix_map.genesis_key())),
+                    NetworkInfo::Local(
+                        network_contacts_path,
+                        Some(*network_contacts.genesis_key()),
+                    ),
                 );
             });
         let mut config = Config::create_config(&tmp_dir, Some(settings)).await?;
 
         config.sync().await?;
         assert_eq!(config.settings.networks.len(), 4);
-        config.compare_settings_and_prefix_maps_dir().await?;
+        config.compare_settings_and_network_contacts_dir().await?;
         Ok(())
     }
 
@@ -984,7 +1047,7 @@ mod sync_prefix_maps_and_settings {
 
         config.sync().await?;
         assert_eq!(config.settings.networks.len(), 0);
-        config.compare_settings_and_prefix_maps_dir().await?;
+        config.compare_settings_and_network_contacts_dir().await?;
         Ok(())
     }
 
@@ -992,22 +1055,25 @@ mod sync_prefix_maps_and_settings {
     async fn genesis_key_field_should_be_set() -> Result<()> {
         // write cli/config.json file
         let tmp_dir = assert_fs::TempDir::new()?;
-        let prefix_map = store_dummy_prefix_maps(&tmp_dir, 1).await?.pop().unwrap();
-        let prefix_map_path = tmp_dir
+        let network_contacts = store_dummy_network_contacts(&tmp_dir, 1)
+            .await?
+            .pop()
+            .unwrap();
+        let network_contacts_path = tmp_dir
             .path()
-            .join(format!("{:?}", prefix_map.genesis_key()));
+            .join(format!("{:?}", network_contacts.genesis_key()));
         let mut settings = Settings::default();
         settings.networks.insert(
             "network_1".to_string(),
             NetworkInfo::Remote(
-                "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/prefix_map"
+                "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/network_contacts"
                     .to_string(),
                 None,
             ),
         );
         settings.networks.insert(
             "network_2".to_string(),
-            NetworkInfo::Local(prefix_map_path, None),
+            NetworkInfo::Local(network_contacts_path, None),
         );
         let mut config = Config::create_config(&tmp_dir, Some(settings)).await?;
 
@@ -1026,7 +1092,7 @@ mod sync_prefix_maps_and_settings {
         assert_eq!(network_name, "network_2");
         assert!(matches!(network_info, NetworkInfo::Local(_, Some(_))));
 
-        config.compare_settings_and_prefix_maps_dir().await?;
+        config.compare_settings_and_network_contacts_dir().await?;
 
         Ok(())
     }
@@ -1035,24 +1101,26 @@ mod sync_prefix_maps_and_settings {
     async fn network_list_should_be_fetched_from_cli_config_file() -> Result<()> {
         // write cli/config.json file
         let tmp_dir = assert_fs::TempDir::new()?;
-        let mut prefix_maps = store_dummy_prefix_maps(&tmp_dir, 2).await?;
-        let prefix_map_path = tmp_dir
-            .path()
-            .join(format!("{:?}", prefix_maps.pop().unwrap().genesis_key()));
+        let mut network_contacts = store_dummy_network_contacts(&tmp_dir, 2).await?;
+        let network_contacts_path = tmp_dir.path().join(format!(
+            "{:?}",
+            network_contacts.pop().unwrap().genesis_key()
+        ));
         let mut settings = Settings::default();
         settings.networks.insert(
             "network_1".to_string(),
-            NetworkInfo::Local(prefix_map_path, None),
+            NetworkInfo::Local(network_contacts_path, None),
         );
         let mut config = Config::create_config(&tmp_dir, Some(settings)).await?;
 
-        let prefix_map_path = tmp_dir
-            .path()
-            .join(format!("{:?}", prefix_maps.pop().unwrap().genesis_key()));
+        let network_contacts_path = tmp_dir.path().join(format!(
+            "{:?}",
+            network_contacts.pop().unwrap().genesis_key()
+        ));
         // will be ignored during sync since the network list is fetched from the config file
         config.settings.networks.insert(
             "network_2".to_string(),
-            NetworkInfo::Local(prefix_map_path.clone(), None),
+            NetworkInfo::Local(network_contacts_path.clone(), None),
         );
         config.sync().await?;
         assert_eq!(config.settings.networks.len(), 1);
@@ -1060,7 +1128,7 @@ mod sync_prefix_maps_and_settings {
         // but it will be read if it's present in the cli/config.json file
         config.settings.networks.insert(
             "network_2".to_string(),
-            NetworkInfo::Local(prefix_map_path, None),
+            NetworkInfo::Local(network_contacts_path, None),
         );
         config.write_settings_to_file().await?;
         config.sync().await?;
@@ -1070,37 +1138,40 @@ mod sync_prefix_maps_and_settings {
     }
 
     #[tokio::test]
-    async fn multiple_networks_with_the_same_prefix_map() -> Result<()> {
+    async fn multiple_networks_with_the_same_network_contacts() -> Result<()> {
         // write cli/config.json file
         let tmp_dir = assert_fs::TempDir::new()?;
-        let prefix_map = store_dummy_prefix_maps(&tmp_dir, 1).await?.pop().unwrap();
-        let prefix_map_path = tmp_dir
+        let network_contacts = store_dummy_network_contacts(&tmp_dir, 1)
+            .await?
+            .pop()
+            .unwrap();
+        let network_contacts_path = tmp_dir
             .path()
-            .join(format!("{:?}", prefix_map.genesis_key()));
+            .join(format!("{:?}", network_contacts.genesis_key()));
         let mut settings = Settings::default();
         settings.networks.insert(
             "network_1".to_string(),
-            NetworkInfo::Local(prefix_map_path.clone(), None),
+            NetworkInfo::Local(network_contacts_path.clone(), None),
         );
         settings.networks.insert(
             "network_1_copy".to_string(),
-            NetworkInfo::Local(prefix_map_path, None),
+            NetworkInfo::Local(network_contacts_path, None),
         );
         let mut config = Config::create_config(&tmp_dir, Some(settings)).await?;
 
         config.sync().await?;
         assert_eq!(config.settings.networks.len(), 2);
-        config.compare_settings_and_prefix_maps_dir().await?;
+        config.compare_settings_and_network_contacts_dir().await?;
         Ok(())
     }
 
     #[tokio::test]
-    async fn local_variant_with_path_inside_prefix_map_dir() -> Result<()> {
-        // This is the case if prefix map was directly pasted into the dir. It should behave as expected
+    async fn local_variant_with_path_inside_network_contacts_dir() -> Result<()> {
+        // This is the case if network contacts file was directly pasted into the dir. It should behave as expected
         let tmp_dir = assert_fs::TempDir::new()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
-        let prefix_map = config
-            .store_dummy_prefix_maps_and_set_default(1)
+        let network_contacts = config
+            .store_dummy_network_contacts_and_set_default(1)
             .await?
             .pop()
             .unwrap();
@@ -1112,22 +1183,30 @@ mod sync_prefix_maps_and_settings {
             .networks_iter()
             .next()
             .ok_or_else(|| eyre!("failed to obtain item from networks list"))?;
-        assert_eq!(*network_name, format!("{:?}", prefix_map.genesis_key()));
+        assert_eq!(
+            *network_name,
+            format!("{:?}", network_contacts.genesis_key())
+        );
         assert!(matches!(
             network_info,
-            NetworkInfo::Local(_, Some(genesis_key)) if genesis_key == prefix_map.genesis_key()
+            NetworkInfo::Local(_, Some(genesis_key)) if genesis_key == network_contacts.genesis_key()
         ));
 
         fs::remove_file(
             config
-                .prefix_maps_dir
-                .join(format!("{:?}", prefix_map.genesis_key())),
+                .network_contacts_dir
+                .join(format!("{:?}", network_contacts.genesis_key())),
         )
         .await?;
-        fs::remove_file(config.prefix_maps_dir.join(DEFAULT_PREFIX_MAP_FILE_NAME)).await?;
+        fs::remove_file(
+            config
+                .network_contacts_dir
+                .join(DEFAULT_NETWORK_CONTACTS_FILE_NAME),
+        )
+        .await?;
         config.sync().await?;
         assert_eq!(config.settings.networks.len(), 0);
-        config.compare_settings_and_prefix_maps_dir().await?;
+        config.compare_settings_and_network_contacts_dir().await?;
 
         Ok(())
     }
@@ -1135,18 +1214,18 @@ mod sync_prefix_maps_and_settings {
     #[tokio::test]
     async fn original_file_of_the_default_hardlink_should_be_written() -> Result<()> {
         // Switching networks can overwrite the default hardlink, so we make sure we have a copy
-        // of the default prefix map.
+        // of the default network contacts file.
         let tmp_dir = assert_fs::TempDir::new()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
-        let prefix_map = config
-            .store_dummy_prefix_maps_and_set_default(1)
+        let network_contacts = config
+            .store_dummy_network_contacts_and_set_default(1)
             .await?
             .pop()
             .unwrap();
         fs::remove_file(
             config
-                .prefix_maps_dir
-                .join(format!("{:?}", prefix_map.genesis_key())),
+                .network_contacts_dir
+                .join(format!("{:?}", network_contacts.genesis_key())),
         )
         .await?;
 
@@ -1156,10 +1235,13 @@ mod sync_prefix_maps_and_settings {
             .networks_iter()
             .next()
             .ok_or_else(|| eyre!("failed to obtain item from networks list"))?;
-        assert_eq!(*network_name, format!("{:?}", prefix_map.genesis_key()));
+        assert_eq!(
+            *network_name,
+            format!("{:?}", network_contacts.genesis_key())
+        );
         assert!(matches!(
             network_info,
-            NetworkInfo::Local(_, Some(genesis_key)) if genesis_key == prefix_map.genesis_key()
+            NetworkInfo::Local(_, Some(genesis_key)) if genesis_key == network_contacts.genesis_key()
         ));
 
         Ok(())
@@ -1168,123 +1250,129 @@ mod sync_prefix_maps_and_settings {
 
 #[cfg(test)]
 mod networks {
-    use super::{test_utils::store_dummy_prefix_maps, Config, NetworkInfo};
+    use super::{test_utils::store_dummy_network_contacts, Config, NetworkInfo};
     use color_eyre::eyre::eyre;
     use color_eyre::Result;
 
     #[tokio::test]
     async fn local_and_remote_networks_should_be_added() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
-        let prefix_map = store_dummy_prefix_maps(&tmp_dir, 1).await?.pop().unwrap();
-        let prefix_map_path = tmp_dir
+        let network_contacts = store_dummy_network_contacts(&tmp_dir, 1)
+            .await?
+            .pop()
+            .unwrap();
+        let network_contacts_path = tmp_dir
             .path()
-            .join(format!("{:?}", prefix_map.genesis_key()));
+            .join(format!("{:?}", network_contacts.genesis_key()));
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let network_1 = NetworkInfo::Remote(
-            "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/prefix_map"
+            "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/network_contacts"
                 .to_string(),
             None,
         );
-        let network_2 = NetworkInfo::Local(prefix_map_path, None);
+        let network_2 = NetworkInfo::Local(network_contacts_path, None);
         config.add_network("network_1", network_1).await?;
         config.add_network("network_2", network_2).await?;
 
         assert_eq!(config.settings.networks.len(), 2);
-        config.compare_settings_and_prefix_maps_dir().await?;
+        config.compare_settings_and_network_contacts_dir().await?;
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn add_local_network_where_path_lies_inside_prefix_maps_dir() -> Result<()> {
+    async fn add_local_network_where_path_lies_inside_network_contacts_dir() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
-        let prefix_map = config
-            .store_dummy_prefix_maps_and_set_default(1)
+        let network_contacts = config
+            .store_dummy_network_contacts_and_set_default(1)
             .await?
             .pop()
             .unwrap();
         let path = config
-            .prefix_maps_dir
-            .join(format!("{:?}", prefix_map.genesis_key()));
+            .network_contacts_dir
+            .join(format!("{:?}", network_contacts.genesis_key()));
 
         let network_1 = NetworkInfo::Local(path, None);
         config.add_network("network_1", network_1).await?;
 
         assert_eq!(config.settings.networks.len(), 1);
-        config.compare_settings_and_prefix_maps_dir().await?;
+        config.compare_settings_and_network_contacts_dir().await?;
         Ok(())
     }
 
     #[tokio::test]
     async fn removing_network_should_give_the_desirable_output() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
-        let prefix_map = store_dummy_prefix_maps(&tmp_dir, 1).await?.pop().unwrap();
-        let prefix_map_path = tmp_dir
+        let network_contacts = store_dummy_network_contacts(&tmp_dir, 1)
+            .await?
+            .pop()
+            .unwrap();
+        let network_contacts_path = tmp_dir
             .path()
-            .join(format!("{:?}", prefix_map.genesis_key()));
+            .join(format!("{:?}", network_contacts.genesis_key()));
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
-        let network_1 = NetworkInfo::Local(prefix_map_path, None);
+        let network_1 = NetworkInfo::Local(network_contacts_path, None);
         config.add_network("network_1", network_1).await?;
         assert_eq!(config.settings.networks.len(), 1);
 
         config.remove_network("a_random_network").await?;
         assert_eq!(config.settings.networks.len(), 1);
-        config.compare_settings_and_prefix_maps_dir().await?;
+        config.compare_settings_and_network_contacts_dir().await?;
 
         config.remove_network("network_1").await?;
         assert_eq!(config.settings.networks.len(), 0);
-        config.compare_settings_and_prefix_maps_dir().await?;
+        config.compare_settings_and_network_contacts_dir().await?;
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn switching_network_should_change_the_default_prefix_map() -> Result<()> {
+    async fn switching_network_should_change_the_default_network_contacts() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
-        let mut prefix_maps = store_dummy_prefix_maps(&tmp_dir, 2).await?;
+        let mut network_contacts = store_dummy_network_contacts(&tmp_dir, 2).await?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
-        let prefix_map_1 = prefix_maps.pop().unwrap();
+        let network_contacts_1 = network_contacts.pop().unwrap();
         let network_1 = NetworkInfo::Local(
             tmp_dir
                 .path()
-                .join(format!("{:?}", prefix_map_1.genesis_key())),
+                .join(format!("{:?}", network_contacts_1.genesis_key())),
             None,
         );
-        let prefix_map_2 = prefix_maps.pop().unwrap();
+        let network_contacts_2 = network_contacts.pop().unwrap();
         let network_2 = NetworkInfo::Local(
             tmp_dir
                 .path()
-                .join(format!("{:?}", prefix_map_2.genesis_key())),
+                .join(format!("{:?}", network_contacts_2.genesis_key())),
             None,
         );
         config.add_network("network_1", network_1).await?;
         config.add_network("network_2", network_2).await?;
 
         config.switch_to_network("network_1").await?;
-        let default = config.read_default_prefix_map().await?;
+        let default = config.read_default_network_contacts().await?;
         let net_info = config
             .settings
             .networks
             .get("network_1")
             .ok_or_else(|| eyre!("network_1 should be present"))?;
-        assert_eq!(default, prefix_map_1);
+        assert_eq!(default, network_contacts_1);
         assert!(matches!(
             net_info,
             NetworkInfo::Local(_, Some(genesis_key)) if genesis_key == default.genesis_key()
         ));
 
         config.switch_to_network("network_2").await?;
-        let default = config.read_default_prefix_map().await?;
+        let default = config.read_default_network_contacts().await?;
         let net_info = config
             .settings
             .networks
             .get("network_2")
             .ok_or_else(|| eyre!("network_2 should be present"))?;
-        assert_eq!(default, prefix_map_2);
+        assert_eq!(default, network_contacts_2);
         assert!(matches!(
             net_info,
             NetworkInfo::Local(_, Some(genesis_key)) if genesis_key == default.genesis_key()
@@ -1299,7 +1387,7 @@ mod networks {
         let config = Config::create_config(&tmp_dir, None).await?;
 
         let switch_result = config.switch_to_network("network_1").await;
-        let default = config.read_default_prefix_map().await;
+        let default = config.read_default_network_contacts().await;
         assert!(switch_result.is_err());
         assert!(default.is_err());
         Ok(())

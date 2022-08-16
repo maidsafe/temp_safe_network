@@ -818,7 +818,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
                     .read()
                     .await
                     .network_knowledge()
-                    .prefix_map()
+                    .section_tree()
                     .all(),
                 vec![signed_sap.value]
             );

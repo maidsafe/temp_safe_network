@@ -14,7 +14,7 @@ use clap::Subcommand;
 use color_eyre::{eyre::eyre, Result};
 use std::{net::SocketAddr, path::PathBuf};
 
-use sn_api::DEFAULT_PREFIX_MAP_FILE_NAME;
+use sn_api::DEFAULT_NETWORK_CONTACTS_FILE_NAME;
 
 const NODES_DATA_DIR_NAME: &str = "baby-fleming-nodes";
 const LOCAL_NODE_DIR_NAME: &str = "local-node";
@@ -138,7 +138,7 @@ pub async fn node_commander(
             let target_dir_path = if let Some(path) = node_path {
                 path
             } else {
-                let mut path = config.prefix_maps_dir.clone();
+                let mut path = config.network_contacts_dir.clone();
                 path.pop();
                 path.push("node");
                 path
@@ -166,13 +166,15 @@ pub async fn node_commander(
             let node_directory_path = if let Some(path) = node_dir_path {
                 path
             } else {
-                let mut path = config.prefix_maps_dir.clone();
+                let mut path = config.network_contacts_dir.clone();
                 path.pop();
                 path.push("node");
                 path
             };
 
-            let default_prefix_map_path = config.prefix_maps_dir.join(DEFAULT_PREFIX_MAP_FILE_NAME);
+            let default_network_contacts_path = config
+                .network_contacts_dir
+                .join(DEFAULT_NETWORK_CONTACTS_FILE_NAME);
 
             node_join(
                 network_launcher,
@@ -184,7 +186,7 @@ pub async fn node_commander(
                 clear_data,
                 local,
                 disable_port_forwarding,
-                default_prefix_map_path,
+                default_network_contacts_path,
             )
         }
         Some(NodeSubCommands::Run {
@@ -196,7 +198,7 @@ pub async fn node_commander(
             let node_directory_path = if let Some(path) = node_dir_path {
                 path
             } else {
-                let mut path = config.prefix_maps_dir.clone();
+                let mut path = config.network_contacts_dir.clone();
                 path.pop();
                 path.push("node");
                 path
@@ -210,13 +212,13 @@ pub async fn node_commander(
                 ip,
             )?;
 
-            // add the network using default prefix map file
-            let prefix_map = config.read_default_prefix_map().await?;
-            config.write_prefix_map(&prefix_map).await?;
+            // add the network using default network contacts file
+            let network_contacts = config.read_default_network_contacts().await?;
+            config.write_network_contacts(&network_contacts).await?;
 
             let actual_path = config
-                .prefix_maps_dir
-                .join(format!("{:?}", prefix_map.genesis_key()));
+                .network_contacts_dir
+                .join(format!("{:?}", network_contacts.genesis_key()));
             config
                 .add_network("baby-fleming", NetworkInfo::Local(actual_path, None))
                 .await?;
@@ -246,7 +248,7 @@ mod test {
             block_on(async {
                 let _ = self
                     .config
-                    .store_dummy_prefix_maps_and_set_default(1)
+                    .store_dummy_network_contacts_and_set_default(1)
                     .await?;
                 Ok(())
             })
@@ -583,15 +585,15 @@ mod join_command {
         node_dir.create_dir_all()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
-        let prefix_map = config
-            .store_dummy_prefix_maps_and_set_default(1)
+        let network_contacts = config
+            .store_dummy_network_contacts_and_set_default(1)
             .await?
             .pop()
             .unwrap();
         let baby_fleming = NetworkInfo::Local(
             config
-                .prefix_maps_dir
-                .join(format!("{:?}", prefix_map.genesis_key())),
+                .network_contacts_dir
+                .join(format!("{:?}", network_contacts.genesis_key())),
             None,
         );
         config.add_network("baby-fleming", baby_fleming).await?;
@@ -615,8 +617,8 @@ mod join_command {
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
 
         assert!(result.is_ok());
-        let default_prefix_map = config.read_default_prefix_map().await?;
-        assert_eq!(prefix_map, default_prefix_map);
+        let default_network_contacts = config.read_default_network_contacts().await?;
+        assert_eq!(network_contacts, default_network_contacts);
         Ok(())
     }
 
@@ -628,15 +630,15 @@ mod join_command {
         node_dir.create_dir_all()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
-        let prefix_map = config
-            .store_dummy_prefix_maps_and_set_default(1)
+        let network_contacts = config
+            .store_dummy_network_contacts_and_set_default(1)
             .await?
             .pop()
             .unwrap();
         let baby_fleming = NetworkInfo::Local(
             config
-                .prefix_maps_dir
-                .join(format!("{:?}", prefix_map.genesis_key())),
+                .network_contacts_dir
+                .join(format!("{:?}", network_contacts.genesis_key())),
             None,
         );
         config.add_network("baby-fleming", baby_fleming).await?;
@@ -675,15 +677,15 @@ mod join_command {
         node_dir.create_dir_all()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
-        let prefix_map = config
-            .store_dummy_prefix_maps_and_set_default(1)
+        let network_contacts = config
+            .store_dummy_network_contacts_and_set_default(1)
             .await?
             .pop()
             .unwrap();
         let baby_fleming = NetworkInfo::Local(
             config
-                .prefix_maps_dir
-                .join(format!("{:?}", prefix_map.genesis_key())),
+                .network_contacts_dir
+                .join(format!("{:?}", network_contacts.genesis_key())),
             None,
         );
         config.add_network("baby-fleming", baby_fleming).await?;
@@ -723,15 +725,15 @@ mod join_command {
         node_dir.create_dir_all()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
-        let prefix_map = config
-            .store_dummy_prefix_maps_and_set_default(1)
+        let network_contacts = config
+            .store_dummy_network_contacts_and_set_default(1)
             .await?
             .pop()
             .unwrap();
         let baby_fleming = NetworkInfo::Local(
             config
-                .prefix_maps_dir
-                .join(format!("{:?}", prefix_map.genesis_key())),
+                .network_contacts_dir
+                .join(format!("{:?}", network_contacts.genesis_key())),
             None,
         );
         config.add_network("baby-fleming", baby_fleming).await?;
@@ -770,15 +772,15 @@ mod join_command {
         node_dir.create_dir_all()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
-        let prefix_map = config
-            .store_dummy_prefix_maps_and_set_default(1)
+        let network_contacts = config
+            .store_dummy_network_contacts_and_set_default(1)
             .await?
             .pop()
             .unwrap();
         let baby_fleming = NetworkInfo::Local(
             config
-                .prefix_maps_dir
-                .join(format!("{:?}", prefix_map.genesis_key())),
+                .network_contacts_dir
+                .join(format!("{:?}", network_contacts.genesis_key())),
             None,
         );
         config.add_network("baby-fleming", baby_fleming).await?;
@@ -816,15 +818,15 @@ mod join_command {
         node_dir.create_dir_all()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
-        let prefix_map = config
-            .store_dummy_prefix_maps_and_set_default(1)
+        let network_contacts = config
+            .store_dummy_network_contacts_and_set_default(1)
             .await?
             .pop()
             .unwrap();
         let baby_fleming = NetworkInfo::Local(
             config
-                .prefix_maps_dir
-                .join(format!("{:?}", prefix_map.genesis_key())),
+                .network_contacts_dir
+                .join(format!("{:?}", network_contacts.genesis_key())),
             None,
         );
         config.add_network("baby-fleming", baby_fleming).await?;
@@ -860,15 +862,15 @@ mod join_command {
         node_dir.create_dir_all()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
-        let prefix_map = config
-            .store_dummy_prefix_maps_and_set_default(1)
+        let network_contacts = config
+            .store_dummy_network_contacts_and_set_default(1)
             .await?
             .pop()
             .unwrap();
         let baby_fleming = NetworkInfo::Local(
             config
-                .prefix_maps_dir
-                .join(format!("{:?}", prefix_map.genesis_key())),
+                .network_contacts_dir
+                .join(format!("{:?}", network_contacts.genesis_key())),
             None,
         );
         config.add_network("baby-fleming", baby_fleming).await?;
@@ -907,15 +909,15 @@ mod join_command {
         node_dir.create_dir_all()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
-        let prefix_map = config
-            .store_dummy_prefix_maps_and_set_default(1)
+        let network_contacts = config
+            .store_dummy_network_contacts_and_set_default(1)
             .await?
             .pop()
             .unwrap();
         let baby_fleming = NetworkInfo::Local(
             config
-                .prefix_maps_dir
-                .join(format!("{:?}", prefix_map.genesis_key())),
+                .network_contacts_dir
+                .join(format!("{:?}", network_contacts.genesis_key())),
             None,
         );
         config.add_network("baby-fleming", baby_fleming).await?;
@@ -950,15 +952,15 @@ mod join_command {
         node_dir.create_dir_all()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
-        let prefix_map = config
-            .store_dummy_prefix_maps_and_set_default(1)
+        let network_contacts = config
+            .store_dummy_network_contacts_and_set_default(1)
             .await?
             .pop()
             .unwrap();
         let baby_fleming = NetworkInfo::Local(
             config
-                .prefix_maps_dir
-                .join(format!("{:?}", prefix_map.genesis_key())),
+                .network_contacts_dir
+                .join(format!("{:?}", network_contacts.genesis_key())),
             None,
         );
         config.add_network("baby-fleming", baby_fleming).await?;
@@ -994,15 +996,15 @@ mod join_command {
         let node_data_dir = node_dir.child(LOCAL_NODE_DIR_NAME);
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
-        let prefix_map = config
-            .store_dummy_prefix_maps_and_set_default(1)
+        let network_contacts = config
+            .store_dummy_network_contacts_and_set_default(1)
             .await?
             .pop()
             .unwrap();
         let baby_fleming = NetworkInfo::Local(
             config
-                .prefix_maps_dir
-                .join(format!("{:?}", prefix_map.genesis_key())),
+                .network_contacts_dir
+                .join(format!("{:?}", network_contacts.genesis_key())),
             None,
         );
         config.add_network("baby-fleming", baby_fleming).await?;

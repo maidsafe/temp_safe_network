@@ -14,11 +14,11 @@
 //! # Ok(())
 //! # }
 //! ```
-use crate::{connections::Session, Client, Error, DEFAULT_PREFIX_MAP_FILE_NAME};
+use crate::{connections::Session, Client, Error, DEFAULT_NETWORK_CONTACTS_FILE_NAME};
 
 use qp2p::Config as Qp2pConfig;
 use sn_dbc::Owner;
-use sn_interface::{network_knowledge::prefix_map::NetworkPrefixMap, types::Keypair};
+use sn_interface::{network_knowledge::SectionTree, types::Keypair};
 use std::{
     net::{Ipv4Addr, SocketAddr},
     path::PathBuf,
@@ -52,7 +52,7 @@ pub struct ClientBuilder {
     query_timeout: Option<Duration>,
     cmd_timeout: Option<Duration>,
     cmd_ack_wait: Option<Duration>,
-    prefix_map: Option<NetworkPrefixMap>,
+    network_contacts: Option<SectionTree>,
 }
 
 impl ClientBuilder {
@@ -103,9 +103,9 @@ impl ClientBuilder {
         self
     }
 
-    /// NetworkPrefixMap used to bootstrap the client on the network
-    pub fn prefix_map(mut self, pm: impl Into<Option<NetworkPrefixMap>>) -> Self {
-        self.prefix_map = pm.into();
+    /// SectionTree used to bootstrap the client on the network
+    pub fn network_contacts(mut self, pm: impl Into<Option<SectionTree>>) -> Self {
+        self.network_contacts = pm.into();
         self
     }
 
@@ -134,17 +134,17 @@ impl ClientBuilder {
     /// - `[Self::query_timeout`] and `[Self::cmd_timeout]` default to [`DEFAULT_QUERY_CMD_TIMEOUT`]
     /// - `[Self::cmd_ack_wait`] defaults to [`DEFAULT_ACK_WAIT`]
     /// - [`qp2p::Config`] will default to it's [`Default`] impl
-    /// - Prefix map will be read from a standard location
+    /// - Network contacts file will be read from a standard location
     pub async fn build(self) -> Result<Client, Error> {
         let query_timeout = self.query_timeout.unwrap_or(DEFAULT_QUERY_CMD_TIMEOUT);
         let cmd_timeout = self.cmd_timeout.unwrap_or(DEFAULT_QUERY_CMD_TIMEOUT);
         let cmd_ack_wait = self.cmd_ack_wait.unwrap_or(DEFAULT_ACK_WAIT);
 
-        let prefix_map = match self.prefix_map {
+        let network_contacts = match self.network_contacts {
             Some(pm) => pm,
             None => {
-                let prefix_map_dir = default_prefix_map_path()?;
-                NetworkPrefixMap::from_disk(&prefix_map_dir)
+                let network_contacts_dir = default_network_contacts_path()?;
+                SectionTree::from_disk(&network_contacts_dir)
                     .await
                     .map_err(|err| Error::NetworkContacts(err.to_string()))?
             }
@@ -161,7 +161,7 @@ impl ClientBuilder {
             self.local_addr
                 .unwrap_or_else(|| SocketAddr::from(DEFAULT_LOCAL_ADDR)),
             cmd_ack_wait,
-            prefix_map,
+            network_contacts,
         )?;
 
         let keypair = self.keypair.unwrap_or_else(Keypair::new_ed25519);
@@ -193,15 +193,15 @@ fn env_parse<F: FromStr>(s: &str) -> Result<Option<F>, F::Err> {
     F::from_str(&v).map(|v| Some(v))
 }
 
-fn default_prefix_map_path() -> Result<PathBuf, Error> {
-    // Use `$HOME/.safe/prefix_maps` directory
+fn default_network_contacts_path() -> Result<PathBuf, Error> {
+    // Use `$HOME/.safe/network_contacts` directory
     let path = dirs_next::home_dir()
         .ok_or_else(|| {
             crate::Error::NetworkContacts("Could not read user's home directory".to_string())
         })?
         .join(".safe")
-        .join("prefix_maps")
-        .join(DEFAULT_PREFIX_MAP_FILE_NAME);
+        .join("network_contacts")
+        .join(DEFAULT_NETWORK_CONTACTS_FILE_NAME);
 
     Ok(path)
 }

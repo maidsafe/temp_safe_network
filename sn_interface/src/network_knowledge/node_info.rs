@@ -6,14 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-// mod elder_candidates;
-// mod errors;
-// pub mod node_state;
-// pub mod prefix_map;
-// pub mod section_authority_provider;
-// pub mod section_keys;
-// mod section_peers;
-
 use crate::types::{Peer, PublicKey};
 use ed25519_dalek::Keypair;
 use std::{
@@ -21,7 +13,7 @@ use std::{
     net::SocketAddr,
     sync::Arc,
 };
-pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API update
+use xor_name::{XorName, XOR_NAME_LEN};
 
 /// Information and state of our node
 #[derive(Clone, custom_debug::Debug)]

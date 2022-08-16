@@ -25,12 +25,12 @@ pub enum NetworksSubCommands {
     /// Check where the default hardlink points and try to match it to the networks in the CLI config
     Check {},
     #[clap(name = "add")]
-    /// Add a network to the CLI config using an existing network map
+    /// Add a network to the CLI config using an existing network contacts
     Add {
-        /// Network name. If network_name already exists, then it's updated with the new network map
+        /// Network name. If network_name already exists, then it's updated with the new network contacts
         network_name: String,
-        /// Local path or a remote URL to fetch the network map from
-        prefix_location: String,
+        /// Local path or a remote URL to fetch the network contacts from
+        contacts_file_location: String,
     },
     #[clap(name = "remove")]
     /// Remove a network from the CLI config
@@ -57,10 +57,10 @@ pub async fn networks_commander(
         }
         Some(NetworksSubCommands::Check {}) => {
             println!("Checking current Network Map...");
-            let prefix_map = config.read_default_prefix_map().await?;
+            let network_contacts = config.read_default_network_contacts().await?;
             let mut matched_network = None;
             for (network_name, network_info) in config.networks_iter() {
-                if network_info.matches(prefix_map.genesis_key()) {
+                if network_info.matches(network_contacts.genesis_key()) {
                     matched_network = Some(network_name);
                     break;
                 }
@@ -83,14 +83,17 @@ pub async fn networks_commander(
         }
         Some(NetworksSubCommands::Add {
             network_name,
-            prefix_location,
+            contacts_file_location,
         }) => {
-            let net_info = if Url::parse(prefix_location.as_str()).is_ok() {
+            let net_info = if Url::parse(contacts_file_location.as_str()).is_ok() {
                 config
-                    .add_network(&network_name, NetworkInfo::Remote(prefix_location, None))
+                    .add_network(
+                        &network_name,
+                        NetworkInfo::Remote(contacts_file_location, None),
+                    )
                     .await?
             } else {
-                let path = PathBuf::from(prefix_location);
+                let path = PathBuf::from(contacts_file_location);
                 config
                     .add_network(&network_name, NetworkInfo::Local(path, None))
                     .await?

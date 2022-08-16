@@ -633,8 +633,8 @@ pub(super) async fn send_msg(
 mod tests {
     use super::*;
     use sn_interface::network_knowledge::{
-        prefix_map::NetworkPrefixMap,
         test_utils::{random_sap, section_signed},
+        SectionTree,
     };
 
     use eyre::{eyre, Result};
@@ -650,11 +650,11 @@ mod tests {
             .map_err(|err| eyre!("failed to parse Prefix '{}': {}", s, err))
     }
 
-    fn new_network_prefix_map() -> (NetworkPrefixMap, bls::SecretKey, bls::PublicKey) {
+    fn new_network_network_contacts() -> (SectionTree, bls::SecretKey, bls::PublicKey) {
         let genesis_sk = bls::SecretKey::random();
         let genesis_pk = genesis_sk.public_key();
 
-        let map = NetworkPrefixMap::new(genesis_pk);
+        let map = SectionTree::new(genesis_pk);
 
         (map, genesis_sk, genesis_pk)
     }
@@ -666,14 +666,14 @@ mod tests {
         let prefix = prefix("0")?;
         let (section_auth, _, secret_key_set) = random_sap(prefix, elders_len);
         let sap0 = section_signed(secret_key_set.secret_key(), section_auth)?;
-        let (mut prefix_map, _genesis_sk, _) = new_network_prefix_map();
-        assert!(prefix_map.insert_without_chain(sap0));
+        let (mut network_contacts, _genesis_sk, _) = new_network_network_contacts();
+        assert!(network_contacts.insert_without_chain(sap0));
 
         let session = Session::new(
             Config::default(),
             SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0)),
             Duration::from_secs(10),
-            prefix_map,
+            network_contacts,
         )?;
 
         let mut rng = rand::thread_rng();

@@ -24,7 +24,7 @@ use crate::node::{
 use crate::UsedSpace;
 
 use sn_interface::{
-    network_knowledge::{NetworkPrefixMap, NodeInfo, MIN_ADULT_AGE},
+    network_knowledge::{NodeInfo, SectionTree, MIN_ADULT_AGE},
     types::{keys::ed25519, log_markers::LogMarker, PublicKey as TypesPublicKey},
 };
 
@@ -224,9 +224,9 @@ async fn bootstrap_node(
         let path = config.network_contacts_file().ok_or_else(|| {
             Error::Configuration("Could not obtain network contacts file path".to_string())
         })?;
-        let prefix_map = NetworkPrefixMap::from_disk(&path).await?;
+        let network_contacts = SectionTree::from_disk(&path).await?;
         let section_elders = {
-            let sap = prefix_map
+            let sap = network_contacts
                 .closest(&xor_name::rand::random(), None)
                 .ok_or_else(|| Error::Configuration("Could not obtain closest SAP".to_string()))?;
             sap.elders_vec()
@@ -248,7 +248,7 @@ async fn bootstrap_node(
             std::process::id(),
             comm.socket_addr(),
             bootstrap_addr,
-            prefix_map.genesis_key()
+            network_contacts.genesis_key()
         );
 
         let joining_node = NodeInfo::new(keypair, comm.socket_addr());
@@ -257,7 +257,7 @@ async fn bootstrap_node(
             &comm,
             &mut connection_event_rx,
             bootstrap_addr,
-            prefix_map,
+            network_contacts,
             join_timeout,
         )
         .await?;

@@ -252,7 +252,7 @@ If you now run `safe networks`, you will see the newly created network in your n
 +----------+--------------+-------------------------------------------------------------------------+
 | Current  | Network name | Network map info                                                        |
 +----------+--------------+-------------------------------------------------------------------------+
-| *        | baby-fleming | Local: "/home/chris/.safe/prefix_maps/PublicKey(0704..73ae)"            |
+| *        | baby-fleming | Local: "/home/chris/.safe/network_contacts/PublicKey(0704..73ae)"            |
 +----------+--------------+-------------------------------------------------------------------------+
 ```
 
@@ -278,8 +278,8 @@ To connect to a network, we need to obtain its network map. This can be provided
 
 People who run networks can keep a copy of the network map at some http location. In our case, we have this map hosted in an S3 bucket, and this is available via http. We can add a new network and use this http location for the network map:
 ```
-$ safe networks add alpha https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/TESTNET_ID-prefix-map
-Network 'alpha' was added to the list. Network map is located at 'https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/TESTNET_ID-prefix-map'
+$ safe networks add alpha https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/TESTNET_ID-network-contacts
+Network 'alpha' was added to the list. Network map is located at 'https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/TESTNET_ID-network-contacts'
 ```
 
 We've given this network the name 'alpha', but it can be named however you wish to refer to it. Run `safe networks` to see it in the networks list:
@@ -290,9 +290,9 @@ $ safe networks
 +----------+--------------+----------------------------------------------------------------------------------------+
 | Current  | Network name | Network map info                                                                       |
 +----------+--------------+----------------------------------------------------------------------------------------+
-|          | alpha        | Remote: "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/TESTNET_ID-prefix-map"   |
+|          | alpha        | Remote: "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/TESTNET_ID-network-contacts"   |
 +----------+--------------+----------------------------------------------------------------------------------------+
-| *        | baby-fleming | Local: "/home/chris/.safe/prefix_maps/PublicKey(0704..73ae)"                           |
+| *        | baby-fleming | Local: "/home/chris/.safe/network_contacts/PublicKey(0704..73ae)"                           |
 +----------+--------------+----------------------------------------------------------------------------------------+
 
 ```
@@ -311,9 +311,9 @@ You can then run `safe networks` to see the current network has changed:
 +----------+--------------+----------------------------------------------------------------------------------------+
 | Current  | Network name | Network map info                                                                       |
 +----------+--------------+----------------------------------------------------------------------------------------+
-| *        | alpha        | Remote: "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/TESTNET_ID-prefix-map"   |
+| *        | alpha        | Remote: "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/TESTNET_ID-network-contacts"   |
 +----------+--------------+----------------------------------------------------------------------------------------+
-|          | baby-fleming | Local: "/home/chris/.safe/prefix_maps/PublicKey(0704..73ae)"                           |
+|          | baby-fleming | Local: "/home/chris/.safe/network_contacts/PublicKey(0704..73ae)"                           |
 +----------+--------------+----------------------------------------------------------------------------------------+
 ```
 
@@ -357,9 +357,9 @@ Regardless of which `join` command you used, if the join request is successful, 
  INFO 2021-12-24T00:52:18.319284Z [sn/src/routing/routing_api/dispatcher.rs:L87]:
 	 ➤ Starting to probe network
  INFO 2021-12-24T00:52:18.319291Z [sn/src/routing/routing_api/dispatcher.rs:L115]:
-	 ➤ Writing our PrefixMap to disk
+	 ➤ Writing our SectionTree to disk
  INFO 2021-12-24T00:52:18.319312Z [sn/src/routing/core/mod.rs:L212]:
-	 ➤ Writing our latest PrefixMap to disk
+	 ➤ Writing our latest SectionTree to disk
  INFO 2021-12-24T00:52:18.319659Z [sn/src/node/node_api/mod.rs:L87]:
 	 ➤ Node PID: 1065146, prefix: Prefix(0), name: 59dc1f(01011001).., age: 5, connection info: "79.71.42.38:12000"
 ```

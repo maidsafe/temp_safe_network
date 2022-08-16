@@ -256,7 +256,7 @@ impl Node {
                             );
 
                             let genesis_key = *self.network_knowledge.genesis_key();
-                            let prefix_map = self.network_knowledge.prefix_map().clone();
+                            let section_tree = self.network_knowledge.section_tree().clone();
 
                             let recipients = section_auth.value.elders.clone();
 
@@ -264,7 +264,7 @@ impl Node {
                                 genesis_key,
                                 section_chain,
                                 section_auth.into_authed_state(),
-                                Some(prefix_map),
+                                Some(section_tree),
                             )?;
 
                             // TODO: confirm whether carry out the switch immediately here

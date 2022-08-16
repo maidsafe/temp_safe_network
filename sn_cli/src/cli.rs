@@ -69,28 +69,29 @@ pub async fn run() -> Result<()> {
 
     let result = process_commands(&mut safe, args, &mut config).await;
 
-    // If we were connected to a network, cache the up to date PrefixMap to disk before exiting
+    // If we were connected to a network, cache the up to date network contacts
+    // to disk before exiting
     if safe.is_connected() {
-        match safe.prefix_map().await {
-            Ok(prefix_map) => {
-                if let Err(err) = config.update_default_prefix_map(prefix_map).await {
+        match safe.section_tree().await {
+            Ok(section_tree) => {
+                if let Err(err) = config.update_default_network_contacts(section_tree).await {
                     warn!(
-                        "Failed to cache up to date PrefixMap for genesis key {:?} to '{}': {:?}",
-                        prefix_map.genesis_key(),
-                        config.prefix_maps_dir.display(),
+                        "Failed to cache up to date network contacts for genesis key {:?} to '{}': {:?}",
+                        section_tree.genesis_key(),
+                        config.network_contacts_dir.display(),
                         err
                     );
                 } else {
                     debug!(
-                        "Up to date PrefixMap for genesis key {:?} was cached at '{}'",
-                        prefix_map.genesis_key(),
-                        config.prefix_maps_dir.display(),
+                        "Up to date network contacts for genesis key {:?} was cached at '{}'",
+                        section_tree.genesis_key(),
+                        config.network_contacts_dir.display(),
                     );
                 }
             }
             Err(err) => warn!(
-                "Failed to cache updated PrefixMap for genesis key {:?}: {:?}",
-                config.read_default_prefix_map().await?.genesis_key(),
+                "Failed to cache updated network contacts for genesis key {:?}: {:?}",
+                config.read_default_network_contacts().await?.genesis_key(),
                 err
             ),
         }
@@ -191,9 +192,9 @@ async fn get_config() -> Result<Config> {
     let mut cli_config_path = config_path.clone();
     cli_config_path.push("cli");
     cli_config_path.push("config.json");
-    let mut prefix_maps_path = config_path;
-    prefix_maps_path.push("prefix_maps");
-    let mut config = Config::new(cli_config_path, prefix_maps_path).await?;
+    let mut network_contacts_path = config_path;
+    network_contacts_path.push("network_contacts");
+    let mut config = Config::new(cli_config_path, network_contacts_path).await?;
     config.sync().await?;
     Ok(config)
 }

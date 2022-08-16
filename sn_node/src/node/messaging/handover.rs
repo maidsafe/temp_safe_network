@@ -156,7 +156,7 @@ impl Node {
 
     fn get_sap_for_prefix(&self, prefix: Prefix) -> Result<SectionAuthorityProvider> {
         self.network_knowledge
-            .prefix_map()
+            .section_tree()
             .get(&prefix)
             .ok_or(Error::FailedToGetSAPforPrefix(prefix))
     }

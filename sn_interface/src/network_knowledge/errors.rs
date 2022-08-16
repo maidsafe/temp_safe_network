@@ -23,16 +23,16 @@ pub enum Error {
     #[error("Directory creation error: {0}")]
     DirectoryHandling(String),
     /// Serialization error
-    #[error("Failed to serialise prefix map: {0}")]
+    #[error("Failed to serialise section tree: {0}")]
     Serialisation(String),
-    /// Failed to deserialise a prefix map.
-    #[error("Failed to deserialise prefix map: {0}")]
+    /// Failed to deserialise a section tree.
+    #[error("Failed to deserialise section tree: {0}")]
     Deserialisation(String),
     #[error("Section authority provider cannot be trusted: {0}")]
     UntrustedSectionAuthProvider(String),
     #[error("Proof chain cannot be trusted: {0}")]
     UntrustedProofChain(String),
-    #[error("Invalid genesis key of provided prefix map: {}", hex::encode(_0.to_bytes()))]
+    #[error("Invalid genesis key of provided in section tree: {}", hex::encode(_0.to_bytes()))]
     InvalidGenesisKey(bls::PublicKey),
     #[error("The node is not in a state to handle the action.")]
     InvalidState,

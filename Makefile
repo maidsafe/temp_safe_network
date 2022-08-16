@@ -163,7 +163,7 @@ run-local-baby-fleming:
 
 ci-unit-tests:
 	cargo test --no-run --release --package sn_interface --package sn_dysfunction --package sn_node
-	cargo nextest run --profile ci --release --package sn_interface messaging prefix_map types
+	cargo nextest run --profile ci --release --package sn_interface messaging section_tree types
 	cargo nextest run --profile ci --release --package sn_dysfunction
 	cargo nextest run --profile ci --release --package sn_node dbs node routing
 	cargo nextest run --profile ci --release --package sn_cli --bin safe

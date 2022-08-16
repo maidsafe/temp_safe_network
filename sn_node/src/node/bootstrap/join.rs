@@ -20,7 +20,7 @@ use sn_interface::{
         },
         AuthKind, Dst, MsgType, NodeAuth, WireMsg,
     },
-    network_knowledge::{prefix_map::NetworkPrefixMap, NetworkKnowledge, NodeInfo, MIN_ADULT_AGE},
+    network_knowledge::{NetworkKnowledge, NodeInfo, SectionTree, MIN_ADULT_AGE},
     types::{keys::ed25519, log_markers::LogMarker, Peer},
 };
 
@@ -46,13 +46,13 @@ pub(crate) async fn join_network(
     comm: &Comm,
     incoming_msgs: &mut mpsc::Receiver<MsgEvent>,
     bootstrap_addr: SocketAddr,
-    prefix_map: NetworkPrefixMap,
+    network_contacts: SectionTree,
     join_timeout: Duration,
 ) -> Result<(NodeInfo, NetworkKnowledge)> {
     let (outgoing_msgs_sender, outgoing_msgs_receiver) = mpsc::channel(1);
 
     let span = trace_span!("bootstrap");
-    let joiner = Joiner::new(node, outgoing_msgs_sender, incoming_msgs, prefix_map);
+    let joiner = Joiner::new(node, outgoing_msgs_sender, incoming_msgs, network_contacts);
 
     debug!("=========> attempting bootstrap to {bootstrap_addr}");
     future::join(
@@ -71,7 +71,7 @@ struct Joiner<'a> {
     incoming_msgs: &'a mut mpsc::Receiver<MsgEvent>,
     node: NodeInfo,
     prefix: Prefix,
-    prefix_map: NetworkPrefixMap,
+    network_contacts: SectionTree,
     backoff: ExponentialBackoff,
     aggregated: bool,
 }
@@ -81,7 +81,7 @@ impl<'a> Joiner<'a> {
         node: NodeInfo,
         outgoing_msgs: mpsc::Sender<(WireMsg, Vec<Peer>)>,
         incoming_msgs: &'a mut mpsc::Receiver<MsgEvent>,
-        prefix_map: NetworkPrefixMap,
+        network_contacts: SectionTree,
     ) -> Self {
         let mut backoff = ExponentialBackoff {
             initial_interval: Duration::from_millis(50),
@@ -98,7 +98,7 @@ impl<'a> Joiner<'a> {
             incoming_msgs,
             node,
             prefix: Prefix::default(),
-            prefix_map,
+            network_contacts,
             backoff,
             aggregated: false,
         }
@@ -119,17 +119,19 @@ impl<'a> Joiner<'a> {
         let bootstrap_peer = Peer::new(self.node.name(), bootstrap_addr);
 
         trace!(
-            "Bootstrap run, prefixmap as we have it: {:?}",
-            self.prefix_map
+            "Bootstrap run, network contacts as we have it: {:?}",
+            self.network_contacts
         );
-        let genesis_key = *self.prefix_map.genesis_key();
+        let genesis_key = *self.network_contacts.genesis_key();
 
-        let (target_section_key, recipients) =
-            if let Ok(sap) = self.prefix_map.section_by_name(&bootstrap_peer.name()) {
-                (sap.section_key(), sap.elders_vec())
-            } else {
-                (genesis_key, vec![bootstrap_peer])
-            };
+        let (target_section_key, recipients) = if let Ok(sap) = self
+            .network_contacts
+            .section_by_name(&bootstrap_peer.name())
+        {
+            (sap.section_key(), sap.elders_vec())
+        } else {
+            (genesis_key, vec![bootstrap_peer])
+        };
         tokio::time::timeout(
             join_timeout,
             self.join(
@@ -231,7 +233,7 @@ impl<'a> Joiner<'a> {
                         genesis_key,
                         section_chain,
                         section_auth,
-                        Some(self.prefix_map),
+                        Some(self.network_contacts),
                     )?;
 
                     return Ok((self.node, network_knowledge));
@@ -271,7 +273,7 @@ impl<'a> Joiner<'a> {
                     };
 
                     // make sure we received a valid and trusted new SAP
-                    let is_new_sap = match self.prefix_map.update(signed_sap, &proof_chain) {
+                    let is_new_sap = match self.network_contacts.update(signed_sap, &proof_chain) {
                         Ok(updated) => updated,
                         Err(err) => {
                             debug!(
@@ -564,7 +566,7 @@ mod tests {
             node,
             send_tx,
             &mut recv_rx,
-            NetworkPrefixMap::new(original_section_key),
+            SectionTree::new(original_section_key),
         );
 
         // Create the bootstrap task, but don't run it yet.
@@ -670,12 +672,7 @@ mod tests {
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
-        let state = Joiner::new(
-            node,
-            send_tx,
-            &mut recv_rx,
-            NetworkPrefixMap::new(genesis_key),
-        );
+        let state = Joiner::new(node, send_tx, &mut recv_rx, SectionTree::new(genesis_key));
 
         let bootstrap_task = state.try_join(bootstrap_node.addr, join_timeout);
         let test_task = async move {
@@ -772,12 +769,7 @@ mod tests {
             gen_addr(),
         );
         let section_key = sk_set.secret_key().public_key();
-        let state = Joiner::new(
-            node,
-            send_tx,
-            &mut recv_rx,
-            NetworkPrefixMap::new(section_key),
-        );
+        let state = Joiner::new(node, send_tx, &mut recv_rx, SectionTree::new(section_key));
 
         let bootstrap_task = state.try_join(bootstrap_node.addr, join_timeout);
         let test_task = async {
@@ -859,12 +851,7 @@ mod tests {
         );
 
         let section_key = sk_set.secret_key().public_key();
-        let state = Joiner::new(
-            node,
-            send_tx,
-            &mut recv_rx,
-            NetworkPrefixMap::new(section_key),
-        );
+        let state = Joiner::new(node, send_tx, &mut recv_rx, SectionTree::new(section_key));
 
         let bootstrap_task = state.try_join(bootstrap_node.addr, join_timeout);
         let test_task = async {
@@ -929,12 +916,7 @@ mod tests {
         let (section_auth, _, sk_set) = random_sap(good_prefix, elder_count());
         let section_key = sk_set.public_keys().public_key();
 
-        let state = Joiner::new(
-            node,
-            send_tx,
-            &mut recv_rx,
-            NetworkPrefixMap::new(section_key),
-        );
+        let state = Joiner::new(node, send_tx, &mut recv_rx, SectionTree::new(section_key));
 
         let elders = (0..elder_count())
             .map(|_| {
