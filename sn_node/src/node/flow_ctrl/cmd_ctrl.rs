@@ -18,6 +18,7 @@ use crate::node::{
 
 use custom_debug::Debug;
 use priority_queue::PriorityQueue;
+use std::ops::Add;
 use std::time::SystemTime;
 use std::{
     sync::{
@@ -30,9 +31,7 @@ use tokio::{sync::RwLock, time::Instant};
 
 type Priority = i32;
 
-const SLEEP_TIME: Duration = Duration::from_millis(10);
-
-const ORDER: Ordering = Ordering::SeqCst;
+const SLEEP_TIME: Duration = Duration::from_millis(100);
 
 /// A module for enhanced flow control.
 ///
@@ -50,7 +49,7 @@ pub(crate) struct CmdCtrl {
     monitoring: RateLimits,
     stopped: bool,
     pub(crate) dispatcher: Arc<Dispatcher>,
-    id_counter: Arc<AtomicUsize>,
+    id_counter: usize,
 }
 
 impl CmdCtrl {
@@ -61,7 +60,7 @@ impl CmdCtrl {
             monitoring,
             stopped: false,
             dispatcher: Arc::new(dispatcher),
-            id_counter: Arc::new(AtomicUsize::new(0)),
+            id_counter: 0,
         }
     }
 
@@ -87,12 +86,7 @@ impl CmdCtrl {
             return Err(Error::InvalidState);
         }
 
-        let job = CmdJob::new(
-            self.id_counter.fetch_add(1, ORDER),
-            parent_id,
-            cmd,
-            SystemTime::now(),
-        );
+        let job = CmdJob::new(self.id_counter.add(1), parent_id, cmd, SystemTime::now());
 
         let prio = job.priority();
         let _ = self.cmd_queue.push(job, prio);
@@ -118,6 +112,7 @@ impl CmdCtrl {
             debug!("Cmd throughput is too high, waiting to reduce throughput");
             log_sleep!(Duration::from_millis((diff * 10_f64) as u64));
         } else if self.cmd_queue.is_empty() {
+            trace!("Empty queue, waiting {SLEEP_TIME:?} to not loop heavily");
             log_sleep!(SLEEP_TIME);
         }
     }
