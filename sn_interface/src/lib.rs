@@ -71,7 +71,7 @@ use tracing_subscriber::{
     fmt::{
         format::Writer,
         time::{FormatTime, SystemTime},
-        FmtContext, FormatEvent, FormatFields, FormattedFields,
+        FmtContext, FormatEvent, FormatFields,
     },
     registry::LookupSpan,
 };
@@ -93,48 +93,14 @@ where
     ) -> std::fmt::Result {
         // Write level and target
         let level = *event.metadata().level();
-        let target = event.metadata().file().unwrap_or("No target file known.");
-        let span_separation_string = "\t ➤ ";
+        let module = event.metadata().module_path().unwrap_or("<unknown module>");
         let time = SystemTime::default();
-        write!(writer, " {} ", level)?;
 
         time.format_time(&mut writer)?;
 
-        writeln!(
-            writer,
-            " [{}:L{}]:",
-            target,
-            event.metadata().line().unwrap_or(0),
-        )?;
+        write!(writer, " [{module}] {level} ")?;
 
-        write!(writer, "{}", span_separation_string)?;
-
-        // let mut span_count = 0;
-        // Write spans and fields of each span
-        ctx.visit_spans(|span| {
-            write!(writer, "{} ", span.name())?;
-
-            let ext = span.extensions();
-
-            // `FormattedFields` is a a formatted representation of the span's
-            // fields, which is stored in its extensions by the `fmt` layer's
-            // `new_span` method. The fields will have been formatted
-            // by the same field formatter that's provided to the event
-            // formatter in the `FmtContext`.
-            let fields = &ext
-                .get::<FormattedFields<N>>()
-                .expect("will never be `None`");
-
-            if !fields.is_empty() {
-                write!(writer, "{{{}}}", fields)?;
-            }
-
-            write!(writer, "\n{}", span_separation_string)?;
-
-            Ok(())
-        })?;
-
-        // Write fields on the event
+        // Add the log message and any fields associated with the event
         ctx.field_format().format_fields(writer.by_ref(), event)?;
 
         writeln!(writer)
