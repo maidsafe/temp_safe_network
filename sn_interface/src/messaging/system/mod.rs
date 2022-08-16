@@ -13,7 +13,6 @@ mod msg_authority;
 mod node_msgs;
 mod node_state;
 mod signed;
-use bls::PublicKey as BlsPublicKey;
 
 pub use agreement::{DkgSessionId, Proposal, SectionAuth};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProof};
