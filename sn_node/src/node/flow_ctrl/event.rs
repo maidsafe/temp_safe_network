@@ -6,8 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::cmds::CmdJob;
-
 use sn_interface::messaging::{
     data::ServiceMsg, system::SystemMsg, AuthorityProof, Dst, EndUser, MsgId, NodeAuth, ServiceAuth,
 };
@@ -83,28 +81,44 @@ pub enum MessagingEvent {
 /// Informing on the processing of an individual cmd.
 #[derive(custom_debug::Debug)]
 pub enum CmdProcessEvent {
-    ///
+    /// Started processing a cmd
     Started {
-        ///
-        job_id: usize,
-        ///
+        /// Cmd Id
+        id: usize,
+        /// Cmd's Parent Cmd Id
+        parent_id: Option<usize>,
+        /// Cmd's priority
+        priority: i32,
+        /// Cmd's creation time
+        cmd_creation_time: SystemTime,
+        /// Time event was sent
         time: SystemTime,
+        /// Cmd as a display string
+        cmd_string: String,
     },
     ///
     Finished {
-        ///
-        job_id: usize,
-        ///
+        /// Cmd Id
+        id: usize,
+        /// Cmd's priority
+        priority: i32,
+        /// Time event was sent
         time: SystemTime,
+        /// Cmd as a display string
+        cmd_string: String,
     },
     ///
     Failed {
-        ///
-        job_id: usize,
-        ///
+        /// Cmd Id
+        id: usize,
+        /// Time event was sent
         time: SystemTime,
-        ///
+        /// Error that caused the event
         error: String,
+        /// Cmd's priority
+        priority: i32,
+        /// Cmd as a display string
+        cmd_string: String,
     },
 }
 
@@ -184,10 +198,17 @@ impl std::fmt::Display for Event {
 impl std::fmt::Display for CmdProcessEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Started { job, time } => {
-                let cmd = job.cmd();
+            Self::Started {
+                id,
+                parent_id,
+                priority,
+                cmd_creation_time,
+                time,
+                cmd_string,
+            } => {
+                // let cmd = job.cmd();
                 let queued_for = time
-                    .duration_since(job.created_at())
+                    .duration_since(*cmd_creation_time)
                     .unwrap_or_default()
                     .as_millis();
                 let time: DateTime<Utc> = (*time).into();
@@ -195,31 +216,42 @@ impl std::fmt::Display for CmdProcessEvent {
                     f,
                     "{}: Started id: {}, parent: {:?} prio: {}, queued for {} ms. Cmd: {}",
                     time.to_rfc3339(),
-                    job.id(),
-                    job.parent_id(),
-                    job.priority(),
+                    id,
+                    parent_id,
+                    priority,
                     queued_for,
-                    cmd,
+                    cmd_string,
                 )
             }
-            Self::Finished { job, time } => {
+            Self::Finished {
+                id,
+                priority,
+                time,
+                cmd_string,
+            } => {
                 let time: DateTime<Utc> = (*time).into();
                 write!(
                     f,
-                    "{}: Finished id: {}, prio: {}",
+                    "{}: Finished id: {}, prio: {}, Cmd: {cmd_string}",
                     time.to_rfc3339(),
-                    job.id(),
-                    job.priority(),
+                    id,
+                    priority,
                 )
             }
-            Self::Failed { job, time, error } => {
+            Self::Failed {
+                id,
+                priority,
+                time,
+                error,
+                cmd_string,
+            } => {
                 let time: DateTime<Utc> = (*time).into();
                 write!(
                     f,
-                    "{}: Failed id: {}, prio: {}, due to: {}",
+                    "{}: Failed id: {}, prio: {}, due to: {}, Cmd: {cmd_string}",
                     time.to_rfc3339(),
-                    job.id(),
-                    job.priority(),
+                    id,
+                    priority,
                     error,
                 )
             }
