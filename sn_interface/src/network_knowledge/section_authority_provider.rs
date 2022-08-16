@@ -228,11 +228,7 @@ impl SectionAuthorityProvider {
                 .iter()
                 .map(|elder| (elder.name(), elder.addr()))
                 .collect(),
-            members: self
-                .members
-                .iter()
-                .map(|state| (state.name(), state.to_msg()))
-                .collect(),
+            members: self.members.iter().map(|state| state.to_msg()).collect(),
             membership_gen: self.membership_gen,
         }
     }
@@ -254,9 +250,7 @@ impl SectionAuthorityProviderMsg {
                 .into_iter()
                 .map(|(name, value)| Peer::new(name, value)),
             self.prefix,
-            self.members
-                .into_iter()
-                .map(|(_name, state)| state.into_state()),
+            self.members.into_iter().map(|state| state.into_state()),
             self.public_key_set,
             self.membership_gen,
         )

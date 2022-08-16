@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use sn_consensus::Generation;
 use std::{
     borrow::Borrow,
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
     net::SocketAddr,
 };
@@ -36,7 +36,7 @@ pub struct SectionAuthorityProvider {
     /// The section's complete set of elders as a map from their name to their socket address.
     pub elders: BTreeMap<XorName, SocketAddr>,
     /// The section members at the time of this elder churn.
-    pub members: BTreeMap<XorName, NodeState>,
+    pub members: BTreeSet<NodeState>,
     /// The membership generation this SAP was instantiated on
     pub membership_gen: Generation,
 }

@@ -536,7 +536,10 @@ mod tests {
         pin_mut,
     };
     use secured_linked_list::SecuredLinkedList;
-    use std::{collections::BTreeMap, net::SocketAddr};
+    use std::{
+        collections::{BTreeMap, BTreeSet},
+        net::SocketAddr,
+    };
     use tokio::task;
     use xor_name::XorName;
 
@@ -707,7 +710,7 @@ mod tests {
                     prefix: Prefix::default(),
                     public_key_set: new_pk_set.clone(),
                     elders: new_bootstrap_addrs.clone(),
-                    members: BTreeMap::new(),
+                    members: BTreeSet::new(),
                     membership_gen: 0,
                 }),
                 &bootstrap_node,
@@ -790,7 +793,7 @@ mod tests {
                     prefix: Prefix::default(),
                     public_key_set: new_pk_set.clone(),
                     elders: BTreeMap::new(),
-                    members: BTreeMap::new(),
+                    members: BTreeSet::new(),
                     membership_gen: 0,
                 }),
                 &bootstrap_node,
@@ -808,7 +811,7 @@ mod tests {
                     prefix: Prefix::default(),
                     public_key_set: new_pk_set.clone(),
                     elders: addrs.clone(),
-                    members: BTreeMap::new(),
+                    members: BTreeSet::new(),
                     membership_gen: 0,
                 }),
                 &bootstrap_node,

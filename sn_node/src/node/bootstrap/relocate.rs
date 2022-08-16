@@ -263,7 +263,10 @@ mod tests {
         },
         types::keys::ed25519,
     };
-    use std::{collections::BTreeMap, net::SocketAddr};
+    use std::{
+        collections::{BTreeMap, BTreeSet},
+        net::SocketAddr,
+    };
     use tokio;
     use xor_name::{Prefix, XorName};
 
@@ -276,7 +279,7 @@ mod tests {
             gen_addr(),
         );
         let node_state = NodeState::joined(node.name(), node.addr, None);
-        let _ = from_sap.members.insert(node.name(), node_state.clone());
+        let _ = from_sap.members.insert(node_state.clone());
         let signed_node_state = section_signed(&from_sk_set.secret_key(), node_state)?;
         // to_sap
         let (to_sap, _) = generate_sap();
@@ -327,7 +330,7 @@ mod tests {
                 gen_addr(),
             );
             let node_state = NodeState::joined(node.name(), node.addr, None);
-            let _ = from_sap.members.insert(node.name(), node_state.clone());
+            let _ = from_sap.members.insert(node_state.clone());
             let signed_node_state = section_signed(&from_sk_set.secret_key(), node_state)?;
             // to_sap
             let (to_sap, to_sk_set) = generate_sap();
@@ -393,7 +396,7 @@ mod tests {
                 gen_addr(),
             );
             let node_state = NodeState::joined(node.name(), node.addr, None);
-            let _ = from_sap.members.insert(node.name(), node_state.clone());
+            let _ = from_sap.members.insert(node_state.clone());
             let signed_node_state = section_signed(&from_sk_set.secret_key(), node_state)?;
             // to_sap
             let (to_sap, to_sk_set) = generate_sap();
@@ -438,13 +441,13 @@ mod tests {
         let sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
 
         let mut elders: BTreeMap<XorName, SocketAddr> = BTreeMap::new();
-        let mut members: BTreeMap<XorName, NodeState> = BTreeMap::new();
+        let mut members: BTreeSet<NodeState> = BTreeSet::new();
 
         for _ in 0..elder_count() {
             let xor_name = xor_name::rand::random();
             let socket_addr = gen_addr();
             let _ = elders.insert(xor_name, socket_addr);
-            let _ = members.insert(xor_name, NodeState::joined(xor_name, socket_addr, None));
+            let _ = members.insert(NodeState::joined(xor_name, socket_addr, None));
         }
         let sap = SectionAuthorityProvider {
             prefix: Prefix::default(),

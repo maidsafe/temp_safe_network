@@ -521,7 +521,7 @@ mod core {
                 (key.index as u8, key.secret_key_share),
                 key.public_key_set,
                 sap.elders.len(),
-                BTreeSet::from_iter(sap.members.into_values()),
+                sap.members,
             ));
 
             Ok(())
