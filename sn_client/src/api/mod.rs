@@ -184,7 +184,7 @@ impl Client {
 
     /// Check if the provided public key is a known section key
     /// based on our current knowledge of the network and sections chains.
-    pub async fn is_known_section_key(&self, section_key: &sn_dbc::PublicKey) -> bool {
+    pub fn is_known_section_key(&self, section_key: &sn_dbc::PublicKey) -> bool {
         self.session.network.get_sections_dag().has_key(section_key)
     }
 

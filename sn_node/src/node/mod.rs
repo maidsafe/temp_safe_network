@@ -95,8 +95,8 @@ mod core {
             AuthorityProof, SectionAuth, SectionAuthorityProvider,
         },
         network_knowledge::{
-            supermajority, utils::write_prefix_map_to_disk, NetworkKnowledge, NodeInfo,
-            SectionKeyShare, SectionKeysProvider,
+            supermajority, NetworkKnowledge, NetworkPrefixMap, NodeInfo, SectionKeyShare,
+            SectionKeysProvider,
         },
         types::{
             keys::ed25519::Digest256, log_markers::LogMarker, Cache, Peer, ReplicatedDataAddress,
@@ -753,7 +753,7 @@ mod core {
             let path = self.root_storage_dir.clone().join(PREFIX_MAP_FILE_NAME);
 
             let _ = tokio::spawn(async move {
-                if let Err(err) = write_prefix_map_to_disk(&prefix_map, &path).await {
+                if let Err(err) = NetworkPrefixMap::write_to_disk(&prefix_map, &path).await {
                     error!(
                         "Error writing PrefixMap to `{}` dir: {:?}",
                         path.display(),

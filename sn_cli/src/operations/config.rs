@@ -80,7 +80,7 @@ pub enum NetworkInfo {
     /// to prefix_maps_dir
     Local(PathBuf, Option<BlsPublicKey>),
     /// The remote url pointing to a network map. The optional genesis key denotes that the network map has been copied
-    //     /// to prefix_maps_dir
+    /// to prefix_maps_dir
     Remote(String, Option<BlsPublicKey>),
 }
 
@@ -249,7 +249,11 @@ impl Config {
                             None => {
                                 if let Ok(prefix_map) = Self::retrieve_local_prefix_map(path).await
                                 {
-                                    write_prefix_map(&self.prefix_maps_dir, &prefix_map).await?;
+                                    Self::write_prefix_map_to_dir(
+                                        &self.prefix_maps_dir,
+                                        &prefix_map,
+                                    )
+                                    .await?;
                                     *genesis_key = Some(*prefix_map.genesis_key());
                                 } else {
                                     remove_list.push(network_name.clone());
@@ -259,7 +263,8 @@ impl Config {
                         // NetworkPrefixMap has not been fetched, fetch it
                         None => {
                             if let Ok(prefix_map) = Self::retrieve_local_prefix_map(path).await {
-                                write_prefix_map(&self.prefix_maps_dir, &prefix_map).await?;
+                                Self::write_prefix_map_to_dir(&self.prefix_maps_dir, &prefix_map)
+                                    .await?;
                                 *genesis_key = Some(*prefix_map.genesis_key());
                             } else {
                                 remove_list.push(network_name.clone());
@@ -273,7 +278,8 @@ impl Config {
                         None => {
                             let url = Url::parse(url)?;
                             if let Ok(prefix_map) = Self::retrieve_remote_prefix_map(&url).await {
-                                write_prefix_map(&self.prefix_maps_dir, &prefix_map).await?;
+                                Self::write_prefix_map_to_dir(&self.prefix_maps_dir, &prefix_map)
+                                    .await?;
                                 *genesis_key = Some(*prefix_map.genesis_key());
                             } else {
                                 remove_list.push(network_name.clone());
@@ -283,7 +289,8 @@ impl Config {
                     None => {
                         let url = Url::parse(url)?;
                         if let Ok(prefix_map) = Self::retrieve_remote_prefix_map(&url).await {
-                            write_prefix_map(&self.prefix_maps_dir, &prefix_map).await?;
+                            Self::write_prefix_map_to_dir(&self.prefix_maps_dir, &prefix_map)
+                                .await?;
                             *genesis_key = Some(*prefix_map.genesis_key());
                         } else {
                             remove_list.push(network_name.clone());
@@ -436,7 +443,12 @@ impl Config {
     pub async fn print_networks(&self) {
         let mut table = Table::new();
         table.add_row(&vec!["Networks"]);
-        table.add_row(&vec!["Current", "Network name", "Network map info"]);
+        table.add_row(&vec![
+            "Current",
+            "Network name",
+            "Genesis Key",
+            "Network map info",
+        ]);
         let current_prefix_map = self.read_default_prefix_map().await;
 
         for (network_name, net_info) in self.networks_iter() {
@@ -446,11 +458,21 @@ impl Config {
                     current = "*";
                 }
             }
-            let simplified_net_info = match net_info {
-                NetworkInfo::Local(path, _) => format!("Local: {:?}", path),
-                NetworkInfo::Remote(url, _) => format!("Remote: {:?}", url),
+            let (simplified_net_info, gk) = match net_info {
+                NetworkInfo::Local(path, gk) => (format!("Local: {:?}", path), gk),
+                NetworkInfo::Remote(url, gk) => (format!("Remote: {:?}", url), gk),
             };
-            table.add_row(&vec![current, network_name, simplified_net_info.as_str()]);
+            let genesis_key = if let Some(key) = gk {
+                format!("{:?}", key)
+            } else {
+                "".to_string()
+            };
+            table.add_row(&vec![
+                current,
+                network_name,
+                &genesis_key,
+                simplified_net_info.as_str(),
+            ]);
         }
 
         println!("{table}");
@@ -491,14 +513,12 @@ impl Config {
     }
 
     pub async fn write_prefix_map(&self, prefix_map: &NetworkPrefixMap) -> Result<()> {
-        write_prefix_map(&self.prefix_maps_dir, prefix_map).await
+        Self::write_prefix_map_to_dir(&self.prefix_maps_dir, prefix_map).await
     }
 
     pub async fn retrieve_local_prefix_map(location: &Path) -> Result<NetworkPrefixMap> {
-        let bytes = fs::read(location)
-            .await
-            .wrap_err_with(|| format!("Unable to read NetworkPrefixMap from '{:?}'", location))?;
-        Self::deserialise_prefix_map(&bytes)
+        let pm = NetworkPrefixMap::from_disk(location).await?;
+        Ok(pm)
     }
 
     pub async fn retrieve_remote_prefix_map(url: &Url) -> Result<NetworkPrefixMap> {
@@ -520,7 +540,10 @@ impl Config {
             break;
         }
         match bytes {
-            Some(b) => Self::deserialise_prefix_map(&b[..]),
+            Some(b) => {
+                let pm = NetworkPrefixMap::from_bytes(&b[..])?;
+                Ok(pm)
+            }
             None => Err(eyre!(
                 "{:?} Failed to fetch network map ({} retries) from '{}'",
                 status,
@@ -533,6 +556,14 @@ impl Config {
     ///
     /// Private helpers
     ///
+
+    // Write the prefix map within the provided directory path, using the
+    // prefix map's genesis key as the filename.
+    async fn write_prefix_map_to_dir(dir: &Path, prefix_map: &NetworkPrefixMap) -> Result<()> {
+        let path = dir.join(format!("{:?}", prefix_map.genesis_key()));
+        prefix_map.write_to_disk(&path).await?;
+        Ok(())
+    }
 
     fn get_dbc_owner(dbc_sk_path: &Path) -> Result<Option<Owner>> {
         if dbc_sk_path.exists() {
@@ -579,54 +610,11 @@ impl Config {
 
         Ok(())
     }
-
-    fn deserialise_prefix_map(bytes: &[u8]) -> Result<NetworkPrefixMap> {
-        let prefix_map = serde_json::from_slice(bytes)
-            .wrap_err_with(|| "Failed to deserialize NetworkPrefixMap")?;
-        Ok(prefix_map)
-    }
-
-    fn serialise_prefix_map(prefix_map: &NetworkPrefixMap) -> Result<Vec<u8>> {
-        serde_json::to_vec(prefix_map).wrap_err_with(|| "Failed to serialise NetworkPrefixMap")
-    }
-}
-
-async fn write_prefix_map(path: &Path, prefix_map: &NetworkPrefixMap) -> Result<()> {
-    let mut temp_file =
-        NamedTempFile::new_in(path).wrap_err_with(|| "Error creating temp file".to_string())?;
-
-    let serialized = Config::serialise_prefix_map(prefix_map)
-        .wrap_err("Failed to serialise NetworkPrefixMap")?;
-    temp_file
-        .write_all(serialized.as_slice())
-        .wrap_err_with(|| {
-            format!(
-                "Unable to write temp NetworkPrefixMap to '{}'",
-                temp_file.path().display()
-            )
-        })?;
-
-    let target_filepath = path.join(format!("{:?}", prefix_map.genesis_key()));
-    fs::rename(temp_file.path(), &target_filepath)
-        .await
-        .wrap_err_with(|| {
-            format!(
-                "Error while renaming NetworkPrefixMap file from {:?} to {:?}",
-                temp_file.path().display(),
-                target_filepath.display()
-            )
-        })?;
-    debug!(
-        "NetworkPrefixMap written at {:?}",
-        target_filepath.display()
-    );
-
-    Ok(())
 }
 
 #[cfg(test)]
 pub mod test_utils {
-    use super::{write_prefix_map, Config, NetworkInfo};
+    use super::{Config, NetworkInfo};
     use crate::operations::config::Settings;
     use assert_fs::{prelude::*, TempDir};
     use color_eyre::{eyre::eyre, Result};
@@ -644,8 +632,9 @@ pub mod test_utils {
         for _ in 0..n_prefix_maps {
             let sk = bls::SecretKey::random();
             let prefix_map = NetworkPrefixMap::new(sk.public_key());
+            let filename = format!("{:?}", prefix_map.genesis_key());
 
-            write_prefix_map(path, &prefix_map).await?;
+            prefix_map.write_to_disk(&path.join(filename)).await?;
             prefix_maps.push(prefix_map);
         }
         Ok(prefix_maps)

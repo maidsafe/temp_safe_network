@@ -25,11 +25,16 @@ use crate::network_knowledge::{Error, Result, SectionAuthUtils, SectionAuthority
 use bls::PublicKey as BlsPublicKey;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 use std::{
     cmp::Ordering,
+    collections::BTreeMap,
+    io::Write,
     iter::{self, Iterator},
+    path::Path,
 };
+use tempfile::NamedTempFile;
+use tokio::{fs, io::AsyncReadExt};
+
 use xor_name::{Prefix, XorName};
 
 /// Container for storing information about other sections in the network.
@@ -48,6 +53,36 @@ impl NetworkPrefixMap {
             sections: BTreeMap::new(),
             sections_dag: SecuredLinkedList::new(genesis_pk),
         }
+    }
+
+    /// Create a new NetworkPrefixMap deserialised from bytes
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        serde_json::from_slice(bytes).map_err(|err| Error::Deserialisation(err.to_string()))
+    }
+
+    /// Create a new NetworkPrefixMap deserialised from a file
+    pub async fn from_disk(path: &Path) -> Result<Self> {
+        let mut prefix_map_file = fs::File::open(path).await.map_err(|err| {
+            Error::FileHandling(format!(
+                "Error opening PrefixMap file from {}: {:?}",
+                path.display(),
+                err
+            ))
+        })?;
+
+        let mut prefix_map_content = vec![];
+        let _ = prefix_map_file
+            .read_to_end(&mut prefix_map_content)
+            .await
+            .map_err(|err| {
+                Error::FileHandling(format!(
+                    "Error reading PrefixMap from {}: {:?}",
+                    path.display(),
+                    err
+                ))
+            })?;
+
+        NetworkPrefixMap::from_bytes(&prefix_map_content)
     }
 
     /// Returns the genesis key of the Network
@@ -319,6 +354,55 @@ impl NetworkPrefixMap {
             total_elders: total.ceil() as u64,
             total_elders_exact,
         }
+    }
+
+    /// Serialise and write it to disk on the provided file path
+    pub async fn write_to_disk(&self, path: &Path) -> Result<()> {
+        trace!("Writing prefix map to disk at {}", path.display());
+        let parent_path = if let Some(parent_path) = path.parent() {
+            fs::create_dir_all(parent_path).await.map_err(|err| {
+                Error::DirectoryHandling(format!(
+                    "Could not create '{}' parent directory path: {}",
+                    path.display(),
+                    err,
+                ))
+            })?;
+            parent_path
+        } else {
+            Path::new(".")
+        };
+
+        let mut temp_file = NamedTempFile::new_in(parent_path).map_err(|e| {
+            Error::FileHandling(format!(
+                "Error creating tempfile at {}: {:?}",
+                parent_path.display(),
+                e
+            ))
+        })?;
+
+        let serialized =
+            serde_json::to_vec(self).map_err(|e| Error::Serialisation(e.to_string()))?;
+
+        temp_file.write_all(serialized.as_slice()).map_err(|e| {
+            Error::FileHandling(format!(
+                "Error writing tempfile at {}: {:?}",
+                temp_file.path().display(),
+                e
+            ))
+        })?;
+
+        fs::rename(temp_file.path(), &path).await.map_err(|e| {
+            Error::FileHandling(format!(
+                "Error renaming tempfile from {} to {}: {:?}",
+                temp_file.path().display(),
+                path.display(),
+                e
+            ))
+        })?;
+
+        trace!("Wrote PrefixMap to disk: {}", path.display());
+
+        Ok(())
     }
 
     /// Remove `prefix` and any of its ancestors.
