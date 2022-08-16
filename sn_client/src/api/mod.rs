@@ -209,7 +209,7 @@ mod tests {
     use crate::utils::test_utils::{
         create_test_client, create_test_client_with, get_dbc_owner_from_secret_key_hex,
     };
-    use sn_interface::{init_logger, types::utils::random_bytes};
+    use sn_interface::init_logger;
 
     use eyre::Result;
     use std::{
@@ -250,17 +250,6 @@ mod tests {
         let client = create_test_client_with(Some(full_id), None, None).await?;
         assert_eq!(pk, client.public_key());
 
-        Ok(())
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn long_lived_connection_survives() -> Result<()> {
-        init_logger();
-
-        let client = create_test_client().await?;
-        tokio::time::sleep(tokio::time::Duration::from_secs(40)).await;
-        let bytes = random_bytes(self_encryption::MIN_ENCRYPTABLE_BYTES / 2);
-        let _ = client.upload(bytes).await?;
         Ok(())
     }
 
