@@ -14,14 +14,11 @@
 //! # Ok(())
 //! # }
 //! ```
-use crate::{connections::Session, Client, DEFAULT_PREFIX_MAP_FILE_NAME};
+use crate::{connections::Session, Client, Error, DEFAULT_PREFIX_MAP_FILE_NAME};
 
 use qp2p::Config as Qp2pConfig;
 use sn_dbc::Owner;
-use sn_interface::{
-    network_knowledge::{prefix_map::NetworkPrefixMap, utils::read_prefix_map_from_disk},
-    types::Keypair,
-};
+use sn_interface::{network_knowledge::prefix_map::NetworkPrefixMap, types::Keypair};
 use std::{
     net::{Ipv4Addr, SocketAddr},
     path::PathBuf,
@@ -138,7 +135,7 @@ impl ClientBuilder {
     /// - `[Self::cmd_ack_wait`] defaults to [`DEFAULT_ACK_WAIT`]
     /// - [`qp2p::Config`] will default to it's [`Default`] impl
     /// - Prefix map will be read from a standard location
-    pub async fn build(self) -> Result<Client, crate::errors::Error> {
+    pub async fn build(self) -> Result<Client, Error> {
         let query_timeout = self.query_timeout.unwrap_or(DEFAULT_QUERY_CMD_TIMEOUT);
         let cmd_timeout = self.cmd_timeout.unwrap_or(DEFAULT_QUERY_CMD_TIMEOUT);
         let cmd_ack_wait = self.cmd_ack_wait.unwrap_or(DEFAULT_ACK_WAIT);
@@ -147,7 +144,9 @@ impl ClientBuilder {
             Some(pm) => pm,
             None => {
                 let prefix_map_dir = default_prefix_map_path()?;
-                read_prefix_map_from_disk(&prefix_map_dir).await?
+                NetworkPrefixMap::from_disk(&prefix_map_dir)
+                    .await
+                    .map_err(|err| Error::NetworkContacts(err.to_string()))?
             }
         };
 
@@ -194,7 +193,7 @@ fn env_parse<F: FromStr>(s: &str) -> Result<Option<F>, F::Err> {
     F::from_str(&v).map(|v| Some(v))
 }
 
-fn default_prefix_map_path() -> Result<PathBuf, crate::Error> {
+fn default_prefix_map_path() -> Result<PathBuf, Error> {
     // Use `$HOME/.safe/prefix_maps` directory
     let path = dirs_next::home_dir()
         .ok_or_else(|| {

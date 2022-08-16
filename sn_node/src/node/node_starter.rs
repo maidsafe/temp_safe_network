@@ -24,7 +24,7 @@ use crate::node::{
 use crate::UsedSpace;
 
 use sn_interface::{
-    network_knowledge::{utils::read_prefix_map_from_disk, NodeInfo, MIN_ADULT_AGE},
+    network_knowledge::{NetworkPrefixMap, NodeInfo, MIN_ADULT_AGE},
     types::{keys::ed25519, log_markers::LogMarker, PublicKey as TypesPublicKey},
 };
 
@@ -224,7 +224,7 @@ async fn bootstrap_node(
         let path = config.network_contacts_file().ok_or_else(|| {
             Error::Configuration("Could not obtain network contacts file path".to_string())
         })?;
-        let prefix_map = read_prefix_map_from_disk(&path).await?;
+        let prefix_map = NetworkPrefixMap::from_disk(&path).await?;
         let section_elders = {
             let sap = prefix_map
                 .closest(&xor_name::rand::random(), None)

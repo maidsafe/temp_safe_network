@@ -51,10 +51,7 @@ impl sn_dbc::SpentProofKeyVerifier for SpentProofKeyVerifier<'_> {
                 "Failed to verify SpentProof signature with key: {}",
                 key.to_hex()
             )))
-        } else if !futures::executor::block_on(self.client.is_known_section_key(key)) {
-            // FIXME: there is a WIP task to change the way sn_client keeps track of sections DAG,
-            // that will allow us to remove the futures block on sn_client::is_known_section_key.
-
+        } else if !self.client.is_known_section_key(key) {
             Err(Error::DbcVerificationFailed(format!(
                 "SpentProof key is an unknown section key: {}",
                 key.to_hex()

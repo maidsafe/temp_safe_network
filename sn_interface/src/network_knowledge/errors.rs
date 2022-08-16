@@ -16,6 +16,18 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Debug, Error)]
 #[allow(missing_docs)]
 pub enum Error {
+    /// Error reading/writing a file
+    #[error("File read/write error: {0}")]
+    FileHandling(String),
+    /// Error creating Directory
+    #[error("Directory creation error: {0}")]
+    DirectoryHandling(String),
+    /// Serialization error
+    #[error("Failed to serialise prefix map: {0}")]
+    Serialisation(String),
+    /// Failed to deserialise a prefix map.
+    #[error("Failed to deserialise prefix map: {0}")]
+    Deserialisation(String),
     #[error("Section authority provider cannot be trusted: {0}")]
     UntrustedSectionAuthProvider(String),
     #[error("Proof chain cannot be trusted: {0}")]

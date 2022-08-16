@@ -13,7 +13,6 @@ pub mod prefix_map;
 pub mod section_authority_provider;
 pub mod section_keys;
 mod section_peers;
-pub mod utils;
 
 #[cfg(any(test, feature = "test-utils"))]
 pub use self::section_authority_provider::test_utils;
@@ -22,11 +21,10 @@ pub use self::{
     errors::{Error, Result},
     node_info::NodeInfo,
     node_state::NodeState,
+    prefix_map::NetworkPrefixMap,
     section_authority_provider::{SapCandidate, SectionAuthUtils, SectionAuthorityProvider},
     section_keys::{SectionKeyShare, SectionKeysProvider},
 };
-
-use self::prefix_map::NetworkPrefixMap;
 
 use crate::{
     messaging::{

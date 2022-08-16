@@ -45,12 +45,6 @@ pub enum Error {
     /// Serialization error
     #[error("Serialisation error: {0}")]
     Serialisation(String),
-    /// Error reading/writing a file
-    #[error("File read/write error: {0}")]
-    FileHandling(String),
-    /// Error creating Directory  at given path
-    #[error("Directory Creation error: {0}")]
-    DirectoryHandling(String),
     /// Entry already exists. Contains the current entry Key.
     #[error("Entry already exists {0}")]
     EntryExists(u8),
