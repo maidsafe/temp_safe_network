@@ -13,9 +13,8 @@ pub(super) mod event;
 pub(super) mod event_channel;
 #[cfg(test)]
 pub(crate) mod tests;
-use crate::log_sleep;
-
 pub(crate) use self::cmd_ctrl::CmdCtrl;
+use event_channel::EventSender;
 
 use crate::comm::MsgEvent;
 use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Node, Result};
@@ -56,8 +55,6 @@ const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 const ADULT_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(2);
 const ELDER_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(3);
 
-const LOOP_SLEEP_INTERVAL: Duration = Duration::from_millis(10);
-
 /// Listens for incoming msgs and forms Cmds for each,
 /// Periodically triggers other Cmd Processes (eg health checks, dysfunction etc)
 pub(crate) struct FlowCtrl {
@@ -66,12 +63,14 @@ pub(crate) struct FlowCtrl {
     incoming_msg_events: mpsc::Receiver<MsgEvent>,
     incoming_cmds_from_apis: mpsc::Receiver<(Cmd, Option<usize>)>,
     cmd_sender_channel: mpsc::Sender<(Cmd, Option<usize>)>,
+    outgoing_node_event_sender: EventSender,
 }
 
 impl FlowCtrl {
     pub(crate) fn new(
         cmd_ctrl: CmdCtrl,
         incoming_msg_events: mpsc::Receiver<MsgEvent>,
+        outgoing_node_event_sender: EventSender,
     ) -> (Self, mpsc::Sender<(Cmd, Option<usize>)>) {
         let node = cmd_ctrl.node();
         let (cmd_sender_channel, incoming_cmds_from_apis) = mpsc::channel(1);
@@ -83,6 +82,7 @@ impl FlowCtrl {
                 incoming_msg_events,
                 incoming_cmds_from_apis,
                 cmd_sender_channel: cmd_sender_channel.clone(),
+                outgoing_node_event_sender,
             },
             cmd_sender_channel,
         )
@@ -108,33 +108,29 @@ impl FlowCtrl {
             // First things. Lets process the next cmd
 
             if let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {
-                debug!("q lennn {}", self.cmd_ctrl.q_len());
+                // if we want to throttle cmd throughput, we do that here.
+                // if there is nothing in the cmd queue, we wait here too.
+                self.cmd_ctrl
+                    .wait_if_not_processing_at_expected_rate()
+                    .await;
 
-                debug!("pre process");
                 if let Err(error) = self
                     .cmd_ctrl
-                    .process_cmd(
-                        next_cmd_job.id(),
-                        next_cmd_job.into_cmd(),
+                    .process_cmd_job(
+                        next_cmd_job,
                         self.cmd_sender_channel.clone(),
+                        self.outgoing_node_event_sender.clone(),
                     )
                     .await
                 {
                     error!("Error during cmd processing: {error:?}");
                 }
-
-                debug!("post process");
             }
 
             let now = Instant::now();
             let mut cmds = vec![];
 
             let is_elder = self.node.read().await.is_elder();
-
-            // // Finally, handle any incoming conn messages
-            // // this requires mut self
-
-            // Now, we want to check for msgs / cmds via api
 
             // Here we handle any incoming conn messages
             // via the API channel
@@ -149,7 +145,7 @@ impl FlowCtrl {
                 }
             }
 
-            // Finally, handle any incoming conn messages
+            // Handle any incoming conn messages
             // this requires mut self
             match self.incoming_msg_events.try_recv() {
                 Ok(msg) => cmds.push(
@@ -206,10 +202,6 @@ impl FlowCtrl {
                     }
                 }
 
-                if cmds.is_empty() {
-                    log_sleep!(LOOP_SLEEP_INTERVAL);
-                }
-
                 for cmd in cmds {
                     if let Err(error) = self.fire_and_forget(cmd).await {
                         error!("Error pushing node process cmd to controller: {error:?}");
@@ -217,13 +209,12 @@ impl FlowCtrl {
                 }
 
                 // remaining cmds are for elders only.
-                // we've pushed what we have so we can continue
+                // we've pushed what we have as an adult so we can continue
                 continue;
             }
 
             // Okay, so the node is currently an elder...
 
-            // if we've passed enough time, network probe
             if last_probe.elapsed() > PROBE_INTERVAL {
                 last_probe = now;
                 if let Some(cmd) = Self::probe_the_network(self.node.clone()).await {
@@ -266,10 +257,6 @@ impl FlowCtrl {
                 cmds.extend(dysf_cmds);
             }
 
-            if cmds.is_empty() {
-                log_sleep!(LOOP_SLEEP_INTERVAL);
-            }
-
             for cmd in cmds {
                 if let Err(error) = self.fire_and_forget(cmd).await {
                     error!("Error pushing node process cmd to controller: {error:?}");
@@ -282,37 +269,8 @@ impl FlowCtrl {
 
     /// Does not await the completion of the cmd.
     pub(crate) async fn fire_and_forget(&mut self, cmd: Cmd) -> Result<()> {
-        let _ = self.cmd_ctrl.push(cmd).await?;
+        self.cmd_ctrl.push(cmd).await?;
         Ok(())
-    }
-
-    /// Awaits the completion of the cmd.
-    #[allow(unused)]
-    pub(crate) async fn await_result(&mut self, cmd: Cmd) -> Result<()> {
-        use cmd_ctrl::CtrlStatus;
-
-        let mut watcher = self.cmd_ctrl.push(cmd).await?;
-
-        loop {
-            match watcher.await_change().await {
-                CtrlStatus::Finished => {
-                    return Ok(());
-                }
-                CtrlStatus::Enqueued => {
-                    // this block should be unreachable, as Enqueued is the initial state
-                    // but let's handle it anyway..
-                    sleep(Duration::from_millis(100)).await;
-                    continue;
-                }
-                CtrlStatus::WatcherDropped => {
-                    // the send job is dropped for some reason,
-                    return Err(Error::CmdJobWatcherDropped);
-                }
-                CtrlStatus::Error(error) => {
-                    continue; // await change on the same recipient again
-                }
-            }
-        }
     }
 
     /// Initiates and generates all the subsequent Cmds to perform a healthcheck
@@ -456,9 +414,6 @@ impl FlowCtrl {
 
             data_queued
         };
-
-        // (src_section_pk, our_info, data_queued)
-        // };
 
         if let Some(address) = data_queued {
             trace!("Data found in queue to send out");
