@@ -42,7 +42,7 @@ use std::{
 /// among other pending cmd jobs, and the time the
 /// job was instantiated.
 #[derive(Debug, Clone)]
-pub struct CmdJob {
+pub(crate) struct CmdJob {
     id: usize,
     parent_id: Option<usize>,
     cmd: Cmd,
@@ -87,10 +87,6 @@ impl CmdJob {
 
     pub(crate) fn parent_id(&self) -> Option<usize> {
         self.parent_id
-    }
-
-    pub(crate) fn cmd(&self) -> &Cmd {
-        &self.cmd
     }
 
     pub(crate) fn into_cmd(self) -> Cmd {
