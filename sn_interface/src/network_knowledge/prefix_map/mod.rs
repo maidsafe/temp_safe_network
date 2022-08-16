@@ -98,34 +98,16 @@ impl NetworkPrefixMap {
     /// Returns the known section that is closest to the given name,
     /// regardless of whether `name` belongs in that section or not.
     /// If provided, it excludes any section matching the passed prefix.
-    fn closest(
+    pub fn closest(
         &self,
         name: &XorName,
         exclude: Option<&Prefix>,
-    ) -> Option<SectionAuth<SectionAuthorityProvider>> {
+    ) -> Option<&SectionAuth<SectionAuthorityProvider>> {
         self.sections
             .iter()
             .filter(|&(prefix, _)| Some(prefix) != exclude)
             .min_by(|&(prefix_lhs, _), &(prefix_rhs, _)| prefix_lhs.cmp_distance(prefix_rhs, name))
-            .map(|(_, sap)| sap.clone())
-    }
-
-    /// Returns the known section that is closest to the given name,
-    /// regardless of whether `name` belongs in that section or not.
-    /// If there are no close matches in remote sections, return a SAP from an opposite prefix.
-    /// If provided, it excludes any section matching the passed prefix.
-    pub fn closest_or_opposite(
-        &self,
-        name: &XorName,
-        exclude: Option<&Prefix>,
-    ) -> Option<SectionAuth<SectionAuthorityProvider>> {
-        self.closest(name, exclude).or_else(|| {
-            self.sections
-                .iter()
-                .filter(|&(prefix, _)| prefix.matches(&name.with_bit(0, !name.bit(0))))
-                .max_by_key(|&(prefix, _)| prefix.bit_count())
-                .map(|(_, sap)| sap.clone())
-        })
+            .map(|(_, sap)| sap)
     }
 
     /// Returns all known sections SAP.
@@ -139,12 +121,12 @@ impl NetworkPrefixMap {
     /// Get `SectionAuthorityProvider` of a known section with the given prefix.
     #[allow(unused)]
     pub fn get(&self, prefix: &Prefix) -> Option<SectionAuthorityProvider> {
-        self.get_signed(prefix).map(|sap| sap.value)
+        self.get_signed(prefix).map(|sap| sap.value.clone())
     }
 
     /// Get signed `SectionAuthorityProvider` of a known section with the given prefix.
-    pub fn get_signed(&self, prefix: &Prefix) -> Option<SectionAuth<SectionAuthorityProvider>> {
-        self.sections.get(prefix).cloned()
+    pub fn get_signed(&self, prefix: &Prefix) -> Option<&SectionAuth<SectionAuthorityProvider>> {
+        self.sections.get(prefix)
     }
 
     /// Update our knowledge on the remote section's SAP and our sections DAG
@@ -195,7 +177,7 @@ impl NetworkPrefixMap {
         }
 
         match self.get_signed(incoming_prefix) {
-            Some(sap) if sap == signed_sap => {
+            Some(sap) if sap == &signed_sap => {
                 // It's the same SAP we are already aware of
                 return Ok(false);
             }
@@ -453,16 +435,16 @@ mod tests {
 
         // There are no matching prefixes, so return an opposite prefix.
         assert_eq!(
-            map.closest_or_opposite(&p1.substituted_in(xor_name::rand::random()), None)
+            map.closest(&p1.substituted_in(xor_name::rand::random()), None)
                 .ok_or(Error::NoMatchingSection)?,
-            sap0
+            &sap0
         );
 
         let _changed = map.insert(sap0.clone());
         assert_eq!(
-            map.closest_or_opposite(&p1.substituted_in(xor_name::rand::random()), None)
+            map.closest(&p1.substituted_in(xor_name::rand::random()), None)
                 .ok_or(Error::NoMatchingSection)?,
-            sap0
+            &sap0
         );
 
         Ok(())

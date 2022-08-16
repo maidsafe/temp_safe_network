@@ -1113,35 +1113,139 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
-## v0.68.2 (2022-07-10)
+## v0.69.0 (2022-08-14)
 
 ### Chore
 
- - <csr-id-19ddebad43aa53822cb7e781913ba34b848e2c89/> remove unused utilities
- - <csr-id-49e223e2c07695b4c63e253ba19ce43ec24d7112/> move more deps to clap-v3; rm some deps on rand
- - <csr-id-5cff2c5325a854f04788f9111439bca75b21c60f/> ignore store_and_read_40mb as too heavy for CI
+ - <csr-id-707df06b08d5b0457b201ce5772d6a1d4fe9f984/> follow rust convention for getters for prefixmap
+
+ - <csr-id-6d60525874dc4efeb658433f1f253d54e0cba2d4/> remove wiremsg.priority as uneeded
+ - <csr-id-42bde15e9a96dbe759575d4bccf4f769e13a695d/> misc. fixes
+ - <csr-id-29de67f1e3583eab867d517cb50ed2e404bd63fd/> serialize NetworkPrefixMap into JSON
+ - <csr-id-8242f2f1035b1c0718e53954951badffa30f3393/> organise usings, cleanup
+ - <csr-id-820fcc9a77f756fca308f247c3ea1b82f65d30b9/> remove NetworkPrefxiMap::genesis_key, NetworkKnowledge::genesis_key
+   Remove the feilds as they can be obtained from NetworkPrefixMap::sections_dag
+ - <csr-id-afcf083469c732f10c7c80f4a45e4c33ab111101/> remove RwLock from NetworkPrefixMap
+ - <csr-id-17f0e8a08c9543d380c16a35d3d7bfe7834a9e5a/> make NetowrkPrefixMap::sections_dag private
+ - <csr-id-aafc560d3b3b1e375f7be224e0e63a3b567bbd86/> rename traceroute fns
+ - <csr-id-73dc9b4a1757393270e62d265328bab0c0aa3b35/> make traceroute a default feature
+ - <csr-id-0a653e4becc4a8e14ffd6d0752cf035430067ce9/> improve Display, Debug impl for Traceroute
+ - <csr-id-9789797e3f773285f23bd22957fe45a67aabec24/> improve traceroute readability and other improvements
+   - simplfies creating identites for traceroute to avoid locking
+   - implements Display and Debug for traceroute
+   - add clearer logs for traceroute
+ - <csr-id-c3196bfdbca221dfa61f978331582fc7d6db72d3/> remove unused error variants
+ - <csr-id-3fc072f256dfe4b9e1a1a09c59800c7d78aa7360/> remove unused config dir/file
+ - <csr-id-947b6cad014a41b0336de7f1c31f9902473c1a70/> remove unused channel from Client
+   Previously there used to be a channel that propagated up errors, this
+   usage was removed in commit 1e4049fc94
+ - <csr-id-8efbd96a5fd3907ace5ca6ac282027595fefd8ef/> Cleanup non-joined member sessions, regardless of connected state
+ - <csr-id-ea490ddf749ac9e0c7962c3c21c053663e6b6ee7/> reflect the semantics not the type
+ - <csr-id-6f03b93bd2d02f0ffe54b69fbf25070fbe64eab0/> upgrade blsttc to 7.0.0
+   This version has a more helpful error message for the shares interpolation problem.
+ - <csr-id-1ee345ce00337f9b24d45db417b6bb3d54c67955/> increase query retry count as we may drop connections now
+ - <csr-id-214adedc31bca576c7f28ff52a1f4ff0a2676757/> improve traceroute redability and resolve clippy
+ - <csr-id-39c3fdf4128462e5f7c5fec3c628d394f505e2f2/> remove unused console-subscriber
+ - <csr-id-1e8180c23fab27ac92c93f201efd050cff00db10/> re-enable registers benchmark and tidy sled residue
+ - <csr-id-ec8b69d642fc4ca0166ffff113306244e5c3936a/> remove extra bootstrap step
+   Remove `Session::genesis_key` as it's unused. Can be obtained
+   from `NetworkPrefixMap` if required.
+ - <csr-id-b9bfb425035fead587b7b5fc03a212a5d5aae4b3/> add binary to query chunk at adults
+ - <csr-id-00fae4d5fd5dbad5696888f0c796fbd39b7e49ed/> formatting with cargo fmt
+ - <csr-id-5aeb15c8c309c16878dde510f68b0e5c2122cd8c/> move to dev-dependencies
+
+### Documentation
+
+ - <csr-id-753443da697a61e49eac977402731c4373e7f4f9/> add client builder code example
+ - <csr-id-70ea78222875eb947e684af6db7544927f0bfe77/> remove TODOs from public docs
+ - <csr-id-49313f62b5a174a9b278c1c5d18baccdf4bb8c85/> fix link to config field
+
+### New Features
+
+ - <csr-id-4772ff129bd8da82465ef93e66d17a8fbbd38f7d/> ClientBuilder to instantiate Client
+   This applies the builder pattern for creating a Client
+ - <csr-id-175d1b909dff8c6729ac7f156ce1d0d22be8cc12/> make traceroute default for now
+ - <csr-id-4f2cf267ee030e5924a2fa999a2a46dbc072d208/> impl traceroute for client cmds and cmd responses
+ - <csr-id-a6fb1fc516a9ef6dae7aa236f3dd440d50697ae2/> impl traceroute feature to trace a message's flow in the network
+   - implements traceroute for Client queries and is logged at the client on return
+ - <csr-id-ba97ca06b67cd6e5de8e1c910b396fbe44f40fd7/> perform verification of input TX and spentproofs when depositing or reissuing a DBC
+ - <csr-id-df5ea26c8243de70d16a75ac936bc322954c8436/> add timeout for queries
 
 ### Bug Fixes
 
- - <csr-id-64eb333d532694f46f1d0b9dd5109961b3551802/> for QueryResponse, set correlation_id to be the origin msg_id
- - <csr-id-3c383ccf9ad0ed77080fb3e3ec459e5b02158505/> passing the churn test
-   This commit contains the work to passing the churn test.
-   There are mainly two fixes:
-   1, Only trigger data reorganization when there is membership update.
-      Previously, data reorganzation get undertaken whenever there is
-      incoming message. Which result in a looping of messaging among
-      nodes.
-   2, Only broadcast result when the QueryResponse is not an error.
-      Previously, this will cause the client thinking the whole query
-      is failed whenever an error response received.
+ - <csr-id-0041e18ab7d1a21e4debb39df9c4b116e002a5e5/> convert nodes joining interval to millis before passing it to launch-tool
+   - Also pass the default prefix map file path as the network contacts file path to CLI node join cmd.
+   - Minor refactoring to sn_client::test_spentbook_spend_dbc test.
+ - <csr-id-0ed5075304b090597f7760fb51c4a33435a853f1/> fix deadlock introduced after removal of Arc from NetworkPrefixMap
+   Removing the checks in compare_and_write_prefix_map and directly
+   writing the prefix_map fixed the issue
+ - <csr-id-f0ad7d56a58a08a7591d978c8ead4c10db734276/> more attempt when query too close to the spend cmd
+ - <csr-id-db525193bed7662c5184810f18587abb0d22b26b/> use Eyre instead of boxed error
+ - <csr-id-145b302aad291120c52f1cffad8e7d116682f532/> unused async in sn_client
+ - <csr-id-d8cc45384f891a9d95a7cef30159f11ec0ff9269/> unused async remove and up-chain
+ - <csr-id-a378e7ba67ec18be708a2e1a9e08e63519da7451/> Remove unused Arc(RwLock) structure
+ - <csr-id-950b3048d1aae1f9ad5d2218a42c34d662925e38/> upon receiving an AE msg update client knowledge of network sections chains
+
+### Refactor
+
+ - <csr-id-27ba2a63dcfa272cf7ef8c5301987fc6bfe18ed0/> sn_client to only read a default prefix map file, updates to be cached on disk by user
+   - CLI to cache the up to date PrefixMap after all commands were executed and right before exiting.
+   - Refactoring sn_cli::Config to remove some redundant code.
+ - <csr-id-6b1fee8cf3d0b2995f4b81e59dd684547593b5fa/> reduce AE msgs to one msg with a kind field
+ - <csr-id-ed37bb56e5e17d4cba7c1b2165746c193241d618/> move SectionChain into NetworkPrefixMap
+ - <csr-id-14ea6c7f4bbaee9c2ac4a30fba938ef2de2f77e5/> use builder to instantiate
+ - <csr-id-db4f4d07b155d732ad76d263563d81b5fee535f7/> remove more unused code
+ - <csr-id-e0fb940b24e87d86fe920095176362f73503ce79/> use sn_dbc::SpentProof API for verifying SpentProofShares
+ - <csr-id-ca32230926e5a435d90694df8fbce1218ea397f0/> remove unused storage path
+ - <csr-id-3f577d2a6fe70792d7d02e231b599ca3d44a5ed2/> rename gen_section_authority_provider to random_sap
+ - <csr-id-9fde534277f359dfa0a1d91d917864776edb5138/> reissuing DBCs for all sn_cli tests only once as a setup stage
+ - <csr-id-5c82df633e7c062fdf761a8e6e0a7ae8d26cc73a/> setup step for tests to reissue a set of DBCs from genesis only once
+ - <csr-id-f5af444b8ac37d2debfbe5e1d4dcdc48de963694/> removing hard-coded test DBC from sn_api Wallet unit tests
+
+### Style
+
+ - <csr-id-4d717a21a2daf6ef0b3b5826329a8848f2fe46ee/> tweak sn_client/Cargo.toml formatting TOML
+
+### Test
+
+ - <csr-id-95c33d1ea2040bce4078be96ed8b1c9f2e966b21/> have many-clients test to report the errors found when instantiating clients
+ - <csr-id-d4be0cc431947b035046cc4d56642a81c0880924/> additional tests in sn-api for DBC verification failures
+
+### Chore (BREAKING)
+
+ - <csr-id-db7dcdc7968d1d7e946274650d5a0c48719b4955/> remove providing path to qp2p cfg
+   This configuration seems never to be provided or stored anyway. It looks
+   like some code was also taking this parameter to be the client config,
+   not the qp2p config, which is a source of confusion.
+ - <csr-id-d3a05a728be8752ea9ebff4e38e7c4c85e5db09b/> having spent proofs and Txs within SpentbookCmd::Send msg to be a set instead of a vec
+
+### New Features (BREAKING)
+
+ - <csr-id-40a5f2d968aff30e7b92fe325aa299deddb49e69/> remove client config in favour of builder
+   The config_handler module handled most of the configurable parameters to
+   the client, but this is superseded by the client builder. The client
+   builder is now the dedicated place for the logic pertaining to
+   instantiating the client.
+ - <csr-id-923cdfded98132e94473db04e01d5fe83f73ca3d/> adjust client instantiation
+   Force the user to provide a DBC owner and Keypair to use with the
+   client. The builder pattern will then take over the convenience of
+   providing defaults (generating new keys) for this if not provided.
+ - <csr-id-f666204febb1044980412345236ce0cb8377b162/> return reference instead of clone
+   Let the end user decide on wether to clone a value that is taken from
+   the struct.
+
+### Refactor (BREAKING)
+
+ - <csr-id-96da1171d0cac240f772e5d6a15c56f63441b4b3/> nodes to cache their own individual prefix map file on disk
+ - <csr-id-dd2eb21352223f6340064e0021f4a7df402cd5c9/> removing Token from sn_interfaces::type as it is now exposed by sn_dbc
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 9 commits contributed to the release over the course of 1 calendar day.
- - 1 day passed between releases.
- - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 67 commits contributed to the release over the course of 30 calendar days.
+ - 33 days passed between releases.
+ - 64 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1151,6 +1255,122 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - follow rust convention for getters for prefixmap ([`707df06`](https://github.com/maidsafe/safe_network/commit/707df06b08d5b0457b201ce5772d6a1d4fe9f984))
+    - sn_client to only read a default prefix map file, updates to be cached on disk by user ([`27ba2a6`](https://github.com/maidsafe/safe_network/commit/27ba2a63dcfa272cf7ef8c5301987fc6bfe18ed0))
+    - remove wiremsg.priority as uneeded ([`6d60525`](https://github.com/maidsafe/safe_network/commit/6d60525874dc4efeb658433f1f253d54e0cba2d4))
+    - have many-clients test to report the errors found when instantiating clients ([`95c33d1`](https://github.com/maidsafe/safe_network/commit/95c33d1ea2040bce4078be96ed8b1c9f2e966b21))
+    - misc. fixes ([`42bde15`](https://github.com/maidsafe/safe_network/commit/42bde15e9a96dbe759575d4bccf4f769e13a695d))
+    - add client builder code example ([`753443d`](https://github.com/maidsafe/safe_network/commit/753443da697a61e49eac977402731c4373e7f4f9))
+    - remove client config in favour of builder ([`40a5f2d`](https://github.com/maidsafe/safe_network/commit/40a5f2d968aff30e7b92fe325aa299deddb49e69))
+    - convert nodes joining interval to millis before passing it to launch-tool ([`0041e18`](https://github.com/maidsafe/safe_network/commit/0041e18ab7d1a21e4debb39df9c4b116e002a5e5))
+    - serialize NetworkPrefixMap into JSON ([`29de67f`](https://github.com/maidsafe/safe_network/commit/29de67f1e3583eab867d517cb50ed2e404bd63fd))
+    - nodes to cache their own individual prefix map file on disk ([`96da117`](https://github.com/maidsafe/safe_network/commit/96da1171d0cac240f772e5d6a15c56f63441b4b3))
+    - reduce AE msgs to one msg with a kind field ([`6b1fee8`](https://github.com/maidsafe/safe_network/commit/6b1fee8cf3d0b2995f4b81e59dd684547593b5fa))
+    - removing Token from sn_interfaces::type as it is now exposed by sn_dbc ([`dd2eb21`](https://github.com/maidsafe/safe_network/commit/dd2eb21352223f6340064e0021f4a7df402cd5c9))
+    - organise usings, cleanup ([`8242f2f`](https://github.com/maidsafe/safe_network/commit/8242f2f1035b1c0718e53954951badffa30f3393))
+    - remove NetworkPrefxiMap::genesis_key, NetworkKnowledge::genesis_key ([`820fcc9`](https://github.com/maidsafe/safe_network/commit/820fcc9a77f756fca308f247c3ea1b82f65d30b9))
+    - fix deadlock introduced after removal of Arc from NetworkPrefixMap ([`0ed5075`](https://github.com/maidsafe/safe_network/commit/0ed5075304b090597f7760fb51c4a33435a853f1))
+    - remove RwLock from NetworkPrefixMap ([`afcf083`](https://github.com/maidsafe/safe_network/commit/afcf083469c732f10c7c80f4a45e4c33ab111101))
+    - make NetowrkPrefixMap::sections_dag private ([`17f0e8a`](https://github.com/maidsafe/safe_network/commit/17f0e8a08c9543d380c16a35d3d7bfe7834a9e5a))
+    - move SectionChain into NetworkPrefixMap ([`ed37bb5`](https://github.com/maidsafe/safe_network/commit/ed37bb56e5e17d4cba7c1b2165746c193241d618))
+    - rename traceroute fns ([`aafc560`](https://github.com/maidsafe/safe_network/commit/aafc560d3b3b1e375f7be224e0e63a3b567bbd86))
+    - make traceroute a default feature ([`73dc9b4`](https://github.com/maidsafe/safe_network/commit/73dc9b4a1757393270e62d265328bab0c0aa3b35))
+    - improve Display, Debug impl for Traceroute ([`0a653e4`](https://github.com/maidsafe/safe_network/commit/0a653e4becc4a8e14ffd6d0752cf035430067ce9))
+    - improve traceroute readability and other improvements ([`9789797`](https://github.com/maidsafe/safe_network/commit/9789797e3f773285f23bd22957fe45a67aabec24))
+    - use builder to instantiate ([`14ea6c7`](https://github.com/maidsafe/safe_network/commit/14ea6c7f4bbaee9c2ac4a30fba938ef2de2f77e5))
+    - adjust client instantiation ([`923cdfd`](https://github.com/maidsafe/safe_network/commit/923cdfded98132e94473db04e01d5fe83f73ca3d))
+    - return reference instead of clone ([`f666204`](https://github.com/maidsafe/safe_network/commit/f666204febb1044980412345236ce0cb8377b162))
+    - remove TODOs from public docs ([`70ea782`](https://github.com/maidsafe/safe_network/commit/70ea78222875eb947e684af6db7544927f0bfe77))
+    - remove unused error variants ([`c3196bf`](https://github.com/maidsafe/safe_network/commit/c3196bfdbca221dfa61f978331582fc7d6db72d3))
+    - remove unused config dir/file ([`3fc072f`](https://github.com/maidsafe/safe_network/commit/3fc072f256dfe4b9e1a1a09c59800c7d78aa7360))
+    - fix link to config field ([`49313f6`](https://github.com/maidsafe/safe_network/commit/49313f62b5a174a9b278c1c5d18baccdf4bb8c85))
+    - remove unused channel from Client ([`947b6ca`](https://github.com/maidsafe/safe_network/commit/947b6cad014a41b0336de7f1c31f9902473c1a70))
+    - remove providing path to qp2p cfg ([`db7dcdc`](https://github.com/maidsafe/safe_network/commit/db7dcdc7968d1d7e946274650d5a0c48719b4955))
+    - ClientBuilder to instantiate Client ([`4772ff1`](https://github.com/maidsafe/safe_network/commit/4772ff129bd8da82465ef93e66d17a8fbbd38f7d))
+    - remove more unused code ([`db4f4d0`](https://github.com/maidsafe/safe_network/commit/db4f4d07b155d732ad76d263563d81b5fee535f7))
+    - Merge #1427 ([`949ee11`](https://github.com/maidsafe/safe_network/commit/949ee111717c8f07487f3f4db6fbc0043583916d))
+    - more attempt when query too close to the spend cmd ([`f0ad7d5`](https://github.com/maidsafe/safe_network/commit/f0ad7d56a58a08a7591d978c8ead4c10db734276))
+    - use sn_dbc::SpentProof API for verifying SpentProofShares ([`e0fb940`](https://github.com/maidsafe/safe_network/commit/e0fb940b24e87d86fe920095176362f73503ce79))
+    - remove unused storage path ([`ca32230`](https://github.com/maidsafe/safe_network/commit/ca32230926e5a435d90694df8fbce1218ea397f0))
+    - Revert "feat: make traceroute default for now" ([`e9b97c7`](https://github.com/maidsafe/safe_network/commit/e9b97c72b860053285ba866b098937f6b25d99bf))
+    - having spent proofs and Txs within SpentbookCmd::Send msg to be a set instead of a vec ([`d3a05a7`](https://github.com/maidsafe/safe_network/commit/d3a05a728be8752ea9ebff4e38e7c4c85e5db09b))
+    - make traceroute default for now ([`175d1b9`](https://github.com/maidsafe/safe_network/commit/175d1b909dff8c6729ac7f156ce1d0d22be8cc12))
+    - Cleanup non-joined member sessions, regardless of connected state ([`8efbd96`](https://github.com/maidsafe/safe_network/commit/8efbd96a5fd3907ace5ca6ac282027595fefd8ef))
+    - reflect the semantics not the type ([`ea490dd`](https://github.com/maidsafe/safe_network/commit/ea490ddf749ac9e0c7962c3c21c053663e6b6ee7))
+    - rename gen_section_authority_provider to random_sap ([`3f577d2`](https://github.com/maidsafe/safe_network/commit/3f577d2a6fe70792d7d02e231b599ca3d44a5ed2))
+    - upgrade blsttc to 7.0.0 ([`6f03b93`](https://github.com/maidsafe/safe_network/commit/6f03b93bd2d02f0ffe54b69fbf25070fbe64eab0))
+    - increase query retry count as we may drop connections now ([`1ee345c`](https://github.com/maidsafe/safe_network/commit/1ee345ce00337f9b24d45db417b6bb3d54c67955))
+    - impl traceroute for client cmds and cmd responses ([`4f2cf26`](https://github.com/maidsafe/safe_network/commit/4f2cf267ee030e5924a2fa999a2a46dbc072d208))
+    - improve traceroute redability and resolve clippy ([`214aded`](https://github.com/maidsafe/safe_network/commit/214adedc31bca576c7f28ff52a1f4ff0a2676757))
+    - impl traceroute feature to trace a message's flow in the network ([`a6fb1fc`](https://github.com/maidsafe/safe_network/commit/a6fb1fc516a9ef6dae7aa236f3dd440d50697ae2))
+    - additional tests in sn-api for DBC verification failures ([`d4be0cc`](https://github.com/maidsafe/safe_network/commit/d4be0cc431947b035046cc4d56642a81c0880924))
+    - reissuing DBCs for all sn_cli tests only once as a setup stage ([`9fde534`](https://github.com/maidsafe/safe_network/commit/9fde534277f359dfa0a1d91d917864776edb5138))
+    - perform verification of input TX and spentproofs when depositing or reissuing a DBC ([`ba97ca0`](https://github.com/maidsafe/safe_network/commit/ba97ca06b67cd6e5de8e1c910b396fbe44f40fd7))
+    - Merge #1356 ([`d9b4608`](https://github.com/maidsafe/safe_network/commit/d9b46080ac849cac259983dc80b4b879e58c13ba))
+    - remove unused console-subscriber ([`39c3fdf`](https://github.com/maidsafe/safe_network/commit/39c3fdf4128462e5f7c5fec3c628d394f505e2f2))
+    - setup step for tests to reissue a set of DBCs from genesis only once ([`5c82df6`](https://github.com/maidsafe/safe_network/commit/5c82df633e7c062fdf761a8e6e0a7ae8d26cc73a))
+    - re-enable registers benchmark and tidy sled residue ([`1e8180c`](https://github.com/maidsafe/safe_network/commit/1e8180c23fab27ac92c93f201efd050cff00db10))
+    - remove extra bootstrap step ([`ec8b69d`](https://github.com/maidsafe/safe_network/commit/ec8b69d642fc4ca0166ffff113306244e5c3936a))
+    - use Eyre instead of boxed error ([`db52519`](https://github.com/maidsafe/safe_network/commit/db525193bed7662c5184810f18587abb0d22b26b))
+    - add timeout for queries ([`df5ea26`](https://github.com/maidsafe/safe_network/commit/df5ea26c8243de70d16a75ac936bc322954c8436))
+    - add binary to query chunk at adults ([`b9bfb42`](https://github.com/maidsafe/safe_network/commit/b9bfb425035fead587b7b5fc03a212a5d5aae4b3))
+    - formatting with cargo fmt ([`00fae4d`](https://github.com/maidsafe/safe_network/commit/00fae4d5fd5dbad5696888f0c796fbd39b7e49ed))
+    - unused async in sn_client ([`145b302`](https://github.com/maidsafe/safe_network/commit/145b302aad291120c52f1cffad8e7d116682f532))
+    - unused async remove and up-chain ([`d8cc453`](https://github.com/maidsafe/safe_network/commit/d8cc45384f891a9d95a7cef30159f11ec0ff9269))
+    - Remove unused Arc(RwLock) structure ([`a378e7b`](https://github.com/maidsafe/safe_network/commit/a378e7ba67ec18be708a2e1a9e08e63519da7451))
+    - removing hard-coded test DBC from sn_api Wallet unit tests ([`f5af444`](https://github.com/maidsafe/safe_network/commit/f5af444b8ac37d2debfbe5e1d4dcdc48de963694))
+    - upon receiving an AE msg update client knowledge of network sections chains ([`950b304`](https://github.com/maidsafe/safe_network/commit/950b3048d1aae1f9ad5d2218a42c34d662925e38))
+    - tweak sn_client/Cargo.toml formatting TOML ([`4d717a2`](https://github.com/maidsafe/safe_network/commit/4d717a21a2daf6ef0b3b5826329a8848f2fe46ee))
+    - move to dev-dependencies ([`5aeb15c`](https://github.com/maidsafe/safe_network/commit/5aeb15c8c309c16878dde510f68b0e5c2122cd8c))
+</details>
+
+## v0.68.2 (2022-07-10)
+
+<csr-id-19ddebad43aa53822cb7e781913ba34b848e2c89/>
+<csr-id-49e223e2c07695b4c63e253ba19ce43ec24d7112/>
+<csr-id-5cff2c5325a854f04788f9111439bca75b21c60f/>
+
+### Chore
+
+ - <csr-id-19ddebad43aa53822cb7e781913ba34b848e2c89/> remove unused utilities
+ - <csr-id-49e223e2c07695b4c63e253ba19ce43ec24d7112/> move more deps to clap-v3; rm some deps on rand
+ - <csr-id-5cff2c5325a854f04788f9111439bca75b21c60f/> ignore store_and_read_40mb as too heavy for CI
+
+### Chore
+
+ - <csr-id-34bd9bd01a3f042c35e0432df2f0cfcebc32a8a8/> sn_interface-0.8.2/sn_client-0.68.2/sn_node-0.64.2/sn_api-0.66.3/sn_cli-0.59.3
+
+### Bug Fixes
+
+ - <csr-id-64eb333d532694f46f1d0b9dd5109961b3551802/> for QueryResponse, set correlation_id to be the origin msg_id
+ - <csr-id-3c383ccf9ad0ed77080fb3e3ec459e5b02158505/> passing the churn test
+   This commit contains the work to passing the churn test.
+   There are mainly two fixes:
+   1, Only trigger data reorganization when there is membership update.
+   Previously, data reorganzation get undertaken whenever there is
+   incoming message. Which result in a looping of messaging among
+   nodes.
+   2, Only broadcast result when the QueryResponse is not an error.
+   Previously, this will cause the client thinking the whole query
+   is failed whenever an error response received.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 10 commits contributed to the release over the course of 2 calendar days.
+ - 2 days passed between releases.
+ - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.8.2/sn_client-0.68.2/sn_node-0.64.2/sn_api-0.66.3/sn_cli-0.59.3 ([`34bd9bd`](https://github.com/maidsafe/safe_network/commit/34bd9bd01a3f042c35e0432df2f0cfcebc32a8a8))
     - remove unused utilities ([`19ddeba`](https://github.com/maidsafe/safe_network/commit/19ddebad43aa53822cb7e781913ba34b848e2c89))
     - move more deps to clap-v3; rm some deps on rand ([`49e223e`](https://github.com/maidsafe/safe_network/commit/49e223e2c07695b4c63e253ba19ce43ec24d7112))
     - Merge branch 'main' into feat-dbc-spent-proof-validations ([`45418f2`](https://github.com/maidsafe/safe_network/commit/45418f2f9b5cc58f2a153bf40966beb2bf36a62a))
@@ -1170,6 +1390,8 @@ needed, as they keypair itself contains the Arcs we need.
 <csr-id-46262268fc167c05963e5b7bd6261310496e2379/>
 <csr-id-8dccb7f1fc81385f9f5f25e6c354ad1d35759528/>
 <csr-id-2d0e23cdc7f94b0cc2d13ddf8203702cec4d3a07/>
+<csr-id-90059dc4edf35fc7d53bc25b485be291a1de9807/>
+<csr-id-2b00cec961561281f6b927e13e501342843f6a0f/>
 
 ### Chore
 

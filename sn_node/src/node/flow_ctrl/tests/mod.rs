@@ -21,6 +21,7 @@ use crate::node::{
     RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
 };
 
+use cmd_utils::run_and_collect_cmds;
 use sn_consensus::Decision;
 use sn_interface::messaging::system::AntiEntropyKind;
 #[cfg(feature = "traceroute")]
@@ -96,7 +97,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
 
             let original_bytes = wire_msg.serialize()?;
 
-            let all_cmds = cmd_utils::run_and_collect_cmds(
+            let all_cmds = run_and_collect_cmds(
                 Cmd::ValidateMsg {
                     origin: new_node.peer(),
                     wire_msg,
@@ -168,7 +169,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
 
             let original_bytes = wire_msg.serialize()?;
 
-            let _ = cmd_utils::run_and_collect_cmds(
+            let _ = run_and_collect_cmds(
                 Cmd::ValidateMsg {
                     origin: new_node.peer(),
                     wire_msg,
@@ -252,7 +253,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
 
             let original_bytes = wire_msg.serialize()?;
 
-            let _ = cmd_utils::run_and_collect_cmds(
+            let _ = run_and_collect_cmds(
                 Cmd::ValidateMsg {
                     origin: relocated_node.peer(),
                     wire_msg,
@@ -373,7 +374,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                 .unwrap()
                 .force_bootstrap(node_state.to_msg());
 
-            let cmds = cmd_utils::run_and_collect_cmds(
+            let cmds = run_and_collect_cmds(
                 Cmd::HandleMembershipDecision(membership_decision),
                 &dispatcher,
             )
@@ -420,6 +421,74 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             Result::<()>::Ok(())
         })
         .await
+}
+
+// Handles a consensus-ed Online proposal.
+async fn handle_online_cmd(
+    peer: &Peer,
+    sk_set: &SecretKeySet,
+    dispatcher: &Dispatcher,
+    section_auth: &SectionAuthorityProvider,
+) -> Result<HandleOnlineStatus> {
+    let node_state = NodeState::joined(*peer, None);
+    let membership_decision = section_decision(sk_set, node_state.to_msg())?;
+
+    let all_cmds = run_and_collect_cmds(
+        Cmd::HandleMembershipDecision(membership_decision),
+        dispatcher,
+    )
+    .await?;
+
+    let mut status = HandleOnlineStatus {
+        node_approval_sent: false,
+        relocate_details: None,
+    };
+
+    for cmd in all_cmds {
+        let (msg, recipients) = match cmd {
+            Cmd::SendMsg {
+                recipients,
+                msg: OutgoingMsg::System(msg),
+                ..
+            } => (msg, recipients),
+            _ => continue,
+        };
+
+        match msg {
+            SystemMsg::JoinResponse(response) => {
+                if let JoinResponse::Approved {
+                    section_auth: signed_sap,
+                    ..
+                } = *response
+                {
+                    assert_eq!(signed_sap.value, section_auth.clone().to_msg());
+                    assert_matches!(recipients, Peers::Multiple(peers) => {
+                        assert_eq!(peers, BTreeSet::from([*peer]));
+                    });
+                    status.node_approval_sent = true;
+                }
+            }
+            SystemMsg::Propose {
+                proposal: sn_interface::messaging::system::Proposal::VoteNodeOffline(node_state),
+                ..
+            } => {
+                if let MembershipState::Relocated(details) = node_state.state {
+                    if details.previous_name != peer.name() {
+                        continue;
+                    }
+                    status.relocate_details = Some(*details.clone());
+                }
+            }
+            _ => continue,
+        }
+    }
+
+    Ok(status)
+}
+
+struct HandleOnlineStatus {
+    node_approval_sent: bool,
+    relocate_details: Option<RelocateDetails>,
 }
 
 #[tokio::test]
@@ -484,14 +553,11 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
                     .await?;
 
             let node_state = NodeState::left(existing_peer, None);
-            let proposal = Proposal::Offline(node_state.clone());
+            let proposal = Proposal::VoteNodeOffline(node_state.clone());
             let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
-            let _cmds = cmd_utils::run_and_collect_cmds(
-                Cmd::HandleAgreement { proposal, sig },
-                &dispatcher,
-            )
-            .await?;
+            let _cmds =
+                run_and_collect_cmds(Cmd::HandleAgreement { proposal, sig }, &dispatcher).await?;
 
             assert!(!dispatcher
                 .node()
@@ -535,14 +601,11 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
                     .build()
                     .await?;
             // Handle agreement on the Offline proposal
-            let proposal = Proposal::Offline(remove_node_state.clone());
+            let proposal = Proposal::VoteNodeOffline(remove_node_state.clone());
             let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
-            let _cmds = cmd_utils::run_and_collect_cmds(
-                Cmd::HandleAgreement { proposal, sig },
-                &dispatcher,
-            )
-            .await?;
+            let _cmds =
+                run_and_collect_cmds(Cmd::HandleAgreement { proposal, sig }, &dispatcher).await?;
 
             // Verify we initiated a membership churn
             assert!(dispatcher
@@ -663,7 +726,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
             let original_bytes = wire_msg.serialize()?;
 
-            let _cmds = cmd_utils::run_and_collect_cmds(
+            let _cmds = run_and_collect_cmds(
                 Cmd::ValidateMsg {
                     origin: old_node.peer(),
                     wire_msg,
@@ -730,7 +793,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
 
             let original_bytes = wire_msg.serialize()?;
 
-            let _cmds = cmd_utils::run_and_collect_cmds(
+            let _cmds = run_and_collect_cmds(
                 Cmd::ValidateMsg {
                     origin: sender.peer(),
                     wire_msg,
@@ -826,7 +889,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
 
             let membership_decision =
                 network_utils::create_relocation_trigger(&sk_set, relocated_peer.age())?;
-            let cmds = cmd_utils::run_and_collect_cmds(
+            let cmds = run_and_collect_cmds(
                 Cmd::HandleMembershipDecision(membership_decision),
                 &dispatcher,
             )
@@ -844,7 +907,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
                 };
 
                 if let SystemMsg::Propose {
-                    proposal: sn_interface::messaging::system::Proposal::Offline(node_state),
+                    proposal: sn_interface::messaging::system::Proposal::VoteNodeOffline(node_state),
                     ..
                 } = msg
                 {
@@ -1008,7 +1071,7 @@ async fn handle_elders_update() -> Result<()> {
 
         let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
-        let cmds = cmd_utils::run_and_collect_cmds(Cmd::HandleNewEldersAgreement { new_elders: signed_sap1, sig }, &dispatcher).await?;
+        let cmds = run_and_collect_cmds(Cmd::HandleNewEldersAgreement { new_elders: signed_sap1, sig }, &dispatcher).await?;
 
         let mut update_actual_recipients = HashSet::new();
 
@@ -1176,7 +1239,7 @@ async fn handle_demote_during_split() -> Result<()> {
 
             let signed_sap = section_signed(sk_set_v1_p0.secret_key(), section_auth)?;
             let cmd = create_our_elders_cmd(signed_sap)?;
-            let mut cmds = cmd_utils::run_and_collect_cmds(cmd, &dispatcher).await?;
+            let mut cmds = run_and_collect_cmds(cmd, &dispatcher).await?;
 
             // Handle agreement on `NewElders` for prefix-1.
             let section_auth = SectionAuthorityProvider::new(
@@ -1190,7 +1253,7 @@ async fn handle_demote_during_split() -> Result<()> {
             let signed_sap = section_signed(sk_set_v1_p1.secret_key(), section_auth)?;
             let cmd = create_our_elders_cmd(signed_sap)?;
 
-            let new_cmds = cmd_utils::run_and_collect_cmds(cmd, &dispatcher).await?;
+            let new_cmds = run_and_collect_cmds(cmd, &dispatcher).await?;
 
             cmds.extend(new_cmds);
 

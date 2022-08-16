@@ -6,11 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{
-    flow_ctrl::cmds::Cmd,
-    messaging::{OutgoingMsg, Peers},
-    Error, Node, Result,
-};
+use crate::node::messaging::{OutgoingMsg, Peers};
+
+use crate::node::{flow_ctrl::cmds::Cmd, Error, Node, Result};
+use bytes::Bytes;
 
 use sn_dbc::{
     Commitment, Hash, IndexedSignatureShare, KeyImage, RingCtTransaction, SpentProof,
@@ -35,7 +34,6 @@ use sn_interface::{
     },
 };
 
-use bytes::Bytes;
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
@@ -151,7 +149,7 @@ impl Node {
         );
 
         let node_id = XorName::from(sending_node_pk);
-        let query_peers = self.pending_data_queries.remove(&op_id);
+        let query_peers = self.pending_data_queries.remove(&(op_id, node_id));
         // Clear expired queries from the cache.
         self.pending_data_queries.remove_expired();
 
@@ -193,7 +191,9 @@ impl Node {
             // if no more responses come in this query should eventually time out
             // TODO: What happens if we keep getting queries / client for some data that's always not found?
             // We need to handle that
-            let _prev = self.pending_data_queries.set(op_id, waiting_peers, None);
+            let _prev = self
+                .pending_data_queries
+                .set((op_id, node_id), waiting_peers, None);
             trace!(
                 "Node {:?}, reported data not found {:?}",
                 sending_node_pk,

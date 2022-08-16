@@ -51,7 +51,9 @@ impl Node {
                 churn_id
             );
 
-            cmds.extend(self.propose(Proposal::Offline(node_state.relocate(relocate_details)))?);
+            cmds.extend(self.propose(Proposal::VoteNodeOffline(
+                node_state.relocate(relocate_details),
+            ))?);
         }
 
         Ok(cmds)

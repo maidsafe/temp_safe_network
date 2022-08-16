@@ -71,9 +71,9 @@ pub async fn run() -> Result<()> {
 
     // If we were connected to a network, cache the up to date PrefixMap to disk before exiting
     if safe.is_connected() {
-        match safe.get_prefix_map().await {
+        match safe.prefix_map().await {
             Ok(prefix_map) => {
-                if let Err(err) = config.update_default_prefix_map(&prefix_map).await {
+                if let Err(err) = config.update_default_prefix_map(prefix_map).await {
                     warn!(
                         "Failed to cache up to date PrefixMap for genesis key {:?} to '{}': {:?}",
                         prefix_map.genesis_key(),

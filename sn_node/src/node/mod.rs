@@ -41,6 +41,7 @@ use self::{
         cmds::Cmd,
         event::{CmdProcessEvent, Elders},
     },
+    node_starter::CmdChannel,
     proposal::Proposal,
 };
 pub use self::{
@@ -125,8 +126,11 @@ mod core {
     pub(crate) const RESOURCE_PROOF_DIFFICULTY: u8 = 10;
 
     // This prevents pending query limit unbound growth
-    pub(crate) const DATA_QUERY_LIMIT: usize = 100;
+    // One insert per OpId/Adult.
+    pub(crate) const DATA_QUERY_LIMIT: usize = 10_000;
     // per query we can have this many peers, so the total peers waiting can be QUERY_LIMIT * MAX_WAITING_PEERS_PER_QUERY
+    // It's worth noting that nodes clean up all connections every two mins, so this max can only last that long.
+    // (and yes, some clients may unfortunately be disconnected quickly)
     pub(crate) const MAX_WAITING_PEERS_PER_QUERY: usize = 100;
 
     const BACKOFF_CACHE_LIMIT: usize = 100;
@@ -184,7 +188,8 @@ mod core {
         // Trackers
         pub(crate) capacity: Capacity,
         pub(crate) dysfunction_tracking: DysfunctionDetection,
-        pub(crate) pending_data_queries: Cache<OperationId, BTreeSet<Peer>>,
+        /// Cache the request combo,  (OperationId -> An adult xorname), to waiting Clients peers for that combo
+        pub(crate) pending_data_queries: Cache<(OperationId, XorName), BTreeSet<Peer>>,
         // Caches
         pub(crate) ae_backoff_cache: AeBackoffCache,
     }
@@ -230,7 +235,7 @@ mod core {
             info!("Creating DysfunctionDetection checks");
             let node_dysfunction_detector = DysfunctionDetection::new(
                 network_knowledge
-                    .adults()
+                    .members()
                     .iter()
                     .map(|peer| peer.name())
                     .collect::<Vec<XorName>>(),
@@ -300,6 +305,7 @@ mod core {
         // Miscellaneous
         ////////////////////////////////////////////////////////////////////////////
 
+        /// Generates a random AE probe for _anywhere_ on the network.
         pub(crate) fn generate_probe_msg(&self) -> Result<Cmd> {
             // Generate a random address not belonging to our Prefix
             let mut dst = xor_name::rand::random();
@@ -320,20 +326,30 @@ mod core {
                 section_key
             );
 
-            Ok(self.send_system_msg(SystemMsg::AntiEntropyProbe, Peers::Multiple(recipients)))
+            Ok(self.send_system_msg(
+                SystemMsg::AntiEntropyProbe(section_key),
+                Peers::Multiple(recipients),
+            ))
         }
 
+        /// Generates a SectionProbeMsg with our current knowledge,
+        /// targetting our section elders.
+        /// Even if we're up to date, we expect a response.
         pub(crate) fn generate_section_probe_msg(&self) -> Cmd {
             let our_section = self.network_knowledge.authority_provider();
             let recipients = our_section.elders_set();
+            let our_key = our_section.section_key();
 
             info!(
-                "ProbeMsg target section {:?} recipients {:?}",
+                "ProbeMsg target our section {:?} recipients {:?}",
                 our_section.prefix(),
                 recipients,
             );
 
-            self.send_system_msg(SystemMsg::AntiEntropyProbe, Peers::Multiple(recipients))
+            self.send_system_msg(
+                SystemMsg::AntiEntropyProbe(our_key),
+                Peers::Multiple(recipients),
+            )
         }
 
         /// returns names that are relatively dysfunctional

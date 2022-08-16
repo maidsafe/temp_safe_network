@@ -4,27 +4,94 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.59.3 (2022-07-10)
+## v0.60.0 (2022-08-14)
+
+### Chore
+
+ - <csr-id-de57210562e1e3a637564332e081514dabb177ab/> let client builder do env overrides
+   The CLI/api had its own env vars to set timeout; delegate this to the
+   client builder
+ - <csr-id-29de67f1e3583eab867d517cb50ed2e404bd63fd/> serialize NetworkPrefixMap into JSON
+ - <csr-id-a8b0631a396ac96e000db22141ffd5d83fd7e987/> semantic tweaks
+ - <csr-id-848dba48e5959d0b9cfe182fde2f12ede71ba9c2/> use matches! macros, minor refactoring
+ - <csr-id-35483b3f322eeea2c10427e94e4750a8269811c0/> remove unused async/await
+ - <csr-id-820fcc9a77f756fca308f247c3ea1b82f65d30b9/> remove NetworkPrefxiMap::genesis_key, NetworkKnowledge::genesis_key
+   Remove the feilds as they can be obtained from NetworkPrefixMap::sections_dag
+ - <csr-id-afcf083469c732f10c7c80f4a45e4c33ab111101/> remove RwLock from NetworkPrefixMap
+ - <csr-id-60ec545c4ff2d56c4b92ecbf3b710088a8339450/> make writes atomic
+ - <csr-id-6f03b93bd2d02f0ffe54b69fbf25070fbe64eab0/> upgrade blsttc to 7.0.0
+   This version has a more helpful error message for the shares interpolation problem.
+ - <csr-id-b38b7298aa1061e6f5f4df3c5b0ea3d7586d74b6/> split PUT,CAT benches
+ - <csr-id-973f958fc4b8ba62fedb86fc5bd1cb32cd9fecea/> use assert_cmd instead of duct
+
+### New Features
+
+ - <csr-id-c2ea9e0a0b4d7c26669aedc5f96277d481a07f62/> wallet CLI cmd to allow storing output DBC to a file upon reissuing it
+ - <csr-id-c46dd0737779c8ee515ee037add54ce049448ea7/> expose a public API which allows users to check if a DBC's `KeyImage` has been already spent on the network
+   - Expose a public `is_dbc_spent` API which allows users to check if a DBC's KeyImage has
+     been already spent on the network.
+   - Have the CLI `wallet deposit` command to perform a verification is the supplied DBC has been
+     already spent before depositing into a wallet.
+   - Allow users to provide a `--force` flag with the CLI `wallet deposit` command to skip the
+     verification of DBC already spent and force the deposit into the wallet.
+ - <csr-id-1b3f0516cf899c2fc0d101ce9cf0079c95bbfd7b/> show the DBC owner in the wallet displayed by cat cmd
+   - Display the owner of each DBC when cat-ing a wallet.
+   - Align to the right the balance of each DBC when cat-ing a wallet.
+   - Shorten the default name set to DBC when deposited in a wallet.
+   - Make the name of the change DBC automatically deposited in the wallet unique.
 
 ### Bug Fixes
 
- - <csr-id-3c383ccf9ad0ed77080fb3e3ec459e5b02158505/> passing the churn test
-   This commit contains the work to passing the churn test.
-   There are mainly two fixes:
-   1, Only trigger data reorganization when there is membership update.
-      Previously, data reorganzation get undertaken whenever there is
-      incoming message. Which result in a looping of messaging among
-      nodes.
-   2, Only broadcast result when the QueryResponse is not an error.
-      Previously, this will cause the client thinking the whole query
-      is failed whenever an error response received.
+ - <csr-id-0041e18ab7d1a21e4debb39df9c4b116e002a5e5/> convert nodes joining interval to millis before passing it to launch-tool
+   - Also pass the default prefix map file path as the network contacts file path to CLI node join cmd.
+   - Minor refactoring to sn_client::test_spentbook_spend_dbc test.
+ - <csr-id-5b181bd1cf908f4b021b0eb9adf53da005292be0/> backing up default prefix map file with genesis key in filename if not found
+ - <csr-id-2979edfb76d4b4273e40fdae809c195f54415c31/> make copy of default prefix map
+   If the prefix_map_dir just contains the default prefix map, adding another
+   network and switching to it will overwrite the default one. Making a copy
+   fixes it.
+ - <csr-id-6d237e5e7d8306cb955f436910aa01ed7221cd84/> unused async in CLI
+ - <csr-id-9eaf971ac4c16bf326f6443636427951f00ae2b6/> enable sn_cli bench
+
+### Other
+
+ - <csr-id-629a5873dd3bdf138649360222c00e3e0a76e097/> remove test files from /resources/test_prefixmap/
+   Generate and write prefixmap for the tests instead of storing a copy
+
+### Refactor
+
+ - <csr-id-27ba2a63dcfa272cf7ef8c5301987fc6bfe18ed0/> sn_client to only read a default prefix map file, updates to be cached on disk by user
+   - CLI to cache the up to date PrefixMap after all commands were executed and right before exiting.
+   - Refactoring sn_cli::Config to remove some redundant code.
+ - <csr-id-ed37bb56e5e17d4cba7c1b2165746c193241d618/> move SectionChain into NetworkPrefixMap
+ - <csr-id-e0fb940b24e87d86fe920095176362f73503ce79/> use sn_dbc::SpentProof API for verifying SpentProofShares
+ - <csr-id-9fde534277f359dfa0a1d91d917864776edb5138/> reissuing DBCs for all sn_cli tests only once as a setup stage
+ - <csr-id-5c82df633e7c062fdf761a8e6e0a7ae8d26cc73a/> setup step for tests to reissue a set of DBCs from genesis only once
+ - <csr-id-24676dadb771bbd966b6a3e1aa53d1c736c90627/> replace sled with filestore for storing registers
+
+### Test
+
+ - <csr-id-d4be0cc431947b035046cc4d56642a81c0880924/> additional tests in sn-api for DBC verification failures
+
+### Chore (BREAKING)
+
+ - <csr-id-db7dcdc7968d1d7e946274650d5a0c48719b4955/> remove providing path to qp2p cfg
+   This configuration seems never to be provided or stored anyway. It looks
+   like some code was also taking this parameter to be the client config,
+   not the qp2p config, which is a source of confusion.
+
+### Refactor (BREAKING)
+
+ - <csr-id-96da1171d0cac240f772e5d6a15c56f63441b4b3/> nodes to cache their own individual prefix map file on disk
+ - <csr-id-dd2eb21352223f6340064e0021f4a7df402cd5c9/> removing Token from sn_interfaces::type as it is now exposed by sn_dbc
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 34 commits contributed to the release over the course of 31 calendar days.
+ - 33 days passed between releases.
+ - 30 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -34,10 +101,84 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_client to only read a default prefix map file, updates to be cached on disk by user ([`27ba2a6`](https://github.com/maidsafe/safe_network/commit/27ba2a63dcfa272cf7ef8c5301987fc6bfe18ed0))
+    - let client builder do env overrides ([`de57210`](https://github.com/maidsafe/safe_network/commit/de57210562e1e3a637564332e081514dabb177ab))
+    - convert nodes joining interval to millis before passing it to launch-tool ([`0041e18`](https://github.com/maidsafe/safe_network/commit/0041e18ab7d1a21e4debb39df9c4b116e002a5e5))
+    - backing up default prefix map file with genesis key in filename if not found ([`5b181bd`](https://github.com/maidsafe/safe_network/commit/5b181bd1cf908f4b021b0eb9adf53da005292be0))
+    - serialize NetworkPrefixMap into JSON ([`29de67f`](https://github.com/maidsafe/safe_network/commit/29de67f1e3583eab867d517cb50ed2e404bd63fd))
+    - make copy of default prefix map ([`2979edf`](https://github.com/maidsafe/safe_network/commit/2979edfb76d4b4273e40fdae809c195f54415c31))
+    - nodes to cache their own individual prefix map file on disk ([`96da117`](https://github.com/maidsafe/safe_network/commit/96da1171d0cac240f772e5d6a15c56f63441b4b3))
+    - semantic tweaks ([`a8b0631`](https://github.com/maidsafe/safe_network/commit/a8b0631a396ac96e000db22141ffd5d83fd7e987))
+    - removing Token from sn_interfaces::type as it is now exposed by sn_dbc ([`dd2eb21`](https://github.com/maidsafe/safe_network/commit/dd2eb21352223f6340064e0021f4a7df402cd5c9))
+    - use matches! macros, minor refactoring ([`848dba4`](https://github.com/maidsafe/safe_network/commit/848dba48e5959d0b9cfe182fde2f12ede71ba9c2))
+    - remove unused async/await ([`35483b3`](https://github.com/maidsafe/safe_network/commit/35483b3f322eeea2c10427e94e4750a8269811c0))
+    - remove test files from /resources/test_prefixmap/ ([`629a587`](https://github.com/maidsafe/safe_network/commit/629a5873dd3bdf138649360222c00e3e0a76e097))
+    - remove NetworkPrefxiMap::genesis_key, NetworkKnowledge::genesis_key ([`820fcc9`](https://github.com/maidsafe/safe_network/commit/820fcc9a77f756fca308f247c3ea1b82f65d30b9))
+    - remove RwLock from NetworkPrefixMap ([`afcf083`](https://github.com/maidsafe/safe_network/commit/afcf083469c732f10c7c80f4a45e4c33ab111101))
+    - move SectionChain into NetworkPrefixMap ([`ed37bb5`](https://github.com/maidsafe/safe_network/commit/ed37bb56e5e17d4cba7c1b2165746c193241d618))
+    - make writes atomic ([`60ec545`](https://github.com/maidsafe/safe_network/commit/60ec545c4ff2d56c4b92ecbf3b710088a8339450))
+    - wallet CLI cmd to allow storing output DBC to a file upon reissuing it ([`c2ea9e0`](https://github.com/maidsafe/safe_network/commit/c2ea9e0a0b4d7c26669aedc5f96277d481a07f62))
+    - remove providing path to qp2p cfg ([`db7dcdc`](https://github.com/maidsafe/safe_network/commit/db7dcdc7968d1d7e946274650d5a0c48719b4955))
+    - use sn_dbc::SpentProof API for verifying SpentProofShares ([`e0fb940`](https://github.com/maidsafe/safe_network/commit/e0fb940b24e87d86fe920095176362f73503ce79))
+    - upgrade blsttc to 7.0.0 ([`6f03b93`](https://github.com/maidsafe/safe_network/commit/6f03b93bd2d02f0ffe54b69fbf25070fbe64eab0))
+    - expose a public API which allows users to check if a DBC's `KeyImage` has been already spent on the network ([`c46dd07`](https://github.com/maidsafe/safe_network/commit/c46dd0737779c8ee515ee037add54ce049448ea7))
+    - additional tests in sn-api for DBC verification failures ([`d4be0cc`](https://github.com/maidsafe/safe_network/commit/d4be0cc431947b035046cc4d56642a81c0880924))
+    - reissuing DBCs for all sn_cli tests only once as a setup stage ([`9fde534`](https://github.com/maidsafe/safe_network/commit/9fde534277f359dfa0a1d91d917864776edb5138))
+    - split PUT,CAT benches ([`b38b729`](https://github.com/maidsafe/safe_network/commit/b38b7298aa1061e6f5f4df3c5b0ea3d7586d74b6))
+    - use assert_cmd instead of duct ([`973f958`](https://github.com/maidsafe/safe_network/commit/973f958fc4b8ba62fedb86fc5bd1cb32cd9fecea))
+    - setup step for tests to reissue a set of DBCs from genesis only once ([`5c82df6`](https://github.com/maidsafe/safe_network/commit/5c82df633e7c062fdf761a8e6e0a7ae8d26cc73a))
+    - replace sled with filestore for storing registers ([`24676da`](https://github.com/maidsafe/safe_network/commit/24676dadb771bbd966b6a3e1aa53d1c736c90627))
+    - unused async in CLI ([`6d237e5`](https://github.com/maidsafe/safe_network/commit/6d237e5e7d8306cb955f436910aa01ed7221cd84))
+    - enable sn_cli bench ([`9eaf971`](https://github.com/maidsafe/safe_network/commit/9eaf971ac4c16bf326f6443636427951f00ae2b6))
+    - Merge branch 'main' into feat-cat-wallet-improvements ([`08a3b85`](https://github.com/maidsafe/safe_network/commit/08a3b85ae73b2360e63f9d4fbdec23e349dc0626))
+    - Merge branch 'main' into feat-cat-wallet-improvements ([`e2e89e6`](https://github.com/maidsafe/safe_network/commit/e2e89e6b061ae0827cdeeb1d8b17e702d2f3607a))
+    - Merge branch 'main' into feat-cat-wallet-improvements ([`9409bf4`](https://github.com/maidsafe/safe_network/commit/9409bf42e99b4eb3da883f76c802e7dc6ea1a4a0))
+    - Merge branch 'main' into feat-cat-wallet-improvements ([`8e6eecf`](https://github.com/maidsafe/safe_network/commit/8e6eecf0da8df5cdac55bbf1f81d00bcb19558b4))
+    - show the DBC owner in the wallet displayed by cat cmd ([`1b3f051`](https://github.com/maidsafe/safe_network/commit/1b3f0516cf899c2fc0d101ce9cf0079c95bbfd7b))
+</details>
+
+## v0.59.3 (2022-07-10)
+
+### Chore
+
+ - <csr-id-34bd9bd01a3f042c35e0432df2f0cfcebc32a8a8/> sn_interface-0.8.2/sn_client-0.68.2/sn_node-0.64.2/sn_api-0.66.3/sn_cli-0.59.3
+
+### Bug Fixes
+
+ - <csr-id-3c383ccf9ad0ed77080fb3e3ec459e5b02158505/> passing the churn test
+   This commit contains the work to passing the churn test.
+   There are mainly two fixes:
+   1, Only trigger data reorganization when there is membership update.
+   Previously, data reorganzation get undertaken whenever there is
+   incoming message. Which result in a looping of messaging among
+   nodes.
+   2, Only broadcast result when the QueryResponse is not an error.
+   Previously, this will cause the client thinking the whole query
+   is failed whenever an error response received.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release over the course of 1 calendar day.
+ - 2 days passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.8.2/sn_client-0.68.2/sn_node-0.64.2/sn_api-0.66.3/sn_cli-0.59.3 ([`34bd9bd`](https://github.com/maidsafe/safe_network/commit/34bd9bd01a3f042c35e0432df2f0cfcebc32a8a8))
     - passing the churn test ([`3c383cc`](https://github.com/maidsafe/safe_network/commit/3c383ccf9ad0ed77080fb3e3ec459e5b02158505))
 </details>
 
 ## v0.59.2 (2022-07-08)
+
+<csr-id-b478314f331382229c9fb235dab0198f5203f509/>
 
 ### Chore
 

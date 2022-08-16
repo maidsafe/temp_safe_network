@@ -140,6 +140,9 @@ pub enum Error {
     /// Network data error.
     #[error("Network data error:: {0}")]
     NetworkData(#[from] sn_interface::types::Error),
+    /// Error Sending Cmd in to node for processing
+    #[error("Error Sending Cmd in to node for processing.")]
+    CmdSendError,
     /// Network Knowledge error.
     #[error("Network data error:: {0}")]
     NetworkKnowledge(#[from] sn_interface::network_knowledge::Error),

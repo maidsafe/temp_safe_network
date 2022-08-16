@@ -116,6 +116,7 @@ pub(crate) enum Cmd {
     AddToPendingQueries {
         operation_id: OperationId,
         origin: Peer,
+        target_adult: XorName,
     },
     HandleValidSystemMsg {
         msg_id: MsgId,
@@ -178,7 +179,7 @@ pub(crate) enum Cmd {
     /// cmd is raised. The token is used to identify the timeout.
     ScheduleDkgTimeout { duration: Duration, token: u64 },
     /// Proposes peers as offline
-    ProposeOffline(BTreeSet<XorName>),
+    ProposeVoteNodesOffline(BTreeSet<XorName>),
     /// Send a signal to all Elders to
     /// test the connectivity to a specific node
     TellEldersToStartConnectivityTest(XorName),
@@ -227,10 +228,10 @@ impl Cmd {
             HandleDkgOutcome { .. } => 10,
             HandleDkgFailure(_) => 10,
             HandleDkgTimeout(_) => 10,
+            ProposeVoteNodesOffline(_) => 10,
 
             HandlePeerFailedSend(_) => 9,
             TrackNodeIssueInDysfunction { .. } => 9,
-            ProposeOffline(_) => 9,
             HandleMembershipDecision(_) => 9,
             EnqueueDataForReplication { .. } => 9,
             CleanupPeerLinks => 9,
@@ -290,7 +291,7 @@ impl fmt::Display for Cmd {
             Cmd::TrackNodeIssueInDysfunction { name, issue } => {
                 write!(f, "TrackNodeIssueInDysfunction {:?}, {:?}", name, issue)
             }
-            Cmd::ProposeOffline(_) => write!(f, "ProposeOffline"),
+            Cmd::ProposeVoteNodesOffline(_) => write!(f, "ProposeOffline"),
             Cmd::AddToPendingQueries { .. } => write!(f, "AddToPendingQueries"),
             Cmd::TellEldersToStartConnectivityTest(_) => {
                 write!(f, "TellEldersToStartConnectivityTest")

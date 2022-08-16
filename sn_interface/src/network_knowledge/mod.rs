@@ -419,12 +419,12 @@ impl NetworkKnowledge {
 
         // Update members if changes were provided
         if let Some(members) = updated_members {
-            let peers = members
+            let peers: BTreeSet<_> = members
                 .into_iter()
                 .map(|member| member.into_authed_state())
                 .collect();
 
-            if self.merge_members(peers)? {
+            if !peers.is_empty() && self.merge_members(peers)? {
                 there_was_an_update = true;
                 let prefix = self.prefix();
                 info!(
@@ -458,22 +458,22 @@ impl NetworkKnowledge {
 
     // Get SectionAuthorityProvider of a known section with the given prefix,
     // along with its section chain.
-    pub fn get_closest_or_opposite_signed_sap(
+    pub fn closest_signed_sap(
         &self,
         name: &XorName,
-    ) -> Option<(SectionAuth<SectionAuthorityProvider>, SecuredLinkedList)> {
+    ) -> Option<(&SectionAuth<SectionAuthorityProvider>, SecuredLinkedList)> {
         let closest_sap = self
             .prefix_map
-            .closest_or_opposite(name, Some(&self.prefix()));
+            .closest(name, Some(&self.prefix()))
+            // In case the only prefix is ours, we fallback to it.
+            .unwrap_or(self.prefix_map.get_signed(&self.prefix())?);
 
-        if let Some(signed_sap) = closest_sap {
-            if let Ok(proof_chain) = self
-                .prefix_map
-                .get_sections_dag()
-                .get_proof_chain(self.genesis_key(), &signed_sap.value.section_key())
-            {
-                return Some((signed_sap, proof_chain));
-            }
+        if let Ok(proof_chain) = self
+            .prefix_map
+            .get_sections_dag()
+            .get_proof_chain(self.genesis_key(), &closest_sap.value.section_key())
+        {
+            return Some((closest_sap, proof_chain));
         }
 
         None
@@ -484,11 +484,17 @@ impl NetworkKnowledge {
         self.prefix_map.genesis_key()
     }
 
-    // Try to merge this `NetworkKnowledge` members with `peers`.
+    /// Try to merge this `NetworkKnowledge` members with `peers`.
+    /// Checks if we're already up to date before attempting to verify and merge members
     pub fn merge_members(&self, peers: BTreeSet<SectionAuth<NodeState>>) -> Result<bool> {
         let mut there_was_an_update = false;
+        let our_current_members = self.section_peers.members();
 
         for node_state in peers.iter() {
+            if our_current_members.contains(node_state) {
+                // we already know of this one, so nothing to do here.
+                continue;
+            }
             trace!(
                 "Updating section members. Name: {:?}, new state: {:?}",
                 node_state.name(),

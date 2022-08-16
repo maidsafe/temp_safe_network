@@ -204,7 +204,12 @@ impl Node {
 
         // Check if we need to resend any messsages and who should we send it to.
         let (bounced_msg, response_peer) = match kind {
-            AntiEntropyKind::Update { .. } => return Ok(cmds), // Nope, bail early
+            AntiEntropyKind::Update { .. } => {
+                // log the msg as received. Elders track this for other elders in dysfunction
+                self.dysfunction_tracking
+                    .ae_update_msg_received(&sender.name());
+                return Ok(cmds);
+            } // Nope, bail early
             AntiEntropyKind::Retry { bounced_msg } => (bounced_msg, sender),
             AntiEntropyKind::Redirect { bounced_msg } => {
                 // We choose the Elder closest to the dst section key,
@@ -314,17 +319,14 @@ impl Node {
                 "AE: prefix not matching. We are: {:?}, they sent to: {:?}",
                 our_prefix, dst_name
             );
-            return match self
-                .network_knowledge
-                .get_closest_or_opposite_signed_sap(&dst_name)
-            {
+            return match self.network_knowledge.closest_signed_sap(&dst_name) {
                 Some((signed_sap, section_dag)) => {
                     info!("Found a better matching prefix {:?}", signed_sap.prefix());
                     let bounced_msg = original_bytes;
                     // Redirect to the closest section
                     let ae_msg = SystemMsg::AntiEntropy {
                         section_auth: signed_sap.value.to_msg(),
-                        section_signed: signed_sap.sig,
+                        section_signed: signed_sap.sig.clone(),
                         proof_chain: section_dag,
                         kind: AntiEntropyKind::Redirect { bounced_msg },
                     };

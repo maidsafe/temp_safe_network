@@ -5,18 +5,88 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.66.3 (2022-07-10)
+## v0.67.0 (2022-08-14)
 
 ### Chore
 
- - <csr-id-49e223e2c07695b4c63e253ba19ce43ec24d7112/> move more deps to clap-v3; rm some deps on rand
+ - <csr-id-de57210562e1e3a637564332e081514dabb177ab/> let client builder do env overrides
+   The CLI/api had its own env vars to set timeout; delegate this to the
+   client builder
+ - <csr-id-29de67f1e3583eab867d517cb50ed2e404bd63fd/> serialize NetworkPrefixMap into JSON
+ - <csr-id-afcf083469c732f10c7c80f4a45e4c33ab111101/> remove RwLock from NetworkPrefixMap
+ - <csr-id-06c3859cf739487b9c27de6fcdf5078f82403b4f/> additional error information within a wallet_reissue error msg
+ - <csr-id-5050522c85a3430ee017db3215aad21619bf7796/> increase the DBC_REISSUE_ATTEMPTS
+ - <csr-id-b98e46116628c62b71e7cc4171aeda86b05b2b99/> perform up to three attempts to reissue DBCs for tests from genesis DBC
+ - <csr-id-6f03b93bd2d02f0ffe54b69fbf25070fbe64eab0/> upgrade blsttc to 7.0.0
+   This version has a more helpful error message for the shares interpolation problem.
+
+### New Features
+
+ - <csr-id-796b9e640ddafcbc804cd4792a867143422cf4f5/> expose a public API to reissue many output DBCs from a wallet
+ - <csr-id-005b84cab0ca91762cbedd208b022d4c4983fe26/> retry twice if it fails spending inputs when reissuing DBCs
+ - <csr-id-c46dd0737779c8ee515ee037add54ce049448ea7/> expose a public API which allows users to check if a DBC's `KeyImage` has been already spent on the network
+   - Expose a public `is_dbc_spent` API which allows users to check if a DBC's KeyImage has
+     been already spent on the network.
+   - Have the CLI `wallet deposit` command to perform a verification is the supplied DBC has been
+     already spent before depositing into a wallet.
+   - Allow users to provide a `--force` flag with the CLI `wallet deposit` command to skip the
+     verification of DBC already spent and force the deposit into the wallet.
+ - <csr-id-ba97ca06b67cd6e5de8e1c910b396fbe44f40fd7/> perform verification of input TX and spentproofs when depositing or reissuing a DBC
+ - <csr-id-1b3f0516cf899c2fc0d101ce9cf0079c95bbfd7b/> show the DBC owner in the wallet displayed by cat cmd
+   - Display the owner of each DBC when cat-ing a wallet.
+   - Align to the right the balance of each DBC when cat-ing a wallet.
+   - Shorten the default name set to DBC when deposited in a wallet.
+   - Make the name of the change DBC automatically deposited in the wallet unique.
+
+### Bug Fixes
+
+ - <csr-id-f4b89d390eaeae0ab6dd329c1a0e9bbc65ec28a6/> update prefixmap getter call after name change
+
+### Refactor
+
+ - <csr-id-27ba2a63dcfa272cf7ef8c5301987fc6bfe18ed0/> sn_client to only read a default prefix map file, updates to be cached on disk by user
+   - CLI to cache the up to date PrefixMap after all commands were executed and right before exiting.
+   - Refactoring sn_cli::Config to remove some redundant code.
+ - <csr-id-ed37bb56e5e17d4cba7c1b2165746c193241d618/> move SectionChain into NetworkPrefixMap
+ - <csr-id-14ea6c7f4bbaee9c2ac4a30fba938ef2de2f77e5/> use builder to instantiate
+ - <csr-id-e0fb940b24e87d86fe920095176362f73503ce79/> use sn_dbc::SpentProof API for verifying SpentProofShares
+ - <csr-id-ca32230926e5a435d90694df8fbce1218ea397f0/> remove unused storage path
+ - <csr-id-9fde534277f359dfa0a1d91d917864776edb5138/> reissuing DBCs for all sn_cli tests only once as a setup stage
+ - <csr-id-5c82df633e7c062fdf761a8e6e0a7ae8d26cc73a/> setup step for tests to reissue a set of DBCs from genesis only once
+ - <csr-id-93614b18b4316af04ab8c74358a5c86510590b85/> make chunk_store accept all datatypes
+ - <csr-id-f5af444b8ac37d2debfbe5e1d4dcdc48de963694/> removing hard-coded test DBC from sn_api Wallet unit tests
+
+### Test
+
+ - <csr-id-9e87a00f8749de236cd9722b22936ae86cfdcf4e/> fix test helper for reissuing dbcs
+ - <csr-id-d4be0cc431947b035046cc4d56642a81c0880924/> additional tests in sn-api for DBC verification failures
+
+### Chore (BREAKING)
+
+ - <csr-id-db7dcdc7968d1d7e946274650d5a0c48719b4955/> remove providing path to qp2p cfg
+   This configuration seems never to be provided or stored anyway. It looks
+   like some code was also taking this parameter to be the client config,
+   not the qp2p config, which is a source of confusion.
+ - <csr-id-d3a05a728be8752ea9ebff4e38e7c4c85e5db09b/> having spent proofs and Txs within SpentbookCmd::Send msg to be a set instead of a vec
+
+### New Features (BREAKING)
+
+ - <csr-id-f666204febb1044980412345236ce0cb8377b162/> return reference instead of clone
+   Let the end user decide on wether to clone a value that is taken from
+   the struct.
+
+### Refactor (BREAKING)
+
+ - <csr-id-96da1171d0cac240f772e5d6a15c56f63441b4b3/> nodes to cache their own individual prefix map file on disk
+ - <csr-id-dd2eb21352223f6340064e0021f4a7df402cd5c9/> removing Token from sn_interfaces::type as it is now exposed by sn_dbc
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 34 commits contributed to the release over the course of 31 calendar days.
+ - 33 days passed between releases.
+ - 29 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -26,12 +96,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - update prefixmap getter call after name change ([`f4b89d3`](https://github.com/maidsafe/safe_network/commit/f4b89d390eaeae0ab6dd329c1a0e9bbc65ec28a6))
+    - sn_client to only read a default prefix map file, updates to be cached on disk by user ([`27ba2a6`](https://github.com/maidsafe/safe_network/commit/27ba2a63dcfa272cf7ef8c5301987fc6bfe18ed0))
+    - let client builder do env overrides ([`de57210`](https://github.com/maidsafe/safe_network/commit/de57210562e1e3a637564332e081514dabb177ab))
+    - serialize NetworkPrefixMap into JSON ([`29de67f`](https://github.com/maidsafe/safe_network/commit/29de67f1e3583eab867d517cb50ed2e404bd63fd))
+    - nodes to cache their own individual prefix map file on disk ([`96da117`](https://github.com/maidsafe/safe_network/commit/96da1171d0cac240f772e5d6a15c56f63441b4b3))
+    - removing Token from sn_interfaces::type as it is now exposed by sn_dbc ([`dd2eb21`](https://github.com/maidsafe/safe_network/commit/dd2eb21352223f6340064e0021f4a7df402cd5c9))
+    - remove RwLock from NetworkPrefixMap ([`afcf083`](https://github.com/maidsafe/safe_network/commit/afcf083469c732f10c7c80f4a45e4c33ab111101))
+    - move SectionChain into NetworkPrefixMap ([`ed37bb5`](https://github.com/maidsafe/safe_network/commit/ed37bb56e5e17d4cba7c1b2165746c193241d618))
+    - expose a public API to reissue many output DBCs from a wallet ([`796b9e6`](https://github.com/maidsafe/safe_network/commit/796b9e640ddafcbc804cd4792a867143422cf4f5))
+    - use builder to instantiate ([`14ea6c7`](https://github.com/maidsafe/safe_network/commit/14ea6c7f4bbaee9c2ac4a30fba938ef2de2f77e5))
+    - return reference instead of clone ([`f666204`](https://github.com/maidsafe/safe_network/commit/f666204febb1044980412345236ce0cb8377b162))
+    - additional error information within a wallet_reissue error msg ([`06c3859`](https://github.com/maidsafe/safe_network/commit/06c3859cf739487b9c27de6fcdf5078f82403b4f))
+    - remove providing path to qp2p cfg ([`db7dcdc`](https://github.com/maidsafe/safe_network/commit/db7dcdc7968d1d7e946274650d5a0c48719b4955))
+    - Merge #1427 ([`949ee11`](https://github.com/maidsafe/safe_network/commit/949ee111717c8f07487f3f4db6fbc0043583916d))
+    - increase the DBC_REISSUE_ATTEMPTS ([`5050522`](https://github.com/maidsafe/safe_network/commit/5050522c85a3430ee017db3215aad21619bf7796))
+    - use sn_dbc::SpentProof API for verifying SpentProofShares ([`e0fb940`](https://github.com/maidsafe/safe_network/commit/e0fb940b24e87d86fe920095176362f73503ce79))
+    - remove unused storage path ([`ca32230`](https://github.com/maidsafe/safe_network/commit/ca32230926e5a435d90694df8fbce1218ea397f0))
+    - retry twice if it fails spending inputs when reissuing DBCs ([`005b84c`](https://github.com/maidsafe/safe_network/commit/005b84cab0ca91762cbedd208b022d4c4983fe26))
+    - fix test helper for reissuing dbcs ([`9e87a00`](https://github.com/maidsafe/safe_network/commit/9e87a00f8749de236cd9722b22936ae86cfdcf4e))
+    - perform up to three attempts to reissue DBCs for tests from genesis DBC ([`b98e461`](https://github.com/maidsafe/safe_network/commit/b98e46116628c62b71e7cc4171aeda86b05b2b99))
+    - having spent proofs and Txs within SpentbookCmd::Send msg to be a set instead of a vec ([`d3a05a7`](https://github.com/maidsafe/safe_network/commit/d3a05a728be8752ea9ebff4e38e7c4c85e5db09b))
+    - upgrade blsttc to 7.0.0 ([`6f03b93`](https://github.com/maidsafe/safe_network/commit/6f03b93bd2d02f0ffe54b69fbf25070fbe64eab0))
+    - expose a public API which allows users to check if a DBC's `KeyImage` has been already spent on the network ([`c46dd07`](https://github.com/maidsafe/safe_network/commit/c46dd0737779c8ee515ee037add54ce049448ea7))
+    - additional tests in sn-api for DBC verification failures ([`d4be0cc`](https://github.com/maidsafe/safe_network/commit/d4be0cc431947b035046cc4d56642a81c0880924))
+    - reissuing DBCs for all sn_cli tests only once as a setup stage ([`9fde534`](https://github.com/maidsafe/safe_network/commit/9fde534277f359dfa0a1d91d917864776edb5138))
+    - perform verification of input TX and spentproofs when depositing or reissuing a DBC ([`ba97ca0`](https://github.com/maidsafe/safe_network/commit/ba97ca06b67cd6e5de8e1c910b396fbe44f40fd7))
+    - setup step for tests to reissue a set of DBCs from genesis only once ([`5c82df6`](https://github.com/maidsafe/safe_network/commit/5c82df633e7c062fdf761a8e6e0a7ae8d26cc73a))
+    - make chunk_store accept all datatypes ([`93614b1`](https://github.com/maidsafe/safe_network/commit/93614b18b4316af04ab8c74358a5c86510590b85))
+    - removing hard-coded test DBC from sn_api Wallet unit tests ([`f5af444`](https://github.com/maidsafe/safe_network/commit/f5af444b8ac37d2debfbe5e1d4dcdc48de963694))
+    - Merge branch 'main' into feat-cat-wallet-improvements ([`08a3b85`](https://github.com/maidsafe/safe_network/commit/08a3b85ae73b2360e63f9d4fbdec23e349dc0626))
+    - Merge branch 'main' into feat-cat-wallet-improvements ([`e2e89e6`](https://github.com/maidsafe/safe_network/commit/e2e89e6b061ae0827cdeeb1d8b17e702d2f3607a))
+    - Merge branch 'main' into feat-cat-wallet-improvements ([`9409bf4`](https://github.com/maidsafe/safe_network/commit/9409bf42e99b4eb3da883f76c802e7dc6ea1a4a0))
+    - Merge branch 'main' into feat-cat-wallet-improvements ([`8e6eecf`](https://github.com/maidsafe/safe_network/commit/8e6eecf0da8df5cdac55bbf1f81d00bcb19558b4))
+    - show the DBC owner in the wallet displayed by cat cmd ([`1b3f051`](https://github.com/maidsafe/safe_network/commit/1b3f0516cf899c2fc0d101ce9cf0079c95bbfd7b))
+</details>
+
+## v0.66.3 (2022-07-10)
+
+<csr-id-49e223e2c07695b4c63e253ba19ce43ec24d7112/>
+
+### Chore
+
+ - <csr-id-49e223e2c07695b4c63e253ba19ce43ec24d7112/> move more deps to clap-v3; rm some deps on rand
+
+### Chore
+
+ - <csr-id-34bd9bd01a3f042c35e0432df2f0cfcebc32a8a8/> sn_interface-0.8.2/sn_client-0.68.2/sn_node-0.64.2/sn_api-0.66.3/sn_cli-0.59.3
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release over the course of 1 calendar day.
+ - 2 days passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.8.2/sn_client-0.68.2/sn_node-0.64.2/sn_api-0.66.3/sn_cli-0.59.3 ([`34bd9bd`](https://github.com/maidsafe/safe_network/commit/34bd9bd01a3f042c35e0432df2f0cfcebc32a8a8))
     - move more deps to clap-v3; rm some deps on rand ([`49e223e`](https://github.com/maidsafe/safe_network/commit/49e223e2c07695b4c63e253ba19ce43ec24d7112))
     - Merge branch 'main' into feat-dbc-spent-proof-validations ([`45418f2`](https://github.com/maidsafe/safe_network/commit/45418f2f9b5cc58f2a153bf40966beb2bf36a62a))
     - Merge branch 'main' into feat-dbc-spent-proof-validations ([`94be181`](https://github.com/maidsafe/safe_network/commit/94be181789b0010f83ed5e89341f3f347575e37f))
 </details>
 
 ## v0.66.2 (2022-07-08)
+
+<csr-id-b478314f331382229c9fb235dab0198f5203f509/>
 
 ### Chore
 

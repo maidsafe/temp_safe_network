@@ -108,19 +108,27 @@ impl Dispatcher {
             Cmd::AddToPendingQueries {
                 operation_id,
                 origin,
+                target_adult,
             } => {
                 let mut node = self.node.write().await;
+                // cleanup
+                node.pending_data_queries.remove_expired();
 
-                if let Some(peers) = node.pending_data_queries.get_mut(&operation_id) {
+                if let Some(peers) = node
+                    .pending_data_queries
+                    .get_mut(&(operation_id, origin.name()))
+                {
                     trace!(
                         "Adding to pending data queries for op id: {:?}",
                         operation_id
                     );
                     let _ = peers.insert(origin);
                 } else {
-                    let _prior_value =
-                        node.pending_data_queries
-                            .set(operation_id, BTreeSet::from([origin]), None);
+                    let _prior_value = node.pending_data_queries.set(
+                        (operation_id, target_adult),
+                        BTreeSet::from([origin]),
+                        None,
+                    );
                 };
 
                 Ok(vec![])
@@ -161,12 +169,15 @@ impl Dispatcher {
                 #[cfg(feature = "traceroute")]
                 traceroute,
             } => {
+                debug!("init of handling valid msg {:?}", msg_id);
                 let mut node = self.node.write().await;
 
                 if let Some(msg_authority) = node
                     .aggregate_system_msg(msg_id, msg_authority, wire_msg_payload)
                     .await
                 {
+                    debug!("handling valid msg {:?}", msg_id);
+
                     node.handle_valid_system_msg(
                         msg_id,
                         msg_authority,
@@ -243,7 +254,7 @@ impl Dispatcher {
                 .await
                 .into_iter()
                 .collect()),
-            Cmd::ProposeOffline(names) => {
+            Cmd::ProposeVoteNodesOffline(names) => {
                 let mut node = self.node.write().await;
                 node.cast_offline_proposals(&names)
             }

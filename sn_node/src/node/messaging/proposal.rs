@@ -166,8 +166,9 @@ impl Node {
                         _ => cmds.push(Cmd::HandleAgreement { proposal, sig }),
                     },
                     Err(AggregatorError::NotEnoughShares) => {
+                        // we add elders too fast in initial....
                         trace!(
-                        "Proposal from {} inserted in aggregator, not enough sig shares yet: {:?}",
+                        "Proposal from {} inserted in aggregator, not enough sig shares yet: {proposal:?} {:?}",
                         sender,
                         msg_id
                     );

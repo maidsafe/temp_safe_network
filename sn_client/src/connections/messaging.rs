@@ -45,7 +45,7 @@ pub(crate) const NODES_TO_CONTACT_PER_STARTUP_BATCH: usize = 3;
 const INITIAL_WAIT: u64 = 1;
 
 // Number of retries for sending a message due to a connection issue.
-const CLIENT_SEND_RETRIES: usize = 1;
+const CLIENT_SEND_RETRIES: usize = 3; // nodes will clean up connections reasonably often, so we try a few times here.
 
 impl Session {
     #[instrument(
@@ -349,8 +349,6 @@ impl Session {
 
         send_msg_in_bg(self.clone(), initial_contacts, wire_msg.clone(), msg_id)?;
 
-        *self.initial_connection_check_msg_id.write().await = Some(msg_id);
-
         let mut knowledge_checks = 0;
         let mut outgoing_msg_rounds = 1;
         let mut last_start_pos = 0;
@@ -371,11 +369,7 @@ impl Session {
 
         info!("Client startup... awaiting some network knowledge");
 
-        let mut known_sap = self
-            .network
-            .read()
-            .await
-            .closest_or_opposite(&dst_address, None);
+        let mut known_sap = self.network.closest(&dst_address, None);
 
         // wait until we have sufficient network knowledge
         while known_sap.is_none() {
@@ -383,7 +377,7 @@ impl Session {
                 return Err(Error::NetworkContact);
             }
 
-            let stats = self.network.read().await.known_sections_count();
+            let stats = self.network.known_sections_count();
             debug!("Client still has not received a complete section's AE-Retry message... Current sections known: {:?}", stats);
             knowledge_checks += 1;
 
@@ -428,17 +422,13 @@ impl Session {
                     tokio::time::sleep(wait).await;
                 }
 
-                known_sap = self
-                    .network
-                    .read()
-                    .await
-                    .closest_or_opposite(&dst_address, None);
+                known_sap = self.network.closest(&dst_address, None);
 
                 debug!("Known sap: {known_sap:?}");
             }
         }
 
-        let stats = self.network.read().await.known_sections_count();
+        let stats = self.network.known_sections_count();
         debug!("Client has received updated network knowledge. Current sections known: {:?}. Sap for our startup-query: {:?}", stats, known_sap);
 
         Ok(())
@@ -446,7 +436,7 @@ impl Session {
 
     async fn get_query_elders(&self, dst: XorName) -> Result<(bls::PublicKey, Vec<Peer>)> {
         // Get DataSection elders details. Resort to own section if DataSection is not available.
-        let sap = self.network.read().await.closest_or_opposite(&dst, None);
+        let sap = self.network.closest(&dst, None);
         let (section_pk, mut elders) = if let Some(sap) = &sap {
             (sap.section_key(), sap.elders_vec())
         } else {
@@ -473,11 +463,7 @@ impl Session {
     }
 
     async fn get_cmd_elders(&self, dst_address: XorName) -> Result<(bls::PublicKey, Vec<Peer>)> {
-        let a_close_sap = self
-            .network
-            .read()
-            .await
-            .closest_or_opposite(&dst_address, None);
+        let a_close_sap = self.network.closest(&dst_address, None);
 
         // Get DataSection elders details.
         if let Some(sap) = a_close_sap {

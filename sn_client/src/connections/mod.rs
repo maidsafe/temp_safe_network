@@ -22,7 +22,7 @@ use sn_interface::{
 use dashmap::DashMap;
 use qp2p::{Config as QuicP2pConfig, Endpoint};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
-use tokio::sync::{mpsc::Sender, RwLock};
+use tokio::sync::mpsc::Sender;
 
 // Here we dont track the msg_id across the network, but just use it as a local identifier to remove the correct listener
 type PendingQueryResponses = Arc<DashMap<OperationId, Vec<(MsgId, QueryResponseSender)>>>;
@@ -46,9 +46,7 @@ pub(super) struct Session {
     // Channels for sending CmdAck to upper layers
     pending_cmds: PendingCmdAcks,
     /// All elders we know about from AE messages
-    pub(super) network: Arc<RwLock<NetworkPrefixMap>>,
-    /// Initial network comms MsgId
-    initial_connection_check_msg_id: Arc<RwLock<Option<MsgId>>>,
+    pub(super) network: NetworkPrefixMap,
     /// Standard time to await potential AE messages:
     cmd_ack_wait: Duration,
     /// Links to nodes
@@ -71,8 +69,7 @@ impl Session {
             pending_queries: Arc::new(DashMap::default()),
             pending_cmds: Arc::new(DashMap::default()),
             endpoint,
-            network: Arc::new(RwLock::new(prefix_map)),
-            initial_connection_check_msg_id: Arc::new(RwLock::new(None)),
+            network: prefix_map,
             cmd_ack_wait,
             peer_links,
         };
