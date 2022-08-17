@@ -9,10 +9,7 @@
 use super::Session;
 
 use crate::{
-    connections::{
-        messaging::{send_msg, NUM_OF_ELDERS_SUBSET_FOR_QUERIES},
-        PendingCmdAcks,
-    },
+    connections::{messaging::NUM_OF_ELDERS_SUBSET_FOR_QUERIES, PendingCmdAcks},
     Error, Result,
 };
 
@@ -125,7 +122,7 @@ impl Session {
     pub(crate) async fn handle_msg(
         msg: MsgType,
         src_peer: Peer,
-        session: Session,
+        mut session: Session,
     ) -> Result<(), Error> {
         match msg.clone() {
             MsgType::Service { msg_id, msg, .. } => {
@@ -142,7 +139,7 @@ impl Session {
     }
 
     async fn handle_system_msg(
-        self,
+        &mut self,
         msg: SystemMsg,
         msg_authority: NodeMsgAuthority,
         sender: Peer,
@@ -165,15 +162,15 @@ impl Session {
                     AntiEntropyKind::Redirect { bounced_msg } | AntiEntropyKind::Retry { bounced_msg },
             } => {
                 debug!("AE-Redirect/Retry msg received");
-                let result = Self::handle_ae_msg(
-                    self,
-                    section_auth.into_state(),
-                    section_signed,
-                    proof_chain,
-                    bounced_msg,
-                    sender,
-                )
-                .await;
+                let result = self
+                    .handle_ae_msg(
+                        section_auth.into_state(),
+                        section_signed,
+                        proof_chain,
+                        bounced_msg,
+                        sender,
+                    )
+                    .await;
                 if result.is_err() {
                     error!("Failed to handle AE msg from {sender:?}, {result:?}");
                 }
@@ -300,7 +297,7 @@ impl Session {
     // Handle Anti-Entropy Redirect or Retry msgs
     #[instrument(skip_all, level = "debug")]
     async fn handle_ae_msg(
-        mut session: Session,
+        &mut self,
         target_sap: SectionAuthorityProvider,
         section_signed: KeyedSig,
         provided_section_chain: SecuredLinkedList,
@@ -310,8 +307,7 @@ impl Session {
         debug!("Received Anti-Entropy from {src_peer}, with SAP: {target_sap:?}");
 
         // Try to update our network knowledge first
-        Self::update_network_knowledge(
-            &mut session,
+        self.update_network_knowledge(
             target_sap.clone(),
             section_signed,
             provided_section_chain,
@@ -340,7 +336,7 @@ impl Session {
 
                 debug!("Resending original message on AE-Redirect with updated details. Expecting an AE-Retry next");
 
-                send_msg(session, vec![elder], wire_msg, msg_id).await?;
+                self.send_msg(vec![elder], wire_msg, msg_id).await?;
             } else {
                 error!("No elder determined for resending AE message");
             }
@@ -352,14 +348,14 @@ impl Session {
     /// Update our network knowledge making sure proof chain validates the
     /// new SAP based on currently known remote section SAP or genesis key.
     async fn update_network_knowledge(
-        session: &mut Session,
+        &mut self,
         sap: SectionAuthorityProvider,
         section_signed: KeyedSig,
         proof_chain: SecuredLinkedList,
         sender: Peer,
     ) {
-        // Update our network knowledge based upon passed in knowledge
-        let result = session.network.update(
+        // Update our network PrefixMap based upon passed in knowledge
+        let result = self.network.update(
             SectionAuth {
                 value: sap.clone(),
                 sig: section_signed,
