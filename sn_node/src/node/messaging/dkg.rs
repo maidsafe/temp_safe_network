@@ -47,9 +47,9 @@ fn acknowledge_dkg_oucome(
     sec_key_share: SecretKeyShare,
 ) -> Cmd {
     trace!(
-        "{} {:?}: {:?}",
+        "{} s{}: {:?}",
         LogMarker::DkgSessionComplete,
-        session_id,
+        session_id.sum(),
         pub_key_set.public_key(),
     );
 
@@ -85,10 +85,10 @@ impl Node {
         let recipients = Vec::from_iter(session_id.elder_peers());
 
         trace!(
-            "{} for {:?} with {:?} to {:?}",
+            "{} s{} with {:?} to {:?}",
             LogMarker::SendDkgStart,
+            session_id.sum(),
             session_id.elders,
-            session_id,
             recipients
         );
 
@@ -165,6 +165,12 @@ impl Node {
         vote: DkgSignedVote,
     ) -> Cmd {
         let recipients = dkg_peers(participant_index, session_id);
+        trace!(
+            "{} s{}: {:?}",
+            LogMarker::DkgBroadcastVote,
+            session_id.sum(),
+            vote
+        );
         let node_msg = SystemMsg::DkgVotes {
             session_id: session_id.clone(),
             pub_keys,
@@ -184,14 +190,17 @@ impl Node {
         let our_id = if let Some(index) = session_id.elder_index(our_name) {
             index
         } else {
-            error!("DKG failed to start for {session_id:?}: {our_name} is not a participant");
+            error!(
+                "DKG failed to start s{}: {our_name} is not a participant",
+                session_id.sum()
+            );
             return Ok(vec![]);
         };
 
         // ignore DkgStart from old chains
         let current_chain_len = self.network_knowledge.chain_len();
         if session_id.section_chain_len < current_chain_len {
-            trace!("Skipping DkgStart for older chain: {:?}", &session_id);
+            trace!("Skipping DkgStart for older chain: s{:?}", session_id.sum());
             return Ok(vec![]);
         }
 
@@ -202,8 +211,9 @@ impl Node {
 
         // broadcast signed pub key
         trace!(
-            "{} from {our_id:?} with {session_id:?}",
-            LogMarker::DkgBroadcastEphemeralPubKey
+            "{} s{} from {our_id:?}",
+            LogMarker::DkgBroadcastEphemeralPubKey,
+            session_id.sum(),
         );
         let peers = dkg_peers(our_id, &session_id);
         let node_msg = SystemMsg::DkgEphemeralPubKey {
@@ -228,15 +238,30 @@ impl Node {
         let our_id = if let Some(index) = session_id.elder_index(name) {
             index
         } else {
-            error!("DKG ephemeral key ignored for {session_id:?}: {name} is not a participant");
+            error!(
+                "DKG ephemeral key ignored for s{}: {name} is not a participant",
+                session_id.sum()
+            );
             return Ok(vec![]);
         };
 
         // try to start DKG if we've got all the keys
-        let (vote, pub_keys) = if let Some(start) =
-            self.dkg_voter
-                .try_init_dkg(session_id, our_id, pub_key, sig, sender.name())?
-        {
+        let outcome =
+            match self
+                .dkg_voter
+                .try_init_dkg(session_id, our_id, pub_key, sig, sender.name())
+            {
+                Ok(o) => o,
+                Err(e) => {
+                    error!(
+                        "Failed to init DKG s{} id:{our_id:?}: {:?}",
+                        session_id.sum(),
+                        e
+                    );
+                    return Ok(vec![]);
+                }
+            };
+        let (vote, pub_keys) = if let Some(start) = outcome {
             start
         } else {
             // we don't have all the keys yet
@@ -244,6 +269,11 @@ impl Node {
         };
 
         // send first vote
+        trace!(
+            "{} s{} from id:{our_id:?}",
+            LogMarker::DkgBroadcastFirstVote,
+            session_id.sum()
+        );
         let peers = dkg_peers(our_id, session_id);
         let node_msg = SystemMsg::DkgVotes {
             session_id: session_id.clone(),
@@ -266,7 +296,10 @@ impl Node {
         let our_id = if let Some(index) = session_id.elder_index(name) {
             index
         } else {
-            error!("DKG failed to handle vote for {session_id:?}: {name} is not a participant");
+            error!(
+                "DKG failed to handle vote in s{}: {name} is not a participant",
+                session_id.sum()
+            );
             return Ok(vec![]);
         };
 
@@ -285,7 +318,12 @@ impl Node {
         let mut ae_cmds: Vec<Cmd> = Vec::new();
         for v in votes {
             match self.dkg_voter.handle_dkg_vote(session_id, v.clone()) {
-                Ok(VoteResponse::WaitingForMoreVotes) => {}
+                Ok(VoteResponse::WaitingForMoreVotes) => {
+                    debug!(
+                        "Dkg s{}: WaitingForMoreVotes after: {v:?}",
+                        session_id.sum()
+                    );
+                }
                 Ok(VoteResponse::RequestAntiEntropy) => {
                     cmds.push(self.request_dkg_ae(session_id, sender))
                 }
@@ -297,10 +335,10 @@ impl Node {
                         session_id, our_id, new_pubs, new_sec,
                     ));
                 }
-                Err(error) => {
+                Err(err) => {
                     error!(
-                        "Error processing DKG vote {:?} from {:?}: {:?}",
-                        v, sender, error
+                        "Error processing DKG vote s{} id:{our_id:?} {v:?} from {sender:?}: {err:?}",
+                        session_id.sum()
                     );
                 }
             }
@@ -320,6 +358,11 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         let pub_keys = self.dkg_voter.get_dkg_keys(&session_id)?;
         let votes = self.dkg_voter.get_all_votes(&session_id)?;
+        trace!(
+            "{} s{}: AE to {sender:?}",
+            LogMarker::DkgBroadcastVote,
+            session_id.sum()
+        );
         let node_msg = SystemMsg::DkgVotes {
             session_id,
             pub_keys,
