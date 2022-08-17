@@ -154,6 +154,20 @@ impl FlowCtrl {
                 }
             }
 
+            // if we've passed enough time, batch outgoing data
+            if last_data_batch_check.elapsed() > DATA_BATCH_INTERVAL {
+                last_data_batch_check = now;
+                if let Some(cmd) = match Self::replicate_queued_data(self.node.clone()).await {
+                    Ok(cmd) => cmd,
+                    Err(error) => {
+                        error!("Error handling getting cmds for data queued for replication: {error:?}");
+                        None
+                    }
+                } {
+                    cmds.push(cmd);
+                }
+            }
+
             // Things that should only happen to non elder nodes
             if !is_elder {
                 // if we've passed enough time, section probe
@@ -185,20 +199,6 @@ impl FlowCtrl {
             if last_probe.elapsed() > PROBE_INTERVAL {
                 last_probe = now;
                 if let Some(cmd) = Self::probe_the_network(self.node.clone()).await {
-                    cmds.push(cmd);
-                }
-            }
-
-            // if we've passed enough time, batch outgoing data
-            if last_data_batch_check.elapsed() > DATA_BATCH_INTERVAL {
-                last_data_batch_check = now;
-                if let Some(cmd) = match Self::replicate_queued_data(self.node.clone()).await {
-                    Ok(cmd) => cmd,
-                    Err(error) => {
-                        error!("Error handling getting cmds for data queued for replication: {error:?}");
-                        None
-                    }
-                } {
                     cmds.push(cmd);
                 }
             }
@@ -416,11 +416,12 @@ impl FlowCtrl {
         use rand::seq::IteratorRandom;
         let mut rng = rand::rngs::OsRng;
 
-        let (_src_section_pk, _our_info, data_queued) = {
+        let data_queued = {
+            debug!(
+                "checking for q data, qlen: {:?}",
+                node.read().await.pending_data_to_replicate_to_peers.len()
+            );
             let node = node.read().await;
-            // get info for the WireMsg
-            let src_section_pk = node.network_knowledge().section_key();
-            let our_info = node.info();
             // choose a data to replicate at random
             let data_queued = node
                 .pending_data_to_replicate_to_peers
@@ -428,7 +429,9 @@ impl FlowCtrl {
                 .choose(&mut rng)
                 .map(|(address, _)| *address);
 
-            (src_section_pk, our_info, data_queued)
+            debug!("data found isssss: {data_queued:?}");
+
+            data_queued
         };
 
         if let Some(address) = data_queued {
