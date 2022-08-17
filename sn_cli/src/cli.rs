@@ -74,7 +74,7 @@ pub async fn run() -> Result<()> {
     if safe.is_connected() {
         match safe.section_tree().await {
             Ok(section_tree) => {
-                if let Err(err) = config.update_default_network_contacts(section_tree).await {
+                if let Err(err) = config.update_default_network_contacts(&section_tree).await {
                     warn!(
                         "Failed to cache up to date network contacts for genesis key {:?} to '{}': {:?}",
                         section_tree.genesis_key(),

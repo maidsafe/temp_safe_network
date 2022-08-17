@@ -47,7 +47,7 @@ impl sn_dbc::SpentProofKeyVerifier for SpentProofKeyVerifier<'_> {
     // Called by sn_dbc API when it needs to verify a SpentProof is signed by a known key,
     // we check if the key is any of the network sections keys we are aware of
     fn verify_known_key(&self, key: &PublicKey) -> Result<()> {
-        if !self.client.is_known_section_key(key) {
+        if !futures::executor::block_on(self.client.is_known_section_key(key)) {
             Err(Error::DbcVerificationFailed(format!(
                 "SpentProof key is an unknown section key: {}",
                 key.to_hex()

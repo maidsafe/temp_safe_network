@@ -370,7 +370,12 @@ impl Session {
 
         info!("Client startup... awaiting some network knowledge");
 
-        let mut known_sap = self.network.closest(&dst_address, None);
+        let mut known_sap = self
+            .network
+            .read()
+            .await
+            .closest(&dst_address, None)
+            .cloned();
 
         // wait until we have sufficient network knowledge
         while known_sap.is_none() {
@@ -378,7 +383,7 @@ impl Session {
                 return Err(Error::NetworkContact);
             }
 
-            let stats = self.network.known_sections_count();
+            let stats = self.network.read().await.known_sections_count();
             debug!("Client still has not received a complete section's AE-Retry message... Current sections known: {:?}", stats);
             knowledge_checks += 1;
 
@@ -424,13 +429,18 @@ impl Session {
                     tokio::time::sleep(wait).await;
                 }
 
-                known_sap = self.network.closest(&dst_address, None);
+                known_sap = self
+                    .network
+                    .read()
+                    .await
+                    .closest(&dst_address, None)
+                    .cloned();
 
                 debug!("Known sap: {known_sap:?}");
             }
         }
 
-        let stats = self.network.known_sections_count();
+        let stats = self.network.read().await.known_sections_count();
         debug!("Client has received updated network knowledge. Current sections known: {:?}. Sap for our startup-query: {:?}", stats, known_sap);
 
         Ok(())
@@ -438,7 +448,7 @@ impl Session {
 
     async fn get_query_elders(&self, dst: XorName) -> Result<(bls::PublicKey, Vec<Peer>)> {
         // Get DataSection elders details. Resort to own section if DataSection is not available.
-        let sap = self.network.closest(&dst, None);
+        let sap = self.network.read().await.closest(&dst, None).cloned();
         let (section_pk, mut elders) = if let Some(sap) = &sap {
             (sap.section_key(), sap.elders_vec())
         } else {
@@ -465,7 +475,12 @@ impl Session {
     }
 
     async fn get_cmd_elders(&self, dst_address: XorName) -> Result<(bls::PublicKey, Vec<Peer>)> {
-        let a_close_sap = self.network.closest(&dst_address, None);
+        let a_close_sap = self
+            .network
+            .read()
+            .await
+            .closest(&dst_address, None)
+            .cloned();
 
         // Get DataSection elders details.
         if let Some(sap) = a_close_sap {
