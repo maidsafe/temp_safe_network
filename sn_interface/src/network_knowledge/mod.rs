@@ -403,8 +403,8 @@ impl NetworkKnowledge {
             }
             Ok(false) => {
                 debug!(
-                    "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
-                    provided_sap.prefix(), provided_sap
+                    "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records",
+                    provided_sap.prefix()
                 );
             }
             Err(err) => {

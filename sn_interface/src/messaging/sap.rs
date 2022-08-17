@@ -7,13 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use bls::PublicKeySet;
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use sn_consensus::Generation;
 use std::{
     borrow::Borrow,
     collections::{BTreeMap, BTreeSet},
-    fmt::{self, Display, Formatter},
+    fmt::{self, Debug, Formatter},
     net::SocketAddr,
 };
 use xor_name::{Prefix, XorName};
@@ -27,7 +26,7 @@ use super::system::NodeState;
 ///
 /// A new `SectionAuthorityProvider` is created whenever the elders change, due to an elder being
 /// added or removed, or the section splitting or merging.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Serialize, Deserialize)]
 pub struct SectionAuthorityProvider {
     /// The section prefix. It matches all the members' names.
     pub prefix: Prefix,
@@ -47,15 +46,17 @@ impl Borrow<Prefix> for SectionAuthorityProvider {
     }
 }
 
-impl Display for SectionAuthorityProvider {
+impl Debug for SectionAuthorityProvider {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let elder_names = Vec::from_iter(self.elders.keys());
         write!(
             f,
-            "sap len:{} generation:{} contains: {{{}}}/({:b})",
-            self.elders.len(),
-            self.membership_gen,
-            self.elders.keys().format(", "),
+            "Sap({:?}@{:?},  gen: {}, elders: {:?}, members: {})",
             self.prefix,
+            self.public_key_set.public_key(),
+            self.membership_gen,
+            elder_names,
+            self.members.len()
         )
     }
 }

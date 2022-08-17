@@ -209,9 +209,7 @@ impl DysfunctionDetection {
                 + node_dkg_score
                 + node_probe_score;
             debug!(
-                "Node {name} has a final score of {final_score} |
-                (Conns score({node_conn_score}), Dkg score({node_dkg_score}), |
-                Knowledge score({node_knowledge_score}), Ops score({score})), AeProbe score ({node_probe_score})"
+                "Node {name} has a final score of {final_score} | {{conn: {node_conn_score}, dkg: {node_dkg_score}, knowledge: {node_knowledge_score}, ops: {score}, ae_probe: {node_probe_score}}}"
             );
 
             scores_only.push(final_score);

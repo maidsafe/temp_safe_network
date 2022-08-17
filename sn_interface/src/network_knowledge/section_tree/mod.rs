@@ -218,7 +218,7 @@ impl SectionTree {
             }
             Some(sap) => {
                 // We are then aware of the prefix, let's just verify the new SAP can
-                // be trusted based on the SAP we aware of and the proof chain provided.
+                // be trusted based on the SAP we are aware of and the proof chain provided.
                 if !proof_chain.has_key(&sap.section_key()) {
                     // This case may happen when both the sender and receiver is about to using
                     // a new SAP. The AE-Update was sent before sender switching to use new SAP,
@@ -229,8 +229,7 @@ impl SectionTree {
                     // there is no need to bounce back here (assuming the sender is outdated) to
                     // avoid potential looping.
                     return Err(Error::UntrustedProofChain(format!(
-                        "provided proof_chain doesn't cover the SAP's key we currently know: {:?}",
-                        sap.value
+                        "Provided proof_chain doesn't cover the SAP's key we currently know: {sap:?} not in {proof_chain:?}"
                     )));
                 }
             }
@@ -239,8 +238,7 @@ impl SectionTree {
                 // trusted based on our own section chain and the provided proof chain.
                 if !proof_chain.check_trust(self.sections_dag.keys()) {
                     return Err(Error::UntrustedProofChain(format!(
-                        "none of the keys were found on our section chain: {:?}",
-                        signed_sap.value
+                        "Proof chain incompatible with our dag: {proof_chain:?}"
                     )));
                 }
             }
@@ -250,17 +248,14 @@ impl SectionTree {
         // i.e. check each key is signed by its parent/predecessor key.
         if !proof_chain.self_verify() {
             return Err(Error::UntrustedProofChain(format!(
-                "invalid proof chain: {:?}",
-                proof_chain
+                "invalid proof chain: {proof_chain:?}"
             )));
         }
 
         // Check the SAP's key is the last key of the proof chain
         if *proof_chain.last_key() != signed_sap.section_key() {
             return Err(Error::UntrustedSectionAuthProvider(format!(
-                "section key ({:?}, from prefix {:?}) isn't in the last key in the proof chain provided. (Which ends with ({:?}))",
-                signed_sap.section_key(),
-                signed_sap.prefix(),
+                "section key {signed_sap:?} isn't in the last key in the proof chain provided. (Which ends with ({:?}))",
                 proof_chain.last_key()
             )));
         }
@@ -276,10 +271,7 @@ impl SectionTree {
         self.sections_dag.join(proof_chain.clone())?;
 
         for (prefix, section_key) in self.sections.iter() {
-            debug!(
-                "Known prefix,section_key after update: {:?} = {:?}",
-                prefix, section_key
-            );
+            debug!("Known prefix, section_key after update: {prefix:?} = {section_key:?}");
         }
         debug!("updated sections_dag: {:?}", self.sections_dag);
 

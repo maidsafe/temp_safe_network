@@ -68,7 +68,7 @@ impl Node {
         recipients: Peers,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Cmd {
-        trace!("{}: {:?}", LogMarker::SendToNodes, msg);
+        trace!("{}: {}", LogMarker::SendToNodes, msg);
         Cmd::send_traced_msg(
             OutgoingMsg::System(msg),
             recipients,
@@ -122,10 +122,7 @@ impl Node {
         #[cfg(feature = "traceroute")]
         {
             if !traceroute.0.is_empty() {
-                info!(
-                    "Handling SystemMsg {}:{:?} with trace \n{:?}",
-                    msg, msg_id, traceroute
-                );
+                info!("Handling SystemMsg {msg}:{msg_id:?} with trace {traceroute}");
             }
         }
 

@@ -201,9 +201,8 @@ impl Node {
             .collect::<BTreeSet<_>>();
 
         trace!(
-            "Chunk holders of {:?} are non-full adults: {:?} and full adults: {:?}",
-            target,
-            candidates,
+            "Chunk holders of {target:?} are non-full adults: {:?} and full adults: {:?}",
+            Vec::from_iter(candidates.iter().map(Peer::name)),
             full_adults
         );
 

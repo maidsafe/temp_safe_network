@@ -22,7 +22,7 @@ use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeSet,
-    fmt::{self, Display, Formatter},
+    fmt::{self, Debug, Formatter},
     net::SocketAddr,
 };
 
@@ -59,7 +59,7 @@ impl<T: Serialize> SectionAuthUtils<T> for SectionAuth<T> {
 ///
 /// A new `SectionAuthorityProvider` is created whenever the elders change, due to an elder being
 /// added or removed, or the section splitting or merging.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SectionAuthorityProvider {
     prefix: Prefix,
     public_key_set: PublicKeySet,
@@ -79,20 +79,17 @@ pub enum SapCandidate {
     ),
 }
 
-impl Display for SectionAuthorityProvider {
+impl Debug for SectionAuthorityProvider {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let elders_info: Vec<_> = self
-            .elders
-            .iter()
-            .map(|peer| (peer.addr(), peer.name()))
-            .collect();
+        let elder_names = Vec::from_iter(self.elders.iter().map(Peer::name));
         write!(
             f,
-            "Sap {:?}  elder len:{} gen:{} contains: {{{:?}}})",
+            "Sap({:?}@{:?},  gen: {}, elders: {:?}, members: {})",
             self.prefix,
-            self.elders.len(),
+            self.public_key_set.public_key(),
             self.membership_gen,
-            elders_info,
+            elder_names,
+            self.members.len()
         )
     }
 }

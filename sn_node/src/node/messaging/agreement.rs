@@ -142,7 +142,7 @@ impl Node {
         let prefix = signed_section_auth.prefix();
         trace!("{}: for {:?}", LogMarker::NewSignedSap, prefix);
 
-        info!("New SAP agreed for:{}", *signed_section_auth);
+        info!("New SAP agreement: {:?}", signed_section_auth);
 
         let our_name = self.info().name();
 
