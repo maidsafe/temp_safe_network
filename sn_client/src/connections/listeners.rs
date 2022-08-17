@@ -145,8 +145,14 @@ impl Session {
         sender: Peer,
     ) -> Result<(), Error> {
         // Check that the message can be trusted w.r.t. our known keys
-        let known_keys: Vec<BlsPublicKey> =
-            self.network.get_sections_dag().keys().cloned().collect();
+        let known_keys: Vec<BlsPublicKey> = self
+            .network
+            .read()
+            .await
+            .get_sections_dag()
+            .keys()
+            .cloned()
+            .collect();
 
         if !NetworkKnowledge::verify_node_msg_can_be_trusted(msg_authority, &msg, &known_keys) {
             warn!("Untrusted message has been dropped, from {sender:?}: {msg:?} ");
@@ -355,7 +361,7 @@ impl Session {
         sender: Peer,
     ) {
         // Update our network PrefixMap based upon passed in knowledge
-        let result = self.network.update(
+        let result = self.network.write().await.update(
             SectionAuth {
                 value: sap.clone(),
                 sig: section_signed,

@@ -110,7 +110,10 @@ impl Client {
             let sap = self
                 .session
                 .network
+                .read()
+                .await
                 .closest(&random_dst_addr, None)
+                .cloned()
                 .ok_or(Error::NoNetworkKnowledge)?;
             (sap.elders_vec(), sap.section_key())
         };
@@ -184,8 +187,13 @@ impl Client {
 
     /// Check if the provided public key is a known section key
     /// based on our current knowledge of the network and sections chains.
-    pub fn is_known_section_key(&self, section_key: &sn_dbc::PublicKey) -> bool {
-        self.session.network.get_sections_dag().has_key(section_key)
+    pub async fn is_known_section_key(&self, section_key: &sn_dbc::PublicKey) -> bool {
+        self.session
+            .network
+            .read()
+            .await
+            .get_sections_dag()
+            .has_key(section_key)
     }
 
     /// SectionTree used to bootstrap the client on the network.
@@ -193,8 +201,8 @@ impl Client {
     /// This is updated by the client as it receives Anti-Entropy/update messages from the network.
     /// Any user of this API is responsible for caching it so it can use it for any new `Client`
     /// instance not needing to obtain all this information from the network all over again.
-    pub fn section_tree(&self) -> &SectionTree {
-        &self.session.network
+    pub async fn section_tree(&self) -> SectionTree {
+        self.session.network.read().await.clone()
     }
 
     /// Create a builder to instantiate a [`Client`]
