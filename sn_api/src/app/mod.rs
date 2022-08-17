@@ -117,8 +117,8 @@ impl Safe {
     /// This is updated by as Anti-Entropy/update messages are received from the network.
     /// Any user of this API is responsible for caching it so it can use it for any new `Safe`
     /// instance, preventing it from learning all this information from the network all over again.
-    pub async fn section_tree(&self) -> Result<&SectionTree> {
-        let section_tree = self.get_safe_client()?.section_tree();
+    pub async fn section_tree(&self) -> Result<SectionTree> {
+        let section_tree = self.get_safe_client()?.section_tree().await;
         Ok(section_tree)
     }
 
