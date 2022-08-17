@@ -41,7 +41,7 @@ const FILE_SIZE_LENGTH: usize = 1024 * 1024 * 10; // 10mb
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let _logger = tracing_subscriber::fmt::fmt()
+    tracing_subscriber::fmt::fmt()
         // NOTE: uncomment this line for pretty printed log output.
         .with_thread_names(true)
         .with_ansi(false)
