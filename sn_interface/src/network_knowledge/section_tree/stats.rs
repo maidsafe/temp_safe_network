@@ -8,22 +8,26 @@
 
 use crate::types::log_markers::LogMarker;
 
+use std::fmt::{self, Display};
+
 pub struct NetworkStats {
     pub(super) known_elders: u64,
     pub(super) total_elders: u64,
     pub(super) total_elders_exact: bool,
 }
 
-impl NetworkStats {
-    pub fn print(&self) {
+impl Display for NetworkStats {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.total_elders_exact {
-            info!(
+            write!(
+                f,
                 "*** Exact {}: {} ***",
                 LogMarker::TotalNetworkElders,
                 self.known_elders
             )
         } else {
-            info!(
+            write!(
+                f,
                 "*** Known network elders: {}, Estimated total network elders: {} ***",
                 self.known_elders, self.total_elders
             )

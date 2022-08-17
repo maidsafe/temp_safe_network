@@ -9,6 +9,7 @@
 use crate::operations::config::{Config, NetworkInfo};
 use clap::Subcommand;
 use color_eyre::Result;
+use comfy_table::{Cell, CellAlignment, Table};
 use std::path::PathBuf;
 use tracing::debug;
 use url::Url;
@@ -38,6 +39,12 @@ pub enum NetworksSubCommands {
         /// Network to remove
         network_name: String,
     },
+    #[clap(name = "sections")]
+    /// Display information about the sections of a network
+    Sections {
+        /// Network to show sections information from, or default network if no name is provided
+        network_name: Option<String>,
+    },
 }
 
 pub async fn networks_commander(
@@ -57,7 +64,7 @@ pub async fn networks_commander(
         }
         Some(NetworksSubCommands::Check {}) => {
             println!("Checking current Network Map...");
-            let network_contacts = config.read_default_network_contacts().await?;
+            let (network_contacts, _) = config.read_default_network_contacts().await?;
             let mut matched_network = None;
             for (network_name, network_info) in config.networks_iter() {
                 if network_info.matches(network_contacts.genesis_key()) {
@@ -105,6 +112,54 @@ pub async fn networks_commander(
         }
         Some(NetworksSubCommands::Remove { network_name }) => {
             config.remove_network(&network_name).await?
+        }
+        Some(NetworksSubCommands::Sections { network_name }) => {
+            let (network_contacts, location) = if let Some(name) = network_name {
+                println!("Network sections information for '{}':", name);
+                config.read_network_contacts(&name).await?
+            } else {
+                println!("Network sections information for default network:");
+                config.read_default_network_contacts().await?
+            };
+            println!("Read from: {}", location);
+            println!();
+
+            let genesis_key = network_contacts.genesis_key();
+            println!("Genesis Key: {:?}", genesis_key);
+            println!();
+
+            println!("Sections:");
+            println!();
+
+            let sections_dag = network_contacts.get_sections_dag();
+            for sap in network_contacts.all().iter() {
+                let section_key = sap.section_key();
+                println!("Prefix '{}'", sap.prefix());
+                println!("----------------------------------");
+                println!("Section key: {:?}", section_key);
+                println!(
+                    "Section keys chain: {:?}",
+                    sections_dag.get_proof_chain(genesis_key, &section_key)?
+                );
+                println!();
+
+                println!("Elders:");
+                let mut table = Table::new();
+                table.load_preset(comfy_table::presets::ASCII_MARKDOWN);
+                table.add_row(&vec!["XorName", "Age", "Address"]);
+
+                let mut sorted_elders = sap.elders().collect::<Vec<_>>();
+                sorted_elders.sort_by_key(|elder| elder.age());
+                for elder in sorted_elders.iter() {
+                    table.add_row(vec![
+                        elder.name().into(),
+                        Cell::new(elder.age().to_string()).set_alignment(CellAlignment::Right),
+                        elder.addr().into(),
+                    ]);
+                }
+                println!("{table}");
+                println!();
+            }
         }
         None => config.print_networks().await,
     }
