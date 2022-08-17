@@ -89,11 +89,14 @@ pub async fn run() -> Result<()> {
                     );
                 }
             }
-            Err(err) => warn!(
-                "Failed to cache updated network contacts for genesis key {:?}: {:?}",
-                config.read_default_network_contacts().await?.genesis_key(),
-                err
-            ),
+            Err(err) => {
+                let (network_contacts, _) = config.read_default_network_contacts().await?;
+                warn!(
+                    "Failed to cache updated network contacts for genesis key {:?}: {:?}",
+                    network_contacts.genesis_key(),
+                    err
+                );
+            }
         }
     }
 

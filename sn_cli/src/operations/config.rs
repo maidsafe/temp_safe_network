@@ -201,7 +201,7 @@ impl Config {
     pub async fn sync(&mut self) -> Result<()> {
         // if default hardlink is present, make sure its original file is also present; Else the
         // default hardlink might be overwritten while switching networks
-        if let Ok(default_network_contacts) = self.read_default_network_contacts().await {
+        if let Ok((default_network_contacts, _)) = self.read_default_network_contacts().await {
             self.write_network_contacts(&default_network_contacts)
                 .await?;
         };
@@ -338,7 +338,7 @@ impl Config {
         Ok(())
     }
 
-    pub async fn read_default_network_contacts(&self) -> Result<SectionTree> {
+    pub async fn read_default_network_contacts(&self) -> Result<(SectionTree, String)> {
         let default_path = self
             .network_contacts_dir
             .join(DEFAULT_NETWORK_CONTACTS_FILE_NAME);
@@ -349,7 +349,26 @@ impl Config {
                     "A Network Map will be created if you join a network or launch your own.",
                 )
             })?;
-        Ok(network_contacts)
+
+        Ok((network_contacts, default_path.display().to_string()))
+    }
+
+    pub async fn read_network_contacts(&mut self, name: &str) -> Result<(SectionTree, String)> {
+        match self.settings.networks.get(name).cloned() {
+            Some(NetworkInfo::Local(ref mut path, _)) => {
+                if !path.is_absolute() {
+                    *path = fs::canonicalize(&path).await?;
+                }
+                let network_contacts = Self::retrieve_local_network_contacts(path).await?;
+                Ok((network_contacts, path.display().to_string()))
+            }
+            Some(NetworkInfo::Remote(ref url, _)) => {
+                let url = Url::parse(url)?;
+                let network_contacts = Self::retrieve_remote_network_contacts(&url).await?;
+                Ok((network_contacts, url.to_string()))
+            }
+            None => Err(eyre!("No network with name '{}' was found in config", name)),
+        }
     }
 
     pub fn networks_iter(&self) -> impl Iterator<Item = (&String, &NetworkInfo)> {
@@ -476,7 +495,7 @@ impl Config {
 
         for (network_name, net_info) in self.networks_iter() {
             let mut current = "";
-            if let Ok(network_contacts) = &current_network_contacts {
+            if let Ok((network_contacts, _)) = &current_network_contacts {
                 if net_info.matches(network_contacts.genesis_key()) {
                     current = "*";
                 }
@@ -914,7 +933,7 @@ mod read_network_contacts {
             .pop()
             .unwrap();
 
-        let retrieved_network_contacts = config.read_default_network_contacts().await?;
+        let (retrieved_network_contacts, _) = config.read_default_network_contacts().await?;
         assert_eq!(retrieved_network_contacts, network_contacts);
 
         Ok(())
@@ -1353,7 +1372,7 @@ mod networks {
         config.add_network("network_2", network_2).await?;
 
         config.switch_to_network("network_1").await?;
-        let default = config.read_default_network_contacts().await?;
+        let (default, _) = config.read_default_network_contacts().await?;
         let net_info = config
             .settings
             .networks
@@ -1366,7 +1385,7 @@ mod networks {
         ));
 
         config.switch_to_network("network_2").await?;
-        let default = config.read_default_network_contacts().await?;
+        let (default, _) = config.read_default_network_contacts().await?;
         let net_info = config
             .settings
             .networks
@@ -1387,9 +1406,10 @@ mod networks {
         let config = Config::create_config(&tmp_dir, None).await?;
 
         let switch_result = config.switch_to_network("network_1").await;
-        let default = config.read_default_network_contacts().await;
         assert!(switch_result.is_err());
+        let default = config.read_default_network_contacts().await;
         assert!(default.is_err());
+
         Ok(())
     }
 }

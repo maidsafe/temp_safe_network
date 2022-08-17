@@ -217,7 +217,7 @@ impl Node {
         }
 
         self.log_section_stats();
-        self.print_network_stats();
+        self.log_network_stats();
 
         Ok(cmds)
     }

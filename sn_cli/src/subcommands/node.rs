@@ -213,7 +213,7 @@ pub async fn node_commander(
             )?;
 
             // add the network using default network contacts file
-            let network_contacts = config.read_default_network_contacts().await?;
+            let (network_contacts, _) = config.read_default_network_contacts().await?;
             config.write_network_contacts(&network_contacts).await?;
 
             let actual_path = config
@@ -617,7 +617,7 @@ mod join_command {
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
 
         assert!(result.is_ok());
-        let default_network_contacts = config.read_default_network_contacts().await?;
+        let (default_network_contacts, _) = config.read_default_network_contacts().await?;
         assert_eq!(network_contacts, default_network_contacts);
         Ok(())
     }
