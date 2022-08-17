@@ -92,6 +92,11 @@ impl DkgVoter {
             .or_insert(new_key)
             .secret_key
             .public_key();
+        debug!(
+            "Signing Dkg ephemeral key s{} from {:?}",
+            session_id_hash.iter().sum::<u8>(),
+            our_name
+        );
         Ok((pub_key, sig))
     }
 
@@ -137,8 +142,16 @@ impl DkgVoter {
         // check and save key
         let just_completed = self.save_key(session_id, sender, ephemeral_pub_key, sig)?;
         if !just_completed {
+            debug!(
+                "Waiting for more Dkg keys s{} id:{participant_index}...",
+                session_id.sum()
+            );
             return Ok(None);
         }
+        debug!(
+            "Got all Dkg keys s{} id:{participant_index}",
+            session_id.sum()
+        );
 
         let (first_vote, pub_keys) = self.initialize_dkg_state(session_id, participant_index)?;
 
@@ -161,6 +174,11 @@ impl DkgVoter {
 
         // check sig
         let sender_pubkey = pub_key(&key_owner).map_err(|_| Error::InvalidXorname(key_owner))?;
+        debug!(
+            "Checking dkg ephemeral key s{} from {:?}",
+            session_id.sum(),
+            key_owner
+        );
         let serialized = bincode::serialize(&key)?;
         if sender_pubkey.verify(&serialized, &sig).is_err() {
             return Err(Error::InvalidSignature);
@@ -185,10 +203,18 @@ impl DkgVoter {
             }
         }
 
-        let did_insert = our_keys.pub_keys.insert(key_owner, (key, sig)).is_some();
-        let we_are_full = our_keys.pub_keys.keys().collect::<BTreeSet<_>>()
-            == session_id.elders.keys().collect::<BTreeSet<_>>();
-        Ok(did_insert && we_are_full)
+        let _did_insert = our_keys.pub_keys.insert(key_owner, (key, sig)).is_some();
+        let what_we_have = our_keys.pub_keys.keys().collect::<BTreeSet<_>>();
+        let what_we_need = session_id.elders.keys().collect::<BTreeSet<_>>();
+
+        debug!(
+            "Dkg keys s{}: ours: {:?}, in session_id: {:?}",
+            session_id.sum(),
+            what_we_have,
+            what_we_need,
+        );
+
+        Ok(what_we_have == what_we_need)
     }
 
     /// Checks the given keys and returns them

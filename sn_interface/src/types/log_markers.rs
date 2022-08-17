@@ -73,6 +73,7 @@ pub enum LogMarker {
     PromotedToElder,
     DemotedFromElder,
     DkgBroadcastEphemeralPubKey,
+    DkgBroadcastFirstVote,
     DkgHandleEphemeralPubKey,
     DkgBroadcastVote,
     DkgVotesHandling,
