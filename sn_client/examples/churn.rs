@@ -33,14 +33,24 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node";
 const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 
 const NODES_DIR: &str = "local-test-network";
-const INTERVAL: &str = "3000";
+const INTERVAL: &str = "100";
 const RUST_LOG: &str = "RUST_LOG";
-const ADDITIONAL_NODES_TO_SPLIT: u64 = 12;
+const ADDITIONAL_NODES: u64 = 12;
 const FILES_TO_PUT: i32 = 40;
 const FILE_SIZE_LENGTH: usize = 1024 * 1024 * 10; // 10mb
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let _logger = tracing_subscriber::fmt::fmt()
+        // NOTE: uncomment this line for pretty printed log output.
+        .with_thread_names(true)
+        .with_ansi(false)
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_target(false)
+        // .event_format(LogFormatter::default())
+        .try_init()
+        .unwrap_or_else(|_| println!("Error initializing logger"));
+
     // First lets build the network and testnet launcher, to ensure we're on the latest version
     let args: Vec<&str> = vec!["build", "--release"];
 
@@ -152,7 +162,7 @@ pub async fn run_split() -> Result<()> {
     // Now we add more nodes
     // ======================
 
-    let additional_node_count_str = &ADDITIONAL_NODES_TO_SPLIT.to_string();
+    let additional_node_count_str = &ADDITIONAL_NODES.to_string();
 
     sn_launch_tool_args.push("--add");
     sn_launch_tool_args.push("-n");
@@ -178,6 +188,10 @@ pub async fn run_split() -> Result<()> {
         let mut attempts = 0;
         while bytes.is_err() && attempts < 10 {
             attempts += 1;
+            println!(
+                "another attempt {attempts} ...reading bytes at address {:?} ...",
+                address
+            );
             // do some retries to ensure we're not just timing out by chance
             sleep(Duration::from_millis(100)).await;
             bytes = client.read_bytes(address).await;
