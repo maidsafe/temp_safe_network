@@ -1,21 +1,14 @@
-name: PR Checks
+name: Bors Merge Flow. All Tests
 
 on:
-  pull_request:
-    branches: ["*"]
   push:
     branches: [staging, trying]
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
 env:
-  CARGO_INCREMENTAL: 0  # bookkeeping for incremental builds has overhead, not useful in CI.
-  RUSTFLAGS: "-D warnings"
-  SAFE_AUTH_PASSPHRASE: "x"
-  SAFE_AUTH_PASSWORD: "y"
-  NODE_COUNT: 15
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: 'eu-west-2'
+  INSTALL_SCRIPT_URL: https://raw.githubusercontent.com/maidsafe/safe_network/main/resources/scripts/install.sh
+  POWERSHELL_INSTALL_SCRIPT_URL: https://raw.githubusercontent.com/maidsafe/safe_network/main/resources/scripts/install.ps1
 
 jobs:
   # bors Continuous Integration
@@ -27,6 +20,10 @@ jobs:
     needs:
       - cargo-udeps
       - cargo-deny
+      - launch-testnet
+      - client
+      - api
+      - cli
       - e2e
       - e2e-split
       - unit
@@ -37,91 +34,6 @@ jobs:
     steps:
       - name: CI succeeded
         run: exit 0
-
-  cargo-udeps:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Unused dependency check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      - uses: actions-rs/toolchain@v1
-        with:
-          #Needs nightly to distinguish between deps of different versions
-          toolchain: nightly
-          override: true
-
-      - name: Run cargo-udeps
-        uses: aig787/cargo-udeps-action@v1
-        with:
-          version: 'latest'
-          args: '--all-targets'
-
-  cargo-deny:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-
-    - shell: bash
-      run: wget https://raw.githubusercontent.com/maidsafe/QA/master/misc-scripts/deny.toml
-
-    - uses: EmbarkStudios/cargo-deny-action@v1
-
-  lint:
-      runs-on: ubuntu-latest
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      steps:
-        - uses: actions/checkout@v2
-          with:
-            fetch-depth: 0
-        - uses: wagoid/commitlint-github-action@f114310111fdbd07e99f47f9ca13d62b3ec98372
-
-  checks:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Run rustfmt and clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      - uses: dorny/paths-filter@v2
-        id: sn_changes
-        with:
-          filters: |
-            src:
-              - 'sn_api/src/**'
-              - 'sn_cli/src/**'
-              - 'sn_client/src/**'
-              - 'sn_interface/src/**'
-              - 'sn_node/src/**'
-
-      - uses: actions-rs/toolchain@v1
-        if: steps.sn_changes.outputs.src == 'true'
-        id: toolchain
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          components: rustfmt, clippy
-
-      - uses: Swatinem/rust-cache@v1
-        with:
-          cache-on-failure: true
-
-      - name: Check formatting
-        if: steps.sn_changes.outputs.src == 'true'
-        run: cargo fmt --all -- --check
-
-      - shell: bash
-        if: steps.sn_changes.outputs.src == 'true'
-        run: cargo clippy --all-targets --all-features
-
-      - name: Check documentation
-        if: steps.sn_changes.outputs.src == 'true'
-        # Deny certain `rustdoc` lints that are unwanted.
-        # See https://doc.rust-lang.org/rustdoc/lints.html for lints that are 'warning' by default.
-        run: RUSTDOCFLAGS="--deny=warnings" cargo doc --no-deps
 
   unit:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -204,6 +116,35 @@ jobs:
           bin: safe
           release: true
 
+
+  build-node-ubuntu:
+    name: build node on ubunu
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        id: toolchain
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - shell: bash
+        name: build node
+        run: |
+          sudo apt update -y
+          sudo apt install -y musl-tools
+          rustup target add x86_64-unknown-linux-musl
+          cargo build --release --target x86_64-unknown-linux-musl --bin sn_node
+      - uses: actions/upload-artifact@main
+        with:
+          name: sn_node-x86_64-unknown-linux-musl
+          path: |
+            target/x86_64-unknown-linux-musl/release
+
   e2e:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: E2E tests
@@ -211,7 +152,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v2
 
@@ -336,6 +277,7 @@ jobs:
           path: log_files.tar.gz
         if: failure()
         continue-on-error: true
+
 
   e2e-split:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -499,17 +441,109 @@ jobs:
           sleep 10
           rm -rf ~/.safe
 
-  api:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Run API tests
+  launch-testnet:
+    name: launch testnet
+    needs: build-node-ubuntu
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@master
+        with:
+          name: sn_node-x86_64-unknown-linux-musl
+          path: sn_node
+      - shell: bash
+        name: copy node to temp location
+        run: cp sn_node/sn_node /tmp
+      - name: Set TESTNET_ID env
+        shell: bash
+        run: |
+          short_commit_hash=$(echo "${{ github.event.pull_request.head.sha || github.sha }}" | cut -c 1-7)
+          echo "TESTNET_ID=gha-testnet-$short_commit_hash" >> $GITHUB_ENV
+      - name: launch testnet
+        uses: maidsafe/sn_testnet_action@main
+        with:
+          do-token: ${{ secrets.DO_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-access-key-secret: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          ssh-secret-key: ${{ secrets.SSH_SECRET_KEY  }}
+          node-count: ${{ github.event.inputs.node-count || 30 }}
+          node-path: /tmp/sn_node
+          testnet-id: ${{ env.TESTNET_ID }}
+      # The other jobs in the workflow have the testnet launch as a dependency, but they go ahead
+      # even if this job fails. It would be better if the whole workflow is abandoned if we don't
+      # have a testnet to run the tests against.
+      - name: cancel workflow if testnet launch fails
+        uses: vishnudxb/cancel-workflow@v1.2
+        if: failure()
+        with:
+          repo: octocat/hello-world
+          workflow_id: ${{ github.run_id }}
+          access_token: ${{ github.token }}
+
+  client:
+    name: client tests
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
+      fail-fast: true
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    needs: launch-testnet
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set TESTNET_ID env
+        shell: bash
+        run: echo "TESTNET_ID=gha-testnet-$(echo ${{ github.event.pull_request.head.sha || github.sha }} | cut -c 1-7)" >> $GITHUB_ENV
+
+      - uses: actions-rs/toolchain@v1
+        id: toolchain
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - uses: Swatinem/rust-cache@v1
+        with:
+          cache-on-failure: true
+
+      - name: Download network config
+        shell: bash
+        run: |
+          mkdir -p ~/.safe/network_contacts
+          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-network-contacts > ~/.safe/network_contacts/default
+
+      - name: Build all client tests before running
+        run: cd sn_client && cargo test --no-run --release
+        timeout-minutes: 25
+
+      - name: Run client tests
+        uses: jacderida/cargo-nextest@main
+        with:
+          test-run-name: nightly-e2e-client-${{ matrix.os }}
+          profile: ci
+          junit-path: junit.xml
+          package: sn_client
+          release: true
+          filters: client
+          test-threads: 2
+        timeout-minutes: 25
+
+      - name: Run example app for file API
+        shell: bash
+        run: cargo run --release --example client_files
+
+  api:
+    name: api tests
+    if: ${{ always() }} # give the suite a chance to run, even if the client tests fail.
+    runs-on: ${{ matrix.os }}
+    needs: launch-testnet
+    strategy:
+      fail-fast: true
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v2
-
       - name: Install Rust
         id: toolchain
         uses: actions-rs/toolchain@v1
@@ -517,6 +551,15 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+      - name: Set TESTNET_ID env
+        shell: bash
+        run: echo "TESTNET_ID=gha-testnet-$(echo ${{ github.event.pull_request.head.sha || github.sha }} | cut -c 1-7)" >> $GITHUB_ENV
+      - name: Download network contacts file
+        shell: bash
+        run: |
+          mkdir -p ~/.safe/network_contacts
+          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-network-contacts \
+            > ~/.safe/network_contacts/default
 
       - uses: Swatinem/rust-cache@v1
         continue-on-error: true
@@ -524,104 +567,41 @@ jobs:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
 
-      - name: install ripgrep
-        run: cargo install ripgrep
+      - name: Build all sn_api tests
+        run: cd sn_api && cargo test --no-run --release --lib
+        timeout-minutes: 25
 
-      - name: Build sn bins
-        run: cd sn_node && cargo build --release --bins
-        timeout-minutes: 60
-
-      - name: Build testnet
-        run: cargo build  --release --bin testnet
-        timeout-minutes: 60
-
-      - name: Build log_cmds_inspector
-        run: cargo build  --release --bin log_cmds_inspector
-        timeout-minutes: 60
-
-      - name: Start the network
-        run: ./target/release/testnet
-        id: section-startup
-        env:
-          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace"
-
-      - name: Print Network Log Stats at start
+      - name: Download genesis DBC
         shell: bash
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: matrix.os != 'windows-latest'
-
-      - name: Wait for all nodes to join
-        shell: bash
-        run: ./resources/scripts/wait_for_nodes_to_join.sh
-        timeout-minutes: 15
-
-      - name: Print Network Log Stats after nodes joined
-        shell: bash
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: matrix.os != 'windows-latest'
-
-      - name: Build all tests before running
-        run: cd sn_api && cargo test --no-run --release -p sn_api
-        timeout-minutes: 50
+        run: |
+          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-genesis-dbc \
+            > /tmp/genesis_dbc
 
       - name: Run API tests
-        uses: maidsafe/cargo-nextest@main
+        uses: jacderida/cargo-nextest@main
         with:
-          test-run-name: api-${{ matrix.os }}
+          test-run-name: nightly-api-${{ matrix.os }}
           profile: ci
           junit-path: junit.xml
           package: sn_api
           release: true
-        timeout-minutes: 80
-        # NRS is slow without this change
-
-      - name: Are nodes still running...?
-        shell: bash
-        timeout-minutes: 1
-        if: failure() && matrix.os
-        run: |
-          echo "$(pgrep sn_node | wc -l) nodes still running"
-          ls $HOME/.safe/node/local-test-network
-
-      - name: Ensure no nodes have left during test runs
-        timeout-minutes: 1
-        shell: bash
-        if: matrix.os != 'windows-latest'
-        # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
-        run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
-
-
-      - name: Print Network Log Stats
-        shell: bash
-        continue-on-error: true
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success'
-
-      - name: Tar log files
-        shell: bash
-        continue-on-error: true
-        run: find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
-        if: failure()
-
-      - name: Upload Node Logs
-        uses: actions/upload-artifact@main
-        with:
-          name: sn_node_logs_api_${{matrix.os}}
-          path: log_files.tar.gz
-        if: failure()
-        continue-on-error: true
+          test-threads: 10
+        timeout-minutes: 60
+        env:
+          SN_QUERY_TIMEOUT: 10
+          TEST_ENV_GENESIS_DBC_PATH: /tmp/genesis_dbc
 
   cli:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Run CLI tests
+    name: cli tests
+    if: ${{ always() }} # give the suite a chance to run, even if the api tests fail.
     runs-on: ${{ matrix.os }}
+    needs: launch-testnet
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v2
-
       - name: Install Rust
         id: toolchain
         uses: actions-rs/toolchain@v1
@@ -629,106 +609,156 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-
       - uses: Swatinem/rust-cache@v1
         continue-on-error: true
         with:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
-
-      - name: install ripgrep
-        run: cargo install ripgrep
-
-      - name: Build sn bins
-        run: cd sn_node && cargo build --release --bins
-        timeout-minutes: 60
-
-      - name: Build testnet
-        run: cargo build  --release --bin testnet
-        timeout-minutes: 60
-
-      - name: Build log_cmds_inspector
-        run: cargo build  --release --bin log_cmds_inspector
-        timeout-minutes: 60
-
-      - name: Start the network
-        run: ./target/release/testnet
-        id: section-startup
-        env:
-          RUST_LOG: "sn_node,sn_api,sn_consensus,sn_dysfunction=trace"
-
-      - name: Print Network Log Stats at start
+      - name: Set TESTNET_ID env
         shell: bash
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: matrix.os != 'windows-latest'
-
-      - name: Wait for all nodes to join
+        run: echo "TESTNET_ID=gha-testnet-$(echo ${{ github.event.pull_request.head.sha || github.sha }} | cut -c 1-7)" >> $GITHUB_ENV
+      - name: Download network config
         shell: bash
-        run: ./resources/scripts/wait_for_nodes_to_join.sh
-        timeout-minutes: 15
+        run: |
+          mkdir -p ~/.safe/network_contacts
+          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-network-contacts > ~/.safe/network_contacts/default
+      - name: Download genesis DBC
+        shell: bash
+        run: |
+          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-genesis-dbc \
+            > /tmp/genesis_dbc
+
+      - name: Build all CLI tests
+        run: cd sn_cli && cargo test --no-run --release
+        timeout-minutes: 25
 
       - name: Generate keys for test run
         run: cargo run --package sn_cli --release -- keys create --for-cli
-
-      - name: Build all tests before running
-        run: cd sn_cli && cargo test --no-run --release -p sn_cli
-        timeout-minutes: 50
-
       - name: Run CLI tests
-        uses: maidsafe/cargo-nextest@main
+        uses: jacderida/cargo-nextest@main
         with:
-          test-run-name: cli-${{ matrix.os }}
+          test-run-name: nightly-cli-${{ matrix.os }}
           profile: ci
           junit-path: junit.xml
           package: sn_cli
           release: true
-        timeout-minutes: 50
+          test-threads: 10
+        timeout-minutes: 60
+        env:
+          SN_QUERY_TIMEOUT: 10
+          TEST_ENV_GENESIS_DBC_PATH: /tmp/genesis_dbc
 
-      - name: Are nodes still running...?
-        shell: bash
-        timeout-minutes: 1
-        if: failure() && matrix.os
-        run: |
-          echo "$(pgrep sn_node | wc -l) nodes still running"
-          ls $HOME/.safe/node/local-test-network
-
-      - name: Ensure no nodes have left during test runs
-        timeout-minutes: 1
-        shell: bash
-        if: matrix.os != 'windows-latest'
-        # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
-        run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
-
-      - name: Print Network Log Stats
-        shell: bash
-        continue-on-error: true
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success'
-
-      - name: Tar log files
-        shell: bash
-        continue-on-error: true
-        run: find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
-        if: failure()
-
-      - name: Upload Node Logs
-        uses: actions/upload-artifact@main
-        with:
-          name: sn_node_logs_cli_${{matrix.os}}
-          path: log_files.tar.gz
-        if: failure()
-        continue-on-error: true
-
-  # This is required for publishing test results that come from forks. The actual publishing of the
-  # results occurs in another workflow that will be triggered when this one finishes. Uploading this
-  # 'event file' is necessary for the triggering to occur.
-  upload_event_file:
-    if: always()
-    name: Upload event file
-    needs: [unit, e2e, e2e-split, api, cli]
+  kill-testnet:
+    name: kill testnet
     runs-on: ubuntu-latest
+    needs: [launch-testnet, client, api, cli]
+    steps:
+      - name: Set TESTNET_ID env
+        shell: bash
+        run: |
+          short_commit_hash=$(echo "${{ github.event.pull_request.head.sha || github.sha }}" | cut -c 1-7)
+          echo "TESTNET_ID=gha-testnet-$short_commit_hash" >> $GITHUB_ENV
+      - name: kill testnet
+        uses: maidsafe/sn_testnet_action@main
+        with:
+          do-token: ${{ secrets.DO_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-access-key-secret: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          action: 'destroy'
+          testnet-id: ${{ env.TESTNET_ID }}
+
+  bump_version:
+    runs-on: ubuntu-22.04
+    needs: kill-testnet
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: '0'
+          token: ${{ secrets.VERSION_BUMP_COMMIT_PAT }}
+      - uses: actions-rs/toolchain@v1
+        id: toolchain
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - shell: bash
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+      - shell: bash
+        run: cargo install cargo-smart-release
+      - shell: bash
+        run: ./resources/scripts/bump_version.sh
+      - name: push version bump commit and tags
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.VERSION_BUMP_COMMIT_PAT }}
+          branch: main
+          tags: true
+      - name: Upload event file
+        uses: actions/upload-artifact@main
+        with:
+          name: event-file
+          path: ${{ github.event_path }}
+
+  kill-if-fail:
+    name: kill testnet on fail
+    runs-on: ubuntu-latest
+    if: |
+      always() &&
+      (needs.launch-testnet.result=='failure' ||
+       needs.client.result=='failure' ||
+       needs.api.result=='failure' ||
+       needs.cli.result=='failure')
+    needs: [launch-testnet, client, api, cli]
+    env:
+      SSH_SECRET_KEY: ${{ secrets.SSH_SECRET_KEY  }}
+    steps:
+      - name: Set TESTNET_ID env
+        shell: bash
+        run: |
+          short_commit_hash=$(echo "${{ github.event.pull_request.head.sha || github.sha }}" | cut -c 1-7)
+          echo "TESTNET_ID=gha-testnet-$short_commit_hash" >> $GITHUB_ENV
+      - name: package and upload logs
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_SECRET_KEY" > ~/.ssh/id_rsa
+          chmod 0600 ~/.ssh/id_rsa
+          cd /tmp
+          aws s3 cp \
+            "s3://safe-testnet-tool/$TESTNET_ID-ip-list" \
+            "$TESTNET_ID-ip-list"
+          aws s3 cp \
+            "s3://safe-testnet-tool/$TESTNET_ID-genesis-dbc" \
+            "$TESTNET_ID-genesis-dbc"
+          aws s3 cp \
+            "s3://safe-testnet-tool/$TESTNET_ID-genesis-key" \
+            "$TESTNET_ID-genesis-key"
+          aws s3 cp \
+            "s3://safe-testnet-tool/$TESTNET_ID-network-contacts" \
+            "$TESTNET_ID-network-contacts"
+
+          wget https://raw.githubusercontent.com/maidsafe/sn_testnet_tool/main/scripts/logs-sync.sh
+          chmod +x logs-sync.sh
+          ./logs-sync.sh "$TESTNET_ID"
+          mv $TESTNET_ID-genesis-dbc logs
+          mv $TESTNET_ID-genesis-key logs
+          mv $TESTNET_ID-network-contacts logs
+          tar -C logs -zcvf $TESTNET_ID-run.tar.gz .
+          aws s3 cp \
+            "$TESTNET_ID-run.tar.gz" \
+            "s3://safe-testnet-tool/$TESTNET_ID-run.tar.gz" \
+            --acl public-read
+
+      - name: Kill testnet
+        uses: maidsafe/sn_testnet_action@main
+        with:
+          do-token: ${{ secrets.DO_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-access-key-secret: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          action: 'destroy'
+          testnet-id: ${{ env.TESTNET_ID }}
       - name: Upload event file
         uses: actions/upload-artifact@main
         with:
