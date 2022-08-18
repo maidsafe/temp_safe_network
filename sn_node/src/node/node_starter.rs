@@ -145,7 +145,7 @@ async fn bootstrap_node(
     root_storage_dir: &Path,
     join_timeout: Duration,
 ) -> Result<(Arc<RwLock<Node>>, CmdChannel, EventReceiver)> {
-    let (connection_event_tx, mut connection_event_rx) = mpsc::channel(1);
+    let (connection_event_tx, mut connection_event_rx) = mpsc::channel(100);
 
     let local_addr = config
         .local_addr
@@ -281,14 +281,14 @@ async fn bootstrap_node(
 
     let node = Arc::new(RwLock::new(node));
     let cmd_ctrl = CmdCtrl::new(Dispatcher::new(node.clone(), comm), monitoring);
-    let (msg_and_period_ctrl, cmd_channel) =
-        FlowCtrl::new(cmd_ctrl, connection_event_rx, event_sender);
+    let (flow_ctrl, cmd_channel) = FlowCtrl::new(cmd_ctrl, connection_event_rx, event_sender);
 
-    let _ = tokio::task::spawn_local(async move {
-        msg_and_period_ctrl
-            .process_messages_and_periodic_checks()
-            .await
-    });
+    tokio::task::spawn_local(async move {
+        flow_ctrl.process_messages_and_periodic_checks().await?;
+
+        Ok::<(), Error>(())
+    })
+    .await??;
 
     Ok((node, cmd_channel, event_receiver))
 }

@@ -18,7 +18,6 @@ use crate::node::{
 
 use custom_debug::Debug;
 use priority_queue::PriorityQueue;
-use std::ops::Add;
 use std::time::SystemTime;
 use std::{
     sync::{
@@ -31,7 +30,7 @@ use tokio::{sync::RwLock, time::Instant};
 
 type Priority = i32;
 
-const SLEEP_TIME: Duration = Duration::from_millis(100);
+const EMPTY_QUEUE_SLEEP_TIME: Duration = Duration::from_millis(100);
 
 /// A module for enhanced flow control.
 ///
@@ -72,6 +71,15 @@ impl CmdCtrl {
         self.push_internal(cmd, None).await
     }
 
+    /// Does the cmd_queue contain _anything_
+    pub(crate) fn queue_len(&self) -> usize {
+        self.cmd_queue.len()
+    }
+    /// Does the cmd_queue contain _anything_
+    pub(crate) fn has_items_queued(&self) -> bool {
+        !self.cmd_queue.is_empty()
+    }
+
     // consume self
     // NB that clones could still exist, however they would be in the disconnected state
     #[allow(unused)]
@@ -86,7 +94,9 @@ impl CmdCtrl {
             return Err(Error::InvalidState);
         }
 
-        let job = CmdJob::new(self.id_counter.add(1), parent_id, cmd, SystemTime::now());
+        self.id_counter += 1;
+
+        let job = CmdJob::new(self.id_counter, parent_id, cmd, SystemTime::now());
 
         let prio = job.priority();
         let _ = self.cmd_queue.push(job, prio);
@@ -100,11 +110,12 @@ impl CmdCtrl {
 
     /// Get the next Cmd going off of priority
     pub(crate) fn next_cmd(&mut self) -> Option<CmdJob> {
+        debug!("gonna pop cmd");
         self.cmd_queue.pop().map(|(job, _prio)| job)
     }
 
     /// Wait if required by the cmd rate monitoring
-    pub(crate) async fn wait_if_not_processing_at_expected_rate(&mut self) {
+    pub(crate) async fn wait_if_not_processing_at_expected_rate(&self) {
         let expected_rate = self.monitoring.max_cmds_per_s().await;
         let actual_rate = self.attempted.value();
         if actual_rate > expected_rate {
@@ -138,6 +149,8 @@ impl CmdCtrl {
 
         let id = job.id();
         let cmd = job.clone().into_cmd();
+
+        debug!("starting processng {cmd:?}");
         let cmd_string = cmd.clone().to_string();
         let priority = job.priority();
 
