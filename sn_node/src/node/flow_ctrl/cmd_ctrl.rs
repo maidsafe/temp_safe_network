@@ -112,8 +112,11 @@ impl CmdCtrl {
             debug!("Cmd throughput is too high, waiting to reduce throughput");
             log_sleep!(Duration::from_millis((diff * 10_f64) as u64));
         } else if self.cmd_queue.is_empty() {
-            trace!("Empty queue, waiting {SLEEP_TIME:?} to not loop heavily");
-            log_sleep!(SLEEP_TIME);
+            trace!("Empty queue, waiting {EMPTY_QUEUE_SLEEP_TIME:?} to not loop heavily");
+            log_sleep!(EMPTY_QUEUE_SLEEP_TIME);
+        } else {
+            // stop overactive CPUs
+            log_sleep!(EMPTY_QUEUE_SLEEP_TIME / 10);
         }
     }
 
