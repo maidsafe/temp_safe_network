@@ -66,8 +66,7 @@ pub(crate) fn pack(
             break (name, chunks);
         } else {
             let serialized_chunk = Bytes::from(serialize(&chunk)?);
-            let (data_map, next_encrypted_chunks) =
-                self_encryption::encrypt(serialized_chunk).map_err(Error::SelfEncryption)?;
+            let (data_map, next_encrypted_chunks) = self_encryption::encrypt(serialized_chunk)?;
             chunks = next_encrypted_chunks
                 .par_iter()
                 .map(|c| to_chunk(c.content.clone())) // no need to encrypt what is self-encrypted
@@ -104,10 +103,12 @@ fn pack_data_map(data_map: DataMapLevel) -> Result<Bytes> {
 }
 
 fn encrypt_file(file: &Path) -> Result<(DataMap, Vec<EncryptedChunk>)> {
-    let bytes = Bytes::from(std::fs::read(file).map_err(Error::IoError)?);
-    self_encryption::encrypt(bytes).map_err(Error::SelfEncryption)
+    let bytes = Bytes::from(std::fs::read(file)?);
+    let encrypted_chunk = self_encryption::encrypt(bytes)?;
+    Ok(encrypted_chunk)
 }
 
 fn encrypt_data(bytes: Bytes) -> Result<(DataMap, Vec<EncryptedChunk>)> {
-    self_encryption::encrypt(bytes).map_err(Error::SelfEncryption)
+    let encrypted_chunk = self_encryption::encrypt(bytes)?;
+    Ok(encrypted_chunk)
 }

@@ -93,16 +93,15 @@ impl Client {
             return Ok(chunk.clone());
         }
 
-        let res = self
-            .send_query(DataQueryVariant::GetChunk(ChunkAddress(*name)))
-            .await?;
+        let query = DataQueryVariant::GetChunk(ChunkAddress(*name));
+        let res = self.send_query(query.clone()).await?;
 
-        let operation_id = res.operation_id;
+        let op_id = res.operation_id;
         let chunk: Chunk = match res.response {
             QueryResponse::GetChunk(result) => {
-                result.map_err(|err| Error::from((err, operation_id)))
+                result.map_err(|err| Error::ErrorMsg { source: err, op_id })
             }
-            response => return Err(Error::UnexpectedQueryResponse(response)),
+            response => return Err(Error::UnexpectedQueryResponse { query, response }),
         }?;
 
         let _ = self.chunks_cache.write().await.insert(chunk.clone());
@@ -134,7 +133,7 @@ impl Client {
     fn package_small(file: SmallFile) -> Result<Chunk> {
         let chunk = to_chunk(file.bytes());
         if chunk.value().len() >= self_encryption::MIN_ENCRYPTABLE_BYTES {
-            return Err(Error::SmallFilePaddingNeeded);
+            return Err(Error::SmallFilePaddingNeeded(chunk.value().len()));
         }
         Ok(chunk)
     }

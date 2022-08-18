@@ -12,7 +12,7 @@ use crate::{connections::CmdResponse, Error, Result};
 
 #[cfg(feature = "traceroute")]
 use sn_interface::{
-    messaging::{Entity, Traceroute},
+    messaging::{data::CmdError, Entity, Traceroute},
     types::PublicKey,
 };
 
@@ -125,7 +125,8 @@ impl Session {
                     if received_err >= expected_acks {
                         error!("Received majority of error response for cmd {:?}", msg_id);
                         let _ = self.pending_cmds.remove(&msg_id);
-                        return Err(Error::from((error, msg_id)));
+                        let CmdError::Data(source) = error;
+                        return Err(Error::ErrorCmd { source, msg_id });
                     }
                 }
                 Err(_err) => {
@@ -164,6 +165,7 @@ impl Session {
         auth: ServiceAuth,
         payload: Bytes,
         #[cfg(feature = "traceroute")] client_pk: PublicKey,
+        dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
     ) -> Result<QueryResult> {
         let endpoint = self.endpoint.clone();
 
@@ -175,7 +177,12 @@ impl Session {
 
         let dst = query.variant.dst_name();
 
-        let (section_pk, elders) = self.get_query_elders(dst).await?;
+        let (section_pk, elders) = if let Some(section_info) = dst_section_info {
+            section_info
+        } else {
+            self.get_query_elders(dst).await?
+        };
+
         let elders_len = elders.len();
         let msg_id = MsgId::new();
 
@@ -217,7 +224,8 @@ impl Session {
         #[cfg(feature = "traceroute")]
         wire_msg.append_trace(&mut Traceroute(vec![Entity::Client(client_pk)]));
 
-        self.clone().send_msg_in_bg(elders, wire_msg, msg_id)?;
+        self.clone()
+            .send_msg_in_bg(elders.clone(), wire_msg, msg_id)?;
 
         // TODO:
         // We are now simply accepting the very first valid response we receive,
@@ -285,7 +293,6 @@ impl Session {
             if let Ok(query_op_id) = query.operation_id() {
                 // Remove the response sender
                 trace!("Removing channel for {:?}", (msg_id, &query_op_id));
-                // let _old_channel =
                 if let Some(mut entry) = self.pending_queries.get_mut(&query_op_id) {
                     let listeners_for_op = entry.value_mut();
                     if let Some(index) = listeners_for_op
@@ -304,13 +311,13 @@ impl Session {
             Some(response) => {
                 let operation_id = response
                     .operation_id()
-                    .map_err(|_| Error::UnknownOperationId)?;
+                    .map_err(|_| Error::UnknownOperationId(response.clone()))?;
                 Ok(QueryResult {
                     response,
                     operation_id,
                 })
             }
-            None => Err(Error::NoResponse),
+            None => Err(Error::NoResponse(elders)),
         }
     }
 
@@ -380,7 +387,7 @@ impl Session {
         // wait until we have sufficient network knowledge
         while known_sap.is_none() {
             if tried_every_contact {
-                return Err(Error::NetworkContact);
+                return Err(Error::NetworkContact(nodes));
             }
 
             let stats = self.network.read().await.known_sections_count();
@@ -446,13 +453,16 @@ impl Session {
         Ok(())
     }
 
-    async fn get_query_elders(&self, dst: XorName) -> Result<(bls::PublicKey, Vec<Peer>)> {
+    pub(crate) async fn get_query_elders(
+        &self,
+        dst: XorName,
+    ) -> Result<(bls::PublicKey, Vec<Peer>)> {
         // Get DataSection elders details. Resort to own section if DataSection is not available.
         let sap = self.network.read().await.closest(&dst, None).cloned();
         let (section_pk, mut elders) = if let Some(sap) = &sap {
             (sap.section_key(), sap.elders_vec())
         } else {
-            return Err(Error::NoNetworkKnowledge);
+            return Err(Error::NoNetworkKnowledge(dst));
         };
 
         elders.shuffle(&mut OsRng);
@@ -503,7 +513,7 @@ impl Session {
 
             Ok((section_pk, sap_elders))
         } else {
-            Err(Error::NoNetworkKnowledge)
+            Err(Error::NoNetworkKnowledge(dst_address))
         }
     }
 
@@ -562,10 +572,12 @@ impl Session {
                 let send_and_retry = || async {
                     match link.send_with(msg_bytes_clone.clone(), None, listen).await {
                         Ok(()) => Ok(()),
-                        Err(error) => match error {
-                            SendToOneError::Connection(err) => Err(Error::QuicP2pConnection(err)),
-                            SendToOneError::Send(err) => Err(Error::QuicP2pSend(err)),
-                        },
+                        Err(SendToOneError::Connection(err)) => {
+                            Err(Error::QuicP2pConnection { peer, error: err })
+                        }
+                        Err(SendToOneError::Send(err)) => {
+                            Err(Error::QuicP2pSend { peer, error: err })
+                        }
                     }
                 };
                 let mut result = send_and_retry().await;
@@ -591,21 +603,35 @@ impl Session {
         for r in results {
             match r {
                 Ok((peer_name, send_result)) => match send_result {
-                    Err(Error::QuicP2pSend(SendError::ConnectionLost(
-                        ConnectionError::Closed(Close::Application { reason, error_code }),
-                    ))) => {
+                    Err(Error::QuicP2pSend {
+                        peer,
+                        error:
+                            SendError::ConnectionLost(ConnectionError::Closed(Close::Application {
+                                reason,
+                                error_code,
+                            })),
+                    }) => {
                         warn!(
                             "Connection was closed by node {}, reason: {:?}",
                             peer_name,
                             String::from_utf8(reason.to_vec())
                         );
-                        last_error = Some(Error::QuicP2pSend(SendError::ConnectionLost(
-                            ConnectionError::Closed(Close::Application { reason, error_code }),
-                        )));
+                        last_error = Some(Error::QuicP2pSend {
+                            peer,
+                            error: SendError::ConnectionLost(ConnectionError::Closed(
+                                Close::Application { reason, error_code },
+                            )),
+                        });
                     }
-                    Err(Error::QuicP2pSend(SendError::ConnectionLost(error))) => {
+                    Err(Error::QuicP2pSend {
+                        peer,
+                        error: SendError::ConnectionLost(error),
+                    }) => {
                         warn!("Connection to {} was lost: {:?}", peer_name, error);
-                        last_error = Some(Error::QuicP2pSend(SendError::ConnectionLost(error)));
+                        last_error = Some(Error::QuicP2pSend {
+                            peer,
+                            error: SendError::ConnectionLost(error),
+                        });
                     }
                     Err(error) => {
                         warn!(

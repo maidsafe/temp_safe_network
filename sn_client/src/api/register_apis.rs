@@ -138,12 +138,15 @@ impl Client {
     pub async fn get_register(&self, address: Address) -> Result<Register, Error> {
         // Let's fetch the Register from the network
         let query = DataQueryVariant::Register(RegisterQuery::Get(address));
-        let query_result = self.send_query(query).await?;
+        let query_result = self.send_query(query.clone()).await?;
         match query_result.response {
             QueryResponse::GetRegister((res, op_id)) => {
                 res.map_err(|err| Error::ErrorMsg { source: err, op_id })
             }
-            _ => Err(Error::ReceivedUnexpectedEvent),
+            other => Err(Error::UnexpectedQueryResponse {
+                query,
+                response: other,
+            }),
         }
     }
 
@@ -154,12 +157,15 @@ impl Client {
         address: Address,
     ) -> Result<BTreeSet<(EntryHash, Entry)>, Error> {
         let query = DataQueryVariant::Register(RegisterQuery::Read(address));
-        let query_result = self.send_query(query).await?;
+        let query_result = self.send_query(query.clone()).await?;
         match query_result.response {
             QueryResponse::ReadRegister((res, op_id)) => {
                 res.map_err(|err| Error::ErrorMsg { source: err, op_id })
             }
-            _ => Err(Error::ReceivedUnexpectedEvent),
+            other => Err(Error::UnexpectedQueryResponse {
+                query,
+                response: other,
+            }),
         }
     }
 
@@ -171,12 +177,15 @@ impl Client {
         hash: EntryHash,
     ) -> Result<Entry, Error> {
         let query = DataQueryVariant::Register(RegisterQuery::GetEntry { address, hash });
-        let query_result = self.send_query(query).await?;
+        let query_result = self.send_query(query.clone()).await?;
         match query_result.response {
             QueryResponse::GetRegisterEntry((res, op_id)) => {
                 res.map_err(|err| Error::ErrorMsg { source: err, op_id })
             }
-            _ => Err(Error::ReceivedUnexpectedEvent),
+            other => Err(Error::UnexpectedQueryResponse {
+                query,
+                response: other,
+            }),
         }
     }
 
@@ -188,12 +197,15 @@ impl Client {
     #[instrument(skip(self), level = "debug")]
     pub async fn get_register_owner(&self, address: Address) -> Result<User, Error> {
         let query = DataQueryVariant::Register(RegisterQuery::GetOwner(address));
-        let query_result = self.send_query(query).await?;
+        let query_result = self.send_query(query.clone()).await?;
         match query_result.response {
             QueryResponse::GetRegisterOwner((res, op_id)) => {
                 res.map_err(|err| Error::ErrorMsg { source: err, op_id })
             }
-            _ => Err(Error::ReceivedUnexpectedEvent),
+            other => Err(Error::UnexpectedQueryResponse {
+                query,
+                response: other,
+            }),
         }
     }
 
@@ -209,12 +221,15 @@ impl Client {
         user: User,
     ) -> Result<Permissions, Error> {
         let query = DataQueryVariant::Register(RegisterQuery::GetUserPermissions { address, user });
-        let query_result = self.send_query(query).await?;
+        let query_result = self.send_query(query.clone()).await?;
         match query_result.response {
             QueryResponse::GetRegisterUserPermissions((res, op_id)) => {
                 res.map_err(|err| Error::ErrorMsg { source: err, op_id })
             }
-            _ => Err(Error::ReceivedUnexpectedEvent),
+            other => Err(Error::UnexpectedQueryResponse {
+                query,
+                response: other,
+            }),
         }
     }
 
@@ -222,12 +237,15 @@ impl Client {
     #[instrument(skip(self), level = "debug")]
     pub async fn get_register_policy(&self, address: Address) -> Result<Policy, Error> {
         let query = DataQueryVariant::Register(RegisterQuery::GetPolicy(address));
-        let query_result = self.send_query(query).await?;
+        let query_result = self.send_query(query.clone()).await?;
         match query_result.response {
             QueryResponse::GetRegisterPolicy((res, op_id)) => {
                 res.map_err(|err| Error::ErrorMsg { source: err, op_id })
             }
-            _ => Err(Error::ReceivedUnexpectedEvent),
+            other => Err(Error::UnexpectedQueryResponse {
+                query,
+                response: other,
+            }),
         }
     }
 }

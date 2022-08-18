@@ -54,12 +54,15 @@ impl Client {
     ) -> Result<Vec<SpentProofShare>, Error> {
         let address = SpentbookAddress::new(XorName::from_content(&key_image.to_bytes()));
         let query = DataQueryVariant::Spentbook(SpentbookQuery::SpentProofShares(address));
-        let query_result = self.send_query(query).await?;
+        let query_result = self.send_query(query.clone()).await?;
         match query_result.response {
             QueryResponse::SpentProofShares((res, op_id)) => {
                 res.map_err(|err| Error::ErrorMsg { source: err, op_id })
             }
-            _ => Err(Error::ReceivedUnexpectedEvent),
+            other => Err(Error::UnexpectedQueryResponse {
+                query,
+                response: other,
+            }),
         }
     }
 }
