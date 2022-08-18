@@ -44,9 +44,6 @@ pub(crate) const NODES_TO_CONTACT_PER_STARTUP_BATCH: usize = 3;
 // Duration of wait for the node to have chance to pickup network knowledge at the beginning
 const INITIAL_WAIT: u64 = 1;
 
-// Number of retries for sending a message due to a connection issue.
-const CLIENT_SEND_RETRIES: usize = 3; // nodes will clean up connections reasonably often, so we try a few times here.
-
 impl Session {
     #[instrument(
         skip(self, auth, payload, client_pk),
@@ -567,30 +564,13 @@ impl Session {
                     Session::spawn_msg_listener_thread(session.clone(), peer, conn, incoming_msgs);
                 };
 
-                let mut retries = 0;
-
-                let send_and_retry = || async {
-                    match link.send_with(msg_bytes_clone.clone(), None, listen).await {
-                        Ok(()) => Ok(()),
-                        Err(SendToOneError::Connection(err)) => {
-                            Err(Error::QuicP2pConnection { peer, error: err })
-                        }
-                        Err(SendToOneError::Send(err)) => {
-                            Err(Error::QuicP2pSend { peer, error: err })
-                        }
-                    }
+                let result = match link.send_with(msg_bytes_clone.clone(), None, listen).await {
+                    Ok(()) => Ok(()),
+                    Err(error) => match error {
+                        SendToOneError::Connection(err) => Err(Error::QuicP2pConnection(err)),
+                        SendToOneError::Send(err) => Err(Error::QuicP2pSend(err)),
+                    },
                 };
-                let mut result = send_and_retry().await;
-
-                while result.is_err() && retries < CLIENT_SEND_RETRIES {
-                    warn!(
-                        "Attempting to send msg again {msg_id:?}, attempt #{:?}",
-                        retries.clone()
-                    );
-                    retries += 1;
-                    result = send_and_retry().await;
-                }
-
                 (peer_name, result)
             });
 

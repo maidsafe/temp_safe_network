@@ -114,6 +114,9 @@ impl CmdCtrl {
         } else if self.cmd_queue.is_empty() {
             trace!("Empty queue, waiting {EMPTY_QUEUE_SLEEP_TIME:?} to not loop heavily");
             log_sleep!(EMPTY_QUEUE_SLEEP_TIME);
+        } else {
+            // stop overactive CPUs
+            log_sleep!(EMPTY_QUEUE_SLEEP_TIME / 10);
         }
     }
 
