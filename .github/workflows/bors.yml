@@ -3,6 +3,12 @@ name: Bors Merge Flow. All Tests
 on:
   push:
     branches: [staging, trying]
+  workflow_dispatch:
+    inputs:
+      node-count:
+        description: number of nodes for the testnet
+        required: true
+        default: 30
 env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
