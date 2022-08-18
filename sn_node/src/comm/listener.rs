@@ -82,14 +82,17 @@ impl MsgListener {
                             .await;
                     }
 
-                    let _send_res = self
+                    if let Err(error) = self
                         .receive_msg
                         .send(MsgEvent::Received {
                             sender: Peer::new(src_name, remote_address),
                             wire_msg,
                             original_bytes: msg_bytes,
                         })
-                        .await;
+                        .await
+                    {
+                        error!("Error pushing msg onto internal msg channel... {error:?}");
+                    }
 
                     // count incoming msgs..
                     let _ = self.count_msg.send(());
