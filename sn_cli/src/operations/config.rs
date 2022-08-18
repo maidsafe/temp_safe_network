@@ -220,24 +220,6 @@ impl Config {
             }
         }
 
-        // use settings from cli_config_file instead of self.settings
-        let content = fs::read(&self.cli_config_path).await.wrap_err_with(|| {
-            format!(
-                "Error reading config file from '{}'",
-                &self.cli_config_path.display(),
-            )
-        })?;
-        self.settings = if content.is_empty() {
-            Settings::default()
-        } else {
-            serde_json::from_slice(&content).wrap_err_with(|| {
-                format!(
-                    "Format of the config file at '{}' is not valid and couldn't be parsed",
-                    &self.cli_config_path.display()
-                )
-            })?
-        };
-
         // get SectionTree from cli_config if they are not in network_contacts_dir
         let mut remove_list: Vec<String> = Vec::new();
         for (network_name, net_info) in self.settings.networks.iter_mut() {
@@ -1112,46 +1094,6 @@ mod sync_network_contacts_and_settings {
         assert!(matches!(network_info, NetworkInfo::Local(_, Some(_))));
 
         config.compare_settings_and_network_contacts_dir().await?;
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn network_list_should_be_fetched_from_cli_config_file() -> Result<()> {
-        // write cli/config.json file
-        let tmp_dir = assert_fs::TempDir::new()?;
-        let mut network_contacts = store_dummy_network_contacts(&tmp_dir, 2).await?;
-        let network_contacts_path = tmp_dir.path().join(format!(
-            "{:?}",
-            network_contacts.pop().unwrap().genesis_key()
-        ));
-        let mut settings = Settings::default();
-        settings.networks.insert(
-            "network_1".to_string(),
-            NetworkInfo::Local(network_contacts_path, None),
-        );
-        let mut config = Config::create_config(&tmp_dir, Some(settings)).await?;
-
-        let network_contacts_path = tmp_dir.path().join(format!(
-            "{:?}",
-            network_contacts.pop().unwrap().genesis_key()
-        ));
-        // will be ignored during sync since the network list is fetched from the config file
-        config.settings.networks.insert(
-            "network_2".to_string(),
-            NetworkInfo::Local(network_contacts_path.clone(), None),
-        );
-        config.sync().await?;
-        assert_eq!(config.settings.networks.len(), 1);
-
-        // but it will be read if it's present in the cli/config.json file
-        config.settings.networks.insert(
-            "network_2".to_string(),
-            NetworkInfo::Local(network_contacts_path, None),
-        );
-        config.write_settings_to_file().await?;
-        config.sync().await?;
-        assert_eq!(config.settings.networks.len(), 2);
 
         Ok(())
     }
