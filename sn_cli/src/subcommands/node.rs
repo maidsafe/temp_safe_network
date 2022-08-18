@@ -143,8 +143,6 @@ pub async fn node_commander(
                 path.push("node");
                 path
             };
-            println!("config: {:?}", config);
-            println!("dir: {:?}", target_dir_path);
             // We run this command in a separate thread to overcome a conflict with
             // the self_update crate as it seems to be creating its own runtime.
             let handler = std::thread::spawn(|| node_install(target_dir_path, version));

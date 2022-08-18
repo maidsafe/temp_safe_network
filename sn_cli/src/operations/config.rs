@@ -199,13 +199,6 @@ impl Config {
 
     /// Sync settings and the network_contacts_dir
     pub async fn sync(&mut self) -> Result<()> {
-        // if default hardlink is present, make sure its original file is also present; Else the
-        // default hardlink might be overwritten while switching networks
-        if let Ok((default_network_contacts, _)) = self.read_default_network_contacts().await {
-            self.write_network_contacts(&default_network_contacts)
-                .await?;
-        };
-
         let mut dir_files_checklist: BTreeMap<String, bool> = BTreeMap::new();
         let mut network_contacts_dir = fs::read_dir(&self.network_contacts_dir).await?;
         while let Some(entry) = network_contacts_dir.next_entry().await? {
@@ -446,16 +439,18 @@ impl Config {
 
     pub async fn switch_to_network(&self, name: &str) -> Result<()> {
         match self.settings.networks.get(name) {
-            Some(NetworkInfo::Local(_, genesis_key)) => {
+            Some(NetworkInfo::Remote(_, genesis_key)) | Some(NetworkInfo::Local(_, genesis_key)) => {
                 match genesis_key {
-                    Some(gk) => self.set_default_network_contacts(gk).await?,
+                    Some(gk) => {
+                        // if default hardlink is present, make sure its original file is also present; Else the
+                        // default hardlink might be overwritten while switching networks
+                        if let Ok((default_network_contacts, _)) = self.read_default_network_contacts().await {
+                            self.write_network_contacts(&default_network_contacts)
+                                .await?;
+                        };
+                        self.set_default_network_contacts(gk).await?
+                    },
                     //  can't be none since we sync during get_config
-                    None => bail!("Cannot switch to {}, since the network file is not found! Please re-run the same command!", name)
-                }
-            }
-            Some(NetworkInfo::Remote(_, genesis_key)) => {
-                match genesis_key {
-                    Some(gk) => self.set_default_network_contacts(gk).await?,
                     None => bail!("Cannot switch to {}, since the network file is not found! Please re-run the same command!", name)
                 }
             }
@@ -474,12 +469,14 @@ impl Config {
             "Network map info",
         ]);
         let current_network_contacts = self.read_default_network_contacts().await;
+        let mut current_network_is_present = false;
 
         for (network_name, net_info) in self.networks_iter() {
             let mut current = "";
             if let Ok((network_contacts, _)) = &current_network_contacts {
                 if net_info.matches(network_contacts.genesis_key()) {
                     current = "*";
+                    current_network_is_present = true;
                 }
             }
             let (simplified_net_info, gk) = match net_info {
@@ -499,6 +496,18 @@ impl Config {
             ]);
         }
 
+        // If current_network_contacts is not present in the config file, display it
+        if let (Ok((network_contacts, _)), false) =
+            (&current_network_contacts, current_network_is_present)
+        {
+            let genesis_key = format!("{:?}", network_contacts.genesis_key());
+            table.add_row(&vec![
+                "*",
+                genesis_key.as_str(),
+                genesis_key.as_str(),
+                format!("Local: {:?}", self.network_contacts_dir.join("default")).as_str(),
+            ]);
+        }
         println!("{table}");
     }
 
@@ -1171,42 +1180,6 @@ mod sync_network_contacts_and_settings {
 
         Ok(())
     }
-
-    #[tokio::test]
-    async fn original_file_of_the_default_hardlink_should_be_written() -> Result<()> {
-        // Switching networks can overwrite the default hardlink, so we make sure we have a copy
-        // of the default network contacts file.
-        let tmp_dir = assert_fs::TempDir::new()?;
-        let mut config = Config::create_config(&tmp_dir, None).await?;
-        let network_contacts = config
-            .store_dummy_network_contacts_and_set_default(1)
-            .await?
-            .pop()
-            .unwrap();
-        fs::remove_file(
-            config
-                .network_contacts_dir
-                .join(format!("{:?}", network_contacts.genesis_key())),
-        )
-        .await?;
-
-        config.sync().await?;
-        assert_eq!(config.settings.networks.len(), 1);
-        let (network_name, network_info) = config
-            .networks_iter()
-            .next()
-            .ok_or_else(|| eyre!("failed to obtain item from networks list"))?;
-        assert_eq!(
-            *network_name,
-            format!("{:?}", network_contacts.genesis_key())
-        );
-        assert!(matches!(
-            network_info,
-            NetworkInfo::Local(_, Some(genesis_key)) if genesis_key == network_contacts.genesis_key()
-        ));
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -1214,6 +1187,7 @@ mod networks {
     use super::{test_utils::store_dummy_network_contacts, Config, NetworkInfo};
     use color_eyre::eyre::eyre;
     use color_eyre::Result;
+    use tokio::fs;
 
     #[tokio::test]
     async fn local_and_remote_networks_should_be_added() -> Result<()> {
@@ -1351,6 +1325,38 @@ mod networks {
         assert!(switch_result.is_err());
         let default = config.read_default_network_contacts().await;
         assert!(default.is_err());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn default_network_contact_should_be_copied_while_switching_networks() -> Result<()> {
+        // Switching networks can overwrite the default hardlink, so we make sure we have a copy
+        // of the default network_contacts file.
+        let tmp_dir = assert_fs::TempDir::new()?;
+        let mut config = Config::create_config(&tmp_dir, None).await?;
+        let networks = config
+            .store_dummy_network_contacts_and_set_default(2)
+            .await?;
+        // make sure the network is set as as the default
+        config
+            .set_default_network_contacts(networks[0].genesis_key())
+            .await?;
+        fs::remove_file(
+            config
+                .network_contacts_dir
+                .join(format!("{:?}", networks[0].genesis_key())),
+        )
+        .await?;
+
+        config.sync().await?;
+        assert_eq!(config.settings.networks.len(), 1);
+
+        config
+            .switch_to_network(format!("{:?}", networks[1].genesis_key()).as_str())
+            .await?;
+        config.sync().await?;
+        assert_eq!(config.settings.networks.len(), 2);
 
         Ok(())
     }
