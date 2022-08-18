@@ -114,7 +114,7 @@ impl Client {
                 .await
                 .closest(&random_dst_addr, None)
                 .cloned()
-                .ok_or(Error::NoNetworkKnowledge)?;
+                .ok_or(Error::NoNetworkKnowledge(random_dst_addr))?;
             (sap.elders_vec(), sap.section_key())
         };
         debug!(
@@ -142,7 +142,7 @@ impl Client {
 
             if attempts == NETWORK_PROBE_RETRY_COUNT {
                 // we've failed
-                return Err(Error::NetworkContact);
+                return Err(Error::NetworkContact(bootstrap_nodes));
             }
 
             attempts += 1;

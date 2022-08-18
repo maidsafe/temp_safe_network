@@ -17,7 +17,7 @@ use sn_interface::{
     at_least_one_correct_elder,
     messaging::{
         data::{CmdError, ServiceMsg},
-        system::{AntiEntropyKind, KeyedSig, SectionAuth, SystemMsg},
+        system::{AntiEntropyKind, KeyedSig, NodeMsgAuthorityUtils, SectionAuth, SystemMsg},
         AuthKind, AuthorityProof, Dst, MsgId, MsgType, NodeMsgAuthority, ServiceAuth, WireMsg,
     },
     network_knowledge::{NetworkKnowledge, SectionAuthorityProvider},
@@ -65,11 +65,11 @@ impl Session {
                         // once the msg loop breaks, we know this specific connection is closed
                         break;
                     }
-                    Err( Error::QuicP2pSend(SendError::ConnectionLost(
+                    Err(Error::QuicP2pSend{ peer, error: SendError::ConnectionLost(
                         ConnectionError::Closed(Close::Application { reason, .. }),
-                    ))) => {
+                    )}) => {
                         warn!(
-                            "Connection was closed by the node: {:?}",
+                            "Connection was closed by the node {}: {:?}",peer,
                             String::from_utf8(reason.to_vec())
                         );
 
@@ -154,9 +154,10 @@ impl Session {
             .cloned()
             .collect();
 
-        if !NetworkKnowledge::verify_node_msg_can_be_trusted(msg_authority, &msg, &known_keys) {
+        if !NetworkKnowledge::verify_node_msg_can_be_trusted(&msg_authority, &msg, &known_keys) {
             warn!("Untrusted message has been dropped, from {sender:?}: {msg:?} ");
-            return Err(Error::UntrustedMessage);
+            let (_, section_pk) = msg_authority.src_location();
+            return Err(Error::UntrustedMessage(section_pk));
         }
 
         match msg {

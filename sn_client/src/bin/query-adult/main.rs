@@ -109,24 +109,24 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn query_chunk(client: &Client, adult: usize, address: XorName) -> Result<Chunk> {
-    let query_response = send_query(client, address, adult).await?;
+async fn query_chunk(client: &Client, adult_index: usize, address: XorName) -> Result<Chunk> {
+    let variant = DataQueryVariant::GetChunk(ChunkAddress(address));
+    let query = DataQuery {
+        adult_index,
+        variant: variant.clone(),
+    };
+    let query_response = send_query(client, query).await?;
     match query_response {
         QueryResponse::GetChunk(result) => result.map_err(|e| e.into()),
-        response => Err(Error::UnexpectedQueryResponse(response)).map_err(|e| e.into()),
+        response => Err(Error::UnexpectedQueryResponse {
+            query: variant,
+            response,
+        })
+        .map_err(|e| e.into()),
     }
 }
 
-async fn send_query(
-    client: &Client,
-    address: XorName,
-    adult_index: usize,
-) -> Result<QueryResponse> {
-    let query = DataQuery {
-        adult_index,
-        variant: DataQueryVariant::GetChunk(ChunkAddress(address)),
-    };
-
+async fn send_query(client: &Client, query: DataQuery) -> Result<QueryResponse> {
     let client_pk = client.public_key();
     let msg = ServiceMsg::Query(query.clone());
     let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
@@ -134,7 +134,7 @@ async fn send_query(
 
     Ok(client
         .send_signed_query(
-            query.clone(),
+            query,
             client_pk,
             serialised_query.clone(),
             signature.clone(),

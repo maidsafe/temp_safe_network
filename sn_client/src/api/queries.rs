@@ -15,7 +15,7 @@ use sn_interface::{
         data::{DataQuery, DataQueryVariant, ServiceMsg},
         ServiceAuth, WireMsg,
     },
-    types::{PublicKey, Signature},
+    types::{Peer, PublicKey, Signature},
 };
 
 use bytes::Bytes;
@@ -24,7 +24,7 @@ use tracing::{debug, info_span};
 
 // We divide the total query timeout by this number.
 // This also represents the max retries possible, while still staying within the max_timeout.
-const MAX_RETRY_COUNT: f32 = 30.0;
+const MAX_RETRY_COUNT: u32 = 30;
 
 impl Client {
     /// Send a Query to the network and await a response.
@@ -42,7 +42,7 @@ impl Client {
         &self,
         query: DataQueryVariant,
     ) -> Result<QueryResult, Error> {
-        self.send_query_with_retry_count(query, 1.0).await
+        self.send_query_with_retry_count(query, 1).await
     }
 
     // Send a Query to the network and await a response.
@@ -52,7 +52,7 @@ impl Client {
     async fn send_query_with_retry_count(
         &self,
         query: DataQueryVariant,
-        retry_count: f32,
+        retry_count: u32,
     ) -> Result<QueryResult, Error> {
         let client_pk = self.public_key();
         let mut query = DataQuery {
@@ -64,12 +64,13 @@ impl Client {
         // Add jitter so not all clients retry at the same rate. This divider will knock on to the overall retry window
         // and should help prevent elders from being conseceutively overwhelmed
         let jitter = rng.gen_range(1.0..1.5);
-        let attempt_timeout = self.query_timeout.div_f32(retry_count + jitter);
+        let attempt_timeout = self.query_timeout.div_f32(retry_count as f32 + jitter);
         trace!("Setting up query retry, interval is: {:?}", attempt_timeout);
 
         let span = info_span!("Attempting a query");
         let _ = span.enter();
-        let mut attempt = 1.0;
+        let mut attempts = 1;
+        let dst = query.variant.dst_name();
         loop {
             let msg = ServiceMsg::Query(query.clone());
             let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
@@ -77,31 +78,54 @@ impl Client {
 
             debug!(
                 "Attempting {:?} (attempt #{}) with a query timeout of {:?}",
-                query, attempt, attempt_timeout
+                query, attempts, attempt_timeout
             );
+
+            // grab up to date destination section from our local network knowledge
+            let (section_pk, elders) = self.session.get_query_elders(dst).await?;
 
             let res = tokio::time::timeout(
                 attempt_timeout,
-                self.send_signed_query(
+                self.send_signed_query_to_section(
                     query.clone(),
                     client_pk,
                     serialised_query.clone(),
                     signature.clone(),
+                    Some((section_pk, elders.clone())),
                 ),
             )
             .await;
 
-            if let Ok(Ok(query_result)) = res {
-                break Ok(query_result);
-            } else if attempt > MAX_RETRY_COUNT {
-                debug!(
-                    "Retries ({}) all failed returning no response for {:?}",
-                    MAX_RETRY_COUNT, query
-                );
-                break Err(Error::NoResponse);
+            match res {
+                Ok(Ok(query_result)) => break Ok(query_result),
+                Ok(Err(err)) if attempts > MAX_RETRY_COUNT => {
+                    debug!(
+                        "Retries ({}) all failed returning no response for {:?}",
+                        MAX_RETRY_COUNT, query
+                    );
+                    break Err(Error::NoResponseAfterRetrying {
+                        query,
+                        attempts,
+                        last_error: Box::new(err),
+                    });
+                }
+                Err(_) if attempts > MAX_RETRY_COUNT => {
+                    // this should be due to our tokio time out, rather than an error
+                    // returned by `send_signed_query_to_section`
+                    debug!(
+                        "Retries ({}) all failed returning no response for {:?}",
+                        MAX_RETRY_COUNT, query
+                    );
+                    break Err(Error::NoResponseAfterRetrying {
+                        query,
+                        attempts,
+                        last_error: Box::new(Error::NoResponse(elders)),
+                    });
+                }
+                _ => {}
             }
 
-            attempt += 1.0;
+            attempts += 1;
 
             // In the next attempt, try the next adult, further away.
             query.adult_index += 1;
@@ -123,6 +147,20 @@ impl Client {
         signature: Signature,
     ) -> Result<QueryResult, Error> {
         debug!("Sending Query: {:?}", query);
+        self.send_signed_query_to_section(query, client_pk, serialised_query, signature, None)
+            .await
+    }
+
+    // Private helper to send a signed query, with the option to define the destination section.
+    // If no destination section is provided, it will be derived from the query content.
+    async fn send_signed_query_to_section(
+        &self,
+        query: DataQuery,
+        client_pk: PublicKey,
+        serialised_query: Bytes,
+        signature: Signature,
+        dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
+    ) -> Result<QueryResult, Error> {
         let auth = ServiceAuth {
             public_key: client_pk,
             signature,
@@ -135,6 +173,7 @@ impl Client {
                 serialised_query,
                 #[cfg(feature = "traceroute")]
                 self.public_key(),
+                dst_section_info,
             )
             .await
     }
