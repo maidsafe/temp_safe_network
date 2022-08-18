@@ -136,7 +136,8 @@ impl Session {
                     "Terminated with insufficient CmdAcks for {:?}, {} / {} acks received",
                     msg_id, received_ack, expected_acks
                 );
-                break;
+
+                return Err(Error::InsufficientAcksReceived);
             }
             trace!(
                 "current ack waiting loop count {}/{}",

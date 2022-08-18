@@ -64,7 +64,7 @@ impl Client {
         let span = info_span!("Attempting a cmd");
         let _ = span.enter();
 
-        let mut attempt = 1.0;
+        let mut attempt = 1;
         loop {
             debug!("Attempting {:?} (attempt #{})", debug_cmd, attempt);
 
@@ -87,7 +87,7 @@ impl Client {
                 res
             );
 
-            attempt += 1.0;
+            attempt += 1;
 
             if let Some(delay) = backoff.next_backoff() {
                 debug!("Sleeping for {delay:?} before trying cmd {debug_cmd:?} again");
