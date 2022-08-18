@@ -107,9 +107,9 @@ impl FlowCtrl {
         loop {
             // if we want to throttle cmd throughput, we do that here.
             // if there is nothing in the cmd queue, we wait here too.
-            self.cmd_ctrl
-                .wait_if_not_processing_at_expected_rate()
-                .await;
+            // self.cmd_ctrl
+            //     .wait_if_not_processing_at_expected_rate()
+            //     .await;
 
             // Lets kick off processing any pending cmds
             if let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {

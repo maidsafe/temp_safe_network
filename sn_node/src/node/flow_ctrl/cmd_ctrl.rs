@@ -31,7 +31,7 @@ use tokio::{sync::RwLock, time::Instant};
 
 type Priority = i32;
 
-const SLEEP_TIME: Duration = Duration::from_millis(100);
+const EMPTY_QUEUE_SLEEP_TIME: Duration = Duration::from_millis(100);
 
 /// A module for enhanced flow control.
 ///
@@ -104,7 +104,7 @@ impl CmdCtrl {
     }
 
     /// Wait if required by the cmd rate monitoring
-    pub(crate) async fn wait_if_not_processing_at_expected_rate(&mut self) {
+    pub(crate) async fn wait_if_not_processing_at_expected_rate(&self) {
         let expected_rate = self.monitoring.max_cmds_per_s().await;
         let actual_rate = self.attempted.value();
         if actual_rate > expected_rate {
@@ -112,8 +112,8 @@ impl CmdCtrl {
             debug!("Cmd throughput is too high, waiting to reduce throughput");
             log_sleep!(Duration::from_millis((diff * 10_f64) as u64));
         } else if self.cmd_queue.is_empty() {
-            trace!("Empty queue, waiting {SLEEP_TIME:?} to not loop heavily");
-            log_sleep!(SLEEP_TIME);
+            trace!("Empty queue, waiting {EMPTY_QUEUE_SLEEP_TIME:?} to not loop heavily");
+            log_sleep!(EMPTY_QUEUE_SLEEP_TIME);
         }
     }
 
