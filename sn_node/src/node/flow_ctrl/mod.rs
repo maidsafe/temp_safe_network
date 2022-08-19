@@ -95,11 +95,14 @@ impl FlowCtrl {
         // Lets kick off processing any pending cmds
         // if let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {
         let mut cmds_kicked_off = 0;
-        while cmds_kicked_off < 10 {
 
-            while let Some(next_cmd_job) = self.cmd_ctrl.next_cmd(){
+        let mut next_cmd = self.cmd_ctrl.next_cmd();
+        // while cmds_kicked_off < 10 && next_cmd.is_some() {
+        while next_cmd.is_some() {
+            cmds_kicked_off += 1;
+
+            while let Some(next_cmd_job) = next_cmd {
                 debug!("=> starting processing cmd {:?}", next_cmd_job);
-                cmds_kicked_off += 1;
 
 
                 if let Err(error) = self
@@ -113,13 +116,15 @@ impl FlowCtrl {
                 {
                     error!("Error during cmd processing: {error:?}");
                 }
+
+                next_cmd = self.cmd_ctrl.next_cmd()
             }
         }
     }
 
     /// Pull and queue up all pending cmds from the CmdChannel
     /// returns if any cmds have been queued
-    async fn enqeued_new_cmds_from_channel(&mut self) -> bool {
+    async fn enqeue_new_cmds_from_channel(&mut self) -> bool {
         // let mut cmds = vec![];
         let mut new_cmds = false;
         // Here we handle any incoming conn messages
@@ -156,7 +161,7 @@ impl FlowCtrl {
     }
 
     /// Add any pending msgs to the cmd queue
-    async fn enqueued_new_incoming_msgs(&mut self) -> bool {
+    async fn enqueue_new_incoming_msgs(&mut self) -> bool {
         // let mut cmds = vec![];
         let mut new_msgs = false;
         let info = self.node.read().await.info();
@@ -272,10 +277,15 @@ impl FlowCtrl {
 
 
             // we go through all pending cmds in this loop
-            while self.enqueued_new_incoming_msgs().await || self.cmd_ctrl.has_items_queued() || self.enqeued_new_cmds_from_channel().await {
+            // while self.enqueued_new_incoming_msgs().await || self.cmd_ctrl.has_items_queued() || self.enqeued_new_cmds_from_channel().await {
 
+                let _ = self.enqueue_new_incoming_msgs().await;
+                debug!("enqued msgs");
+                let _ = self.enqeue_new_cmds_from_channel().await;
+                debug!("added all from channel");
                 self.process_next_cmds_batch().await;
-            }
+                debug!("cmds batch done");
+            // }
 
             // debug!("the cmd queue is empty");
             // self.enqueue_cmds_from_channel().await;
@@ -311,6 +321,7 @@ impl FlowCtrl {
                     }
                 }
 
+                log_sleep!(Duration::from_millis(15));
 
                 // remaining cmds are for elders only.
                 // we've pushed what we have as an adult so we can continue
@@ -368,6 +379,9 @@ impl FlowCtrl {
                     error!("Error pushing node process cmd to controller: {error:?}");
                 }
             }
+
+            log_sleep!(Duration::from_millis(15));
+
         }
 
         error!("Internal processing ended.")

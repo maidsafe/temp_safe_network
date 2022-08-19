@@ -107,6 +107,7 @@ impl CmdCtrl {
 
     /// Get the next Cmd going off of priority
     pub(crate) fn next_cmd(&mut self) -> Option<CmdJob> {
+        debug!("gonna pop cmd");
         self.cmd_queue.pop().map(|(job, _prio)| job)
     }
 
@@ -122,10 +123,10 @@ impl CmdCtrl {
             trace!("Empty queue, waiting {EMPTY_QUEUE_SLEEP_TIME:?} to not loop heavily");
             log_sleep!(EMPTY_QUEUE_SLEEP_TIME);
         }
-        // else {
+        else {
             // stop overactive CPUs
-            // log_sleep!(EMPTY_QUEUE_SLEEP_TIME / 10);
-        // }
+            log_sleep!(EMPTY_QUEUE_SLEEP_TIME / 10);
+        }
     }
 
     /// Processes the next priority cmd
