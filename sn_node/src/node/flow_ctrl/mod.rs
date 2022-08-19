@@ -18,6 +18,7 @@ use event_channel::EventSender;
 
 use crate::comm::MsgEvent;
 use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Node, Result};
+use crate::log_sleep;
 
 use ed25519_dalek::Signer;
 #[cfg(feature = "traceroute")]
@@ -108,9 +109,27 @@ impl FlowCtrl {
         loop {
             // if we want to throttle cmd throughput, we do that here.
             // if there is nothing in the cmd queue, we wait here too.
-            self.cmd_ctrl
-                .wait_if_not_processing_at_expected_rate()
-                .await;
+            // self.cmd_ctrl
+            //     .wait_if_not_processing_at_expected_rate()
+            //     .await;
+
+            // Cmds Queued should be cleared before we do _any_ of the interval OR messaging
+            // ValidateMsg is always lowest prio...
+
+            let mut cmds = vec![];
+
+            // Here we handle any incoming conn messages
+            // via the API channel
+            match self.incoming_cmds_from_apis.try_recv() {
+                // TODO: handle a passed if if that still makes sense here
+                Ok((cmd, _id)) => cmds.push(cmd),
+                Err(TryRecvError::Empty) => {
+                    // do nothing
+                }
+                Err(TryRecvError::Disconnected) => {
+                    trace!("Senders to `incoming_cmds_from_apis` have disconnected.");
+                }
+            }
 
             // Lets kick off processing any pending cmds
             // if let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {
@@ -129,22 +148,9 @@ impl FlowCtrl {
             }
 
             let now = Instant::now();
-            let mut cmds = vec![];
 
             let is_elder = self.node.read().await.is_elder();
 
-            // Here we handle any incoming conn messages
-            // via the API channel
-            match self.incoming_cmds_from_apis.try_recv() {
-                // TODO: handle a passed if if that still makes sense here
-                Ok((cmd, _id)) => cmds.push(cmd),
-                Err(TryRecvError::Empty) => {
-                    // do nothing
-                }
-                Err(TryRecvError::Disconnected) => {
-                    trace!("Senders to `incoming_cmds_from_apis` have disconnected.");
-                }
-            }
 
             // Handle any incoming conn messages
             // this requires mut self
@@ -203,11 +209,14 @@ impl FlowCtrl {
                     }
                 }
 
+                if cmds.is_empty() { log_sleep!(Duration::from_millis(15)); };
+
                 for cmd in cmds {
                     if let Err(error) = self.fire_and_forget(cmd).await {
                         error!("Error pushing node process cmd to controller: {error:?}");
                     }
                 }
+
 
                 // remaining cmds are for elders only.
                 // we've pushed what we have as an adult so we can continue
@@ -258,6 +267,7 @@ impl FlowCtrl {
                 cmds.extend(dysf_cmds);
             }
 
+            if cmds.is_empty() { log_sleep!(Duration::from_millis(15)); };
             for cmd in cmds {
                 if let Err(error) = self.fire_and_forget(cmd).await {
                     error!("Error pushing node process cmd to controller: {error:?}");

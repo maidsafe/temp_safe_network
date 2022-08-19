@@ -159,7 +159,7 @@ impl CmdCtrl {
         let _ = tokio::task::spawn_local(async move {
             match dispatcher.process_cmd(cmd).await {
                 Ok(cmds) => {
-                    monitoring.increment_cmds().await;
+                    // monitoring.increment_cmds().await;
 
                     for cmd in cmds {
                         match cmd_process_api.send((cmd, Some(id))).await {
@@ -192,7 +192,7 @@ impl CmdCtrl {
                         .await;
                 }
             }
-            throughpout.increment(); // both on fail and success
+            // throughpout.increment(); // both on fail and success
         });
         Ok(())
     }
