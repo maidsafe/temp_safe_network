@@ -72,6 +72,11 @@ impl CmdCtrl {
         self.push_internal(cmd, None).await
     }
 
+    /// Does the cmd_queue contain _anything_
+    pub(crate) fn has_items_queued(&self) -> bool {
+        !self.cmd_queue.is_empty()
+    }
+
     // consume self
     // NB that clones could still exist, however they would be in the disconnected state
     #[allow(unused)]
@@ -86,7 +91,9 @@ impl CmdCtrl {
             return Err(Error::InvalidState);
         }
 
-        let job = CmdJob::new(self.id_counter.add(1), parent_id, cmd, SystemTime::now());
+        self.id_counter += 1;
+
+        let job = CmdJob::new(self.id_counter, parent_id, cmd, SystemTime::now());
 
         let prio = job.priority();
         let _ = self.cmd_queue.push(job, prio);
@@ -114,10 +121,11 @@ impl CmdCtrl {
         } else if self.cmd_queue.is_empty() {
             trace!("Empty queue, waiting {EMPTY_QUEUE_SLEEP_TIME:?} to not loop heavily");
             log_sleep!(EMPTY_QUEUE_SLEEP_TIME);
-        } else {
+        }
+        // else {
             // stop overactive CPUs
             // log_sleep!(EMPTY_QUEUE_SLEEP_TIME / 10);
-        }
+        // }
     }
 
     /// Processes the next priority cmd
@@ -131,6 +139,8 @@ impl CmdCtrl {
             return Err(Error::CmdCtrlStopped);
         }
 
+        // self.wait_if_not_processing_at_expected_rate().await;
+
         #[cfg(feature = "test-utils")]
         {
             debug!("Cmd queue length: {}", self.cmd_queue.len());
@@ -138,6 +148,8 @@ impl CmdCtrl {
 
         let id = job.id();
         let cmd = job.clone().into_cmd();
+
+        debug!("starting processng {cmd:?}");
         let cmd_string = cmd.clone().to_string();
         let priority = job.priority();
 
@@ -159,7 +171,7 @@ impl CmdCtrl {
         let _ = tokio::task::spawn_local(async move {
             match dispatcher.process_cmd(cmd).await {
                 Ok(cmds) => {
-                    // monitoring.increment_cmds().await;
+                    monitoring.increment_cmds().await;
 
                     for cmd in cmds {
                         match cmd_process_api.send((cmd, Some(id))).await {
@@ -192,7 +204,7 @@ impl CmdCtrl {
                         .await;
                 }
             }
-            // throughpout.increment(); // both on fail and success
+            throughpout.increment(); // both on fail and success
         });
         Ok(())
     }

@@ -89,11 +89,13 @@ impl FlowCtrl {
         )
     }
 
+
     /// Start Processing all pending cmds in order
     async fn process_all_pending_cmds(&mut self) {
         // Lets kick off processing any pending cmds
         // if let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {
         while let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {
+            debug!("=> starting processing cmd {:?}", next_cmd_job);
             if let Err(error) = self
                 .cmd_ctrl
                 .process_cmd_job(
@@ -109,9 +111,10 @@ impl FlowCtrl {
     }
 
     /// Pull and queue up all pending cmds from the CmdChannel
-    async fn enqueue_cmds_from_channel(&mut self) {
+    /// returns if any cmds have been queued
+    async fn enqeued_new_cmds_from_channel(&mut self) -> bool {
         let mut cmds = vec![];
-
+        let mut new_cmds = false;
         // Here we handle any incoming conn messages
         // via the API channel
         match self.incoming_cmds_from_apis.try_recv() {
@@ -125,9 +128,17 @@ impl FlowCtrl {
             }
         }
 
-        for cmd in cmds {
-            self.fire_and_forget(cmd).await;
+        if !cmds.is_empty() {
+            new_cmds = true;
         }
+        for cmd in cmds {
+            debug!("=> adding cmd to the queuueueueueuuee");
+            if let Err(error) = self.fire_and_forget(cmd).await {
+                error!("Error pushing node cmd from CmdChannel to controller: {error:?}");
+            }
+        }
+
+        new_cmds
     }
 
     /// Add any pending msgs to the cmd queue
@@ -137,6 +148,7 @@ impl FlowCtrl {
          // Handle any incoming conn messages
             // this requires mut self
             while let Ok(msg) =  self.incoming_msg_events.try_recv() {
+                debug!("pushing msg into cmd q");
                 cmds.push(
                     self.handle_new_msg_event(self.node.read().await.info(), msg)
                         .await,
@@ -156,12 +168,15 @@ impl FlowCtrl {
             }
 
             for cmd in cmds {
-                self.fire_and_forget(cmd).await;
+                debug!("msg cmd pushed");
+                if let Err(error) = self.cmd_sender_channel.send((cmd, None)).await {
+                    error!("Error pushing incoming msg cmd to controller: {error:?}");
+                };
             }
     }
 
 
-    async fn perform_standard_periodic_checks(&mut self, mut last_link_cleanup: Instant, #[cfg(feature = "back-pressure")] mut last_backpressure_check: Instant, mut last_data_batch_check: Instant ) {
+    async fn enqueue_cmds_for_standard_periodic_checks(&mut self, mut last_link_cleanup: Instant, #[cfg(feature = "back-pressure")] mut last_backpressure_check: Instant, mut last_data_batch_check: Instant ) {
         let now = Instant::now();
         let mut cmds = vec![];
 
@@ -197,7 +212,9 @@ impl FlowCtrl {
             }
 
             for cmd in cmds {
-                self.fire_and_forget(cmd).await;
+                if let Err(error) = self.cmd_sender_channel.send((cmd, None)).await {
+                    error!("Error pushing node periodic cmd to controller: {error:?}");
+                }
             }
     }
 
@@ -229,20 +246,29 @@ impl FlowCtrl {
 
             let mut cmds = vec![];
 
-            self.enqueue_cmds_from_channel().await;
+            // debug!("loop, pre cmds from channel");
 
-            self.process_all_pending_cmds().await;
+
+            // we go through all pending cmds in this loop
+            while self.cmd_ctrl.has_items_queued() || self.enqeued_new_cmds_from_channel().await {
+
+                self.process_all_pending_cmds().await;
+            }
+
+            // debug!("the cmd queue is empty");
+            // self.enqueue_cmds_from_channel().await;
 
             // Now we fill the queue with any msgs awaiting validation
             self.enqueue_all_waiting_msgs().await;
 
+            // debug!("waiting smgs queued");
 
 
             let now = Instant::now();
             let is_elder = self.node.read().await.is_elder();
 
 
-            self.perform_standard_periodic_checks(last_link_cleanup, #[cfg(feature = "back-pressure")] last_backpressure_check, last_data_batch_check).await;
+            // self.enqueue_cmds_for_standard_periodic_checks(last_link_cleanup, #[cfg(feature = "back-pressure")] last_backpressure_check, last_data_batch_check).await;
 
 
             // Things that should only happen to non elder nodes
@@ -255,7 +281,7 @@ impl FlowCtrl {
                     }
                 }
 
-                if cmds.is_empty() { log_sleep!(Duration::from_millis(15)); };
+                // if cmds.is_empty() { log_sleep!(Duration::from_millis(15)); };
 
                 for cmd in cmds {
                     if let Err(error) = self.fire_and_forget(cmd).await {
@@ -313,7 +339,8 @@ impl FlowCtrl {
                 cmds.extend(dysf_cmds);
             }
 
-            if cmds.is_empty() { log_sleep!(Duration::from_millis(15)); };
+            // if cmds.is_empty() { log_sleep!(Duration::from_millis(15)); };
+
             for cmd in cmds {
                 if let Err(error) = self.fire_and_forget(cmd).await {
                     error!("Error pushing node process cmd to controller: {error:?}");
