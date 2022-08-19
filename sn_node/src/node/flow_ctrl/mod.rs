@@ -130,6 +130,8 @@ impl FlowCtrl {
         // Here we handle any incoming conn messages
         // via the API channel
 
+        debug!("---------------- quing stuff from channel----------");
+
         // TODO: handle all disconnected, as we'll have lost CmdCtrl.
         while let Ok((cmd, _id)) = self.incoming_cmds_from_apis.try_recv() {
             new_cmds = true;
@@ -157,23 +159,31 @@ impl FlowCtrl {
         //     }
         // }
 
+        debug!("............. channel all queued up.................");
+
+
+        // TODO. Somewhere below here in msgs, after push, we're not getting more msgs in... despire obv connections there.
+        // WHY!?!
+
+
         new_cmds
     }
 
     /// Add any pending msgs to the cmd queue
-    async fn enqueue_new_incoming_msgs(&mut self) -> bool {
+    async fn enqueue_new_incoming_msgs(&mut self, info: NodeInfo) -> bool {
         // let mut cmds = vec![];
         let mut new_msgs = false;
-        let info = self.node.read().await.info();
          // Handle any incoming conn messages
             // this requires mut self
-            if let Ok(msg) =  self.incoming_msg_events.try_recv() {
+            while let Ok(msg) =  self.incoming_msg_events.try_recv() {
                 new_msgs = true;
                 debug!("pushing msg into cmd q");
                 // cmds.push(
                     let cmd = self.handle_new_msg_event(info.clone(), msg)
                         .await;
                 // )
+
+                debug!("msg event handleddd");
 
                 if let Err(error) = self.cmd_sender_channel.send((cmd, None)).await {
                     error!("Error pushing incoming msg cmd to controller: {error:?}");
@@ -192,6 +202,7 @@ impl FlowCtrl {
                 // }
             }
 
+            debug!("............. msgs queued up.................");
             new_msgs
 
             // for cmd in cmds {
@@ -271,15 +282,21 @@ impl FlowCtrl {
             // Cmds Queued should be cleared before we do _any_ of the interval OR messaging
             // ValidateMsg is always lowest prio...
 
-            let mut cmds = vec![];
+            // let mut cmds = vec![];
+
+            let info = self.node.read().await.info();
+
 
             // debug!("loop, pre cmds from channel");
 
-            let _ = self.enqueue_new_incoming_msgs().await;
+            let _ = self.enqueue_new_incoming_msgs(info).await;
             self.enqeue_new_cmds_from_channel().await;
 
+            debug!("qlen at start: {:?}", self.cmd_ctrl.queue_len());
             // we go through all pending cmds in this loop
             while self.cmd_ctrl.has_items_queued()  {
+
+                debug!("qlen while looping: {:?}", self.cmd_ctrl.queue_len());
 
                 // let _ = self.enqueue_new_incoming_msgs().await;
                 // self.enqeue_new_cmds_from_channel().await;
@@ -301,89 +318,89 @@ impl FlowCtrl {
             // debug!("waiting smgs queued");
 
 
-            let now = Instant::now();
-            let is_elder = self.node.read().await.is_elder();
+            // let now = Instant::now();
+            // let is_elder = self.node.read().await.is_elder();
 
 
-            self.enqueue_cmds_for_standard_periodic_checks(&mut last_link_cleanup, &mut last_data_batch_check, #[cfg(feature = "back-pressure")] &mut last_backpressure_check).await;
+            // self.enqueue_cmds_for_standard_periodic_checks(&mut last_link_cleanup, &mut last_data_batch_check, #[cfg(feature = "back-pressure")] &mut last_backpressure_check).await;
 
 
-            // Things that should only happen to non elder nodes
-            if !is_elder {
-                // if we've passed enough time, section probe
-                if last_section_probe.elapsed() > SECTION_PROBE_INTERVAL {
-                    last_section_probe = now;
-                    if let Some(cmd) = Self::probe_the_section(self.node.clone()).await {
-                        cmds.push(cmd);
-                    }
-                }
+            // // Things that should only happen to non elder nodes
+            // if !is_elder {
+            //     // if we've passed enough time, section probe
+            //     if last_section_probe.elapsed() > SECTION_PROBE_INTERVAL {
+            //         last_section_probe = now;
+            //         if let Some(cmd) = Self::probe_the_section(self.node.clone()).await {
+            //             cmds.push(cmd);
+            //         }
+            //     }
 
-                // if cmds.is_empty() { log_sleep!(Duration::from_millis(15)); };
+            //     // if cmds.is_empty() { log_sleep!(Duration::from_millis(15)); };
 
-                for cmd in cmds {
-                    if let Err(error) = self.fire_and_forget(cmd).await {
-                        error!("Error pushing node process cmd to controller: {error:?}");
-                    }
-                }
+            //     for cmd in cmds {
+            //         if let Err(error) = self.fire_and_forget(cmd).await {
+            //             error!("Error pushing node process cmd to controller: {error:?}");
+            //         }
+            //     }
 
-                log_sleep!(Duration::from_millis(15));
+            //     log_sleep!(Duration::from_millis(15));
 
-                // remaining cmds are for elders only.
-                // we've pushed what we have as an adult so we can continue
-                continue;
-            }
+            //     // remaining cmds are for elders only.
+            //     // we've pushed what we have as an adult so we can continue
+            //     continue;
+            // }
 
-            // Okay, so the node is currently an elder...
+            // // Okay, so the node is currently an elder...
 
-            if last_probe.elapsed() > PROBE_INTERVAL {
-                last_probe = now;
-                if let Some(cmd) = Self::probe_the_network(self.node.clone()).await {
-                    cmds.push(cmd);
-                }
-            }
+            // if last_probe.elapsed() > PROBE_INTERVAL {
+            //     last_probe = now;
+            //     if let Some(cmd) = Self::probe_the_network(self.node.clone()).await {
+            //         cmds.push(cmd);
+            //     }
+            // }
 
-            if last_adult_health_check.elapsed() > ADULT_HEALTH_CHECK_INTERVAL {
-                last_adult_health_check = now;
-                let health_cmds = match Self::perform_health_checks(self.node.clone()).await {
-                    Ok(cmds) => cmds,
-                    Err(error) => {
-                        error!("Error handling service msg to perform health check: {error:?}");
-                        vec![]
-                    }
-                };
-                cmds.extend(health_cmds);
-            }
+            // if last_adult_health_check.elapsed() > ADULT_HEALTH_CHECK_INTERVAL {
+            //     last_adult_health_check = now;
+            //     let health_cmds = match Self::perform_health_checks(self.node.clone()).await {
+            //         Ok(cmds) => cmds,
+            //         Err(error) => {
+            //             error!("Error handling service msg to perform health check: {error:?}");
+            //             vec![]
+            //         }
+            //     };
+            //     cmds.extend(health_cmds);
+            // }
 
-            // The above health check only queries for chunks
-            // here we specifically ask for AE prob msgs and manually
-            // track dysfunction
-            if last_elder_health_check.elapsed() > ELDER_HEALTH_CHECK_INTERVAL {
-                last_elder_health_check = now;
-                for cmd in Self::health_check_elders_in_section(self.node.clone()).await {
-                    cmds.push(cmd);
-                }
-            }
+            // // The above health check only queries for chunks
+            // // here we specifically ask for AE prob msgs and manually
+            // // track dysfunction
+            // if last_elder_health_check.elapsed() > ELDER_HEALTH_CHECK_INTERVAL {
+            //     last_elder_health_check = now;
+            //     for cmd in Self::health_check_elders_in_section(self.node.clone()).await {
+            //         cmds.push(cmd);
+            //     }
+            // }
 
-            if last_vote_check.elapsed() > MISSING_VOTE_INTERVAL {
-                last_vote_check = now;
-                if let Some(cmd) = Self::check_for_missed_votes(self.node.clone()).await {
-                    cmds.push(cmd);
-                };
-            }
+            // if last_vote_check.elapsed() > MISSING_VOTE_INTERVAL {
+            //     last_vote_check = now;
+            //     if let Some(cmd) = Self::check_for_missed_votes(self.node.clone()).await {
+            //         cmds.push(cmd);
+            //     };
+            // }
 
-            if last_dysfunction_check.elapsed() > DYSFUNCTION_CHECK_INTERVAL {
-                last_dysfunction_check = now;
-                let dysf_cmds = Self::check_for_dysfunction(self.node.clone()).await;
-                cmds.extend(dysf_cmds);
-            }
+            // if last_dysfunction_check.elapsed() > DYSFUNCTION_CHECK_INTERVAL {
+            //     last_dysfunction_check = now;
+            //     let dysf_cmds = Self::check_for_dysfunction(self.node.clone()).await;
+            //     cmds.extend(dysf_cmds);
+            // }
 
-            // if cmds.is_empty() { log_sleep!(Duration::from_millis(15)); };
+            // // if cmds.is_empty() { log_sleep!(Duration::from_millis(15)); };
 
-            for cmd in cmds {
-                if let Err(error) = self.fire_and_forget(cmd).await {
-                    error!("Error pushing node process cmd to controller: {error:?}");
-                }
-            }
+            // for cmd in cmds {
+            //     if let Err(error) = self.fire_and_forget(cmd).await {
+            //         error!("Error pushing node process cmd to controller: {error:?}");
+            //     }
+            // }
 
             log_sleep!(Duration::from_millis(15));
 

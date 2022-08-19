@@ -73,6 +73,10 @@ impl CmdCtrl {
     }
 
     /// Does the cmd_queue contain _anything_
+    pub(crate) fn queue_len(&self) -> usize {
+        self.cmd_queue.len()
+    }
+    /// Does the cmd_queue contain _anything_
     pub(crate) fn has_items_queued(&self) -> bool {
         !self.cmd_queue.is_empty()
     }
