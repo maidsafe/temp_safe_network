@@ -17,8 +17,8 @@ pub(crate) use self::cmd_ctrl::CmdCtrl;
 use event_channel::EventSender;
 
 use crate::comm::MsgEvent;
-use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Node, Result};
 use crate::log_sleep;
+use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Node, Result};
 
 use ed25519_dalek::Signer;
 #[cfg(feature = "traceroute")]
@@ -89,43 +89,28 @@ impl FlowCtrl {
         )
     }
 
-
     /// Start Processing all pending cmds in order
     async fn process_next_cmds_batch(&mut self) {
-        // Lets kick off processing any pending cmds
-        // if let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {
-        let mut cmds_kicked_off = 0;
+        if let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {
+            debug!("=> starting processing cmd {:?}", next_cmd_job);
 
-        // let mut next_cmd = self.cmd_ctrl.next_cmd();
-        // // while cmds_kicked_off < 10 && next_cmd.is_some() {
-        // while next_cmd.is_some() {
-            cmds_kicked_off += 1;
-
-            if let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {
-                debug!("=> starting processing cmd {:?}", next_cmd_job);
-
-
-                if let Err(error) = self
-                    .cmd_ctrl
-                    .process_cmd_job(
-                        next_cmd_job,
-                        self.cmd_sender_channel.clone(),
-                        self.outgoing_node_event_sender.clone(),
-                    )
-                    .await
-                {
-                    error!("Error during cmd processing: {error:?}");
-                }
-
-                // next_cmd = self.cmd_ctrl.next_cmd()
+            if let Err(error) = self
+                .cmd_ctrl
+                .process_cmd_job(
+                    next_cmd_job,
+                    self.cmd_sender_channel.clone(),
+                    self.outgoing_node_event_sender.clone(),
+                )
+                .await
+            {
+                error!("Error during cmd processing: {error:?}");
             }
-        // }
+        }
     }
 
     /// Pull and queue up all pending cmds from the CmdChannel
     /// returns if any cmds have been queued
     async fn enqeue_new_cmds_from_channel(&mut self) -> bool {
-        // let mut cmds = vec![];
         let mut new_cmds = false;
         // Here we handle any incoming conn messages
         // via the API channel
@@ -142,125 +127,95 @@ impl FlowCtrl {
             // cmds.push(value)
             // Ok((cmd, _id)) => cmds.push(cmd),
             // Err(TryRecvError::Empty) => {
-                //     // do nothing
-                // }
-                // Err(TryRecvError::Disconnected) => {
-                    //     trace!("Senders to `incoming_cmds_from_apis` have disconnected.");
-                    // }
-                }
-
-                // if !cmds.is_empty() {
-                    //     new_cmds = true;
-                    // }
-                    // for cmd in cmds {
-                        //     debug!("=> adding cmd to the queuueueueueuuee");
-                        //     if let Err(error) = self.fire_and_forget(cmd).await {
-                            //         error!("Error pushing node cmd from CmdChannel to controller: {error:?}");
-                            //     }
-                            // }
-
+            //     // do nothing
+            // }
+            // Err(TryRecvError::Disconnected) => {
+            //     trace!("Senders to `incoming_cmds_from_apis` have disconnected.");
+            // }
+        }
         debug!("----------------  channel Q done   ----------");
-
-
-        // TODO. Somewhere below here in msgs, after push, we're not getting more msgs in... despire obv connections there.
-        // WHY!?!
-
-
         new_cmds
     }
 
     /// Add any pending msgs to the cmd queue
     async fn enqueue_new_incoming_msgs(&mut self) -> bool {
         debug!("start enqueue_new_incoming_msgs");
-        // let mut cmds = vec![];
         let mut new_msgs = false;
-         // Handle any incoming conn messages
-            // this requires mut self
-            while let Ok(msg) =  self.incoming_msg_events.try_recv() {
-                new_msgs = true;
-                debug!("pushing msg into cmd q");
-                // cmds.push(
-                    let cmd = self.handle_new_msg_event(msg)
-                        .await;
-                // )
+        while let Ok(msg) = self.incoming_msg_events.try_recv() {
+            new_msgs = true;
+            debug!("pushing msg into cmd q");
+            let cmd = self.handle_new_msg_event(msg).await;
 
-                debug!("msg event handleddd");
+            debug!("msg event handleddd");
 
-                // dont use sender here incase channel gets full
-                if let Err(error) = self.fire_and_forget(cmd).await {
-                    error!("Error pushing node cmd from CmdChannel to controller: {error:?}");
-                }
-
-                // if let Err(error) = self.cmd_sender_channel.send((cmd, None)).await {
-                //     error!("Error pushing incoming msg cmd to controller: {error:?}");
-                // };
-
-                // Ok(msg) => cmds.push(
-                //     self.handle_new_msg_event(self.node.read().await.info(), msg)
-                //         .await,
-                // ),
-                // Err(TryRecvError::Empty) => {
-                //     // do nothing
-                // }
-                // Err(TryRecvError::Disconnected) => {
-                //     trace!("Senders to `incoming_msg_events` have disconnected. Stopping node periodic tasks.");
-                //     break;
-                // }
+            // dont use sender here incase channel gets full
+            if let Err(error) = self.fire_and_forget(cmd).await {
+                error!("Error pushing node cmd from CmdChannel to controller: {error:?}");
             }
 
-            debug!("............. msgs queued up.................");
-            new_msgs
-
-            // for cmd in cmds {
-            //     debug!("msg cmd pushed");
-            //     if let Err(error) = self.cmd_sender_channel.send((cmd, None)).await {
-            //         error!("Error pushing incoming msg cmd to controller: {error:?}");
-            //     };
+            // Ok(msg) => cmds.push(
+            //     self.handle_new_msg_event(self.node.read().await.info(), msg)
+            //         .await,
+            // ),
+            // Err(TryRecvError::Empty) => {
+            //     // do nothing
             // }
+            // Err(TryRecvError::Disconnected) => {
+            //     trace!("Senders to `incoming_msg_events` have disconnected. Stopping node periodic tasks.");
+            //     break;
+            // }
+        }
+
+        debug!("............. msgs queued up.................");
+        new_msgs
     }
 
-
-    async fn enqueue_cmds_for_standard_periodic_checks(&mut self, last_link_cleanup: &mut Instant,  last_data_batch_check: &mut Instant, #[cfg(feature = "back-pressure")]  last_backpressure_check: &mut Instant ) {
+    async fn enqueue_cmds_for_standard_periodic_checks(
+        &mut self,
+        last_link_cleanup: &mut Instant,
+        last_data_batch_check: &mut Instant,
+        #[cfg(feature = "back-pressure")] last_backpressure_check: &mut Instant,
+    ) {
         let now = Instant::now();
         let mut cmds = vec![];
 
-                // happens regardless of if elder or adult
-            if last_link_cleanup.elapsed() > LINK_CLEANUP_INTERVAL {
-                *last_link_cleanup = now;
-                cmds.push(Cmd::CleanupPeerLinks);
+        // happens regardless of if elder or adult
+        if last_link_cleanup.elapsed() > LINK_CLEANUP_INTERVAL {
+            *last_link_cleanup = now;
+            cmds.push(Cmd::CleanupPeerLinks);
+        }
+
+        #[cfg(feature = "back-pressure")]
+        if last_backpressure_check.elapsed() > BACKPRESSURE_INTERVAL {
+            *last_backpressure_check = now;
+
+            if let Some(cmd) = Self::report_backpressure(self.node.clone(), &self.cmd_ctrl).await {
+                cmds.push(cmd)
             }
+        }
 
-            #[cfg(feature = "back-pressure")]
-            if last_backpressure_check.elapsed() > BACKPRESSURE_INTERVAL {
-                *last_backpressure_check = now;
-
-                if let Some(cmd) =
-                    Self::report_backpressure(self.node.clone(), &self.cmd_ctrl).await
-                {
-                    cmds.push(cmd)
+        // if we've passed enough time, batch outgoing data
+        if last_data_batch_check.elapsed() > DATA_BATCH_INTERVAL {
+            *last_data_batch_check = now;
+            if let Some(cmd) = match Self::replicate_queued_data(self.node.clone()).await {
+                Ok(cmd) => cmd,
+                Err(error) => {
+                    error!(
+                        "Error handling getting cmds for data queued for replication: {error:?}"
+                    );
+                    None
                 }
+            } {
+                cmds.push(cmd);
             }
+        }
 
-            // if we've passed enough time, batch outgoing data
-            if last_data_batch_check.elapsed() > DATA_BATCH_INTERVAL {
-                *last_data_batch_check = now;
-                if let Some(cmd) = match Self::replicate_queued_data(self.node.clone()).await {
-                    Ok(cmd) => cmd,
-                    Err(error) => {
-                        error!("Error handling getting cmds for data queued for replication: {error:?}");
-                        None
-                    }
-                } {
-                    cmds.push(cmd);
-                }
+        for cmd in cmds {
+            // dont use sender here incase channel gets full
+            if let Err(error) = self.fire_and_forget(cmd).await {
+                error!("Error pushing node periodic cmd to controller: {error:?}");
             }
-
-            for cmd in cmds {
-                // dont use sender here incase channel gets full
-                if let Err(error) = self.fire_and_forget(cmd).await {
-                    error!("Error pushing node periodic cmd to controller: {error:?}");
-                }
-            }
+        }
     }
 
     /// This is a never ending loop as long as the node is live.
@@ -286,16 +241,7 @@ impl FlowCtrl {
                 .wait_if_not_processing_at_expected_rate()
                 .await;
 
-            // Cmds Queued should be cleared before we do _any_ of the interval OR messaging
-            // ValidateMsg is always lowest prio...
-
-            // let mut cmds = vec![];
-
             debug!("---------------- start loop ----------------------");
-            // let info = self.node.read().await.info();
-
-
-            // debug!("loop, pre cmds from channel");
 
             let _ = self.enqueue_new_incoming_msgs().await;
             debug!("---------------- enQQQQQQQQQQQQQd incoming ----------------------");
@@ -304,8 +250,7 @@ impl FlowCtrl {
 
             debug!("qlen at start: {:?}", self.cmd_ctrl.queue_len());
             // we go through all pending cmds in this loop
-            while self.cmd_ctrl.has_items_queued()  {
-
+            while self.cmd_ctrl.has_items_queued() {
                 debug!("qlen while looping: {:?}", self.cmd_ctrl.queue_len());
 
                 // let _ = self.enqueue_new_incoming_msgs().await;
@@ -317,7 +262,6 @@ impl FlowCtrl {
                 // debug!("cmds batch done");
             }
 
-
             debug!("--------------------------CMD MSG LOOPS DONE--------------------");
             // debug!("the cmd queue is empty");
             // self.enqueue_cmds_from_channel().await;
@@ -327,13 +271,10 @@ impl FlowCtrl {
 
             // debug!("waiting smgs queued");
 
-
             // let now = Instant::now();
             // let is_elder = self.node.read().await.is_elder();
 
-
             // self.enqueue_cmds_for_standard_periodic_checks(&mut last_link_cleanup, &mut last_data_batch_check, #[cfg(feature = "back-pressure")] &mut last_backpressure_check).await;
-
 
             // // Things that should only happen to non elder nodes
             // if !is_elder {
@@ -413,7 +354,6 @@ impl FlowCtrl {
             // }
 
             // log_sleep!(Duration::from_m illis(15));
-
         }
 
         error!("Internal processing ended.")
