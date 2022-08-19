@@ -91,21 +91,28 @@ impl FlowCtrl {
 
 
     /// Start Processing all pending cmds in order
-    async fn process_all_pending_cmds(&mut self) {
+    async fn process_next_cmds_batch(&mut self) {
         // Lets kick off processing any pending cmds
         // if let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {
-        while let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {
-            debug!("=> starting processing cmd {:?}", next_cmd_job);
-            if let Err(error) = self
-                .cmd_ctrl
-                .process_cmd_job(
-                    next_cmd_job,
-                    self.cmd_sender_channel.clone(),
-                    self.outgoing_node_event_sender.clone(),
-                )
-                .await
-            {
-                error!("Error during cmd processing: {error:?}");
+        let mut cmds_kicked_off = 0;
+        while cmds_kicked_off < 10 {
+
+            while let Some(next_cmd_job) = self.cmd_ctrl.next_cmd(){
+                debug!("=> starting processing cmd {:?}", next_cmd_job);
+                cmds_kicked_off += 1;
+
+
+                if let Err(error) = self
+                    .cmd_ctrl
+                    .process_cmd_job(
+                        next_cmd_job,
+                        self.cmd_sender_channel.clone(),
+                        self.outgoing_node_event_sender.clone(),
+                    )
+                    .await
+                {
+                    error!("Error during cmd processing: {error:?}");
+                }
             }
         }
     }
@@ -149,13 +156,14 @@ impl FlowCtrl {
     }
 
     /// Add any pending msgs to the cmd queue
-    async fn enqueue_all_waiting_msgs(&mut self) {
+    async fn enqueued_new_incoming_msgs(&mut self) -> bool {
         // let mut cmds = vec![];
-
+        let mut new_msgs = false;
         let info = self.node.read().await.info();
          // Handle any incoming conn messages
             // this requires mut self
             while let Ok(msg) =  self.incoming_msg_events.try_recv() {
+                new_msgs = true;
                 debug!("pushing msg into cmd q");
                 // cmds.push(
                     let cmd = self.handle_new_msg_event(info.clone(), msg)
@@ -178,6 +186,8 @@ impl FlowCtrl {
                 //     break;
                 // }
             }
+
+            new_msgs
 
             // for cmd in cmds {
             //     debug!("msg cmd pushed");
@@ -262,16 +272,16 @@ impl FlowCtrl {
 
 
             // we go through all pending cmds in this loop
-            while self.cmd_ctrl.has_items_queued() || self.enqeued_new_cmds_from_channel().await {
+            while self.enqueued_new_incoming_msgs().await || self.cmd_ctrl.has_items_queued() || self.enqeued_new_cmds_from_channel().await {
 
-                self.process_all_pending_cmds().await;
+                self.process_next_cmds_batch().await;
             }
 
             // debug!("the cmd queue is empty");
             // self.enqueue_cmds_from_channel().await;
 
             // Now we fill the queue with any msgs awaiting validation
-            self.enqueue_all_waiting_msgs().await;
+            // self.enqueued_new_incoming_msgs().await;
 
             // debug!("waiting smgs queued");
 
