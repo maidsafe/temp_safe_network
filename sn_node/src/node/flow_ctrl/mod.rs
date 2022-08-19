@@ -89,6 +89,47 @@ impl FlowCtrl {
         )
     }
 
+    /// Start Processing all pending cmds in order
+    async fn process_all_pending_cmds(&mut self) {
+        // Lets kick off processing any pending cmds
+        // if let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {
+        while let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {
+            if let Err(error) = self
+                .cmd_ctrl
+                .process_cmd_job(
+                    next_cmd_job,
+                    self.cmd_sender_channel.clone(),
+                    self.outgoing_node_event_sender.clone(),
+                )
+                .await
+            {
+                error!("Error during cmd processing: {error:?}");
+            }
+        }
+    }
+
+    /// Pull and queue up all pending cmds from the CmdChannel
+    async fn enqueue_cmds_from_channel(&mut self) {
+        let mut cmds = vec![];
+
+        // Here we handle any incoming conn messages
+        // via the API channel
+        match self.incoming_cmds_from_apis.try_recv() {
+            // TODO: handle a passed if if that still makes sense here
+            Ok((cmd, _id)) => cmds.push(cmd),
+            Err(TryRecvError::Empty) => {
+                // do nothing
+            }
+            Err(TryRecvError::Disconnected) => {
+                trace!("Senders to `incoming_cmds_from_apis` have disconnected.");
+            }
+        }
+
+        for cmd in cmds {
+            self.fire_and_forget(cmd).await;
+        }
+    }
+
 
     /// This is a never ending loop as long as the node is live.
     /// This loop drives the periodic events internal to the node.
@@ -118,37 +159,13 @@ impl FlowCtrl {
 
             let mut cmds = vec![];
 
-            // Here we handle any incoming conn messages
-            // via the API channel
-            match self.incoming_cmds_from_apis.try_recv() {
-                // TODO: handle a passed if if that still makes sense here
-                Ok((cmd, _id)) => cmds.push(cmd),
-                Err(TryRecvError::Empty) => {
-                    // do nothing
-                }
-                Err(TryRecvError::Disconnected) => {
-                    trace!("Senders to `incoming_cmds_from_apis` have disconnected.");
-                }
-            }
+            self.enqueue_cmds_from_channel().await;
 
-            // Lets kick off processing any pending cmds
-            // if let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {
-            while let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {
-                if let Err(error) = self
-                    .cmd_ctrl
-                    .process_cmd_job(
-                        next_cmd_job,
-                        self.cmd_sender_channel.clone(),
-                        self.outgoing_node_event_sender.clone(),
-                    )
-                    .await
-                {
-                    error!("Error during cmd processing: {error:?}");
-                }
-            }
+            self.process_all_pending_cmds().await;
+
+
 
             let now = Instant::now();
-
             let is_elder = self.node.read().await.is_elder();
 
 
