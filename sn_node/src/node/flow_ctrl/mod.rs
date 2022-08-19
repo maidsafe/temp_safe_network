@@ -130,6 +130,76 @@ impl FlowCtrl {
         }
     }
 
+    /// Add any pending msgs to the cmd queue
+    async fn enqueue_all_waiting_msgs(&mut self) {
+        let mut cmds = vec![];
+
+         // Handle any incoming conn messages
+            // this requires mut self
+            while let Ok(msg) =  self.incoming_msg_events.try_recv() {
+                cmds.push(
+                    self.handle_new_msg_event(self.node.read().await.info(), msg)
+                        .await,
+                )
+
+                // Ok(msg) => cmds.push(
+                //     self.handle_new_msg_event(self.node.read().await.info(), msg)
+                //         .await,
+                // ),
+                // Err(TryRecvError::Empty) => {
+                //     // do nothing
+                // }
+                // Err(TryRecvError::Disconnected) => {
+                //     trace!("Senders to `incoming_msg_events` have disconnected. Stopping node periodic tasks.");
+                //     break;
+                // }
+            }
+
+            for cmd in cmds {
+                self.fire_and_forget(cmd).await;
+            }
+    }
+
+
+    async fn perform_standard_periodic_checks(&mut self, mut last_link_cleanup: Instant, #[cfg(feature = "back-pressure")] mut last_backpressure_check: Instant, mut last_data_batch_check: Instant ) {
+        let now = Instant::now();
+        let mut cmds = vec![];
+
+                // happens regardless of if elder or adult
+            if last_link_cleanup.elapsed() > LINK_CLEANUP_INTERVAL {
+                last_link_cleanup = now;
+                cmds.push(Cmd::CleanupPeerLinks);
+            }
+
+            #[cfg(feature = "back-pressure")]
+            if last_backpressure_check.elapsed() > BACKPRESSURE_INTERVAL {
+                last_backpressure_check = now;
+
+                if let Some(cmd) =
+                    Self::report_backpressure(self.node.clone(), &self.cmd_ctrl).await
+                {
+                    cmds.push(cmd)
+                }
+            }
+
+            // if we've passed enough time, batch outgoing data
+            if last_data_batch_check.elapsed() > DATA_BATCH_INTERVAL {
+                last_data_batch_check = now;
+                if let Some(cmd) = match Self::replicate_queued_data(self.node.clone()).await {
+                    Ok(cmd) => cmd,
+                    Err(error) => {
+                        error!("Error handling getting cmds for data queued for replication: {error:?}");
+                        None
+                    }
+                } {
+                    cmds.push(cmd);
+                }
+            }
+
+            for cmd in cmds {
+                self.fire_and_forget(cmd).await;
+            }
+    }
 
     /// This is a never ending loop as long as the node is live.
     /// This loop drives the periodic events internal to the node.
@@ -163,58 +233,17 @@ impl FlowCtrl {
 
             self.process_all_pending_cmds().await;
 
+            // Now we fill the queue with any msgs awaiting validation
+            self.enqueue_all_waiting_msgs().await;
+
 
 
             let now = Instant::now();
             let is_elder = self.node.read().await.is_elder();
 
 
-            // Handle any incoming conn messages
-            // this requires mut self
-            match self.incoming_msg_events.try_recv() {
-                Ok(msg) => cmds.push(
-                    self.handle_new_msg_event(self.node.read().await.info(), msg)
-                        .await,
-                ),
-                Err(TryRecvError::Empty) => {
-                    // do nothing
-                }
-                Err(TryRecvError::Disconnected) => {
-                    trace!("Senders to `incoming_msg_events` have disconnected. Stopping node periodic tasks.");
-                    break;
-                }
-            }
+            self.perform_standard_periodic_checks(last_link_cleanup, #[cfg(feature = "back-pressure")] last_backpressure_check, last_data_batch_check).await;
 
-            // happens regardless of if elder or adult
-            if last_link_cleanup.elapsed() > LINK_CLEANUP_INTERVAL {
-                last_link_cleanup = now;
-                cmds.push(Cmd::CleanupPeerLinks);
-            }
-
-            #[cfg(feature = "back-pressure")]
-            if last_backpressure_check.elapsed() > BACKPRESSURE_INTERVAL {
-                last_backpressure_check = now;
-
-                if let Some(cmd) =
-                    Self::report_backpressure(self.node.clone(), &self.cmd_ctrl).await
-                {
-                    cmds.push(cmd)
-                }
-            }
-
-            // if we've passed enough time, batch outgoing data
-            if last_data_batch_check.elapsed() > DATA_BATCH_INTERVAL {
-                last_data_batch_check = now;
-                if let Some(cmd) = match Self::replicate_queued_data(self.node.clone()).await {
-                    Ok(cmd) => cmd,
-                    Err(error) => {
-                        error!("Error handling getting cmds for data queued for replication: {error:?}");
-                        None
-                    }
-                } {
-                    cmds.push(cmd);
-                }
-            }
 
             // Things that should only happen to non elder nodes
             if !is_elder {
