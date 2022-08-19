@@ -96,12 +96,12 @@ impl FlowCtrl {
         // if let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {
         let mut cmds_kicked_off = 0;
 
-        let mut next_cmd = self.cmd_ctrl.next_cmd();
-        // while cmds_kicked_off < 10 && next_cmd.is_some() {
-        while next_cmd.is_some() {
+        // let mut next_cmd = self.cmd_ctrl.next_cmd();
+        // // while cmds_kicked_off < 10 && next_cmd.is_some() {
+        // while next_cmd.is_some() {
             cmds_kicked_off += 1;
 
-            while let Some(next_cmd_job) = next_cmd {
+            if let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {
                 debug!("=> starting processing cmd {:?}", next_cmd_job);
 
 
@@ -117,9 +117,9 @@ impl FlowCtrl {
                     error!("Error during cmd processing: {error:?}");
                 }
 
-                next_cmd = self.cmd_ctrl.next_cmd()
+                // next_cmd = self.cmd_ctrl.next_cmd()
             }
-        }
+        // }
     }
 
     /// Pull and queue up all pending cmds from the CmdChannel
@@ -167,7 +167,7 @@ impl FlowCtrl {
         let info = self.node.read().await.info();
          // Handle any incoming conn messages
             // this requires mut self
-            while let Ok(msg) =  self.incoming_msg_events.try_recv() {
+            if let Ok(msg) =  self.incoming_msg_events.try_recv() {
                 new_msgs = true;
                 debug!("pushing msg into cmd q");
                 // cmds.push(
@@ -275,18 +275,23 @@ impl FlowCtrl {
 
             // debug!("loop, pre cmds from channel");
 
+            let _ = self.enqueue_new_incoming_msgs().await;
+            self.enqeue_new_cmds_from_channel().await;
 
             // we go through all pending cmds in this loop
-            // while self.enqueued_new_incoming_msgs().await || self.cmd_ctrl.has_items_queued() || self.enqeued_new_cmds_from_channel().await {
+            while self.cmd_ctrl.has_items_queued()  {
 
-                let _ = self.enqueue_new_incoming_msgs().await;
-                debug!("enqued msgs");
-                let _ = self.enqeue_new_cmds_from_channel().await;
-                debug!("added all from channel");
+                // let _ = self.enqueue_new_incoming_msgs().await;
+                // self.enqeue_new_cmds_from_channel().await;
+                // debug!("enqued msgs");
+                // let _ = self.enqeue_new_cmds_from_channel().await;
+                // debug!("added all from channel");
                 self.process_next_cmds_batch().await;
-                debug!("cmds batch done");
-            // }
+                // debug!("cmds batch done");
+            }
 
+
+            debug!("--------------------------CMD MSG LOOPS DONE--------------------");
             // debug!("the cmd queue is empty");
             // self.enqueue_cmds_from_channel().await;
 
