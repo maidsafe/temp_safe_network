@@ -74,7 +74,7 @@ impl FlowCtrl {
         outgoing_node_event_sender: EventSender,
     ) -> (Self, mpsc::Sender<(Cmd, Option<usize>)>) {
         let node = cmd_ctrl.node();
-        let (cmd_sender_channel, incoming_cmds_from_apis) = mpsc::channel(1);
+        let (cmd_sender_channel, incoming_cmds_from_apis) = mpsc::channel(100);
 
         (
             Self {
@@ -170,7 +170,7 @@ impl FlowCtrl {
     }
 
     /// Add any pending msgs to the cmd queue
-    async fn enqueue_new_incoming_msgs(&mut self, info: NodeInfo) -> bool {
+    async fn enqueue_new_incoming_msgs(&mut self) -> bool {
         debug!("start enqueue_new_incoming_msgs");
         // let mut cmds = vec![];
         let mut new_msgs = false;
@@ -180,15 +180,20 @@ impl FlowCtrl {
                 new_msgs = true;
                 debug!("pushing msg into cmd q");
                 // cmds.push(
-                    let cmd = self.handle_new_msg_event(info.clone(), msg)
+                    let cmd = self.handle_new_msg_event(msg)
                         .await;
                 // )
 
                 debug!("msg event handleddd");
 
-                if let Err(error) = self.cmd_sender_channel.send((cmd, None)).await {
-                    error!("Error pushing incoming msg cmd to controller: {error:?}");
-                };
+                // dont use sender here incase channel gets full
+                if let Err(error) = self.fire_and_forget(cmd).await {
+                    error!("Error pushing node cmd from CmdChannel to controller: {error:?}");
+                }
+
+                // if let Err(error) = self.cmd_sender_channel.send((cmd, None)).await {
+                //     error!("Error pushing incoming msg cmd to controller: {error:?}");
+                // };
 
                 // Ok(msg) => cmds.push(
                 //     self.handle_new_msg_event(self.node.read().await.info(), msg)
@@ -251,7 +256,8 @@ impl FlowCtrl {
             }
 
             for cmd in cmds {
-                if let Err(error) = self.cmd_sender_channel.send((cmd, None)).await {
+                // dont use sender here incase channel gets full
+                if let Err(error) = self.fire_and_forget(cmd).await {
                     error!("Error pushing node periodic cmd to controller: {error:?}");
                 }
             }
@@ -276,9 +282,9 @@ impl FlowCtrl {
         loop {
             // if we want to throttle cmd throughput, we do that here.
             // if there is nothing in the cmd queue, we wait here too.
-            // self.cmd_ctrl
-            //     .wait_if_not_processing_at_expected_rate()
-            //     .await;
+            self.cmd_ctrl
+                .wait_if_not_processing_at_expected_rate()
+                .await;
 
             // Cmds Queued should be cleared before we do _any_ of the interval OR messaging
             // ValidateMsg is always lowest prio...
@@ -286,13 +292,15 @@ impl FlowCtrl {
             // let mut cmds = vec![];
 
             debug!("---------------- start loop ----------------------");
-            let info = self.node.read().await.info();
+            // let info = self.node.read().await.info();
 
 
             // debug!("loop, pre cmds from channel");
 
-            let _ = self.enqueue_new_incoming_msgs(info).await;
+            let _ = self.enqueue_new_incoming_msgs().await;
+            debug!("---------------- enQQQQQQQQQQQQQd incoming ----------------------");
             self.enqeue_new_cmds_from_channel().await;
+            debug!("---------------- enQQQQQQQQQQQQQd new_cmdssss ----------------------");
 
             debug!("qlen at start: {:?}", self.cmd_ctrl.queue_len());
             // we go through all pending cmds in this loop
@@ -653,7 +661,7 @@ impl FlowCtrl {
     }
 
     // Listen for a new incoming connection event and handle it.
-    async fn handle_new_msg_event(&self, node_info: NodeInfo, event: MsgEvent) -> Cmd {
+    async fn handle_new_msg_event(&self, event: MsgEvent) -> Cmd {
         match event {
             MsgEvent::Received {
                 sender,
@@ -667,8 +675,8 @@ impl FlowCtrl {
                 );
 
                 let span = {
-                    let name = node_info.name();
-                    trace_span!("handle_message", name = %name, ?sender, msg_id = ?wire_msg.msg_id())
+                    // let name = node_info.name();
+                    trace_span!("handle_message", ?sender, msg_id = ?wire_msg.msg_id())
                 };
                 let _span_guard = span.enter();
 
