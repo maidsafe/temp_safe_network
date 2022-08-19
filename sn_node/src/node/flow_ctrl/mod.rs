@@ -88,6 +88,7 @@ impl FlowCtrl {
         )
     }
 
+
     /// This is a never ending loop as long as the node is live.
     /// This loop drives the periodic events internal to the node.
     pub(crate) async fn process_messages_and_periodic_checks(mut self) {
@@ -112,7 +113,8 @@ impl FlowCtrl {
                 .await;
 
             // Lets kick off processing any pending cmds
-            if let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {
+            // if let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {
+            while let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {
                 if let Err(error) = self
                     .cmd_ctrl
                     .process_cmd_job(

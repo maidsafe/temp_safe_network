@@ -116,7 +116,7 @@ impl CmdCtrl {
             log_sleep!(EMPTY_QUEUE_SLEEP_TIME);
         } else {
             // stop overactive CPUs
-            log_sleep!(EMPTY_QUEUE_SLEEP_TIME / 10);
+            // log_sleep!(EMPTY_QUEUE_SLEEP_TIME / 10);
         }
     }
 
