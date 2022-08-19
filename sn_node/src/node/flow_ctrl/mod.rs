@@ -142,24 +142,24 @@ impl FlowCtrl {
             // cmds.push(value)
             // Ok((cmd, _id)) => cmds.push(cmd),
             // Err(TryRecvError::Empty) => {
-            //     // do nothing
-            // }
-            // Err(TryRecvError::Disconnected) => {
-            //     trace!("Senders to `incoming_cmds_from_apis` have disconnected.");
-            // }
-        }
+                //     // do nothing
+                // }
+                // Err(TryRecvError::Disconnected) => {
+                    //     trace!("Senders to `incoming_cmds_from_apis` have disconnected.");
+                    // }
+                }
 
-        // if !cmds.is_empty() {
-        //     new_cmds = true;
-        // }
-        // for cmd in cmds {
-        //     debug!("=> adding cmd to the queuueueueueuuee");
-        //     if let Err(error) = self.fire_and_forget(cmd).await {
-        //         error!("Error pushing node cmd from CmdChannel to controller: {error:?}");
-        //     }
-        // }
+                // if !cmds.is_empty() {
+                    //     new_cmds = true;
+                    // }
+                    // for cmd in cmds {
+                        //     debug!("=> adding cmd to the queuueueueueuuee");
+                        //     if let Err(error) = self.fire_and_forget(cmd).await {
+                            //         error!("Error pushing node cmd from CmdChannel to controller: {error:?}");
+                            //     }
+                            // }
 
-        debug!("............. channel all queued up.................");
+        debug!("----------------  channel Q done   ----------");
 
 
         // TODO. Somewhere below here in msgs, after push, we're not getting more msgs in... despire obv connections there.
@@ -171,6 +171,7 @@ impl FlowCtrl {
 
     /// Add any pending msgs to the cmd queue
     async fn enqueue_new_incoming_msgs(&mut self, info: NodeInfo) -> bool {
+        debug!("start enqueue_new_incoming_msgs");
         // let mut cmds = vec![];
         let mut new_msgs = false;
          // Handle any incoming conn messages
@@ -284,6 +285,7 @@ impl FlowCtrl {
 
             // let mut cmds = vec![];
 
+            debug!("---------------- start loop ----------------------");
             let info = self.node.read().await.info();
 
 
@@ -402,7 +404,7 @@ impl FlowCtrl {
             //     }
             // }
 
-            log_sleep!(Duration::from_millis(15));
+            // log_sleep!(Duration::from_m illis(15));
 
         }
 
