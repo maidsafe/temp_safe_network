@@ -567,10 +567,10 @@ impl Session {
 
                 let result = match link.send_with(msg_bytes_clone.clone(), None, listen).await {
                     Ok(()) => Ok(()),
-                    Err(error) => match error {
-                        SendToOneError::Connection(err) => Err(Error::QuicP2pConnection(err)),
-                        SendToOneError::Send(err) => Err(Error::QuicP2pSend(err)),
-                    },
+                    Err(SendToOneError::Connection(err)) => {
+                        Err(Error::QuicP2pConnection { peer, error: err })
+                    }
+                    Err(SendToOneError::Send(err)) => Err(Error::QuicP2pSend { peer, error: err }),
                 };
                 (peer_name, result)
             });
