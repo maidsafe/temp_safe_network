@@ -23,7 +23,6 @@ use crate::node::{
 };
 use crate::UsedSpace;
 
-use futures::TryFutureExt;
 use sn_interface::{
     network_knowledge::{NodeInfo, SectionTree, MIN_ADULT_AGE},
     types::{keys::ed25519, log_markers::LogMarker, PublicKey as TypesPublicKey},
