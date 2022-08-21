@@ -109,7 +109,6 @@ impl FlowCtrl {
     }
 
     /// Pull and queue up all pending cmds from the CmdChannel
-    /// returns if any cmds have been queued
     async fn enqeue_new_cmds_from_channel(&mut self) -> Result<()> {
         debug!("---------------- quing stuff from channel----------");
         loop {
@@ -134,38 +133,69 @@ impl FlowCtrl {
         Ok(())
     }
 
-    /// Add any pending msgs to the cmd queue
-    async fn enqueue_new_incoming_msgs(&mut self) -> bool {
-        debug!("start enqueue_new_incoming_msgs");
-        let mut new_msgs = false;
-        while let Ok(msg) = self.incoming_msg_events.try_recv() {
-            new_msgs = true;
-            debug!("pushing msg into cmd q");
-            let cmd = self.handle_new_msg_event(msg).await;
+    /// Pull and queue up all pending msgs from the MsgSender
+    async fn enqueue_new_incoming_msgs(&mut self) -> Result<()> {
+        debug!("---------------- quing cmds from new msgs ----------");
+        loop {
+            match self.incoming_msg_events.try_recv() {
+                Ok(msg) => {
+                    debug!("pushing msg into cmd q");
+                    let cmd = self.handle_new_msg_event(msg).await;
 
-            debug!("msg event handleddd");
+                    debug!("msg event handleddd");
 
-            // dont use sender here incase channel gets full
-            if let Err(error) = self.fire_and_forget(cmd).await {
-                error!("Error pushing node cmd from CmdChannel to controller: {error:?}");
+                    // dont use sender here incase channel gets full
+                    if let Err(error) = self.fire_and_forget(cmd).await {
+                        error!("Error pushing node msg as cmd to controller: {error:?}");
+                    }
+                }
+                Err(TryRecvError::Empty) => {
+                    // do nothing
+                    continue;
+                }
+                Err(TryRecvError::Disconnected) => {
+                    error!("Senders to `incoming_cmds_from_apis` have disconnected.");
+                    return Err(Error::MsgChannelDropped);
+                }
             }
-
-            // Ok(msg) => cmds.push(
-            //     self.handle_new_msg_event(self.node.read().await.info(), msg)
-            //         .await,
-            // ),
-            // Err(TryRecvError::Empty) => {
-            //     // do nothing
-            // }
-            // Err(TryRecvError::Disconnected) => {
-            //     trace!("Senders to `incoming_msg_events` have disconnected. Stopping node periodic tasks.");
-            //     break;
-            // }
         }
 
-        debug!("............. msgs queued up.................");
-        new_msgs
+        debug!("----------------  msg Q done   ----------");
+        Ok(())
     }
+
+    // /// Add any pending msgs to the cmd queue
+    // async fn enqueue_new_incoming_msgs(&mut self) -> bool {
+    //     debug!("start enqueue_new_incoming_msgs");
+    //     let mut new_msgs = false;
+    //     while let Ok(msg) = self.incoming_msg_events.try_recv() {
+    //         new_msgs = true;
+    //         debug!("pushing msg into cmd q");
+    //         let cmd = self.handle_new_msg_event(msg).await;
+
+    //         debug!("msg event handleddd");
+
+    //         // dont use sender here incase channel gets full
+    //         if let Err(error) = self.fire_and_forget(cmd).await {
+    //             error!("Error pushing node cmd from CmdChannel to controller: {error:?}");
+    //         }
+
+    //         // Ok(msg) => cmds.push(
+    //         //     self.handle_new_msg_event(self.node.read().await.info(), msg)
+    //         //         .await,
+    //         // ),
+    //         // Err(TryRecvError::Empty) => {
+    //         //     // do nothing
+    //         // }
+    //         // Err(TryRecvError::Disconnected) => {
+    //         //     trace!("Senders to `incoming_msg_events` have disconnected. Stopping node periodic tasks.");
+    //         //     break;
+    //         // }
+    //     }
+
+    //     debug!("............. msgs queued up.................");
+    //     new_msgs
+    // }
 
     async fn enqueue_cmds_for_standard_periodic_checks(
         &mut self,
