@@ -23,6 +23,7 @@ use crate::node::{
 };
 use crate::UsedSpace;
 
+use futures::TryFutureExt;
 use sn_interface::{
     network_knowledge::{NodeInfo, SectionTree, MIN_ADULT_AGE},
     types::{keys::ed25519, log_markers::LogMarker, PublicKey as TypesPublicKey},
@@ -281,14 +282,14 @@ async fn bootstrap_node(
 
     let node = Arc::new(RwLock::new(node));
     let cmd_ctrl = CmdCtrl::new(Dispatcher::new(node.clone(), comm), monitoring);
-    let (msg_and_period_ctrl, cmd_channel) =
-        FlowCtrl::new(cmd_ctrl, connection_event_rx, event_sender);
+    let (flow_ctrl, cmd_channel) = FlowCtrl::new(cmd_ctrl, connection_event_rx, event_sender);
 
-    let _ = tokio::task::spawn_local(async move {
-        msg_and_period_ctrl
-            .process_messages_and_periodic_checks()
-            .await
-    });
+    tokio::task::spawn_local(async move {
+        flow_ctrl.process_messages_and_periodic_checks().await?;
+
+        Ok::<(), Error>(())
+    })
+    .await??;
 
     Ok((node, cmd_channel, event_receiver))
 }

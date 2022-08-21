@@ -18,7 +18,7 @@ use event_channel::EventSender;
 
 use crate::comm::MsgEvent;
 use crate::log_sleep;
-use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Node, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Error, Node, Result};
 
 use ed25519_dalek::Signer;
 #[cfg(feature = "traceroute")]
@@ -110,31 +110,28 @@ impl FlowCtrl {
 
     /// Pull and queue up all pending cmds from the CmdChannel
     /// returns if any cmds have been queued
-    async fn enqeue_new_cmds_from_channel(&mut self) -> bool {
-        let mut new_cmds = false;
-        // Here we handle any incoming conn messages
-        // via the API channel
-
+    async fn enqeue_new_cmds_from_channel(&mut self) -> Result<()> {
         debug!("---------------- quing stuff from channel----------");
-
-        // TODO: handle all disconnected, as we'll have lost CmdCtrl.
-        while let Ok((cmd, _id)) = self.incoming_cmds_from_apis.try_recv() {
-            new_cmds = true;
-            if let Err(error) = self.fire_and_forget(cmd).await {
-                error!("Error pushing node cmd from CmdChannel to controller: {error:?}");
+        loop {
+            match self.incoming_cmds_from_apis.try_recv() {
+                Ok((cmd, _id)) => {
+                    if let Err(error) = self.fire_and_forget(cmd).await {
+                        error!("Error pushing node cmd from CmdChannel to controller: {error:?}");
+                    }
+                }
+                Err(TryRecvError::Empty) => {
+                    // do nothing
+                    continue;
+                }
+                Err(TryRecvError::Disconnected) => {
+                    error!("Senders to `incoming_cmds_from_apis` have disconnected.");
+                    return Err(Error::CmdCtrlChannelDropped);
+                }
             }
-            // TODO: handle a passed if if that still makes sense here
-            // cmds.push(value)
-            // Ok((cmd, _id)) => cmds.push(cmd),
-            // Err(TryRecvError::Empty) => {
-            //     // do nothing
-            // }
-            // Err(TryRecvError::Disconnected) => {
-            //     trace!("Senders to `incoming_cmds_from_apis` have disconnected.");
-            // }
         }
+
         debug!("----------------  channel Q done   ----------");
-        new_cmds
+        Ok(())
     }
 
     /// Add any pending msgs to the cmd queue
@@ -220,7 +217,7 @@ impl FlowCtrl {
 
     /// This is a never ending loop as long as the node is live.
     /// This loop drives the periodic events internal to the node.
-    pub(crate) async fn process_messages_and_periodic_checks(mut self) {
+    pub(crate) async fn process_messages_and_periodic_checks(mut self) -> Result<()> {
         debug!("Starting internal processing...");
         let mut last_probe = Instant::now();
         let mut last_section_probe = Instant::now();
@@ -245,7 +242,7 @@ impl FlowCtrl {
 
             let _ = self.enqueue_new_incoming_msgs().await;
             debug!("---------------- enQQQQQQQQQQQQQd incoming ----------------------");
-            self.enqeue_new_cmds_from_channel().await;
+            self.enqeue_new_cmds_from_channel().await?;
             debug!("---------------- enQQQQQQQQQQQQQd new_cmdssss ----------------------");
 
             debug!("qlen at start: {:?}", self.cmd_ctrl.queue_len());
@@ -356,7 +353,9 @@ impl FlowCtrl {
             // log_sleep!(Duration::from_m illis(15));
         }
 
-        error!("Internal processing ended.")
+        error!("Internal processing ended.");
+        // TODO: this is not okay, but we should not break above anymore so this is uncreachable
+        Ok(())
     }
 
     /// Does not await the completion of the cmd.
