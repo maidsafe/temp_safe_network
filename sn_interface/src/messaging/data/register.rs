@@ -9,9 +9,10 @@
 use super::{CmdError, Error, QueryResponse, Result};
 
 use crate::messaging::{data::OperationId, SectionAuth};
-use crate::types::register::{EntryHash, Register};
+#[allow(unused_imports)] // needed by rustdocs links
+use crate::types::register::Register;
 use crate::types::{
-    register::{Entry, Policy, RegisterOp, User},
+    register::{Entry, EntryHash, Policy, RegisterOp, User},
     RegisterAddress,
 };
 use tiny_keccak::{Hasher, Sha3};
@@ -91,39 +92,26 @@ pub enum RegisterCmd {
 ///
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum CreateRegister {
-    /// Populated with entries
-    Populated(Register),
-    /// Without entries
-    Empty {
-        /// The name of the [`Register`].
-        name: XorName,
-        /// The tag on the [`Register`].
-        tag: u64,
-        /// The policy of the [`Register`].
-        policy: Policy,
-    },
+pub struct CreateRegister {
+    /// The name of the [`Register`].
+    pub name: XorName,
+    /// The tag on the [`Register`].
+    pub tag: u64,
+    /// The policy of the [`Register`].
+    pub policy: Policy,
 }
 
 impl CreateRegister {
-    ///
+    /// Returns the owner of the register.
     pub fn owner(&self) -> User {
-        use CreateRegister::*;
-        match self {
-            Populated(reg) => reg.owner(),
-            Empty { policy, .. } => *policy.owner(),
-        }
+        *self.policy.owner()
     }
 
-    ///
+    /// Returns the address of the register.
     pub fn address(&self) -> RegisterAddress {
-        use CreateRegister::*;
-        match self {
-            Populated(reg) => *reg.address(),
-            Empty { name, tag, .. } => RegisterAddress {
-                name: *name,
-                tag: *tag,
-            },
+        RegisterAddress {
+            name: self.name,
+            tag: self.tag,
         }
     }
 }
