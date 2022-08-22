@@ -7,13 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod errors;
-mod event_store;
 mod file_store;
+mod reg_op_store;
 mod used_space;
 
 pub(crate) use errors::{convert_to_error_msg, Error, Result};
-pub(crate) use event_store::RegOpStore;
 pub(crate) use file_store::FileStore;
+pub(crate) use reg_op_store::RegOpStore;
 use std::path::Path;
 pub use used_space::UsedSpace;
 
