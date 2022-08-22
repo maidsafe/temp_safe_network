@@ -109,10 +109,7 @@ impl FlowCtrl {
         loop {
             match self.incoming_msg_events.try_recv() {
                 Ok(msg) => {
-                    debug!("pushing msg into cmd q");
                     let cmd = self.handle_new_msg_event(msg).await;
-
-                    debug!("msg event handleddd");
 
                     // dont use sender here incase channel gets full
                     if let Err(error) = self.fire_and_forget(cmd).await {
