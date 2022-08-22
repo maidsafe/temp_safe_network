@@ -36,8 +36,8 @@ impl ChunkStorage {
         })
     }
 
-    pub(crate) fn keys(&self) -> Vec<DataAddress> {
-        self.db.list_all_data_addresses()
+    pub(crate) fn addrs(&self) -> Vec<ChunkAddress> {
+        self.db.list_all_chunk_addrs()
     }
 
     #[allow(dead_code)]

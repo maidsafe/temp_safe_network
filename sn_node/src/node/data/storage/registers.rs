@@ -71,8 +71,8 @@ impl RegisterStorage {
         Ok(())
     }
 
-    pub(crate) fn keys(&self) -> Vec<DataAddress> {
-        self.file_db.list_all_data_addresses()
+    pub(crate) fn addrs(&self) -> Vec<RegisterAddress> {
+        self.file_db.list_all_reg_addrs()
     }
 
     /// Used for replication of data to new Adults.
@@ -137,21 +137,19 @@ impl RegisterStorage {
     pub(crate) async fn get_data_of(&mut self, prefix: Prefix) -> Result<RegisterStoreExport> {
         let mut the_data = vec![];
 
-        let all_keys = self.keys();
+        let all_addrs = self.addrs();
 
         // TODO: make this concurrent
-        for addr in all_keys {
-            if let DataAddress::Register(key) = addr {
-                match self.try_load_register_entry(&key).await {
-                    Ok(entry) => {
-                        let read_only = entry.state.clone();
-                        if prefix.matches(read_only.name()) {
-                            the_data.push(self.create_replica(entry.clone())?);
-                        }
+        for key in all_addrs {
+            match self.try_load_register_entry(&key).await {
+                Ok(entry) => {
+                    let read_only = entry.state.clone();
+                    if prefix.matches(read_only.name()) {
+                        the_data.push(self.create_replica(entry.clone())?);
                     }
-                    Err(Error::KeyNotFound(_)) => return Err(Error::InvalidStore),
-                    Err(e) => return Err(e),
                 }
+                Err(Error::KeyNotFound(_)) => return Err(Error::InvalidStore),
+                Err(e) => return Err(e),
             }
         }
 
