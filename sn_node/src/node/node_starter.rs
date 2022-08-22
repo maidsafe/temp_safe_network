@@ -53,7 +53,7 @@ const GENESIS_DBC_FILENAME: &str = "genesis_dbc";
 
 static EVENT_CHANNEL_SIZE: usize = 20;
 
-pub(crate) type CmdChannel = mpsc::Sender<Cmd>;
+pub(crate) type CmdChannel = mpsc::Sender<(Cmd, Option<usize>)>;
 
 /// Test only
 pub async fn new_test_api(
@@ -145,7 +145,7 @@ async fn bootstrap_node(
     root_storage_dir: &Path,
     join_timeout: Duration,
 ) -> Result<(Arc<RwLock<Node>>, CmdChannel, EventReceiver)> {
-    let (connection_event_tx, mut connection_event_rx) = mpsc::channel(1);
+    let (connection_event_tx, mut connection_event_rx) = mpsc::channel(100);
 
     let local_addr = config
         .local_addr
@@ -280,12 +280,9 @@ async fn bootstrap_node(
     };
 
     let node = Arc::new(RwLock::new(node));
-    let cmd_ctrl = CmdCtrl::new(
-        Dispatcher::new(node.clone(), comm),
-        monitoring,
-        event_sender,
-    );
-    let (msg_and_period_ctrl, cmd_channel) = FlowCtrl::new(cmd_ctrl, connection_event_rx);
+    let cmd_ctrl = CmdCtrl::new(Dispatcher::new(node.clone(), comm), monitoring);
+    let (msg_and_period_ctrl, cmd_channel) =
+        FlowCtrl::new(cmd_ctrl, connection_event_rx, event_sender);
 
     let _ = tokio::task::spawn_local(async move {
         msg_and_period_ctrl

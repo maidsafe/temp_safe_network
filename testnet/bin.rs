@@ -150,7 +150,7 @@ async fn main() -> Result<()> {
                     result
                         .status
                         .success()
-                        .then(|| ())
+                        .then_some(())
                         .ok_or_else(|| eyre!("Command exited with error"))
                 })
                 .wrap_err_with(|| {

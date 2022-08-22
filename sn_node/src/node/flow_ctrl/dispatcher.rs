@@ -394,7 +394,7 @@ impl Drop for Dispatcher {
     }
 }
 
-struct DkgTimeout {
+pub(crate) struct DkgTimeout {
     cancel_timer_tx: watch::Sender<bool>,
     cancel_timer_rx: watch::Receiver<bool>,
 }

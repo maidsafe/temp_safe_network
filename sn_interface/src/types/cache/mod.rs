@@ -122,7 +122,7 @@ where
                 key,
                 Item::new(value, custom_duration.or(self.item_duration)),
             )
-            .and_then(|item| (!item.expired()).then(|| item.object));
+            .and_then(|item| (!item.expired()).then_some(item.object));
         self.remove_expired();
         self.drop_excess();
         replaced

@@ -611,7 +611,7 @@ mod core {
                     cmds.extend(self.propose(Proposal::JoinsAllowed(self.joins_allowed))?);
                 }
 
-                self.print_network_stats();
+                self.log_network_stats();
                 self.log_section_stats();
             } else {
                 // if not elder
@@ -725,11 +725,13 @@ mod core {
             }
         }
 
-        pub(crate) fn print_network_stats(&self) {
-            self.network_knowledge
-                .section_tree()
-                .network_stats(&self.network_knowledge.authority_provider())
-                .print();
+        pub(crate) fn log_network_stats(&self) {
+            info!(
+                "{}",
+                self.network_knowledge
+                    .section_tree()
+                    .network_stats(&self.network_knowledge.authority_provider())
+            );
         }
 
         pub(crate) fn log_section_stats(&self) {

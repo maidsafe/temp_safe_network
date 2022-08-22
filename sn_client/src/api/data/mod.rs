@@ -38,7 +38,10 @@ impl SmallFile {
     /// Enforces size > 0 and size < [`MIN_ENCRYPTABLE_BYTES`] bytes.
     pub(crate) fn new(bytes: Bytes) -> Result<Self> {
         if bytes.len() >= MIN_ENCRYPTABLE_BYTES {
-            Err(Error::TooLargeAsSmallFile)
+            Err(Error::TooLargeAsSmallFile {
+                size: bytes.len(),
+                maximum: MIN_ENCRYPTABLE_BYTES - 1,
+            })
         } else if bytes.is_empty() {
             Err(Error::EmptyFileProvided)
         } else {
@@ -56,7 +59,10 @@ impl LargeFile {
     /// Enforces size >= [`MIN_ENCRYPTABLE_BYTES`] bytes.
     pub(crate) fn new(bytes: Bytes) -> Result<Self> {
         if MIN_ENCRYPTABLE_BYTES > bytes.len() {
-            Err(Error::TooSmallForSelfEncryption)
+            Err(Error::TooSmallForSelfEncryption {
+                size: bytes.len(),
+                minimum: MIN_ENCRYPTABLE_BYTES,
+            })
         } else {
             Ok(Self { bytes })
         }

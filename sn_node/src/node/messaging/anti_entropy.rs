@@ -474,7 +474,7 @@ mod tests {
 
                 // AeUpdate message shall get pass through.
                 assert!(NetworkKnowledge::verify_node_msg_can_be_trusted(
-                    msg_authority.clone(),
+                    &msg_authority,
                     &msg,
                     &known_keys
                 ));
@@ -484,7 +484,7 @@ mod tests {
                 let (corrupted_msg, _msg_authority) =
                     env.create_update_msg(other_env.proof_chain)?;
                 assert!(!NetworkKnowledge::verify_node_msg_can_be_trusted(
-                    msg_authority.clone(),
+                    &msg_authority,
                     &corrupted_msg,
                     &known_keys
                 ));
@@ -492,7 +492,7 @@ mod tests {
                 // Other messages shall get rejected.
                 let other_msg = SystemMsg::StartConnectivityTest(xor_name::rand::random());
                 assert!(!NetworkKnowledge::verify_node_msg_can_be_trusted(
-                    msg_authority,
+                    &msg_authority,
                     &other_msg,
                     &known_keys
                 ));

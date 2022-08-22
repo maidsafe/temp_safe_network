@@ -289,7 +289,7 @@ impl NetworkKnowledge {
 
     /// Given a `NodeMsg` can we trust it (including verifying contents of an AE message)
     pub fn verify_node_msg_can_be_trusted(
-        msg_authority: NodeMsgAuthority,
+        msg_authority: &NodeMsgAuthority,
         msg: &SystemMsg,
         known_keys: &[BlsPublicKey],
     ) -> bool {

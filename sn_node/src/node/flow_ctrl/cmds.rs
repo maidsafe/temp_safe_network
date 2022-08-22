@@ -42,12 +42,26 @@ use std::{
 /// among other pending cmd jobs, and the time the
 /// job was instantiated.
 #[derive(Debug, Clone)]
-pub struct CmdJob {
+pub(crate) struct CmdJob {
     id: usize,
     parent_id: Option<usize>,
     cmd: Cmd,
     priority: i32,
     created_at: SystemTime,
+}
+
+impl PartialEq for CmdJob {
+    fn eq(&self, other: &Self) -> bool {
+        self.id() == other.id()
+    }
+}
+
+impl Eq for CmdJob {}
+
+impl std::hash::Hash for CmdJob {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id().hash(state);
+    }
 }
 
 impl CmdJob {
@@ -75,8 +89,8 @@ impl CmdJob {
         self.parent_id
     }
 
-    pub(crate) fn cmd(&self) -> &Cmd {
-        &self.cmd
+    pub(crate) fn into_cmd(self) -> Cmd {
+        self.cmd
     }
 
     pub(crate) fn priority(&self) -> i32 {
