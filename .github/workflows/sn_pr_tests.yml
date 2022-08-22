@@ -389,39 +389,39 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
 
 
-      - name: Cleanup churn test
-        run: |
-          killall -9 sn_node
-          sleep 10
-          rm -rf ~/.safe
+      # - name: Cleanup churn test
+      #   run: |
+      #     killall -9 sn_node
+      #     sleep 10
+      #     rm -rf ~/.safe
 
-      # This starts a NODE_COUNT node network, and then adds 15 _more_ nodes
-      - name: Run network split data integrity test
-        timeout-minutes: 35 # made 35 for now due to client slowdown. TODO: fix that!
-        shell: bash
-        run: cargo run --release --example network_split
-        env:
-          RUST_LOG: "sn_node,sn_client,sn_consensus,sn_dysfunction=trace"
+      # # This starts a NODE_COUNT node network, and then adds 15 _more_ nodes
+      # - name: Run network split data integrity test
+      #   timeout-minutes: 35 # made 35 for now due to client slowdown. TODO: fix that!
+      #   shell: bash
+      #   run: cargo run --release --example network_split
+      #   env:
+      #     RUST_LOG: "sn_node,sn_client,sn_consensus,sn_dysfunction=trace"
 
 
-      - name: Print Network Log Stats at start
-        shell: bash
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+      # - name: Print Network Log Stats at start
+      #   shell: bash
+      #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
 
-      - name: Wait for all nodes to join
-        shell: bash
-        # we should not have the full 33 nodes as yet.
-        run: NODE_COUNT=28 ./resources/scripts/wait_for_nodes_to_join.sh
-        timeout-minutes: 20
+      # - name: Wait for all nodes to join
+      #   shell: bash
+      #   # we should not have the full 33 nodes as yet.
+      #   run: NODE_COUNT=28 ./resources/scripts/wait_for_nodes_to_join.sh
+      #   timeout-minutes: 20
 
-      - name: Is the network split and ready?
-        shell: bash
-        run: ./resources/scripts/network_is_ready.sh
-        timeout-minutes: 5
+      # - name: Is the network split and ready?
+      #   shell: bash
+      #   run: ./resources/scripts/network_is_ready.sh
+      #   timeout-minutes: 5
 
-      - name: Print Network Log Stats after nodes joined
-        shell: bash
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+      # - name: Print Network Log Stats after nodes joined
+      #   shell: bash
+      #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
 
       - name: Build all tests before running
         run: cd sn_client && cargo test --no-run --release -p sn_client
