@@ -65,6 +65,9 @@ pub enum Error {
     /// NetworkData error.
     #[error("Network data error:: {0}")]
     NetworkData(#[from] sn_interface::types::Error),
+    /// Messaging error.
+    #[error("Messaging error:: {0}")]
+    Messaging(#[from] sn_interface::messaging::data::Error),
     /// No filename found
     #[error("Path contains no file name")]
     NoFilename,

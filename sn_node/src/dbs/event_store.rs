@@ -9,7 +9,7 @@
 use super::{Error, Result};
 
 use crate::dbs::FileStore;
-use sn_interface::types::{RegisterAddress, RegisterCmd};
+use sn_interface::types::{RegisterAddress, RegisterCmd, RegisterCmdId};
 use std::collections::btree_map::BTreeMap;
 use std::fmt::Debug;
 use std::path::PathBuf;
@@ -17,7 +17,7 @@ use std::path::PathBuf;
 /// Disk storage for logging RegisterCmds.
 #[derive(Clone, Debug)]
 pub(crate) struct RegOpStore {
-    tree: BTreeMap<String, RegisterCmd>,
+    tree: BTreeMap<RegisterCmdId, RegisterCmd>,
     path: PathBuf,
 }
 
@@ -48,12 +48,12 @@ impl RegOpStore {
 
     /// append a new entry
     pub(crate) async fn append(&mut self, event: RegisterCmd, file_store: FileStore) -> Result<()> {
-        let key = &self.tree.len().to_string();
-        if self.tree.get(key).is_some() {
+        let key = event.register_operation_id()?;
+        if self.tree.get(&key).is_some() {
             return Err(Error::DataExists);
         }
 
-        let _old_entry = self.tree.insert(key.clone(), event);
+        let _old_entry = self.tree.insert(key, event);
 
         file_store
             .write_to_log(self.tree.clone(), &self.path)
