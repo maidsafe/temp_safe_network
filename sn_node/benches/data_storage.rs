@@ -242,12 +242,7 @@ pub fn create_random_register_replicated_data() -> ReplicatedData {
     let owner = User::Key(keypair.public_key());
     let policy = public_policy(owner);
 
-    let op = CreateRegister::Empty {
-        name,
-        tag,
-        size: u16::MAX, // TODO: use argument
-        policy,
-    };
+    let op = CreateRegister::Empty { name, tag, policy };
     let signature = keypair.sign(&bincode::serialize(&op).expect("could not serialize op"));
     let reg_cmd = RegisterCmd::Create {
         cmd: SignedRegisterCreate {

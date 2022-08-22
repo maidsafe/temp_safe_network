@@ -11,9 +11,8 @@ use crate::dbs::{convert_to_error_msg, Error, FileStore, RegOpStore, Result};
 use sn_interface::{
     messaging::{
         data::{
-            CreateRegister, EditRegister, ExtendRegister, OperationId, RegisterCmd, RegisterQuery,
+            CreateRegister, EditRegister, OperationId, RegisterCmd, RegisterQuery,
             RegisterStoreExport, ReplicatedRegisterLog, SignedRegisterCreate, SignedRegisterEdit,
-            SignedRegisterExtend,
         },
         system::NodeQueryResponse,
         SectionAuth, ServiceAuth, VerifyAuthority,
@@ -89,15 +88,10 @@ impl RegisterStorage {
             Err(e) => return Err(e),
         };
 
-        self.create_replica(*address, entry)
+        self.create_replica(entry)
     }
 
-    fn create_replica(
-        &self,
-        key: RegisterAddress,
-        entry: RegisterEntry,
-    ) -> Result<ReplicatedRegisterLog> {
-        let id = key.id()?;
+    fn create_replica(&self, entry: RegisterEntry) -> Result<ReplicatedRegisterLog> {
         let mut address = None;
         let op_log = entry
             .store
@@ -125,14 +119,8 @@ impl RegisterStorage {
                             return None;
                         }
                     }
-                    RegisterCmd::Extend { section_auth, .. } => {
-                        // TODO: in higher layers we must verify that the section_auth is from a proper section..!
-                        if section_auth.verify_authority(id).is_err() {
-                            warn!("Invalid section auth on register container: {:?}", key);
-                            return None;
-                        }
-                    }
-                };
+                }
+
                 Some(stored_cmd)
             })
             .collect();
@@ -158,7 +146,7 @@ impl RegisterStorage {
                     Ok(entry) => {
                         let read_only = entry.state.clone();
                         if prefix.matches(read_only.name()) {
-                            the_data.push(self.create_replica(key, entry.clone())?);
+                            the_data.push(self.create_replica(entry.clone())?);
                         }
                     }
                     Err(Error::KeyNotFound(_)) => return Err(Error::InvalidStore),
@@ -273,36 +261,6 @@ impl RegisterStorage {
                         Err(err)
                     }
                 }
-            }
-            Extend {
-                cmd: SignedRegisterExtend { op, auth },
-                ..
-            } => {
-                // TODO 1: in higher layers we must verify that the section_auth is from a proper section..!
-                // TODO 2: Enable this check once we have section signature over this.
-                // let public_key = section_auth.sig.public_key;
-                // let _ = section_auth.verify_authority(key).or(Err(Error::InvalidSignature(PublicKey::Bls(public_key))))?;
-
-                let public_key = auth.public_key;
-                let _ = auth
-                    .verify_authority(serialize(&op)?)
-                    .or(Err(Error::InvalidSignature(public_key)))?;
-
-                let ExtendRegister { extend_with, .. } = op;
-
-                let mut entry = self.try_load_register_entry(&address).await?;
-                entry.store.append(cmd, self.file_db.clone()).await?;
-
-                let prev = entry.state.cap();
-                entry.state.increment_cap(extend_with);
-
-                info!(
-                    "Extended Register size from {} to {}",
-                    prev,
-                    prev + extend_with,
-                );
-
-                Ok(())
             }
         }
     }
@@ -509,13 +467,8 @@ impl RegisterStorage {
                     section_auth,
                 } => {
                     hydrated_register = match op {
-                        CreateRegister::Empty {
-                            name,
-                            tag,
-                            size,
-                            policy,
-                        } => Some((
-                            Register::new(*policy.owner(), name, tag, policy, size),
+                        CreateRegister::Empty { name, tag, policy } => Some((
+                            Register::new(*policy.owner(), name, tag, policy),
                             section_auth,
                         )),
                         CreateRegister::Populated(instance) => {
@@ -533,18 +486,6 @@ impl RegisterStorage {
                 }) => {
                     if let Some((reg, _)) = &mut hydrated_register {
                         reg.apply_op(edit).map_err(Error::NetworkData)?
-                    }
-                }
-                Extend {
-                    cmd:
-                        SignedRegisterExtend {
-                            op: ExtendRegister { extend_with, .. },
-                            ..
-                        },
-                    ..
-                } => {
-                    if let Some((reg, _)) = &mut hydrated_register {
-                        reg.increment_cap(extend_with);
                     }
                 }
             }
@@ -578,12 +519,7 @@ fn create_reg_w_policy(
     policy: Policy,
     keypair: Keypair,
 ) -> Result<RegisterCmd> {
-    let op = CreateRegister::Empty {
-        name,
-        tag,
-        size: u16::MAX,
-        policy,
-    };
+    let op = CreateRegister::Empty { name, tag, policy };
     let signature = keypair.sign(&serialize(&op)?);
 
     let auth = ServiceAuth {

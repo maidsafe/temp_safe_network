@@ -29,6 +29,9 @@ use xor_name::XorName;
 /// Arbitrary maximum size of a register entry.
 const MAX_REG_ENTRY_SIZE: usize = MIN_ENCRYPTABLE_BYTES / 3; // 1024 bytes
 
+/// Maximum number of entries of a register.
+const MAX_REG_NUM_ENTRIES: u16 = u16::MAX;
+
 /// Register mutation operation to apply to Register.
 pub type RegisterOp<T> = CrdtOperation<T>;
 
@@ -38,22 +41,20 @@ pub struct Register {
     authority: User,
     pub(super) crdt: RegisterCrdt, // Temporarily exposed to 'super' till spentbook fully implemented.
     policy: Policy,
-    cap: u16,
 }
 
 impl Register {
     ///
-    pub fn new(authority: User, name: XorName, tag: u64, policy: Policy, cap: u16) -> Self {
+    pub fn new(authority: User, name: XorName, tag: u64, policy: Policy) -> Self {
         let address = RegisterAddress { name, tag };
         Self {
             authority,
             crdt: RegisterCrdt::new(address),
             policy,
-            cap,
         }
     }
 
-    pub fn new_owned(authority: User, name: XorName, tag: u64, cap: u16) -> Self {
+    pub fn new_owned(authority: User, name: XorName, tag: u64) -> Self {
         Self::new(
             authority,
             name,
@@ -62,7 +63,6 @@ impl Register {
                 owner: authority,
                 permissions: BTreeMap::new(),
             },
-            cap,
         )
     }
 
@@ -89,11 +89,6 @@ impl Register {
     /// Return the PK which the messages are expected to be signed with by this replica.
     pub fn replica_authority(&self) -> User {
         self.authority
-    }
-
-    /// Return the max number of items that can be held in the register.
-    pub fn cap(&self) -> u16 {
-        self.cap
     }
 
     /// Return the number of items held in the register
@@ -126,11 +121,6 @@ impl Register {
         &self.policy
     }
 
-    /// Increment the size cap of the register, returning the previous value.
-    pub fn increment_cap(&mut self, add: u16) {
-        self.cap += add;
-    }
-
     /// Write an entry to the Register, returning the generated unsigned
     /// CRDT operation so the caller can sign and broadcast it to other replicas,
     /// along with the hash of the entry just written.
@@ -139,20 +129,30 @@ impl Register {
         entry: Entry,
         children: BTreeSet<EntryHash>,
     ) -> Result<(EntryHash, RegisterOp<Entry>)> {
-        let size = entry.len();
-        if size > MAX_REG_ENTRY_SIZE {
-            return Err(Error::EntryTooBig(size, MAX_REG_ENTRY_SIZE));
-        }
-        if self.crdt.size() >= self.cap() as u64 {
-            return Err(Error::TooManyEntries(self.crdt.size() as usize));
-        }
-
+        self.check_entry_and_reg_sizes(&entry)?;
         self.crdt.write(entry, children, self.authority)
     }
 
     /// Apply a signed data CRDT operation.
     pub fn apply_op(&mut self, op: RegisterOp<Entry>) -> Result<()> {
+        self.check_entry_and_reg_sizes(&op.crdt_op.value)?;
         self.crdt.apply_op(op)
+    }
+
+    // Private helper to check the given Entry's size is within define limit,
+    // as well as check the Register hasn't already reached the maximum number of entries.
+    fn check_entry_and_reg_sizes(&self, entry: &Entry) -> Result<()> {
+        let entry_size = entry.len();
+        if entry_size > MAX_REG_ENTRY_SIZE {
+            return Err(Error::EntryTooBig(entry_size, MAX_REG_ENTRY_SIZE));
+        }
+
+        let reg_size = self.crdt.size();
+        if reg_size >= MAX_REG_NUM_ENTRIES.into() {
+            return Err(Error::TooManyEntries(reg_size as usize));
+        }
+
+        Ok(())
     }
 
     /// Helper to check permissions for given `action`
@@ -208,7 +208,6 @@ mod tests {
 
         let name: XorName = xor_name::rand::random();
         let tag = 43_000u64;
-        let cap = u16::MAX;
 
         // We'll have 'authority1' as the owner in both replicas and
         // grant permissions for Write to 'authority2' in both replicas too
@@ -225,7 +224,6 @@ mod tests {
                 owner: authority1,
                 permissions: perms.clone(),
             },
-            cap,
         );
         let mut replica2 = Register::new(
             authority2,
@@ -235,7 +233,6 @@ mod tests {
                 owner: authority1,
                 permissions: perms,
             },
-            cap,
         );
 
         // And let's write an item to replica1 with autority1
@@ -386,7 +383,7 @@ mod tests {
                     owner: authority,
                     permissions: BTreeMap::new(),
                 });
-                let register = Register::new(authority, name, tag, policy, u16::MAX);
+                let register = Register::new(authority, name, tag, policy);
                 (authority_keypair, register)
             })
             .collect();
@@ -445,7 +442,7 @@ mod tests {
         (1..max_quantity + 1).prop_map(move |quantity| {
             let mut replicas = Vec::with_capacity(quantity);
             for _ in 0..quantity {
-                let replica = Register::new(owner, xorname, tag, policy.clone(), u16::MAX);
+                let replica = Register::new(owner, xorname, tag, policy.clone());
 
                 replicas.push(replica);
             }
@@ -810,9 +807,8 @@ mod tests {
             // set up a replica that has nothing to do with the rest, random xor... different owner...
             let xorname = xor_name::rand::random();
             let tag = 45_000u64;
-            let cap = u16::MAX;
             let random_owner_keypair = Keypair::new_ed25519();
-            let mut bogus_replica = Register::new_owned(User::Key(random_owner_keypair.public_key()), xorname, tag, cap);
+            let mut bogus_replica = Register::new_owned(User::Key(random_owner_keypair.public_key()), xorname, tag);
 
             // add bogus ops from bogus replica + bogus data
             let mut children = BTreeSet::new();
