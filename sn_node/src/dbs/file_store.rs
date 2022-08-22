@@ -14,7 +14,8 @@ use sn_interface::{
     messaging::data::DataCmd,
     types::{
         utils::{deserialise, serialise},
-        Chunk, RegisterAddress, RegisterCmd, RegisterCmdId, ReplicatedDataAddress as DataAddress,
+        Chunk, ChunkAddress, RegisterAddress, RegisterCmd, RegisterCmdId,
+        ReplicatedDataAddress as DataAddress,
     },
 };
 
@@ -77,25 +78,58 @@ impl FileStore {
     }
 
     fn address_to_filepath(&self, addr: &DataAddress) -> Result<PathBuf> {
-        let xorname = if let DataAddress::Register(reg_addr) = addr {
-            reg_addr.id()?
+        let path = if let DataAddress::Register(reg_addr) = addr {
+            self.prefix_tree_path(reg_addr.id()?, self.bit_tree_depth)
         } else {
-            *addr.name()
+            let xorname = *addr.name();
+            let mut path = self.prefix_tree_path(xorname, self.bit_tree_depth);
+            let filename = addr.encode_to_zbase32()?;
+            path.push(filename);
+            path
         };
-        let filename = addr.encode_to_zbase32()?;
-        let mut path = self.prefix_tree_path(xorname, self.bit_tree_depth);
-        path.push(filename);
+
         Ok(path)
     }
 
-    fn filepath_to_address(&self, path: &Path) -> Result<DataAddress> {
+    pub(crate) fn list_all_chunk_addrs(&self) -> Vec<ChunkAddress> {
+        self.list_all_files()
+            .iter()
+            .filter_map(|filepath| self.chunk_filepath_to_address(filepath).ok())
+            .collect()
+    }
+
+    pub(crate) fn list_all_reg_addrs(&self) -> Vec<RegisterAddress> {
+        self.list_all_files()
+            .iter()
+            .filter_map(|filepath| self.reg_filepath_to_address(filepath).ok())
+            .collect()
+    }
+
+    fn chunk_filepath_to_address(&self, path: &Path) -> Result<ChunkAddress> {
         let filename = path
             .file_name()
             .ok_or(Error::NoFilename)?
             .to_str()
             .ok_or(Error::InvalidFilename)?;
 
-        Ok(DataAddress::decode_from_zbase32(filename)?)
+        Ok(ChunkAddress::decode_from_zbase32(filename)?)
+    }
+
+    fn reg_filepath_to_address(&self, path: &Path) -> Result<RegisterAddress> {
+        let parent_path = path.parent().ok_or(Error::InvalidFilename)?;
+
+        futures::executor::block_on(async {
+            let mut ops_files = tokio::fs::read_dir(&parent_path).await?;
+            while let Some(entry) = ops_files.next_entry().await? {
+                if entry.metadata().await?.is_file() {
+                    let serialized_data = read(entry.path()).await?;
+                    let cmd: RegisterCmd = deserialise(&serialized_data)?;
+                    return Ok(cmd.dst_address());
+                }
+            }
+
+            Err(Error::NoFilename)
+        })
     }
 
     // ---------------------- api methods ----------------------
@@ -147,13 +181,6 @@ impl FileStore {
         list_files_in(&self.file_store_path)
     }
 
-    pub(crate) fn list_all_data_addresses(&self) -> Vec<DataAddress> {
-        self.list_all_files()
-            .iter()
-            .filter_map(|filepath| self.filepath_to_address(filepath).ok()) // perfectly fine to filter map, as list_all_files walks through existing valid files
-            .collect()
-    }
-
     #[allow(unused)]
     /// quickly find chunks related or not to a section, might be useful when adults change sections
     /// not used yet
@@ -180,14 +207,13 @@ impl FileStore {
     ) -> Result<(RegisterLog, PathBuf)> {
         let mut register_log = RegisterLog::new();
 
-        let path = self.prefix_tree_path(addr.id()?, self.bit_tree_depth);
+        let path = self.address_to_filepath(&DataAddress::Register(*addr))?;
         if path.exists() {
             trace!("Register log path exists: {}", path.display());
 
             let mut ops_files = tokio::fs::read_dir(&path).await?;
             while let Some(entry) = ops_files.next_entry().await? {
                 if entry.metadata().await?.is_file() {
-                    debug!(">>>file to read: {}", entry.path().display());
                     let serialized_data = read(entry.path()).await?;
                     let cmd: RegisterCmd = deserialise(&serialized_data)?;
                     let _existing = register_log.insert(cmd.register_operation_id()?, cmd.clone());
@@ -195,7 +221,7 @@ impl FileStore {
             }
         } else {
             trace!(
-                "Register log does not exists, creating a new one {}",
+                "Register log does not exist, creating a new one {}",
                 path.display()
             );
         }

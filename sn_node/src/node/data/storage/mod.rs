@@ -210,14 +210,14 @@ impl DataStorage {
         let mut all_addrs = vec![];
 
         // TODO: Parallelize this below loops
-        let chunk_keys = self.chunks.keys();
-        for addr in chunk_keys {
-            all_addrs.push(addr)
+        let chunk_addrs = self.chunks.addrs();
+        for addr in chunk_addrs {
+            all_addrs.push(ReplicatedDataAddress::Chunk(addr))
         }
 
-        let reg_keys = self.registers.keys();
-        for addr in reg_keys {
-            all_addrs.push(addr)
+        let reg_addrs = self.registers.addrs();
+        for addr in reg_addrs {
+            all_addrs.push(ReplicatedDataAddress::Register(addr))
         }
 
         all_addrs
