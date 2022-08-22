@@ -23,24 +23,12 @@ pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 #[non_exhaustive]
 /// Node error variants.
 pub enum Error {
-    /// Db key conversion failed
-    #[error("Could not convert the Db key")]
-    CouldNotConvertDbKey,
-    /// Db key conversion failed
-    #[error("Could not decode the Db key: {0:?}")]
-    CouldNotDecodeDbKey(String),
     /// Not enough space to store the value.
     #[error("Not enough space")]
     NotEnoughSpace,
     /// Key not found.
     #[error("Key not found: {0:?}")]
     KeyNotFound(String),
-    /// Key, Value pair not found.
-    #[error("No value found for key: {0:?}")]
-    NoSuchValue(String),
-    /// Data id not found.
-    #[error("Data id not found: {0:?}")]
-    DataIdNotFound(DataAddress),
     /// Data not found.
     #[error("No such data: {0:?}")]
     NoSuchData(DataAddress),
@@ -65,21 +53,12 @@ pub enum Error {
     /// Deserialization error
     #[error("Deserialization error: {0}")]
     Deserialize(String),
-    /// Creating temp directory failed.
-    #[error("Could not create temp store: {0}")]
-    TempDirCreationFailed(String),
     /// I/O error.
     #[error("I/O error: {0}")]
     Io(#[from] io::Error),
     /// Bincode error.
     #[error("Bincode error:: {0}")]
     Bincode(#[from] bincode::Error),
-    ///Db key parse error.
-    #[error("Could not parse key:: {0:?}")]
-    CouldNotParseDbKey(Vec<u8>),
-    ///Operation Id could not be generated
-    #[error("Operation Id could not be generated")]
-    NoOperationId,
     /// Invalid filename
     #[error("Invalid chunk filename")]
     InvalidFilename,
@@ -95,10 +74,8 @@ pub enum Error {
 pub(crate) fn convert_to_error_msg(error: Error) -> ErrorMsg {
     match error {
         Error::NotEnoughSpace => ErrorMsg::FailedToWriteFile,
-        Error::DataIdNotFound(address) => ErrorMsg::DataNotFound(address),
         Error::NoSuchData(address) => ErrorMsg::DataNotFound(address),
         Error::ChunkNotFound(xorname) => ErrorMsg::ChunkNotFound(xorname),
-        Error::TempDirCreationFailed(_) => ErrorMsg::FailedToWriteFile,
         Error::DataExists => ErrorMsg::DataExists,
         Error::NetworkData(error) => convert_dt_error_to_error_msg(error),
         other => ErrorMsg::InvalidOperation(format!("Failed to perform operation: {:?}", other)),

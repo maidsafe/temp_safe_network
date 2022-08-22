@@ -64,12 +64,7 @@ impl Client {
     ) -> Result<(Address, RegisterWriteAheadLog), Error> {
         let address = Address { name, tag };
 
-        let op = CreateRegister::Empty {
-            name,
-            tag,
-            size: u16::MAX, // TODO: use argument
-            policy,
-        };
+        let op = CreateRegister::Empty { name, tag, policy };
         let signature = self.keypair.sign(&bincode::serialize(&op)?);
 
         let cmd = DataCmd::Register(RegisterCmd::Create {

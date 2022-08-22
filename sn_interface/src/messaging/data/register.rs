@@ -86,14 +86,6 @@ pub enum RegisterCmd {
     },
     /// Edit the [`Register`].
     Edit(SignedRegisterEdit),
-    /// Extend the size of the [`Register`].
-    Extend {
-        /// The user signed op.
-        cmd: SignedRegisterExtend,
-        /// Section signature over the operation,
-        /// verifying that it was paid for.
-        section_auth: SectionAuth,
-    },
 }
 
 ///
@@ -108,8 +100,6 @@ pub enum CreateRegister {
         name: XorName,
         /// The tag on the [`Register`].
         tag: u64,
-        /// The initial size of the [`Register`].
-        size: u16,
         /// The policy of the [`Register`].
         policy: Policy,
     },
@@ -122,15 +112,6 @@ impl CreateRegister {
         match self {
             Populated(reg) => reg.owner(),
             Empty { policy, .. } => *policy.owner(),
-        }
-    }
-
-    ///
-    pub fn size(&self) -> u16 {
-        use CreateRegister::*;
-        match self {
-            Populated(reg) => reg.size() as u16,
-            Empty { size, .. } => *size,
         }
     }
 
@@ -149,15 +130,6 @@ impl CreateRegister {
 
 ///
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct ExtendRegister {
-    /// The address of the [`Register`] to extend.
-    pub address: RegisterAddress,
-    /// The size to extend the [`Register`] with.
-    pub extend_with: u16,
-}
-
-///
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EditRegister {
     /// The address of the [`Register`] to edit.
     pub address: RegisterAddress,
@@ -170,17 +142,6 @@ pub struct EditRegister {
 pub struct SignedRegisterCreate {
     /// Create a [`Register`].
     pub op: CreateRegister,
-    /// A signature carrying authority to perform the operation.
-    ///
-    /// This will be verified against the register's owner and permissions.
-    pub auth: crate::messaging::ServiceAuth,
-}
-
-/// A signed cmd to create a [`Register`].
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct SignedRegisterExtend {
-    /// Extend a [`Register`].
-    pub op: ExtendRegister,
     /// A signature carrying authority to perform the operation.
     ///
     /// This will be verified against the register's owner and permissions.
@@ -206,13 +167,6 @@ impl SignedRegisterCreate {
 }
 
 impl SignedRegisterEdit {
-    /// Returns the dst address of the register.
-    pub fn dst_address(&self) -> &RegisterAddress {
-        &self.op.address
-    }
-}
-
-impl SignedRegisterExtend {
     /// Returns the dst address of the register.
     pub fn dst_address(&self) -> &RegisterAddress {
         &self.op.address
@@ -300,20 +254,11 @@ impl RegisterCmd {
         *self.dst_address().name()
     }
 
-    // /// Returns the id of the register.
-    // /// This is a unique identifier, used
-    // /// in order to not co-locate private and public
-    // /// and different tags of same register name.
-    // pub fn dst_id(&self) -> Result<XorName> {
-    //     self.dst_address().id()
-    // }
-
     /// Returns the dst address of the register.
     pub fn dst_address(&self) -> RegisterAddress {
         match self {
             Self::Create { cmd, .. } => cmd.dst_address(),
             Self::Edit(cmd) => *cmd.dst_address(),
-            Self::Extend { cmd, .. } => *cmd.dst_address(),
         }
     }
 

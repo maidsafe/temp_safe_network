@@ -459,7 +459,6 @@ impl Node {
             XorName::from_content(&key_image.to_bytes()),
             SPENTBOOK_TYPE_TAG,
             policy,
-            u16::MAX,
         );
 
         let entry = Bytes::from(rmp_serde::to_vec_named(spent_proof_share).map_err(|err| {
