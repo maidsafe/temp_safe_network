@@ -490,7 +490,7 @@ mod tests {
                 ));
 
                 // Other messages shall get rejected.
-                let other_msg = SystemMsg::StartConnectivityTest(xor_name::rand::random());
+                let other_msg = SystemMsg::AntiEntropyProbe(known_keys[0]);
                 assert!(!NetworkKnowledge::verify_node_msg_can_be_trusted(
                     &msg_authority,
                     &other_msg,
@@ -733,7 +733,9 @@ mod tests {
                 gen_addr(),
             );
 
-            let payload_msg = SystemMsg::StartConnectivityTest(xor_name::rand::random());
+            // just some message we can construct easily
+            let payload_msg = SystemMsg::AntiEntropyProbe(src_section_pk);
+
             let payload = WireMsg::serialize_msg_payload(&payload_msg)?;
 
             let dst = Dst {
