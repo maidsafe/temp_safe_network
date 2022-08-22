@@ -13,12 +13,16 @@ use crate::messaging::{data::OperationId, SectionAuth};
 use crate::types::register::Register;
 use crate::types::{
     register::{Entry, EntryHash, Policy, RegisterOp, User},
+    utils::serialise,
     RegisterAddress,
 };
 use tiny_keccak::{Hasher, Sha3};
 
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
+
+/// Deterministic Id for a register Cmd, takes into account he underlying cmd, and all sigs
+pub type RegisterCmdId = [u8; 32];
 
 /// [`Register`] read operations.
 #[allow(clippy::large_enum_variant)]
@@ -240,6 +244,18 @@ impl RegisterCmd {
     /// This is not a unique identifier.
     pub fn name(&self) -> XorName {
         *self.dst_address().name()
+    }
+
+    /// Gets an operation id, deterministic for a RegisterCmd, it takes
+    /// the full Cmd and all signers into consideration
+    pub fn register_operation_id(&self) -> Result<RegisterCmdId> {
+        let mut hasher = Sha3::v256();
+
+        let bytes = serialise(&self).map_err(|_| Error::CouldNotSerialiseCmd)?;
+        let mut output = [0; 32];
+        hasher.update(&bytes);
+        hasher.finalize(&mut output);
+        Ok(output)
     }
 
     /// Returns the dst address of the register.

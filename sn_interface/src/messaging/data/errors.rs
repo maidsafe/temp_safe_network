@@ -71,4 +71,7 @@ pub enum Error {
     /// Destination is either outdated or incorrect
     #[error("Destination is either outdated or wrong")]
     WrongDestination,
+    /// Failed to seriliase the Cmd for hashing
+    #[error("Cmd could not be serialised")]
+    CouldNotSerialiseCmd,
 }

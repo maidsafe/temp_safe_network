@@ -14,7 +14,7 @@ use sn_interface::{
     messaging::data::DataCmd,
     types::{
         utils::{deserialise, serialise},
-        Chunk, RegisterAddress, RegisterCmd, ReplicatedDataAddress as DataAddress,
+        Chunk, RegisterAddress, RegisterCmd, RegisterCmdId, ReplicatedDataAddress as DataAddress,
     },
 };
 
@@ -177,7 +177,7 @@ impl FileStore {
     pub(crate) async fn open_log(
         &self,
         addr: &RegisterAddress,
-    ) -> Result<(BTreeMap<String, RegisterCmd>, PathBuf)> {
+    ) -> Result<(BTreeMap<RegisterCmdId, RegisterCmd>, PathBuf)> {
         let path = self.address_to_filepath(&DataAddress::Register(*addr))?;
 
         let map = if self.data_file_exists(&DataAddress::Register(*addr))? {
@@ -185,7 +185,7 @@ impl FileStore {
             let serialized_data = read(&path)
                 .await
                 .map_err(|e| Error::Serialize(e.to_string()))?;
-            let map: BTreeMap<String, RegisterCmd> = deserialise(&serialized_data)?;
+            let map: BTreeMap<RegisterCmdId, RegisterCmd> = deserialise(&serialized_data)?;
             map
         } else {
             trace!(
@@ -200,7 +200,7 @@ impl FileStore {
 
     pub(crate) async fn write_to_log(
         &self,
-        log: BTreeMap<String, RegisterCmd>,
+        log: BTreeMap<RegisterCmdId, RegisterCmd>,
         path: &PathBuf,
     ) -> Result<()> {
         let serialized_data = serialise(&log)?;

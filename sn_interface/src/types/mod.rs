@@ -25,7 +25,9 @@ mod chunk;
 mod errors;
 mod peer;
 
-pub use crate::messaging::data::{RegisterCmd, ReplicatedRegisterLog, ReplicatedSpentbookLog};
+pub use crate::messaging::data::{
+    RegisterCmd, RegisterCmdId, ReplicatedRegisterLog, ReplicatedSpentbookLog,
+};
 
 pub use address::{
     ChunkAddress, DataAddress, RegisterAddress, ReplicatedDataAddress, SpentbookAddress,
