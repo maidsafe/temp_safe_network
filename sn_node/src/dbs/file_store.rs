@@ -21,10 +21,7 @@ use sn_interface::{
 use crate::dbs::reg_op_store::RegisterLog;
 
 use bytes::Bytes;
-use std::{
-    collections::btree_map::BTreeMap,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 use tokio::fs::{create_dir_all, metadata, read, remove_file, File};
 use tokio::io::AsyncWriteExt;
 use walkdir::WalkDir;
@@ -91,12 +88,13 @@ impl FileStore {
         Ok(path)
     }
 
-    fn filepath_to_address(&self, path: &str) -> Result<DataAddress> {
-        let filename = Path::new(path)
+    fn filepath_to_address(&self, path: &Path) -> Result<DataAddress> {
+        let filename = path
             .file_name()
             .ok_or(Error::NoFilename)?
             .to_str()
             .ok_or(Error::InvalidFilename)?;
+
         Ok(DataAddress::decode_from_zbase32(filename)?)
     }
 
@@ -145,7 +143,7 @@ impl FileStore {
         Ok(filepath.exists())
     }
 
-    pub(crate) fn list_all_files(&self) -> Vec<String> {
+    pub(crate) fn list_all_files(&self) -> Vec<PathBuf> {
         list_files_in(&self.file_store_path)
     }
 
@@ -159,18 +157,18 @@ impl FileStore {
     #[allow(unused)]
     /// quickly find chunks related or not to a section, might be useful when adults change sections
     /// not used yet
-    pub(crate) fn list_files_without_prefix(&self, prefix: Prefix) -> Vec<String> {
+    pub(crate) fn list_files_without_prefix(&self, prefix: Prefix) -> Vec<PathBuf> {
         let prefix_path = self.prefix_tree_path(prefix.name(), prefix.bit_count());
         self.list_all_files()
             .into_iter()
-            .filter(|p| !Path::new(&p).starts_with(&prefix_path.as_path()))
+            .filter(|path| !path.starts_with(&prefix_path.as_path()))
             .collect()
     }
 
     #[allow(unused)]
     /// quickly find chunks related or not to a section, might be useful when adults change sections
     /// not used yet
-    pub(crate) fn list_files_with_prefix(&self, prefix: Prefix) -> Vec<String> {
+    pub(crate) fn list_files_with_prefix(&self, prefix: Prefix) -> Vec<PathBuf> {
         let prefix_path = self.prefix_tree_path(prefix.name(), prefix.bit_count());
         list_files_in(prefix_path.as_path())
     }
@@ -180,74 +178,63 @@ impl FileStore {
         &self,
         addr: &RegisterAddress,
     ) -> Result<(RegisterLog, PathBuf)> {
-        let path = self.address_to_filepath(&DataAddress::Register(*addr))?;
+        let mut register_log = RegisterLog::new();
 
-        let register_log = if self.data_file_exists(&DataAddress::Register(*addr))? {
-            trace!("Register log exists {:?}", path);
+        let path = self.prefix_tree_path(addr.id()?, self.bit_tree_depth);
+        if path.exists() {
+            trace!("Register log path exists: {}", path.display());
 
-            let mut register_log = BTreeMap::new();
-
-            while let Some(entry) = tokio::fs::read_dir(&path).await?.next_entry().await? {
+            let mut ops_files = tokio::fs::read_dir(&path).await?;
+            while let Some(entry) = ops_files.next_entry().await? {
                 if entry.metadata().await?.is_file() {
-                    let file = entry
-                        .file_name()
-                        .into_string()
-                        .map_err(|_| Error::InvalidFilename)?;
-                    debug!(">>>file to read: {file:?}");
-                    let serialized_data = read(file).await?;
+                    debug!(">>>file to read: {}", entry.path().display());
+                    let serialized_data = read(entry.path()).await?;
                     let cmd: RegisterCmd = deserialise(&serialized_data)?;
-                    let _existing = register_log.insert(cmd.register_operation_id()?, cmd);
-
+                    let _existing = register_log.insert(cmd.register_operation_id()?, cmd.clone());
                 }
             }
-
-            register_log
         } else {
             trace!(
-                "Register log does not exists, creating a new one {:?}",
-                path
+                "Register log does not exists, creating a new one {}",
+                path.display()
             );
-            BTreeMap::new()
-        };
-
+        }
 
         Ok((register_log, path))
     }
 
     /// Persists a RegisterLog to disk
-    pub(crate) async fn write_log_to_disk(&self, log: RegisterLog, path: &PathBuf) -> Result<()> {
-        trace!("Writing to register log at {:?}", path);
+    pub(crate) async fn write_log_to_disk(&self, log: &RegisterLog, path: &Path) -> Result<()> {
+        trace!("Writing to register log at {}", path.display());
+
+        create_dir_all(&path).await?;
 
         for (reg_id, cmd) in log {
             // TODO do we want to fail here if one entry fails?
             self.write_register_cmd(reg_id, cmd, path).await?;
         }
 
-        trace!("Log writing successful");
+        trace!("Log writing successful at {}", path.display());
         Ok(())
     }
 
     /// Persists a RegisterCmd to disk
     pub(crate) async fn write_register_cmd(
         &self,
-        reg_id: RegisterCmdId,
-        cmd: RegisterCmd,
-        path: &PathBuf,
+        reg_id: &RegisterCmdId,
+        cmd: &RegisterCmd,
+        path: &Path,
     ) -> Result<()> {
-        let serialized_data = serialise(&cmd)?;
+        let serialized_data = serialise(cmd)?;
 
-        trace!("Writing cmd register log at {:?}", path);
-
-        let path = path.join(format!("{:?}", reg_id));
+        let reg_id = hex::encode(reg_id);
+        let path = path.join(reg_id.clone());
+        trace!("Writing cmd register log at {}", path.display());
         // it's deterministic, so they are exactly the same op so we can leave
         if path.exists() {
             trace!("RegisterCmd exists on disk, so was not written: {cmd:?}");
             // TODO: should we error?
             return Ok(());
-        }
-
-        if let Some(dirs) = path.parent() {
-            create_dir_all(dirs).await?;
         }
 
         let mut file = File::create(path).await?;
@@ -256,12 +243,12 @@ impl FileStore {
 
         self.used_space.increase(std::mem::size_of::<RegisterCmd>());
 
-        trace!("RegisterCmd writing successful");
+        trace!("RegisterCmd writing successful for id {reg_id}");
         Ok(())
     }
 }
 
-fn list_files_in(path: &Path) -> Vec<String> {
+fn list_files_in(path: &Path) -> Vec<PathBuf> {
     if !path.exists() {
         return vec![];
     }
@@ -275,7 +262,7 @@ fn list_files_in(path: &Path) -> Vec<String> {
             }
         })
         .filter(|e| e.file_type().is_file())
-        .map(|e| e.path().display().to_string())
+        .map(|e| e.path().to_path_buf())
         .collect()
 }
 

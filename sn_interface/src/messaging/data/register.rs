@@ -21,7 +21,7 @@ use tiny_keccak::{Hasher, Sha3};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
-/// Deterministic Id for a register Cmd, takes into account he underlying cmd, and all sigs
+/// Deterministic Id for a register Cmd, takes into account the underlying cmd, and all sigs
 pub type RegisterCmdId = [u8; 32];
 
 /// [`Register`] read operations.

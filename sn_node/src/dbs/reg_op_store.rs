@@ -30,36 +30,21 @@ impl RegOpStore {
         Ok(Self { tree, path })
     }
 
-    /// Get all events stored in db
-    pub(crate) fn get_all(&self) -> Result<Vec<RegisterCmd>> {
-        let iter = self.tree.iter();
-
-        let mut events = vec![];
-        for (_, res) in iter.enumerate() {
-            let (db_key, val) = res;
-
-            events.push((db_key, val))
-        }
-
-        events.sort_by(|(key_a, _), (key_b, _)| key_a.partial_cmp(key_b).unwrap());
-
-        let events: Vec<RegisterCmd> = events.into_iter().map(|(_, val)| val).cloned().collect();
-
-        Ok(events)
+    /// Get all events stored
+    pub(crate) fn get_all(&self) -> Vec<RegisterCmd> {
+        self.tree.iter().map(|(_, cmd)| cmd).cloned().collect()
     }
 
-    /// append a new entry and write to disk
+    /// Append a new entry and write to disk
     pub(crate) async fn append(&mut self, event: RegisterCmd, file_store: FileStore) -> Result<()> {
-        let key = event.register_operation_id()?;
-        if self.tree.get(&key).is_some() {
+        let reg_id = event.register_operation_id()?;
+        if self.tree.get(&reg_id).is_some() {
             return Err(Error::DataExists);
         }
 
-        let _old_entry = self.tree.insert(key, event);
+        let _old_entry = self.tree.insert(reg_id, event);
 
-        file_store
-            .write_log_to_disk(self.tree.clone(), &self.path)
-            .await?;
+        file_store.write_log_to_disk(&self.tree, &self.path).await?;
 
         Ok(())
     }
