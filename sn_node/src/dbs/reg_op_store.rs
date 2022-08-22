@@ -46,7 +46,7 @@ impl RegOpStore {
         Ok(events)
     }
 
-    /// append a new entry
+    /// append a new entry and write to disk
     pub(crate) async fn append(&mut self, event: RegisterCmd, file_store: FileStore) -> Result<()> {
         let key = event.register_operation_id()?;
         if self.tree.get(&key).is_some() {
