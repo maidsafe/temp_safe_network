@@ -182,16 +182,26 @@ impl FileStore {
     ) -> Result<(RegisterLog, PathBuf)> {
         let path = self.address_to_filepath(&DataAddress::Register(*addr))?;
 
-        let map = if self.data_file_exists(&DataAddress::Register(*addr))? {
+        let register_log = if self.data_file_exists(&DataAddress::Register(*addr))? {
             trace!("Register log exists {:?}", path);
 
-            // TODO: walk dir and merge all ops...
+            let mut register_log = BTreeMap::new();
 
-            let serialized_data = read(&path)
-                .await
-                .map_err(|e| Error::Serialize(e.to_string()))?;
-            let map: RegisterLog = deserialise(&serialized_data)?;
-            map
+            while let Some(entry) = tokio::fs::read_dir(&path).await?.next_entry().await? {
+                if entry.metadata().await?.is_file() {
+                    let file = entry
+                        .file_name()
+                        .into_string()
+                        .map_err(|_| Error::InvalidFilename)?;
+                    debug!(">>>file to read: {file:?}");
+                    let serialized_data = read(file).await?;
+                    let cmd: RegisterCmd = deserialise(&serialized_data)?;
+                    let _existing = register_log.insert(cmd.register_operation_id()?, cmd);
+
+                }
+            }
+
+            register_log
         } else {
             trace!(
                 "Register log does not exists, creating a new one {:?}",
@@ -200,7 +210,8 @@ impl FileStore {
             BTreeMap::new()
         };
 
-        Ok((map, path))
+
+        Ok((register_log, path))
     }
 
     /// Persists a RegisterLog to disk
@@ -225,16 +236,18 @@ impl FileStore {
     ) -> Result<()> {
         let serialized_data = serialise(&cmd)?;
 
-        let path = path.join(format!("{:?}", reg_id));
         trace!("Writing cmd register log at {:?}", path);
 
-        create_dir_all(path).await?;
-
+        let path = path.join(format!("{:?}", reg_id));
         // it's deterministic, so they are exactly the same op so we can leave
         if path.exists() {
             trace!("RegisterCmd exists on disk, so was not written: {cmd:?}");
             // TODO: should we error?
             return Ok(());
+        }
+
+        if let Some(dirs) = path.parent() {
+            create_dir_all(dirs).await?;
         }
 
         let mut file = File::create(path).await?;
