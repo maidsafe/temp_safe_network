@@ -33,6 +33,8 @@ use tokio::{
     time::Instant,
 };
 
+const PROCESS_BATCH_COUNT: usize = 5;
+
 /// Listens for incoming msgs and forms Cmds for each,
 /// Periodically triggers other Cmd Processes (eg health checks, dysfunction etc)
 pub(crate) struct FlowCtrl {
@@ -109,10 +111,7 @@ impl FlowCtrl {
         loop {
             match self.incoming_msg_events.try_recv() {
                 Ok(msg) => {
-                    debug!("pushing msg into cmd q");
                     let cmd = self.handle_new_msg_event(msg).await;
-
-                    debug!("msg event handleddd");
 
                     // dont use sender here incase channel gets full
                     if let Err(error) = self.fire_and_forget(cmd).await {
@@ -165,16 +164,19 @@ impl FlowCtrl {
             }
 
             let mut process_batch_count = 0;
+
+            let mut continue_with_periodics = false;
             // we go through all pending cmds in this loop
-            while self.cmd_ctrl.has_items_queued() {
+            while self.cmd_ctrl.has_items_queued() && !continue_with_periodics {
                 process_batch_count += 1;
                 self.process_next_cmd().await;
 
-                if process_batch_count > 5 {
+                if process_batch_count > PROCESS_BATCH_COUNT {
                     // let's start fresh,
-                    // topping up the queue with anything new that's come in
-                    // or been generated
-                    continue;
+                    // adding any periodic check on top and
+                    // topping up the queue with any new msg that's come in
+                    // or been generated from existing cmds
+                    continue_with_periodics = true;
                 }
             }
 
