@@ -16,7 +16,7 @@ use crate::node::{
 #[cfg(feature = "traceroute")]
 use sn_interface::{messaging::Entity, messaging::Traceroute, types::PublicKey};
 use sn_interface::{
-    messaging::{system::SystemMsg, AuthKind, Dst, MsgId, WireMsg},
+    messaging::{AuthKind, Dst, MsgId, WireMsg},
     types::Peer,
 };
 
@@ -257,28 +257,6 @@ impl Dispatcher {
             Cmd::ProposeVoteNodesOffline(names) => {
                 let mut node = self.node.write().await;
                 node.cast_offline_proposals(&names)
-            }
-            Cmd::TellEldersToStartConnectivityTest(name) => {
-                let node = self.node.read().await;
-                Ok(vec![node.send_msg_to_our_elders(
-                    SystemMsg::StartConnectivityTest(name),
-                )])
-            }
-            Cmd::TestConnectivity(name) => {
-                let node_state = self
-                    .node
-                    .read()
-                    .await
-                    .network_knowledge()
-                    .get_section_member(&name);
-
-                if let Some(member_info) = node_state {
-                    if self.comm.is_reachable(&member_info.addr()).await.is_err() {
-                        let mut node = self.node.write().await;
-                        node.log_comm_issue(member_info.name());
-                    }
-                }
-                Ok(vec![])
             }
             Cmd::Comm(comm_cmd) => {
                 self.comm.handle_cmd(comm_cmd).await;

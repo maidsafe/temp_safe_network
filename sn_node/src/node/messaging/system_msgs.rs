@@ -139,18 +139,6 @@ impl Node {
                     .into_iter()
                     .collect())
             }
-            SystemMsg::StartConnectivityTest(name) => {
-                trace!(
-                    "Handling msg: StartConnectivityTest from {}: {:?}",
-                    sender,
-                    msg_id
-                );
-                if self.is_not_elder() {
-                    return Ok(vec![]);
-                }
-
-                Ok(vec![Cmd::TestConnectivity(name)])
-            }
             SystemMsg::JoinAsRelocatedResponse(join_response) => {
                 trace!("Handling msg: JoinAsRelocatedResponse from {}", sender);
                 if let Some(ref mut joining_as_relocated) = self.relocate_state {

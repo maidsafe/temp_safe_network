@@ -160,9 +160,6 @@ pub enum SystemMsg {
         /// BLS signature share
         sig_share: SigShare,
     },
-    /// Message that notifies a section to test
-    /// the connectivity to a node
-    StartConnectivityTest(XorName),
     /// Events are facts about something that happened on a node.
     NodeEvent(NodeEvent),
     /// The returned error, from any msg handling on recipient node.
@@ -231,8 +228,7 @@ impl SystemMsg {
             // Inter-node comms for joining, relocating etc.
             SystemMsg::Relocate(_)
             | SystemMsg::JoinRequest(_)
-            | SystemMsg::JoinAsRelocatedRequest(_)
-            | SystemMsg::StartConnectivityTest(_) => JOIN_RELOCATE_MSG_PRIORITY,
+            | SystemMsg::JoinAsRelocatedRequest(_) => JOIN_RELOCATE_MSG_PRIORITY,
 
             #[cfg(feature = "back-pressure")]
             // Inter-node comms for backpressure
@@ -279,9 +275,6 @@ impl Display for SystemMsg {
             SystemMsg::HandoverVotes { .. } => write!(f, "SystemMsg::HandoverVotes"),
             SystemMsg::HandoverAE { .. } => write!(f, "SystemMsg::HandoverAE"),
             SystemMsg::Propose { .. } => write!(f, "SystemMsg::Propose"),
-            SystemMsg::StartConnectivityTest { .. } => {
-                write!(f, "SystemMsg::StartConnectivityTest")
-            }
             SystemMsg::NodeEvent { .. } => write!(f, "SystemMsg::NodeEvent"),
             SystemMsg::NodeMsgError { .. } => write!(f, "SystemMsg::NodeMsgError"),
             #[cfg(any(feature = "chunks", feature = "registers"))]
