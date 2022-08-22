@@ -97,7 +97,7 @@ impl RealPath for FilesMap {
                                 newpath = Vec::<&str>::new();
                                 break;
                             } else if meta.is_dir() {
-                                if iter.peek() == None {
+                                if iter.peek().is_none() {
                                     ended = true;
                                 }
                             } else {
@@ -111,7 +111,7 @@ impl RealPath for FilesMap {
                         // always a further path component.  And of course it
                         // applies for an invalid path.
                         None => {
-                            if iter.peek() == None {
+                            if iter.peek().is_none() {
                                 ended = true;
                             }
                         }

@@ -150,7 +150,7 @@ impl Session {
         self.session_id
             .elder_peers()
             .enumerate()
-            .filter_map(|(index, peer)| (index != self.participant_index).then(|| peer))
+            .filter_map(|(index, peer)| (index != self.participant_index).then_some(peer))
             .collect()
     }
 

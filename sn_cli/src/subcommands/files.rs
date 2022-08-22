@@ -736,7 +736,7 @@ fn print_files_map(
                 name,
             ]);
         } else {
-            if None == name.trim_matches('/').find('/') {
+            if name.trim_matches('/').find('/').is_none() {
                 cwd_size += file_item["size"].parse().unwrap_or(0);
                 cwd_files += 1;
             }
