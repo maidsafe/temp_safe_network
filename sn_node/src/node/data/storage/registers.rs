@@ -463,22 +463,17 @@ impl RegisterStorage {
             match stored_cmd {
                 // first op would be create
                 Create {
-                    cmd: SignedRegisterCreate { op, .. },
+                    cmd:
+                        SignedRegisterCreate {
+                            op: CreateRegister { name, tag, policy },
+                            ..
+                        },
                     section_auth,
                 } => {
-                    hydrated_register = match op {
-                        CreateRegister::Empty { name, tag, policy } => Some((
-                            Register::new(*policy.owner(), name, tag, policy),
-                            section_auth,
-                        )),
-                        CreateRegister::Populated(instance) => {
-                            if instance.size() > (u16::MAX as u64) {
-                                // this would mean the instance has been modified on disk outside of the software
-                                warn!("Data corruption! Encountered stored register with {} entries, wich is larger than max size of {}", instance.size(), u16::MAX);
-                            }
-                            Some((instance, section_auth))
-                        }
-                    };
+                    hydrated_register = Some((
+                        Register::new(*policy.owner(), name, tag, policy),
+                        section_auth,
+                    ));
                 }
                 Edit(SignedRegisterEdit {
                     op: EditRegister { edit, .. },
@@ -519,7 +514,7 @@ fn create_reg_w_policy(
     policy: Policy,
     keypair: Keypair,
 ) -> Result<RegisterCmd> {
-    let op = CreateRegister::Empty { name, tag, policy };
+    let op = CreateRegister { name, tag, policy };
     let signature = keypair.sign(&serialize(&op)?);
 
     let auth = ServiceAuth {
