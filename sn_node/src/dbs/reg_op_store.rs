@@ -14,17 +14,19 @@ use std::collections::btree_map::BTreeMap;
 use std::fmt::Debug;
 use std::path::PathBuf;
 
+pub(crate) type RegisterLog = BTreeMap<RegisterCmdId, RegisterCmd>;
+
 /// Disk storage for logging RegisterCmds.
 #[derive(Clone, Debug)]
 pub(crate) struct RegOpStore {
-    tree: BTreeMap<RegisterCmdId, RegisterCmd>,
+    tree: RegisterLog,
     path: PathBuf,
 }
 
 impl RegOpStore {
     /// Create a new event store
     pub(crate) async fn new(addr: &RegisterAddress, db: FileStore) -> Result<Self> {
-        let (tree, path) = db.open_log(addr).await?;
+        let (tree, path) = db.open_log_from_disk(addr).await?;
         Ok(Self { tree, path })
     }
 
@@ -56,7 +58,7 @@ impl RegOpStore {
         let _old_entry = self.tree.insert(key, event);
 
         file_store
-            .write_to_log(self.tree.clone(), &self.path)
+            .write_log_to_disk(self.tree.clone(), &self.path)
             .await?;
 
         Ok(())

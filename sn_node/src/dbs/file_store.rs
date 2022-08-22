@@ -18,6 +18,8 @@ use sn_interface::{
     },
 };
 
+use crate::dbs::reg_op_store::RegisterLog;
+
 use bytes::Bytes;
 use std::{
     collections::btree_map::BTreeMap,
@@ -174,18 +176,21 @@ impl FileStore {
     }
 
     /// Opens the log of RegisterCmds for a given register address. Creates a new log if no data is found
-    pub(crate) async fn open_log(
+    pub(crate) async fn open_log_from_disk(
         &self,
         addr: &RegisterAddress,
-    ) -> Result<(BTreeMap<RegisterCmdId, RegisterCmd>, PathBuf)> {
+    ) -> Result<(RegisterLog, PathBuf)> {
         let path = self.address_to_filepath(&DataAddress::Register(*addr))?;
 
         let map = if self.data_file_exists(&DataAddress::Register(*addr))? {
             trace!("Register log exists {:?}", path);
+
+            // TODO: walk dir and merge all ops...
+
             let serialized_data = read(&path)
                 .await
                 .map_err(|e| Error::Serialize(e.to_string()))?;
-            let map: BTreeMap<RegisterCmdId, RegisterCmd> = deserialise(&serialized_data)?;
+            let map: RegisterLog = deserialise(&serialized_data)?;
             map
         } else {
             trace!(
@@ -198,17 +203,38 @@ impl FileStore {
         Ok((map, path))
     }
 
-    pub(crate) async fn write_to_log(
-        &self,
-        log: BTreeMap<RegisterCmdId, RegisterCmd>,
-        path: &PathBuf,
-    ) -> Result<()> {
-        let serialized_data = serialise(&log)?;
-
+    /// Persists a RegisterLog to disk
+    pub(crate) async fn write_log_to_disk(&self, log: RegisterLog, path: &PathBuf) -> Result<()> {
         trace!("Writing to register log at {:?}", path);
 
-        if let Some(dirs) = path.parent() {
-            create_dir_all(dirs).await?;
+        for (reg_id, cmd) in log {
+            // TODO do we want to fail here if one entry fails?
+            self.write_register_cmd(reg_id, cmd, path).await?;
+        }
+
+        trace!("Log writing successful");
+        Ok(())
+    }
+
+    /// Persists a RegisterCmd to disk
+    pub(crate) async fn write_register_cmd(
+        &self,
+        reg_id: RegisterCmdId,
+        cmd: RegisterCmd,
+        path: &PathBuf,
+    ) -> Result<()> {
+        let serialized_data = serialise(&cmd)?;
+
+        let path = path.join(format!("{:?}", reg_id));
+        trace!("Writing cmd register log at {:?}", path);
+
+        create_dir_all(path).await?;
+
+        // it's deterministic, so they are exactly the same op so we can leave
+        if path.exists() {
+            trace!("RegisterCmd exists on disk, so was not written: {cmd:?}");
+            // TODO: should we error?
+            return Ok(());
         }
 
         let mut file = File::create(path).await?;
@@ -217,7 +243,7 @@ impl FileStore {
 
         self.used_space.increase(std::mem::size_of::<RegisterCmd>());
 
-        trace!("Log writing successful");
+        trace!("RegisterCmd writing successful");
         Ok(())
     }
 }
