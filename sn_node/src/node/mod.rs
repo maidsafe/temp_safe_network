@@ -360,26 +360,26 @@ mod core {
 
         /// Log an issue in dysfunction
         pub(crate) fn log_node_issue(&mut self, name: XorName, issue: IssueType) {
-            trace!("Logging issue {issue:?} in dysfunction");
+            trace!("Logging issue {issue:?} in dysfunction for {name}");
             self.dysfunction_tracking.track_issue(name, issue)
         }
 
         /// Log a communication problem
         pub(crate) fn log_comm_issue(&mut self, name: XorName) {
-            trace!("Logging comms issue in dysfunction");
+            trace!("Logging comms issue in dysfunction for {name}");
             self.dysfunction_tracking
                 .track_issue(name, IssueType::Communication)
         }
 
         /// Log a dkg issue (ie, an initialised but unfinished dkg round for a given participant)
         pub(crate) fn log_dkg_issue(&mut self, name: XorName) {
-            trace!("Logging Dkg issue in dysfunction");
+            trace!("Logging Dkg issue in dysfunction for {name}");
             self.dysfunction_tracking.track_issue(name, IssueType::Dkg)
         }
 
         /// Log a dkg session as responded to
         pub(crate) fn log_dkg_session(&mut self, name: &XorName) {
-            trace!("Logging Dkg session as responded to in dysfunction");
+            trace!("Logging Dkg session as responded to in dysfunction for {name}");
             self.dysfunction_tracking.dkg_ack_fulfilled(name);
         }
 
