@@ -95,7 +95,7 @@ impl RegisterStorage {
         let mut address = None;
         let op_log = entry
             .store
-            .get_all()?
+            .get_all()
             .into_iter()
             .filter_map(|stored_cmd| {
                 // only spread signed data
@@ -457,12 +457,15 @@ impl RegisterStorage {
         // read from disk
         let store = self.get_or_create_store(key).await?;
         let mut hydrated_register = None;
+
+        // RegisterEdit ops could be read after the RegisterCreate op, so we should keep them
+        // till we read the RegisterCreate op from disk, and then apply all queued ops on top.
+        let mut queued = Vec::new();
+
         // apply all ops
-        use RegisterCmd::*;
-        for stored_cmd in store.get_all()? {
+        for stored_cmd in store.get_all() {
             match stored_cmd {
-                // first op would be create
-                Create {
+                RegisterCmd::Create {
                     cmd:
                         SignedRegisterCreate {
                             op: CreateRegister { name, tag, policy },
@@ -470,31 +473,42 @@ impl RegisterStorage {
                         },
                     section_auth,
                 } => {
-                    hydrated_register = Some((
-                        Register::new(*policy.owner(), name, tag, policy),
-                        section_auth,
-                    ));
+                    // TODO: if we already have read a RegisterCreate op, check if there
+                    // is any difference this other one, ... and perhaps log a warning if so?
+                    hydrated_register = hydrated_register.or_else(|| {
+                        Some((
+                            Register::new(*policy.owner(), name, tag, policy),
+                            section_auth,
+                        ))
+                    });
                 }
-                Edit(SignedRegisterEdit {
+                RegisterCmd::Edit(SignedRegisterEdit {
                     op: EditRegister { edit, .. },
                     ..
                 }) => {
                     if let Some((reg, _)) = &mut hydrated_register {
-                        reg.apply_op(edit).map_err(Error::NetworkData)?
+                        reg.apply_op(edit).map_err(Error::NetworkData)?;
+                    } else {
+                        // we'll apply it after we read the RegisterCreate op from disk
+                        queued.push(edit);
                     }
                 }
             }
         }
 
         match hydrated_register {
-            None => Err(Error::KeyNotFound(key.id()?.to_string())), // nothing found on disk
-            Some((reg, section_auth)) => {
-                let entry = RegisterEntry {
+            None => Err(Error::KeyNotFound(key.id()?.to_string())),
+            Some((mut reg, section_auth)) => {
+                // apply any queued RegisterEdit op
+                for op in queued {
+                    reg.apply_op(op).map_err(Error::NetworkData)?;
+                }
+
+                Ok(RegisterEntry {
                     state: reg,
                     store,
                     section_auth,
-                };
-                Ok(entry)
+                })
             }
         }
     }
@@ -533,7 +547,7 @@ fn section_auth() -> SectionAuth {
 
     let sk = bls::SecretKey::random();
     let public_key = sk.public_key();
-    let data = "hello".to_string();
+    let data = "TODO-spentbook".to_string();
     let signature = sk.sign(&data);
     let sig = KeyedSig {
         public_key,
