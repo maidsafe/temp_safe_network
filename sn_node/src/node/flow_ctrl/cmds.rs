@@ -194,11 +194,6 @@ pub(crate) enum Cmd {
     ScheduleDkgTimeout { duration: Duration, token: u64 },
     /// Proposes peers as offline
     ProposeVoteNodesOffline(BTreeSet<XorName>),
-    /// Send a signal to all Elders to
-    /// test the connectivity to a specific node
-    TellEldersToStartConnectivityTest(XorName),
-    /// Test Connectivity
-    TestConnectivity(XorName),
     /// Comm Commands
     #[allow(unused)]
     Comm(crate::comm::Cmd),
@@ -251,8 +246,6 @@ impl Cmd {
             CleanupPeerLinks => 9,
 
             ScheduleDkgTimeout { .. } => 8,
-            TellEldersToStartConnectivityTest(_) => 8,
-            TestConnectivity(_) => 8,
 
             Comm(_) => 7,
 
@@ -307,10 +300,6 @@ impl fmt::Display for Cmd {
             }
             Cmd::ProposeVoteNodesOffline(_) => write!(f, "ProposeOffline"),
             Cmd::AddToPendingQueries { .. } => write!(f, "AddToPendingQueries"),
-            Cmd::TellEldersToStartConnectivityTest(_) => {
-                write!(f, "TellEldersToStartConnectivityTest")
-            }
-            Cmd::TestConnectivity(_) => write!(f, "TestConnectivity"),
             Cmd::Comm(comm) => write!(f, "Comm({:?})", comm),
         }
     }

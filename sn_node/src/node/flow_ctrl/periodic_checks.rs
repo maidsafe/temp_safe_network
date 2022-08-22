@@ -372,9 +372,6 @@ impl FlowCtrl {
 
         if !unresponsive_nodes.is_empty() {
             debug!("{:?} : {unresponsive_nodes:?}", LogMarker::ProposeOffline);
-            for name in &unresponsive_nodes {
-                cmds.push(Cmd::TellEldersToStartConnectivityTest(*name))
-            }
             cmds.push(Cmd::ProposeVoteNodesOffline(unresponsive_nodes))
         }
 
