@@ -25,31 +25,37 @@ const CHUNKS_DB_NAME: &str = "chunks";
 
 /// Operations on data chunks.
 #[derive(Clone, Debug)]
-pub(crate) struct ChunkStorage {
-    db: FileStore,
+pub(super) struct ChunkStorage {
+    file_store: FileStore,
 }
 
 impl ChunkStorage {
     pub(crate) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         Ok(Self {
-            db: FileStore::new(path.join(CHUNKS_DB_NAME), used_space)?,
+            file_store: FileStore::new(path.join(CHUNKS_DB_NAME), used_space)?,
         })
     }
 
     pub(crate) fn addrs(&self) -> Vec<ChunkAddress> {
-        self.db.list_all_chunk_addrs()
+        self.file_store.list_all_chunk_addrs()
     }
 
     #[allow(dead_code)]
     pub(crate) async fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
         trace!("Removing chunk, {:?}", address);
-        self.db.delete_data(&DataAddress::Chunk(*address)).await
+        self.file_store
+            .delete_data(&DataAddress::Chunk(*address))
+            .await
     }
 
     pub(crate) async fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
         debug!("Getting chunk {:?}", address);
 
-        match self.db.read_data(&DataAddress::Chunk(*address)).await {
+        match self
+            .file_store
+            .read_data(&DataAddress::Chunk(*address))
+            .await
+        {
             Ok(res) => Ok(res),
             Err(error) => match error {
                 Error::Io(io_error) if io_error.kind() == ErrorKind::NotFound => {
@@ -70,7 +76,7 @@ impl ChunkStorage {
     /// If that chunk was already in the local store, just overwrites it
     #[instrument(skip_all)]
     pub(super) async fn store(&self, data: DataCmd) -> Result<()> {
-        if self.db.data_file_exists(&data.address())? {
+        if self.file_store.data_file_exists(&data.address())? {
             info!(
                 "{}: Data already exists, not storing: {:?}",
                 self,
@@ -84,14 +90,14 @@ impl ChunkStorage {
         // just so we don't go too much overboard
         // should not be triggered as chunks should not be sent to full adults
         if let DataCmd::StoreChunk(chunk) = &data {
-            if !self.db.can_add(chunk.value().len()) {
+            if !self.file_store.can_add(chunk.value().len()) {
                 return Err(Error::NotEnoughSpace);
             }
         }
 
         // store the data
         trace!("{:?}", LogMarker::StoringChunk);
-        let _addr = self.db.write_data(data).await?;
+        let _addr = self.file_store.write_data(data).await?;
         trace!("{:?}", LogMarker::StoredNewChunk);
 
         Ok(())

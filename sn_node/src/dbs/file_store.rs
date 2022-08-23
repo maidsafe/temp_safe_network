@@ -19,17 +19,19 @@ use sn_interface::{
     },
 };
 
-use crate::dbs::reg_op_store::RegisterLog;
-
 use bytes::Bytes;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::{btree_map::Entry, BTreeMap},
+    path::{Path, PathBuf},
+};
 use tokio::fs::{create_dir_all, metadata, read, remove_file, File};
 use tokio::io::AsyncWriteExt;
 use walkdir::WalkDir;
 use xor_name::{Prefix, XorName};
 
 const BIT_TREE_DEPTH: usize = 20;
-const FILE_DB_DIR: &str = "filedb";
+
+pub(crate) type RegisterLog = BTreeMap<RegisterCmdId, RegisterCmd>;
 
 /// A disk store for chunks
 #[derive(Clone, Debug)]
@@ -40,17 +42,15 @@ pub(crate) struct FileStore {
 }
 
 impl FileStore {
-    /// Creates a new `FileStore` at location `root/CHUNK_DB_DIR`
+    /// Creates a new `FileStore` at the specified root location
     ///
     /// If the location specified already contains a `FileStore`, it is simply used
     ///
     /// Used space of the dir is tracked
-    pub(crate) fn new<P: AsRef<Path>>(root: P, used_space: UsedSpace) -> Result<Self> {
-        let chunk_store_path = root.as_ref().join(FILE_DB_DIR);
-
-        Ok(FileStore {
+    pub(crate) fn new<P: AsRef<Path>>(root_path: P, used_space: UsedSpace) -> Result<Self> {
+        Ok(Self {
             bit_tree_depth: BIT_TREE_DEPTH,
-            file_store_path: chunk_store_path,
+            file_store_path: root_path.as_ref().to_path_buf(),
             used_space,
         })
     }
@@ -94,18 +94,11 @@ impl FileStore {
     pub(crate) fn list_all_chunk_addrs(&self) -> Vec<ChunkAddress> {
         self.list_all_files()
             .iter()
-            .filter_map(|filepath| self.chunk_filepath_to_address(filepath).ok())
+            .filter_map(|filepath| Self::chunk_filepath_to_address(filepath).ok())
             .collect()
     }
 
-    pub(crate) fn list_all_reg_addrs(&self) -> Vec<RegisterAddress> {
-        self.list_all_files()
-            .iter()
-            .filter_map(|filepath| self.reg_filepath_to_address(filepath).ok())
-            .collect()
-    }
-
-    fn chunk_filepath_to_address(&self, path: &Path) -> Result<ChunkAddress> {
+    fn chunk_filepath_to_address(path: &Path) -> Result<ChunkAddress> {
         let filename = path
             .file_name()
             .ok_or(Error::NoFilename)?
@@ -115,21 +108,24 @@ impl FileStore {
         Ok(ChunkAddress::decode_from_zbase32(filename)?)
     }
 
-    fn reg_filepath_to_address(&self, path: &Path) -> Result<RegisterAddress> {
-        let parent_path = path.parent().ok_or(Error::InvalidFilename)?;
+    pub(crate) async fn list_all_reg_addrs(&self) -> Vec<RegisterAddress> {
+        let iter = list_files_in(&self.file_store_path)
+            .into_iter()
+            .filter_map(|e| e.parent().map(|parent| (parent.to_path_buf(), e.clone())));
 
-        futures::executor::block_on(async {
-            let mut ops_files = tokio::fs::read_dir(&parent_path).await?;
-            while let Some(entry) = ops_files.next_entry().await? {
-                if entry.metadata().await?.is_file() {
-                    let serialized_data = read(entry.path()).await?;
-                    let cmd: RegisterCmd = deserialise(&serialized_data)?;
-                    return Ok(cmd.dst_address());
+        let mut addrs = BTreeMap::<PathBuf, RegisterAddress>::new();
+        for (parent, op_file) in iter {
+            if let Entry::Vacant(vacant) = addrs.entry(parent) {
+                if let Ok(Ok(cmd)) = read(op_file)
+                    .await
+                    .map(|serialized_data| deserialise::<RegisterCmd>(&serialized_data))
+                {
+                    let _existing = vacant.insert(cmd.dst_address());
                 }
             }
+        }
 
-            Err(Error::NoFilename)
-        })
+        addrs.into_iter().map(|(_, addr)| addr).collect()
     }
 
     // ---------------------- api methods ----------------------
@@ -180,7 +176,6 @@ impl FileStore {
     pub(crate) fn list_all_files(&self) -> Vec<PathBuf> {
         list_files_in(&self.file_store_path)
     }
-
     #[allow(unused)]
     /// quickly find chunks related or not to a section, might be useful when adults change sections
     /// not used yet
@@ -201,7 +196,7 @@ impl FileStore {
     }
 
     /// Opens the log of RegisterCmds for a given register address. Creates a new log if no data is found
-    pub(crate) async fn open_log_from_disk(
+    pub(crate) async fn open_reg_log_from_disk(
         &self,
         addr: &RegisterAddress,
     ) -> Result<(RegisterLog, PathBuf)> {
@@ -210,14 +205,10 @@ impl FileStore {
         let path = self.address_to_filepath(&DataAddress::Register(*addr))?;
         if path.exists() {
             trace!("Register log path exists: {}", path.display());
-
-            let mut ops_files = tokio::fs::read_dir(&path).await?;
-            while let Some(entry) = ops_files.next_entry().await? {
-                if entry.metadata().await?.is_file() {
-                    let serialized_data = read(entry.path()).await?;
-                    let cmd: RegisterCmd = deserialise(&serialized_data)?;
-                    let _existing = register_log.insert(cmd.register_operation_id()?, cmd.clone());
-                }
+            for filepath in list_files_in(&path) {
+                let serialized_data = read(filepath).await?;
+                let cmd: RegisterCmd = deserialise(&serialized_data)?;
+                let _existing = register_log.insert(cmd.register_operation_id()?, cmd);
             }
         } else {
             trace!(
@@ -278,12 +269,13 @@ fn list_files_in(path: &Path) -> Vec<PathBuf> {
     if !path.exists() {
         return vec![];
     }
+
     WalkDir::new(path)
         .into_iter()
         .filter_map(|e| match e {
             Ok(direntry) => Some(direntry),
             Err(err) => {
-                warn!("FileStore: failed to process file entry: {}", err);
+                warn!("FileStore: failed to process filesystem entry: {}", err);
                 None
             }
         })
