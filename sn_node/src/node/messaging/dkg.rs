@@ -85,9 +85,10 @@ impl Node {
         let recipients = Vec::from_iter(session_id.elder_peers());
 
         trace!(
-            "{} s{} with {:?} to {:?}",
+            "{} s{} {:?} with {:?} to {:?}",
             LogMarker::SendDkgStart,
             session_id.sum(),
+            session_id.prefix,
             session_id.elders,
             recipients
         );
