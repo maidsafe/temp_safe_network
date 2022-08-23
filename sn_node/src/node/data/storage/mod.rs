@@ -9,8 +9,8 @@
 mod chunks;
 mod registers;
 
-pub(crate) use chunks::ChunkStorage;
-pub(crate) use registers::RegisterStorage;
+use chunks::ChunkStorage;
+use registers::RegisterStorage;
 
 use crate::{dbs::Result, UsedSpace};
 
@@ -206,19 +206,19 @@ impl DataStorage {
     }
 
     /// Retrieve all keys/ReplicatedDataAddresses of stored data
-    pub fn keys(&self) -> Vec<ReplicatedDataAddress> {
+    pub async fn keys(&self) -> Vec<ReplicatedDataAddress> {
         let mut all_addrs = vec![];
 
         // TODO: Parallelize this below loops
         let chunk_addrs = self.chunks.addrs();
-        for addr in chunk_addrs {
-            all_addrs.push(ReplicatedDataAddress::Chunk(addr))
-        }
+        chunk_addrs
+            .into_iter()
+            .for_each(|addr| all_addrs.push(ReplicatedDataAddress::Chunk(addr)));
 
-        let reg_addrs = self.registers.addrs();
-        for addr in reg_addrs {
-            all_addrs.push(ReplicatedDataAddress::Register(addr))
-        }
+        let reg_addrs = self.registers.addrs().await;
+        reg_addrs
+            .into_iter()
+            .for_each(|addr| all_addrs.push(ReplicatedDataAddress::Register(addr)));
 
         all_addrs
     }
