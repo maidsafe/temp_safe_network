@@ -8,8 +8,7 @@ exit=0
 # The tests parse output from the CLI process and they are expecting it to be in a certain form, so
 # any additional logging needs to be disabled.
 unset RUST_LOG
-# The default timeout value is 120 seconds, which causes NRS to run extremely slow.
-export SN_QUERY_TIMEOUT=10
+
 export RUST_BACKTRACE=full
 
 cd sn_cli

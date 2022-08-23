@@ -285,7 +285,6 @@ jobs:
           test-threads: 10
         timeout-minutes: 60
         env:
-          SN_QUERY_TIMEOUT: 10
           TEST_ENV_GENESIS_DBC_PATH: /tmp/genesis_dbc
 
   cli:
@@ -342,7 +341,6 @@ jobs:
           test-threads: 10
         timeout-minutes: 60
         env:
-          SN_QUERY_TIMEOUT: 10
           TEST_ENV_GENESIS_DBC_PATH: /tmp/genesis_dbc
 
   kill-testnet:
