@@ -38,7 +38,7 @@ pub const ENV_AE_WAIT: &str = "SN_AE_WAIT";
 /// Bind by default to all network interfaces on a OS assigned port
 pub const DEFAULT_LOCAL_ADDR: (Ipv4Addr, u16) = (Ipv4Addr::UNSPECIFIED, 0);
 /// Default timeout to use before timing out queries and commands
-pub const DEFAULT_QUERY_CMD_TIMEOUT: Duration = Duration::from_secs(120);
+pub const DEFAULT_QUERY_CMD_TIMEOUT: Duration = Duration::from_secs(30);
 /// Default timeout for waiting for potential Anti-Entropy messages
 pub const DEFAULT_ACK_WAIT: Duration = Duration::from_secs(10);
 
