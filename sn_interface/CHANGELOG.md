@@ -6,7 +6,154 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## v0.10.0 (2022-08-23)
+
+### Chore
+
+ - <csr-id-2c8cbdf06993e86f7e5575c5dc856721a5ed08b7/> update tokio
+ - <csr-id-c8517a481e39bf688041cd8f8661bc663ee7bce7/> fix clippy some/none issues
+ - <csr-id-589f03ce8670544285f329fe35c19897d4bfced8/> upgrading sn_dbc to v8.0
+ - <csr-id-9f64d681e285de57a54f571e98ff68f1bf39b6f1/> increase data query limit
+   Now we differentiate queries per adult/index, we may need more queries.
+ - <csr-id-836c1ba8d17d380e8504325e14f46739e2688bb3/> check members need updating before verifying.
+   During merge members we were spending a lot of CPU verifying, when we may not actually need the udpate at all
+
+### New Features
+
+ - <csr-id-f0f860efcf89cb7bf51bddd6364a9bec33bbf3c3/> remove ConnectivityCheck
+   Now we have periodic health checks and dysfunciton, this
+   check should not be needed, and can cause network strain
+   with the frequent DKG we have now
+ - <csr-id-e97ab2220d150706741549944c6e4bf77f2a5bae/> new cmd to display detailed information about a configured network
+ - <csr-id-438716cf9cfc11685968b10ccba8deffff96e56e/> include span in module path
+ - <csr-id-108997c0ca4c291b8628b4a349732b3a23802d5a/> simplify log format to '<timestamp> [module] LEVEL <msg>'
+ - <csr-id-1e2a0a122f8c53d669916cded16876aa16d8ebfb/> make AntiEntropyProbe carry a current known section key for response
+
+### Bug Fixes
+
+ - <csr-id-d529bd61de83795b2b10cce12549374cd9521a4f/> add fallback if only single prefix
+
+### Refactor
+
+ - <csr-id-1618cf6a93117942946d152efee24fe3c7020e55/> expose serialisation/deserialisation utilities as public methods instead
+   - Also include the genesis key of each network in the list shown by CLI networks cmd.
+ - <csr-id-11b8182a3de636a760d899cb15d7184d8153545a/> clean up unused functionality
+   `closest` is a method that will find a prefix that is closest, but if
+   not returning any, it means the set is empty. The `closest_or_opposite`
+   used this function internally, but actually never got to the opposite,
+   because `closest` would always return a SAP.
+   
+   This method was used in a few places where no exclusions were given, so
+   it is clear in that case that it would always find a prefix. In a single
+   case, it was called with an exclusion, where it would find a section
+   closer than its own section.
+ - <csr-id-e52028f1e9d7fcf19962a7643b272ba3a786c7c4/> SAP reference instead of clone
+
+### New Features (BREAKING)
+
+ - <csr-id-991ccd452119137d9da046b7f222f091177e28f1/> adding more context information to sn_client::Error types
+
+### Refactor (BREAKING)
+
+ - <csr-id-28d95a2e959e32ee69a70bdc855cba1fff1fc8d8/> removing unused CreateRegister::Populated msg type
+ - <csr-id-d3f66d6cfa838a5c65fb8f31fa68d48794b33dea/> removing unused sn_node::dbs::Error variants and RegisterExtend cmd
+ - <csr-id-f0fbe5fd9bec0b2865271bb139c9fcb4ec225884/> renaming NetworkPrefixMap to SectionTree
+   - Changing CLI and sn_client default path for network contacts to `$HOME/.safe/network_contacts`.
+   - Renaming variables and functions referring to "prefix map" to now refer to "network contacts".
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 18 commits contributed to the release over the course of 8 calendar days.
+ - 9 days passed between releases.
+ - 18 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - remove ConnectivityCheck ([`f0f860e`](https://github.com/maidsafe/safe_network/commit/f0f860efcf89cb7bf51bddd6364a9bec33bbf3c3))
+    - removing unused CreateRegister::Populated msg type ([`28d95a2`](https://github.com/maidsafe/safe_network/commit/28d95a2e959e32ee69a70bdc855cba1fff1fc8d8))
+    - removing unused sn_node::dbs::Error variants and RegisterExtend cmd ([`d3f66d6`](https://github.com/maidsafe/safe_network/commit/d3f66d6cfa838a5c65fb8f31fa68d48794b33dea))
+    - update tokio ([`2c8cbdf`](https://github.com/maidsafe/safe_network/commit/2c8cbdf06993e86f7e5575c5dc856721a5ed08b7))
+    - fix clippy some/none issues ([`c8517a4`](https://github.com/maidsafe/safe_network/commit/c8517a481e39bf688041cd8f8661bc663ee7bce7))
+    - new cmd to display detailed information about a configured network ([`e97ab22`](https://github.com/maidsafe/safe_network/commit/e97ab2220d150706741549944c6e4bf77f2a5bae))
+    - adding more context information to sn_client::Error types ([`991ccd4`](https://github.com/maidsafe/safe_network/commit/991ccd452119137d9da046b7f222f091177e28f1))
+    - upgrading sn_dbc to v8.0 ([`589f03c`](https://github.com/maidsafe/safe_network/commit/589f03ce8670544285f329fe35c19897d4bfced8))
+    - renaming NetworkPrefixMap to SectionTree ([`f0fbe5f`](https://github.com/maidsafe/safe_network/commit/f0fbe5fd9bec0b2865271bb139c9fcb4ec225884))
+    - include span in module path ([`438716c`](https://github.com/maidsafe/safe_network/commit/438716cf9cfc11685968b10ccba8deffff96e56e))
+    - simplify log format to '<timestamp> [module] LEVEL <msg>' ([`108997c`](https://github.com/maidsafe/safe_network/commit/108997c0ca4c291b8628b4a349732b3a23802d5a))
+    - expose serialisation/deserialisation utilities as public methods instead ([`1618cf6`](https://github.com/maidsafe/safe_network/commit/1618cf6a93117942946d152efee24fe3c7020e55))
+    - increase data query limit ([`9f64d68`](https://github.com/maidsafe/safe_network/commit/9f64d681e285de57a54f571e98ff68f1bf39b6f1))
+    - add fallback if only single prefix ([`d529bd6`](https://github.com/maidsafe/safe_network/commit/d529bd61de83795b2b10cce12549374cd9521a4f))
+    - clean up unused functionality ([`11b8182`](https://github.com/maidsafe/safe_network/commit/11b8182a3de636a760d899cb15d7184d8153545a))
+    - SAP reference instead of clone ([`e52028f`](https://github.com/maidsafe/safe_network/commit/e52028f1e9d7fcf19962a7643b272ba3a786c7c4))
+    - check members need updating before verifying. ([`836c1ba`](https://github.com/maidsafe/safe_network/commit/836c1ba8d17d380e8504325e14f46739e2688bb3))
+    - make AntiEntropyProbe carry a current known section key for response ([`1e2a0a1`](https://github.com/maidsafe/safe_network/commit/1e2a0a122f8c53d669916cded16876aa16d8ebfb))
+</details>
+
 ## v0.9.0 (2022-08-14)
+
+<csr-id-66c26782759be707edb922daa548e3f0a3f9be8c/>
+<csr-id-6d60525874dc4efeb658433f1f253d54e0cba2d4/>
+<csr-id-29de67f1e3583eab867d517cb50ed2e404bd63fd/>
+<csr-id-8242f2f1035b1c0718e53954951badffa30f3393/>
+<csr-id-848dba48e5959d0b9cfe182fde2f12ede71ba9c2/>
+<csr-id-35483b3f322eeea2c10427e94e4750a8269811c0/>
+<csr-id-820fcc9a77f756fca308f247c3ea1b82f65d30b9/>
+<csr-id-afcf083469c732f10c7c80f4a45e4c33ab111101/>
+<csr-id-17f0e8a08c9543d380c16a35d3d7bfe7834a9e5a/>
+<csr-id-aafc560d3b3b1e375f7be224e0e63a3b567bbd86/>
+<csr-id-7394030fe5aeeb88f4524d2da2a71e36334c831d/>
+<csr-id-73dc9b4a1757393270e62d265328bab0c0aa3b35/>
+<csr-id-0a653e4becc4a8e14ffd6d0752cf035430067ce9/>
+<csr-id-9789797e3f773285f23bd22957fe45a67aabec24/>
+<csr-id-08af2a6ac3485a696d2a1e799af588943f207e6b/>
+<csr-id-702c33b0d78f4a459725ed0c4538819c949978ce/>
+<csr-id-2ea069543dbe6ffebac663d4d8d7e0bc33cfc566/>
+<csr-id-322c69845e2e14eb029fdbebb24e08063a2323b0/>
+<csr-id-ea490ddf749ac9e0c7962c3c21c053663e6b6ee7/>
+<csr-id-bf2902c18b900b8b4a8abae5f966d1e08d547910/>
+<csr-id-6f03b93bd2d02f0ffe54b69fbf25070fbe64eab0/>
+<csr-id-8b3c4eb06fa988dc97b0cb75ed615ec69af29a48/>
+<csr-id-214adedc31bca576c7f28ff52a1f4ff0a2676757/>
+<csr-id-39c3fdf4128462e5f7c5fec3c628d394f505e2f2/>
+<csr-id-1e8180c23fab27ac92c93f201efd050cff00db10/>
+<csr-id-44cea00f54b39eaea0936ec187a8fa9ccdb61661/>
+<csr-id-847db2c487cd102af0cf9a477b4c1b65fc2c8aa6/>
+<csr-id-0a5593b0512d6f059c6a8003634b07e7d2d3e514/>
+<csr-id-707b80c3526ae727a7e91330dc386cdb41c51f4c/>
+<csr-id-9bd6ae20c1207f99420093fd5c9f4eb53836e3c1/>
+<csr-id-31d9f9f99b4e166986b8e51c3d41e0eac55621a4/>
+<csr-id-30a7028dd702e2f6575e299a609a2416439cbaed/>
+<csr-id-dedec486f85c1cf6cf2d538238f32e826e08da0a/>
+<csr-id-879678e986a722d216ee9a4f37e8ae398221a394/>
+<csr-id-629a5873dd3bdf138649360222c00e3e0a76e097/>
+<csr-id-12360a6dcc204153a81adbf842a64dc018c750f9/>
+<csr-id-27ba2a63dcfa272cf7ef8c5301987fc6bfe18ed0/>
+<csr-id-6e65ed8e6c5872bd2c49a1ed2837b1fb16523af1/>
+<csr-id-6b1fee8cf3d0b2995f4b81e59dd684547593b5fa/>
+<csr-id-ed37bb56e5e17d4cba7c1b2165746c193241d618/>
+<csr-id-a0c89ff0e451d2e5dd13fc29635075097f2c7b94/>
+<csr-id-0f07efd9ef0b75de79f27772566b013bc886bcc8/>
+<csr-id-db4f4d07b155d732ad76d263563d81b5fee535f7/>
+<csr-id-ff1a10b4aa2b41b7028949101504a29b52927e71/>
+<csr-id-e0fb940b24e87d86fe920095176362f73503ce79/>
+<csr-id-35ebd8e872f9d9db16c42cbe8d61702f9660aece/>
+<csr-id-3f577d2a6fe70792d7d02e231b599ca3d44a5ed2/>
+<csr-id-5c82df633e7c062fdf761a8e6e0a7ae8d26cc73a/>
+<csr-id-24676dadb771bbd966b6a3e1aa53d1c736c90627/>
+<csr-id-93614b18b4316af04ab8c74358a5c86510590b85/>
+<csr-id-116b109ecdaaf0f1f10ede96cd68977782ab9ea3/>
+<csr-id-f5f73acb035159718780a08f3d10512b11558e59/>
+<csr-id-d3a05a728be8752ea9ebff4e38e7c4c85e5db09b/>
+<csr-id-96da1171d0cac240f772e5d6a15c56f63441b4b3/>
+<csr-id-dd2eb21352223f6340064e0021f4a7df402cd5c9/>
 
 ### Chore
 
@@ -51,6 +198,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-dedec486f85c1cf6cf2d538238f32e826e08da0a/> remove unused async
  - <csr-id-879678e986a722d216ee9a4f37e8ae398221a394/> logging sn_consensus in CI, tweak section min and max elder age
 
+### Chore
+
+ - <csr-id-53f60c2327f8a69f0b2ef6d1a4e96644c10aa358/> sn_interface-0.9.0/sn_dysfunction-0.8.0/sn_client-0.69.0/sn_node-0.65.0/sn_api-0.67.0/sn_cli-0.60.0
+
 ### Documentation
 
  - <csr-id-e3c90998e1abd10768e861370a65a934f52e2ec3/> broken links
@@ -63,6 +214,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Bug Fixes
 
+<csr-id-1694c1566ac562216447eb491cc3b2b00b0c5979/>
+<csr-id-19bb0b99afee53dd7b6e109919249b25e0a55e48/>
+<csr-id-f0d1abf6dd8731310b7749cd6cc7077886215997/>
+<csr-id-f6ea1da4a57e40a051c7d1ee3b87fe9b442c537b/>
+<csr-id-d2bc1167288724b05d70ae7a305c88c93eac611a/>
+
  - <csr-id-8bf0aeed0af193322f341bd718f7a5f84fa2d02f/> gossip all votes and start timer after first vote
  - <csr-id-0ed5075304b090597f7760fb51c4a33435a853f1/> fix deadlock introduced after removal of Arc from NetworkPrefixMap
    Removing the checks in compare_and_write_prefix_map and directly
@@ -74,22 +231,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    
    The flow was:
    1. a node leaves the section (reason is not tracked)
-   2. the node rejoins
-   3. the section accepts them back and attempts to relocate them
-   
-   This seems fine until you realize that relocating the node may fail
-   for some reason and now we're stuck holding this re-joined node.
-   
-   Also we don't track why this node was removed from the section.
-   
-   They could have been a faulty elder that now is back in the same
-   section it had attacked with the same age which will likely cause it
-   to become an elder again.
- - <csr-id-1694c1566ac562216447eb491cc3b2b00b0c5979/> prevent rejoins of archived nodes
- - <csr-id-19bb0b99afee53dd7b6e109919249b25e0a55e48/> adds unique conn info validation to membership
- - <csr-id-f0d1abf6dd8731310b7749cd6cc7077886215997/> remove redundant generation field
- - <csr-id-f6ea1da4a57e40a051c7d1ee3b87fe9b442c537b/> cleanup unused async
- - <csr-id-d2bc1167288724b05d70ae7a305c88c93eac611a/> box LRUCache to avoid stackoverflow
+2. the node rejoins
+3. the section accepts them back and attempts to relocate them
 
 ### Other
 
@@ -148,9 +291,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 69 commits contributed to the release over the course of 29 calendar days.
- - 33 days passed between releases.
- - 67 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 70 commits contributed to the release over the course of 31 calendar days.
+ - 34 days passed between releases.
+ - 68 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -160,6 +303,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.9.0/sn_dysfunction-0.8.0/sn_client-0.69.0/sn_node-0.65.0/sn_api-0.67.0/sn_cli-0.60.0 ([`53f60c2`](https://github.com/maidsafe/safe_network/commit/53f60c2327f8a69f0b2ef6d1a4e96644c10aa358))
     - add partial eq for rust 1.63; dep updates ([`66c2678`](https://github.com/maidsafe/safe_network/commit/66c26782759be707edb922daa548e3f0a3f9be8c))
     - reorganise flow control unit tests ([`12360a6`](https://github.com/maidsafe/safe_network/commit/12360a6dcc204153a81adbf842a64dc018c750f9))
     - sn_client to only read a default prefix map file, updates to be cached on disk by user ([`27ba2a6`](https://github.com/maidsafe/safe_network/commit/27ba2a63dcfa272cf7ef8c5301987fc6bfe18ed0))
@@ -231,10 +375,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - logging sn_consensus in CI, tweak section min and max elder age ([`879678e`](https://github.com/maidsafe/safe_network/commit/879678e986a722d216ee9a4f37e8ae398221a394))
 </details>
 
+<csr-unknown>
+This seems fine until you realize that relocating the node may failfor some reason and now we’re stuck holding this re-joined node.Also we don’t track why this node was removed from the section.They could have been a faulty elder that now is back in the samesection it had attacked with the same age which will likely cause itto become an elder again. prevent rejoins of archived nodes adds unique conn info validation to membership remove redundant generation field cleanup unused async box LRUCache to avoid stackoverflow<csr-unknown/>
+
 ## v0.8.2 (2022-07-10)
 
 <csr-id-49e223e2c07695b4c63e253ba19ce43ec24d7112/>
 <csr-id-dce3ba214354ad007900efce78273670cfb725d5/>
+<csr-id-34bd9bd01a3f042c35e0432df2f0cfcebc32a8a8/>
 
 ### Chore
 

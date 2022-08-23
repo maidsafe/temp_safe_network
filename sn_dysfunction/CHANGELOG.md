@@ -5,7 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.9.0 (2022-08-23)
+
+### Chore
+
+ - <csr-id-93a13d896343f746718be228c46a37b03d6618bb/> run periodic checks on time
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release over the course of 8 calendar days.
+ - 9 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - run periodic checks on time ([`93a13d8`](https://github.com/maidsafe/safe_network/commit/93a13d896343f746718be228c46a37b03d6618bb))
+    - feat(node) add elder health checks ([`93cc084`](https://github.com/maidsafe/safe_network/commit/93cc08468278995598938a8ed3dcdff33a23d066))
+</details>
+
 ## v0.8.0 (2022-08-14)
+
+<csr-id-a4a39b421103af7c143280ad3860b3cbd3016386/>
+<csr-id-3cf903367bfcd805ceff2f2508cd2b12eddc3ca5/>
+<csr-id-29de67f1e3583eab867d517cb50ed2e404bd63fd/>
+<csr-id-db22c6c8c1aedb347bea52199a5673695eff86f8/>
+<csr-id-7c109a0e22b2032ad5ad3b10f828f855091bec67/>
+<csr-id-2f38be726cf493c89d452b6faa50ab8284048798/>
+<csr-id-bbb77f0c34e9d4c263be1c5362f1115ecee1da57/>
+<csr-id-31d9f9f99b4e166986b8e51c3d41e0eac55621a4/>
+<csr-id-dedec486f85c1cf6cf2d538238f32e826e08da0a/>
+<csr-id-e39917d0635a071625f7961ce6d40cb44cc65da0/>
+<csr-id-9fde534277f359dfa0a1d91d917864776edb5138/>
 
 ### Chore
 
@@ -34,6 +72,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    If not, we can only ever propose one node for a membership change
    (lost), every 30s... which may not succeed under churn...
 
+### Chore
+
+ - <csr-id-53f60c2327f8a69f0b2ef6d1a4e96644c10aa358/> sn_interface-0.9.0/sn_dysfunction-0.8.0/sn_client-0.69.0/sn_node-0.65.0/sn_api-0.67.0/sn_cli-0.60.0
+
 ### New Features
 
  - <csr-id-b2c6b2164fbf6679edea0157217dc946d5f9d318/> add AeProbe dysfunction. Refactor score calculation
@@ -52,9 +94,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 15 commits contributed to the release over the course of 29 calendar days.
- - 36 days passed between releases.
- - 15 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 16 commits contributed to the release over the course of 31 calendar days.
+ - 37 days passed between releases.
+ - 16 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -64,6 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.9.0/sn_dysfunction-0.8.0/sn_client-0.69.0/sn_node-0.65.0/sn_api-0.67.0/sn_cli-0.60.0 ([`53f60c2`](https://github.com/maidsafe/safe_network/commit/53f60c2327f8a69f0b2ef6d1a4e96644c10aa358))
     - further tweak dysf, reduce score by std dev for better avg. ([`a4a39b4`](https://github.com/maidsafe/safe_network/commit/a4a39b421103af7c143280ad3860b3cbd3016386))
     - remove unused severity; refactor weighted score ([`3cf9033`](https://github.com/maidsafe/safe_network/commit/3cf903367bfcd805ceff2f2508cd2b12eddc3ca5))
     - add AeProbe dysfunction. Refactor score calculation ([`b2c6b21`](https://github.com/maidsafe/safe_network/commit/b2c6b2164fbf6679edea0157217dc946d5f9d318))
@@ -86,6 +129,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-46262268fc167c05963e5b7bd6261310496e2379/>
 <csr-id-6b574bd53f7e51839380b7be914dbab015726d1e/>
 <csr-id-2f6fff23a29cc4f04415a9a606fec88167551268/>
+<csr-id-2b00cec961561281f6b927e13e501342843f6a0f/>
 
 ### Chore
 

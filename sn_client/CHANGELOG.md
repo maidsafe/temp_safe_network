@@ -1113,7 +1113,139 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
+## v0.70.0 (2022-08-23)
+
+### Chore
+
+ - <csr-id-3b068764721cd74f4d52a279a606743415abff02/> add logs and tweaks to churn example
+ - <csr-id-2f8f8ca6ba0f2faae5bb4631c708988edf907725/> associated functions to methods
+ - <csr-id-589f03ce8670544285f329fe35c19897d4bfced8/> upgrading sn_dbc to v8.0
+ - <csr-id-ddbbb53d61d6c94b00a47dc2b708a2aeda870d96/> leave out unnecessary Arc<RwLock>
+ - <csr-id-1235f7d8a92eb9f086c35696bf5c0a8baf67f2ac/> remove unused Session member
+ - <csr-id-6471eb88f7ce8c060909930ac23c855f30e8690a/> retry more times for connection fails w/ client
+
+### Bug Fixes
+
+ - <csr-id-dfed2a8d2751b6627250b64e7a78213b68ec6733/> move data replication steps ahead of elder check in FlowCtrl
+ - <csr-id-43ecab2dda52cb0ede7c0d4b6e48eaffe1fb6b75/> reintroduce Arc<RwLock> for section tree
+   The RwLock was mistakenly removed by me. This meant that network updates
+   to the section tree were not propagated back to the client's session.
+ - <csr-id-6155ad0334104d367638373fbcbbd7e21631b3e6/> reduce client qp2p default idle timeout
+
+### Other
+
+ - <csr-id-06f5b607cdfbacba082612965630249e3c0f7300/> remove long lived client conn test
+   No longer relevant, client conns can be cleaned up by nodes every X time.
+   So clients have to be resilient and retry (which they do). So this (long)
+   test can be dropped
+
+### Refactor
+
+ - <csr-id-1618cf6a93117942946d152efee24fe3c7020e55/> expose serialisation/deserialisation utilities as public methods instead
+   - Also include the genesis key of each network in the list shown by CLI networks cmd.
+ - <csr-id-11b8182a3de636a760d899cb15d7184d8153545a/> clean up unused functionality
+   `closest` is a method that will find a prefix that is closest, but if
+   not returning any, it means the set is empty. The `closest_or_opposite`
+   used this function internally, but actually never got to the opposite,
+   because `closest` would always return a SAP.
+   
+   This method was used in a few places where no exclusions were given, so
+   it is clear in that case that it would always find a prefix. In a single
+   case, it was called with an exclusion, where it would find a section
+   closer than its own section.
+
+### New Features (BREAKING)
+
+ - <csr-id-991ccd452119137d9da046b7f222f091177e28f1/> adding more context information to sn_client::Error types
+
+### Refactor (BREAKING)
+
+ - <csr-id-28d95a2e959e32ee69a70bdc855cba1fff1fc8d8/> removing unused CreateRegister::Populated msg type
+ - <csr-id-d3f66d6cfa838a5c65fb8f31fa68d48794b33dea/> removing unused sn_node::dbs::Error variants and RegisterExtend cmd
+ - <csr-id-f0fbe5fd9bec0b2865271bb139c9fcb4ec225884/> renaming NetworkPrefixMap to SectionTree
+   - Changing CLI and sn_client default path for network contacts to `$HOME/.safe/network_contacts`.
+   - Renaming variables and functions referring to "prefix map" to now refer to "network contacts".
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 16 commits contributed to the release over the course of 8 calendar days.
+ - 9 days passed between releases.
+ - 16 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - removing unused CreateRegister::Populated msg type ([`28d95a2`](https://github.com/maidsafe/safe_network/commit/28d95a2e959e32ee69a70bdc855cba1fff1fc8d8))
+    - removing unused sn_node::dbs::Error variants and RegisterExtend cmd ([`d3f66d6`](https://github.com/maidsafe/safe_network/commit/d3f66d6cfa838a5c65fb8f31fa68d48794b33dea))
+    - adding more context information to sn_client::Error types ([`991ccd4`](https://github.com/maidsafe/safe_network/commit/991ccd452119137d9da046b7f222f091177e28f1))
+    - move data replication steps ahead of elder check in FlowCtrl ([`dfed2a8`](https://github.com/maidsafe/safe_network/commit/dfed2a8d2751b6627250b64e7a78213b68ec6733))
+    - add logs and tweaks to churn example ([`3b06876`](https://github.com/maidsafe/safe_network/commit/3b068764721cd74f4d52a279a606743415abff02))
+    - reintroduce Arc<RwLock> for section tree ([`43ecab2`](https://github.com/maidsafe/safe_network/commit/43ecab2dda52cb0ede7c0d4b6e48eaffe1fb6b75))
+    - associated functions to methods ([`2f8f8ca`](https://github.com/maidsafe/safe_network/commit/2f8f8ca6ba0f2faae5bb4631c708988edf907725))
+    - upgrading sn_dbc to v8.0 ([`589f03c`](https://github.com/maidsafe/safe_network/commit/589f03ce8670544285f329fe35c19897d4bfced8))
+    - renaming NetworkPrefixMap to SectionTree ([`f0fbe5f`](https://github.com/maidsafe/safe_network/commit/f0fbe5fd9bec0b2865271bb139c9fcb4ec225884))
+    - expose serialisation/deserialisation utilities as public methods instead ([`1618cf6`](https://github.com/maidsafe/safe_network/commit/1618cf6a93117942946d152efee24fe3c7020e55))
+    - remove long lived client conn test ([`06f5b60`](https://github.com/maidsafe/safe_network/commit/06f5b607cdfbacba082612965630249e3c0f7300))
+    - reduce client qp2p default idle timeout ([`6155ad0`](https://github.com/maidsafe/safe_network/commit/6155ad0334104d367638373fbcbbd7e21631b3e6))
+    - clean up unused functionality ([`11b8182`](https://github.com/maidsafe/safe_network/commit/11b8182a3de636a760d899cb15d7184d8153545a))
+    - leave out unnecessary Arc<RwLock> ([`ddbbb53`](https://github.com/maidsafe/safe_network/commit/ddbbb53d61d6c94b00a47dc2b708a2aeda870d96))
+    - remove unused Session member ([`1235f7d`](https://github.com/maidsafe/safe_network/commit/1235f7d8a92eb9f086c35696bf5c0a8baf67f2ac))
+    - retry more times for connection fails w/ client ([`6471eb8`](https://github.com/maidsafe/safe_network/commit/6471eb88f7ce8c060909930ac23c855f30e8690a))
+</details>
+
 ## v0.69.0 (2022-08-14)
+
+<csr-id-707df06b08d5b0457b201ce5772d6a1d4fe9f984/>
+<csr-id-6d60525874dc4efeb658433f1f253d54e0cba2d4/>
+<csr-id-42bde15e9a96dbe759575d4bccf4f769e13a695d/>
+<csr-id-29de67f1e3583eab867d517cb50ed2e404bd63fd/>
+<csr-id-8242f2f1035b1c0718e53954951badffa30f3393/>
+<csr-id-820fcc9a77f756fca308f247c3ea1b82f65d30b9/>
+<csr-id-afcf083469c732f10c7c80f4a45e4c33ab111101/>
+<csr-id-17f0e8a08c9543d380c16a35d3d7bfe7834a9e5a/>
+<csr-id-aafc560d3b3b1e375f7be224e0e63a3b567bbd86/>
+<csr-id-73dc9b4a1757393270e62d265328bab0c0aa3b35/>
+<csr-id-0a653e4becc4a8e14ffd6d0752cf035430067ce9/>
+<csr-id-9789797e3f773285f23bd22957fe45a67aabec24/>
+<csr-id-c3196bfdbca221dfa61f978331582fc7d6db72d3/>
+<csr-id-3fc072f256dfe4b9e1a1a09c59800c7d78aa7360/>
+<csr-id-947b6cad014a41b0336de7f1c31f9902473c1a70/>
+<csr-id-8efbd96a5fd3907ace5ca6ac282027595fefd8ef/>
+<csr-id-ea490ddf749ac9e0c7962c3c21c053663e6b6ee7/>
+<csr-id-6f03b93bd2d02f0ffe54b69fbf25070fbe64eab0/>
+<csr-id-1ee345ce00337f9b24d45db417b6bb3d54c67955/>
+<csr-id-214adedc31bca576c7f28ff52a1f4ff0a2676757/>
+<csr-id-39c3fdf4128462e5f7c5fec3c628d394f505e2f2/>
+<csr-id-1e8180c23fab27ac92c93f201efd050cff00db10/>
+<csr-id-ec8b69d642fc4ca0166ffff113306244e5c3936a/>
+<csr-id-b9bfb425035fead587b7b5fc03a212a5d5aae4b3/>
+<csr-id-00fae4d5fd5dbad5696888f0c796fbd39b7e49ed/>
+<csr-id-5aeb15c8c309c16878dde510f68b0e5c2122cd8c/>
+<csr-id-27ba2a63dcfa272cf7ef8c5301987fc6bfe18ed0/>
+<csr-id-6b1fee8cf3d0b2995f4b81e59dd684547593b5fa/>
+<csr-id-ed37bb56e5e17d4cba7c1b2165746c193241d618/>
+<csr-id-14ea6c7f4bbaee9c2ac4a30fba938ef2de2f77e5/>
+<csr-id-db4f4d07b155d732ad76d263563d81b5fee535f7/>
+<csr-id-e0fb940b24e87d86fe920095176362f73503ce79/>
+<csr-id-ca32230926e5a435d90694df8fbce1218ea397f0/>
+<csr-id-3f577d2a6fe70792d7d02e231b599ca3d44a5ed2/>
+<csr-id-9fde534277f359dfa0a1d91d917864776edb5138/>
+<csr-id-5c82df633e7c062fdf761a8e6e0a7ae8d26cc73a/>
+<csr-id-f5af444b8ac37d2debfbe5e1d4dcdc48de963694/>
+<csr-id-4d717a21a2daf6ef0b3b5826329a8848f2fe46ee/>
+<csr-id-95c33d1ea2040bce4078be96ed8b1c9f2e966b21/>
+<csr-id-d4be0cc431947b035046cc4d56642a81c0880924/>
+<csr-id-db7dcdc7968d1d7e946274650d5a0c48719b4955/>
+<csr-id-d3a05a728be8752ea9ebff4e38e7c4c85e5db09b/>
+<csr-id-96da1171d0cac240f772e5d6a15c56f63441b4b3/>
+<csr-id-dd2eb21352223f6340064e0021f4a7df402cd5c9/>
 
 ### Chore
 
@@ -1154,6 +1286,10 @@ needed, as they keypair itself contains the Arcs we need.
  - <csr-id-00fae4d5fd5dbad5696888f0c796fbd39b7e49ed/> formatting with cargo fmt
  - <csr-id-5aeb15c8c309c16878dde510f68b0e5c2122cd8c/> move to dev-dependencies
 
+### Chore
+
+ - <csr-id-53f60c2327f8a69f0b2ef6d1a4e96644c10aa358/> sn_interface-0.9.0/sn_dysfunction-0.8.0/sn_client-0.69.0/sn_node-0.65.0/sn_api-0.67.0/sn_cli-0.60.0
+
 ### Documentation
 
  - <csr-id-753443da697a61e49eac977402731c4373e7f4f9/> add client builder code example
@@ -1162,29 +1298,29 @@ needed, as they keypair itself contains the Arcs we need.
 
 ### New Features
 
+<csr-id-ba97ca06b67cd6e5de8e1c910b396fbe44f40fd7/>
+<csr-id-df5ea26c8243de70d16a75ac936bc322954c8436/>
+
  - <csr-id-4772ff129bd8da82465ef93e66d17a8fbbd38f7d/> ClientBuilder to instantiate Client
    This applies the builder pattern for creating a Client
  - <csr-id-175d1b909dff8c6729ac7f156ce1d0d22be8cc12/> make traceroute default for now
  - <csr-id-4f2cf267ee030e5924a2fa999a2a46dbc072d208/> impl traceroute for client cmds and cmd responses
  - <csr-id-a6fb1fc516a9ef6dae7aa236f3dd440d50697ae2/> impl traceroute feature to trace a message's flow in the network
    - implements traceroute for Client queries and is logged at the client on return
- - <csr-id-ba97ca06b67cd6e5de8e1c910b396fbe44f40fd7/> perform verification of input TX and spentproofs when depositing or reissuing a DBC
- - <csr-id-df5ea26c8243de70d16a75ac936bc322954c8436/> add timeout for queries
 
 ### Bug Fixes
 
+<csr-id-0ed5075304b090597f7760fb51c4a33435a853f1/>
+<csr-id-f0ad7d56a58a08a7591d978c8ead4c10db734276/>
+<csr-id-db525193bed7662c5184810f18587abb0d22b26b/>
+<csr-id-145b302aad291120c52f1cffad8e7d116682f532/>
+<csr-id-d8cc45384f891a9d95a7cef30159f11ec0ff9269/>
+<csr-id-a378e7ba67ec18be708a2e1a9e08e63519da7451/>
+<csr-id-950b3048d1aae1f9ad5d2218a42c34d662925e38/>
+
  - <csr-id-0041e18ab7d1a21e4debb39df9c4b116e002a5e5/> convert nodes joining interval to millis before passing it to launch-tool
    - Also pass the default prefix map file path as the network contacts file path to CLI node join cmd.
-   - Minor refactoring to sn_client::test_spentbook_spend_dbc test.
- - <csr-id-0ed5075304b090597f7760fb51c4a33435a853f1/> fix deadlock introduced after removal of Arc from NetworkPrefixMap
-   Removing the checks in compare_and_write_prefix_map and directly
-   writing the prefix_map fixed the issue
- - <csr-id-f0ad7d56a58a08a7591d978c8ead4c10db734276/> more attempt when query too close to the spend cmd
- - <csr-id-db525193bed7662c5184810f18587abb0d22b26b/> use Eyre instead of boxed error
- - <csr-id-145b302aad291120c52f1cffad8e7d116682f532/> unused async in sn_client
- - <csr-id-d8cc45384f891a9d95a7cef30159f11ec0ff9269/> unused async remove and up-chain
- - <csr-id-a378e7ba67ec18be708a2e1a9e08e63519da7451/> Remove unused Arc(RwLock) structure
- - <csr-id-950b3048d1aae1f9ad5d2218a42c34d662925e38/> upon receiving an AE msg update client knowledge of network sections chains
+- Minor refactoring to sn_client::test_spentbook_spend_dbc test.
 
 ### Refactor
 
@@ -1243,9 +1379,9 @@ needed, as they keypair itself contains the Arcs we need.
 
 <csr-read-only-do-not-edit/>
 
- - 67 commits contributed to the release over the course of 30 calendar days.
- - 33 days passed between releases.
- - 64 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 68 commits contributed to the release over the course of 32 calendar days.
+ - 34 days passed between releases.
+ - 65 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1255,6 +1391,7 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.9.0/sn_dysfunction-0.8.0/sn_client-0.69.0/sn_node-0.65.0/sn_api-0.67.0/sn_cli-0.60.0 ([`53f60c2`](https://github.com/maidsafe/safe_network/commit/53f60c2327f8a69f0b2ef6d1a4e96644c10aa358))
     - follow rust convention for getters for prefixmap ([`707df06`](https://github.com/maidsafe/safe_network/commit/707df06b08d5b0457b201ce5772d6a1d4fe9f984))
     - sn_client to only read a default prefix map file, updates to be cached on disk by user ([`27ba2a6`](https://github.com/maidsafe/safe_network/commit/27ba2a63dcfa272cf7ef8c5301987fc6bfe18ed0))
     - remove wiremsg.priority as uneeded ([`6d60525`](https://github.com/maidsafe/safe_network/commit/6d60525874dc4efeb658433f1f253d54e0cba2d4))
@@ -1324,11 +1461,15 @@ needed, as they keypair itself contains the Arcs we need.
     - move to dev-dependencies ([`5aeb15c`](https://github.com/maidsafe/safe_network/commit/5aeb15c8c309c16878dde510f68b0e5c2122cd8c))
 </details>
 
+<csr-unknown>
+ perform verification of input TX and spentproofs when depositing or reissuing a DBC add timeout for queries fix deadlock introduced after removal of Arc from NetworkPrefixMapRemoving the checks in compare_and_write_prefix_map and directlywriting the prefix_map fixed the issue more attempt when query too close to the spend cmd use Eyre instead of boxed error unused async in sn_client unused async remove and up-chain Remove unused Arc(RwLock) structure upon receiving an AE msg update client knowledge of network sections chains<csr-unknown/>
+
 ## v0.68.2 (2022-07-10)
 
 <csr-id-19ddebad43aa53822cb7e781913ba34b848e2c89/>
 <csr-id-49e223e2c07695b4c63e253ba19ce43ec24d7112/>
 <csr-id-5cff2c5325a854f04788f9111439bca75b21c60f/>
+<csr-id-34bd9bd01a3f042c35e0432df2f0cfcebc32a8a8/>
 
 ### Chore
 

@@ -5,7 +5,229 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.66.0 (2022-08-23)
+
+### Chore
+
+ - <csr-id-0ae61c2877df283dde6f18800a40fc0e3afd603e/> continue with periodics afer process batch has been done
+ - <csr-id-857ce2d13a354945ebc0c968ac94f1e119b3a43a/> log node name when tracking dysfunction
+ - <csr-id-c8517a481e39bf688041cd8f8661bc663ee7bce7/> fix clippy some/none issues
+ - <csr-id-7691f087b30805d68614581aa43b3d6933cd83c9/> refactor flow ctrl msg and cmd processing
+ - <csr-id-90b25e9b6aae86f2fc0b83911993aac64964c4b6/> remove AtomicUsize in CmdCtrl
+ - <csr-id-c994fb627165b03e6baf0d13cb2ce5b2e84b2d07/> move event sender to FlowCtrl, refactor process_cmd
+ - <csr-id-990a6d210329f65f6bcf97ca116cfaa2447e6b17/> remove Cmd watchers as unsused
+ - <csr-id-1dfaf5f758fa797463342ba0fe1815323e851a86/> remove CmdCtrl.clone
+   We move Cmd handling into main flowCtrl loop to avoid
+   a clone and its knock on consequences of Arc/Rw
+ - <csr-id-589f03ce8670544285f329fe35c19897d4bfced8/> upgrading sn_dbc to v8.0
+ - <csr-id-9f64d681e285de57a54f571e98ff68f1bf39b6f1/> increase data query limit
+   Now we differentiate queries per adult/index, we may need more queries.
+ - <csr-id-2936bf28e56e0086e687bd99979aa4b1c3bde1e3/> initialise flow control earlier
+ - <csr-id-93a13d896343f746718be228c46a37b03d6618bb/> run periodic checks on time
+ - <csr-id-9fa9989657d6a272b5041008d7daf4281db39298/> refactor CmdCtrl, naming and remove retries
+ - <csr-id-b2c1cd4f32c54c249aaaf932df014f50268bed0c/> do not merge client requests to different adult indexes
+ - <csr-id-90e756aebb5ca0c900e6438b397b2d5739887611/> remove unnecessary unwrap
+ - <csr-id-7c11b1ea35770a2211ee4afc746bbafedb02caf8/> dont have adults responding to AeProbe msgs that come through
+
+### New Features
+
+ - <csr-id-f0f860efcf89cb7bf51bddd6364a9bec33bbf3c3/> remove ConnectivityCheck
+   Now we have periodic health checks and dysfunciton, this
+   check should not be needed, and can cause network strain
+   with the frequent DKG we have now
+ - <csr-id-e97ab2220d150706741549944c6e4bf77f2a5bae/> new cmd to display detailed information about a configured network
+ - <csr-id-1e2a0a122f8c53d669916cded16876aa16d8ebfb/> make AntiEntropyProbe carry a current known section key for response
+
+### Bug Fixes
+
+ - <csr-id-ff10da14cae0dfdb6f5e46090794a762e9ee3252/> tests that were using Connectivity msging as placeholder
+ - <csr-id-dfed2a8d2751b6627250b64e7a78213b68ec6733/> move data replication steps ahead of elder check in FlowCtrl
+
+### Refactor
+
+ - <csr-id-1618cf6a93117942946d152efee24fe3c7020e55/> expose serialisation/deserialisation utilities as public methods instead
+   - Also include the genesis key of each network in the list shown by CLI networks cmd.
+ - <csr-id-11b8182a3de636a760d899cb15d7184d8153545a/> clean up unused functionality
+   `closest` is a method that will find a prefix that is closest, but if
+   not returning any, it means the set is empty. The `closest_or_opposite`
+   used this function internally, but actually never got to the opposite,
+   because `closest` would always return a SAP.
+   
+   This method was used in a few places where no exclusions were given, so
+   it is clear in that case that it would always find a prefix. In a single
+   case, it was called with an exclusion, where it would find a section
+   closer than its own section.
+ - <csr-id-e52028f1e9d7fcf19962a7643b272ba3a786c7c4/> SAP reference instead of clone
+
+### New Features (BREAKING)
+
+ - <csr-id-991ccd452119137d9da046b7f222f091177e28f1/> adding more context information to sn_client::Error types
+
+### Refactor (BREAKING)
+
+ - <csr-id-28d95a2e959e32ee69a70bdc855cba1fff1fc8d8/> removing unused CreateRegister::Populated msg type
+ - <csr-id-d3f66d6cfa838a5c65fb8f31fa68d48794b33dea/> removing unused sn_node::dbs::Error variants and RegisterExtend cmd
+ - <csr-id-f0fbe5fd9bec0b2865271bb139c9fcb4ec225884/> renaming NetworkPrefixMap to SectionTree
+   - Changing CLI and sn_client default path for network contacts to `$HOME/.safe/network_contacts`.
+   - Renaming variables and functions referring to "prefix map" to now refer to "network contacts".
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 30 commits contributed to the release over the course of 8 calendar days.
+ - 9 days passed between releases.
+ - 28 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - tests that were using Connectivity msging as placeholder ([`ff10da1`](https://github.com/maidsafe/safe_network/commit/ff10da14cae0dfdb6f5e46090794a762e9ee3252))
+    - remove ConnectivityCheck ([`f0f860e`](https://github.com/maidsafe/safe_network/commit/f0f860efcf89cb7bf51bddd6364a9bec33bbf3c3))
+    - removing unused CreateRegister::Populated msg type ([`28d95a2`](https://github.com/maidsafe/safe_network/commit/28d95a2e959e32ee69a70bdc855cba1fff1fc8d8))
+    - removing unused sn_node::dbs::Error variants and RegisterExtend cmd ([`d3f66d6`](https://github.com/maidsafe/safe_network/commit/d3f66d6cfa838a5c65fb8f31fa68d48794b33dea))
+    - continue with periodics afer process batch has been done ([`0ae61c2`](https://github.com/maidsafe/safe_network/commit/0ae61c2877df283dde6f18800a40fc0e3afd603e))
+    - log node name when tracking dysfunction ([`857ce2d`](https://github.com/maidsafe/safe_network/commit/857ce2d13a354945ebc0c968ac94f1e119b3a43a))
+    - fix clippy some/none issues ([`c8517a4`](https://github.com/maidsafe/safe_network/commit/c8517a481e39bf688041cd8f8661bc663ee7bce7))
+    - refactor flow ctrl msg and cmd processing ([`7691f08`](https://github.com/maidsafe/safe_network/commit/7691f087b30805d68614581aa43b3d6933cd83c9))
+    - remove AtomicUsize in CmdCtrl ([`90b25e9`](https://github.com/maidsafe/safe_network/commit/90b25e9b6aae86f2fc0b83911993aac64964c4b6))
+    - move event sender to FlowCtrl, refactor process_cmd ([`c994fb6`](https://github.com/maidsafe/safe_network/commit/c994fb627165b03e6baf0d13cb2ce5b2e84b2d07))
+    - remove Cmd watchers as unsused ([`990a6d2`](https://github.com/maidsafe/safe_network/commit/990a6d210329f65f6bcf97ca116cfaa2447e6b17))
+    - remove CmdCtrl.clone ([`1dfaf5f`](https://github.com/maidsafe/safe_network/commit/1dfaf5f758fa797463342ba0fe1815323e851a86))
+    - new cmd to display detailed information about a configured network ([`e97ab22`](https://github.com/maidsafe/safe_network/commit/e97ab2220d150706741549944c6e4bf77f2a5bae))
+    - adding more context information to sn_client::Error types ([`991ccd4`](https://github.com/maidsafe/safe_network/commit/991ccd452119137d9da046b7f222f091177e28f1))
+    - move data replication steps ahead of elder check in FlowCtrl ([`dfed2a8`](https://github.com/maidsafe/safe_network/commit/dfed2a8d2751b6627250b64e7a78213b68ec6733))
+    - upgrading sn_dbc to v8.0 ([`589f03c`](https://github.com/maidsafe/safe_network/commit/589f03ce8670544285f329fe35c19897d4bfced8))
+    - renaming NetworkPrefixMap to SectionTree ([`f0fbe5f`](https://github.com/maidsafe/safe_network/commit/f0fbe5fd9bec0b2865271bb139c9fcb4ec225884))
+    - expose serialisation/deserialisation utilities as public methods instead ([`1618cf6`](https://github.com/maidsafe/safe_network/commit/1618cf6a93117942946d152efee24fe3c7020e55))
+    - Update README.md ([`0af715e`](https://github.com/maidsafe/safe_network/commit/0af715e7f647ccae745c8adb41119be66af109a9))
+    - increase data query limit ([`9f64d68`](https://github.com/maidsafe/safe_network/commit/9f64d681e285de57a54f571e98ff68f1bf39b6f1))
+    - initialise flow control earlier ([`2936bf2`](https://github.com/maidsafe/safe_network/commit/2936bf28e56e0086e687bd99979aa4b1c3bde1e3))
+    - run periodic checks on time ([`93a13d8`](https://github.com/maidsafe/safe_network/commit/93a13d896343f746718be228c46a37b03d6618bb))
+    - refactor CmdCtrl, naming and remove retries ([`9fa9989`](https://github.com/maidsafe/safe_network/commit/9fa9989657d6a272b5041008d7daf4281db39298))
+    - do not merge client requests to different adult indexes ([`b2c1cd4`](https://github.com/maidsafe/safe_network/commit/b2c1cd4f32c54c249aaaf932df014f50268bed0c))
+    - clean up unused functionality ([`11b8182`](https://github.com/maidsafe/safe_network/commit/11b8182a3de636a760d899cb15d7184d8153545a))
+    - SAP reference instead of clone ([`e52028f`](https://github.com/maidsafe/safe_network/commit/e52028f1e9d7fcf19962a7643b272ba3a786c7c4))
+    - remove unnecessary unwrap ([`90e756a`](https://github.com/maidsafe/safe_network/commit/90e756aebb5ca0c900e6438b397b2d5739887611))
+    - dont have adults responding to AeProbe msgs that come through ([`7c11b1e`](https://github.com/maidsafe/safe_network/commit/7c11b1ea35770a2211ee4afc746bbafedb02caf8))
+    - make AntiEntropyProbe carry a current known section key for response ([`1e2a0a1`](https://github.com/maidsafe/safe_network/commit/1e2a0a122f8c53d669916cded16876aa16d8ebfb))
+    - feat(node) add elder health checks ([`93cc084`](https://github.com/maidsafe/safe_network/commit/93cc08468278995598938a8ed3dcdff33a23d066))
+</details>
+
 ## v0.65.0 (2022-08-14)
+
+<csr-id-1af888c09b2f5a49d04a7068b7f948cf096da8f3/>
+<csr-id-aea5782e583ae353566abb0f10d94132bd9b14fe/>
+<csr-id-6d60525874dc4efeb658433f1f253d54e0cba2d4/>
+<csr-id-52ed23049c83e0da0b4dfefa7b30713a52f3c73a/>
+<csr-id-68d28d5591c5ccc6a241832f9b7855827958372a/>
+<csr-id-42bde15e9a96dbe759575d4bccf4f769e13a695d/>
+<csr-id-3cf903367bfcd805ceff2f2508cd2b12eddc3ca5/>
+<csr-id-29de67f1e3583eab867d517cb50ed2e404bd63fd/>
+<csr-id-a8b0631a396ac96e000db22141ffd5d83fd7e987/>
+<csr-id-8242f2f1035b1c0718e53954951badffa30f3393/>
+<csr-id-848dba48e5959d0b9cfe182fde2f12ede71ba9c2/>
+<csr-id-35483b3f322eeea2c10427e94e4750a8269811c0/>
+<csr-id-820fcc9a77f756fca308f247c3ea1b82f65d30b9/>
+<csr-id-afcf083469c732f10c7c80f4a45e4c33ab111101/>
+<csr-id-72db95a092ea33f29e77b6101b16e219fadd47ab/>
+<csr-id-aafc560d3b3b1e375f7be224e0e63a3b567bbd86/>
+<csr-id-7394030fe5aeeb88f4524d2da2a71e36334c831d/>
+<csr-id-73dc9b4a1757393270e62d265328bab0c0aa3b35/>
+<csr-id-0a653e4becc4a8e14ffd6d0752cf035430067ce9/>
+<csr-id-9789797e3f773285f23bd22957fe45a67aabec24/>
+<csr-id-8e626f9fabbb07a126199ea5481e2ac524cbae0d/>
+<csr-id-db22c6c8c1aedb347bea52199a5673695eff86f8/>
+<csr-id-2809ed1177c416f933f3869bd11607c4e5e6a908/>
+<csr-id-08af2a6ac3485a696d2a1e799af588943f207e6b/>
+<csr-id-080f9ef83005ebda9e1c96b228f3d5096fd79b81/>
+<csr-id-1b37f4bbf266c21d795bff6b4e6f2e1885405697/>
+<csr-id-feaf3ef88b140a0f530082e851831b736320de59/>
+<csr-id-7157ed27ddfc0d987272f1285b44faa9709a4c8f/>
+<csr-id-2ea069543dbe6ffebac663d4d8d7e0bc33cfc566/>
+<csr-id-322c69845e2e14eb029fdbebb24e08063a2323b0/>
+<csr-id-5a5f0f4608c27f463178f4a560f1f9b4c020e764/>
+<csr-id-83a3a98a6972c9a1824e41cb87325b037b65938c/>
+<csr-id-9c855c187465a0594cf18fb359a082742593a4d4/>
+<csr-id-f8b6ff0edd7a64389439081b6306296402887ab1/>
+<csr-id-c6fa7735a5e48a4caa6ee3aac000785a9da9413a/>
+<csr-id-302fb954360521d40efab0e26fd31f8278a74755/>
+<csr-id-70f3ecc367ca9450be038f8ff806f40c324d1b00/>
+<csr-id-8efbd96a5fd3907ace5ca6ac282027595fefd8ef/>
+<csr-id-ea490ddf749ac9e0c7962c3c21c053663e6b6ee7/>
+<csr-id-bf2902c18b900b8b4a8abae5f966d1e08d547910/>
+<csr-id-6f03b93bd2d02f0ffe54b69fbf25070fbe64eab0/>
+<csr-id-934bf6cbc86e252eb3859c757a0b66c02f7826d9/>
+<csr-id-214adedc31bca576c7f28ff52a1f4ff0a2676757/>
+<csr-id-893b4af340b0ced1a2b38dda07bd82cf833be776/>
+<csr-id-feaca15b7c44297c16a4665ceec738226bb860ba/>
+<csr-id-7d060f0e92e3b250e3fe1e0523aa0c30b439e0be/>
+<csr-id-7a675f4889c4ef01b9040773184ab2e0ed78b208/>
+<csr-id-c3778cd77e0c9cbc407449afe713ff7cdb4b9909/>
+<csr-id-fba2f76ec23a00ca1da857e63af160a11904288c/>
+<csr-id-5a121c19d395130e40df0134be36e4264b60972a/>
+<csr-id-67c82cae6654423cae3567d8417a442a40ce1e5e/>
+<csr-id-1e8180c23fab27ac92c93f201efd050cff00db10/>
+<csr-id-900fa8c4803e9e45a1471a32fb4fe5b8cdd5112b/>
+<csr-id-a95be6277a9ee8d66eccd40711392325fac986e2/>
+<csr-id-a856d788131ef85414ee1f42a868abcbbfc0d2b6/>
+<csr-id-00fae4d5fd5dbad5696888f0c796fbd39b7e49ed/>
+<csr-id-549c4b169547e620471c416c1506afc6e3ee265b/>
+<csr-id-847db2c487cd102af0cf9a477b4c1b65fc2c8aa6/>
+<csr-id-0a5593b0512d6f059c6a8003634b07e7d2d3e514/>
+<csr-id-707b80c3526ae727a7e91330dc386cdb41c51f4c/>
+<csr-id-9bd6ae20c1207f99420093fd5c9f4eb53836e3c1/>
+<csr-id-31d9f9f99b4e166986b8e51c3d41e0eac55621a4/>
+<csr-id-30a7028dd702e2f6575e299a609a2416439cbaed/>
+<csr-id-dedec486f85c1cf6cf2d538238f32e826e08da0a/>
+<csr-id-3bef795923863d977f70c95647444ebbc97c5cf5/>
+<csr-id-f142bbb0030233add4808427a2819ca386fef503/>
+<csr-id-e39917d0635a071625f7961ce6d40cb44cc65da0/>
+<csr-id-879678e986a722d216ee9a4f37e8ae398221a394/>
+<csr-id-ca5120885e3e28229f298b81edf6090542e0e3f9/>
+<csr-id-12360a6dcc204153a81adbf842a64dc018c750f9/>
+<csr-id-6e65ed8e6c5872bd2c49a1ed2837b1fb16523af1/>
+<csr-id-24227673b57954b1c53b9b88d714e42c39d8f000/>
+<csr-id-a9885a8d0e3e59dc630cf605fc9e353e152a5bb3/>
+<csr-id-2e865cf211a91bef3caaded6310eaddd7e03e997/>
+<csr-id-c77f686e132f1ac58a113392bc65087bfb650bb9/>
+<csr-id-a184ebe3f07b86a53c7e8b36b3d86034558a99fb/>
+<csr-id-8eebc01007a49f1debaede519324d920e9628d46/>
+<csr-id-46b6e53d220ebc7f60bb754a4c7ebf4ec7d83e58/>
+<csr-id-13fc65dc634348740095226e1da0af1866f5b3a8/>
+<csr-id-6b1fee8cf3d0b2995f4b81e59dd684547593b5fa/>
+<csr-id-ed37bb56e5e17d4cba7c1b2165746c193241d618/>
+<csr-id-a0c89ff0e451d2e5dd13fc29635075097f2c7b94/>
+<csr-id-0f07efd9ef0b75de79f27772566b013bc886bcc8/>
+<csr-id-db4f4d07b155d732ad76d263563d81b5fee535f7/>
+<csr-id-ff1a10b4aa2b41b7028949101504a29b52927e71/>
+<csr-id-e0fb940b24e87d86fe920095176362f73503ce79/>
+<csr-id-81f5e252501174cb6367474a980b8a2a5da58dc2/>
+<csr-id-35ebd8e872f9d9db16c42cbe8d61702f9660aece/>
+<csr-id-042503a7d44f94ed3f0ce482984744e175d7752b/>
+<csr-id-3f577d2a6fe70792d7d02e231b599ca3d44a5ed2/>
+<csr-id-a1d74e894975d67f3293dbb0db73f6b62b9c378a/>
+<csr-id-3a74f59269f57a50a14de9a35f7e725014ec8f0e/>
+<csr-id-a727daea6e5a01a24c9bcdbeef033d0622f4ba39/>
+<csr-id-1db6648954987ebce4c91f8e29bbec4e54b75edf/>
+<csr-id-fa7dfa342e90acd0a681110e149df4400a8f392e/>
+<csr-id-28c0a1063194eea66910c7d18653c558595ec17e/>
+<csr-id-f467d5f45452244d2f8e3e81910b76d0d4b0f7cb/>
+<csr-id-f45afa221a18638bbbbad5cf6121a68825ed3ff3/>
+<csr-id-9895a2b9e82bdbf110a9805972290841860d1a49/>
+<csr-id-1c7b47f48635bb7b0a8a13d01bb41b148e343ce8/>
+<csr-id-f06a0260b058519ec858abf654cbce102eb00147/>
+<csr-id-5c82df633e7c062fdf761a8e6e0a7ae8d26cc73a/>
+<csr-id-24676dadb771bbd966b6a3e1aa53d1c736c90627/>
+<csr-id-93614b18b4316af04ab8c74358a5c86510590b85/>
+<csr-id-d3a05a728be8752ea9ebff4e38e7c4c85e5db09b/>
+<csr-id-96da1171d0cac240f772e5d6a15c56f63441b4b3/>
+<csr-id-dd2eb21352223f6340064e0021f4a7df402cd5c9/>
 
 ### Chore
 
@@ -124,11 +346,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    (lost), every 30s... which may not succeed under churn...
  - <csr-id-879678e986a722d216ee9a4f37e8ae398221a394/> logging sn_consensus in CI, tweak section min and max elder age
 
+### Chore
+
+ - <csr-id-53f60c2327f8a69f0b2ef6d1a4e96644c10aa358/> sn_interface-0.9.0/sn_dysfunction-0.8.0/sn_client-0.69.0/sn_node-0.65.0/sn_api-0.67.0/sn_cli-0.60.0
+
 ### Documentation
 
  - <csr-id-e3c90998e1abd10768e861370a65a934f52e2ec3/> broken links
 
 ### New Features
+
+<csr-id-01ea9c0bdb88da4f181d8f1638f2f2ad692d0ca3/>
+<csr-id-c6999a92d06f275f7506a24492bec50042466459/>
+<csr-id-6f781b96da745839206352ae02c18b759b49f1f2/>
 
  - <csr-id-f817fa5917f48faaeb3714c7faeaee5392b82f55/> log with unique id around sleep
  - <csr-id-366719f9e158fb35093382739d48cdb8dac65b60/> make the content explicit
@@ -142,11 +372,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-4f2cf267ee030e5924a2fa999a2a46dbc072d208/> impl traceroute for client cmds and cmd responses
  - <csr-id-a6fb1fc516a9ef6dae7aa236f3dd440d50697ae2/> impl traceroute feature to trace a message's flow in the network
    - implements traceroute for Client queries and is logged at the client on return
- - <csr-id-01ea9c0bdb88da4f181d8f1638f2f2ad692d0ca3/> add OTLP support to sn_node bin
- - <csr-id-c6999a92d06f275f7506a24492bec50042466459/> validate w low prio before handling
- - <csr-id-6f781b96da745839206352ae02c18b759b49f1f2/> validate w low prio before handling
 
 ### Bug Fixes
+
+<csr-id-b492cc25cfadf7dd3aaf3584cd5dbbd0dc8532ce/>
+<csr-id-1694c1566ac562216447eb491cc3b2b00b0c5979/>
+<csr-id-6dbc032907bcb1fc6e3e9034f794643097260e17/>
+<csr-id-7fc6231f241bcae4447839989b712b1b410a2523/>
+<csr-id-19bb0b99afee53dd7b6e109919249b25e0a55e48/>
+<csr-id-e1a0474e78fd00a881b13ad036c1aabc9ce2f02a/>
+<csr-id-f0d1abf6dd8731310b7749cd6cc7077886215997/>
+<csr-id-640b64d2b5f19df5f5439a8fce31a848a47526cd/>
+<csr-id-38d25d6df71e3bb71e8efda50a4bf64345f69f81/>
+<csr-id-ae38fdce6499d8245025d7bd82fa6c583f04060d/>
+<csr-id-6d237e5e7d8306cb955f436910aa01ed7221cd84/>
+<csr-id-78be9fb24cf66d9f8f06ac31895302eae875661e/>
+<csr-id-abddc53df9fbbd5c35b6ce473646f3183bf423df/>
+<csr-id-8f3d3f7acf62f0f5c50cc68280214a4119801abd/>
+<csr-id-e12479f8db891107215192e4824df92999fb23af/>
+<csr-id-4a277b6a290ee7b8ec99dba4e421ac19023fe08e/>
+<csr-id-4773e185302ada27cd08c8dfd04582e7fdaf42aa/>
+<csr-id-f6ea1da4a57e40a051c7d1ee3b87fe9b442c537b/>
+<csr-id-4e44e373da9ee75b2563b39c26794299e607f48f/>
 
  - <csr-id-f531c62b0d82f14b6aa6df4f1f82bcd0ce95b9ce/> modify the join process timeout mechanism
  - <csr-id-26ad7578f0d224528a1be6509453f695f6530eb4/> reduce to 5s
@@ -179,38 +426,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    
    The flow was:
    1. a node leaves the section (reason is not tracked)
-   2. the node rejoins
-   3. the section accepts them back and attempts to relocate them
-   
-   This seems fine until you realize that relocating the node may fail
-   for some reason and now we're stuck holding this re-joined node.
-   
-   Also we don't track why this node was removed from the section.
-   
-   They could have been a faulty elder that now is back in the same
-   section it had attacked with the same age which will likely cause it
-   to become an elder again.
- - <csr-id-b492cc25cfadf7dd3aaf3584cd5dbbd0dc8532ce/> reduce re-join tests to one case
- - <csr-id-1694c1566ac562216447eb491cc3b2b00b0c5979/> prevent rejoins of archived nodes
- - <csr-id-6dbc032907bcb1fc6e3e9034f794643097260e17/> update rejoin tests to test proposal validation
-   Rather then testing the decision handling code, a lot of the logic we
-   care about is now frontloaded in the proposal validations
- - <csr-id-7fc6231f241bcae4447839989b712b1b410a2523/> support the traceroute feature flag
- - <csr-id-19bb0b99afee53dd7b6e109919249b25e0a55e48/> adds unique conn info validation to membership
- - <csr-id-e1a0474e78fd00a881b13ad036c1aabc9ce2f02a/> avoid un-necessary dysfunction log_dkg_issue
- - <csr-id-f0d1abf6dd8731310b7749cd6cc7077886215997/> remove redundant generation field
- - <csr-id-640b64d2b5f19df5f5439a8fce31a848a47526cd/> drop RwLock guards after job is done
- - <csr-id-38d25d6df71e3bb71e8efda50a4bf64345f69f81/> update for the split of HandleCmd
- - <csr-id-ae38fdce6499d8245025d7bd82fa6c583f04060d/> update for the split of HandleCmd
- - <csr-id-6d237e5e7d8306cb955f436910aa01ed7221cd84/> unused async in CLI
- - <csr-id-78be9fb24cf66d9f8f06ac31895302eae875661e/> unused async in node/dkg etc
- - <csr-id-abddc53df9fbbd5c35b6ce473646f3183bf423df/> more node messaging async removal
- - <csr-id-8f3d3f7acf62f0f5c50cc68280214a4119801abd/> node messaging unused async removal
- - <csr-id-e12479f8db891107215192e4824df92999fb23af/> more async removal from node/mod.rs
- - <csr-id-4a277b6a290ee7b8ec99dba4e421ac19023fe08e/> unused async in comm/node methods
- - <csr-id-4773e185302ada27cd08c8dfd04582e7fdaf42aa/> removed unused async at dysfunction
- - <csr-id-f6ea1da4a57e40a051c7d1ee3b87fe9b442c537b/> cleanup unused async
- - <csr-id-4e44e373da9ee75b2563b39c26794299e607f48f/> only process each membership decision once
+2. the node rejoins
+3. the section accepts them back and attempts to relocate them
 
 ### Other
 
@@ -283,9 +500,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 157 commits contributed to the release over the course of 29 calendar days.
- - 31 days passed between releases.
- - 153 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 158 commits contributed to the release over the course of 31 calendar days.
+ - 32 days passed between releases.
+ - 154 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -295,6 +512,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.9.0/sn_dysfunction-0.8.0/sn_client-0.69.0/sn_node-0.65.0/sn_api-0.67.0/sn_cli-0.60.0 ([`53f60c2`](https://github.com/maidsafe/safe_network/commit/53f60c2327f8a69f0b2ef6d1a4e96644c10aa358))
     - add README docs for join process and traceroute ([`1af888c`](https://github.com/maidsafe/safe_network/commit/1af888c09b2f5a49d04a7068b7f948cf096da8f3))
     - print full error during node startup fail ([`aea5782`](https://github.com/maidsafe/safe_network/commit/aea5782e583ae353566abb0f10d94132bd9b14fe))
     - reorganise flow control unit tests ([`12360a6`](https://github.com/maidsafe/safe_network/commit/12360a6dcc204153a81adbf842a64dc018c750f9))
@@ -454,10 +672,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - logging sn_consensus in CI, tweak section min and max elder age ([`879678e`](https://github.com/maidsafe/safe_network/commit/879678e986a722d216ee9a4f37e8ae398221a394))
 </details>
 
+<csr-unknown>
+ add OTLP support to sn_node bin validate w low prio before handling validate w low prio before handlingThis seems fine until you realize that relocating the node may failfor some reason and now we’re stuck holding this re-joined node.Also we don’t track why this node was removed from the section.They could have been a faulty elder that now is back in the samesection it had attacked with the same age which will likely cause itto become an elder again. reduce re-join tests to one case prevent rejoins of archived nodes update rejoin tests to test proposal validationRather then testing the decision handling code, a lot of the logic wecare about is now frontloaded in the proposal validations support the traceroute feature flag adds unique conn info validation to membership avoid un-necessary dysfunction log_dkg_issue remove redundant generation field drop RwLock guards after job is done update for the split of HandleCmd update for the split of HandleCmd unused async in CLI unused async in node/dkg etc more node messaging async removal node messaging unused async removal more async removal from node/mod.rs unused async in comm/node methods removed unused async at dysfunction cleanup unused async only process each membership decision once<csr-unknown/>
+
 ## v0.64.3 (2022-07-12)
 
 <csr-id-0dcd4917c9a7bfbf6706f3b8a18e68d010c9b50d/>
 <csr-id-5523e237464a76ef682ae2dbc183692502018682/>
+<csr-id-5068b155ce42f0902f9f3847e8069dc415910f34/>
 
 ### Other
 

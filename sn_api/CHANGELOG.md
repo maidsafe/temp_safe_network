@@ -5,7 +5,81 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.68.0 (2022-08-23)
+
+### Chore
+
+ - <csr-id-c8517a481e39bf688041cd8f8661bc663ee7bce7/> fix clippy some/none issues
+ - <csr-id-589f03ce8670544285f329fe35c19897d4bfced8/> upgrading sn_dbc to v8.0
+ - <csr-id-ddbbb53d61d6c94b00a47dc2b708a2aeda870d96/> leave out unnecessary Arc<RwLock>
+
+### Bug Fixes
+
+ - <csr-id-43ecab2dda52cb0ede7c0d4b6e48eaffe1fb6b75/> reintroduce Arc<RwLock> for section tree
+   The RwLock was mistakenly removed by me. This meant that network updates
+   to the section tree were not propagated back to the client's session.
+
+### Refactor
+
+ - <csr-id-1618cf6a93117942946d152efee24fe3c7020e55/> expose serialisation/deserialisation utilities as public methods instead
+   - Also include the genesis key of each network in the list shown by CLI networks cmd.
+ - <csr-id-63172ab4ab9fc87bc17b09c6fd384679a37a40f0/> circumvent clone to use reference
+
+### Refactor (BREAKING)
+
+ - <csr-id-f0fbe5fd9bec0b2865271bb139c9fcb4ec225884/> renaming NetworkPrefixMap to SectionTree
+   - Changing CLI and sn_client default path for network contacts to `$HOME/.safe/network_contacts`.
+   - Renaming variables and functions referring to "prefix map" to now refer to "network contacts".
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 7 commits contributed to the release over the course of 8 calendar days.
+ - 9 days passed between releases.
+ - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - fix clippy some/none issues ([`c8517a4`](https://github.com/maidsafe/safe_network/commit/c8517a481e39bf688041cd8f8661bc663ee7bce7))
+    - reintroduce Arc<RwLock> for section tree ([`43ecab2`](https://github.com/maidsafe/safe_network/commit/43ecab2dda52cb0ede7c0d4b6e48eaffe1fb6b75))
+    - upgrading sn_dbc to v8.0 ([`589f03c`](https://github.com/maidsafe/safe_network/commit/589f03ce8670544285f329fe35c19897d4bfced8))
+    - renaming NetworkPrefixMap to SectionTree ([`f0fbe5f`](https://github.com/maidsafe/safe_network/commit/f0fbe5fd9bec0b2865271bb139c9fcb4ec225884))
+    - expose serialisation/deserialisation utilities as public methods instead ([`1618cf6`](https://github.com/maidsafe/safe_network/commit/1618cf6a93117942946d152efee24fe3c7020e55))
+    - circumvent clone to use reference ([`63172ab`](https://github.com/maidsafe/safe_network/commit/63172ab4ab9fc87bc17b09c6fd384679a37a40f0))
+    - leave out unnecessary Arc<RwLock> ([`ddbbb53`](https://github.com/maidsafe/safe_network/commit/ddbbb53d61d6c94b00a47dc2b708a2aeda870d96))
+</details>
+
 ## v0.67.0 (2022-08-14)
+
+<csr-id-de57210562e1e3a637564332e081514dabb177ab/>
+<csr-id-29de67f1e3583eab867d517cb50ed2e404bd63fd/>
+<csr-id-afcf083469c732f10c7c80f4a45e4c33ab111101/>
+<csr-id-06c3859cf739487b9c27de6fcdf5078f82403b4f/>
+<csr-id-5050522c85a3430ee017db3215aad21619bf7796/>
+<csr-id-b98e46116628c62b71e7cc4171aeda86b05b2b99/>
+<csr-id-6f03b93bd2d02f0ffe54b69fbf25070fbe64eab0/>
+<csr-id-27ba2a63dcfa272cf7ef8c5301987fc6bfe18ed0/>
+<csr-id-ed37bb56e5e17d4cba7c1b2165746c193241d618/>
+<csr-id-14ea6c7f4bbaee9c2ac4a30fba938ef2de2f77e5/>
+<csr-id-e0fb940b24e87d86fe920095176362f73503ce79/>
+<csr-id-ca32230926e5a435d90694df8fbce1218ea397f0/>
+<csr-id-9fde534277f359dfa0a1d91d917864776edb5138/>
+<csr-id-5c82df633e7c062fdf761a8e6e0a7ae8d26cc73a/>
+<csr-id-93614b18b4316af04ab8c74358a5c86510590b85/>
+<csr-id-f5af444b8ac37d2debfbe5e1d4dcdc48de963694/>
+<csr-id-9e87a00f8749de236cd9722b22936ae86cfdcf4e/>
+<csr-id-d4be0cc431947b035046cc4d56642a81c0880924/>
+<csr-id-db7dcdc7968d1d7e946274650d5a0c48719b4955/>
+<csr-id-d3a05a728be8752ea9ebff4e38e7c4c85e5db09b/>
+<csr-id-96da1171d0cac240f772e5d6a15c56f63441b4b3/>
+<csr-id-dd2eb21352223f6340064e0021f4a7df402cd5c9/>
 
 ### Chore
 
@@ -20,23 +94,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-6f03b93bd2d02f0ffe54b69fbf25070fbe64eab0/> upgrade blsttc to 7.0.0
    This version has a more helpful error message for the shares interpolation problem.
 
+### Chore
+
+ - <csr-id-53f60c2327f8a69f0b2ef6d1a4e96644c10aa358/> sn_interface-0.9.0/sn_dysfunction-0.8.0/sn_client-0.69.0/sn_node-0.65.0/sn_api-0.67.0/sn_cli-0.60.0
+
 ### New Features
+
+<csr-id-ba97ca06b67cd6e5de8e1c910b396fbe44f40fd7/>
+<csr-id-1b3f0516cf899c2fc0d101ce9cf0079c95bbfd7b/>
 
  - <csr-id-796b9e640ddafcbc804cd4792a867143422cf4f5/> expose a public API to reissue many output DBCs from a wallet
  - <csr-id-005b84cab0ca91762cbedd208b022d4c4983fe26/> retry twice if it fails spending inputs when reissuing DBCs
  - <csr-id-c46dd0737779c8ee515ee037add54ce049448ea7/> expose a public API which allows users to check if a DBC's `KeyImage` has been already spent on the network
    - Expose a public `is_dbc_spent` API which allows users to check if a DBC's KeyImage has
-     been already spent on the network.
-   - Have the CLI `wallet deposit` command to perform a verification is the supplied DBC has been
+   been already spent on the network.
+- Have the CLI `wallet deposit` command to perform a verification is the supplied DBC has been
      already spent before depositing into a wallet.
-   - Allow users to provide a `--force` flag with the CLI `wallet deposit` command to skip the
+- Allow users to provide a `--force` flag with the CLI `wallet deposit` command to skip the
      verification of DBC already spent and force the deposit into the wallet.
- - <csr-id-ba97ca06b67cd6e5de8e1c910b396fbe44f40fd7/> perform verification of input TX and spentproofs when depositing or reissuing a DBC
- - <csr-id-1b3f0516cf899c2fc0d101ce9cf0079c95bbfd7b/> show the DBC owner in the wallet displayed by cat cmd
-   - Display the owner of each DBC when cat-ing a wallet.
-   - Align to the right the balance of each DBC when cat-ing a wallet.
-   - Shorten the default name set to DBC when deposited in a wallet.
-   - Make the name of the change DBC automatically deposited in the wallet unique.
+- Display the owner of each DBC when cat-ing a wallet.
+- Align to the right the balance of each DBC when cat-ing a wallet.
+- Shorten the default name set to DBC when deposited in a wallet.
+- Make the name of the change DBC automatically deposited in the wallet unique.
 
 ### Bug Fixes
 
@@ -84,9 +163,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 34 commits contributed to the release over the course of 31 calendar days.
- - 33 days passed between releases.
- - 29 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 35 commits contributed to the release over the course of 33 calendar days.
+ - 34 days passed between releases.
+ - 30 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -96,6 +175,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.9.0/sn_dysfunction-0.8.0/sn_client-0.69.0/sn_node-0.65.0/sn_api-0.67.0/sn_cli-0.60.0 ([`53f60c2`](https://github.com/maidsafe/safe_network/commit/53f60c2327f8a69f0b2ef6d1a4e96644c10aa358))
     - update prefixmap getter call after name change ([`f4b89d3`](https://github.com/maidsafe/safe_network/commit/f4b89d390eaeae0ab6dd329c1a0e9bbc65ec28a6))
     - sn_client to only read a default prefix map file, updates to be cached on disk by user ([`27ba2a6`](https://github.com/maidsafe/safe_network/commit/27ba2a63dcfa272cf7ef8c5301987fc6bfe18ed0))
     - let client builder do env overrides ([`de57210`](https://github.com/maidsafe/safe_network/commit/de57210562e1e3a637564332e081514dabb177ab))
@@ -132,9 +212,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - show the DBC owner in the wallet displayed by cat cmd ([`1b3f051`](https://github.com/maidsafe/safe_network/commit/1b3f0516cf899c2fc0d101ce9cf0079c95bbfd7b))
 </details>
 
+<csr-unknown>
+ perform verification of input TX and spentproofs when depositing or reissuing a DBC show the DBC owner in the wallet displayed by cat cmd<csr-unknown/>
+
 ## v0.66.3 (2022-07-10)
 
 <csr-id-49e223e2c07695b4c63e253ba19ce43ec24d7112/>
+<csr-id-34bd9bd01a3f042c35e0432df2f0cfcebc32a8a8/>
 
 ### Chore
 

@@ -4,7 +4,88 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## v0.61.0 (2022-08-23)
+
+### Chore
+
+ - <csr-id-c8517a481e39bf688041cd8f8661bc663ee7bce7/> fix clippy some/none issues
+ - <csr-id-589f03ce8670544285f329fe35c19897d4bfced8/> upgrading sn_dbc to v8.0
+
+### New Features
+
+ - <csr-id-e97ab2220d150706741549944c6e4bf77f2a5bae/> new cmd to display detailed information about a configured network
+
+### Bug Fixes
+
+ - <csr-id-2e370f5241bc26074526bc588f1f9bb34be574f2/> copy default network_contacts when switching networks
+ - <csr-id-5decc563679014a0c124128d58e87d8d1ab43300/> do not read settings from file during Config::sync()
+ - <csr-id-43ecab2dda52cb0ede7c0d4b6e48eaffe1fb6b75/> reintroduce Arc<RwLock> for section tree
+   The RwLock was mistakenly removed by me. This meant that network updates
+   to the section tree were not propagated back to the client's session.
+
+### Refactor
+
+ - <csr-id-1618cf6a93117942946d152efee24fe3c7020e55/> expose serialisation/deserialisation utilities as public methods instead
+   - Also include the genesis key of each network in the list shown by CLI networks cmd.
+ - <csr-id-63172ab4ab9fc87bc17b09c6fd384679a37a40f0/> circumvent clone to use reference
+
+### Refactor (BREAKING)
+
+ - <csr-id-f0fbe5fd9bec0b2865271bb139c9fcb4ec225884/> renaming NetworkPrefixMap to SectionTree
+   - Changing CLI and sn_client default path for network contacts to `$HOME/.safe/network_contacts`.
+   - Renaming variables and functions referring to "prefix map" to now refer to "network contacts".
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 9 commits contributed to the release over the course of 8 calendar days.
+ - 9 days passed between releases.
+ - 9 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - copy default network_contacts when switching networks ([`2e370f5`](https://github.com/maidsafe/safe_network/commit/2e370f5241bc26074526bc588f1f9bb34be574f2))
+    - do not read settings from file during Config::sync() ([`5decc56`](https://github.com/maidsafe/safe_network/commit/5decc563679014a0c124128d58e87d8d1ab43300))
+    - fix clippy some/none issues ([`c8517a4`](https://github.com/maidsafe/safe_network/commit/c8517a481e39bf688041cd8f8661bc663ee7bce7))
+    - new cmd to display detailed information about a configured network ([`e97ab22`](https://github.com/maidsafe/safe_network/commit/e97ab2220d150706741549944c6e4bf77f2a5bae))
+    - reintroduce Arc<RwLock> for section tree ([`43ecab2`](https://github.com/maidsafe/safe_network/commit/43ecab2dda52cb0ede7c0d4b6e48eaffe1fb6b75))
+    - upgrading sn_dbc to v8.0 ([`589f03c`](https://github.com/maidsafe/safe_network/commit/589f03ce8670544285f329fe35c19897d4bfced8))
+    - renaming NetworkPrefixMap to SectionTree ([`f0fbe5f`](https://github.com/maidsafe/safe_network/commit/f0fbe5fd9bec0b2865271bb139c9fcb4ec225884))
+    - expose serialisation/deserialisation utilities as public methods instead ([`1618cf6`](https://github.com/maidsafe/safe_network/commit/1618cf6a93117942946d152efee24fe3c7020e55))
+    - circumvent clone to use reference ([`63172ab`](https://github.com/maidsafe/safe_network/commit/63172ab4ab9fc87bc17b09c6fd384679a37a40f0))
+</details>
+
 ## v0.60.0 (2022-08-14)
+
+<csr-id-de57210562e1e3a637564332e081514dabb177ab/>
+<csr-id-29de67f1e3583eab867d517cb50ed2e404bd63fd/>
+<csr-id-a8b0631a396ac96e000db22141ffd5d83fd7e987/>
+<csr-id-848dba48e5959d0b9cfe182fde2f12ede71ba9c2/>
+<csr-id-35483b3f322eeea2c10427e94e4750a8269811c0/>
+<csr-id-820fcc9a77f756fca308f247c3ea1b82f65d30b9/>
+<csr-id-afcf083469c732f10c7c80f4a45e4c33ab111101/>
+<csr-id-60ec545c4ff2d56c4b92ecbf3b710088a8339450/>
+<csr-id-6f03b93bd2d02f0ffe54b69fbf25070fbe64eab0/>
+<csr-id-b38b7298aa1061e6f5f4df3c5b0ea3d7586d74b6/>
+<csr-id-973f958fc4b8ba62fedb86fc5bd1cb32cd9fecea/>
+<csr-id-629a5873dd3bdf138649360222c00e3e0a76e097/>
+<csr-id-27ba2a63dcfa272cf7ef8c5301987fc6bfe18ed0/>
+<csr-id-ed37bb56e5e17d4cba7c1b2165746c193241d618/>
+<csr-id-e0fb940b24e87d86fe920095176362f73503ce79/>
+<csr-id-9fde534277f359dfa0a1d91d917864776edb5138/>
+<csr-id-5c82df633e7c062fdf761a8e6e0a7ae8d26cc73a/>
+<csr-id-24676dadb771bbd966b6a3e1aa53d1c736c90627/>
+<csr-id-d4be0cc431947b035046cc4d56642a81c0880924/>
+<csr-id-db7dcdc7968d1d7e946274650d5a0c48719b4955/>
+<csr-id-96da1171d0cac240f772e5d6a15c56f63441b4b3/>
+<csr-id-dd2eb21352223f6340064e0021f4a7df402cd5c9/>
 
 ### Chore
 
@@ -24,34 +105,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - <csr-id-b38b7298aa1061e6f5f4df3c5b0ea3d7586d74b6/> split PUT,CAT benches
  - <csr-id-973f958fc4b8ba62fedb86fc5bd1cb32cd9fecea/> use assert_cmd instead of duct
 
+### Chore
+
+ - <csr-id-53f60c2327f8a69f0b2ef6d1a4e96644c10aa358/> sn_interface-0.9.0/sn_dysfunction-0.8.0/sn_client-0.69.0/sn_node-0.65.0/sn_api-0.67.0/sn_cli-0.60.0
+
 ### New Features
+
+<csr-id-1b3f0516cf899c2fc0d101ce9cf0079c95bbfd7b/>
 
  - <csr-id-c2ea9e0a0b4d7c26669aedc5f96277d481a07f62/> wallet CLI cmd to allow storing output DBC to a file upon reissuing it
  - <csr-id-c46dd0737779c8ee515ee037add54ce049448ea7/> expose a public API which allows users to check if a DBC's `KeyImage` has been already spent on the network
    - Expose a public `is_dbc_spent` API which allows users to check if a DBC's KeyImage has
-     been already spent on the network.
-   - Have the CLI `wallet deposit` command to perform a verification is the supplied DBC has been
+   been already spent on the network.
+- Have the CLI `wallet deposit` command to perform a verification is the supplied DBC has been
      already spent before depositing into a wallet.
-   - Allow users to provide a `--force` flag with the CLI `wallet deposit` command to skip the
+- Allow users to provide a `--force` flag with the CLI `wallet deposit` command to skip the
      verification of DBC already spent and force the deposit into the wallet.
- - <csr-id-1b3f0516cf899c2fc0d101ce9cf0079c95bbfd7b/> show the DBC owner in the wallet displayed by cat cmd
-   - Display the owner of each DBC when cat-ing a wallet.
-   - Align to the right the balance of each DBC when cat-ing a wallet.
-   - Shorten the default name set to DBC when deposited in a wallet.
-   - Make the name of the change DBC automatically deposited in the wallet unique.
+- Display the owner of each DBC when cat-ing a wallet.
+- Align to the right the balance of each DBC when cat-ing a wallet.
+- Shorten the default name set to DBC when deposited in a wallet.
+- Make the name of the change DBC automatically deposited in the wallet unique.
 
 ### Bug Fixes
 
+<csr-id-5b181bd1cf908f4b021b0eb9adf53da005292be0/>
+<csr-id-2979edfb76d4b4273e40fdae809c195f54415c31/>
+<csr-id-6d237e5e7d8306cb955f436910aa01ed7221cd84/>
+<csr-id-9eaf971ac4c16bf326f6443636427951f00ae2b6/>
+
  - <csr-id-0041e18ab7d1a21e4debb39df9c4b116e002a5e5/> convert nodes joining interval to millis before passing it to launch-tool
    - Also pass the default prefix map file path as the network contacts file path to CLI node join cmd.
-   - Minor refactoring to sn_client::test_spentbook_spend_dbc test.
- - <csr-id-5b181bd1cf908f4b021b0eb9adf53da005292be0/> backing up default prefix map file with genesis key in filename if not found
- - <csr-id-2979edfb76d4b4273e40fdae809c195f54415c31/> make copy of default prefix map
-   If the prefix_map_dir just contains the default prefix map, adding another
-   network and switching to it will overwrite the default one. Making a copy
-   fixes it.
- - <csr-id-6d237e5e7d8306cb955f436910aa01ed7221cd84/> unused async in CLI
- - <csr-id-9eaf971ac4c16bf326f6443636427951f00ae2b6/> enable sn_cli bench
+- Minor refactoring to sn_client::test_spentbook_spend_dbc test.
 
 ### Other
 
@@ -89,9 +173,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 34 commits contributed to the release over the course of 31 calendar days.
- - 33 days passed between releases.
- - 30 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 35 commits contributed to the release over the course of 33 calendar days.
+ - 34 days passed between releases.
+ - 31 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -101,6 +185,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.9.0/sn_dysfunction-0.8.0/sn_client-0.69.0/sn_node-0.65.0/sn_api-0.67.0/sn_cli-0.60.0 ([`53f60c2`](https://github.com/maidsafe/safe_network/commit/53f60c2327f8a69f0b2ef6d1a4e96644c10aa358))
     - sn_client to only read a default prefix map file, updates to be cached on disk by user ([`27ba2a6`](https://github.com/maidsafe/safe_network/commit/27ba2a63dcfa272cf7ef8c5301987fc6bfe18ed0))
     - let client builder do env overrides ([`de57210`](https://github.com/maidsafe/safe_network/commit/de57210562e1e3a637564332e081514dabb177ab))
     - convert nodes joining interval to millis before passing it to launch-tool ([`0041e18`](https://github.com/maidsafe/safe_network/commit/0041e18ab7d1a21e4debb39df9c4b116e002a5e5))
@@ -137,7 +222,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     - show the DBC owner in the wallet displayed by cat cmd ([`1b3f051`](https://github.com/maidsafe/safe_network/commit/1b3f0516cf899c2fc0d101ce9cf0079c95bbfd7b))
 </details>
 
+<csr-unknown>
+ show the DBC owner in the wallet displayed by cat cmd backing up default prefix map file with genesis key in filename if not found make copy of default prefix mapIf the prefix_map_dir just contains the default prefix map, adding anothernetwork and switching to it will overwrite the default one. Making a copyfixes it. unused async in CLI enable sn_cli bench<csr-unknown/>
+
 ## v0.59.3 (2022-07-10)
+
+<csr-id-34bd9bd01a3f042c35e0432df2f0cfcebc32a8a8/>
 
 ### Chore
 
