@@ -66,8 +66,8 @@ impl DkgSessionId {
     }
 
     /// A small checksum of the session id's hash used for logging as it is very short
-    pub fn sum(&self) -> u8 {
-        self.hash().iter().sum::<u8>()
+    pub fn sum(&self) -> u16 {
+        self.hash().iter().map(|i| *i as u16).sum::<u16>()
     }
 
     pub fn hash_update(&self, hasher: &mut Sha3) {
