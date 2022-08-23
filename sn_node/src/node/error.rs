@@ -118,8 +118,8 @@ pub enum Error {
     /// Received a dkg message from a node that is not in dkg session
     #[error("Node not in dkg session: {0:?}")]
     NodeNotInDkgSession(XorName),
-    /// We don't have a bls key for this dkg session id
-    #[error("No dkg keys for session: {0:?}")]
+    /// We don't have a bls key for this dkg session id yet
+    #[error("We don't have a bls key for this dkg session id yet: {0:?}")]
     NoDkgKeysForSession(DkgSessionId),
     /// Double Key Attack Detected, node is faulty, error contains proof: sigs and signed bls keys
     #[error("Double Key Attack Detected from: {0:?}")]

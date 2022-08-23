@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    dkg::DkgPubKeys,
+    dkg::{check_key, DkgPubKeys},
     flow_ctrl::cmds::Cmd,
     messaging::{OutgoingMsg, Peers},
     Error, Node, Proposal, Result,
@@ -209,6 +209,9 @@ impl Node {
             self.dkg_voter
                 .gen_ephemeral_key(session_id.hash(), our_name, &self.keypair)?;
 
+        // assert people can check key
+        assert!(check_key(&session_id, our_name, ephemeral_pub_key, sig).is_ok());
+
         // broadcast signed pub key
         trace!(
             "{} s{} from {our_id:?}",
@@ -331,6 +334,7 @@ impl Node {
                     cmds.push(self.broadcast_dkg_vote(session_id, pub_keys.clone(), our_id, *vote))
                 }
                 Ok(VoteResponse::DkgComplete(new_pubs, new_sec)) => {
+                    debug!("DkgComplete s{:?}", session_id.sum());
                     cmds.push(acknowledge_dkg_oucome(
                         session_id, our_id, new_pubs, new_sec,
                     ));

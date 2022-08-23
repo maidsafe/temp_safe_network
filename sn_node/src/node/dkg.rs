@@ -68,6 +68,40 @@ fn create_dkg_state(
     )?)
 }
 
+// Helper that checks an ephemeral pubkey
+pub(crate) fn check_key(
+    session_id: &DkgSessionId,
+    key_owner: XorName,
+    key: BlsPublicKey,
+    sig: Signature,
+) -> Result<()> {
+    // check key owner is in dkg session
+    if !session_id.elders.contains_key(&key_owner) {
+        return Err(Error::NodeNotInDkgSession(key_owner));
+    }
+
+    // check sig
+    let sender_pubkey = pub_key(&key_owner).map_err(|_| Error::InvalidXorname(key_owner))?;
+    debug!(
+        "Checking dkg ephemeral key s{} from {:?}",
+        session_id.sum(),
+        key_owner
+    );
+    let serialized = bincode::serialize(&key)?;
+    if sender_pubkey.verify(&serialized, &sig).is_err() {
+        warn!(
+            "Got an invalid signature in Dkg s{} from {:?} sig: {:?} pubkey: {:?}",
+            session_id.sum(),
+            key_owner,
+            sig,
+            sender_pubkey
+        );
+        return Err(Error::InvalidSignature);
+    }
+
+    Ok(())
+}
+
 impl DkgVoter {
     /// Generate ephemeral secret key and save the key pair
     /// If we already have a key for the current session_id, this function mutates nothing
@@ -78,26 +112,36 @@ impl DkgVoter {
         our_name: XorName,
         keypair: &Arc<Keypair>,
     ) -> Result<(BlsPublicKey, Signature)> {
+        // gen temp new key
         let new_secret_key: BlsSecretKey = bls::rand::random();
         let new_pub_key = new_secret_key.public_key();
         let serialized = bincode::serialize(&new_pub_key)?;
-        let sig = types::keys::ed25519::sign(&serialized, keypair);
-        let new_key = DkgEphemeralKeys {
-            secret_key: new_secret_key,
-            pub_keys: BTreeMap::from_iter([(our_name, (new_pub_key, sig))]),
-        };
-        let pub_key = self
+
+        // insert the key if we don't already have it
+        let ephemeral_keys = self
             .dkg_ephemeral_keys
             .entry(session_id_hash)
-            .or_insert(new_key)
-            .secret_key
-            .public_key();
+            .or_insert_with(|| {
+                let sig = types::keys::ed25519::sign(&serialized, keypair);
+                DkgEphemeralKeys {
+                    secret_key: new_secret_key,
+                    pub_keys: BTreeMap::from_iter([(our_name, (new_pub_key, sig))]),
+                }
+            });
+
+        // return the key and sig
+        let (pub_key, sig) = ephemeral_keys
+            .pub_keys
+            .get(&our_name)
+            .ok_or(Error::InvalidState)?;
         debug!(
-            "Signing Dkg ephemeral key s{} from {:?}",
+            "Signing Dkg ephemeral key s{} from {:?} sig: {:?} pubkey: {:?}",
             session_id_hash.iter().sum::<u8>(),
-            our_name
+            our_name,
+            sig,
+            pub_key,
         );
-        Ok((pub_key, sig))
+        Ok((*pub_key, *sig))
     }
 
     /// Initializes our DKG state and returns our first vote and dkg keys
@@ -167,22 +211,8 @@ impl DkgVoter {
         key: BlsPublicKey,
         sig: Signature,
     ) -> Result<bool> {
-        // check key owner is in dkg session
-        if !session_id.elders.contains_key(&key_owner) {
-            return Err(Error::NodeNotInDkgSession(key_owner));
-        }
-
-        // check sig
-        let sender_pubkey = pub_key(&key_owner).map_err(|_| Error::InvalidXorname(key_owner))?;
-        debug!(
-            "Checking dkg ephemeral key s{} from {:?}",
-            session_id.sum(),
-            key_owner
-        );
-        let serialized = bincode::serialize(&key)?;
-        if sender_pubkey.verify(&serialized, &sig).is_err() {
-            return Err(Error::InvalidSignature);
-        }
+        // check key
+        check_key(session_id, key_owner, key, sig)?;
 
         // check if we have our secret key yet
         let our_keys = self
