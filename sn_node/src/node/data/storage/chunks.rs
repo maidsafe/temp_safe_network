@@ -36,7 +36,7 @@ impl ChunkStorage {
         })
     }
 
-    pub(crate) fn addrs(&self) -> Vec<ChunkAddress> {
+    pub(crate) fn addrs(&self) -> Vec<DataAddress> {
         self.file_store.list_all_chunk_addrs()
     }
 

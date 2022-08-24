@@ -213,7 +213,7 @@ impl DataStorage {
         let chunk_addrs = self.chunks.addrs();
         chunk_addrs
             .into_iter()
-            .for_each(|addr| all_addrs.push(ReplicatedDataAddress::Chunk(addr)));
+            .for_each(|addr| all_addrs.push(addr));
 
         let reg_addrs = self.registers.addrs().await;
         reg_addrs
@@ -231,10 +231,16 @@ mod tests {
     use crate::UsedSpace;
 
     use sn_interface::{
-        messaging::{data::DataQueryVariant, system::NodeQueryResponse},
+        init_logger,
+        messaging::{
+            data::{CreateRegister, DataQueryVariant, SignedRegisterCreate},
+            system::NodeQueryResponse,
+        },
         types::{
-            register::User, utils::random_bytes, Chunk, ChunkAddress, Keypair, PublicKey,
-            ReplicatedData, ReplicatedDataAddress,
+            register::{Policy, User},
+            utils::random_bytes,
+            Chunk, ChunkAddress, Keypair, PublicKey, RegisterCmd, ReplicatedData,
+            ReplicatedDataAddress,
         },
     };
 
@@ -301,6 +307,119 @@ mod tests {
             Err(Error::ChunkNotFound(address)) => assert_eq!(address, replicated_data.name()),
             _ => panic!("Unexpected data found"),
         }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn data_storage_chunk_keys_returned() -> Result<(), Error> {
+        init_logger();
+        // Generate temp path for storage
+        // Cleaned up automatically after test completes
+        let tmp_dir = tempdir()?;
+        let path = tmp_dir.path();
+        let used_space = UsedSpace::new(usize::MAX);
+
+        // Create instance
+        let mut storage = DataStorage::new(path, used_space)?;
+
+        // 5mb random data chunk
+        let bytes = random_bytes(5 * 1024 * 1024);
+        let chunk = Chunk::new(bytes);
+        let replicated_chunk = ReplicatedData::Chunk(chunk.clone());
+
+        let pk = PublicKey::Bls(bls::SecretKey::random().public_key());
+        let keypair = Keypair::new_ed25519();
+
+        // Store the chunk
+        let _ = storage.store(&replicated_chunk, pk, keypair).await?;
+
+        let keys = storage.keys().await;
+
+        let expected_key = replicated_chunk.address();
+        assert!(
+            keys.contains(&expected_key),
+            "data storage does not contain our keys: {expected_key:?}"
+        );
+
+        Ok(())
+    }
+
+    fn section_auth() -> sn_interface::messaging::SectionAuth {
+        use sn_interface::messaging::system::KeyedSig;
+
+        let sk = bls::SecretKey::random();
+        let public_key = sk.public_key();
+        let data = "hello".to_string();
+        let signature = sk.sign(&data);
+        let sig = KeyedSig {
+            public_key,
+            signature,
+        };
+        sn_interface::messaging::SectionAuth {
+            src_name: sn_interface::types::PublicKey::Bls(public_key).into(),
+            sig,
+        }
+    }
+
+    #[tokio::test]
+    async fn data_storage_register_keys_returned() -> Result<(), Error> {
+        init_logger();
+        // Generate temp path for storage
+        // Cleaned up automatically after test completes
+        let tmp_dir = tempdir()?;
+        let path = tmp_dir.path();
+        let used_space = UsedSpace::new(usize::MAX);
+
+        // Create instance
+        let mut storage = DataStorage::new(path, used_space)?;
+
+        // create reg cmd
+
+        let keypair = Keypair::new_ed25519();
+
+        let name = xor_name::rand::random();
+        let tag = 15000;
+        let owner = User::Key(keypair.public_key());
+
+        fn public_policy(owner: User) -> Policy {
+            let permissions = BTreeMap::new();
+            Policy { owner, permissions }
+        }
+
+        let policy = public_policy(owner);
+
+        let op = CreateRegister { name, tag, policy };
+        let signature = keypair.sign(&bincode::serialize(&op).expect("could not serialize op"));
+        let section_auth = section_auth();
+        let cmd = RegisterCmd::Create {
+            cmd: SignedRegisterCreate {
+                op,
+                auth: sn_interface::messaging::ServiceAuth {
+                    public_key: keypair.public_key(),
+                    signature,
+                },
+            },
+            section_auth: section_auth.clone(), // obtained after presenting a valid payment to the network
+        };
+
+        // ReplicatedData::RegisterWrite(reg_cmd)
+
+        let replicated_register = ReplicatedData::RegisterWrite(cmd);
+
+        let pk = PublicKey::Bls(bls::SecretKey::random().public_key());
+        let keypair = Keypair::new_ed25519();
+
+        // Store the chunk
+        let _ = storage.store(&replicated_register, pk, keypair).await?;
+
+        let keys = storage.keys().await;
+
+        let expected_key = replicated_register.address();
+        assert!(
+            keys.contains(&expected_key),
+            "data storage does not contain our keys: {expected_key:?}"
+        );
 
         Ok(())
     }

@@ -14,8 +14,7 @@ use sn_interface::{
     messaging::data::DataCmd,
     types::{
         utils::{deserialise, serialise},
-        Chunk, ChunkAddress, RegisterAddress, RegisterCmd, RegisterCmdId,
-        ReplicatedDataAddress as DataAddress,
+        Chunk, RegisterAddress, RegisterCmd, RegisterCmdId, ReplicatedDataAddress as DataAddress,
     },
 };
 
@@ -83,6 +82,7 @@ impl FileStore {
         } else {
             let xorname = *addr.name();
             let mut path = self.prefix_tree_path(xorname, self.bit_tree_depth);
+
             let filename = addr.encode_to_zbase32()?;
             path.push(filename);
             path
@@ -91,21 +91,21 @@ impl FileStore {
         Ok(path)
     }
 
-    pub(crate) fn list_all_chunk_addrs(&self) -> Vec<ChunkAddress> {
+    pub(crate) fn list_all_chunk_addrs(&self) -> Vec<DataAddress> {
         self.list_all_files()
             .iter()
             .filter_map(|filepath| Self::chunk_filepath_to_address(filepath).ok())
             .collect()
     }
 
-    fn chunk_filepath_to_address(path: &Path) -> Result<ChunkAddress> {
+    fn chunk_filepath_to_address(path: &Path) -> Result<DataAddress> {
         let filename = path
             .file_name()
             .ok_or(Error::NoFilename)?
             .to_str()
             .ok_or(Error::InvalidFilename)?;
 
-        Ok(ChunkAddress::decode_from_zbase32(filename)?)
+        Ok(DataAddress::decode_from_zbase32(filename)?)
     }
 
     pub(crate) async fn list_all_reg_addrs(&self) -> Vec<RegisterAddress> {
