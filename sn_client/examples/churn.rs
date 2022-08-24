@@ -176,8 +176,7 @@ pub async fn run_split() -> Result<()> {
         .and_then(|launch| launch.run())
         .wrap_err("Error adding nodes to the testnet")?;
 
-
-    let post_churn_interval_to_allow_replication = Duration::from_secs(120);
+    let post_churn_interval_to_allow_replication = Duration::from_secs(30);
     sleep(post_churn_interval_to_allow_replication).await;
 
     let client = Client::builder().build().await?;
