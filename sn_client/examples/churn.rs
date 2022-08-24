@@ -33,7 +33,7 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node";
 const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 
 const NODES_DIR: &str = "local-test-network";
-const INTERVAL: &str = "100";
+const INTERVAL_IN_MS: &str = "100";
 const RUST_LOG: &str = "RUST_LOG";
 const ADDITIONAL_NODES: u64 = 12;
 const FILES_TO_PUT: i32 = 40;
@@ -123,7 +123,7 @@ pub async fn run_split() -> Result<()> {
         "--nodes-dir",
         &arg_node_log_dir,
         "--interval",
-        INTERVAL,
+        INTERVAL_IN_MS,
         "--local",
     ];
 
@@ -135,7 +135,7 @@ pub async fn run_split() -> Result<()> {
         sn_launch_tool_args.push(&rust_log);
     }
 
-    let interval_as_int = &INTERVAL
+    let interval_as_int_in_ms = &INTERVAL_IN_MS
         .parse::<u64>()
         .context("Error parsing Interval argument")?;
 
@@ -149,7 +149,7 @@ pub async fn run_split() -> Result<()> {
         .wrap_err("Error starting the testnet")?;
 
     // leave a longer interval with more nodes to allow for splits if using split amounts
-    let _interval_duration = Duration::from_millis(*interval_as_int);
+    let _interval_duration = Duration::from_millis(*interval_as_int_in_ms * 10);
 
     let mut all_data_put = vec![];
 
@@ -176,8 +176,9 @@ pub async fn run_split() -> Result<()> {
         .and_then(|launch| launch.run())
         .wrap_err("Error adding nodes to the testnet")?;
 
-    let interval_duration = Duration::from_millis(*interval_as_int);
-    sleep(interval_duration).await;
+
+    let post_churn_interval_to_allow_replication = Duration::from_secs(120);
+    sleep(post_churn_interval_to_allow_replication).await;
 
     let client = Client::builder().build().await?;
 
