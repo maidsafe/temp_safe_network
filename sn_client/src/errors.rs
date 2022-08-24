@@ -92,7 +92,7 @@ pub enum Error {
     #[error("Failed to obtain any response, even after {attempts} attempts, for query: {query:?}. Error in last attempt: {last_error}")]
     NoResponseAfterRetrying {
         /// Number of attempts made
-        attempts: u32,
+        attempts: usize,
         /// Query sent to Elders
         query: DataQuery,
         /// Source of error in last attempt

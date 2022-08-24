@@ -30,6 +30,8 @@ use tokio::sync::RwLock;
 
 /// Environment variable used to convert into [`ClientBuilder::query_timeout`] (seconds)
 pub const ENV_QUERY_TIMEOUT: &str = "SN_QUERY_TIMEOUT";
+/// Environment variable used to convert into [`ClientBuilder::query_timeout`] (seconds)
+pub const ENV_MAX_RETRIES: &str = "SN_MAX_RETRIES";
 /// Environment variable used to convert into [`ClientBuilder::cmd_timeout`] (seconds)
 pub const ENV_CMD_TIMEOUT: &str = "SN_CMD_TIMEOUT";
 /// Environment variable used to convert into [`ClientBuilder::cmd_ack_wait`] (seconds)
@@ -38,7 +40,10 @@ pub const ENV_AE_WAIT: &str = "SN_AE_WAIT";
 /// Bind by default to all network interfaces on a OS assigned port
 pub const DEFAULT_LOCAL_ADDR: (Ipv4Addr, u16) = (Ipv4Addr::UNSPECIFIED, 0);
 /// Default timeout to use before timing out queries and commands
-pub const DEFAULT_QUERY_CMD_TIMEOUT: Duration = Duration::from_secs(15);
+pub const DEFAULT_QUERY_CMD_TIMEOUT: Duration = Duration::from_secs(30);
+/// Max retries to be attempted in the DEFAULT_QUERY_CMD_TIMEOUT; DEFAULT_QUERY_CMD_TIMEOUT / DEFAULT_MAX_QUERY_CMD_RETRIES ~ tries per second
+/// (though exponential backoff exists)
+pub const DEFAULT_MAX_QUERY_CMD_RETRIES: usize = 15;
 /// Default timeout for waiting for potential Anti-Entropy messages
 pub const DEFAULT_ACK_WAIT: Duration = Duration::from_secs(10);
 
@@ -50,6 +55,7 @@ pub struct ClientBuilder {
     local_addr: Option<SocketAddr>,
     qp2p: Option<Qp2pConfig>,
     query_timeout: Option<Duration>,
+    max_retries: Option<usize>,
     cmd_timeout: Option<Duration>,
     cmd_ack_wait: Option<Duration>,
     network_contacts: Option<SectionTree>,
@@ -91,6 +97,12 @@ impl ClientBuilder {
         self
     }
 
+    /// Max retries within `query_timeout` for any one operation
+    pub fn max_retries(mut self, max_retries: impl Into<Option<usize>>) -> Self {
+        self.max_retries = max_retries.into();
+        self
+    }
+
     /// Time to wait for cmds to not error before giving up and returning an error
     pub fn cmd_timeout(mut self, timeout: impl Into<Option<Duration>>) -> Self {
         self.cmd_timeout = timeout.into();
@@ -111,11 +123,15 @@ impl ClientBuilder {
 
     /// Read options from environment variables:
     /// - [`Self::query_timeout()`] from [`ENV_QUERY_TIMEOUT`]
+    /// - [`Self::max_retries()`] from [`ENV_MAX_RETRIES`]
     /// - [`Self::cmd_timeout()`] from [`ENV_CMD_TIMEOUT`]
     /// - [`Self::cmd_ack_wait()`] from [`ENV_AE_WAIT`]
     pub fn from_env(mut self) -> Self {
         if let Ok(Some(v)) = env_parse(ENV_QUERY_TIMEOUT) {
             self.query_timeout = Some(Duration::from_secs(v));
+        }
+        if let Ok(Some(v)) = env_parse(ENV_MAX_RETRIES) {
+            self.max_retries = Some(v);
         }
         if let Ok(Some(v)) = env_parse(ENV_CMD_TIMEOUT) {
             self.cmd_timeout = Some(Duration::from_secs(v));
@@ -132,10 +148,12 @@ impl ClientBuilder {
     /// In case parameters have not been passed to this builder, defaults will be used:
     /// - `[Self::keypair]` and `[Self::dbc_owner]` are randomly generated
     /// - `[Self::query_timeout`] and `[Self::cmd_timeout]` default to [`DEFAULT_QUERY_CMD_TIMEOUT`]
+    /// - `[Self::max_retries`] and `[Self::cmd_timeout]` default to [`DEFAULT_MAX_QUERY_CMD_RETRIES`]
     /// - `[Self::cmd_ack_wait`] defaults to [`DEFAULT_ACK_WAIT`]
     /// - [`qp2p::Config`] will default to it's [`Default`] impl
     /// - Network contacts file will be read from a standard location
     pub async fn build(self) -> Result<Client, Error> {
+        let max_retries = self.max_retries.unwrap_or(DEFAULT_MAX_QUERY_CMD_RETRIES);
         let query_timeout = self.query_timeout.unwrap_or(DEFAULT_QUERY_CMD_TIMEOUT);
         let cmd_timeout = self.cmd_timeout.unwrap_or(DEFAULT_QUERY_CMD_TIMEOUT);
         let cmd_ack_wait = self.cmd_ack_wait.unwrap_or(DEFAULT_ACK_WAIT);
@@ -174,6 +192,7 @@ impl ClientBuilder {
             dbc_owner,
             session,
             query_timeout,
+            max_retries,
             cmd_timeout,
             chunks_cache: Arc::new(RwLock::new(Default::default())),
         };
