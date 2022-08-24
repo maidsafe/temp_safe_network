@@ -492,8 +492,19 @@ mod tests {
                             ReplicatedData::Chunk(chunk)
                         }
                     };
-                    let _ =
-                        runtime.block_on(storage.store(&data, owner_pk, owner_keypair.clone()))?;
+                    runtime.block_on(async {
+                        match storage.store(&data, owner_pk, owner_keypair.clone()).await {
+                            Ok(_) => {
+                                // do nothing
+                                Ok(())
+                            }
+                            Err(Error::DataExists) => {
+                                // also do nothing
+                                Ok(())
+                            }
+                            Err(other_error) => Err(other_error),
+                        }
+                    })?;
                     // If Get/Query is performed just after a Store op, half-written data is returned
                     // Adding some delay fixes it
                     thread::sleep(Duration::from_millis(15));
