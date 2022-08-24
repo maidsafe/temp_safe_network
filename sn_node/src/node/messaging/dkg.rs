@@ -158,24 +158,24 @@ impl Node {
         Ok((auth, payload))
     }
 
-    fn broadcast_dkg_vote(
+    fn broadcast_dkg_votes(
         &self,
         session_id: &DkgSessionId,
         pub_keys: DkgPubKeys,
         participant_index: usize,
-        vote: DkgSignedVote,
+        votes: Vec<DkgSignedVote>,
     ) -> Cmd {
         let recipients = dkg_peers(participant_index, session_id);
         trace!(
             "{} s{}: {:?}",
             LogMarker::DkgBroadcastVote,
             session_id.sum(),
-            vote
+            votes
         );
         let node_msg = SystemMsg::DkgVotes {
             session_id: session_id.clone(),
             pub_keys,
-            votes: vec![vote],
+            votes,
         };
         self.send_system_msg(node_msg, Peers::Multiple(recipients))
     }
@@ -288,6 +288,33 @@ impl Node {
         Ok(vec![cmd])
     }
 
+    fn handle_vote_response(
+        &mut self,
+        session_id: &DkgSessionId,
+        pub_keys: DkgPubKeys,
+        sender: Peer,
+        our_id: usize,
+        vote_response: VoteResponse,
+    ) -> Vec<Cmd> {
+        match vote_response {
+            VoteResponse::WaitingForMoreVotes => {
+                vec![]
+            }
+            VoteResponse::RequestAntiEntropy => {
+                vec![self.request_dkg_ae(session_id, sender)]
+            }
+            VoteResponse::BroadcastVote(vote) => {
+                vec![self.broadcast_dkg_votes(session_id, pub_keys, our_id, vec![*vote])]
+            }
+            VoteResponse::DkgComplete(new_pubs, new_sec) => {
+                debug!("DkgComplete s{:?}", session_id.sum());
+                vec![acknowledge_dkg_oucome(
+                    session_id, our_id, new_pubs, new_sec,
+                )]
+            }
+        }
+    }
+
     pub(crate) fn handle_dkg_votes(
         &mut self,
         session_id: &DkgSessionId,
@@ -314,7 +341,12 @@ impl Node {
         let mut cmds = Vec::new();
         if just_completed {
             let (first_vote, _) = self.dkg_voter.initialize_dkg_state(session_id, our_id)?;
-            cmds.push(self.broadcast_dkg_vote(session_id, pub_keys.clone(), our_id, first_vote));
+            cmds.push(self.broadcast_dkg_votes(
+                session_id,
+                pub_keys.clone(),
+                our_id,
+                vec![first_vote],
+            ));
         }
 
         // handle vote
@@ -322,23 +354,24 @@ impl Node {
         let mut ae_cmds: Vec<Cmd> = Vec::new();
         for v in votes {
             match self.dkg_voter.handle_dkg_vote(session_id, v.clone()) {
-                Ok(VoteResponse::WaitingForMoreVotes) => {
-                    debug!(
-                        "Dkg s{}: WaitingForMoreVotes after: {v:?}",
-                        session_id.sum()
+                Ok((vote_response, learned_something)) => {
+                    if learned_something {
+                        self.dkg_voter.learned_something_from_message();
+                    }
+                    let cmd = self.handle_vote_response(
+                        session_id,
+                        pub_keys.clone(),
+                        sender,
+                        our_id,
+                        vote_response,
                     );
-                }
-                Ok(VoteResponse::RequestAntiEntropy) => {
-                    cmds.push(self.request_dkg_ae(session_id, sender))
-                }
-                Ok(VoteResponse::BroadcastVote(vote)) => {
-                    cmds.push(self.broadcast_dkg_vote(session_id, pub_keys.clone(), our_id, *vote))
-                }
-                Ok(VoteResponse::DkgComplete(new_pubs, new_sec)) => {
-                    debug!("DkgComplete s{:?}", session_id.sum());
-                    cmds.push(acknowledge_dkg_oucome(
-                        session_id, our_id, new_pubs, new_sec,
-                    ));
+                    if cmds.is_empty() {
+                        debug!(
+                            "Dkg s{}: WaitingForMoreVotes after: {v:?}",
+                            session_id.sum()
+                        );
+                    }
+                    cmds.extend(cmd);
                 }
                 Err(err) => {
                     error!(
@@ -375,6 +408,105 @@ impl Node {
         };
         let cmd = self.send_system_msg(node_msg, Peers::Single(sender));
         Ok(vec![cmd])
+    }
+
+    // broadcasts our current known votes
+    fn gossip_votes(
+        &self,
+        session_id: DkgSessionId,
+        votes: Vec<DkgSignedVote>,
+        our_id: usize,
+    ) -> Vec<Cmd> {
+        let pub_keys = match self.dkg_voter.get_dkg_keys(&session_id) {
+            Ok(k) => k,
+            Err(_) => {
+                warn!(
+                    "Unexpectedly missing dkg keys when gossiping s{}",
+                    session_id.sum()
+                );
+                return vec![];
+            }
+        };
+        trace!(
+            "{} s{}: gossiping votes",
+            LogMarker::DkgBroadcastVote,
+            session_id.sum()
+        );
+        let cmd = self.broadcast_dkg_votes(&session_id, pub_keys, our_id, votes);
+        vec![cmd]
+    }
+
+    // broadcasts our ephemeral key
+    fn gossip_our_key(
+        &self,
+        session_id: DkgSessionId,
+        our_name: XorName,
+        our_id: usize,
+    ) -> Vec<Cmd> {
+        // get the keys
+        let dkg_keys = match self.dkg_voter.get_dkg_keys(&session_id) {
+            Ok(k) => k,
+            Err(_) => {
+                warn!(
+                    "Unexpectedly missing dkg pub keys when gossiping s{}",
+                    session_id.sum()
+                );
+                return vec![];
+            }
+        };
+        let (pub_key, sig) = match dkg_keys.get(&our_name) {
+            Some(res) => res,
+            None => {
+                warn!(
+                    "Unexpectedly missing our dkg key when gossiping s{}",
+                    session_id.sum()
+                );
+                return vec![];
+            }
+        };
+
+        trace!(
+            "{} s{}: gossiping ephemeral key",
+            LogMarker::DkgBroadcastVote,
+            session_id.sum()
+        );
+
+        // broadcast our key
+        let peers = dkg_peers(our_id, &session_id);
+        let node_msg = SystemMsg::DkgEphemeralPubKey {
+            session_id,
+            pub_key: *pub_key,
+            sig: *sig,
+        };
+        let cmd = self.send_system_msg(node_msg, Peers::Multiple(peers));
+        vec![cmd]
+    }
+
+    /// For all the ongoing DKG sessions, sends out all the current known votes to all DKG
+    /// participants if we don't have any votes yet, sends out our ephemeral key
+    pub(crate) fn dkg_gossip_msgs(&self) -> Vec<Cmd> {
+        let mut cmds = vec![];
+        for (_hash, session_id) in self.dkg_sessions_info.iter() {
+            // get our id
+            let name = types::keys::ed25519::name(&self.keypair.public);
+            let our_id = if let Some(index) = session_id.elder_index(name) {
+                index
+            } else {
+                error!(
+                    "DKG failed gossip in s{}: {name} is not a participant",
+                    session_id.sum()
+                );
+                continue;
+            };
+
+            // gossip votes else gossip our key
+            if let Ok(votes) = self.dkg_voter.get_all_votes(session_id) {
+                cmds.extend(self.gossip_votes(session_id.clone(), votes, our_id));
+            } else {
+                cmds.extend(self.gossip_our_key(session_id.clone(), name, our_id));
+            }
+        }
+        cmds
     }
 
     pub(crate) async fn handle_dkg_outcome(
