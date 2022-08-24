@@ -95,4 +95,14 @@ impl ReplicatedData {
             }
         }
     }
+
+    pub fn reg_op_id(&self) -> Result<Option<RegisterCmdId>> {
+        match self {
+            Self::RegisterWrite(cmd) => Ok(Some(
+                cmd.register_operation_id()
+                    .map_err(|_| Error::InvalidOperation)?,
+            )),
+            _ => Ok(None),
+        }
+    }
 }

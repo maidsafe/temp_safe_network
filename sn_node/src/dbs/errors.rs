@@ -35,9 +35,12 @@ pub enum Error {
     /// Chunk not found.
     #[error("Chunk not found: {0:?}")]
     ChunkNotFound(XorName),
-    /// Chunk already exists for this node
+    /// Data already exists for this node
     #[error("Data already exists at this node")]
     DataExists,
+    /// Chunk already exists for this node. Pass in the RegCmdId
+    #[error("RegCmd Operation already exists at this node: {0}")]
+    RegCmdOperationExists(String),
     /// Data owner provided is invalid.
     #[error("Provided PublicKey is not a valid owner. Provided PublicKey: {0}")]
     InvalidOwner(PublicKey),
