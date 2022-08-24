@@ -22,16 +22,12 @@ use bytes::Bytes;
 use rand::Rng;
 use tracing::{debug, info_span};
 
-// We divide the total query timeout by this number.
-// This also represents the max retries possible, while still staying within the max_timeout.
-const MAX_RETRY_COUNT: u32 = 5;
-
 impl Client {
     /// Send a Query to the network and await a response.
     /// Queries are automatically retried using exponential backoff if the timeout is hit.
     #[instrument(skip(self), level = "debug")]
     pub async fn send_query(&self, query: DataQueryVariant) -> Result<QueryResult, Error> {
-        self.send_query_with_retry_count(query, MAX_RETRY_COUNT)
+        self.send_query_with_retry_count(query, self.max_retries)
             .await
     }
 
@@ -52,7 +48,7 @@ impl Client {
     async fn send_query_with_retry_count(
         &self,
         query: DataQueryVariant,
-        retry_count: u32,
+        retry_count: usize,
     ) -> Result<QueryResult, Error> {
         let client_pk = self.public_key();
         let mut query = DataQuery {
@@ -98,10 +94,10 @@ impl Client {
 
             match res {
                 Ok(Ok(query_result)) => break Ok(query_result),
-                Ok(Err(err)) if attempts > MAX_RETRY_COUNT => {
+                Ok(Err(err)) if attempts > self.max_retries => {
                     debug!(
                         "Retries ({}) all failed returning no response for {:?}",
-                        MAX_RETRY_COUNT, query
+                        self.max_retries, query
                     );
                     break Err(Error::NoResponseAfterRetrying {
                         query,
@@ -109,12 +105,12 @@ impl Client {
                         last_error: Box::new(err),
                     });
                 }
-                Err(_) if attempts > MAX_RETRY_COUNT => {
+                Err(_) if attempts > self.max_retries => {
                     // this should be due to our tokio time out, rather than an error
                     // returned by `send_signed_query_to_section`
                     debug!(
                         "Retries ({}) all failed returning no response for {:?}",
-                        MAX_RETRY_COUNT, query
+                        self.max_retries, query
                     );
                     break Err(Error::NoResponseAfterRetrying {
                         query,

@@ -22,21 +22,23 @@ use bytes::Bytes;
 use tokio::time::Duration;
 use xor_name::XorName;
 
-const MAX_RETRY_COUNT: f32 = 5.0;
-
 impl Client {
     /// Send a Cmd to the network and await a response.
     /// Cmds are not retried if the timeout is hit.
     #[instrument(skip(self), level = "debug")]
     pub async fn send_cmd_without_retry(&self, cmd: DataCmd) -> Result<(), Error> {
-        self.send_cmd_with_retry_count(cmd, 1.0).await
+        self.send_cmd_with_retry_count(cmd, 1).await
     }
 
     // Send a Cmd to the network and await a response.
     // Cmds are automatically retried if an error is returned
     // This function is a private helper.
     #[instrument(skip(self), level = "debug")]
-    async fn send_cmd_with_retry_count(&self, cmd: DataCmd, retry_count: f32) -> Result<(), Error> {
+    async fn send_cmd_with_retry_count(
+        &self,
+        cmd: DataCmd,
+        retry_count: usize,
+    ) -> Result<(), Error> {
         let client_pk = self.public_key();
         let dst_name = cmd.dst_name();
 
@@ -64,7 +66,7 @@ impl Client {
         let span = info_span!("Attempting a cmd");
         let _ = span.enter();
 
-        let mut attempt = 1.0;
+        let mut attempt = 1;
         loop {
             debug!("Attempting {:?} (attempt #{})", debug_cmd, attempt);
 
@@ -87,7 +89,7 @@ impl Client {
                 res
             );
 
-            attempt += 1.0;
+            attempt += 1;
 
             if let Some(delay) = backoff.next_backoff() {
                 debug!("Sleeping for {delay:?} before trying cmd {debug_cmd:?} again");
@@ -130,6 +132,6 @@ impl Client {
     /// This function is a helper private to this module.
     #[instrument(skip_all, level = "debug", name = "client-api send cmd")]
     pub(crate) async fn send_cmd(&self, cmd: DataCmd) -> Result<(), Error> {
-        self.send_cmd_with_retry_count(cmd, MAX_RETRY_COUNT).await
+        self.send_cmd_with_retry_count(cmd, self.max_retries).await
     }
 }
