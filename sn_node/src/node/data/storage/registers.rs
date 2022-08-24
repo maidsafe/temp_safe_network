@@ -200,8 +200,9 @@ impl RegisterStorage {
         path: &Path,
     ) -> Result<()> {
         let reg_id = cmd.register_operation_id()?;
+
         if ops_log.get(&reg_id).is_some() {
-            return Err(Error::DataExists);
+            return Err(Error::RegCmdOperationExists(reg_id));
         }
 
         let _old_cmd = ops_log.insert(reg_id, cmd);

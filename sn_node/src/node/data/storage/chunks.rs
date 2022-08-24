@@ -83,7 +83,7 @@ impl ChunkStorage {
                 data.address()
             );
             // Nothing more to do here
-            return Ok(());
+            return Err(Error::DataExists);
         }
 
         // cheap extra security check for space (prone to race conditions)

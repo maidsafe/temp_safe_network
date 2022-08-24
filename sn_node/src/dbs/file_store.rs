@@ -78,7 +78,11 @@ impl FileStore {
 
     fn address_to_filepath(&self, addr: &DataAddress) -> Result<PathBuf> {
         let path = if let DataAddress::Register(reg_addr) = addr {
-            self.prefix_tree_path(reg_addr.id()?, self.bit_tree_depth)
+            let reg_id = reg_addr.id()?;
+            let path = self.prefix_tree_path(reg_id, self.bit_tree_depth);
+            // we need to append a folder for the file specifically so bit depth is an issue when low.
+            // we use hex to get full id, not just first bytes
+            path.join(format!("{:X}", reg_id))
         } else {
             let xorname = *addr.name();
             let mut path = self.prefix_tree_path(xorname, self.bit_tree_depth);

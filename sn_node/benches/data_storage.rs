@@ -166,12 +166,11 @@ fn bench_data_storage_reads(c: &mut Criterion) -> Result<()> {
             for _ in 0..size {
                 let random_data = create_random_register_replicated_data();
 
-                if runtime
+                if let Err(error) = runtime
                     .block_on(storage.clone().store(&random_data, pk, keypair.clone()))
                     .context("could not store register")
-                    .is_err()
                 {
-                    panic!("Error storing register");
+                    panic!("Error storing register {random_data:?}: {error:?}");
                 }
             }
 
@@ -190,12 +189,11 @@ fn bench_data_storage_reads(c: &mut Criterion) -> Result<()> {
             for _ in 0..size {
                 let file = sn_interface::types::utils::random_bytes(NONSENSE_CHUNK_SIZE);
                 let random_data = ReplicatedData::Chunk(Chunk::new(file));
-                if runtime
+                if let Err(error) = runtime
                     .block_on(storage.store(&random_data, pk, keypair.clone()))
                     .context("could not store chunk")
-                    .is_err()
                 {
-                    panic!("Error storing chunk");
+                    panic!("Error storing chunk {error:?}");
                 };
             }
 
