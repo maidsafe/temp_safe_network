@@ -32,7 +32,7 @@ use sn_interface::messaging::Traceroute;
 use sn_interface::{
     elder_count, init_logger,
     messaging::{
-        data::{DataCmd, RegisterCmd, ServiceMsg, SpentbookCmd},
+        data::{DataCmd, Error as MessagingDataError, RegisterCmd, ServiceMsg, SpentbookCmd},
         system::{
             JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState,
             NodeMsgAuthorityUtils, NodeState as NodeStateMsg, RelocateDetails, ResourceProof,
@@ -1331,7 +1331,7 @@ async fn spentbook_spend_spentproof_with_invalid_pk_should_return_no_commands() 
 }
 
 #[tokio::test]
-async fn spentbook_spend_spentproof_with_key_not_in_section_chain_should_return_no_commands(
+async fn spentbook_spend_spentproof_with_key_not_in_section_chain_should_return_cmd_error_response(
 ) -> Result<()> {
     let local = tokio::task::LocalSet::new();
     local
@@ -1364,7 +1364,10 @@ async fn spentbook_spend_spentproof_with_key_not_in_section_chain_should_return_
             )
             .await?;
 
-            assert_eq!(cmds.len(), 0);
+            assert_eq!(cmds.len(), 1);
+            let cmd = cmds[0].clone();
+            let cmd_err = cmd.get_error()?;
+            assert_matches!(cmd_err, MessagingDataError::SpentProofUnknownSectionKey);
 
             Result::<()>::Ok(())
         })

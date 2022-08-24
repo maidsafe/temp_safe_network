@@ -242,15 +242,39 @@ impl Node {
                 spent_proofs,
                 spent_transactions,
             })) => {
-                // Generate and sign spent proof share
-                if let Some(spent_proof_share) =
-                    self.gen_spent_proof_share(&key_image, &tx, &spent_proofs, &spent_transactions)?
-                {
-                    // Store spent proof share to adults
-                    let reg_cmd = self.gen_register_cmd(&key_image, &spent_proof_share)?;
-                    ReplicatedData::SpentbookWrite(reg_cmd)
-                } else {
-                    return Ok(vec![]);
+                match self.gen_spent_proof_share(
+                    &key_image,
+                    &tx,
+                    &spent_proofs,
+                    &spent_transactions,
+                ) {
+                    Ok(share) => {
+                        if let Some(spent_proof_share) = share {
+                            // Store spent proof share to adults
+                            let reg_cmd = self.gen_register_cmd(&key_image, &spent_proof_share)?;
+                            ReplicatedData::SpentbookWrite(reg_cmd)
+                        } else {
+                            return Ok(vec![]);
+                        }
+                    }
+                    Err(e) => match e {
+                        Error::SpentbookError(_) => {
+                            // At the moment the only place where `SpentbookError` can occur from
+                            // `gen_spent_proof_share` is if the spent proof was signed with a
+                            // section key that is not currently known. In this case we want to
+                            // send the error back to the client.
+                            return Ok(vec![self.send_cmd_error_response(
+                                CmdError::Data(ErrorMsg::SpentProofUnknownSectionKey),
+                                origin,
+                                msg_id,
+                                #[cfg(feature = "traceroute")]
+                                traceroute,
+                            )]);
+                        }
+                        _ => {
+                            return Ok(vec![]);
+                        }
+                    },
                 }
             }
             ServiceMsg::Cmd(DataCmd::StoreChunk(chunk)) => ReplicatedData::Chunk(chunk),
@@ -428,12 +452,13 @@ impl Node {
         // Verify each spent proof is signed by a known section key (or the genesis key).
         for pk in spent_proofs_keys.iter() {
             if !self.network_knowledge.verify_section_key_is_known(pk) {
-                warn!(
+                let error_msg = format!(
                     "Dropping spend request: spent proof is signed by unknown section with public \
                     key {:?}",
                     pk
                 );
-                return Ok(None);
+                warn!(error_msg);
+                return Err(Error::SpentbookError(error_msg));
             }
         }
 

@@ -11,7 +11,7 @@ use eyre::Result;
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
-        data::ServiceMsg,
+        data::{CmdError, Error as MessagingDataError, ServiceMsg},
         serialisation::WireMsg,
         system::{JoinResponse, MembershipState, NodeCmd, RelocateDetails, SystemMsg},
         AuthorityProof, MsgId, MsgType, ServiceAuth,
@@ -114,7 +114,7 @@ pub(crate) fn wrap_service_msg_for_handling(msg: ServiceMsg, peer: Peer) -> Resu
         public_key: src_client_keypair.public_key(),
         signature: src_client_keypair.sign(&payload),
     };
-    let auth_proof = AuthorityProof::verify(auth, &payload).unwrap();
+    let auth_proof = AuthorityProof::verify(auth, &payload)?;
     Ok(HandleValidServiceMsg {
         msg_id: MsgId::new(),
         msg,
@@ -157,17 +157,13 @@ impl Cmd {
                             }
                             Ok(data[0].clone())
                         }
-                        _ => {
-                            return Err(eyre!("A NodeCmd::ReplicateData variant was expected"));
-                        }
+                        _ => Err(eyre!("A NodeCmd::ReplicateData variant was expected")),
                     },
-                    _ => return Err(eyre!("An SystemMsg::NodeCmd variant was expected")),
+                    _ => Err(eyre!("An SystemMsg::NodeCmd variant was expected")),
                 },
-                _ => return Err(eyre!("An OutgoingMsg::System variant was expected")),
+                _ => Err(eyre!("An OutgoingMsg::System variant was expected")),
             },
-            _ => {
-                return Err(eyre!("A Cmd::SendMsg variant was expected"));
-            }
+            _ => Err(eyre!("A Cmd::SendMsg variant was expected")),
         }
     }
 
@@ -176,6 +172,22 @@ impl Cmd {
         match self {
             Cmd::SendMsg { msg, .. } => match msg {
                 OutgoingMsg::Service(service_msg) => Ok(service_msg.clone()),
+                _ => Err(eyre!("A OutgoingMsg::Service variant was expected")),
+            },
+            _ => Err(eyre!("A Cmd::SendMsg variant was expected")),
+        }
+    }
+
+    /// Get a `sn_interface::messaging::data::Error` from a `Cmd::SendMsg` enum variant.
+    pub(crate) fn get_error(&self) -> Result<MessagingDataError> {
+        match self {
+            Cmd::SendMsg { msg, .. } => match msg {
+                OutgoingMsg::Service(service_msg) => match service_msg {
+                    ServiceMsg::CmdError { error, .. } => match error {
+                        CmdError::Data(err) => Ok(err.clone()),
+                    },
+                    _ => Err(eyre!("A ServiceMsg::CmdError variant was expected")),
+                },
                 _ => Err(eyre!("A OutgoingMsg::Service variant was expected")),
             },
             _ => Err(eyre!("A Cmd::SendMsg variant was expected")),

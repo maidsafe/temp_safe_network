@@ -812,7 +812,7 @@ mod tests {
     }
 
     fn gen_section_auth(prefix: Prefix) -> Result<SectionAuth<SectionAuthorityProvider>> {
-        let (section_auth, _, secret_key_set) = random_sap(prefix, 5);
+        let (section_auth, _, secret_key_set) = random_sap(prefix, 5, 0, None);
         section_signed(secret_key_set.secret_key(), section_auth)
             .context(format!("Failed to generate SAP for prefix {:?}", prefix))
     }
@@ -867,7 +867,7 @@ mod tests {
             Rc::new(RefCell::new(BTreeMap::new()));
 
         // genesis section; inserted at the end
-        let (gen_sap, _, gen_sk) = random_sap(Prefix::default(), 0);
+        let (gen_sap, _, gen_sk) = random_sap(Prefix::default(), 0, 0, None);
         let gen_sap_signed = section_signed(gen_sk.secret_key(), gen_sap.clone())?;
         let mut chain = SecuredLinkedList::new(gen_sap.section_key());
 
@@ -886,7 +886,7 @@ mod tests {
 
         // insert a new section
         let mut insert = |prefix: Prefix, parent_sk: &bls::SecretKey| -> Result<()> {
-            let (sap, _, sk) = random_sap(prefix, 0);
+            let (sap, _, sk) = random_sap(prefix, 0, 0, None);
             let section_key_signed =
                 bincode::serialize(&sap.section_key()).map(|bytes| parent_sk.sign(&bytes))?;
             let sap_signed = section_signed(sk.secret_key(), sap.clone())?;
