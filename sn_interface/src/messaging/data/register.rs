@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
 /// Deterministic Id for a register Cmd, takes into account the underlying cmd, and all sigs
-pub type RegisterCmdId = [u8; 32];
+pub type RegisterCmdId = String;
 
 /// [`Register`] read operations.
 #[allow(clippy::large_enum_variant)]
@@ -252,10 +252,12 @@ impl RegisterCmd {
         let mut hasher = Sha3::v256();
 
         let bytes = serialise(&self).map_err(|_| Error::CouldNotSerialiseCmd)?;
-        let mut output = [0; 32];
+        let mut output = [0; 64];
         hasher.update(&bytes);
         hasher.finalize(&mut output);
-        Ok(output)
+
+        let id = hex::encode(output);
+        Ok(id)
     }
 
     /// Returns the dst address of the register.
