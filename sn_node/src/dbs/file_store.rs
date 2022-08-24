@@ -244,7 +244,6 @@ impl FileStore {
     ) -> Result<()> {
         let serialized_data = serialise(cmd)?;
 
-        let reg_id = hex::encode(reg_id);
         let path = path.join(reg_id.clone());
         trace!("Writing cmd register log at {}", path.display());
         // it's deterministic, so they are exactly the same op so we can leave
