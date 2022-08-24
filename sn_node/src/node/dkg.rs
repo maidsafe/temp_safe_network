@@ -23,6 +23,7 @@ use bls::{PublicKey as BlsPublicKey, SecretKey as BlsSecretKey};
 use sn_sdkg::{DkgSignedVote, DkgState, NodeId, VoteResponse};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
+use std::time::Instant;
 use xor_name::XorName;
 
 pub(crate) type DkgPubKeys = BTreeMap<XorName, (BlsPublicKey, Signature)>;
@@ -40,6 +41,8 @@ pub(crate) struct DkgVoter {
     /// Once we've got our ephemeral keys, we can go on with DKG with DKG states
     /// keyed by DkgSessionId hash
     dkg_states: HashMap<Digest256, DkgState<bls::rand::rngs::OsRng>>,
+    // last dkg message timestamp
+    last_received_dkg_msg_time: Option<Instant>,
 }
 
 /// Helper that creates a dkg state
@@ -144,6 +147,14 @@ impl DkgVoter {
         Ok((*pub_key, *sig))
     }
 
+    pub(crate) fn last_received_dkg_message(&self) -> Option<Instant> {
+        self.last_received_dkg_msg_time
+    }
+
+    pub(crate) fn learned_something_from_message(&mut self) {
+        self.last_received_dkg_msg_time = Some(Instant::now());
+    }
+
     /// Initializes our DKG state and returns our first vote and dkg keys
     /// If we already have a DKG state, this function does nothing
     pub(crate) fn initialize_dkg_state(
@@ -233,10 +244,10 @@ impl DkgVoter {
             }
         }
 
-        let _did_insert = our_keys.pub_keys.insert(key_owner, (key, sig)).is_some();
+        let did_insert = our_keys.pub_keys.insert(key_owner, (key, sig)).is_some();
         let what_we_have = our_keys.pub_keys.keys().collect::<BTreeSet<_>>();
         let what_we_need = session_id.elders.keys().collect::<BTreeSet<_>>();
-
+        let just_completed = what_we_have == what_we_need;
         debug!(
             "Dkg keys s{}: ours: {:?}, in session_id: {:?}",
             session_id.sum(),
@@ -244,7 +255,10 @@ impl DkgVoter {
             what_we_need,
         );
 
-        Ok(what_we_have == what_we_need)
+        if did_insert {
+            self.learned_something_from_message();
+        }
+        Ok(just_completed)
     }
 
     /// Checks the given keys and returns them
@@ -300,7 +314,7 @@ impl DkgVoter {
         &mut self,
         session_id: &DkgSessionId,
         vote: DkgSignedVote,
-    ) -> Result<VoteResponse> {
+    ) -> Result<(VoteResponse, bool)> {
         match self.dkg_states.get_mut(&session_id.hash()) {
             Some(state) => Ok(state.handle_signed_vote(vote)?),
             None => Err(Error::NoDkgStateForSession(session_id.clone())),
