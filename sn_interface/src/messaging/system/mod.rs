@@ -14,6 +14,9 @@ mod node_msgs;
 mod node_state;
 mod signed;
 
+use super::authority::SectionAuth as SectionAuthProof;
+use crate::messaging::{AuthorityProof, EndUser, MsgId, SectionAuthorityProvider};
+use crate::network_knowledge::SapCandidate;
 pub use agreement::{DkgSessionId, Proposal, SectionAuth};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProof};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
@@ -21,9 +24,6 @@ pub use msg_authority::NodeMsgAuthorityUtils;
 pub use node_msgs::{NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse};
 pub use node_state::{MembershipState, NodeState, RelocateDetails};
 pub use signed::{KeyedSig, SigShare};
-
-use crate::messaging::{EndUser, MsgId, SectionAuthorityProvider};
-use crate::network_knowledge::SapCandidate;
 
 use sn_consensus::{Generation, SignedVote};
 
@@ -97,6 +97,8 @@ pub enum SystemMsg {
     DkgEphemeralPubKey {
         /// The identifier of the DKG session this message is for.
         session_id: DkgSessionId,
+        /// Section authority for the DKG start message
+        section_auth: AuthorityProof<SectionAuthProof>,
         /// The ephemeral bls key chosen by candidate
         pub_key: BlsPublicKey,
         /// The ed25519 signature of the candidate
