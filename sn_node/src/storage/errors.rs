@@ -11,7 +11,7 @@ use sn_interface::{
     types::{convert_dt_error_to_error_msg, PublicKey, ReplicatedDataAddress as DataAddress},
 };
 
-use std::io;
+use std::{io, path::PathBuf};
 use thiserror::Error;
 use xor_name::XorName;
 
@@ -26,9 +26,9 @@ pub enum Error {
     /// Not enough space to store the value.
     #[error("Not enough space")]
     NotEnoughSpace,
-    /// Key not found.
-    #[error("Key not found: {0:?}")]
-    KeyNotFound(String),
+    /// Register not found in local storage.
+    #[error("Rgister not found in storage, expected location: {0}")]
+    RegisterNotFound(PathBuf),
     /// Data not found.
     #[error("No such data: {0:?}")]
     NoSuchData(DataAddress),

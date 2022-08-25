@@ -6,8 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::super::{Result, XorName};
-use super::DataAddress;
+use super::super::{utils, Result, XorName};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
@@ -27,12 +26,6 @@ impl RegisterAddress {
         Self { name, tag }
     }
 
-    /// This is a unique identifier of the Register,
-    /// since it also encodes the tag of the Address.
-    pub fn id(&self) -> Result<XorName> {
-        Ok(XorName::from_content(self.encode_to_zbase32()?.as_bytes()))
-    }
-
     /// Returns the name.
     /// This is not a unique identifier.
     pub fn name(&self) -> &XorName {
@@ -46,6 +39,28 @@ impl RegisterAddress {
 
     /// Returns the Address serialised and encoded in z-base-32.
     pub fn encode_to_zbase32(&self) -> Result<String> {
-        DataAddress::Register(*self).encode_to_zbase32()
+        utils::encode(&self)
+    }
+
+    /// Creates from z-base-32 encoded string.
+    pub fn decode_from_zbase32<T: AsRef<str>>(encoded: T) -> Result<Self> {
+        utils::decode(encoded)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::RegisterAddress;
+    use crate::types::Result;
+    use xor_name::XorName;
+
+    #[test]
+    fn zbase32_encode_decode_register_address() -> Result<()> {
+        let name: XorName = xor_name::rand::random();
+        let address = RegisterAddress::new(name, rand::random());
+        let encoded = address.encode_to_zbase32()?;
+        let decoded = RegisterAddress::decode_from_zbase32(&encoded)?;
+        assert_eq!(address, decoded);
+        Ok(())
     }
 }

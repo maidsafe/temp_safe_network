@@ -23,10 +23,7 @@ use registers::RegisterStorage;
 use sn_dbc::SpentProofShare;
 use sn_interface::{
     messaging::{
-        data::{
-            DataQueryVariant, Error as MessagingError, RegisterQuery, RegisterStoreExport,
-            StorageLevel,
-        },
+        data::{DataQueryVariant, Error as MessagingError, RegisterQuery, StorageLevel},
         system::NodeQueryResponse,
     },
     types::{
@@ -35,7 +32,6 @@ use sn_interface::{
     },
 };
 
-use sn_interface::messaging::data::DataCmd;
 use std::path::Path;
 
 /// Operations on data.
@@ -69,12 +65,10 @@ impl DataStorage {
     ) -> Result<Option<StorageLevel>> {
         debug!("Replicating {data:?}");
         match data.clone() {
-            ReplicatedData::Chunk(chunk) => self.chunks.store(DataCmd::StoreChunk(chunk)).await?,
+            ReplicatedData::Chunk(chunk) => self.chunks.store(chunk).await?,
             ReplicatedData::RegisterLog(data) => {
                 info!("Updating register: {:?}", data.address);
-                self.registers
-                    .update(RegisterStoreExport(vec![data]))
-                    .await?
+                self.registers.update(vec![data]).await?
             }
             ReplicatedData::RegisterWrite(cmd) => self.registers.write(cmd).await?,
             ReplicatedData::SpentbookWrite(cmd) => {
@@ -91,11 +85,7 @@ impl DataStorage {
                 // We now write the cmd received
                 self.registers.write(cmd).await?
             }
-            ReplicatedData::SpentbookLog(data) => {
-                self.registers
-                    .update(RegisterStoreExport(vec![data]))
-                    .await?
-            }
+            ReplicatedData::SpentbookLog(data) => self.registers.update(vec![data]).await?,
         };
 
         // check if we've filled another approx. 10%-points of our storage
@@ -219,13 +209,14 @@ impl DataStorage {
         let mut all_addrs = vec![];
 
         // TODO: Parallelize this below loops
-        let chunk_addrs = self.chunks.addrs();
-        chunk_addrs
+        self.chunks
+            .addrs()
             .into_iter()
-            .for_each(|addr| all_addrs.push(addr));
+            .for_each(|addr| all_addrs.push(ReplicatedDataAddress::Chunk(addr)));
 
-        let reg_addrs = self.registers.addrs().await;
-        reg_addrs
+        self.registers
+            .addrs()
+            .await
             .into_iter()
             .for_each(|addr| all_addrs.push(ReplicatedDataAddress::Register(addr)));
 

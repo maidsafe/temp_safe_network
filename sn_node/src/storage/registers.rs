@@ -12,14 +12,14 @@ use sn_interface::{
     messaging::{
         data::{
             CreateRegister, EditRegister, OperationId, RegisterCmd, RegisterQuery,
-            RegisterStoreExport, ReplicatedRegisterLog, SignedRegisterCreate, SignedRegisterEdit,
+            SignedRegisterCreate, SignedRegisterEdit,
         },
         system::NodeQueryResponse,
         SectionAuth, ServiceAuth, VerifyAuthority,
     },
     types::{
         register::{Action, EntryHash, Permissions, Policy, Register, User},
-        Keypair, PublicKey, RegisterAddress, ReplicatedDataAddress as DataAddress,
+        Keypair, PublicKey, RegisterAddress, ReplicatedDataAddress, ReplicatedRegisterLog,
         SPENTBOOK_TYPE_TAG,
     },
 };
@@ -60,19 +60,16 @@ impl RegisterStorage {
         Ok(Self { file_store })
     }
 
-    #[allow(dead_code)]
     pub(crate) async fn remove_register(&mut self, address: &RegisterAddress) -> Result<()> {
         trace!("Removing register, {:?}", address);
 
-        self.file_store
-            .delete_data(&DataAddress::Register(*address))
-            .await?;
+        self.file_store.delete_register_log(address).await?;
 
         Ok(())
     }
 
     pub(crate) async fn addrs(&self) -> Vec<RegisterAddress> {
-        self.file_store.list_all_reg_addrs().await
+        self.file_store.list_all_registers_addrs().await
     }
 
     /// Used for replication of data to new Adults.
@@ -82,8 +79,8 @@ impl RegisterStorage {
     ) -> Result<ReplicatedRegisterLog> {
         let stored_reg = match self.try_load_stored_register(address).await {
             Ok(stored_reg) => stored_reg,
-            Err(Error::KeyNotFound(_key)) => {
-                return Err(Error::NoSuchData(DataAddress::Register(*address)))
+            Err(Error::RegisterNotFound(_)) => {
+                return Err(Error::NoSuchData(ReplicatedDataAddress::Register(*address)))
             }
             Err(e) => return Err(e),
         };
@@ -133,7 +130,10 @@ impl RegisterStorage {
 
     /// Used for replication of data to new Adults.
     #[cfg(test)]
-    pub(crate) async fn get_data_of(&mut self, prefix: Prefix) -> Result<RegisterStoreExport> {
+    pub(crate) async fn get_data_of(
+        &mut self,
+        prefix: Prefix,
+    ) -> Result<Vec<ReplicatedRegisterLog>> {
         let mut the_data = vec![];
 
         let all_addrs = self.addrs().await;
@@ -147,28 +147,25 @@ impl RegisterStorage {
                         the_data.push(self.create_replica(stored_reg.clone())?);
                     }
                 }
-                Err(Error::KeyNotFound(_)) => return Err(Error::InvalidStore),
+                Err(Error::RegisterNotFound(_)) => return Err(Error::InvalidStore),
                 Err(e) => return Err(e),
             }
         }
 
-        Ok(RegisterStoreExport(the_data))
+        Ok(the_data)
     }
 
     /// On receiving data from Elders when promoted.
-    pub(crate) async fn update(&mut self, store_data: RegisterStoreExport) -> Result<()> {
+    pub(crate) async fn update(&mut self, registers: Vec<ReplicatedRegisterLog>) -> Result<()> {
         debug!("Updating Register store");
-
-        let RegisterStoreExport(registers) = store_data;
 
         // nested loops, slow..
         for data in registers {
-            let key = data.address.id()?;
             for replicated_cmd in data.op_log {
                 if replicated_cmd.dst_address() != data.address {
                     warn!(
-                        "Corrupt ReplicatedRegisterLog, op log contains foreign ops: {}",
-                        key
+                        "Corrupt ReplicatedRegisterLog, op log contains foreign ops: {:?}",
+                        data.address
                     );
                     continue;
                 }
@@ -230,10 +227,8 @@ impl RegisterStorage {
                     .verify_authority(serialize(&op)?)
                     .or(Err(Error::InvalidSignature(public_key)))?;
 
-                if self
-                    .file_store
-                    .data_file_exists(&DataAddress::Register(address))?
-                {
+                let reg_filepath = self.file_store.register_addr_to_filepath(&address)?;
+                if reg_filepath.exists() {
                     return Err(Error::DataExists);
                 }
 
@@ -341,8 +336,8 @@ impl RegisterStorage {
     ) -> Result<Register> {
         let stored_reg = match self.try_load_stored_register(address).await {
             Ok(stored_reg) => stored_reg,
-            Err(Error::KeyNotFound(_key)) => {
-                return Err(Error::NoSuchData(DataAddress::Register(*address)))
+            Err(Error::RegisterNotFound(_)) => {
+                return Err(Error::NoSuchData(ReplicatedDataAddress::Register(*address)))
             }
             Err(e) => return Err(e),
         };
@@ -506,7 +501,7 @@ impl RegisterStorage {
         }
 
         match hydrated_register {
-            None => Err(Error::KeyNotFound(addr.id()?.to_string())),
+            None => Err(Error::RegisterNotFound(ops_log_path)),
             Some((mut state, section_auth)) => {
                 // apply any queued RegisterEdit op
                 for op in queued {

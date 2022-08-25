@@ -10,12 +10,9 @@ use super::{Error, Result};
 
 use crate::UsedSpace;
 
-use sn_interface::{
-    messaging::data::DataCmd,
-    types::{
-        utils::{deserialise, serialise},
-        Chunk, RegisterAddress, RegisterCmd, RegisterCmdId, ReplicatedDataAddress as DataAddress,
-    },
+use sn_interface::types::{
+    utils::{deserialise, serialise},
+    Chunk, ChunkAddress, RegisterAddress, RegisterCmd, RegisterCmdId,
 };
 
 use bytes::Bytes;
@@ -54,65 +51,47 @@ impl FileStore {
         })
     }
 
-    // ---------------------- helper methods ----------------------
+    pub(crate) fn chunk_addr_to_filepath(&self, addr: &ChunkAddress) -> Result<PathBuf> {
+        let xorname = *addr.name();
+        let mut path = self.prefix_tree_path(xorname, self.bit_tree_depth);
 
-    // Helper that returns the prefix tree path of depth `bit_count` for a given xorname
-    // Example:
-    // - with a xorname with starting bits `010001110110....`
-    // - and a bit_count of `6`
-    // returns the path `FILE_STORE_PATH/0/1/0/0/0/1`
-    // If the provided bit count is larger than `self.bit_tree_depth`, uses `self.bit_tree_depth`
-    // to stay within the prefix tree path
-    fn prefix_tree_path(&self, xorname: XorName, bit_count: usize) -> PathBuf {
-        let bin = format!("{:b}", xorname);
-        let prefix_dir_path: PathBuf = bin
-            .chars()
-            .take(std::cmp::min(bit_count, self.bit_tree_depth))
-            .map(|c| format!("{}", c))
-            .collect();
-
-        let mut path = self.file_store_path.clone();
-        path.push(prefix_dir_path);
-        path
-    }
-
-    fn address_to_filepath(&self, addr: &DataAddress) -> Result<PathBuf> {
-        let path = if let DataAddress::Register(reg_addr) = addr {
-            let reg_id = reg_addr.id()?;
-            let path = self.prefix_tree_path(reg_id, self.bit_tree_depth);
-            // we need to append a folder for the file specifically so bit depth is an issue when low.
-            // we use hex to get full id, not just first bytes
-            path.join(format!("{:X}", reg_id))
-        } else {
-            let xorname = *addr.name();
-            let mut path = self.prefix_tree_path(xorname, self.bit_tree_depth);
-
-            let filename = addr.encode_to_zbase32()?;
-            path.push(filename);
-            path
-        };
+        let filename = addr.encode_to_zbase32()?;
+        path.push(filename);
 
         Ok(path)
     }
 
-    pub(crate) fn list_all_chunk_addrs(&self) -> Vec<DataAddress> {
+    pub(crate) fn register_addr_to_filepath(&self, addr: &RegisterAddress) -> Result<PathBuf> {
+        // This is a unique identifier of the Register,
+        // since it also encodes the tag of the Address.
+        let reg_id = XorName::from_content(addr.encode_to_zbase32()?.as_bytes());
+
+        let mut path = self.prefix_tree_path(reg_id, self.bit_tree_depth);
+        // we need to append a folder for the file specifically so bit depth is an issue when low.
+        // we use hex to get full id, not just first bytes
+        path.push(format!("{:X}", reg_id));
+
+        Ok(path)
+    }
+
+    pub(crate) fn list_all_chunk_addrs(&self) -> Vec<ChunkAddress> {
         self.list_all_files()
             .iter()
             .filter_map(|filepath| Self::chunk_filepath_to_address(filepath).ok())
             .collect()
     }
 
-    fn chunk_filepath_to_address(path: &Path) -> Result<DataAddress> {
+    fn chunk_filepath_to_address(path: &Path) -> Result<ChunkAddress> {
         let filename = path
             .file_name()
             .ok_or(Error::NoFilename)?
             .to_str()
             .ok_or(Error::InvalidFilename)?;
 
-        Ok(DataAddress::decode_from_zbase32(filename)?)
+        Ok(ChunkAddress::decode_from_zbase32(filename)?)
     }
 
-    pub(crate) async fn list_all_reg_addrs(&self) -> Vec<RegisterAddress> {
+    pub(crate) async fn list_all_registers_addrs(&self) -> Vec<RegisterAddress> {
         let iter = list_files_in(&self.file_store_path)
             .into_iter()
             .filter_map(|e| e.parent().map(|parent| (parent.to_path_buf(), e.clone())));
@@ -132,15 +111,13 @@ impl FileStore {
         addrs.into_iter().map(|(_, addr)| addr).collect()
     }
 
-    // ---------------------- api methods ----------------------
-
     pub(crate) fn can_add(&self, size: usize) -> bool {
         self.used_space.can_add(size)
     }
 
-    pub(crate) async fn write_data(&self, data: DataCmd) -> Result<DataAddress> {
-        let addr = data.address();
-        let filepath = self.address_to_filepath(&addr)?;
+    pub(crate) async fn write_chunk_data(&self, chunk: Chunk) -> Result<()> {
+        let addr = chunk.address();
+        let filepath = self.chunk_addr_to_filepath(addr)?;
         if let Some(dirs) = filepath.parent() {
             create_dir_all(dirs).await?;
         }
@@ -148,38 +125,31 @@ impl FileStore {
         let mut file = File::create(filepath).await?;
 
         // Only chunk go through here
-        if let DataCmd::StoreChunk(chunk) = data {
-            file.write_all(chunk.value()).await?;
-            self.used_space.increase(chunk.value().len());
-        }
+        file.write_all(chunk.value()).await?;
+        self.used_space.increase(chunk.value().len());
 
-        Ok(addr)
+        Ok(())
     }
 
-    #[allow(dead_code)]
-    pub(crate) async fn delete_data(&self, addr: &DataAddress) -> Result<()> {
-        let filepath = self.address_to_filepath(addr)?;
-        let meta = metadata(filepath.clone()).await?;
+    pub(crate) async fn delete_chunk_data(&self, addr: &ChunkAddress) -> Result<()> {
+        let filepath = self.chunk_addr_to_filepath(addr)?;
+        let meta = metadata(&filepath).await?;
         remove_file(filepath).await?;
         self.used_space.decrease(meta.len() as usize);
         Ok(())
     }
 
-    pub(crate) async fn read_data(&self, addr: &DataAddress) -> Result<Chunk> {
-        let file_path = self.address_to_filepath(addr)?;
+    pub(crate) async fn read_chunk_data(&self, addr: &ChunkAddress) -> Result<Chunk> {
+        let file_path = self.chunk_addr_to_filepath(addr)?;
         let bytes = Bytes::from(read(file_path).await?);
         let chunk = Chunk::new(bytes);
         Ok(chunk)
     }
 
-    pub(crate) fn data_file_exists(&self, addr: &DataAddress) -> Result<bool> {
-        let filepath = self.address_to_filepath(addr)?;
-        Ok(filepath.exists())
-    }
-
     pub(crate) fn list_all_files(&self) -> Vec<PathBuf> {
         list_files_in(&self.file_store_path)
     }
+
     #[allow(unused)]
     /// quickly find chunks related or not to a section, might be useful when adults change sections
     /// not used yet
@@ -206,7 +176,7 @@ impl FileStore {
     ) -> Result<(RegisterLog, PathBuf)> {
         let mut register_log = RegisterLog::new();
 
-        let path = self.address_to_filepath(&DataAddress::Register(*addr))?;
+        let path = self.register_addr_to_filepath(addr)?;
         if path.exists() {
             trace!("Register log path exists: {}", path.display());
             for filepath in list_files_in(&path) {
@@ -266,8 +236,39 @@ impl FileStore {
         trace!("RegisterCmd writing successful for id {reg_id}");
         Ok(())
     }
+
+    pub(crate) async fn delete_register_log(&self, addr: &RegisterAddress) -> Result<()> {
+        let filepath = self.register_addr_to_filepath(addr)?;
+        let meta = metadata(&filepath).await?;
+        remove_file(filepath).await?;
+        self.used_space.decrease(meta.len() as usize);
+        Ok(())
+    }
+
+    // ---------------------- helper methods ----------------------
+
+    // Helper that returns the prefix tree path of depth `bit_count` for a given xorname
+    // Example:
+    // - with a xorname with starting bits `010001110110....`
+    // - and a bit_count of `6`
+    // returns the path `FILE_STORE_PATH/0/1/0/0/0/1`
+    // If the provided bit count is larger than `self.bit_tree_depth`, uses `self.bit_tree_depth`
+    // to stay within the prefix tree path
+    fn prefix_tree_path(&self, xorname: XorName, bit_count: usize) -> PathBuf {
+        let bin = format!("{:b}", xorname);
+        let prefix_dir_path: PathBuf = bin
+            .chars()
+            .take(std::cmp::min(bit_count, self.bit_tree_depth))
+            .map(|c| format!("{}", c))
+            .collect();
+
+        let mut path = self.file_store_path.clone();
+        path.push(prefix_dir_path);
+        path
+    }
 }
 
+// Recuresively search for files within the provided path, returning them in a list
 fn list_files_in(path: &Path) -> Vec<PathBuf> {
     if !path.exists() {
         return vec![];
@@ -310,12 +311,15 @@ mod tests {
         for _ in 0..10 {
             let chunk = Chunk::new(random_bytes(100));
 
-            let addr = store
-                .write_data(DataCmd::StoreChunk(chunk.clone()))
+            store
+                .write_chunk_data(chunk.clone())
                 .await
                 .expect("Failed to write chunk.");
 
-            let read_chunk = store.read_data(&addr).await.expect("Failed to read chunk.");
+            let read_chunk = store
+                .read_chunk_data(chunk.address())
+                .await
+                .expect("Failed to read chunk.");
 
             assert_eq!(chunk.value(), read_chunk.value());
         }
@@ -342,13 +346,22 @@ mod tests {
 
     async fn write_and_read_chunks(chunks: &[Chunk], store: FileStore) {
         // write all chunks
-        let tasks = chunks
-            .iter()
-            .map(|c| store.write_data(DataCmd::StoreChunk(c.clone())));
+        let mut tasks = Vec::new();
+        for c in chunks.iter() {
+            tasks.push(async {
+                store
+                    .write_chunk_data(c.clone())
+                    .await
+                    .map(|_| *c.address())
+            });
+        }
         let results = join_all(tasks).await;
 
         // read all chunks
-        let tasks = results.iter().flatten().map(|addr| store.read_data(addr));
+        let tasks = results
+            .iter()
+            .flatten()
+            .map(|addr| store.read_chunk_data(addr));
         let results = join_all(tasks).await;
         let read_chunks: Vec<&Chunk> = results.iter().flatten().collect();
 

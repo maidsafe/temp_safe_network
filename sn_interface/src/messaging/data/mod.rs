@@ -17,10 +17,7 @@ mod spentbook;
 
 pub use self::{
     cmd::DataCmd,
-    data_exchange::{
-        MetadataExchange, RegisterStoreExport, ReplicatedRegisterLog, ReplicatedSpentbookLog,
-        SpentbookStoreExport, StorageLevel,
-    },
+    data_exchange::{MetadataExchange, StorageLevel},
     errors::{Error, Result},
     query::DataQuery,
     query::DataQueryVariant,

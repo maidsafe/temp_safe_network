@@ -42,16 +42,6 @@ impl DataAddress {
         }
     }
 
-    /// Returns the Address serialised and encoded in z-base-32.
-    pub fn encode_to_zbase32(&self) -> Result<String> {
-        utils::encode(&self)
-    }
-
-    /// Creates from z-base-32 encoded string.
-    pub fn decode_from_zbase32<T: AsRef<str>>(encoded: T) -> Result<Self> {
-        utils::decode(encoded)
-    }
-
     ///
     pub fn register(name: XorName, tag: u64) -> DataAddress {
         DataAddress::Register(RegisterAddress::new(name, tag))
@@ -93,16 +83,6 @@ impl ReplicatedDataAddress {
             Self::Spentbook(address) => address.name(),
         }
     }
-
-    /// Returns the Address serialised and encoded in z-base-32.
-    pub fn encode_to_zbase32(&self) -> Result<String> {
-        utils::encode(&self)
-    }
-
-    /// Creates from z-base-32 encoded string.
-    pub fn decode_from_zbase32<T: AsRef<str>>(encoded: T) -> Result<Self> {
-        utils::decode(encoded)
-    }
 }
 
 /// Address of a Chunk.
@@ -128,19 +108,9 @@ impl ChunkAddress {
 
 #[cfg(test)]
 mod tests {
-    use crate::types::{ChunkAddress, DataAddress, Result};
+    use super::ChunkAddress;
+    use crate::types::Result;
     use xor_name::XorName;
-
-    #[test]
-    fn zbase32_encode_decode_data_address() -> Result<()> {
-        let name: XorName = xor_name::rand::random();
-        let chunk_addr = ChunkAddress(name);
-        let address = DataAddress::Bytes(chunk_addr);
-        let encoded = address.encode_to_zbase32()?;
-        let decoded = DataAddress::decode_from_zbase32(&encoded)?;
-        assert_eq!(address, decoded);
-        Ok(())
-    }
 
     #[test]
     fn zbase32_encode_decode_chunk_address() -> Result<()> {
