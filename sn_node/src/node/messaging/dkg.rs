@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
+    core::DkgSessionInfo,
     dkg::{check_key, DkgPubKeys},
     flow_ctrl::cmds::Cmd,
     messaging::{OutgoingMsg, Peers},
@@ -19,7 +20,7 @@ use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         system::{DkgSessionId, SigShare, SystemMsg},
-        AuthorityProof, BlsShareAuth, NodeMsgAuthority, WireMsg,
+        AuthorityProof, BlsShareAuth, NodeMsgAuthority, SectionAuth, WireMsg,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
     types::{self, log_markers::LogMarker, Peer},
@@ -213,6 +214,14 @@ impl Node {
         // assert people can check key
         assert!(check_key(&session_id, our_name, ephemeral_pub_key, sig).is_ok());
 
+        // get original auth (as proof for those who missed the original DkgStart msg)
+        let section_auth = self
+            .dkg_sessions_info
+            .get(&session_id.hash())
+            .ok_or(Error::InvalidState)?
+            .authority
+            .clone();
+
         // broadcast signed pub key
         trace!(
             "{} s{} from {our_id:?}",
@@ -222,6 +231,7 @@ impl Node {
         let peers = dkg_peers(our_id, &session_id);
         let node_msg = SystemMsg::DkgEphemeralPubKey {
             session_id,
+            section_auth,
             pub_key: ephemeral_pub_key,
             sig,
         };
@@ -230,9 +240,68 @@ impl Node {
         Ok(vec![cmd])
     }
 
+    fn handle_missed_dkg_start(
+        &mut self,
+        session_id: &DkgSessionId,
+        section_auth: AuthorityProof<SectionAuth>,
+        pub_key: BlsPublicKey,
+        sig: Signature,
+        sender: Peer,
+    ) -> Result<Vec<Cmd>> {
+        trace!(
+            "Detected missed dkg start for s{:?} after msg from {sender:?}",
+            session_id.sum()
+        );
+
+        // reconstruct the original DKG start message and verify the section signature
+        let payload = WireMsg::serialize_msg_payload(&SystemMsg::DkgStart(session_id.clone()))?;
+        let auth = section_auth.clone().into_inner();
+        if self.network_knowledge.section_key() != auth.sig.public_key {
+            warn!(
+                "Invalid section key in dkg auth proof in s{:?}: {sender:?}",
+                session_id.sum()
+            );
+            return Ok(vec![]);
+        }
+        if let Err(err) = AuthorityProof::verify(auth, payload) {
+            error!(
+                "Invalid signature in dkg auth proof in s{:?}: {err:?}",
+                session_id.sum()
+            );
+            return Ok(vec![]);
+        }
+
+        // acknowledge Dkg Session
+        info!(
+            "Handling missed dkg start for s{:?} after msg from {sender:?}",
+            session_id.sum()
+        );
+        self.log_dkg_session(&sender.name());
+        let session_info = DkgSessionInfo {
+            session_id: session_id.clone(),
+            authority: section_auth.clone(),
+        };
+        let _existing = self
+            .dkg_sessions_info
+            .insert(session_id.hash(), session_info);
+
+        // catch back up
+        let mut cmds = vec![];
+        cmds.extend(self.handle_dkg_start(session_id.clone())?);
+        cmds.extend(self.handle_dkg_ephemeral_pubkey(
+            session_id,
+            section_auth,
+            pub_key,
+            sig,
+            sender,
+        )?);
+        Ok(cmds)
+    }
+
     pub(crate) fn handle_dkg_ephemeral_pubkey(
         &mut self,
         session_id: &DkgSessionId,
+        section_auth: AuthorityProof<SectionAuth>,
         pub_key: BlsPublicKey,
         sig: Signature,
         sender: Peer,
@@ -256,6 +325,15 @@ impl Node {
                 .try_init_dkg(session_id, our_id, pub_key, sig, sender.name())
             {
                 Ok(o) => o,
+                Err(Error::NoDkgKeysForSession(_)) => {
+                    return self.handle_missed_dkg_start(
+                        session_id,
+                        section_auth,
+                        pub_key,
+                        sig,
+                        sender,
+                    );
+                }
                 Err(e) => {
                     error!(
                         "Failed to init DKG s{} id:{our_id:?}: {:?}",
@@ -465,6 +543,19 @@ impl Node {
             }
         };
 
+        // get original auth (as proof for those who missed the original DkgStart msg)
+        let section_info = match self.dkg_sessions_info.get(&session_id.hash()) {
+            Some(auth) => auth,
+            None => {
+                warn!(
+                    "Unexpectedly missing dkg section info when gossiping s{}",
+                    session_id.sum()
+                );
+                return vec![];
+            }
+        };
+        let section_auth = section_info.authority.clone();
+
         trace!(
             "{} s{}: gossiping ephemeral key",
             LogMarker::DkgBroadcastVote,
@@ -475,6 +566,7 @@ impl Node {
         let peers = dkg_peers(our_id, &session_id);
         let node_msg = SystemMsg::DkgEphemeralPubKey {
             session_id,
+            section_auth,
             pub_key: *pub_key,
             sig: *sig,
         };
@@ -486,24 +578,24 @@ impl Node {
     /// participants if we don't have any votes yet, sends out our ephemeral key
     pub(crate) fn dkg_gossip_msgs(&self) -> Vec<Cmd> {
         let mut cmds = vec![];
-        for (_hash, session_id) in self.dkg_sessions_info.iter() {
+        for (_hash, session_info) in self.dkg_sessions_info.iter() {
             // get our id
             let name = types::keys::ed25519::name(&self.keypair.public);
-            let our_id = if let Some(index) = session_id.elder_index(name) {
+            let our_id = if let Some(index) = session_info.session_id.elder_index(name) {
                 index
             } else {
                 error!(
                     "DKG failed gossip in s{}: {name} is not a participant",
-                    session_id.sum()
+                    session_info.session_id.sum()
                 );
                 continue;
             };
 
             // gossip votes else gossip our key
-            if let Ok(votes) = self.dkg_voter.get_all_votes(session_id) {
-                cmds.extend(self.gossip_votes(session_id.clone(), votes, our_id));
+            if let Ok(votes) = self.dkg_voter.get_all_votes(&session_info.session_id) {
+                cmds.extend(self.gossip_votes(session_info.session_id.clone(), votes, our_id));
             } else {
-                cmds.extend(self.gossip_our_key(session_id.clone(), name, our_id));
+                cmds.extend(self.gossip_our_key(session_info.session_id.clone(), name, our_id));
             }
         }
         cmds

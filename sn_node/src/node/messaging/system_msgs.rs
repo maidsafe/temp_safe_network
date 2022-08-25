@@ -9,6 +9,7 @@
 use crate::{
     comm::Comm,
     node::{
+        core::DkgSessionInfo,
         flow_ctrl::cmds::Cmd,
         messaging::{OutgoingMsg, Peers},
         Error, Event, MembershipEvent, Node, Proposal as CoreProposal, Result, MIN_LEVEL_WHEN_FULL,
@@ -319,19 +320,20 @@ impl Node {
                     sender
                 );
                 self.log_dkg_session(&sender.name());
-                let our_name = self.info().name();
-                if !session_id.contains_elder(our_name) {
-                    return Ok(vec![]);
-                }
-                if let NodeMsgAuthority::Section(_authority) = msg_authority {
+                if let NodeMsgAuthority::Section(authority) = msg_authority {
+                    let session_info = DkgSessionInfo {
+                        session_id: session_id.clone(),
+                        authority,
+                    };
                     let _existing = self
                         .dkg_sessions_info
-                        .insert(session_id.hash(), session_id.clone());
+                        .insert(session_id.hash(), session_info);
                 }
                 self.handle_dkg_start(session_id)
             }
             SystemMsg::DkgEphemeralPubKey {
                 session_id,
+                section_auth,
                 pub_key,
                 sig,
             } => {
@@ -341,7 +343,7 @@ impl Node {
                     session_id.sum(),
                     sender
                 );
-                self.handle_dkg_ephemeral_pubkey(&session_id, pub_key, sig, sender)
+                self.handle_dkg_ephemeral_pubkey(&session_id, section_auth, pub_key, sig, sender)
             }
             SystemMsg::DkgVotes {
                 session_id,

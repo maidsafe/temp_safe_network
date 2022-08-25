@@ -87,7 +87,8 @@ mod core {
     };
     use sn_dysfunction::{DysfunctionDetection, IssueType};
     #[cfg(feature = "traceroute")]
-    use sn_interface::messaging::Entity;
+    use sn_interface::messaging::{AuthorityProof, Entity, SectionAuth};
+
     use sn_interface::{
         messaging::{
             data::OperationId,
@@ -146,6 +147,12 @@ mod core {
     // the section).
     const DATA_QUERY_TIMEOUT: Duration = Duration::from_secs(15);
 
+    #[derive(Debug, Clone)]
+    pub(crate) struct DkgSessionInfo {
+        pub(crate) session_id: DkgSessionId,
+        pub(crate) authority: AuthorityProof<SectionAuth>,
+    }
+
     // Store up to 100 in use backoffs
     pub(crate) type AeBackoffCache = LRUCache<(Peer, ExponentialBackoff), BACKOFF_CACHE_LIMIT>;
 
@@ -168,7 +175,7 @@ mod core {
         pub(crate) proposal_aggregator: SignatureAggregator,
         // DKG/Split/Churn modules
         pub(crate) split_barrier: SplitBarrier,
-        pub(crate) dkg_sessions_info: HashMap<Digest256, DkgSessionId>,
+        pub(crate) dkg_sessions_info: HashMap<Digest256, DkgSessionInfo>,
         pub(crate) dkg_voter: DkgVoter,
         pub(crate) relocate_state: Option<Box<JoiningAsRelocated>>,
         // ======================== Elder only ========================
@@ -551,8 +558,8 @@ mod core {
             // clean up old DKG sessions
             let old_chain_len = self.network_knowledge.chain_len();
             let mut old_hashes = vec![];
-            for (hash, session_id) in self.dkg_sessions_info.iter() {
-                if session_id.section_chain_len <= old_chain_len {
+            for (hash, session_info) in self.dkg_sessions_info.iter() {
+                if session_info.session_id.section_chain_len <= old_chain_len {
                     old_hashes.push(*hash);
                 }
             }
