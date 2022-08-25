@@ -59,6 +59,7 @@ impl DataStorage {
         keypair_for_spent_book: Keypair,
     ) -> Result<Option<StorageLevel>> {
         debug!("Replicating {data:?}");
+        println!("Replicating {:?}", data.address());
         match data.clone() {
             ReplicatedData::Chunk(chunk) => self.chunks.store(DataCmd::StoreChunk(chunk)).await?,
             ReplicatedData::RegisterLog(data) => {

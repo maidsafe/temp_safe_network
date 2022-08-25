@@ -82,6 +82,10 @@ impl ChunkStorage {
                 self,
                 data.address()
             );
+
+            let x = self.file_store.read_data(&data.address()).await?;
+
+            println!("chunk exists was: {:?}", x.value());
             // Nothing more to do here
             return Err(Error::DataExists);
         }

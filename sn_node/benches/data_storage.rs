@@ -80,7 +80,7 @@ fn main() -> Result<()> {
     let mut criterion = custom_criterion();
 
     bench_data_storage_writes(&mut criterion)?;
-    bench_data_storage_reads(&mut criterion)?;
+    // bench_data_storage_reads(&mut criterion)?;
 
     Ok(())
 }
@@ -94,30 +94,30 @@ fn bench_data_storage_writes(c: &mut Criterion) -> Result<()> {
     let runtime = Runtime::new().unwrap();
     pub const NONSENSE_CHUNK_SIZE: usize = 1024; // data size should not be important for keys() tests
 
-    let size_ranges = [100, 1_000, 4_000];
+    let size_ranges = [40_000];
 
-    for size in size_ranges.iter() {
-        let data_set: Vec<_> = (0..*size)
-            .map(|_| create_random_register_replicated_data())
-            .collect();
-        group.bench_with_input(
-            BenchmarkId::new("register_writes", size),
-            &(size, &data_set),
-            |b, (size, data_set)| {
-                let storage = get_new_data_store()
-                    .context("Could not create a temp data store")
-                    .unwrap();
-                b.to_async(&runtime).iter(|| async {
-                    for i in 0..**size {
-                        let _ = storage
-                            .clone()
-                            .store(&data_set[i], pk, keypair.clone())
-                            .await;
-                    }
-                })
-            },
-        );
-    }
+    // for size in size_ranges.iter() {
+    //     let data_set: Vec<_> = (0..*size)
+    //         .map(|_| create_random_register_replicated_data())
+    //         .collect();
+    //     group.bench_with_input(
+    //         BenchmarkId::new("register_writes", size),
+    //         &(size, &data_set),
+    //         |b, (size, data_set)| {
+    //             let storage = get_new_data_store()
+    //                 .context("Could not create a temp data store")
+    //                 .unwrap();
+    //             b.to_async(&runtime).iter(|| async {
+    //                 for i in 0..**size {
+    //                     let _ = storage
+    //                         .clone()
+    //                         .store(&data_set[i], pk, keypair.clone())
+    //                         .await;
+    //                 }
+    //             })
+    //         },
+    //     );
+    // }
 
     for size in size_ranges.iter() {
         let seed = random_vector(NONSENSE_CHUNK_SIZE);
@@ -130,13 +130,16 @@ fn bench_data_storage_writes(c: &mut Criterion) -> Result<()> {
                     .unwrap();
                 b.to_async(&runtime).iter(|| async {
                     for _ in 0..**size {
+                        let the_chunk = Chunk::new(grows_vec_to_bytes(seed));
                         let random_data =
-                            ReplicatedData::Chunk(Chunk::new(grows_vec_to_bytes(seed)));
-                        storage
+                            ReplicatedData::Chunk(the_chunk.clone());
+                        if let Err(error) = storage
                             .clone()
                             .store(&random_data, pk, keypair.clone())
-                            .await
-                            .expect("failed to write chunk {i}");
+                            .await {
+                                println!("dodgy chunk : {:?}", the_chunk.value());
+                                panic!("Could not write chunk {:?}, due to error {error:?}", random_data.address());
+                            }
                     }
                 })
             },

@@ -174,6 +174,8 @@ impl FileStore {
 
     pub(crate) fn data_file_exists(&self, addr: &DataAddress) -> Result<bool> {
         let filepath = self.address_to_filepath(addr)?;
+
+        println!("==> {filepath:?}");
         Ok(filepath.exists())
     }
 
