@@ -92,7 +92,7 @@ impl Session {
         let _ = self.pending_cmds.insert(msg_id, sender);
         trace!("Inserted channel for cmd {:?}", msg_id);
 
-        self.send_msg(elders, wire_msg, msg_id).await?;
+        Self::send_msg_in_bg(self.clone(), elders, wire_msg, msg_id)?;
 
         let expected_acks = elders_len * 2 / 3 + 1;
 
@@ -224,8 +224,7 @@ impl Session {
         #[cfg(feature = "traceroute")]
         wire_msg.append_trace(&mut Traceroute(vec![Entity::Client(client_pk)]));
 
-        self.clone()
-            .send_msg_in_bg(elders.clone(), wire_msg, msg_id)?;
+        Self::send_msg_in_bg(self.clone(), elders.clone(), wire_msg, msg_id)?;
 
         // TODO:
         // We are now simply accepting the very first valid response we receive,
@@ -354,8 +353,7 @@ impl Session {
             .take(NODES_TO_CONTACT_PER_STARTUP_BATCH)
             .collect();
 
-        self.clone()
-            .send_msg_in_bg(initial_contacts, wire_msg.clone(), msg_id)?;
+        Self::send_msg_in_bg(self.clone(), initial_contacts, wire_msg.clone(), msg_id)?;
 
         let mut knowledge_checks = 0;
         let mut outgoing_msg_rounds = 1;
@@ -422,8 +420,7 @@ impl Session {
                 };
 
                 trace!("Sending out another batch of initial contact msgs to new nodes");
-                self.clone()
-                    .send_msg_in_bg(next_contacts, wire_msg.clone(), msg_id)?;
+                Self::send_msg_in_bg(self.clone(), next_contacts, wire_msg.clone(), msg_id)?;
 
                 let next_wait = backoff.next_backoff();
                 trace!(
@@ -520,7 +517,7 @@ impl Session {
     #[instrument(skip_all, level = "trace")]
     /// Pushes a send_msg call into a background thread. Errors will be logged
     pub(super) fn send_msg_in_bg(
-        self,
+        session: Self,
         nodes: Vec<Peer>,
         wire_msg: WireMsg,
         msg_id: MsgId,
@@ -528,7 +525,7 @@ impl Session {
         trace!("Sending client message in bg thread so as not to block");
 
         let _handle = tokio::spawn(async move {
-            let send_res = self.send_msg(nodes, wire_msg, msg_id).await;
+            let send_res = session.send_msg(nodes, wire_msg, msg_id).await;
 
             if send_res.is_err() {
                 error!("Error sending msg in the bg: {:?}", send_res);
