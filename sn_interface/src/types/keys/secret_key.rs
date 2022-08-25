@@ -105,8 +105,9 @@ pub mod test_utils {
     }
 
     impl SecretKeySet {
-        pub fn random() -> Self {
-            let poly = bls::poly::Poly::random(threshold(), &mut rand::thread_rng());
+        pub fn random(threshold_size: Option<usize>) -> Self {
+            let threshold_size = threshold_size.unwrap_or_else(threshold);
+            let poly = bls::poly::Poly::random(threshold_size, &mut rand::thread_rng());
             let key = bls::SecretKey::from_mut(&mut poly.evaluate(0));
             let set = bls::SecretKeySet::from(poly);
 

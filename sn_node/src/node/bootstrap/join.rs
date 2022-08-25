@@ -548,7 +548,8 @@ mod tests {
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
-        let (section_auth, mut nodes, sk_set) = random_sap(Prefix::default(), elder_count());
+        let (section_auth, mut nodes, sk_set) =
+            random_sap(Prefix::default(), elder_count(), 0, None);
         let bootstrap_node = nodes.remove(0);
         let bootstrap_addr = bootstrap_node.addr;
         let sk = sk_set.secret_key();
@@ -664,7 +665,7 @@ mod tests {
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
-        let (_, mut nodes, sk_set) = random_sap(Prefix::default(), elder_count());
+        let (_, mut nodes, sk_set) = random_sap(Prefix::default(), elder_count(), 0, None);
         let bootstrap_node = nodes.remove(0);
         let genesis_key = sk_set.secret_key().public_key();
 
@@ -698,7 +699,8 @@ mod tests {
                 .map(|_| (xor_name::rand::random(), gen_addr()))
                 .collect();
 
-            let (new_section_auth, _, new_sk_set) = random_sap(Prefix::default(), elder_count());
+            let (new_section_auth, _, new_sk_set) =
+                random_sap(Prefix::default(), elder_count(), 0, None);
             let new_pk_set = new_sk_set.public_keys();
 
             send_response(
@@ -761,7 +763,7 @@ mod tests {
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
-        let (_, mut nodes, sk_set) = random_sap(Prefix::default(), elder_count());
+        let (_, mut nodes, sk_set) = random_sap(Prefix::default(), elder_count(), 0, None);
         let bootstrap_node = nodes.remove(0);
 
         let node = NodeInfo::new(
@@ -781,7 +783,8 @@ mod tests {
             assert_matches!(wire_msg.into_msg(), Ok(MsgType::System { msg, .. }) =>
             assert_matches!(msg, SystemMsg::JoinRequest{..}));
 
-            let (new_section_auth, _, new_sk_set) = random_sap(Prefix::default(), elder_count());
+            let (new_section_auth, _, new_sk_set) =
+                random_sap(Prefix::default(), elder_count(), 0, None);
             let new_pk_set = new_sk_set.public_keys();
 
             send_response(
@@ -842,7 +845,8 @@ mod tests {
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
-        let (section_auth, mut nodes, sk_set) = random_sap(Prefix::default(), elder_count());
+        let (section_auth, mut nodes, sk_set) =
+            random_sap(Prefix::default(), elder_count(), 0, None);
         let bootstrap_node = nodes.remove(0);
 
         let node = NodeInfo::new(
@@ -913,7 +917,7 @@ mod tests {
             }
         };
 
-        let (section_auth, _, sk_set) = random_sap(good_prefix, elder_count());
+        let (section_auth, _, sk_set) = random_sap(good_prefix, elder_count(), 0, None);
         let section_key = sk_set.public_keys().public_key();
 
         let state = Joiner::new(node, send_tx, &mut recv_rx, SectionTree::new(section_key));
@@ -948,7 +952,7 @@ mod tests {
             send_response(
                 &recv_tx,
                 JoinResponse::Retry {
-                    section_auth: random_sap(bad_prefix, elder_count()).0.to_msg(),
+                    section_auth: random_sap(bad_prefix, elder_count(), 0, None).0.to_msg(),
                     section_signed: signed_sap.sig.clone(),
                     proof_chain: section_chain.clone(),
                     expected_age: MIN_ADULT_AGE,

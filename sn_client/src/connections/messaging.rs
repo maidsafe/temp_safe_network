@@ -708,7 +708,7 @@ mod tests {
         let elders_len = 5;
 
         let prefix = prefix("0")?;
-        let (section_auth, _, secret_key_set) = random_sap(prefix, elders_len);
+        let (section_auth, _, secret_key_set) = random_sap(prefix, elders_len, 0, None);
         let sap0 = section_signed(secret_key_set.secret_key(), section_auth)?;
         let (mut network_contacts, _genesis_sk, _) = new_network_network_contacts();
         assert!(network_contacts.insert_without_chain(sap0));

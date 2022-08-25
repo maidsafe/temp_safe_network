@@ -668,7 +668,8 @@ mod tests {
             let prefix1 = Prefix::default().pushed(true);
 
             // generate a SAP for prefix0
-            let (section_auth, mut nodes, secret_key_set) = random_sap(prefix0, elder_count());
+            let (section_auth, mut nodes, secret_key_set) =
+                random_sap(prefix0, elder_count(), 0, None);
             let info = nodes.remove(0);
             let sap_sk = secret_key_set.secret_key();
             let signed_sap = section_signed(sap_sk, section_auth)?;
@@ -707,7 +708,7 @@ mod tests {
             );
 
             // generate other SAP for prefix1
-            let (other_sap, _, secret_key_set) = random_sap(prefix1, elder_count());
+            let (other_sap, _, secret_key_set) = random_sap(prefix1, elder_count(), 0, None);
             let other_sap_sk = secret_key_set.secret_key();
             let other_sap = section_signed(other_sap_sk, other_sap)?;
             // generate a proof chain for this other SAP
