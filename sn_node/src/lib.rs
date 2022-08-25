@@ -43,9 +43,9 @@ extern crate tracing;
 
 mod comm;
 
-mod dbs;
+mod storage;
 
-pub use dbs::UsedSpace;
+pub use storage::UsedSpace;
 
 pub mod node;
 

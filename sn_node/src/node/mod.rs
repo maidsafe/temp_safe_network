@@ -46,7 +46,6 @@ use self::{
 };
 pub use self::{
     cfg::config_handler::Config,
-    data::DataStorage,
     error::{Error, Result},
     flow_ctrl::{
         event::{Event, MembershipEvent, MessagingEvent, NodeElderChange},
@@ -55,6 +54,8 @@ pub use self::{
     node_starter::{new_test_api, start_node},
     node_test_api::NodeTestApi,
 };
+
+pub use crate::storage::DataStorage;
 
 pub(crate) use self::monitoring::RateLimits;
 #[cfg(test)]

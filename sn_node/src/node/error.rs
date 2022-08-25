@@ -112,7 +112,7 @@ pub enum Error {
     RemovedFromSection,
     /// Database error.
     #[error("Database error:: {0}")]
-    Database(#[from] crate::dbs::Error),
+    Database(#[from] crate::storage::Error),
     /// Not enough in the section to perform Chunk operation
     #[error("Not enough Adults available in Section({0:?}) to perform operation")]
     NoAdults(Prefix),
