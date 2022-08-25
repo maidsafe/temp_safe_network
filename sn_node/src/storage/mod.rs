@@ -7,17 +7,26 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod chunks;
+mod errors;
+mod file_store;
 mod registers;
+mod used_space;
+
+pub use used_space::UsedSpace;
+
+pub(crate) use errors::{convert_to_error_msg, Error, Result};
+pub(crate) use file_store::{FileStore, RegisterLog};
 
 use chunks::ChunkStorage;
 use registers::RegisterStorage;
 
-use crate::{dbs::Result, UsedSpace};
-
 use sn_dbc::SpentProofShare;
 use sn_interface::{
     messaging::{
-        data::{DataQueryVariant, Error, RegisterQuery, RegisterStoreExport, StorageLevel},
+        data::{
+            DataQueryVariant, Error as MessagingError, RegisterQuery, RegisterStoreExport,
+            StorageLevel,
+        },
         system::NodeQueryResponse,
     },
     types::{
@@ -133,7 +142,7 @@ impl DataStorage {
                     .read(&RegisterQuery::Get(reg_addr), requester)
                     .await
                 {
-                    NodeQueryResponse::GetRegister((Err(Error::DataNotFound(_)), _)) => {
+                    NodeQueryResponse::GetRegister((Err(MessagingError::DataNotFound(_)), _)) => {
                         NodeQueryResponse::SpentProofShares((Ok(Vec::new()), spentbook_op_id))
                     }
                     NodeQueryResponse::GetRegister((result, _)) => {
@@ -226,9 +235,7 @@ impl DataStorage {
 
 #[cfg(test)]
 mod tests {
-    use crate::dbs::Error;
-    use crate::node::data::DataStorage;
-    use crate::UsedSpace;
+    use super::{DataStorage, Error, UsedSpace};
 
     use sn_interface::{
         init_logger,

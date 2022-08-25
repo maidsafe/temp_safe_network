@@ -1,5 +1,4 @@
 use crate::comm::Comm;
-use crate::dbs::UsedSpace;
 use crate::node::{
     cfg::create_test_max_capacity_and_root_storage,
     flow_ctrl::{
@@ -9,6 +8,7 @@ use crate::node::{
     },
     relocation_check, ChurnId, Node, RateLimits,
 };
+use crate::storage::UsedSpace;
 use bls::Signature;
 use ed25519_dalek::Keypair;
 use eyre::{bail, eyre, Context, Result};

@@ -8,13 +8,13 @@
 
 use crate::{
     comm::Comm,
-    dbs::Error as DbError,
     node::{
         flow_ctrl::cmds::Cmd,
         messaging::{OutgoingMsg, Peers},
         DkgSessionInfo, Error, Event, MembershipEvent, Node, Proposal as CoreProposal, Result,
         MIN_LEVEL_WHEN_FULL,
     },
+    storage::Error as StorageError,
 };
 
 use bytes::Bytes;
@@ -483,7 +483,7 @@ impl Node {
                             #[cfg(feature = "traceroute")]
                             info!("End of message flow. Trace: {:?}", traceroute);
                         }
-                        Err(DbError::NotEnoughSpace) => {
+                        Err(StorageError::NotEnoughSpace) => {
                             // db full
                             error!("Not enough space to store more data");
 

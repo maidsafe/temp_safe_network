@@ -6,8 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::dbs::{convert_to_error_msg, Error, FileStore, Result};
-use crate::UsedSpace;
+use super::{convert_to_error_msg, Error, FileStore, Result, UsedSpace};
 
 use sn_interface::{
     messaging::{data::DataCmd, system::NodeQueryResponse},

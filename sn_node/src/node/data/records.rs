@@ -6,10 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod capacity;
-
-pub(crate) use self::capacity::{Capacity, MIN_LEVEL_WHEN_FULL};
-
 use crate::node::{
     error::convert_to_error_msg, messaging::Peers, Cmd, Error, Node, Prefix, Result,
     MAX_WAITING_PEERS_PER_QUERY,
