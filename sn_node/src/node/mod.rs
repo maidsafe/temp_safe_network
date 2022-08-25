@@ -396,7 +396,7 @@ mod core {
             excluded_names: &BTreeSet<XorName>,
         ) -> Vec<DkgSessionId> {
             let sap = self.network_knowledge.authority_provider();
-            let chain_len = self.network_knowledge.chain_len();
+            let chain_len = self.network_knowledge.our_section_dag_len();
 
             // get current gen and members
             let current_gen;
@@ -481,7 +481,7 @@ mod core {
                 trace!("section_peers {:?}", members);
                 vec![]
             } else {
-                let chain_len = self.network_knowledge.chain_len();
+                let chain_len = self.network_knowledge.our_section_dag_len();
                 let session_id = DkgSessionId {
                     prefix: sap.prefix(),
                     elders: BTreeMap::from_iter(
@@ -704,7 +704,21 @@ mod core {
                 // In case this assumption is not correct (because we already progressed more than one
                 // key since the split) then this key would be unknown to them and they would send
                 // us back their whole section chain. However, this situation should be rare.
-                *self.network_knowledge.our_section_dag().prev_key()
+
+                // our_section_dag produces a DAG with only 1 leaf
+                let leaf_key = self
+                    .network_knowledge
+                    .our_section_dag()
+                    .leaf_keys()
+                    .into_iter()
+                    .collect::<Vec<_>>()[0];
+                match self.our_section_dag().get_parent_key(&leaf_key) {
+                    Ok(prev_pk) => prev_pk.unwrap_or(*self.our_section_dag().genesis_key()),
+                    Err(_) => {
+                        error!("SectionsDAG fields went out of sync");
+                        leaf_key
+                    }
+                }
             } else {
                 *self.network_knowledge.genesis_key()
             }

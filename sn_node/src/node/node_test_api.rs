@@ -8,10 +8,12 @@
 
 use crate::node::{CmdChannel, Error, Node, Peer, Result};
 
-use sn_interface::{messaging::system::SystemMsg, network_knowledge::SectionAuthorityProvider};
+use sn_interface::{
+    messaging::system::SystemMsg,
+    network_knowledge::{SectionAuthorityProvider, SectionsDAG},
+};
 
 use ed25519_dalek::PublicKey;
-use secured_linked_list::SecuredLinkedList;
 use std::{collections::BTreeSet, net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 use xor_name::{Prefix, XorName};
@@ -58,7 +60,7 @@ impl NodeTestApi {
     }
 
     /// Returns the Section Signed Chain
-    pub async fn section_chain(&self) -> SecuredLinkedList {
+    pub async fn section_chain(&self) -> SectionsDAG {
         self.node.read().await.our_section_dag()
     }
 

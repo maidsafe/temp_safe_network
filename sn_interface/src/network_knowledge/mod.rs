@@ -41,7 +41,6 @@ use crate::{
 
 use bls::PublicKey as BlsPublicKey;
 use section_peers::SectionPeers;
-use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
 use std::{collections::BTreeSet, iter, net::SocketAddr};
 use xor_name::{Prefix, XorName};
@@ -156,15 +155,15 @@ impl NetworkKnowledge {
     /// Returns error if the `signed_sap` is not verifiable with the `chain`.
     pub fn new(
         genesis_key: bls::PublicKey,
-        chain: SecuredLinkedList,
+        dag: SectionsDAG,
         signed_sap: SectionAuth<SectionAuthorityProvider>,
         passed_section_tree: Option<SectionTree>,
     ) -> Result<Self, Error> {
         // Let's check the section chain's genesis key matches ours.
-        if genesis_key != *chain.root_key() {
-            return Err(Error::UntrustedProofChain(format!(
+        if genesis_key != *dag.genesis_key() {
+            return Err(Error::UntrustedPartialDAG(format!(
                 "genesis key doesn't match first key in proof chain: {:?}",
-                chain.root_key()
+                dag.genesis_key()
             )));
         }
 
@@ -183,8 +182,8 @@ impl NetworkKnowledge {
 
         // At this point we know the section tree corresponds to the correct genesis key,
         // let's make sure the section tree contains also our own prefix and SAP,
-        if let Err(err) = section_tree.update(signed_sap.clone(), &chain) {
-            debug!("Failed to update SectionTree with SAP {:?} and chain {:?} upon creating new NetworkKnowledge instance: {:?}", signed_sap, chain, err);
+        if let Err(err) = section_tree.update(signed_sap.clone(), &dag) {
+            debug!("Failed to update SectionTree with SAP {:?} and chain {:?} upon creating new NetworkKnowledge instance: {:?}", signed_sap, dag, err);
         }
 
         Ok(Self {
@@ -218,7 +217,7 @@ impl NetworkKnowledge {
 
         let network_knowledge = Self::new(
             genesis_key,
-            SecuredLinkedList::new(genesis_key),
+            SectionsDAG::new(genesis_key),
             section_auth,
             None,
         )?;
@@ -250,18 +249,26 @@ impl NetworkKnowledge {
         // Let's try to find the signed SAP corresponding to the provided prefix and section key
         match self.section_tree.get_signed(prefix) {
             Some(signed_sap) if signed_sap.value.section_key() == section_key => {
-                let proof = self
+                let partial_dag = self
                     .section_tree
                     .get_sections_dag()
-                    .get_proof_chain(self.genesis_key(), &section_key);
+                    .partial_dag(self.genesis_key(), &section_key);
                 // We have the signed SAP for the provided prefix and section key,
                 // we should be able to update our current SAP and section chain
-                match proof {
-                    Ok(section_chain) => {
+                match partial_dag {
+                    Ok(section_dag) => {
                         // Remove any peer which doesn't belong to our new section's prefix
                         self.section_peers.retain(prefix);
                         // Prune list of archived members
-                        self.section_peers.prune_members_archive(&section_chain);
+                        if self
+                            .section_peers
+                            .prune_members_archive(&section_dag, &section_key)
+                            .is_err()
+                        {
+                            error!(
+                                "Error while pruning member archive with last_key: {section_key:?}"
+                            );
+                        }
 
                         // Let's then update our current SAP and section chain
                         let our_prev_prefix = self.prefix();
@@ -298,9 +305,9 @@ impl NetworkKnowledge {
         if !msg_authority.verify_src_section_key_is_known(known_keys) {
             // In case the incoming message itself is trying to update our knowledge,
             // it shall be allowed.
-            if let SystemMsg::AntiEntropy { proof_chain, .. } = &msg {
+            if let SystemMsg::AntiEntropy { partial_dag, .. } = &msg {
                 // The attached chain shall contains a key known to us
-                if !proof_chain.check_trust(known_keys) {
+                if !partial_dag.check_trust(known_keys) {
                     return false;
                 } else {
                     trace!("Allows AntiEntropyUpdate msg({msg:?}) ahead of our knowledge");
@@ -323,7 +330,7 @@ impl NetworkKnowledge {
     pub fn update_knowledge_if_valid(
         &mut self,
         signed_sap: SectionAuth<SectionAuthorityProvider>,
-        proof_chain: &SecuredLinkedList,
+        partial_dag: &SectionsDAG,
         updated_members: Option<SectionPeersMsg>,
         our_name: &XorName,
         section_keys_provider: &SectionKeysProvider,
@@ -332,7 +339,7 @@ impl NetworkKnowledge {
         let provided_sap = signed_sap.value.clone();
 
         // Update the network section tree
-        match self.section_tree.update(signed_sap.clone(), proof_chain) {
+        match self.section_tree.update(signed_sap.clone(), partial_dag) {
             Ok(true) => {
                 there_was_an_update = true;
                 debug!(
@@ -395,13 +402,14 @@ impl NetworkKnowledge {
                         provided_sap
                     );
 
-                    let section_chain = self
+                    let section_dag = self
                         .section_tree
                         .get_sections_dag()
-                        .get_proof_chain(self.genesis_key(), &provided_sap.section_key())?;
+                        .partial_dag(self.genesis_key(), &provided_sap.section_key())?;
 
                     // Prune list of archived members
-                    self.section_peers.prune_members_archive(&section_chain);
+                    self.section_peers
+                        .prune_members_archive(&section_dag, &provided_sap.section_key())?;
 
                     // Switch to new SAP
                     self.signed_sap = signed_sap;
@@ -465,19 +473,19 @@ impl NetworkKnowledge {
     pub fn closest_signed_sap(
         &self,
         name: &XorName,
-    ) -> Option<(&SectionAuth<SectionAuthorityProvider>, SecuredLinkedList)> {
+    ) -> Option<(&SectionAuth<SectionAuthorityProvider>, SectionsDAG)> {
         let closest_sap = self
             .section_tree
             .closest(name, Some(&self.prefix()))
             // In case the only prefix is ours, we fallback to it.
             .unwrap_or(self.section_tree.get_signed(&self.prefix())?);
 
-        if let Ok(proof_chain) = self
+        if let Ok(section_dag) = self
             .section_tree
             .get_sections_dag()
-            .get_proof_chain(self.genesis_key(), &closest_sap.value.section_key())
+            .partial_dag(self.genesis_key(), &closest_sap.value.section_key())
         {
-            return Some((closest_sap, proof_chain));
+            return Some((closest_sap, section_dag));
         }
 
         None
@@ -544,20 +552,20 @@ impl NetworkKnowledge {
     }
 
     /// Return a copy of our section_dag
-    pub fn our_section_dag(&self) -> SecuredLinkedList {
-        self.get_proof_chain_to_current(self.genesis_key())
+    pub fn our_section_dag(&self) -> SectionsDAG {
+        self.get_partial_dag_to_current(self.genesis_key())
             // will never be an error since we will always have signed_sap's key in section tree and
             // also keep the fields in sync
-            .unwrap_or_else(|_| SecuredLinkedList::new(*self.genesis_key()))
+            .unwrap_or_else(|_| SectionsDAG::new(*self.genesis_key()))
     }
 
     /// Generate a proof chain from the provided key to our current section key
-    pub fn get_proof_chain_to_current(&self, from_key: &BlsPublicKey) -> Result<SecuredLinkedList> {
+    pub fn get_partial_dag_to_current(&self, from_key: &BlsPublicKey) -> Result<SectionsDAG> {
         let our_section_key = self.signed_sap.section_key();
         let proof_chain = self
             .section_tree
             .get_sections_dag()
-            .get_proof_chain(from_key, &our_section_key)?;
+            .partial_dag(from_key, &our_section_key)?;
 
         Ok(proof_chain)
     }
@@ -568,8 +576,8 @@ impl NetworkKnowledge {
     }
 
     /// Return current section chain length
-    pub fn chain_len(&self) -> u64 {
-        self.our_section_dag().main_branch_len() as u64
+    pub fn our_section_dag_len(&self) -> u64 {
+        self.our_section_dag().keys().count() as u64
     }
 
     /// Return weather current section chain has the provided key
@@ -577,12 +585,14 @@ impl NetworkKnowledge {
         self.our_section_dag().has_key(key)
     }
 
+    // TODO roland why did they implement the old one?
     /// Return a vec of all known keys
-    pub fn known_keys(&self) -> Vec<bls::PublicKey> {
-        let mut known_keys: Vec<_> = self.our_section_dag().keys().copied().collect();
-        known_keys.extend(self.section_tree().section_keys());
-        known_keys.push(*self.genesis_key());
-        known_keys
+    pub fn known_keys(&self) -> BTreeSet<bls::PublicKey> {
+        self.section_tree
+            .get_sections_dag()
+            .keys()
+            .cloned()
+            .collect()
     }
 
     /// Return a copy of current SAP

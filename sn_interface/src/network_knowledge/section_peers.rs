@@ -7,10 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::system::{MembershipState, SectionAuth};
-use crate::network_knowledge::NodeState;
+use crate::network_knowledge::{errors::Result, NodeState, SectionsDAG};
 
 use dashmap::{mapref::entry::Entry, DashMap};
-use secured_linked_list::SecuredLinkedList;
 use std::{collections::BTreeSet, sync::Arc};
 use xor_name::{Prefix, XorName};
 
@@ -124,10 +123,17 @@ impl SectionPeers {
     }
 
     // Remove any member which Left, or was Relocated, more
-    // than ELDER_CHURN_EVENTS_TO_PRUNE_ARCHIVE section keys ago.
-    pub(super) fn prune_members_archive(&self, section_chain: &SecuredLinkedList) {
-        let last_section_keys = section_chain.truncate(ELDER_CHURN_EVENTS_TO_PRUNE_ARCHIVE);
+    // than ELDER_CHURN_EVENTS_TO_PRUNE_ARCHIVE section keys ago from `last_key`
+    pub(super) fn prune_members_archive(
+        &self,
+        section_dag: &SectionsDAG,
+        last_key: &bls::PublicKey,
+    ) -> Result<()> {
+        let mut last_section_keys = section_dag.get_ancestors(last_key)?;
+        last_section_keys.truncate(ELDER_CHURN_EVENTS_TO_PRUNE_ARCHIVE - 1);
+        last_section_keys.push(*last_key);
         self.archive
-            .retain(|_, node_state| last_section_keys.has_key(&node_state.sig.public_key))
+            .retain(|_, node_state| last_section_keys.contains(&node_state.sig.public_key));
+        Ok(())
     }
 }

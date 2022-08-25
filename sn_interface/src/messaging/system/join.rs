@@ -7,10 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{agreement::SectionAuth, KeyedSig, NodeState};
-use crate::messaging::SectionAuthorityProvider;
+use crate::{messaging::SectionAuthorityProvider, network_knowledge::SectionsDAG};
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::Signature;
-use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
 use sn_consensus::Decision;
 use std::{collections::VecDeque, net::SocketAddr};
@@ -69,7 +68,7 @@ pub enum JoinResponse {
         /// Section signature over the `SectionAuthorityProvider`.
         section_signed: KeyedSig,
         /// Section chain truncated from the section key found in the join request.
-        proof_chain: SecuredLinkedList,
+        partial_dag: SectionsDAG,
         /// The age of the node as expected by the section.
         expected_age: u8,
     },
@@ -85,7 +84,7 @@ pub enum JoinResponse {
         /// SectionAuthorityProvider Signed by (current section)
         section_auth: SectionAuth<SectionAuthorityProvider>,
         /// Full verifiable section chain
-        section_chain: SecuredLinkedList,
+        sections_dag: SectionsDAG,
         /// Current node's state
         decision: Decision<NodeState>,
     },

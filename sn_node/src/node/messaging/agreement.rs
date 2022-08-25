@@ -134,7 +134,9 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         trace!("{}", LogMarker::HandlingNewEldersAgreement);
         let snapshot = self.state_snapshot();
-        let old_chain = self.our_section_dag().clone();
+        // our_section_dag produces a DAG with only 1 leaf
+        let mut old_dag = self.our_section_dag();
+        let last_key = old_dag.leaf_keys().into_iter().collect::<Vec<_>>()[0];
 
         let prefix = signed_section_auth.prefix();
         trace!("{}: for {:?}", LogMarker::NewSignedSap, prefix);
@@ -146,9 +148,8 @@ impl Node {
         // Let's update our network knowledge, including our
         // section SAP and chain if the new SAP's prefix matches our name
         // We need to generate the proof chain to connect our current chain to new SAP.
-        let mut proof_chain = old_chain.clone();
-        match proof_chain.insert(
-            old_chain.last_key(),
+        match old_dag.insert(
+            &last_key,
             signed_section_auth.section_key(),
             key_sig.signature,
         ) {
@@ -159,7 +160,7 @@ impl Node {
             Ok(()) => {
                 match self.network_knowledge.update_knowledge_if_valid(
                     signed_section_auth.clone(),
-                    &proof_chain,
+                    &old_dag,
                     None,
                     &our_name,
                     &self.section_keys_provider,

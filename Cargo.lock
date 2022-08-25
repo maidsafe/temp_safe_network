@@ -1025,7 +1025,7 @@ dependencies = [
  "criterion-plot",
  "csv",
  "futures",
- "itertools 0.10.3",
+ "itertools",
  "lazy_static",
  "num-traits",
  "oorandom",
@@ -1048,7 +1048,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2673cc8207403546f45f5fd319a974b1e6983ad1a3ee7e6041650013be041876"
 dependencies = [
  "cast",
- "itertools 0.10.3",
+ "itertools",
 ]
 
 [[package]]
@@ -2211,15 +2211,6 @@ dependencies = [
 
 [[package]]
 name = "itertools"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "284f18f85651fe11e8a991b2adb42cb078325c996ed026d994719efcfca1d54b"
-dependencies = [
- "either",
-]
-
-[[package]]
-name = "itertools"
 version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a9a9d19fa1e79b6215ff29b9d6880b706147f16e9b1dbb1e4e5947b5b02bc5e3"
@@ -2274,7 +2265,7 @@ dependencies = [
  "bit-set",
  "diff",
  "ena",
- "itertools 0.10.3",
+ "itertools",
  "lalrpop-util",
  "petgraph",
  "pico-args",
@@ -2909,7 +2900,7 @@ checksum = "a5aab5be6e4732b473071984b3164dbbfb7a3674d30ea5ff44410b6bcd960c3c"
 dependencies = [
  "difflib",
  "float-cmp",
- "itertools 0.10.3",
+ "itertools",
  "normalize-line-endings",
  "predicates-core",
  "regex",
@@ -3028,7 +3019,7 @@ checksum = "62941722fb675d463659e49c4f3fe1fe792ff24fe5bbaa9c08cd3b98a1c354f5"
 dependencies = [
  "bytes",
  "heck 0.3.3",
- "itertools 0.10.3",
+ "itertools",
  "lazy_static",
  "log",
  "multimap",
@@ -3047,7 +3038,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9cc1a3263e07e0bf68e96268f37665207b49560d98739662cdfaae215c720fe"
 dependencies = [
  "anyhow",
- "itertools 0.10.3",
+ "itertools",
  "proc-macro2",
  "quote",
  "syn",
@@ -3060,7 +3051,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7345d5f0e08c0536d7ac7229952590239e77abf0a0100a1b1d890add6ea96364"
 dependencies = [
  "anyhow",
- "itertools 0.10.3",
+ "itertools",
  "proc-macro2",
  "quote",
  "syn",
@@ -3594,19 +3585,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "secured_linked_list"
-version = "0.5.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f4a7b54c93287084ff0e44d8b7cc52ea8cf9e49258608074b436ab23337cd35"
-dependencies = [
- "bincode",
- "blsttc",
- "itertools 0.9.0",
- "serde",
- "thiserror",
-]
-
-[[package]]
 name = "self_encryption"
 version = "0.27.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3618,7 +3596,7 @@ dependencies = [
  "bytes",
  "cbc",
  "err-derive",
- "itertools 0.10.3",
+ "itertools",
  "num_cpus",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
@@ -4006,7 +3984,7 @@ dependencies = [
  "grep",
  "hex",
  "hex_fmt",
- "itertools 0.10.3",
+ "itertools",
  "lazy_static",
  "multibase",
  "num_cpus",
@@ -4016,7 +3994,6 @@ dependencies = [
  "rand 0.8.5",
  "rayon",
  "rmp-serde",
- "secured_linked_list",
  "self_encryption",
  "serde",
  "serde_bytes",
@@ -4095,7 +4072,7 @@ version = "0.14.0"
 dependencies = [
  "dashmap",
  "eyre",
- "itertools 0.10.3",
+ "itertools",
  "proptest",
  "rand 0.8.5",
  "sn_interface",
@@ -4125,7 +4102,7 @@ dependencies = [
  "futures",
  "hex",
  "hex_fmt",
- "itertools 0.10.3",
+ "itertools",
  "lazy_static",
  "multibase",
  "num_cpus",
@@ -4137,7 +4114,6 @@ dependencies = [
  "rand_xorshift 0.2.0",
  "rayon",
  "rmp-serde",
- "secured_linked_list",
  "self_encryption",
  "serde",
  "serde_bytes",
@@ -4203,7 +4179,7 @@ dependencies = [
  "futures",
  "hex",
  "hex_fmt",
- "itertools 0.10.3",
+ "itertools",
  "lazy_static",
  "multibase",
  "num_cpus",
@@ -4218,7 +4194,6 @@ dependencies = [
  "rayon",
  "resource_proof",
  "rmp-serde",
- "secured_linked_list",
  "self_encryption",
  "self_update",
  "serde",

@@ -108,7 +108,7 @@ impl Node {
     }
 
     pub(crate) fn handle_dkg_start(&mut self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
-        let current_generation = self.network_knowledge.chain_len();
+        let current_generation = self.network_knowledge.our_section_dag_len();
         if session_id.section_chain_len < current_generation {
             trace!("Skipping DkgStart for older generation: {:?}", &session_id);
             return Ok(vec![]);
@@ -195,7 +195,7 @@ impl Node {
         sender: Peer,
     ) -> Result<Vec<Cmd>> {
         let section_key = self.network_knowledge().section_key();
-        let current_generation = self.network_knowledge.chain_len();
+        let current_generation = self.network_knowledge.our_section_dag_len();
         if session_id.section_chain_len < current_generation {
             trace!(
                 "Ignoring DkgRetry for expired DKG session: {:?}",
@@ -245,7 +245,7 @@ impl Node {
             return Err(Error::InvalidDkgParticipant);
         }
 
-        let generation = self.network_knowledge.chain_len();
+        let generation = self.network_knowledge.our_section_dag_len();
 
         let dkg_session = if let Some(dkg_session) = self
             .promote_and_demote_elders(&BTreeSet::new())

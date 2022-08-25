@@ -17,8 +17,8 @@ use crate::types::Peer;
 use sn_consensus::Generation;
 use xor_name::{Prefix, XorName};
 
+use crate::network_knowledge::SectionsDAG;
 use bls::{PublicKey, PublicKeySet};
-use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeSet,
@@ -32,7 +32,7 @@ pub trait SectionAuthUtils<T: Serialize> {
     fn new(value: T, sig: KeyedSig) -> Self;
 
     ///
-    fn verify(&self, section_chain: &SecuredLinkedList) -> bool;
+    fn verify(&self, section_dag: &SectionsDAG) -> bool;
 
     ///
     fn self_verify(&self) -> bool;
@@ -43,8 +43,8 @@ impl<T: Serialize> SectionAuthUtils<T> for SectionAuth<T> {
         Self { value, sig }
     }
 
-    fn verify(&self, section_chain: &SecuredLinkedList) -> bool {
-        section_chain.has_key(&self.sig.public_key) && self.self_verify()
+    fn verify(&self, section_dag: &SectionsDAG) -> bool {
+        section_dag.has_key(&self.sig.public_key) && self.self_verify()
     }
 
     fn self_verify(&self) -> bool {

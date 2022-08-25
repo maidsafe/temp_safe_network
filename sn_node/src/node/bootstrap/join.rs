@@ -201,7 +201,7 @@ impl<'a> Joiner<'a> {
                 JoinResponse::Approved {
                     section_auth,
                     genesis_key,
-                    section_chain,
+                    sections_dag,
                     decision,
                 } => {
                     info!("{}", LogMarker::ReceivedJoinApproval);
@@ -231,7 +231,7 @@ impl<'a> Joiner<'a> {
 
                     let network_knowledge = NetworkKnowledge::new(
                         genesis_key,
-                        section_chain,
+                        sections_dag,
                         section_auth,
                         Some(self.network_contacts),
                     )?;
@@ -241,7 +241,7 @@ impl<'a> Joiner<'a> {
                 JoinResponse::Retry {
                     section_auth,
                     section_signed,
-                    proof_chain,
+                    partial_dag,
                     expected_age,
                 } => {
                     let section_auth = section_auth.into_state();
@@ -273,7 +273,7 @@ impl<'a> Joiner<'a> {
                     };
 
                     // make sure we received a valid and trusted new SAP
-                    let is_new_sap = match self.network_contacts.update(signed_sap, &proof_chain) {
+                    let is_new_sap = match self.network_contacts.update(signed_sap, &partial_dag) {
                         Ok(updated) => updated,
                         Err(err) => {
                             debug!(
@@ -526,7 +526,7 @@ mod tests {
     use sn_interface::{
         elder_count, init_logger,
         messaging::SectionAuthorityProvider as SectionAuthorityProviderMsg,
-        network_knowledge::{test_utils::*, NodeState},
+        network_knowledge::{test_utils::*, NodeState, SectionsDAG},
         types::PublicKey,
     };
 
@@ -536,7 +536,6 @@ mod tests {
         future::{self, Either},
         pin_mut,
     };
-    use secured_linked_list::SecuredLinkedList;
     use std::{collections::BTreeMap, net::SocketAddr};
     use tokio::task;
     use xor_name::XorName;
@@ -602,7 +601,7 @@ mod tests {
             );
 
             // Send JoinResponse::Retry with section auth provider info
-            let section_chain = SecuredLinkedList::new(original_section_key);
+            let partial_dag = SectionsDAG::new(original_section_key);
             let signed_sap = section_signed(sk, section_auth.clone())?;
 
             send_response(
@@ -610,7 +609,7 @@ mod tests {
                 JoinResponse::Retry {
                     section_auth: section_auth.to_msg(),
                     section_signed: signed_sap.sig,
-                    proof_chain: section_chain,
+                    partial_dag,
                     expected_age: MIN_ADULT_AGE,
                 },
                 &bootstrap_node,
@@ -634,13 +633,13 @@ mod tests {
             // Send JoinResponse::Approved
             let section_auth = section_signed(sk, section_auth.clone())?;
             let decision = section_decision(&sk_set, NodeState::joined(peer, None).to_msg())?;
-            let section_chain = SecuredLinkedList::new(original_section_key);
+            let sections_dag = SectionsDAG::new(original_section_key);
             send_response(
                 &recv_tx,
                 JoinResponse::Approved {
                     genesis_key: original_section_key,
                     section_auth: section_auth.clone().into_authed_msg(),
-                    section_chain,
+                    sections_dag,
                     decision,
                 },
                 &bootstrap_node,
@@ -946,7 +945,7 @@ mod tests {
                 SystemMsg::JoinRequest(JoinRequest::Initiate { .. })
             );
 
-            let section_chain = SecuredLinkedList::new(section_key);
+            let partial_dag = SectionsDAG::new(section_key);
             let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
 
             // Send `Retry` with bad prefix
@@ -955,7 +954,7 @@ mod tests {
                 JoinResponse::Retry {
                     section_auth: random_sap(bad_prefix, elder_count(), 0, None).0.to_msg(),
                     section_signed: signed_sap.sig.clone(),
-                    proof_chain: section_chain.clone(),
+                    partial_dag: partial_dag.clone(),
                     expected_age: MIN_ADULT_AGE,
                 },
                 &bootstrap_node,
@@ -969,7 +968,7 @@ mod tests {
                 JoinResponse::Retry {
                     section_auth: section_auth.to_msg(),
                     section_signed: signed_sap.sig,
-                    proof_chain: section_chain,
+                    partial_dag,
                     expected_age: MIN_ADULT_AGE,
                 },
                 &bootstrap_node,
