@@ -5,13 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.69.0 (2022-08-25)
+
 ## v0.68.0 (2022-08-23)
+
+<csr-id-c8517a481e39bf688041cd8f8661bc663ee7bce7/>
+<csr-id-589f03ce8670544285f329fe35c19897d4bfced8/>
+<csr-id-ddbbb53d61d6c94b00a47dc2b708a2aeda870d96/>
+<csr-id-1618cf6a93117942946d152efee24fe3c7020e55/>
+<csr-id-63172ab4ab9fc87bc17b09c6fd384679a37a40f0/>
+<csr-id-f0fbe5fd9bec0b2865271bb139c9fcb4ec225884/>
 
 ### Chore
 
  - <csr-id-c8517a481e39bf688041cd8f8661bc663ee7bce7/> fix clippy some/none issues
  - <csr-id-589f03ce8670544285f329fe35c19897d4bfced8/> upgrading sn_dbc to v8.0
  - <csr-id-ddbbb53d61d6c94b00a47dc2b708a2aeda870d96/> leave out unnecessary Arc<RwLock>
+
+### Chore
+
+ - <csr-id-43fcc7c517f95eab0e27ddc79cd9c6de3631c7c6/> sn_interface-0.10.0/sn_dysfunction-0.9.0/sn_client-0.70.0/sn_node-0.66.0/sn_api-0.68.0/sn_cli-0.61.0
 
 ### Bug Fixes
 
@@ -35,9 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 7 commits contributed to the release over the course of 8 calendar days.
+ - 8 commits contributed to the release over the course of 8 calendar days.
  - 9 days passed between releases.
- - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 8 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -47,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.10.0/sn_dysfunction-0.9.0/sn_client-0.70.0/sn_node-0.66.0/sn_api-0.68.0/sn_cli-0.61.0 ([`43fcc7c`](https://github.com/maidsafe/safe_network/commit/43fcc7c517f95eab0e27ddc79cd9c6de3631c7c6))
     - fix clippy some/none issues ([`c8517a4`](https://github.com/maidsafe/safe_network/commit/c8517a481e39bf688041cd8f8661bc663ee7bce7))
     - reintroduce Arc<RwLock> for section tree ([`43ecab2`](https://github.com/maidsafe/safe_network/commit/43ecab2dda52cb0ede7c0d4b6e48eaffe1fb6b75))
     - upgrading sn_dbc to v8.0 ([`589f03c`](https://github.com/maidsafe/safe_network/commit/589f03ce8670544285f329fe35c19897d4bfced8))
@@ -80,6 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-d3a05a728be8752ea9ebff4e38e7c4c85e5db09b/>
 <csr-id-96da1171d0cac240f772e5d6a15c56f63441b4b3/>
 <csr-id-dd2eb21352223f6340064e0021f4a7df402cd5c9/>
+<csr-id-53f60c2327f8a69f0b2ef6d1a4e96644c10aa358/>
 
 ### Chore
 
@@ -108,14 +123,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-c46dd0737779c8ee515ee037add54ce049448ea7/> expose a public API which allows users to check if a DBC's `KeyImage` has been already spent on the network
    - Expose a public `is_dbc_spent` API which allows users to check if a DBC's KeyImage has
    been already spent on the network.
-- Have the CLI `wallet deposit` command to perform a verification is the supplied DBC has been
-     already spent before depositing into a wallet.
-- Allow users to provide a `--force` flag with the CLI `wallet deposit` command to skip the
-     verification of DBC already spent and force the deposit into the wallet.
-- Display the owner of each DBC when cat-ing a wallet.
-- Align to the right the balance of each DBC when cat-ing a wallet.
-- Shorten the default name set to DBC when deposited in a wallet.
-- Make the name of the change DBC automatically deposited in the wallet unique.
 
 ### Bug Fixes
 
@@ -213,7 +220,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 <csr-unknown>
- perform verification of input TX and spentproofs when depositing or reissuing a DBC show the DBC owner in the wallet displayed by cat cmd<csr-unknown/>
+Have the CLI wallet deposit command to perform a verification is the supplied DBC has beenalready spent before depositing into a wallet.Allow users to provide a --force flag with the CLI wallet deposit command to skip theverification of DBC already spent and force the deposit into the wallet.Display the owner of each DBC when cat-ing a wallet.Align to the right the balance of each DBC when cat-ing a wallet.Shorten the default name set to DBC when deposited in a wallet.Make the name of the change DBC automatically deposited in the wallet unique.<csr-unknown/>
 
 ## v0.66.3 (2022-07-10)
 

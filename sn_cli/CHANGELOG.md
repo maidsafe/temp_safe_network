@@ -4,12 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## v0.62.0 (2022-08-25)
+
 ## v0.61.0 (2022-08-23)
+
+<csr-id-c8517a481e39bf688041cd8f8661bc663ee7bce7/>
+<csr-id-589f03ce8670544285f329fe35c19897d4bfced8/>
+<csr-id-1618cf6a93117942946d152efee24fe3c7020e55/>
+<csr-id-63172ab4ab9fc87bc17b09c6fd384679a37a40f0/>
+<csr-id-f0fbe5fd9bec0b2865271bb139c9fcb4ec225884/>
 
 ### Chore
 
  - <csr-id-c8517a481e39bf688041cd8f8661bc663ee7bce7/> fix clippy some/none issues
  - <csr-id-589f03ce8670544285f329fe35c19897d4bfced8/> upgrading sn_dbc to v8.0
+
+### Chore
+
+ - <csr-id-43fcc7c517f95eab0e27ddc79cd9c6de3631c7c6/> sn_interface-0.10.0/sn_dysfunction-0.9.0/sn_client-0.70.0/sn_node-0.66.0/sn_api-0.68.0/sn_cli-0.61.0
 
 ### New Features
 
@@ -39,9 +51,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 9 commits contributed to the release over the course of 8 calendar days.
+ - 10 commits contributed to the release over the course of 8 calendar days.
  - 9 days passed between releases.
- - 9 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 10 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -51,6 +63,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.10.0/sn_dysfunction-0.9.0/sn_client-0.70.0/sn_node-0.66.0/sn_api-0.68.0/sn_cli-0.61.0 ([`43fcc7c`](https://github.com/maidsafe/safe_network/commit/43fcc7c517f95eab0e27ddc79cd9c6de3631c7c6))
     - copy default network_contacts when switching networks ([`2e370f5`](https://github.com/maidsafe/safe_network/commit/2e370f5241bc26074526bc588f1f9bb34be574f2))
     - do not read settings from file during Config::sync() ([`5decc56`](https://github.com/maidsafe/safe_network/commit/5decc563679014a0c124128d58e87d8d1ab43300))
     - fix clippy some/none issues ([`c8517a4`](https://github.com/maidsafe/safe_network/commit/c8517a481e39bf688041cd8f8661bc663ee7bce7))
@@ -86,6 +99,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <csr-id-db7dcdc7968d1d7e946274650d5a0c48719b4955/>
 <csr-id-96da1171d0cac240f772e5d6a15c56f63441b4b3/>
 <csr-id-dd2eb21352223f6340064e0021f4a7df402cd5c9/>
+<csr-id-53f60c2327f8a69f0b2ef6d1a4e96644c10aa358/>
 
 ### Chore
 
@@ -117,14 +131,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - <csr-id-c46dd0737779c8ee515ee037add54ce049448ea7/> expose a public API which allows users to check if a DBC's `KeyImage` has been already spent on the network
    - Expose a public `is_dbc_spent` API which allows users to check if a DBC's KeyImage has
    been already spent on the network.
-- Have the CLI `wallet deposit` command to perform a verification is the supplied DBC has been
-     already spent before depositing into a wallet.
-- Allow users to provide a `--force` flag with the CLI `wallet deposit` command to skip the
-     verification of DBC already spent and force the deposit into the wallet.
-- Display the owner of each DBC when cat-ing a wallet.
-- Align to the right the balance of each DBC when cat-ing a wallet.
-- Shorten the default name set to DBC when deposited in a wallet.
-- Make the name of the change DBC automatically deposited in the wallet unique.
 
 ### Bug Fixes
 
@@ -135,7 +141,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - <csr-id-0041e18ab7d1a21e4debb39df9c4b116e002a5e5/> convert nodes joining interval to millis before passing it to launch-tool
    - Also pass the default prefix map file path as the network contacts file path to CLI node join cmd.
-- Minor refactoring to sn_client::test_spentbook_spend_dbc test.
 
 ### Other
 
@@ -223,7 +228,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 </details>
 
 <csr-unknown>
- show the DBC owner in the wallet displayed by cat cmd backing up default prefix map file with genesis key in filename if not found make copy of default prefix mapIf the prefix_map_dir just contains the default prefix map, adding anothernetwork and switching to it will overwrite the default one. Making a copyfixes it. unused async in CLI enable sn_cli bench<csr-unknown/>
+Have the CLI wallet deposit command to perform a verification is the supplied DBC has beenalready spent before depositing into a wallet.Allow users to provide a --force flag with the CLI wallet deposit command to skip theverification of DBC already spent and force the deposit into the wallet.Display the owner of each DBC when cat-ing a wallet.Align to the right the balance of each DBC when cat-ing a wallet.Shorten the default name set to DBC when deposited in a wallet.Make the name of the change DBC automatically deposited in the wallet unique.Minor refactoring to sn_client::test_spentbook_spend_dbc test.<csr-unknown/>
 
 ## v0.59.3 (2022-07-10)
 
