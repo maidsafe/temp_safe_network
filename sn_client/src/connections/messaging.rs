@@ -222,8 +222,7 @@ impl Session {
         #[cfg(feature = "traceroute")]
         wire_msg.append_trace(&mut Traceroute(vec![Entity::Client(client_pk)]));
 
-        self.clone()
-            .send_msg_in_bg(elders.clone(), wire_msg, msg_id)?;
+        self.send_msg(elders.clone(), wire_msg, msg_id).await?;
 
         // TODO:
         // We are now simply accepting the very first valid response we receive,
@@ -352,8 +351,8 @@ impl Session {
             .take(NODES_TO_CONTACT_PER_STARTUP_BATCH)
             .collect();
 
-        self.clone()
-            .send_msg_in_bg(initial_contacts, wire_msg.clone(), msg_id)?;
+        self.send_msg(initial_contacts, wire_msg.clone(), msg_id)
+            .await?;
 
         let mut knowledge_checks = 0;
         let mut outgoing_msg_rounds = 1;
@@ -420,8 +419,8 @@ impl Session {
                 };
 
                 trace!("Sending out another batch of initial contact msgs to new nodes");
-                self.clone()
-                    .send_msg_in_bg(next_contacts, wire_msg.clone(), msg_id)?;
+                self.send_msg(next_contacts, wire_msg.clone(), msg_id)
+                    .await?;
 
                 let next_wait = backoff.next_backoff();
                 trace!(
@@ -513,27 +512,6 @@ impl Session {
         } else {
             Err(Error::NoNetworkKnowledge(dst_address))
         }
-    }
-
-    #[instrument(skip_all, level = "trace")]
-    /// Pushes a send_msg call into a background thread. Errors will be logged
-    pub(super) fn send_msg_in_bg(
-        self,
-        nodes: Vec<Peer>,
-        wire_msg: WireMsg,
-        msg_id: MsgId,
-    ) -> Result<()> {
-        trace!("Sending client message in bg thread so as not to block");
-
-        let _handle = tokio::spawn(async move {
-            let send_res = self.send_msg(nodes, wire_msg, msg_id).await;
-
-            if send_res.is_err() {
-                error!("Error sending msg in the bg: {:?}", send_res);
-            }
-        });
-
-        Ok(())
     }
 
     #[instrument(skip_all, level = "trace")]
