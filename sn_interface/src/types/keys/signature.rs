@@ -92,10 +92,11 @@ impl From<(usize, bls::SignatureShare)> for Signature {
 #[cfg(test)]
 mod tests {
     use super::Signature;
+    use eyre::Result;
 
     #[test]
-    fn ed25519_rmp_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
-        let signature = gen_ed25519_sig();
+    fn ed25519_rmp_roundtrip() -> Result<()> {
+        let signature = gen_ed25519_sig()?;
         let serialized = rmp_serde::to_vec(&signature)?;
 
         assert_eq!(
@@ -110,7 +111,7 @@ mod tests {
     /// in the array passed in, and does a bitwise and operation on it. If that operation doesn't
     /// result in 0, an error is returned. The only thing that makes sense to me is to keep trying
     /// until you get a value it accepts. It doesn't seem to take very long.
-    fn gen_ed25519_sig() -> Signature {
+    fn gen_ed25519_sig() -> Result<Signature> {
         let random_bytes: Vec<u8> = (0..ed25519::Signature::BYTE_SIZE)
             .map(|_| rand::random::<u8>())
             .collect();
@@ -121,6 +122,6 @@ mod tests {
                 .collect();
             result = ed25519::Signature::from_bytes(&random_bytes);
         }
-        Signature::Ed25519(result.unwrap())
+        Ok(Signature::Ed25519(result?))
     }
 }

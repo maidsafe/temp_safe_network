@@ -55,6 +55,7 @@ pub fn gen_keypair(range: &RangeInclusive<XorName>, age: u8) -> Keypair {
 }
 
 #[cfg(feature = "proptest")]
+#[allow(clippy::unwrap_used)]
 pub mod proptesting {
 
     pub use ed25519_dalek::{Keypair, PublicKey, Signature, Verifier};

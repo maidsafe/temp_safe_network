@@ -372,7 +372,7 @@ mod tests {
             public_key: src_client_keypair.public_key(),
             signature: src_client_keypair.sign(&payload),
         };
-        let auth_proof = AuthorityProof::verify(auth.clone(), &payload).unwrap();
+        let auth_proof = AuthorityProof::verify(auth.clone(), &payload)?;
 
         let auth = AuthKind::Service(auth);
 

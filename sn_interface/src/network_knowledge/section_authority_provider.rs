@@ -275,19 +275,16 @@ impl SectionAuth<SectionAuthorityProviderMsg> {
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils {
     use super::*;
-    use crate::network_knowledge::{NodeInfo, MIN_ADULT_AGE};
+    use crate::messaging::system::{KeyedSig, SectionAuth};
+    use crate::network_knowledge::{Error, NodeInfo, MIN_ADULT_AGE};
     use crate::types::SecretKeySet;
+    use eyre::{eyre, Result};
     use itertools::Itertools;
+    use serde::Serialize;
     use sn_consensus::{Ballot, Consensus, Decision, Proposition, Vote, VoteResponse};
-    // use ed25519::ed25519;
+    use std::collections::BTreeMap;
     use std::{cell::Cell, net::SocketAddr};
     use xor_name::Prefix;
-
-    use crate::messaging::system::{KeyedSig, SectionAuth};
-
-    use crate::network_knowledge::{Error, Result};
-
-    use serde::Serialize;
 
     // Generate unique SocketAddr for testing purposes
     pub fn gen_addr() -> SocketAddr {
@@ -383,11 +380,22 @@ pub mod test_utils {
 
         // All nodes have agreed to the same proposal
         assert_eq!(
-            BTreeSet::from_iter(nodes.iter().map(|n| n.decision.clone().unwrap().proposals)).len(),
+            BTreeSet::from_iter(nodes.iter().map(|n| {
+                if let Some(d) = n.decision.clone() {
+                    d.proposals
+                } else {
+                    BTreeMap::new()
+                }
+            }))
+            .len(),
             1
         );
 
-        Ok(nodes[0].decision.clone().unwrap())
+        let decision = nodes[0]
+            .decision
+            .clone()
+            .ok_or_else(|| eyre!("A decision was expected to be found for this particular node"))?;
+        Ok(decision)
     }
 
     // Wrap the given payload in `SectionAuth`

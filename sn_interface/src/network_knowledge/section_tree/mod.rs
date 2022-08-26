@@ -706,6 +706,7 @@ mod tests {
             cases: 20, .. ProptestConfig::default()
         })]
         #[test]
+        #[allow(clippy::unwrap_used)]
         fn proptest_section_tree_fields_should_stay_in_sync((main_chain, update_variations_list) in arb_sll_and_proof_chains(25, 3)) {
             for variation in update_variations_list {
                 let mut section_tree = SectionTree::new(*main_chain.root_key());
@@ -720,6 +721,7 @@ mod tests {
 
     // Generate an arbitrary sized SecuredLinkedList and a List<list of proof_chains which inserted in
     // that order gives back the main_chain>; i.e., multiple variations of <list of proof_chains>
+    #[allow(clippy::unwrap_used)]
     fn arb_sll_and_proof_chains(
         max_sections: usize,
         update_variations: usize,

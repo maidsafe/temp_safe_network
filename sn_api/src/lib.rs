@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+#![warn(clippy::unwrap_used)]
+
 #[cfg(feature = "app")]
 mod app;
 #[cfg(any(feature = "app", feature = "authd_client"))]

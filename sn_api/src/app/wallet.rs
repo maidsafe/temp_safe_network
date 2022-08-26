@@ -320,7 +320,15 @@ impl Safe {
                     "Output amount to reissue needs to be larger than zero (0).".to_string(),
                 ));
             }
-            total_output_amount = total_output_amount.checked_add(output_amount).unwrap();
+            total_output_amount =
+                total_output_amount
+                    .checked_add(output_amount)
+                    .ok_or_else(|| {
+                        Error::DbcReissueError(
+                        "Overflow occurred while calculating the total amount for the output DBC"
+                            .to_string(),
+                    )
+                    })?;
 
             let output_owner = if let Some(pk) = owner_pk {
                 let owner = Owner::from(pk);

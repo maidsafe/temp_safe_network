@@ -477,6 +477,7 @@ mod tests {
 
     proptest! {
         #[test]
+        #[allow(clippy::unwrap_used)]
         fn pt_calculate_scores_should_include_all_nodes_in_score_map(
             node_count in 4..50usize, issue_type in generate_no_churn_normal_use_msg_issues())
         {
@@ -511,6 +512,7 @@ mod tests {
         }
 
         #[test]
+        #[allow(clippy::unwrap_used)]
         fn pt_calculate_scores_one_node_with_issues_should_have_higher_score_and_others_should_have_zero(
             node_count in 4..50usize, issue_count in 1..50, issue_type in generate_no_churn_normal_use_msg_issues())
         {
@@ -561,6 +563,7 @@ mod tests {
 
 
         #[test]
+        #[allow(clippy::unwrap_used)]
         /// Test that gives a range of nodes and a few bad nodes,
         /// we then check that we can reliably detect those nodes
         ///
@@ -656,6 +659,7 @@ mod tests {
 
 
         #[test]
+        #[allow(clippy::unwrap_used)]
         /// Test to check if we have more DKG messages, that bad nodes are found, within our expected issue count
         /// we then check that we can reliably detect those nodes
         ///
@@ -746,7 +750,9 @@ mod tests {
                 Ok(())
             });
         }
+
         #[test]
+        #[allow(clippy::unwrap_used)]
         /// Test to check if we have unresponded to AeProbe msgs
         ///
         /// "Nodes" are just random xornames,
@@ -832,6 +838,7 @@ mod tests {
         }
 
         #[test]
+        #[allow(clippy::unwrap_used)]
         fn pt_calculate_scores_when_all_nodes_have_the_same_number_of_issues_scores_should_all_be_zero(
             node_count in 4..50, issue_count in 0..50, issue_type in generate_no_churn_normal_use_msg_issues())
         {

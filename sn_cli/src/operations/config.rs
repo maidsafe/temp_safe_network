@@ -729,7 +729,13 @@ pub mod test_utils {
             )
             .await?;
             // set one as default
-            let default_network_contacts = dummy_network_contacts.clone().pop().unwrap();
+            let default_network_contacts =
+                dummy_network_contacts.clone().pop().ok_or_else(|| {
+                    eyre!(
+                        "There must be at least one set of contacts in the dummy_network_contacts \
+                        list"
+                    )
+                })?;
             self.set_default_network_contacts(default_network_contacts.genesis_key())
                 .await?;
             Ok(dummy_network_contacts)
@@ -926,7 +932,7 @@ mod constructor {
 #[cfg(test)]
 mod read_network_contacts {
     use super::Config;
-    use color_eyre::Result;
+    use color_eyre::{eyre::eyre, Result};
     use sn_api::DEFAULT_NETWORK_CONTACTS_FILE_NAME;
     use tokio::fs;
 
@@ -938,7 +944,12 @@ mod read_network_contacts {
             .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
-            .unwrap();
+            .ok_or_else(|| {
+                eyre!(
+                    "There must be at least one set of contacts in the dummy_network_contacts \
+                        list"
+                )
+            })?;
 
         let (retrieved_network_contacts, _) = config.read_default_network_contacts().await?;
         assert_eq!(retrieved_network_contacts, network_contacts);
@@ -1129,7 +1140,12 @@ mod sync_network_contacts_and_settings {
         let network_contacts = store_dummy_network_contacts(&tmp_dir, None, 1)
             .await?
             .pop()
-            .unwrap();
+            .ok_or_else(|| {
+                eyre!(
+                    "There must be at least one set of contacts in the dummy_network_contacts \
+                        list"
+                )
+            })?;
         let network_contacts_path = tmp_dir
             .path()
             .join(format!("{:?}", network_contacts.genesis_key()));
@@ -1159,7 +1175,12 @@ mod sync_network_contacts_and_settings {
             .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
-            .unwrap();
+            .ok_or_else(|| {
+                eyre!(
+                    "There must be at least one set of contacts in the dummy_network_contacts \
+                        list"
+                )
+            })?;
 
         config.sync().await?;
 
@@ -1236,7 +1257,12 @@ mod networks {
             .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
-            .unwrap();
+            .ok_or_else(|| {
+                eyre!(
+                    "There must be at least one set of contacts in the dummy_network_contacts \
+                        list"
+                )
+            })?;
         let path = config
             .network_contacts_dir
             .join(format!("{:?}", network_contacts.genesis_key()));
@@ -1255,7 +1281,12 @@ mod networks {
         let network_contacts = store_dummy_network_contacts(&tmp_dir, None, 1)
             .await?
             .pop()
-            .unwrap();
+            .ok_or_else(|| {
+                eyre!(
+                    "There must be at least one set of contacts in the dummy_network_contacts \
+                        list"
+                )
+            })?;
         let network_contacts_path = tmp_dir
             .path()
             .join(format!("{:?}", network_contacts.genesis_key()));
@@ -1282,14 +1313,24 @@ mod networks {
         let mut network_contacts = store_dummy_network_contacts(&tmp_dir, None, 2).await?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
-        let network_contacts_1 = network_contacts.pop().unwrap();
+        let network_contacts_1 = network_contacts.pop().ok_or_else(|| {
+            eyre!(
+                "There must be at least one set of contacts in the dummy_network_contacts \
+                        list"
+            )
+        })?;
         let network_1 = NetworkInfo::Local(
             tmp_dir
                 .path()
                 .join(format!("{:?}", network_contacts_1.genesis_key())),
             None,
         );
-        let network_contacts_2 = network_contacts.pop().unwrap();
+        let network_contacts_2 = network_contacts.pop().ok_or_else(|| {
+            eyre!(
+                "There must be at least one set of contacts in the dummy_network_contacts \
+                        list"
+            )
+        })?;
         let network_2 = NetworkInfo::Local(
             tmp_dir
                 .path()

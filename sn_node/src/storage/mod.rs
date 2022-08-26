@@ -435,6 +435,7 @@ mod tests {
     // a hashmap. The behaviour of both the models should be identical.
     proptest! {
         #[test]
+        #[allow(clippy::unwrap_used)]
         fn model_based_test(ops in arbitrary_ops(0..MAX_N_OPS)){
             model_based_test_imp(ops).unwrap();
         }

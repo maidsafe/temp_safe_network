@@ -10,6 +10,7 @@ use super::Prefix;
 
 use crate::node::handover::Error as HandoverError;
 
+use sn_dbc::Error as DbcError;
 use sn_interface::{
     messaging::data::Error as ErrorMsg,
     types::{convert_dt_error_to_error_msg, Peer, PublicKey, ReplicatedDataAddress as DataAddress},
@@ -200,6 +201,8 @@ pub enum Error {
     /// Error occurred when minting the Genesis DBC.
     #[error("Genesis DBC error:: {0}")]
     GenesisDbcError(String),
+    #[error("DbcError: {0}")]
+    DbcError(#[from] DbcError),
 }
 
 impl From<qp2p::ClientEndpointError> for Error {

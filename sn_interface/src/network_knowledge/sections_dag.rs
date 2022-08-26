@@ -358,7 +358,7 @@ impl SectionsDAG {
 mod tests {
     use super::{SectionInfo, SectionsDAG};
     use crdts::CmRDT;
-    use eyre::Result;
+    use eyre::{eyre, Result};
     use proptest::prelude::{any, proptest, ProptestConfig, Strategy};
     use rand::rngs::SmallRng;
     use rand::{distributions::Standard, Rng, SeedableRng};
@@ -380,7 +380,7 @@ mod tests {
             expected_keys.push(info.key);
             last_sk = sk;
         }
-        assert_lists(dag.keys(), &expected_keys);
+        assert_lists(dag.keys(), &expected_keys)?;
         Ok(())
     }
 
@@ -404,18 +404,18 @@ mod tests {
         assert_lists(
             dag.keys(),
             &vec![pk_gen, info_a1.key, info_a2.key, info_b.key],
-        );
+        )?;
 
         // cannot get partial dag till genesis
         assert!(dag.partial_dag(&pk_gen, &pk_gen).is_err());
         assert_lists(
             dag.partial_dag(&pk_gen, &info_a2.key)?.keys(),
             &vec![pk_gen, info_a1.key, info_a2.key],
-        );
+        )?;
         assert_lists(
             dag.partial_dag(&pk_gen, &info_b.key)?.keys(),
             &vec![pk_gen, info_b.key],
-        );
+        )?;
 
         assert!(dag.partial_dag(&info_a2.key, &pk_gen).is_err());
         assert!(dag.partial_dag(&info_a1.key, &info_b.key).is_err());
@@ -431,7 +431,7 @@ mod tests {
         let mut dag = SectionsDAG::new(pk_gen);
         assert!(dag.insert(&pk_gen, info_a.key, info_a.sig.clone()).is_ok());
         assert!(dag.insert(&pk_gen, info_a.key, info_a.sig).is_ok());
-        assert_lists(dag.keys(), &vec![info_a.key, pk_gen]);
+        assert_lists(dag.keys(), &vec![info_a.key, pk_gen])?;
 
         Ok(())
     }
@@ -457,11 +457,11 @@ mod tests {
         assert!(dag
             .insert(&info_a1.key, info_a2.key, info_a2.sig.clone())
             .is_err());
-        assert_lists(dag.keys(), &vec![pk_gen]);
+        assert_lists(dag.keys(), &vec![pk_gen])?;
 
         dag.insert(&pk_gen, info_a1.key, info_a1.sig)?;
         dag.insert(&info_a1.key, info_a2.key, info_a2.sig)?;
-        assert_lists(dag.keys(), &vec![pk_gen, info_a1.key, info_a2.key]);
+        assert_lists(dag.keys(), &vec![pk_gen, info_a1.key, info_a2.key])?;
 
         Ok(())
     }
@@ -520,7 +520,7 @@ mod tests {
         // out: Error
         let partial_dag = main_dag.partial_dag(&info_a2.key, &info_a3.key)?;
         assert!(dag_01_err.merge(partial_dag).is_err());
-        assert_lists(dag_01_err.keys(), &vec![pk_gen, info_a1.key]);
+        assert_lists(dag_01_err.keys(), &vec![pk_gen, info_a1.key])?;
 
         Ok(())
     }
@@ -672,8 +672,8 @@ mod tests {
         dag.insert(&pk_gen, info_b1.key, info_b1.sig)?;
         dag.insert(&info_b1.key, info_b2.key, info_b2.sig)?;
 
-        assert_lists(dag.get_child_keys(&pk_gen)?, vec![info_a.key, info_b1.key]);
-        assert_lists(dag.get_child_keys(&info_b1.key)?, vec![info_b2.key]);
+        assert_lists(dag.get_child_keys(&pk_gen)?, vec![info_a.key, info_b1.key])?;
+        assert_lists(dag.get_child_keys(&info_b1.key)?, vec![info_b2.key])?;
         assert!(dag.get_child_keys(&info_a.key)?.is_empty());
         Ok(())
     }
@@ -690,7 +690,7 @@ mod tests {
         sections_dag.insert(&pk_gen, info_b1.key, info_b1.sig)?;
         sections_dag.insert(&info_b1.key, info_b2.key, info_b2.sig)?;
 
-        assert_lists(sections_dag.leaf_keys(), vec![info_a.key, info_b2.key]);
+        assert_lists(sections_dag.leaf_keys(), vec![info_a.key, info_b2.key])?;
         Ok(())
     }
 
@@ -710,11 +710,11 @@ mod tests {
         assert_lists(
             dag.get_ancestors(&info_a3.key)?,
             vec![pk_gen, info_a1.key, info_a2.key],
-        );
-        assert_lists(dag.get_ancestors(&info_a2.key)?, vec![pk_gen, info_a1.key]);
-        assert_lists(dag.get_ancestors(&info_a1.key)?, vec![pk_gen]);
+        )?;
+        assert_lists(dag.get_ancestors(&info_a2.key)?, vec![pk_gen, info_a1.key])?;
+        assert_lists(dag.get_ancestors(&info_a1.key)?, vec![pk_gen])?;
         let empty: Vec<bls::PublicKey> = Vec::new();
-        assert_lists(dag.get_ancestors(&pk_gen)?, empty);
+        assert_lists(dag.get_ancestors(&pk_gen)?, empty)?;
 
         Ok(())
     }
@@ -726,6 +726,7 @@ mod tests {
             cases: 20, .. ProptestConfig::default()
         })]
         #[test]
+        #[allow(clippy::unwrap_used)]
         fn proptest_merge_sections_dag((main_dag, update_variations_list) in arb_sections_dag_and_partial_dags(100, 5)) {
             for variation in update_variations_list {
                 let mut dag = SectionsDAG::new(main_dag.genesis_key);
@@ -738,7 +739,7 @@ mod tests {
     }
 
     // Test helpers
-    fn assert_lists<I, J>(a: I, b: J)
+    fn assert_lists<I, J>(a: I, b: J) -> Result<()>
     where
         I: IntoIterator,
         J: IntoIterator,
@@ -750,10 +751,12 @@ mod tests {
         assert_eq!(vec1.len(), vec2.len());
         for item1 in &vec1 {
             let idx2 = vec2.iter().position(|item2| *item2 == *item1);
-            assert!(idx2.is_some());
-            vec2.remove(idx2.unwrap());
+            vec2.remove(idx2.ok_or_else(|| {
+                eyre!("An item that was expected to be in list two was not found")
+            })?);
         }
         assert_eq!(vec2.len(), 0);
+        Ok(())
     }
 
     fn gen_keypair(rng: Option<&mut SmallRng>) -> (bls::SecretKey, bls::PublicKey) {
@@ -783,6 +786,7 @@ mod tests {
 
     // Generate an arbitrary sized `SectionsDAG` and a List<list of `SectionsDAG` which inserted in
     // that order gives back the main_dag>; i.e., multiple variations of <list of SectionsDAG>
+    #[allow(clippy::unwrap_used)]
     fn arb_sections_dag_and_partial_dags(
         max_sections: usize,
         update_variations: usize,
@@ -861,8 +865,15 @@ mod tests {
         };
         while count < n_sections {
             let leaves: Vec<_> = dag.leaf_keys().into_iter().collect();
-            let pk_random_leaf = leaves.get(rng.gen::<usize>() % leaves.len()).unwrap();
-            let sk_random_leaf = sk_map.get(pk_random_leaf).unwrap().clone();
+            let pk_random_leaf = leaves
+                .get(rng.gen::<usize>() % leaves.len())
+                .ok_or_else(|| eyre!("This random public key was expected to be in the leaves"))?;
+            let sk_random_leaf = sk_map
+                .get(pk_random_leaf)
+                .ok_or_else(|| {
+                    eyre!("This random secret key was expected to be in the leaves collection")
+                })?
+                .clone();
 
             let (sk1, info1) = gen_signed_keypair(Some(&mut rng), &sk_random_leaf);
             dag.insert(pk_random_leaf, info1.key, info1.sig)?;
