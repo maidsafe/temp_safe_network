@@ -13,6 +13,7 @@ use crate::node::{
     Error, Event, MembershipEvent, Node, Result, StateSnapshot,
 };
 
+use qp2p::UsrMsgBytes;
 use sn_interface::messaging::system::AntiEntropyKind;
 #[cfg(feature = "traceroute")]
 use sn_interface::messaging::Traceroute;
@@ -27,7 +28,6 @@ use sn_interface::{
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
-use bytes::Bytes;
 use secured_linked_list::SecuredLinkedList;
 use std::{collections::BTreeSet, time::Duration};
 use xor_name::{Prefix, XorName};
@@ -304,7 +304,7 @@ impl Node {
     // bring the sender's knowledge about us up to date.
     pub(crate) fn check_for_entropy(
         &self,
-        original_bytes: Bytes,
+        wire_msg: &WireMsg,
         dst_section_key: &BlsPublicKey,
         dst_name: XorName,
         sender: &Peer,
@@ -322,7 +322,7 @@ impl Node {
             return match self.network_knowledge.closest_signed_sap(&dst_name) {
                 Some((signed_sap, section_dag)) => {
                     info!("Found a better matching prefix {:?}", signed_sap.prefix());
-                    let bounced_msg = original_bytes;
+                    let bounced_msg = wire_msg.serialize()?;
                     // Redirect to the closest section
                     let ae_msg = SystemMsg::AntiEntropy {
                         section_auth: signed_sap.value.to_msg(),
@@ -366,7 +366,7 @@ impl Node {
             return Ok(None);
         }
 
-        let bounced_msg = original_bytes;
+        let bounced_msg = wire_msg.serialize()?;
 
         let ae_msg = self.generate_ae_msg(
             Some(*dst_section_key),
@@ -383,7 +383,7 @@ impl Node {
     pub(crate) fn ae_redirect_to_our_elders(
         &self,
         sender: Peer,
-        bounced_msg: Bytes,
+        bounced_msg: UsrMsgBytes,
     ) -> Result<Cmd> {
         trace!("{} in ae_redirect ", LogMarker::AeSendRedirect);
 
@@ -443,12 +443,9 @@ mod tests {
                 let dst_name = our_prefix.substituted_in(xor_name::rand::random());
                 let dst_section_key = env.node.network_knowledge().section_key();
 
-                let cmd = env.node.check_for_entropy(
-                    msg.serialize()?,
-                    &dst_section_key,
-                    dst_name,
-                    &sender,
-                )?;
+                let cmd = env
+                    .node
+                    .check_for_entropy(&msg, &dst_section_key, dst_name, &sender)?;
 
                 assert!(cmd.is_none());
                 Result::<()>::Ok(())
@@ -513,18 +510,17 @@ mod tests {
             let other_sk = bls::SecretKey::random();
             let other_pk = other_sk.public_key();
 
-            let msg = env.create_msg(&env.other_sap.prefix(), other_pk)?;
+            let wire_msg = env.create_msg(&env.other_sap.prefix(), other_pk)?;
             let sender = env.node.info().peer();
 
             // since it's not aware of the other prefix, it will redirect to self
             let dst_section_key = other_pk;
             let dst_name = env.other_sap.prefix().name();
 
-            let original_bytes = msg.serialize()?;
             let cmd = env
                 .node
                 .check_for_entropy(
-                    original_bytes.clone(),
+                    &wire_msg,
                     &dst_section_key,
                     dst_name,
                     &sender,
@@ -556,7 +552,7 @@ mod tests {
             let cmd = env
                 .node
                 .check_for_entropy(
-                    original_bytes,
+                    &wire_msg,
                     &dst_section_key,
                     dst_name,
                     &sender,
@@ -596,7 +592,7 @@ mod tests {
             let cmd = env
                 .node
                 .check_for_entropy(
-                    msg.serialize()?,
+                    &msg,
                     dst_section_key,
                     dst_name,
                     &sender,
@@ -638,7 +634,7 @@ mod tests {
             let cmd = env
                 .node
                 .check_for_entropy(
-                    msg.serialize()?,
+                    &msg,
                     dst_section_key,
                     dst_name,
                     &sender,

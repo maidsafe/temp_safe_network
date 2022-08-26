@@ -9,8 +9,8 @@
 use super::Peer;
 
 use crate::types::log_markers::LogMarker;
+use qp2p::UsrMsgBytes;
 
-use bytes::Bytes;
 use priority_queue::DoublePriorityQueue;
 use qp2p::{ConnectionIncoming as IncomingMsgs, Endpoint, RetryConfig};
 use std::{
@@ -109,10 +109,10 @@ impl Link {
     #[allow(unused)]
     pub async fn send<F: Fn(qp2p::Connection, IncomingMsgs)>(
         &self,
-        msg: Bytes,
+        bytes: UsrMsgBytes,
         listen: F,
     ) -> Result<(), SendToOneError> {
-        self.send_with(msg, None, listen).await
+        self.send_with(bytes, None, listen).await
     }
 
     /// Send a message to the peer using the given configuration.
@@ -121,7 +121,7 @@ impl Link {
     #[instrument(skip_all)]
     pub async fn send_with<F: Fn(qp2p::Connection, IncomingMsgs)>(
         &self,
-        msg: Bytes,
+        bytes: UsrMsgBytes,
         retry_config: Option<&RetryConfig>,
         listen: F,
     ) -> Result<(), SendToOneError> {
@@ -133,7 +133,7 @@ impl Link {
             queue_len,
             self.peer
         );
-        match conn.send_with(msg, default_priority, retry_config).await {
+        match conn.send_with(bytes, default_priority, retry_config).await {
             Ok(()) => {
                 self.remove_expired().await;
                 Ok(())

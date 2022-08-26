@@ -24,6 +24,7 @@ use self::{
 
 use crate::log_sleep;
 use crate::node::{Error, RateLimits, Result};
+use qp2p::UsrMsgBytes;
 
 use sn_interface::{
     messaging::{system::MembershipState, MsgId, WireMsg},
@@ -31,7 +32,6 @@ use sn_interface::{
     types::Peer,
 };
 
-use bytes::Bytes;
 use dashmap::DashMap;
 use qp2p::{Endpoint, IncomingConnections};
 use std::{collections::BTreeSet, net::SocketAddr, sync::Arc, time::Duration};
@@ -208,16 +208,14 @@ impl Comm {
         session.update_send_rate(msgs_per_s).await;
     }
 
-    #[tracing::instrument(skip(self))]
-    pub(crate) async fn send(&self, peer: Peer, msg: WireMsg) -> Result<()> {
-        let msg_id = msg.msg_id();
-        let dst = *msg.dst();
-        let watcher = self.send_to_one(peer, msg).await;
+    #[tracing::instrument(skip(self, bytes))]
+    pub(crate) async fn send(&self, peer: Peer, msg_id: MsgId, bytes: UsrMsgBytes) -> Result<()> {
+        let watcher = self.send_to_one(peer, msg_id, bytes).await;
 
         match watcher {
             Ok(watcher) => {
                 if Self::is_sent(watcher, msg_id, peer).await {
-                    trace!("Msg {msg_id:?} sent to {dst:?}");
+                    trace!("Msg {msg_id:?} sent to {peer:?}");
                     Ok(())
                 } else {
                     Err(Error::FailedSend(peer))
@@ -335,26 +333,26 @@ impl Comm {
     }
 
     // Helper to send a message to a single recipient.
-    #[instrument(skip(self, wire_msg))]
-    async fn send_to_one(&self, recipient: Peer, wire_msg: WireMsg) -> Result<SendWatcher> {
-        let msg_id = wire_msg.msg_id();
-
-        let msg_bytes = match wire_msg.serialize() {
-            Ok(bytes) => bytes,
-            Err(error) => {
-                // early return if we cannot serialise msg
-                return Err(Error::Messaging(error));
-            }
+    #[instrument(skip(self, bytes))]
+    async fn send_to_one(
+        &self,
+        recipient: Peer,
+        msg_id: MsgId,
+        bytes: UsrMsgBytes,
+    ) -> Result<SendWatcher> {
+        let bytes_len = {
+            let (h, d, p) = bytes.clone();
+            h.len() + d.len() + p.len()
         };
 
         trace!(
-            "Sending message ({} bytes, msg_id: {:?}) to {:?}",
-            msg_bytes.len(),
+            "Sending message ({} bytes) w/ {:?} to {:?}",
+            bytes_len,
             msg_id,
             recipient,
         );
         let peer = self.get_or_create(&recipient).await;
-        peer.send(msg_id, msg_bytes).await
+        peer.send(msg_id, bytes).await
     }
 }
 
@@ -449,11 +447,7 @@ impl Drop for Comm {
 
 #[derive(Debug)]
 pub(crate) enum MsgEvent {
-    Received {
-        sender: Peer,
-        wire_msg: WireMsg,
-        original_bytes: Bytes,
-    },
+    Received { sender: Peer, wire_msg: WireMsg },
 }
 
 #[cfg(test)]
@@ -495,8 +489,10 @@ mod tests {
                 let peer0_msg = new_test_msg(dst(peer0))?;
                 let peer1_msg = new_test_msg(dst(peer1))?;
 
-                comm.send(peer0, peer0_msg.clone()).await?;
-                comm.send(peer1, peer1_msg.clone()).await?;
+                comm.send(peer0, peer0_msg.msg_id(), peer0_msg.serialize()?)
+                    .await?;
+                comm.send(peer1, peer1_msg.msg_id(), peer1_msg.serialize()?)
+                    .await?;
 
                 if let Some(bytes) = rx0.recv().await {
                     assert_eq!(WireMsg::from(bytes)?, peer0_msg);
@@ -534,7 +530,8 @@ mod tests {
 
                 let invalid_peer = get_invalid_peer().await?;
                 let invalid_addr = invalid_peer.addr();
-                let result = comm.send(invalid_peer, new_test_msg(dst(invalid_peer))?).await;
+                let msg = new_test_msg(dst(invalid_peer))?;
+                let result = comm.send(invalid_peer, msg.msg_id(), msg.serialize()?).await;
 
                 assert_matches!(result, Err(Error::FailedSend(peer)) => assert_eq!(peer.addr(), invalid_addr));
 
@@ -563,7 +560,9 @@ mod tests {
                 let peer = Peer::new(name, recv_addr);
                 let msg0 = new_test_msg(dst(peer))?;
 
-                send_comm.send(peer, msg0.clone()).await?;
+                send_comm
+                    .send(peer, msg0.msg_id(), msg0.serialize()?)
+                    .await?;
 
                 let mut msg0_received = false;
 
@@ -580,7 +579,9 @@ mod tests {
                 }
 
                 let msg1 = new_test_msg(dst(peer))?;
-                send_comm.send(peer, msg1.clone()).await?;
+                send_comm
+                    .send(peer, msg1.msg_id(), msg1.serialize()?)
+                    .await?;
 
                 let mut msg1_received = false;
 
@@ -620,7 +621,7 @@ mod tests {
                 let peer = Peer::new(xor_name::rand::random(), addr0);
                 let msg = new_test_msg(dst(peer))?;
                 // Send a message to establish the connection
-                comm1.send(peer, msg).await?;
+                comm1.send(peer, msg.msg_id(), msg.serialize()?).await?;
 
                 assert_matches!(rx0.recv().await, Some(MsgEvent::Received { .. }));
 
@@ -665,7 +666,7 @@ mod tests {
         ))
     }
 
-    async fn new_peer() -> Result<(Peer, Receiver<Bytes>)> {
+    async fn new_peer() -> Result<(Peer, Receiver<UsrMsgBytes>)> {
         let (endpoint, mut incoming_connections, _) =
             Endpoint::new_peer(local_addr(), &[], Config::default()).await?;
         let addr = endpoint.public_addr();

@@ -11,9 +11,9 @@ use super::Link;
 use crate::{log_sleep, node::Result};
 
 use qp2p::RetryConfig;
+use qp2p::UsrMsgBytes;
 use sn_interface::messaging::MsgId;
 
-use bytes::Bytes;
 use custom_debug::Debug;
 use std::{
     sync::{
@@ -79,13 +79,13 @@ impl PeerSession {
         }
     }
 
-    #[instrument(skip(self, msg_bytes))]
-    pub(crate) async fn send(&self, msg_id: MsgId, msg_bytes: Bytes) -> Result<SendWatcher> {
+    #[instrument(skip(self, bytes))]
+    pub(crate) async fn send(&self, msg_id: MsgId, bytes: UsrMsgBytes) -> Result<SendWatcher> {
         let (watcher, reporter) = status_watching();
 
         let job = SendJob {
             msg_id,
-            msg_bytes,
+            bytes,
             retries: 0,
             reporter,
         };
@@ -202,7 +202,7 @@ impl PeerSessionWorker {
 
         let send_resp = self
             .link
-            .send_with(job.msg_bytes.clone(), 0, Some(&RetryConfig::default()))
+            .send_with(job.bytes.clone(), 0, Some(&RetryConfig::default()))
             .await;
 
         match send_resp {
@@ -265,16 +265,14 @@ impl MsgThroughput {
 pub(crate) struct SendJob {
     msg_id: MsgId,
     #[debug(skip)]
-    msg_bytes: Bytes,
+    bytes: UsrMsgBytes,
     retries: usize, // TAI: Do we need this if we are using QP2P's retry
     reporter: StatusReporting,
 }
 
 impl PartialEq for SendJob {
     fn eq(&self, other: &Self) -> bool {
-        self.msg_id == other.msg_id
-            && self.msg_bytes == other.msg_bytes
-            && self.retries == other.retries
+        self.msg_id == other.msg_id && self.bytes == other.bytes && self.retries == other.retries
     }
 }
 
@@ -283,7 +281,7 @@ impl Eq for SendJob {}
 impl std::hash::Hash for SendJob {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.msg_id.hash(state);
-        self.msg_bytes.hash(state);
+        self.bytes.hash(state);
         self.retries.hash(state);
     }
 }
