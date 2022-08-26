@@ -662,6 +662,7 @@ pub mod test_utils {
     use crate::operations::config::Settings;
     use assert_fs::{prelude::*, TempDir};
     use color_eyre::{eyre::eyre, Result};
+    use httpmock::{Method, MockServer};
     use sn_api::{SectionTree, DEFAULT_NETWORK_CONTACTS_FILE_NAME};
     use std::collections::BTreeMap;
     use std::path::{Path, PathBuf};
@@ -669,6 +670,7 @@ pub mod test_utils {
 
     pub async fn store_dummy_network_contacts(
         path: &Path,
+        mock_server: Option<&MockServer>,
         n_network_contacts: usize,
     ) -> Result<Vec<SectionTree>> {
         let mut dummy_network_contacts: Vec<SectionTree> = Vec::new();
@@ -678,7 +680,19 @@ pub mod test_utils {
             let network_contacts = SectionTree::new(sk.public_key());
             let filename = format!("{:?}", network_contacts.genesis_key());
 
-            network_contacts.write_to_disk(&path.join(filename)).await?;
+            network_contacts
+                .write_to_disk(&path.join(filename.clone()))
+                .await?;
+            // upload the contacts to the mock server
+            if let Some(server) = mock_server {
+                let contacts_json = serde_json::to_vec(&network_contacts)?;
+                server.mock(|when, then| {
+                    when.method(Method::GET).path(format!("/{filename}"));
+                    then.status(200)
+                        .header("content-type", "application/octet-stream")
+                        .body(contacts_json);
+                });
+            }
             dummy_network_contacts.push(network_contacts);
         }
         Ok(dummy_network_contacts)
@@ -705,11 +719,15 @@ pub mod test_utils {
 
         pub async fn store_dummy_network_contacts_and_set_default(
             &self,
+            mock_server: Option<&MockServer>,
             n_network_contacts: usize,
         ) -> Result<Vec<SectionTree>> {
-            let dummy_network_contacts =
-                store_dummy_network_contacts(&self.network_contacts_dir, n_network_contacts)
-                    .await?;
+            let dummy_network_contacts = store_dummy_network_contacts(
+                &self.network_contacts_dir,
+                mock_server,
+                n_network_contacts,
+            )
+            .await?;
             // set one as default
             let default_network_contacts = dummy_network_contacts.clone().pop().unwrap();
             self.set_default_network_contacts(default_network_contacts.genesis_key())
@@ -773,6 +791,7 @@ mod constructor {
     use assert_fs::prelude::*;
     use bls::SecretKey;
     use color_eyre::{eyre::eyre, Result};
+    use httpmock::MockServer;
     use predicates::prelude::*;
     use sn_api::Safe;
     use std::path::PathBuf;
@@ -841,25 +860,22 @@ mod constructor {
     async fn given_config_file_exists_then_the_settings_should_be_read() -> Result<()> {
         // write cli/config.json file
         let tmp_dir = assert_fs::TempDir::new()?;
-        let network_contacts = store_dummy_network_contacts(&tmp_dir, 1)
-            .await?
-            .pop()
-            .unwrap();
-        let network_contacts_path = tmp_dir
-            .path()
-            .join(format!("{:?}", network_contacts.genesis_key()));
+        let mock_server = MockServer::start();
+        let network_contacts =
+            store_dummy_network_contacts(&tmp_dir, Some(&mock_server), 2).await?;
         let mut settings = Settings::default();
+
+        let remote_path = mock_server.url(format!("/{:?}", network_contacts[0].genesis_key()));
         settings.networks.insert(
             "network_1".to_string(),
-            NetworkInfo::Remote(
-                "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/network_contacts"
-                    .to_string(),
-                None,
-            ),
+            NetworkInfo::Remote(remote_path, None),
         );
+        let local_path = tmp_dir
+            .path()
+            .join(format!("{:?}", network_contacts[1].genesis_key()));
         settings.networks.insert(
             "network_2".to_string(),
-            NetworkInfo::Local(network_contacts_path, Some(*network_contacts.genesis_key())),
+            NetworkInfo::Local(local_path, Some(*network_contacts[1].genesis_key())),
         );
         let config = Config::create_config(&tmp_dir, Some(settings)).await?;
 
@@ -879,7 +895,7 @@ mod constructor {
         assert_eq!(network_name, "network_2");
         assert!(matches!(
                 network_info,
-                NetworkInfo::Local(_, Some(genesis_key)) if genesis_key == network_contacts.genesis_key()
+                NetworkInfo::Local(_, Some(genesis_key)) if genesis_key == network_contacts[1].genesis_key()
         ));
         Ok(())
     }
@@ -919,7 +935,7 @@ mod read_network_contacts {
         let tmp_dir = assert_fs::TempDir::new()?;
         let config = Config::create_config(&tmp_dir, None).await?;
         let network_contacts = config
-            .store_dummy_network_contacts_and_set_default(1)
+            .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
             .unwrap();
@@ -935,7 +951,7 @@ mod read_network_contacts {
         let tmp_dir = assert_fs::TempDir::new()?;
         let config = Config::create_config(&tmp_dir, None).await?;
         let _ = config
-            .store_dummy_network_contacts_and_set_default(1)
+            .store_dummy_network_contacts_and_set_default(None, 1)
             .await?;
         fs::remove_file(
             &config
@@ -975,6 +991,7 @@ mod sync_network_contacts_and_settings {
     };
     use color_eyre::eyre::eyre;
     use color_eyre::Result;
+    use httpmock::MockServer;
     use sn_api::DEFAULT_NETWORK_CONTACTS_FILE_NAME;
     use tokio::fs;
 
@@ -984,7 +1001,7 @@ mod sync_network_contacts_and_settings {
         let tmp_dir = assert_fs::TempDir::new()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
         let _ = config
-            .store_dummy_network_contacts_and_set_default(4)
+            .store_dummy_network_contacts_and_set_default(None, 4)
             .await?;
 
         config.sync().await?;
@@ -998,21 +1015,22 @@ mod sync_network_contacts_and_settings {
     async fn network_contacts_should_be_fetched_from_cli_config_file() -> Result<()> {
         // write cli/config.json file
         let tmp_dir = assert_fs::TempDir::new()?;
-        let network_contacts = store_dummy_network_contacts(&tmp_dir, 2).await?;
+        let mock_server = MockServer::start();
         let mut settings = Settings::default();
-        settings.networks.insert(
-            "network_1".to_string(),
-            NetworkInfo::Remote(
-                "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/network_contacts"
-                    .to_string(),
-                None,
-            ),
-        );
-        settings.networks.insert(
-            "network_2".to_string(),
-            NetworkInfo::Remote("https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/network_contacts_1".to_string(), None)
-        );
-        network_contacts
+
+        store_dummy_network_contacts(&tmp_dir, Some(&mock_server), 2)
+            .await?
+            .iter()
+            .enumerate()
+            .for_each(|(idx, network_contacts)| {
+                let remote_path = mock_server.url(format!("/{:?}", network_contacts.genesis_key()));
+                settings.networks.insert(
+                    format!("remote_network_{}", idx + 1),
+                    NetworkInfo::Remote(remote_path, None),
+                );
+            });
+        store_dummy_network_contacts(&tmp_dir, None, 2)
+            .await?
             .iter()
             .enumerate()
             .for_each(|(idx, network_contacts)| {
@@ -1065,25 +1083,22 @@ mod sync_network_contacts_and_settings {
     async fn genesis_key_field_should_be_set() -> Result<()> {
         // write cli/config.json file
         let tmp_dir = assert_fs::TempDir::new()?;
-        let network_contacts = store_dummy_network_contacts(&tmp_dir, 1)
-            .await?
-            .pop()
-            .unwrap();
-        let network_contacts_path = tmp_dir
-            .path()
-            .join(format!("{:?}", network_contacts.genesis_key()));
+        let mock_server = MockServer::start();
         let mut settings = Settings::default();
+
+        let network_contacts =
+            store_dummy_network_contacts(&tmp_dir, Some(&mock_server), 2).await?;
+        let remote_path = mock_server.url(format!("/{:?}", network_contacts[0].genesis_key()));
         settings.networks.insert(
             "network_1".to_string(),
-            NetworkInfo::Remote(
-                "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/network_contacts"
-                    .to_string(),
-                None,
-            ),
+            NetworkInfo::Remote(remote_path, None),
         );
+        let local_path = tmp_dir
+            .path()
+            .join(format!("{:?}", network_contacts[1].genesis_key()));
         settings.networks.insert(
             "network_2".to_string(),
-            NetworkInfo::Local(network_contacts_path, None),
+            NetworkInfo::Local(local_path, None),
         );
         let mut config = Config::create_config(&tmp_dir, Some(settings)).await?;
 
@@ -1111,7 +1126,7 @@ mod sync_network_contacts_and_settings {
     async fn multiple_networks_with_the_same_network_contacts() -> Result<()> {
         // write cli/config.json file
         let tmp_dir = assert_fs::TempDir::new()?;
-        let network_contacts = store_dummy_network_contacts(&tmp_dir, 1)
+        let network_contacts = store_dummy_network_contacts(&tmp_dir, None, 1)
             .await?
             .pop()
             .unwrap();
@@ -1141,7 +1156,7 @@ mod sync_network_contacts_and_settings {
         let tmp_dir = assert_fs::TempDir::new()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
         let network_contacts = config
-            .store_dummy_network_contacts_and_set_default(1)
+            .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
             .unwrap();
@@ -1187,26 +1202,23 @@ mod networks {
     use super::{test_utils::store_dummy_network_contacts, Config, NetworkInfo};
     use color_eyre::eyre::eyre;
     use color_eyre::Result;
+    use httpmock::MockServer;
     use tokio::fs;
 
     #[tokio::test]
     async fn local_and_remote_networks_should_be_added() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
-        let network_contacts = store_dummy_network_contacts(&tmp_dir, 1)
-            .await?
-            .pop()
-            .unwrap();
-        let network_contacts_path = tmp_dir
-            .path()
-            .join(format!("{:?}", network_contacts.genesis_key()));
+        let mock_server = MockServer::start();
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
-        let network_1 = NetworkInfo::Remote(
-            "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/network_contacts"
-                .to_string(),
-            None,
-        );
-        let network_2 = NetworkInfo::Local(network_contacts_path, None);
+        let network_contacts =
+            store_dummy_network_contacts(&tmp_dir, Some(&mock_server), 2).await?;
+        let remote_path = mock_server.url(format!("/{:?}", network_contacts[0].genesis_key()));
+        let network_1 = NetworkInfo::Remote(remote_path, None);
+        let local_path = tmp_dir
+            .path()
+            .join(format!("{:?}", network_contacts[1].genesis_key()));
+        let network_2 = NetworkInfo::Local(local_path, None);
         config.add_network("network_1", network_1).await?;
         config.add_network("network_2", network_2).await?;
 
@@ -1221,7 +1233,7 @@ mod networks {
         let tmp_dir = assert_fs::TempDir::new()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
         let network_contacts = config
-            .store_dummy_network_contacts_and_set_default(1)
+            .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
             .unwrap();
@@ -1240,7 +1252,7 @@ mod networks {
     #[tokio::test]
     async fn removing_network_should_give_the_desirable_output() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
-        let network_contacts = store_dummy_network_contacts(&tmp_dir, 1)
+        let network_contacts = store_dummy_network_contacts(&tmp_dir, None, 1)
             .await?
             .pop()
             .unwrap();
@@ -1267,7 +1279,7 @@ mod networks {
     #[tokio::test]
     async fn switching_network_should_change_the_default_network_contacts() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
-        let mut network_contacts = store_dummy_network_contacts(&tmp_dir, 2).await?;
+        let mut network_contacts = store_dummy_network_contacts(&tmp_dir, None, 2).await?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let network_contacts_1 = network_contacts.pop().unwrap();
@@ -1336,7 +1348,7 @@ mod networks {
         let tmp_dir = assert_fs::TempDir::new()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
         let networks = config
-            .store_dummy_network_contacts_and_set_default(2)
+            .store_dummy_network_contacts_and_set_default(None, 2)
             .await?;
         // make sure the network is set as as the default
         config
