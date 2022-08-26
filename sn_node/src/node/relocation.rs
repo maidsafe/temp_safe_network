@@ -152,6 +152,7 @@ mod tests {
 
     proptest! {
         #[test]
+        #[allow(clippy::unwrap_used)]
         fn proptest_actions(
             peers in arbitrary_unique_peers(2..(recommended_section_size() + elder_count()), MIN_ADULT_AGE..MAX_AGE),
             signature_trailing_zeros in 0..MAX_AGE)

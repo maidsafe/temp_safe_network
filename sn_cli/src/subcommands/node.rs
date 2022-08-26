@@ -572,7 +572,7 @@ mod join_command {
     use crate::operations::config::{Config, NetworkInfo};
     use crate::operations::node::SN_NODE_EXECUTABLE;
     use assert_fs::prelude::*;
-    use color_eyre::Result;
+    use color_eyre::{eyre::eyre, Result};
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     use std::path::PathBuf;
 
@@ -587,7 +587,12 @@ mod join_command {
             .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
-            .unwrap();
+            .ok_or_else(|| {
+                eyre!(
+                    "There must be at least one set of contacts in the dummy_network_contacts \
+                        list"
+                )
+            })?;
         let baby_fleming = NetworkInfo::Local(
             config
                 .network_contacts_dir
@@ -632,7 +637,12 @@ mod join_command {
             .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
-            .unwrap();
+            .ok_or_else(|| {
+                eyre!(
+                    "There must be at least one set of contacts in the dummy_network_contacts \
+                        list"
+                )
+            })?;
         let baby_fleming = NetworkInfo::Local(
             config
                 .network_contacts_dir
@@ -679,7 +689,12 @@ mod join_command {
             .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
-            .unwrap();
+            .ok_or_else(|| {
+                eyre!(
+                    "There must be at least one set of contacts in the dummy_network_contacts \
+                        list"
+                )
+            })?;
         let baby_fleming = NetworkInfo::Local(
             config
                 .network_contacts_dir
@@ -727,7 +742,12 @@ mod join_command {
             .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
-            .unwrap();
+            .ok_or_else(|| {
+                eyre!(
+                    "There must be at least one set of contacts in the dummy_network_contacts \
+                        list"
+                )
+            })?;
         let baby_fleming = NetworkInfo::Local(
             config
                 .network_contacts_dir
@@ -774,7 +794,12 @@ mod join_command {
             .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
-            .unwrap();
+            .ok_or_else(|| {
+                eyre!(
+                    "There must be at least one set of contacts in the dummy_network_contacts \
+                        list"
+                )
+            })?;
         let baby_fleming = NetworkInfo::Local(
             config
                 .network_contacts_dir
@@ -820,7 +845,12 @@ mod join_command {
             .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
-            .unwrap();
+            .ok_or_else(|| {
+                eyre!(
+                    "There must be at least one set of contacts in the dummy_network_contacts \
+                        list"
+                )
+            })?;
         let baby_fleming = NetworkInfo::Local(
             config
                 .network_contacts_dir
@@ -864,7 +894,12 @@ mod join_command {
             .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
-            .unwrap();
+            .ok_or_else(|| {
+                eyre!(
+                    "There must be at least one set of contacts in the dummy_network_contacts \
+                        list"
+                )
+            })?;
         let baby_fleming = NetworkInfo::Local(
             config
                 .network_contacts_dir
@@ -911,7 +946,12 @@ mod join_command {
             .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
-            .unwrap();
+            .ok_or_else(|| {
+                eyre!(
+                    "There must be at least one set of contacts in the dummy_network_contacts \
+                        list"
+                )
+            })?;
         let baby_fleming = NetworkInfo::Local(
             config
                 .network_contacts_dir
@@ -954,7 +994,12 @@ mod join_command {
             .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
-            .unwrap();
+            .ok_or_else(|| {
+                eyre!(
+                    "There must be at least one set of contacts in the dummy_network_contacts \
+                        list"
+                )
+            })?;
         let baby_fleming = NetworkInfo::Local(
             config
                 .network_contacts_dir
@@ -998,7 +1043,12 @@ mod join_command {
             .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
-            .unwrap();
+            .ok_or_else(|| {
+                eyre!(
+                    "There must be at least one set of contacts in the dummy_network_contacts \
+                        list"
+                )
+            })?;
         let baby_fleming = NetworkInfo::Local(
             config
                 .network_contacts_dir

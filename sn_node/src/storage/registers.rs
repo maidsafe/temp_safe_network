@@ -541,8 +541,8 @@ fn section_auth() -> SectionAuth {
 mod test {
     use super::{create_reg_w_policy, RegisterStorage};
 
-    use crate::node::{Error, Result};
     use crate::UsedSpace;
+    use eyre::{eyre, Result};
 
     use sn_interface::{
         messaging::{
@@ -580,18 +580,16 @@ mod test {
             e => panic!("Could not read! {:?}", e),
         }
 
-        // try to create the register again
-        // (should fail)
-
-        let res = store.write(cmd).await;
-
-        assert_eq!(
-            res.err().unwrap().to_string(),
-            Error::DataExists.to_string(),
-            "Should not be able to create twice!"
-        );
-
-        Ok(())
+        match store.write(cmd).await {
+            Ok(_) => Err(eyre!("An error should occur for this test case")),
+            Err(error) => match error {
+                crate::storage::Error::DataExists => {
+                    assert_eq!(error.to_string(), "Data already exists at this node");
+                    Ok(())
+                }
+                _ => Err(eyre!("A Error::DataExists variant was expected")),
+            },
+        }
     }
 
     #[tokio::test]
@@ -616,13 +614,19 @@ mod test {
         // assert the same tests hold as for the first db
 
         // should fail to write same register again, also on this new store
-        let res = new_store.write(cmd).await;
-
-        assert_eq!(
-            res.err().unwrap().to_string(),
-            Error::DataExists.to_string(),
-            "Should not be able to create twice!"
-        );
+        match new_store.write(cmd).await {
+            Ok(_) => {
+                return Err(eyre!("An error should occur for this test case"));
+            }
+            Err(error) => match error {
+                crate::storage::Error::DataExists => {
+                    assert_eq!(error.to_string(), "Data already exists at this node");
+                }
+                _ => {
+                    return Err(eyre!("A Error::DataExists variant was expected"));
+                }
+            },
+        }
 
         // should be able to read the same value from this new store also
         let res = new_store

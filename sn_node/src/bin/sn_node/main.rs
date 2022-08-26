@@ -24,7 +24,8 @@
     unused_extern_crates,
     unused_import_braces,
     unused_qualifications,
-    unused_results
+    unused_results,
+    clippy::unwrap_used
 )]
 
 use sn_node::node::{start_node, Config, Error as NodeError, Event, MembershipEvent};

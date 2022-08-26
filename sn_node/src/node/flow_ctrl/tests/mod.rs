@@ -188,7 +188,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
                 .await
                 .membership
                 .as_ref()
-                .unwrap()
+                .ok_or_else(|| eyre!("Membership for the node must be set"))?
                 .is_churn_in_progress());
             // makes sure that the nonce signature is always valid
             let random_peer = Peer::new(xor_name::rand::random(), gen_addr());
@@ -272,7 +272,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
                 .await
                 .membership
                 .as_ref()
-                .unwrap()
+                .ok_or_else(|| eyre!("Membership for the node must be set"))?
                 .is_churn_in_progress());
 
             Result::<()>::Ok(())
@@ -375,7 +375,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                 .await
                 .membership
                 .as_mut()
-                .unwrap()
+                .ok_or_else(|| eyre!("Membership for the node must be set"))?
                 .force_bootstrap(node_state.to_msg());
 
             let cmds = run_and_collect_cmds(
@@ -447,7 +447,7 @@ async fn handle_join_request_of_rejoined_node() -> Result<()> {
                 .await
                 .membership
                 .as_mut()
-                .unwrap()
+                .ok_or_else(|| eyre!("Membership for the node must be set"))?
                 .force_bootstrap(NodeState::left(peer, None).to_msg());
 
             // Simulate the same peer rejoining
@@ -466,7 +466,7 @@ async fn handle_join_request_of_rejoined_node() -> Result<()> {
                 .await
                 .membership
                 .as_ref()
-                .unwrap()
+                .ok_or_else(|| eyre!("Membership for the node must be set"))?
                 .is_churn_in_progress());
             Ok(())
         })
@@ -550,7 +550,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
                 .await
                 .membership
                 .as_ref()
-                .unwrap()
+                .ok_or_else(|| eyre!("Membership for the node must be set"))?
                 .is_churn_in_progress());
             Result::<()>::Ok(())
         })
@@ -781,7 +781,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
     let local = tokio::task::LocalSet::new();
     local
         .run_until(async move {
-            let prefix: Prefix = "0".parse().unwrap();
+            let prefix: Prefix = "0".parse().map_err(|_| eyre!("Failed to parse integer to Prefix"))?;
             let section_size = match relocated_peer_role {
                 RelocatedPeerRole::Elder => elder_count(),
                 RelocatedPeerRole::NonElder => recommended_section_size(),

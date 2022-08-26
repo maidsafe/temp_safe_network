@@ -188,7 +188,7 @@ async fn bootstrap_node(
 
         // Write the genesis DBC to disk
         let path = root_storage_dir.join(GENESIS_DBC_FILENAME);
-        fs::write(path, genesis_dbc.to_hex().unwrap()).await?;
+        fs::write(path, genesis_dbc.to_hex()?).await?;
 
         let network_knowledge = node.network_knowledge();
 
