@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1661428885822,
+  "lastUpdate": 1661526798699,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -19637,6 +19637,144 @@ window.BENCHMARK_DATA = {
             "name": "generating keys",
             "value": 4609268,
             "range": "± 199531",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "a9eccb3d3f03b9b56b3f53fa2b561f32c03a1364",
+          "message": "Merge #1520\n\n1520: test(cli): use `httpmock` to test remote network contacts r=bochaco a=RolandSherwin\n\n- `sn_cli` can fetch \"Network Contacts\" present on a remote server. To test this feature, `network_contact` files were uploaded to an actual server and the URLs were used inside the tests.\r\n- So any changes made to the struct of the `SectionTree` can render the previous test files useless. Hence use a mock server instead of an actual one for the tests. \n\nCo-authored-by: RolandSherwin <RolandSherwin@protonmail.com>",
+          "timestamp": "2022-08-26T12:41:02Z",
+          "tree_id": "1dc6e1bfcc913fe0d567f50d4e36d26bce3e4eb2",
+          "url": "https://github.com/maidsafe/safe_network/commit/a9eccb3d3f03b9b56b3f53fa2b561f32c03a1364"
+        },
+        "date": 1661526797108,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 1930625424,
+            "range": "± 117688287",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 1990125119,
+            "range": "± 140916637",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 2122023066,
+            "range": "± 2404953030",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 5354362688,
+            "range": "± 5117430278",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 492999928,
+            "range": "± 1333006757",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 891304159,
+            "range": "± 1776464040",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 13376588,
+            "range": "± 4081825",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 1618929393,
+            "range": "± 557547782",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 6213801399,
+            "range": "± 952350742",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 116170168,
+            "range": "± 38819481",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1108916649,
+            "range": "± 225275592",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 4354889563,
+            "range": "± 376696320",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 4,
+            "range": "± 0",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 4,
+            "range": "± 0",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 4,
+            "range": "± 0",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 4,
+            "range": "± 0",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 4,
+            "range": "± 0",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 4,
+            "range": "± 0",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "generating keys",
+            "value": 6000222,
+            "range": "± 239298",
             "unit": "ns/iter"
           }
         ]
