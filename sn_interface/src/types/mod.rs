@@ -25,8 +25,9 @@ mod chunk;
 mod errors;
 mod peer;
 
-pub use crate::messaging::data::{
-    RegisterCmd, RegisterCmdId, ReplicatedRegisterLog, ReplicatedSpentbookLog,
+pub use crate::messaging::{
+    data::{RegisterCmd, RegisterCmdId},
+    SectionAuth,
 };
 
 pub use address::{
@@ -54,6 +55,17 @@ pub use keys::secret_key::test_utils::{keyed_signed, SecretKeySet};
 // TODO: temporary type tag for spentbook since its underlying data type is
 // still not implemented, it uses a Public Register for now.
 pub const SPENTBOOK_TYPE_TAG: u64 = 0;
+
+/// Register data exchange.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReplicatedRegisterLog {
+    ///
+    pub address: RegisterAddress,
+    /// This is a duplicated entry as it should exist in first cmd
+    pub section_auth: SectionAuth,
+    ///
+    pub op_log: Vec<RegisterCmd>,
+}
 
 ///
 #[allow(clippy::large_enum_variant)]

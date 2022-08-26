@@ -12,14 +12,15 @@ use sn_interface::{
     messaging::{
         data::{
             CreateRegister, EditRegister, OperationId, RegisterCmd, RegisterQuery,
-            RegisterStoreExport, ReplicatedRegisterLog, SignedRegisterCreate, SignedRegisterEdit,
+            SignedRegisterCreate, SignedRegisterEdit,
         },
         system::NodeQueryResponse,
         SectionAuth, ServiceAuth, VerifyAuthority,
     },
     types::{
         register::{Action, EntryHash, Permissions, Policy, Register, User},
-        Keypair, PublicKey, RegisterAddress, ReplicatedDataAddress, SPENTBOOK_TYPE_TAG,
+        Keypair, PublicKey, RegisterAddress, ReplicatedDataAddress, ReplicatedRegisterLog,
+        SPENTBOOK_TYPE_TAG,
     },
 };
 
@@ -132,7 +133,10 @@ impl RegisterStorage {
 
     /// Used for replication of data to new Adults.
     #[cfg(test)]
-    pub(crate) async fn get_data_of(&mut self, prefix: Prefix) -> Result<RegisterStoreExport> {
+    pub(crate) async fn get_data_of(
+        &mut self,
+        prefix: Prefix,
+    ) -> Result<Vec<ReplicatedRegisterLog>> {
         let mut the_data = vec![];
 
         let all_addrs = self.addrs().await;
@@ -151,14 +155,12 @@ impl RegisterStorage {
             }
         }
 
-        Ok(RegisterStoreExport(the_data))
+        Ok(the_data)
     }
 
     /// On receiving data from Elders when promoted.
-    pub(crate) async fn update(&mut self, store_data: RegisterStoreExport) -> Result<()> {
+    pub(crate) async fn update(&mut self, registers: Vec<ReplicatedRegisterLog>) -> Result<()> {
         debug!("Updating Register store");
-
-        let RegisterStoreExport(registers) = store_data;
 
         // nested loops, slow..
         for data in registers {

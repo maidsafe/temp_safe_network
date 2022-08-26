@@ -23,10 +23,7 @@ use registers::RegisterStorage;
 use sn_dbc::SpentProofShare;
 use sn_interface::{
     messaging::{
-        data::{
-            DataQueryVariant, Error as MessagingError, RegisterQuery, RegisterStoreExport,
-            StorageLevel,
-        },
+        data::{DataQueryVariant, Error as MessagingError, RegisterQuery, StorageLevel},
         system::NodeQueryResponse,
     },
     types::{
@@ -72,9 +69,7 @@ impl DataStorage {
             ReplicatedData::Chunk(chunk) => self.chunks.store(DataCmd::StoreChunk(chunk)).await?,
             ReplicatedData::RegisterLog(data) => {
                 info!("Updating register: {:?}", data.address);
-                self.registers
-                    .update(RegisterStoreExport(vec![data]))
-                    .await?
+                self.registers.update(vec![data]).await?
             }
             ReplicatedData::RegisterWrite(cmd) => self.registers.write(cmd).await?,
             ReplicatedData::SpentbookWrite(cmd) => {
@@ -91,11 +86,7 @@ impl DataStorage {
                 // We now write the cmd received
                 self.registers.write(cmd).await?
             }
-            ReplicatedData::SpentbookLog(data) => {
-                self.registers
-                    .update(RegisterStoreExport(vec![data]))
-                    .await?
-            }
+            ReplicatedData::SpentbookLog(data) => self.registers.update(vec![data]).await?,
         };
 
         // check if we've filled another approx. 10%-points of our storage
