@@ -53,7 +53,7 @@ impl Client {
             let msg = ServiceMsg::Cmd(cmd);
             WireMsg::serialize_msg_payload(&msg)?
         };
-        let signature = self.keypair.sign(&serialised_cmd);
+        let signature = self.sign(&serialised_cmd);
 
         let op_limit = self.cmd_timeout;
 

@@ -24,6 +24,7 @@ use self::{
 
 use crate::log_sleep;
 use crate::node::{Error, RateLimits, Result};
+use qp2p::UsrMsgBytes;
 
 use sn_interface::{
     messaging::{system::MembershipState, MsgId, WireMsg},
@@ -31,7 +32,6 @@ use sn_interface::{
     types::Peer,
 };
 
-use bytes::Bytes;
 use dashmap::DashMap;
 use qp2p::{Endpoint, IncomingConnections};
 use std::{collections::BTreeSet, net::SocketAddr, sync::Arc, time::Duration};
@@ -208,16 +208,14 @@ impl Comm {
         session.update_send_rate(msgs_per_s).await;
     }
 
-    #[tracing::instrument(skip(self))]
-    pub(crate) async fn send(&self, peer: Peer, msg: WireMsg) -> Result<()> {
-        let msg_id = msg.msg_id();
-        let dst = *msg.dst();
-        let watcher = self.send_to_one(peer, msg).await;
+    #[tracing::instrument(skip(self, bytes))]
+    pub(crate) async fn send(&self, peer: Peer, msg_id: MsgId, bytes: UsrMsgBytes) -> Result<()> {
+        let watcher = self.send_to_one(peer, msg_id, bytes).await;
 
         match watcher {
             Ok(watcher) => {
                 if Self::is_sent(watcher, msg_id, peer).await {
-                    trace!("Msg {msg_id:?} sent to {dst:?}");
+                    trace!("Msg {msg_id:?} sent to {peer:?}");
                     Ok(())
                 } else {
                     Err(Error::FailedSend(peer))
@@ -335,26 +333,26 @@ impl Comm {
     }
 
     // Helper to send a message to a single recipient.
-    #[instrument(skip(self, wire_msg))]
-    async fn send_to_one(&self, recipient: Peer, wire_msg: WireMsg) -> Result<SendWatcher> {
-        let msg_id = wire_msg.msg_id();
-
-        let msg_bytes = match wire_msg.serialize() {
-            Ok(bytes) => bytes,
-            Err(error) => {
-                // early return if we cannot serialise msg
-                return Err(Error::Messaging(error));
-            }
+    #[instrument(skip(self, bytes))]
+    async fn send_to_one(
+        &self,
+        recipient: Peer,
+        msg_id: MsgId,
+        bytes: UsrMsgBytes,
+    ) -> Result<SendWatcher> {
+        let bytes_len = {
+            let (h, d, p) = bytes.clone();
+            h.len() + d.len() + p.len()
         };
 
         trace!(
-            "Sending message ({} bytes, msg_id: {:?}) to {:?}",
-            msg_bytes.len(),
+            "Sending message ({} bytes) w/ {:?} to {:?}",
+            bytes_len,
             msg_id,
             recipient,
         );
         let peer = self.get_or_create(&recipient).await;
-        peer.send(msg_id, msg_bytes).await
+        peer.send(msg_id, bytes).await
     }
 }
 
@@ -449,11 +447,7 @@ impl Drop for Comm {
 
 #[derive(Debug)]
 pub(crate) enum MsgEvent {
-    Received {
-        sender: Peer,
-        wire_msg: WireMsg,
-        original_bytes: Bytes,
-    },
+    Received { sender: Peer, wire_msg: WireMsg },
 }
 
 #[cfg(test)]

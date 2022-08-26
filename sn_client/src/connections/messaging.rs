@@ -542,10 +542,10 @@ impl Session {
     pub(super) async fn send_msg(
         &self,
         nodes: Vec<Peer>,
-        wire_msg: WireMsg,
+        mut wire_msg: WireMsg,
         msg_id: MsgId,
     ) -> Result<()> {
-        let msg_bytes = wire_msg.serialize()?;
+        let bytes = wire_msg.serialize_and_cache_bytes()?;
 
         let mut last_error = None;
         drop(wire_msg);
@@ -557,7 +557,7 @@ impl Session {
 
         for peer in nodes.clone() {
             let session = self.clone();
-            let msg_bytes_clone = msg_bytes.clone();
+            let bytes = bytes.clone();
             let peer_name = peer.name();
 
             let task_handle: JoinHandle<(XorName, Result<()>)> = tokio::spawn(async move {
@@ -570,7 +570,7 @@ impl Session {
                 let mut retries = 0;
 
                 let send_and_retry = || async {
-                    match link.send(msg_bytes_clone.clone(), listen).await {
+                    match link.send(bytes.clone(), listen).await {
                         Ok(()) => Ok(()),
                         Err(SendToOneError::Connection(err)) => {
                             Err(Error::QuicP2pConnection { peer, error: err })

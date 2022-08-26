@@ -103,7 +103,13 @@ impl FlowCtrl {
         loop {
             match self.incoming_msg_events.try_recv() {
                 Ok(msg) => {
-                    let cmd = self.handle_new_msg_event(msg).await;
+                    let cmd = match self.handle_new_msg_event(msg).await {
+                        Ok(cmd) => cmd,
+                        Err(error) => {
+                            error!("Could not handle incoming msg event: {error:?}");
+                            continue;
+                        }
+                    };
 
                     // dont use sender here incase channel gets full
                     self.fire_and_forget(cmd).await;
@@ -206,17 +212,15 @@ impl FlowCtrl {
     }
 
     // Listen for a new incoming connection event and handle it.
-    async fn handle_new_msg_event(&self, event: MsgEvent) -> Cmd {
+    async fn handle_new_msg_event(&self, event: MsgEvent) -> Result<Cmd> {
         match event {
-            MsgEvent::Received {
-                sender,
-                wire_msg,
-                original_bytes,
-            } => {
+            MsgEvent::Received { sender, wire_msg } => {
+                let (header, dst, payload) = wire_msg.serialize()?;
+                let original_bytes_len = header.len() + dst.len() + payload.len();
+
                 debug!(
                     "New message ({} bytes) received from: {:?}",
-                    original_bytes.len(),
-                    sender
+                    original_bytes_len, sender
                 );
 
                 let span = {
@@ -229,7 +233,7 @@ impl FlowCtrl {
                     "{:?} from {:?} length {}",
                     LogMarker::DispatchHandleMsgCmd,
                     sender,
-                    original_bytes.len(),
+                    original_bytes_len
                 );
 
                 #[cfg(feature = "test-utils")]
@@ -239,11 +243,10 @@ impl FlowCtrl {
                     wire_msg
                 };
 
-                Cmd::ValidateMsg {
+                Ok(Cmd::ValidateMsg {
                     origin: sender,
                     wire_msg,
-                    original_bytes,
-                }
+                })
             }
         }
     }
