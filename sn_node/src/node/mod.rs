@@ -788,8 +788,8 @@ mod core {
             let nanos = start_dur.subsec_nanos();
             let name = self.name();
             let states = json!({
-                "waiting-for-cmd": { "value": 0, "color": "#DAF7A6" },
-                "processing-cmd": { "value": 1, "color": "#f9f9f9" },
+                "waiting-for-cmd": { "value": 0, "color": "#f9f9f9" },
+                "processing-cmd": { "value": 1, "color": "#850101" },
             });
 
             let metadata = json!({
