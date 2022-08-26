@@ -85,6 +85,7 @@ mod core {
         },
         UsedSpace,
     };
+    use serde_json::json;
     use sn_dysfunction::{DysfunctionDetection, IssueType};
     #[cfg(feature = "traceroute")]
     use sn_interface::messaging::Entity;
@@ -110,7 +111,7 @@ mod core {
         net::SocketAddr,
         path::PathBuf,
         sync::Arc,
-        time::Duration,
+        time::{Duration, SystemTime, UNIX_EPOCH},
     };
     use uluru::LRUCache;
 
@@ -156,6 +157,7 @@ mod core {
     pub(crate) type AeBackoffCache = LRUCache<(Peer, ExponentialBackoff), BACKOFF_CACHE_LIMIT>;
 
     pub(crate) struct Node {
+        pub(crate) start_time: SystemTime,
         pub(crate) addr: SocketAddr, // does this change? if so... when? only at node start atm?
         pub(crate) event_sender: EventSender,
         root_storage_dir: PathBuf,
@@ -255,6 +257,7 @@ mod core {
             };
 
             let node = Self {
+                start_time: SystemTime::now(),
                 addr,
                 keypair,
                 network_knowledge,
@@ -281,6 +284,8 @@ mod core {
                 ae_backoff_cache: AeBackoffCache::default(),
                 membership,
             };
+
+            node.log_statemap_metadata();
 
             // Write the section tree to this node's root storage directory
             node.write_section_tree().await;
@@ -769,6 +774,50 @@ mod core {
             } else {
                 Entity::Adult(self.info().public_key())
             }
+        }
+
+        pub(crate) fn log_statemap_metadata(&self) {
+            let start_dur = match self.start_time.duration_since(UNIX_EPOCH) {
+                Ok(dur) => dur,
+                Err(e) => {
+                    error!("STATEMAP: failed to calculate start time {e:?}");
+                    return;
+                }
+            };
+            let secs = start_dur.as_secs();
+            let nanos = start_dur.subsec_nanos();
+            let name = self.name();
+            let states = json!({
+                "waiting-for-cmd": { "value": 0, "color": "#DAF7A6" },
+                "processing-cmd": { "value": 1, "color": "#f9f9f9" },
+            });
+
+            let metadata = json!({
+                "title": format!("States of {name}"),
+                "start": [secs, nanos],
+                "host": name,
+                "states": states
+            });
+
+            trace!("STATEMAP_METADATA: {metadata}");
+        }
+
+        pub(crate) fn log_statemap(&self, state: usize) {
+            // { "time": "1579579142", "entity": "<xorname>", "state": 6 }
+            let time = match SystemTime::now().duration_since(self.start_time) {
+                Ok(t) => t.as_nanos(),
+                Err(e) => {
+                    error!("STATEMAP: failed to read system time: {e:?}");
+                    return;
+                }
+            };
+            let name = self.name();
+            let entry = json!({
+                "time": format!("{}", time),
+                "entity": name,
+                "state": state,
+            });
+            info!("STATEMAP_ENTRY: {entry}")
         }
     }
 

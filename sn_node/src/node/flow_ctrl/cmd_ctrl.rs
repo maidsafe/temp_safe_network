@@ -162,6 +162,7 @@ impl CmdCtrl {
 
         let dispatcher = self.dispatcher.clone();
         let _ = tokio::task::spawn_local(async move {
+            dispatcher.node().read().await.log_statemap(1);
             match dispatcher.process_cmd(cmd).await {
                 Ok(cmds) => {
                     monitoring.increment_cmds().await;
@@ -198,6 +199,7 @@ impl CmdCtrl {
                 }
             }
             throughpout.increment(); // both on fail and success
+            dispatcher.node().read().await.log_statemap(0);
         });
         Ok(())
     }
