@@ -14,11 +14,13 @@ use sn_interface::{
     messaging::data::DataCmd,
     types::{
         utils::{deserialise, serialise},
-        Chunk, RegisterAddress, RegisterCmd, RegisterCmdId, ReplicatedDataAddress as DataAddress,
+        Chunk, ChunkAddress, RegisterAddress, RegisterCmd, RegisterCmdId, ReplicatedDataAddress,
     },
 };
 
+use bincode::serialize;
 use bytes::Bytes;
+use hex::FromHex;
 use std::{
     collections::{btree_map::Entry, BTreeMap},
     path::{Path, PathBuf},
@@ -54,62 +56,49 @@ impl FileStore {
         })
     }
 
-    // ---------------------- helper methods ----------------------
+    fn address_to_filepath(&self, addr: &ReplicatedDataAddress) -> Result<PathBuf> {
+        let path = match addr {
+            ReplicatedDataAddress::Register(reg_addr) => {
+                // this is a unique identifier of the Register,
+                // since it encodes both the xorname and tag.
+                let reg_id = XorName::from_content(&serialize(reg_addr)?);
+                let path = self.prefix_tree_path(reg_id, self.bit_tree_depth);
 
-    // Helper that returns the prefix tree path of depth `bit_count` for a given xorname
-    // Example:
-    // - with a xorname with starting bits `010001110110....`
-    // - and a bit_count of `6`
-    // returns the path `FILE_STORE_PATH/0/1/0/0/0/1`
-    // If the provided bit count is larger than `self.bit_tree_depth`, uses `self.bit_tree_depth`
-    // to stay within the prefix tree path
-    fn prefix_tree_path(&self, xorname: XorName, bit_count: usize) -> PathBuf {
-        let bin = format!("{:b}", xorname);
-        let prefix_dir_path: PathBuf = bin
-            .chars()
-            .take(std::cmp::min(bit_count, self.bit_tree_depth))
-            .map(|c| format!("{}", c))
-            .collect();
+                // we need to append a folder for the file specifically so bit depth is an issue when low.
+                // we use hex to get full id, not just first bytes
+                path.join(hex::encode(reg_id))
+            }
+            ReplicatedDataAddress::Chunk(chunk_addr) => {
+                let xorname = *chunk_addr.name();
+                let path = self.prefix_tree_path(xorname, self.bit_tree_depth);
 
-        let mut path = self.file_store_path.clone();
-        path.push(prefix_dir_path);
-        path
-    }
-
-    fn address_to_filepath(&self, addr: &DataAddress) -> Result<PathBuf> {
-        let path = if let DataAddress::Register(reg_addr) = addr {
-            let reg_id = reg_addr.id()?;
-            let path = self.prefix_tree_path(reg_id, self.bit_tree_depth);
-            // we need to append a folder for the file specifically so bit depth is an issue when low.
-            // we use hex to get full id, not just first bytes
-            path.join(format!("{:X}", reg_id))
-        } else {
-            let xorname = *addr.name();
-            let mut path = self.prefix_tree_path(xorname, self.bit_tree_depth);
-
-            let filename = addr.encode_to_zbase32()?;
-            path.push(filename);
-            path
+                let filename = hex::encode(xorname);
+                path.join(filename)
+            }
+            ReplicatedDataAddress::Spentbook(addr) => {
+                return Err(Error::UnsupportedDataType(*addr.name()));
+            }
         };
 
         Ok(path)
     }
 
-    pub(crate) fn list_all_chunk_addrs(&self) -> Vec<DataAddress> {
+    pub(crate) fn list_all_chunk_addrs(&self) -> Vec<ChunkAddress> {
         self.list_all_files()
             .iter()
             .filter_map(|filepath| Self::chunk_filepath_to_address(filepath).ok())
             .collect()
     }
 
-    fn chunk_filepath_to_address(path: &Path) -> Result<DataAddress> {
+    fn chunk_filepath_to_address(path: &Path) -> Result<ChunkAddress> {
         let filename = path
             .file_name()
             .ok_or(Error::NoFilename)?
             .to_str()
             .ok_or(Error::InvalidFilename)?;
 
-        Ok(DataAddress::decode_from_zbase32(filename)?)
+        let xorname = XorName(<[u8; 32]>::from_hex(filename)?);
+        Ok(ChunkAddress(xorname))
     }
 
     pub(crate) async fn list_all_reg_addrs(&self) -> Vec<RegisterAddress> {
@@ -132,13 +121,11 @@ impl FileStore {
         addrs.into_iter().map(|(_, addr)| addr).collect()
     }
 
-    // ---------------------- api methods ----------------------
-
     pub(crate) fn can_add(&self, size: usize) -> bool {
         self.used_space.can_add(size)
     }
 
-    pub(crate) async fn write_data(&self, data: DataCmd) -> Result<DataAddress> {
+    pub(crate) async fn write_data(&self, data: DataCmd) -> Result<ReplicatedDataAddress> {
         let addr = data.address();
         let filepath = self.address_to_filepath(&addr)?;
         if let Some(dirs) = filepath.parent() {
@@ -157,7 +144,7 @@ impl FileStore {
     }
 
     #[allow(dead_code)]
-    pub(crate) async fn delete_data(&self, addr: &DataAddress) -> Result<()> {
+    pub(crate) async fn delete_data(&self, addr: &ReplicatedDataAddress) -> Result<()> {
         let filepath = self.address_to_filepath(addr)?;
         let meta = metadata(filepath.clone()).await?;
         remove_file(filepath).await?;
@@ -165,14 +152,14 @@ impl FileStore {
         Ok(())
     }
 
-    pub(crate) async fn read_data(&self, addr: &DataAddress) -> Result<Chunk> {
+    pub(crate) async fn read_data(&self, addr: &ReplicatedDataAddress) -> Result<Chunk> {
         let file_path = self.address_to_filepath(addr)?;
         let bytes = Bytes::from(read(file_path).await?);
         let chunk = Chunk::new(bytes);
         Ok(chunk)
     }
 
-    pub(crate) fn data_file_exists(&self, addr: &DataAddress) -> Result<bool> {
+    pub(crate) fn data_file_exists(&self, addr: &ReplicatedDataAddress) -> Result<bool> {
         let filepath = self.address_to_filepath(addr)?;
         Ok(filepath.exists())
     }
@@ -180,6 +167,7 @@ impl FileStore {
     pub(crate) fn list_all_files(&self) -> Vec<PathBuf> {
         list_files_in(&self.file_store_path)
     }
+
     #[allow(unused)]
     /// quickly find chunks related or not to a section, might be useful when adults change sections
     /// not used yet
@@ -206,7 +194,7 @@ impl FileStore {
     ) -> Result<(RegisterLog, PathBuf)> {
         let mut register_log = RegisterLog::new();
 
-        let path = self.address_to_filepath(&DataAddress::Register(*addr))?;
+        let path = self.address_to_filepath(&ReplicatedDataAddress::Register(*addr))?;
         if path.exists() {
             trace!("Register log path exists: {}", path.display());
             for filepath in list_files_in(&path) {
@@ -265,6 +253,28 @@ impl FileStore {
 
         trace!("RegisterCmd writing successful for id {reg_id}");
         Ok(())
+    }
+
+    // ---------------------- private helper methods ----------------------
+
+    // Helper that returns the prefix tree path of depth `bit_count` for a given xorname
+    // Example:
+    // - with a xorname with starting bits `010001110110....`
+    // - and a bit_count of `6`
+    // returns the path `FILE_STORE_PATH/0/1/0/0/0/1`
+    // If the provided bit count is larger than `self.bit_tree_depth`, uses `self.bit_tree_depth`
+    // to stay within the prefix tree path
+    fn prefix_tree_path(&self, xorname: XorName, bit_count: usize) -> PathBuf {
+        let bin = format!("{:b}", xorname);
+        let prefix_dir_path: PathBuf = bin
+            .chars()
+            .take(std::cmp::min(bit_count, self.bit_tree_depth))
+            .map(|c| format!("{}", c))
+            .collect();
+
+        let mut path = self.file_store_path.clone();
+        path.push(prefix_dir_path);
+        path
     }
 }
 

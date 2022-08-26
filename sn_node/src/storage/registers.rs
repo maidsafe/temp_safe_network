@@ -19,8 +19,7 @@ use sn_interface::{
     },
     types::{
         register::{Action, EntryHash, Permissions, Policy, Register, User},
-        Keypair, PublicKey, RegisterAddress, ReplicatedDataAddress as DataAddress,
-        SPENTBOOK_TYPE_TAG,
+        Keypair, PublicKey, RegisterAddress, ReplicatedDataAddress, SPENTBOOK_TYPE_TAG,
     },
 };
 
@@ -65,7 +64,7 @@ impl RegisterStorage {
         trace!("Removing register, {:?}", address);
 
         self.file_store
-            .delete_data(&DataAddress::Register(*address))
+            .delete_data(&ReplicatedDataAddress::Register(*address))
             .await?;
 
         Ok(())
@@ -82,8 +81,8 @@ impl RegisterStorage {
     ) -> Result<ReplicatedRegisterLog> {
         let stored_reg = match self.try_load_stored_register(address).await {
             Ok(stored_reg) => stored_reg,
-            Err(Error::KeyNotFound(_key)) => {
-                return Err(Error::NoSuchData(DataAddress::Register(*address)))
+            Err(Error::RegisterNotFound(_)) => {
+                return Err(Error::NoSuchData(ReplicatedDataAddress::Register(*address)))
             }
             Err(e) => return Err(e),
         };
@@ -147,7 +146,7 @@ impl RegisterStorage {
                         the_data.push(self.create_replica(stored_reg.clone())?);
                     }
                 }
-                Err(Error::KeyNotFound(_)) => return Err(Error::InvalidStore),
+                Err(Error::RegisterNotFound(_)) => return Err(Error::InvalidStore),
                 Err(e) => return Err(e),
             }
         }
@@ -163,12 +162,11 @@ impl RegisterStorage {
 
         // nested loops, slow..
         for data in registers {
-            let key = data.address.id()?;
             for replicated_cmd in data.op_log {
                 if replicated_cmd.dst_address() != data.address {
                     warn!(
-                        "Corrupt ReplicatedRegisterLog, op log contains foreign ops: {}",
-                        key
+                        "Corrupt ReplicatedRegisterLog, op log contains foreign ops: {:?}",
+                        data.address
                     );
                     continue;
                 }
@@ -232,7 +230,7 @@ impl RegisterStorage {
 
                 if self
                     .file_store
-                    .data_file_exists(&DataAddress::Register(address))?
+                    .data_file_exists(&ReplicatedDataAddress::Register(address))?
                 {
                     return Err(Error::DataExists);
                 }
@@ -341,8 +339,8 @@ impl RegisterStorage {
     ) -> Result<Register> {
         let stored_reg = match self.try_load_stored_register(address).await {
             Ok(stored_reg) => stored_reg,
-            Err(Error::KeyNotFound(_key)) => {
-                return Err(Error::NoSuchData(DataAddress::Register(*address)))
+            Err(Error::RegisterNotFound(_)) => {
+                return Err(Error::NoSuchData(ReplicatedDataAddress::Register(*address)))
             }
             Err(e) => return Err(e),
         };
@@ -506,7 +504,7 @@ impl RegisterStorage {
         }
 
         match hydrated_register {
-            None => Err(Error::KeyNotFound(addr.id()?.to_string())),
+            None => Err(Error::RegisterNotFound(ops_log_path)),
             Some((mut state, section_auth)) => {
                 // apply any queued RegisterEdit op
                 for op in queued {

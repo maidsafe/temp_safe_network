@@ -6,10 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::super::{Result, XorName};
-use super::DataAddress;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
+use xor_name::XorName;
 
 /// Address of a Spentbook.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
@@ -25,10 +24,5 @@ impl SpentbookAddress {
     /// This is a unique identifier.
     pub fn name(&self) -> &XorName {
         &self.0
-    }
-
-    /// Returns the Address serialised and encoded in z-base-32.
-    pub fn encode_to_zbase32(&self) -> Result<String> {
-        DataAddress::Spentbook(*self).encode_to_zbase32()
     }
 }

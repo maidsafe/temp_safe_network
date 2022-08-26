@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::types::{register::User, PublicKey, ReplicatedDataAddress as DataAddress};
+use crate::types::{register::User, PublicKey, ReplicatedDataAddress};
 use serde::{Deserialize, Serialize};
 use std::result;
 use thiserror::Error;
@@ -28,7 +28,7 @@ pub enum Error {
     ChunkNotFound(XorName),
     /// Requested data not found
     #[error("Requested data not found: {0:?}")]
-    DataNotFound(DataAddress),
+    DataNotFound(ReplicatedDataAddress),
     /// Failed to write file, likely due to a system Io error
     #[error("Failed to write file")]
     FailedToWriteFile,

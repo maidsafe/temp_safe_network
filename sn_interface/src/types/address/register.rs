@@ -6,10 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::super::{Result, XorName};
-use super::DataAddress;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
+use xor_name::XorName;
 
 /// Address of a Register, different from
 /// a `ChunkAddress` in that it also includes a tag.
@@ -27,12 +26,6 @@ impl RegisterAddress {
         Self { name, tag }
     }
 
-    /// This is a unique identifier of the Register,
-    /// since it also encodes the tag of the Address.
-    pub fn id(&self) -> Result<XorName> {
-        Ok(XorName::from_content(self.encode_to_zbase32()?.as_bytes()))
-    }
-
     /// Returns the name.
     /// This is not a unique identifier.
     pub fn name(&self) -> &XorName {
@@ -42,10 +35,5 @@ impl RegisterAddress {
     /// Returns the tag.
     pub fn tag(&self) -> u64 {
         self.tag
-    }
-
-    /// Returns the Address serialised and encoded in z-base-32.
-    pub fn encode_to_zbase32(&self) -> Result<String> {
-        DataAddress::Register(*self).encode_to_zbase32()
     }
 }
