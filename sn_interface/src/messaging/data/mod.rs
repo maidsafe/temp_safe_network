@@ -22,8 +22,8 @@ pub use self::{
     query::DataQuery,
     query::DataQueryVariant,
     register::{
-        CreateRegister, EditRegister, RegisterCmd, RegisterCmdId, RegisterQuery,
-        SignedRegisterCreate, SignedRegisterEdit,
+        CreateRegister, EditRegister, RegisterCmd, RegisterQuery, SignedRegisterCreate,
+        SignedRegisterEdit,
     },
     spentbook::{SpentbookCmd, SpentbookQuery},
 };

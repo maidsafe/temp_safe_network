@@ -25,10 +25,7 @@ mod chunk;
 mod errors;
 mod peer;
 
-pub use crate::messaging::{
-    data::{RegisterCmd, RegisterCmdId},
-    SectionAuth,
-};
+pub use crate::messaging::{data::RegisterCmd, SectionAuth};
 
 pub use address::{ChunkAddress, DataAddress, RegisterAddress, SpentbookAddress};
 pub use cache::Cache;
@@ -103,16 +100,6 @@ impl ReplicatedData {
             Self::SpentbookWrite(cmd) => {
                 DataAddress::Spentbook(SpentbookAddress::new(*cmd.dst_address().name()))
             }
-        }
-    }
-
-    pub fn reg_op_id(&self) -> Result<Option<RegisterCmdId>> {
-        match self {
-            Self::RegisterWrite(cmd) => Ok(Some(
-                cmd.register_operation_id()
-                    .map_err(|_| Error::InvalidOperation)?,
-            )),
-            _ => Ok(None),
         }
     }
 }

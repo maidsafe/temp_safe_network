@@ -30,7 +30,7 @@ impl Node {
         // Collection of data addresses that we do not have
 
         // TODO: can we cache this data stored per churn event?
-        let data_i_have = self.data_storage.keys().await;
+        let data_i_have = self.data_storage.data_addrs().await;
         trace!("Our data got");
 
         if data_i_have.is_empty() {
@@ -82,7 +82,7 @@ impl Node {
     pub(crate) async fn ask_for_any_new_data(&self) -> Cmd {
         trace!("{:?}", LogMarker::DataReorganisationUnderway);
         debug!("Querying section for any new data");
-        let data_i_have = self.data_storage.keys().await;
+        let data_i_have = self.data_storage.data_addrs().await;
 
         let my_name = self.info().name();
         let adults = self.network_knowledge.adults();
