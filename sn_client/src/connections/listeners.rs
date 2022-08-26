@@ -13,6 +13,7 @@ use crate::{
     Error, Result,
 };
 
+use qp2p::UsrMsgBytes;
 use sn_interface::{
     at_least_one_correct_elder,
     messaging::{
@@ -25,7 +26,6 @@ use sn_interface::{
 };
 
 use bls::PublicKey as BlsPublicKey;
-use bytes::Bytes;
 use itertools::Itertools;
 use qp2p::{Close, ConnectionError, ConnectionIncoming as IncomingMsgs, SendError};
 use rand::{rngs::OsRng, seq::SliceRandom};
@@ -98,9 +98,9 @@ impl Session {
         src: SocketAddr,
         incoming_msgs: &mut IncomingMsgs,
     ) -> Result<Option<MsgType>, Error> {
-        if let Some(msg) = incoming_msgs.next().await? {
+        if let Some(bytes) = incoming_msgs.next().await? {
             trace!("Incoming msg from {:?}", src);
-            let wire_msg = WireMsg::from(msg)?;
+            let wire_msg = WireMsg::from(bytes)?;
             let msg_type = wire_msg.into_msg()?;
 
             #[cfg(feature = "traceroute")]
@@ -308,7 +308,7 @@ impl Session {
         target_sap: SectionAuthorityProvider,
         section_signed: KeyedSig,
         provided_section_chain: SecuredLinkedList,
-        bounced_msg: Bytes,
+        bounced_msg: UsrMsgBytes,
         src_peer: Peer,
     ) -> Result<(), Error> {
         debug!("Received Anti-Entropy from {src_peer}, with SAP: {target_sap:?}");
@@ -401,7 +401,7 @@ impl Session {
     /// or if it has already been dealt with
     #[instrument(skip_all, level = "debug")]
     async fn new_target_elders(
-        bounced_msg: Bytes,
+        bounced_msg: UsrMsgBytes,
         received_auth: &SectionAuthorityProvider,
     ) -> Result<
         Option<(
@@ -413,7 +413,7 @@ impl Session {
         )>,
         Error,
     > {
-        let (msg_id, service_msg, dst, auth) = match WireMsg::deserialize(bounced_msg.clone())? {
+        let (msg_id, service_msg, dst, auth) = match WireMsg::deserialize(bounced_msg)? {
             MsgType::Service {
                 msg_id,
                 msg,

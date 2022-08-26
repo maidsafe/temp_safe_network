@@ -60,7 +60,7 @@ impl MsgListener {
         while let Some(result) = incoming_msgs.next().await.transpose() {
             match result {
                 Ok(msg_bytes) => {
-                    let wire_msg = match WireMsg::from(msg_bytes.clone()) {
+                    let wire_msg = match WireMsg::from(msg_bytes) {
                         Ok(wire_msg) => wire_msg,
                         Err(error) => {
                             // TODO: should perhaps rather drop this connection.. as it is a spam vector
@@ -87,7 +87,6 @@ impl MsgListener {
                         .send(MsgEvent::Received {
                             sender: Peer::new(src_name, remote_address),
                             wire_msg,
-                            original_bytes: msg_bytes,
                         })
                         .await
                     {
