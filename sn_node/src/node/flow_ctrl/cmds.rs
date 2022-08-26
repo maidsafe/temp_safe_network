@@ -22,7 +22,7 @@ use sn_interface::{
         AuthorityProof, MsgId, NodeMsgAuthority, ServiceAuth, WireMsg,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
-    types::{Peer, ReplicatedDataAddress},
+    types::{DataAddress, Peer},
 };
 
 use bytes::Bytes;
@@ -178,8 +178,8 @@ pub(crate) enum Cmd {
     EnqueueDataForReplication {
         // throttle_duration: Duration,
         recipient: Peer,
-        /// Batches of ReplicatedDataAddress to be sent together
-        data_batch: Vec<ReplicatedDataAddress>,
+        /// Batches of DataAddress to be sent together
+        data_batch: Vec<DataAddress>,
     },
     /// Performs serialisation and signing and sends the msg.
     SendMsg {

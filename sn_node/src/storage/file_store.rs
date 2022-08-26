@@ -14,7 +14,7 @@ use sn_interface::{
     messaging::data::DataCmd,
     types::{
         utils::{deserialise, serialise},
-        Chunk, ChunkAddress, RegisterAddress, RegisterCmd, RegisterCmdId, ReplicatedDataAddress,
+        Chunk, ChunkAddress, DataAddress, RegisterAddress, RegisterCmd, RegisterCmdId,
     },
 };
 
@@ -56,9 +56,9 @@ impl FileStore {
         })
     }
 
-    fn address_to_filepath(&self, addr: &ReplicatedDataAddress) -> Result<PathBuf> {
+    fn address_to_filepath(&self, addr: &DataAddress) -> Result<PathBuf> {
         let path = match addr {
-            ReplicatedDataAddress::Register(reg_addr) => {
+            DataAddress::Register(reg_addr) => {
                 // this is a unique identifier of the Register,
                 // since it encodes both the xorname and tag.
                 let reg_id = XorName::from_content(&serialize(reg_addr)?);
@@ -68,15 +68,18 @@ impl FileStore {
                 // we use hex to get full id, not just first bytes
                 path.join(hex::encode(reg_id))
             }
-            ReplicatedDataAddress::Chunk(chunk_addr) => {
+            DataAddress::Bytes(chunk_addr) => {
                 let xorname = *chunk_addr.name();
                 let path = self.prefix_tree_path(xorname, self.bit_tree_depth);
 
                 let filename = hex::encode(xorname);
                 path.join(filename)
             }
-            ReplicatedDataAddress::Spentbook(addr) => {
+            DataAddress::Spentbook(addr) => {
                 return Err(Error::UnsupportedDataType(*addr.name()));
+            }
+            DataAddress::SafeKey(xorname) => {
+                return Err(Error::UnsupportedDataType(*xorname));
             }
         };
 
@@ -125,7 +128,7 @@ impl FileStore {
         self.used_space.can_add(size)
     }
 
-    pub(crate) async fn write_data(&self, data: DataCmd) -> Result<ReplicatedDataAddress> {
+    pub(crate) async fn write_data(&self, data: DataCmd) -> Result<DataAddress> {
         let addr = data.address();
         let filepath = self.address_to_filepath(&addr)?;
         if let Some(dirs) = filepath.parent() {
@@ -143,8 +146,7 @@ impl FileStore {
         Ok(addr)
     }
 
-    #[allow(dead_code)]
-    pub(crate) async fn delete_data(&self, addr: &ReplicatedDataAddress) -> Result<()> {
+    pub(crate) async fn delete_data(&self, addr: &DataAddress) -> Result<()> {
         let filepath = self.address_to_filepath(addr)?;
         let meta = metadata(filepath.clone()).await?;
         remove_file(filepath).await?;
@@ -152,14 +154,14 @@ impl FileStore {
         Ok(())
     }
 
-    pub(crate) async fn read_data(&self, addr: &ReplicatedDataAddress) -> Result<Chunk> {
+    pub(crate) async fn read_data(&self, addr: &DataAddress) -> Result<Chunk> {
         let file_path = self.address_to_filepath(addr)?;
         let bytes = Bytes::from(read(file_path).await?);
         let chunk = Chunk::new(bytes);
         Ok(chunk)
     }
 
-    pub(crate) fn data_file_exists(&self, addr: &ReplicatedDataAddress) -> Result<bool> {
+    pub(crate) fn data_file_exists(&self, addr: &DataAddress) -> Result<bool> {
         let filepath = self.address_to_filepath(addr)?;
         Ok(filepath.exists())
     }
@@ -194,7 +196,7 @@ impl FileStore {
     ) -> Result<(RegisterLog, PathBuf)> {
         let mut register_log = RegisterLog::new();
 
-        let path = self.address_to_filepath(&ReplicatedDataAddress::Register(*addr))?;
+        let path = self.address_to_filepath(&DataAddress::Register(*addr))?;
         if path.exists() {
             trace!("Register log path exists: {}", path.display());
             for filepath in list_files_in(&path) {

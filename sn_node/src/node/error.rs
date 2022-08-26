@@ -12,7 +12,7 @@ use crate::node::handover::Error as HandoverError;
 
 use sn_interface::{
     messaging::data::Error as ErrorMsg,
-    types::{convert_dt_error_to_error_msg, Peer, PublicKey, ReplicatedDataAddress},
+    types::{convert_dt_error_to_error_msg, DataAddress, Peer, PublicKey},
 };
 
 use secured_linked_list::error::Error as SecuredLinkedListError;
@@ -127,7 +127,7 @@ pub enum Error {
     NoSectionPublicKeyKnown(XorName),
     /// Key, Value pair not found.
     #[error("No such data: {0:?}")]
-    NoSuchData(ReplicatedDataAddress),
+    NoSuchData(DataAddress),
     /// Chunk already exists for this node
     #[error("Data already exists at this node")]
     DataExists,

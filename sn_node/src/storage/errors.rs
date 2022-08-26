@@ -8,7 +8,7 @@
 
 use sn_interface::{
     messaging::data::Error as ErrorMsg,
-    types::{convert_dt_error_to_error_msg, PublicKey, ReplicatedDataAddress},
+    types::{convert_dt_error_to_error_msg, DataAddress, PublicKey},
 };
 
 use std::{io, path::PathBuf};
@@ -31,7 +31,7 @@ pub enum Error {
     RegisterNotFound(PathBuf),
     /// Data not found.
     #[error("No such data: {0:?}")]
-    NoSuchData(ReplicatedDataAddress),
+    NoSuchData(DataAddress),
     /// Chunk not found.
     #[error("Chunk not found: {0:?}")]
     ChunkNotFound(XorName),
