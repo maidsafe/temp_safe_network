@@ -14,7 +14,6 @@ pub use register::RegisterAddress;
 #[allow(unreachable_pub)]
 pub use spentbook::SpentbookAddress;
 
-use super::{utils, Result};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
@@ -40,16 +39,6 @@ impl DataAddress {
             Self::Register(address) => address.name(),
             Self::Spentbook(address) => address.name(),
         }
-    }
-
-    /// Returns the Address serialised and encoded in z-base-32.
-    pub fn encode_to_zbase32(&self) -> Result<String> {
-        utils::encode(&self)
-    }
-
-    /// Creates from z-base-32 encoded string.
-    pub fn decode_from_zbase32<T: AsRef<str>>(encoded: T) -> Result<Self> {
-        utils::decode(encoded)
     }
 
     ///
@@ -93,16 +82,6 @@ impl ReplicatedDataAddress {
             Self::Spentbook(address) => address.name(),
         }
     }
-
-    /// Returns the Address serialised and encoded in z-base-32.
-    pub fn encode_to_zbase32(&self) -> Result<String> {
-        utils::encode(&self)
-    }
-
-    /// Creates from z-base-32 encoded string.
-    pub fn decode_from_zbase32<T: AsRef<str>>(encoded: T) -> Result<Self> {
-        utils::decode(encoded)
-    }
 }
 
 /// Address of a Chunk.
@@ -113,42 +92,5 @@ impl ChunkAddress {
     /// Returns the name.
     pub fn name(&self) -> &XorName {
         &self.0
-    }
-
-    /// Returns the Address serialised and encoded in z-base-32.
-    pub fn encode_to_zbase32(&self) -> Result<String> {
-        utils::encode(&self)
-    }
-
-    /// Creates from z-base-32 encoded string.
-    pub fn decode_from_zbase32<T: AsRef<str>>(encoded: T) -> Result<Self> {
-        utils::decode(encoded)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::types::{ChunkAddress, DataAddress, Result};
-    use xor_name::XorName;
-
-    #[test]
-    fn zbase32_encode_decode_data_address() -> Result<()> {
-        let name: XorName = xor_name::rand::random();
-        let chunk_addr = ChunkAddress(name);
-        let address = DataAddress::Bytes(chunk_addr);
-        let encoded = address.encode_to_zbase32()?;
-        let decoded = DataAddress::decode_from_zbase32(&encoded)?;
-        assert_eq!(address, decoded);
-        Ok(())
-    }
-
-    #[test]
-    fn zbase32_encode_decode_chunk_address() -> Result<()> {
-        let name: XorName = xor_name::rand::random();
-        let address = ChunkAddress(name);
-        let encoded = address.encode_to_zbase32()?;
-        let decoded = ChunkAddress::decode_from_zbase32(&encoded)?;
-        assert_eq!(address, decoded);
-        Ok(())
     }
 }

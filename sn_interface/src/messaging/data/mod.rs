@@ -34,7 +34,7 @@ pub use self::{
 use crate::messaging::{data::Error as ErrorMsg, MsgId};
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register, User},
-    utils, Chunk, ChunkAddress, ReplicatedDataAddress as DataAddress,
+    utils, Chunk, ChunkAddress, ReplicatedDataAddress,
 };
 
 use bytes::Bytes;
@@ -301,7 +301,7 @@ impl QueryResponse {
             GetChunk(result) => match result {
                 Ok(chunk) => chunk_operation_id(chunk.address()),
                 Err(ErrorMsg::ChunkNotFound(name)) => chunk_operation_id(&ChunkAddress(*name)),
-                Err(ErrorMsg::DataNotFound(DataAddress::Chunk(address))) => {
+                Err(ErrorMsg::DataNotFound(ReplicatedDataAddress::Chunk(address))) => {
                     chunk_operation_id(address)
                 }
                 Err(ErrorMsg::DataNotFound(another_address)) => {

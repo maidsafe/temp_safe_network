@@ -10,7 +10,7 @@ use super::{convert_to_error_msg, Error, FileStore, Result, UsedSpace};
 
 use sn_interface::{
     messaging::{data::DataCmd, system::NodeQueryResponse},
-    types::{log_markers::LogMarker, Chunk, ChunkAddress, ReplicatedDataAddress as DataAddress},
+    types::{log_markers::LogMarker, Chunk, ChunkAddress, ReplicatedDataAddress},
 };
 
 use std::{
@@ -35,7 +35,7 @@ impl ChunkStorage {
         })
     }
 
-    pub(crate) fn addrs(&self) -> Vec<DataAddress> {
+    pub(crate) fn addrs(&self) -> Vec<ChunkAddress> {
         self.file_store.list_all_chunk_addrs()
     }
 
@@ -43,7 +43,7 @@ impl ChunkStorage {
     pub(crate) async fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
         trace!("Removing chunk, {:?}", address);
         self.file_store
-            .delete_data(&DataAddress::Chunk(*address))
+            .delete_data(&ReplicatedDataAddress::Chunk(*address))
             .await
     }
 
@@ -52,7 +52,7 @@ impl ChunkStorage {
 
         match self
             .file_store
-            .read_data(&DataAddress::Chunk(*address))
+            .read_data(&ReplicatedDataAddress::Chunk(*address))
             .await
         {
             Ok(res) => Ok(res),

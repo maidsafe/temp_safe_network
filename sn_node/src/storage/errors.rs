@@ -8,10 +8,10 @@
 
 use sn_interface::{
     messaging::data::Error as ErrorMsg,
-    types::{convert_dt_error_to_error_msg, PublicKey, ReplicatedDataAddress as DataAddress},
+    types::{convert_dt_error_to_error_msg, PublicKey, ReplicatedDataAddress},
 };
 
-use std::io;
+use std::{io, path::PathBuf};
 use thiserror::Error;
 use xor_name::XorName;
 
@@ -26,42 +26,42 @@ pub enum Error {
     /// Not enough space to store the value.
     #[error("Not enough space")]
     NotEnoughSpace,
-    /// Key not found.
-    #[error("Key not found: {0:?}")]
-    KeyNotFound(String),
+    /// Register not found in local storage.
+    #[error("Register not found in local storage: {0}")]
+    RegisterNotFound(PathBuf),
     /// Data not found.
     #[error("No such data: {0:?}")]
-    NoSuchData(DataAddress),
+    NoSuchData(ReplicatedDataAddress),
     /// Chunk not found.
     #[error("Chunk not found: {0:?}")]
     ChunkNotFound(XorName),
     /// Data already exists for this node
     #[error("Data already exists at this node")]
     DataExists,
-    /// Chunk already exists for this node. Pass in the RegCmdId
+    /// Register op already exists for this node. Pass in the RegCmdId
     #[error("RegCmd Operation already exists at this node: {0}")]
     RegCmdOperationExists(String),
     /// Data owner provided is invalid.
     #[error("Provided PublicKey is not a valid owner. Provided PublicKey: {0}")]
     InvalidOwner(PublicKey),
     /// Invalid store found
-    #[error("A KV store was loaded, but found to be invalid")]
+    #[error("A store was loaded, but found to be invalid")]
     InvalidStore,
+    /// Storage not supported for type of data address
+    #[error("Storage not supported for type of data address: {0:?}")]
+    UnsupportedDataType(XorName),
     /// Data owner provided is invalid.
     #[error("Provided PublicKey could not validate signature {0:?}")]
     InvalidSignature(PublicKey),
-    /// Serialization error
-    #[error("Serialization error: {0}")]
-    Serialize(String),
-    /// Deserialization error
-    #[error("Deserialization error: {0}")]
-    Deserialize(String),
     /// I/O error.
     #[error("I/O error: {0}")]
     Io(#[from] io::Error),
     /// Bincode error.
     #[error("Bincode error:: {0}")]
     Bincode(#[from] bincode::Error),
+    /// Hex decoding error.
+    #[error("Hex decoding error:: {0}")]
+    HexDecoding(#[from] hex::FromHexError),
     /// Invalid filename
     #[error("Invalid chunk filename")]
     InvalidFilename,
