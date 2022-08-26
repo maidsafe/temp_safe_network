@@ -246,7 +246,7 @@ mod test {
             block_on(async {
                 let _ = self
                     .config
-                    .store_dummy_network_contacts_and_set_default(1)
+                    .store_dummy_network_contacts_and_set_default(None, 1)
                     .await?;
                 Ok(())
             })
@@ -584,7 +584,7 @@ mod join_command {
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let network_contacts = config
-            .store_dummy_network_contacts_and_set_default(1)
+            .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
             .unwrap();
@@ -629,7 +629,7 @@ mod join_command {
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let network_contacts = config
-            .store_dummy_network_contacts_and_set_default(1)
+            .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
             .unwrap();
@@ -676,7 +676,7 @@ mod join_command {
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let network_contacts = config
-            .store_dummy_network_contacts_and_set_default(1)
+            .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
             .unwrap();
@@ -724,7 +724,7 @@ mod join_command {
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let network_contacts = config
-            .store_dummy_network_contacts_and_set_default(1)
+            .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
             .unwrap();
@@ -771,7 +771,7 @@ mod join_command {
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let network_contacts = config
-            .store_dummy_network_contacts_and_set_default(1)
+            .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
             .unwrap();
@@ -817,7 +817,7 @@ mod join_command {
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let network_contacts = config
-            .store_dummy_network_contacts_and_set_default(1)
+            .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
             .unwrap();
@@ -861,7 +861,7 @@ mod join_command {
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let network_contacts = config
-            .store_dummy_network_contacts_and_set_default(1)
+            .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
             .unwrap();
@@ -908,7 +908,7 @@ mod join_command {
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let network_contacts = config
-            .store_dummy_network_contacts_and_set_default(1)
+            .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
             .unwrap();
@@ -951,7 +951,7 @@ mod join_command {
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let network_contacts = config
-            .store_dummy_network_contacts_and_set_default(1)
+            .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
             .unwrap();
@@ -995,7 +995,7 @@ mod join_command {
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let network_contacts = config
-            .store_dummy_network_contacts_and_set_default(1)
+            .store_dummy_network_contacts_and_set_default(None, 1)
             .await?
             .pop()
             .unwrap();

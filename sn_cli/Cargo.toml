@@ -79,6 +79,7 @@ multibase = "~0.9.1"
 xor_name = "~5.0.0"
 futures = "0.3.21"
 sn_api = { path = "../sn_api", version = "^0.69.0", features = ["app", "test-utils"] }
+httpmock = "~0.6.6"
 
 [dev-dependencies.sn_cmd_test_utilities]
 path = "../sn_cmd_test_utilities"
