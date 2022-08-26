@@ -19,7 +19,7 @@ use sn_interface::{
     },
     types::{
         register::{Action, EntryHash, Permissions, Policy, Register, User},
-        Keypair, PublicKey, RegisterAddress, ReplicatedDataAddress, ReplicatedRegisterLog,
+        DataAddress, Keypair, PublicKey, RegisterAddress, ReplicatedRegisterLog,
         SPENTBOOK_TYPE_TAG,
     },
 };
@@ -65,7 +65,7 @@ impl RegisterStorage {
         trace!("Removing register, {:?}", address);
 
         self.file_store
-            .delete_data(&ReplicatedDataAddress::Register(*address))
+            .delete_data(&DataAddress::Register(*address))
             .await?;
 
         Ok(())
@@ -83,7 +83,7 @@ impl RegisterStorage {
         let stored_reg = match self.try_load_stored_register(address).await {
             Ok(stored_reg) => stored_reg,
             Err(Error::RegisterNotFound(_)) => {
-                return Err(Error::NoSuchData(ReplicatedDataAddress::Register(*address)))
+                return Err(Error::NoSuchData(DataAddress::Register(*address)))
             }
             Err(e) => return Err(e),
         };
@@ -232,7 +232,7 @@ impl RegisterStorage {
 
                 if self
                     .file_store
-                    .data_file_exists(&ReplicatedDataAddress::Register(address))?
+                    .data_file_exists(&DataAddress::Register(address))?
                 {
                     return Err(Error::DataExists);
                 }
@@ -342,7 +342,7 @@ impl RegisterStorage {
         let stored_reg = match self.try_load_stored_register(address).await {
             Ok(stored_reg) => stored_reg,
             Err(Error::RegisterNotFound(_)) => {
-                return Err(Error::NoSuchData(ReplicatedDataAddress::Register(*address)))
+                return Err(Error::NoSuchData(DataAddress::Register(*address)))
             }
             Err(e) => return Err(e),
         };

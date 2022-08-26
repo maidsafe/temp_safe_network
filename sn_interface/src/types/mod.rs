@@ -30,9 +30,7 @@ pub use crate::messaging::{
     SectionAuth,
 };
 
-pub use address::{
-    ChunkAddress, DataAddress, RegisterAddress, ReplicatedDataAddress, SpentbookAddress,
-};
+pub use address::{ChunkAddress, DataAddress, RegisterAddress, SpentbookAddress};
 pub use cache::Cache;
 pub use chunk::{Chunk, MAX_CHUNK_SIZE_IN_BYTES};
 pub use connections::{PeerLinks, SendToOneError};
@@ -94,16 +92,16 @@ impl ReplicatedData {
         }
     }
 
-    pub fn address(&self) -> ReplicatedDataAddress {
+    pub fn address(&self) -> DataAddress {
         match self {
-            Self::Chunk(chunk) => ReplicatedDataAddress::Chunk(*chunk.address()),
-            Self::RegisterLog(log) => ReplicatedDataAddress::Register(log.address),
-            Self::RegisterWrite(cmd) => ReplicatedDataAddress::Register(cmd.dst_address()),
+            Self::Chunk(chunk) => DataAddress::Bytes(*chunk.address()),
+            Self::RegisterLog(log) => DataAddress::Register(log.address),
+            Self::RegisterWrite(cmd) => DataAddress::Register(cmd.dst_address()),
             Self::SpentbookLog(log) => {
-                ReplicatedDataAddress::Spentbook(SpentbookAddress::new(*log.address.name()))
+                DataAddress::Spentbook(SpentbookAddress::new(*log.address.name()))
             }
             Self::SpentbookWrite(cmd) => {
-                ReplicatedDataAddress::Spentbook(SpentbookAddress::new(*cmd.dst_address().name()))
+                DataAddress::Spentbook(SpentbookAddress::new(*cmd.dst_address().name()))
             }
         }
     }

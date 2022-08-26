@@ -11,7 +11,7 @@ use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Node};
 use sn_interface::{
     data_copy_count,
     messaging::system::{NodeCmd, SystemMsg},
-    types::{log_markers::LogMarker, Peer, ReplicatedDataAddress},
+    types::{log_markers::LogMarker, DataAddress, Peer},
 };
 
 use itertools::Itertools;
@@ -24,7 +24,7 @@ impl Node {
     pub(crate) async fn get_missing_data_for_node(
         &self,
         sender: Peer,
-        data_sender_has: Vec<ReplicatedDataAddress>,
+        data_sender_has: Vec<DataAddress>,
     ) -> Option<Cmd> {
         trace!("Getting missing data for node");
         // Collection of data addresses that we do not have

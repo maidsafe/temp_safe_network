@@ -27,7 +27,7 @@ use sn_interface::{
         system::NodeQueryResponse,
     },
     types::{
-        register::User, Keypair, PublicKey, RegisterAddress, ReplicatedData, ReplicatedDataAddress,
+        register::User, DataAddress, Keypair, PublicKey, RegisterAddress, ReplicatedData,
         SPENTBOOK_TYPE_TAG,
     },
 };
@@ -172,52 +172,54 @@ impl DataStorage {
     // Read data from local store
     pub(crate) async fn get_from_local_store(
         &self,
-        address: &ReplicatedDataAddress,
+        address: &DataAddress,
     ) -> Result<ReplicatedData> {
         match address {
-            ReplicatedDataAddress::Chunk(addr) => {
+            DataAddress::Bytes(addr) => {
                 self.chunks.get_chunk(addr).await.map(ReplicatedData::Chunk)
             }
-            ReplicatedDataAddress::Register(addr) => self
+            DataAddress::Register(addr) => self
                 .registers
                 .get_register_replica(addr)
                 .await
                 .map(ReplicatedData::RegisterLog),
-            ReplicatedDataAddress::Spentbook(addr) => {
+            DataAddress::Spentbook(addr) => {
                 let reg_addr = RegisterAddress::new(*addr.name(), SPENTBOOK_TYPE_TAG);
                 self.registers
                     .get_register_replica(&reg_addr)
                     .await
                     .map(ReplicatedData::SpentbookLog)
             }
+            DataAddress::SafeKey(xorname) => Err(Error::UnsupportedDataType(*xorname)),
         }
     }
 
     #[allow(dead_code)]
-    pub(crate) async fn remove(&mut self, address: &ReplicatedDataAddress) -> Result<()> {
+    pub(crate) async fn remove(&mut self, address: &DataAddress) -> Result<()> {
         match address {
-            ReplicatedDataAddress::Chunk(addr) => self.chunks.remove_chunk(addr).await,
-            ReplicatedDataAddress::Register(addr) => self.registers.remove_register(addr).await,
-            ReplicatedDataAddress::Spentbook(addr) => {
+            DataAddress::Bytes(addr) => self.chunks.remove_chunk(addr).await,
+            DataAddress::Register(addr) => self.registers.remove_register(addr).await,
+            DataAddress::Spentbook(addr) => {
                 let reg_addr = RegisterAddress::new(*addr.name(), SPENTBOOK_TYPE_TAG);
                 self.registers.remove_register(&reg_addr).await
             }
+            DataAddress::SafeKey(xorname) => Err(Error::UnsupportedDataType(*xorname)),
         }
     }
 
     /// Retrieve all ReplicatedDataAddresses of stored data
-    pub async fn keys(&self) -> Vec<ReplicatedDataAddress> {
+    pub async fn keys(&self) -> Vec<DataAddress> {
         // TODO: Parallelize this below loops
         self.chunks
             .addrs()
             .into_iter()
-            .map(ReplicatedDataAddress::Chunk)
+            .map(DataAddress::Bytes)
             .chain(
                 self.registers
                     .addrs()
                     .await
                     .into_iter()
-                    .map(ReplicatedDataAddress::Register),
+                    .map(DataAddress::Register),
             )
             .collect()
     }
@@ -236,8 +238,7 @@ mod tests {
         types::{
             register::{Policy, User},
             utils::random_bytes,
-            Chunk, ChunkAddress, Keypair, PublicKey, RegisterCmd, ReplicatedData,
-            ReplicatedDataAddress,
+            Chunk, ChunkAddress, DataAddress, Keypair, PublicKey, RegisterCmd, ReplicatedData,
         },
     };
 
@@ -537,7 +538,7 @@ mod tests {
                 }
                 Op::Get(idx) => {
                     let key = get_xor_name(&model, idx % (model.len() + 1));
-                    let addr = ReplicatedDataAddress::Chunk(ChunkAddress(key));
+                    let addr = DataAddress::Bytes(ChunkAddress(key));
                     let stored_data = runtime.block_on(storage.get_from_local_store(&addr));
                     let model_data = model.get(&key);
 
@@ -558,7 +559,7 @@ mod tests {
                 }
                 Op::Remove(idx) => {
                     let key = get_xor_name(&model, idx % (model.len() + 1));
-                    let addr = ReplicatedDataAddress::Chunk(ChunkAddress(key));
+                    let addr = DataAddress::Bytes(ChunkAddress(key));
 
                     let storage_res = runtime.block_on(storage.remove(&addr));
                     match model.remove(&key) {

@@ -10,7 +10,7 @@ use super::{
     chunk_operation_id, register::RegisterQuery, spentbook::SpentbookQuery, Error, OperationId,
     QueryResponse, Result,
 };
-use crate::types::{ChunkAddress, ReplicatedDataAddress, SpentbookAddress};
+use crate::types::{ChunkAddress, DataAddress, SpentbookAddress};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
@@ -79,15 +79,15 @@ impl DataQueryVariant {
     }
 
     /// Returns the address of the data
-    pub fn address(&self) -> ReplicatedDataAddress {
+    pub fn address(&self) -> DataAddress {
         match self {
             #[cfg(feature = "chunks")]
-            DataQueryVariant::GetChunk(address) => ReplicatedDataAddress::Chunk(*address),
+            DataQueryVariant::GetChunk(address) => DataAddress::Bytes(*address),
             #[cfg(feature = "registers")]
-            DataQueryVariant::Register(read) => ReplicatedDataAddress::Register(read.dst_address()),
+            DataQueryVariant::Register(read) => DataAddress::Register(read.dst_address()),
             #[cfg(feature = "spentbook")]
             DataQueryVariant::Spentbook(read) => {
-                ReplicatedDataAddress::Spentbook(SpentbookAddress::new(*read.dst_address().name()))
+                DataAddress::Spentbook(SpentbookAddress::new(*read.dst_address().name()))
             }
         }
     }

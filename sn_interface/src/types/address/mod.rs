@@ -62,28 +62,6 @@ impl DataAddress {
     }
 }
 
-/// An address of data on the network
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
-pub enum ReplicatedDataAddress {
-    ///
-    Chunk(ChunkAddress),
-    ///
-    Register(RegisterAddress),
-    ///
-    Spentbook(SpentbookAddress),
-}
-
-impl ReplicatedDataAddress {
-    /// The xorname.
-    pub fn name(&self) -> &XorName {
-        match self {
-            Self::Chunk(address) => address.name(),
-            Self::Register(address) => address.name(),
-            Self::Spentbook(address) => address.name(),
-        }
-    }
-}
-
 /// Address of a Chunk.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
 pub struct ChunkAddress(pub XorName);

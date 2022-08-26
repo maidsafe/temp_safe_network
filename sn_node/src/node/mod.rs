@@ -98,9 +98,7 @@ mod core {
         network_knowledge::{
             supermajority, NetworkKnowledge, NodeInfo, SectionKeyShare, SectionKeysProvider,
         },
-        types::{
-            keys::ed25519::Digest256, log_markers::LogMarker, Cache, Peer, ReplicatedDataAddress,
-        },
+        types::{keys::ed25519::Digest256, log_markers::LogMarker, Cache, DataAddress, Peer},
     };
 
     use backoff::ExponentialBackoff;
@@ -166,8 +164,7 @@ mod core {
         /// queue up all batch data to be replicated (as a result of churn events atm)
         // TODO: This can probably be reworked into the general per peer msg queue, but as
         // we need to pull data first before we form the WireMsg, we won't do that just now
-        pub(crate) pending_data_to_replicate_to_peers:
-            BTreeMap<ReplicatedDataAddress, BTreeSet<Peer>>,
+        pub(crate) pending_data_to_replicate_to_peers: BTreeMap<DataAddress, BTreeSet<Peer>>,
         pub(crate) resource_proof: ResourceProof,
         // Network resources
         pub(crate) section_keys_provider: SectionKeysProvider,
