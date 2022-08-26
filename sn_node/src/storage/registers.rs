@@ -6,7 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{convert_to_error_msg, Error, FileStore, RegisterLog, Result};
+use super::{
+    errors::convert_to_error_msg,
+    register_store::{RegisterLog, RegisterStore},
+    Error, Result,
+};
 
 use sn_interface::{
     messaging::{
@@ -19,8 +23,7 @@ use sn_interface::{
     },
     types::{
         register::{Action, EntryHash, Permissions, Policy, Register, User},
-        DataAddress, Keypair, PublicKey, RegisterAddress, ReplicatedRegisterLog,
-        SPENTBOOK_TYPE_TAG,
+        Keypair, PublicKey, RegisterAddress, ReplicatedRegisterLog, SPENTBOOK_TYPE_TAG,
     },
 };
 
@@ -36,12 +39,12 @@ use tracing::info;
 use xor_name::Prefix;
 use xor_name::XorName;
 
-const REGISTER_DB_NAME: &str = "register";
+const REGISTER_STORE_DIR_NAME: &str = "register";
 
 /// Operations over the data type Register.
 #[derive(Debug, Clone)]
 pub(super) struct RegisterStorage {
-    file_store: FileStore,
+    file_store: RegisterStore,
 }
 
 #[derive(Clone, Debug)]
@@ -55,7 +58,7 @@ struct StoredRegister {
 impl RegisterStorage {
     /// Create new `RegisterStorage`
     pub(crate) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
-        let file_store = FileStore::new(path.join(REGISTER_DB_NAME), used_space)?;
+        let file_store = RegisterStore::new(path.join(REGISTER_STORE_DIR_NAME), used_space)?;
 
         Ok(Self { file_store })
     }
@@ -63,12 +66,7 @@ impl RegisterStorage {
     #[allow(dead_code)]
     pub(crate) async fn remove_register(&mut self, address: &RegisterAddress) -> Result<()> {
         trace!("Removing register, {:?}", address);
-
-        self.file_store
-            .delete_data(&DataAddress::Register(*address))
-            .await?;
-
-        Ok(())
+        self.file_store.delete_data(address).await
     }
 
     pub(crate) async fn addrs(&self) -> Vec<RegisterAddress> {
@@ -80,14 +78,7 @@ impl RegisterStorage {
         &self,
         address: &RegisterAddress,
     ) -> Result<ReplicatedRegisterLog> {
-        let stored_reg = match self.try_load_stored_register(address).await {
-            Ok(stored_reg) => stored_reg,
-            Err(Error::RegisterNotFound(_)) => {
-                return Err(Error::NoSuchData(DataAddress::Register(*address)))
-            }
-            Err(e) => return Err(e),
-        };
-
+        let stored_reg = self.try_load_stored_register(address).await?;
         self.create_replica(stored_reg)
     }
 
@@ -192,26 +183,6 @@ impl RegisterStorage {
         self.apply(cmd).await
     }
 
-    // Append a new command and write to disk
-    async fn append(
-        &mut self,
-        cmd: RegisterCmd,
-        mut ops_log: RegisterLog,
-        path: &Path,
-    ) -> Result<()> {
-        let reg_id = cmd.register_operation_id()?;
-
-        if ops_log.get(&reg_id).is_some() {
-            return Err(Error::RegCmdOperationExists(reg_id));
-        }
-
-        let _old_cmd = ops_log.insert(reg_id, cmd);
-
-        self.file_store.write_log_to_disk(&ops_log, path).await?;
-
-        Ok(())
-    }
-
     async fn apply(&mut self, cmd: RegisterCmd) -> Result<()> {
         let address = cmd.dst_address();
         match cmd.clone() {
@@ -230,21 +201,20 @@ impl RegisterStorage {
                     .verify_authority(serialize(&op)?)
                     .or(Err(Error::InvalidSignature(public_key)))?;
 
-                if self
-                    .file_store
-                    .data_file_exists(&DataAddress::Register(address))?
-                {
+                if self.file_store.data_file_exists(&address)? {
                     return Err(Error::DataExists);
                 }
 
                 // init store first, to allow append to happen asap after key insert
                 // could be races, but edge case for later todos.
-                let (ops_log, path) = self.file_store.open_reg_log_from_disk(&address).await?;
+                let (log, path) = self.file_store.open_reg_log_from_disk(&address).await?;
 
                 trace!("Creating new register");
 
                 // insert the op to the cmds log
-                self.append(cmd, ops_log, &path).await?;
+                self.file_store
+                    .append_and_write_log_to_disk(cmd, log, &path)
+                    .await?;
 
                 Ok(())
             }
@@ -266,7 +236,12 @@ impl RegisterStorage {
 
                 match result {
                     Ok(()) => {
-                        self.append(cmd, stored_reg.ops_log, &stored_reg.ops_log_path)
+                        self.file_store
+                            .append_and_write_log_to_disk(
+                                cmd,
+                                stored_reg.ops_log,
+                                &stored_reg.ops_log_path,
+                            )
                             .await?;
 
                         trace!("Editing Register success!");
@@ -339,14 +314,7 @@ impl RegisterStorage {
         action: Action,
         requester: User,
     ) -> Result<Register> {
-        let stored_reg = match self.try_load_stored_register(address).await {
-            Ok(stored_reg) => stored_reg,
-            Err(Error::RegisterNotFound(_)) => {
-                return Err(Error::NoSuchData(DataAddress::Register(*address)))
-            }
-            Err(e) => return Err(e),
-        };
-
+        let stored_reg = self.try_load_stored_register(address).await?;
         let read_only = stored_reg.state;
         read_only
             .check_permissions(action, Some(requester))
@@ -506,7 +474,7 @@ impl RegisterStorage {
         }
 
         match hydrated_register {
-            None => Err(Error::RegisterNotFound(ops_log_path)),
+            None => Err(Error::RegisterNotFound(*addr)),
             Some((mut state, section_auth)) => {
                 // apply any queued RegisterEdit op
                 for op in queued {

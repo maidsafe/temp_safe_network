@@ -8,14 +8,13 @@
 
 mod chunks;
 mod errors;
-mod file_store;
+mod register_store;
 mod registers;
 mod used_space;
 
 pub use used_space::UsedSpace;
 
-pub(crate) use errors::{convert_to_error_msg, Error, Result};
-pub(crate) use file_store::{FileStore, RegisterLog};
+pub(crate) use errors::{Error, Result};
 
 use chunks::ChunkStorage;
 use registers::RegisterStorage;
@@ -32,8 +31,11 @@ use sn_interface::{
     },
 };
 
-use sn_interface::messaging::data::DataCmd;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use walkdir::WalkDir;
+use xor_name::XorName;
+
+const BIT_TREE_DEPTH: usize = 20;
 
 /// Operations on data.
 #[derive(Debug, Clone)]
@@ -66,7 +68,7 @@ impl DataStorage {
     ) -> Result<Option<StorageLevel>> {
         debug!("Replicating {data:?}");
         match data.clone() {
-            ReplicatedData::Chunk(chunk) => self.chunks.store(DataCmd::StoreChunk(chunk)).await?,
+            ReplicatedData::Chunk(chunk) => self.chunks.store(chunk).await?,
             ReplicatedData::RegisterLog(data) => {
                 info!("Updating register: {:?}", data.address);
                 self.registers.update(vec![data]).await?
@@ -208,7 +210,7 @@ impl DataStorage {
     }
 
     /// Retrieve all ReplicatedDataAddresses of stored data
-    pub async fn keys(&self) -> Vec<DataAddress> {
+    pub async fn data_addrs(&self) -> Vec<DataAddress> {
         // TODO: Parallelize this below loops
         self.chunks
             .addrs()
@@ -223,6 +225,36 @@ impl DataStorage {
             )
             .collect()
     }
+}
+
+// Helper that returns the prefix tree path of depth BIT_TREE_DEPTH for a given xorname
+// Example:
+// - with a xorname with starting bits `010001110110....`
+// - and a BIT_TREE_DEPTH of `6`
+// returns the path `ROOT_PATH/0/1/0/0/0/1`
+fn prefix_tree_path(root: &Path, xorname: XorName) -> PathBuf {
+    let bin = format!("{:b}", xorname);
+    let prefix_dir_path: PathBuf = bin.chars().take(BIT_TREE_DEPTH).map(String::from).collect();
+    root.join(prefix_dir_path)
+}
+
+fn list_files_in(path: &Path) -> Vec<PathBuf> {
+    if !path.exists() {
+        return vec![];
+    }
+
+    WalkDir::new(path)
+        .into_iter()
+        .filter_map(|e| match e {
+            Ok(direntry) => Some(direntry),
+            Err(err) => {
+                warn!("Store: failed to process filesystem entry: {}", err);
+                None
+            }
+        })
+        .filter(|entry| entry.file_type().is_file())
+        .map(|entry| entry.path().to_path_buf())
+        .collect()
 }
 
 #[cfg(test)]
@@ -332,7 +364,7 @@ mod tests {
         // Store the chunk
         let _ = storage.store(&replicated_chunk, pk, keypair).await?;
 
-        let keys = storage.keys().await;
+        let keys = storage.data_addrs().await;
 
         let expected_key = replicated_chunk.address();
         assert!(
@@ -411,7 +443,7 @@ mod tests {
         // Store the chunk
         let _ = storage.store(&replicated_register, pk, keypair).await?;
 
-        let keys = storage.keys().await;
+        let keys = storage.data_addrs().await;
 
         let expected_key = replicated_register.address();
         assert!(

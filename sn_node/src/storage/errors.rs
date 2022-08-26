@@ -8,10 +8,10 @@
 
 use sn_interface::{
     messaging::data::Error as ErrorMsg,
-    types::{convert_dt_error_to_error_msg, DataAddress, PublicKey},
+    types::{convert_dt_error_to_error_msg, DataAddress, PublicKey, RegisterAddress},
 };
 
-use std::{io, path::PathBuf};
+use std::io;
 use thiserror::Error;
 use xor_name::XorName;
 
@@ -27,11 +27,8 @@ pub enum Error {
     #[error("Not enough space")]
     NotEnoughSpace,
     /// Register not found in local storage.
-    #[error("Register not found in local storage: {0}")]
-    RegisterNotFound(PathBuf),
-    /// Data not found.
-    #[error("No such data: {0:?}")]
-    NoSuchData(DataAddress),
+    #[error("Register data not found in local storage: {0:?}")]
+    RegisterNotFound(RegisterAddress),
     /// Chunk not found.
     #[error("Chunk not found: {0:?}")]
     ChunkNotFound(XorName),
@@ -41,9 +38,6 @@ pub enum Error {
     /// Register op already exists for this node. Pass in the RegCmdId
     #[error("RegCmd Operation already exists at this node: {0}")]
     RegCmdOperationExists(String),
-    /// Data owner provided is invalid.
-    #[error("Provided PublicKey is not a valid owner. Provided PublicKey: {0}")]
-    InvalidOwner(PublicKey),
     /// Invalid store found
     #[error("A store was loaded, but found to be invalid")]
     InvalidStore,
@@ -62,9 +56,6 @@ pub enum Error {
     /// Hex decoding error.
     #[error("Hex decoding error:: {0}")]
     HexDecoding(#[from] hex::FromHexError),
-    /// Invalid filename
-    #[error("Invalid chunk filename")]
-    InvalidFilename,
     /// NetworkData error.
     #[error("Network data error:: {0}")]
     NetworkData(#[from] sn_interface::types::Error),
@@ -74,13 +65,16 @@ pub enum Error {
     /// No filename found
     #[error("Path contains no file name")]
     NoFilename,
+    /// Invalid filename
+    #[error("Invalid chunk filename")]
+    InvalidFilename,
 }
 
 /// Convert db error to messaging error message for sending over the network.
 pub(crate) fn convert_to_error_msg(error: Error) -> ErrorMsg {
     match error {
         Error::NotEnoughSpace => ErrorMsg::FailedToWriteFile,
-        Error::NoSuchData(address) => ErrorMsg::DataNotFound(address),
+        Error::RegisterNotFound(address) => ErrorMsg::DataNotFound(DataAddress::Register(address)),
         Error::ChunkNotFound(xorname) => ErrorMsg::ChunkNotFound(xorname),
         Error::DataExists => ErrorMsg::DataExists,
         Error::NetworkData(error) => convert_dt_error_to_error_msg(error),

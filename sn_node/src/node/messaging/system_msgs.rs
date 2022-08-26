@@ -484,7 +484,7 @@ impl Node {
                             info!("End of message flow. Trace: {:?}", traceroute);
                         }
                         Err(StorageError::NotEnoughSpace) => {
-                            // db full
+                            // storage full
                             error!("Not enough space to store more data");
 
                             let node_id = PublicKey::from(self.keypair.public);

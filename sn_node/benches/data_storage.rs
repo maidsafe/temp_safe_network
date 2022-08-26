@@ -175,7 +175,7 @@ fn bench_data_storage_reads(c: &mut Criterion) -> Result<()> {
             }
 
             b.iter(|| {
-                let _keys = storage.keys();
+                let _keys = storage.data_addrs();
             })
         });
     }
@@ -198,7 +198,7 @@ fn bench_data_storage_reads(c: &mut Criterion) -> Result<()> {
             }
 
             b.iter(|| {
-                let _keys = storage.keys();
+                let _keys = storage.data_addrs();
             })
         });
     }
