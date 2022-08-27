@@ -88,7 +88,10 @@ pub(crate) async fn handle_online_cmd(
     Ok(status)
 }
 
-pub(crate) async fn run_and_collect_cmds(cmd: Cmd, dispatcher: &Dispatcher) -> Result<Vec<Cmd>> {
+pub(crate) async fn run_and_collect_cmds(
+    cmd: Cmd,
+    dispatcher: &Dispatcher,
+) -> crate::node::error::Result<Vec<Cmd>> {
     let mut all_cmds = vec![];
 
     let mut cmds = dispatcher.process_cmd(cmd).await?;
