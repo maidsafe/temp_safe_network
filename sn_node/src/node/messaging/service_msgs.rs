@@ -242,40 +242,18 @@ impl Node {
                 spent_proofs,
                 spent_transactions,
             })) => {
-                match self.gen_spent_proof_share(
+                let spent_proof_share = self.gen_spent_proof_share(
                     &key_image,
                     &tx,
                     &spent_proofs,
                     &spent_transactions,
-                ) {
-                    Ok(share) => {
-                        if let Some(spent_proof_share) = share {
-                            // Store spent proof share to adults
-                            let reg_cmd = self.gen_register_cmd(&key_image, &spent_proof_share)?;
-                            ReplicatedData::SpentbookWrite(reg_cmd)
-                        } else {
-                            return Ok(vec![]);
-                        }
-                    }
-                    Err(e) => match e {
-                        Error::SpentbookError(_) => {
-                            // At the moment the only place where `SpentbookError` can occur from
-                            // `gen_spent_proof_share` is if the spent proof was signed with a
-                            // section key that is not currently known. In this case we want to
-                            // send the error back to the client.
-                            return Ok(vec![self.send_cmd_error_response(
-                                CmdError::Data(ErrorMsg::SpentProofUnknownSectionKey),
-                                origin,
-                                msg_id,
-                                #[cfg(feature = "traceroute")]
-                                traceroute,
-                            )]);
-                        }
-                        _ => {
-                            return Ok(vec![]);
-                        }
-                    },
-                }
+                    msg_id,
+                    origin,
+                    #[cfg(feature = "traceroute")]
+                    traceroute.clone(),
+                )?;
+                let reg_cmd = self.gen_register_cmd(&key_image, &spent_proof_share)?;
+                ReplicatedData::SpentbookWrite(reg_cmd)
             }
             ServiceMsg::Cmd(DataCmd::StoreChunk(chunk)) => ReplicatedData::Chunk(chunk),
             ServiceMsg::Query(query) => {
@@ -385,7 +363,7 @@ impl Node {
 
             if commitments.len() != mlsag.public_keys().len() {
                 let error_msg = format!(
-                    "the number of spent proofs ({}) does not match the number \
+                    "The number of spent proofs ({}) does not match the number \
                     of input public keys ({})",
                     commitments.len(),
                     mlsag.public_keys().len()
@@ -423,14 +401,21 @@ impl Node {
         })
     }
 
-    // Private helper to generate spent proof share
+    /// Generate a spent proof share from the information provided by the client.
+    ///
+    /// The additional arguments here are just for composing the error that gets sent back to the
+    /// client, which seems justified, hence the use of the `allow` attribute.
+    #[allow(clippy::too_many_arguments)]
     fn gen_spent_proof_share(
         &self,
         key_image: &KeyImage,
         tx: &RingCtTransaction,
         spent_proofs: &BTreeSet<SpentProof>,
         spent_transactions: &BTreeSet<RingCtTransaction>,
-    ) -> Result<Option<SpentProofShare>> {
+        msg_id: MsgId,
+        origin: Peer,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
+    ) -> Result<SpentProofShare> {
         info!("Processing spend request for key image: {:?}", key_image);
 
         // Verify spent proof signatures are valid.
@@ -440,11 +425,12 @@ impl Node {
                 .spentbook_pub_key
                 .verify(&proof.spentbook_sig, proof.content.hash().as_ref())
             {
-                debug!(
-                    "Dropping spend request: spent proof signature {:?} is invalid",
+                let msg = format!(
+                    "Spent proof signature {:?} is invalid",
                     proof.spentbook_pub_key
                 );
-                return Ok(None);
+                debug!("Dropping spend request: {msg}");
+                return Err(Error::SpentbookError(msg));
             }
             let _ = spent_proofs_keys.insert(proof.spentbook_pub_key);
         }
@@ -452,26 +438,24 @@ impl Node {
         // Verify each spent proof is signed by a known section key (or the genesis key).
         for pk in spent_proofs_keys.iter() {
             if !self.network_knowledge.verify_section_key_is_known(pk) {
-                let error_msg = format!(
+                warn!(
                     "Dropping spend request: spent proof is signed by unknown section with public \
                     key {:?}",
                     pk
                 );
-                warn!(error_msg);
-                return Err(Error::SpentbookError(error_msg));
+                return Err(Error::CmdProcessingClientRespondError(vec![self
+                    .send_cmd_error_response(
+                        CmdError::Data(ErrorMsg::SpentProofUnknownSectionKey),
+                        origin,
+                        msg_id,
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
+                    )]));
             }
         }
 
-        let public_commitments_info = match Self::get_public_commitments_from_transaction(
-            tx,
-            spent_proofs,
-            spent_transactions,
-        ) {
-            Ok(pci) => pci,
-            Err(_) => {
-                return Ok(None);
-            }
-        };
+        let public_commitments_info =
+            Self::get_public_commitments_from_transaction(tx, spent_proofs, spent_transactions)?;
 
         // Do not sign invalid TX.
         let tx_public_commitments: Vec<Vec<Commitment>> = public_commitments_info
@@ -482,7 +466,7 @@ impl Node {
 
         if let Err(err) = tx.verify(&tx_public_commitments) {
             debug!("Dropping spend request: {:?}", err.to_string());
-            return Ok(None);
+            return Err(Error::SpentbookError(err.to_string()));
         }
 
         // TODO:
@@ -494,11 +478,12 @@ impl Node {
             .flat_map(|(k, v)| if &k == key_image { v } else { vec![] })
             .collect();
         if public_commitments.is_empty() {
-            debug!(
-                "Dropping spend request: there are no commitments for the given key image {:?}",
+            let msg = format!(
+                "There are no commitments for the given key image {:?}",
                 key_image
             );
-            return Ok(None);
+            debug!("Dropping spend request: {msg}");
+            return Err(Error::SpentbookError(msg));
         }
         let spent_proof_share = Self::build_spent_proof_share(
             key_image,
@@ -507,11 +492,11 @@ impl Node {
             &self.section_keys_provider,
             public_commitments,
         )?;
-        Ok(Some(spent_proof_share))
+        Ok(spent_proof_share)
     }
 
-    // Private helper to generate the RegisterCmd to write the SpentProofShare
-    // as an entry in the Spentbook (Register).
+    /// Generate the RegisterCmd to write the SpentProofShare as an entry in the Spentbook
+    /// (Register).
     fn gen_register_cmd(
         &self,
         key_image: &KeyImage,

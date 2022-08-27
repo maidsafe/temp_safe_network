@@ -1284,7 +1284,7 @@ async fn spentbook_spend_service_message_should_replicate_to_adults_and_send_ack
 }
 
 #[tokio::test]
-async fn spentbook_spend_spentproof_with_invalid_pk_should_return_no_commands() -> Result<()> {
+async fn spentbook_spend_spent_proof_with_invalid_pk_should_return_spentbook_error() -> Result<()> {
     let local = tokio::task::LocalSet::new();
     local
         .run_until(async move {
@@ -1309,7 +1309,7 @@ async fn spentbook_spend_spentproof_with_invalid_pk_should_return_no_commands() 
                 })
                 .collect();
 
-            let cmds = run_and_collect_cmds(
+            let result = run_and_collect_cmds(
                 wrap_service_msg_for_handling(
                     ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                         key_image,
@@ -1321,17 +1321,23 @@ async fn spentbook_spend_spentproof_with_invalid_pk_should_return_no_commands() 
                 )?,
                 &dispatcher,
             )
-            .await?;
-
-            assert_eq!(cmds.len(), 0);
-
-            Result::<()>::Ok(())
+            .await;
+            match result {
+                Err(error) => match error {
+                    Error::SpentbookError(msg) => {
+                        assert_eq!(msg, format!("Spent proof signature {:?} is invalid", pk));
+                        Ok(())
+                    }
+                    _ => Err(eyre!("A `Error::SpentbookError` variant was expected")),
+                },
+                Ok(_) => Err(eyre!("An error result was expected for this case")),
+            }
         })
         .await
 }
 
 #[tokio::test]
-async fn spentbook_spend_spentproof_with_key_not_in_section_chain_should_return_cmd_error_response(
+async fn spentbook_spend_spent_proof_with_key_not_in_section_chain_should_return_cmd_error_response(
 ) -> Result<()> {
     let local = tokio::task::LocalSet::new();
     local
@@ -1350,7 +1356,7 @@ async fn spentbook_spend_spentproof_with_key_not_in_section_chain_should_return_
             let (key_image, tx, spent_proofs, spent_transactions) =
                 dbc_utils::get_genesis_dbc_spend_info(&sk_set)?;
 
-            let cmds = run_and_collect_cmds(
+            let result = run_and_collect_cmds(
                 wrap_service_msg_for_handling(
                     ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                         key_image,
@@ -1362,20 +1368,28 @@ async fn spentbook_spend_spentproof_with_key_not_in_section_chain_should_return_
                 )?,
                 &dispatcher,
             )
-            .await?;
-
-            assert_eq!(cmds.len(), 1);
-            let cmd = cmds[0].clone();
-            let cmd_err = cmd.get_error()?;
-            assert_matches!(cmd_err, MessagingDataError::SpentProofUnknownSectionKey);
-
-            Result::<()>::Ok(())
+            .await;
+            match result {
+                Err(error) => match error {
+                    Error::CmdProcessingClientRespondError(cmds) => {
+                        assert_eq!(cmds.len(), 1);
+                        let cmd = cmds[0].clone();
+                        let cmd_err = cmd.get_error()?;
+                        assert_matches!(cmd_err, MessagingDataError::SpentProofUnknownSectionKey);
+                        Ok(())
+                    }
+                    _ => Err(eyre!(
+                        "A `Error::CmdProcessingClientRespondError` variant was expected"
+                    )),
+                },
+                Ok(_) => Err(eyre!("An error result was expected for this case")),
+            }
         })
         .await
 }
 
 #[tokio::test]
-async fn spentbook_spend_spent_proofs_do_not_relate_to_input_dbcs_should_return_no_commands(
+async fn spentbook_spend_spent_proofs_do_not_relate_to_input_dbcs_should_return_spentbook_error(
 ) -> Result<()> {
     let local = tokio::task::LocalSet::new();
     local
@@ -1409,7 +1423,7 @@ async fn spentbook_spend_spent_proofs_do_not_relate_to_input_dbcs_should_return_
             let new_dbc2_sk = bls::SecretKey::random();
             let new_dbc2 = dbc_utils::reissue_dbc(&new_dbc, 5, &new_dbc2_sk, &sap, &keys_provider)?;
 
-            let cmds = run_and_collect_cmds(
+            let result = run_and_collect_cmds(
                 wrap_service_msg_for_handling(
                     ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                         key_image: new_dbc2_sk.public_key(),
@@ -1421,17 +1435,27 @@ async fn spentbook_spend_spent_proofs_do_not_relate_to_input_dbcs_should_return_
                 )?,
                 &dispatcher,
             )
-            .await?;
-
-            assert_eq!(cmds.len(), 0);
-
-            Result::<()>::Ok(())
+            .await;
+            match result {
+                Err(error) => match error {
+                    Error::SpentbookError(msg) => {
+                        assert_eq!(
+                            msg,
+                            "The number of spent proofs (0) does not match the number of input \
+                            public keys (1)"
+                        );
+                        Ok(())
+                    }
+                    _ => Err(eyre!("A `Error::SpentbookError` variant was expected")),
+                },
+                Ok(_) => Err(eyre!("An error result was expected for this case")),
+            }
         })
         .await
 }
 
 #[tokio::test]
-async fn spentbook_spend_transaction_with_no_inputs_should_return_no_commands() -> Result<()> {
+async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_error() -> Result<()> {
     let local = tokio::task::LocalSet::new();
     local
         .run_until(async move {
@@ -1460,7 +1484,7 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_no_commands() 
             let new_dbc2 =
                 dbc_utils::reissue_invalid_dbc_with_no_inputs(&new_dbc, 5, &new_dbc2_sk)?;
 
-            let cmds = run_and_collect_cmds(
+            let result = run_and_collect_cmds(
                 wrap_service_msg_for_handling(
                     ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                         key_image: new_dbc2_sk.public_key(),
@@ -1472,17 +1496,23 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_no_commands() 
                 )?,
                 &dispatcher,
             )
-            .await?;
-
-            assert_eq!(cmds.len(), 0);
-
-            Result::<()>::Ok(())
+            .await;
+            match result {
+                Err(error) => match error {
+                    Error::SpentbookError(msg) => {
+                        assert_eq!(msg, "The DBC transaction must have at least one input");
+                        Ok(())
+                    }
+                    _ => Err(eyre!("A `Error::SpentbookError` variant was expected")),
+                },
+                Ok(_) => Err(eyre!("An error result was expected for this case")),
+            }
         })
         .await
 }
 
 #[tokio::test]
-async fn spentbook_spend_with_random_key_image_should_return_no_commands() -> Result<()> {
+async fn spentbook_spend_with_random_key_image_should_return_spentbook_error() -> Result<()> {
     let local = tokio::task::LocalSet::new();
     local
         .run_until(async move {
@@ -1509,10 +1539,11 @@ async fn spentbook_spend_with_random_key_image_should_return_no_commands() -> Re
             let new_dbc2_sk = bls::SecretKey::random();
             let new_dbc2 = dbc_utils::reissue_dbc(&new_dbc, 5, &new_dbc2_sk, &sap, &keys_provider)?;
 
-            let cmds = run_and_collect_cmds(
+            let pk = bls::SecretKey::random().public_key();
+            let result = run_and_collect_cmds(
                 wrap_service_msg_for_handling(
                     ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
-                        key_image: bls::SecretKey::random().public_key(),
+                        key_image: pk,
                         tx: new_dbc2.transaction.clone(),
                         spent_proofs: new_dbc.spent_proofs.clone(),
                         spent_transactions: new_dbc.spent_transactions.clone(),
@@ -1521,11 +1552,20 @@ async fn spentbook_spend_with_random_key_image_should_return_no_commands() -> Re
                 )?,
                 &dispatcher,
             )
-            .await?;
-
-            assert_eq!(cmds.len(), 0);
-
-            Result::<()>::Ok(())
+            .await;
+            match result {
+                Err(error) => match error {
+                    Error::SpentbookError(msg) => {
+                        assert_eq!(
+                            msg,
+                            format!("There are no commitments for the given key image {:?}", pk)
+                        );
+                        Ok(())
+                    }
+                    _ => Err(eyre!("A `Error::SpentbookError` variant was expected")),
+                },
+                Ok(_) => Err(eyre!("An error result was expected for this case")),
+            }
         })
         .await
 }
