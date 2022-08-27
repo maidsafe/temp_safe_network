@@ -186,13 +186,25 @@ impl CmdCtrl {
                         .await;
                 }
                 Err(error) => {
+                    if let Error::CmdProcessingClientRespondError(ref cmds) = error {
+                        for cmd in cmds.clone() {
+                            match cmd_process_api.send((cmd, Some(id))).await {
+                                Ok(_) => {
+                                    //no issues
+                                }
+                                Err(error) => {
+                                    error!("Could not enqueue child Cmd: {:?}", error);
+                                }
+                            }
+                        }
+                    }
                     node_event_sender
                         .send(Event::CmdProcessing(CmdProcessEvent::Failed {
                             id,
                             priority,
                             time: SystemTime::now(),
                             cmd_string,
-                            error: format!("{:?}", error),
+                            error: format!("{:?}", &error.to_string()),
                         }))
                         .await;
                 }

@@ -102,7 +102,7 @@ impl CmdJob {
     }
 }
 
-/// Internal cmds for a node.
+/// Commands for a node.
 ///
 /// Cmds are used to connect different modules, allowing
 /// for a better modularization of the code base.
@@ -111,7 +111,7 @@ impl CmdJob {
 /// In other words, it enables enhanced flow control.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
-pub(crate) enum Cmd {
+pub enum Cmd {
     /// Cleanup node's PeerLinks, removing any unsused, unconnected peers
     CleanupPeerLinks,
     /// Validate `wire_msg` from `sender`.
