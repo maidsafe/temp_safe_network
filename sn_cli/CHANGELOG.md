@@ -4,7 +4,55 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## v0.62.1 (2022-08-28)
+
+### Test
+
+ - <csr-id-5776b75465d8bb7eb2d2de30e558b9480e9dc8c3/> use `httpmock` to test remote network contacts
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release over the course of 2 calendar days.
+ - 2 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - use `httpmock` to test remote network contacts ([`5776b75`](https://github.com/maidsafe/safe_network/commit/5776b75465d8bb7eb2d2de30e558b9480e9dc8c3))
+</details>
+
 ## v0.62.0 (2022-08-25)
+
+### Chore
+
+ - <csr-id-401bc416c7aea65ae55e9adee2cbecf782c999cf/> sn_interface-0.10.1/sn_client-0.71.0/sn_node-0.66.1/sn_api-0.69.0/sn_cli-0.62.0
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 1 day passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.10.1/sn_client-0.71.0/sn_node-0.66.1/sn_api-0.69.0/sn_cli-0.62.0 ([`401bc41`](https://github.com/maidsafe/safe_network/commit/401bc416c7aea65ae55e9adee2cbecf782c999cf))
+</details>
 
 ## v0.61.0 (2022-08-23)
 
@@ -13,6 +61,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <csr-id-1618cf6a93117942946d152efee24fe3c7020e55/>
 <csr-id-63172ab4ab9fc87bc17b09c6fd384679a37a40f0/>
 <csr-id-f0fbe5fd9bec0b2865271bb139c9fcb4ec225884/>
+<csr-id-43fcc7c517f95eab0e27ddc79cd9c6de3631c7c6/>
 
 ### Chore
 
@@ -226,9 +275,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     - Merge branch 'main' into feat-cat-wallet-improvements ([`8e6eecf`](https://github.com/maidsafe/safe_network/commit/8e6eecf0da8df5cdac55bbf1f81d00bcb19558b4))
     - show the DBC owner in the wallet displayed by cat cmd ([`1b3f051`](https://github.com/maidsafe/safe_network/commit/1b3f0516cf899c2fc0d101ce9cf0079c95bbfd7b))
 </details>
-
-<csr-unknown>
-Have the CLI wallet deposit command to perform a verification is the supplied DBC has beenalready spent before depositing into a wallet.Allow users to provide a --force flag with the CLI wallet deposit command to skip theverification of DBC already spent and force the deposit into the wallet.Display the owner of each DBC when cat-ing a wallet.Align to the right the balance of each DBC when cat-ing a wallet.Shorten the default name set to DBC when deposited in a wallet.Make the name of the change DBC automatically deposited in the wallet unique.Minor refactoring to sn_client::test_spentbook_spend_dbc test.<csr-unknown/>
 
 ## v0.59.3 (2022-07-10)
 
