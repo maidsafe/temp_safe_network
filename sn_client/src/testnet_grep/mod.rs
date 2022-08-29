@@ -9,7 +9,7 @@
 use sn_interface::types::log_markers::LogMarker;
 
 use dirs_next::home_dir;
-use eyre::{bail, eyre, Error, Result};
+use eyre::{bail, eyre, Result};
 use grep::{
     matcher::Matcher,
     regex::RegexMatcher,
@@ -93,7 +93,7 @@ impl NetworkLogState {
 }
 
 /// Search the local-test-network dir for matches.
-pub(crate) fn search_testnet(pattern: &LogMarker) -> Result<Matches, Error> {
+pub(crate) fn search_testnet(pattern: &LogMarker) -> Result<Matches> {
     let the_path = get_testnet_path()?;
     let paths = [the_path];
     let matcher = RegexMatcher::new_line_matcher(&pattern.to_string())?;
@@ -118,8 +118,12 @@ pub(crate) fn search_testnet(pattern: &LogMarker) -> Result<Matches, Error> {
                 &matcher,
                 dent.path(),
                 UTF8(|lnum, line| {
-                    // We are guaranteed to find a match, so the unwrap is OK.
-                    let mymatch = matcher.find(line.as_bytes())?.unwrap();
+                    let mymatch = matcher.find(line.as_bytes())?.ok_or_else(|| {
+                        std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            format!("A match was expected to occur on line: {}", line),
+                        )
+                    })?;
                     matches.push((lnum, line[mymatch].to_string()));
                     Ok(true)
                 }),
@@ -133,7 +137,7 @@ pub(crate) fn search_testnet(pattern: &LogMarker) -> Result<Matches, Error> {
 /// Search the local-test-network dir for matches.
 pub(crate) fn search_testnet_results_per_node(
     pattern: String,
-) -> Result<BTreeMap<String, Matches>, Error> {
+) -> Result<BTreeMap<String, Matches>> {
     let the_path = get_testnet_path()?;
     let paths = [the_path];
     let matcher = RegexMatcher::new_line_matcher(&pattern)?;
@@ -170,8 +174,12 @@ pub(crate) fn search_testnet_results_per_node(
                         .expect("node dir name can be parsed to str")
                         .to_string();
 
-                    // We are guaranteed to find a match, so the unwrap is OK.
-                    let mymatch = matcher.find(line.as_bytes())?.unwrap();
+                    let mymatch = matcher.find(line.as_bytes())?.ok_or_else(|| {
+                        std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            format!("A match was expected to occur on line: {}", line),
+                        )
+                    })?;
 
                     let file_matches = matches.entry(node_name).or_insert_with(Vec::new);
 
