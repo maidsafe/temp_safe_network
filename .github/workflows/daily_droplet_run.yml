@@ -180,7 +180,6 @@ jobs:
     name: client tests
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     needs: launch-testnet
@@ -234,9 +233,8 @@ jobs:
     name: api tests
     if: ${{ always() }} # give the suite a chance to run, even if the client tests fail.
     runs-on: ${{ matrix.os }}
-    needs: launch-testnet
+    needs: [client, launch-testnet]
     strategy:
-      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
@@ -291,7 +289,7 @@ jobs:
     name: cli tests
     if: ${{ always() }} # give the suite a chance to run, even if the api tests fail.
     runs-on: ${{ matrix.os }}
-    needs: launch-testnet
+    needs: [api, launch-testnet]
     strategy:
       fail-fast: false
       matrix:

@@ -3928,7 +3928,7 @@ dependencies = [
 
 [[package]]
 name = "sn_cli"
-version = "0.62.0"
+version = "0.62.1"
 dependencies = [
  "ansi_term",
  "assert_cmd",
@@ -3981,7 +3981,7 @@ dependencies = [
 
 [[package]]
 name = "sn_client"
-version = "0.71.0"
+version = "0.71.1"
 dependencies = [
  "backoff 0.4.0",
  "base64",
@@ -4107,7 +4107,7 @@ dependencies = [
 
 [[package]]
 name = "sn_interface"
-version = "0.10.1"
+version = "0.10.2"
 dependencies = [
  "backoff 0.4.0",
  "base64",
@@ -4176,7 +4176,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.66.1"
+version = "0.66.2"
 dependencies = [
  "assert_matches",
  "backoff 0.4.0",

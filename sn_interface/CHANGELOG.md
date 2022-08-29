@@ -6,7 +6,131 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## v0.10.2 (2022-08-28)
+
+### New Features
+
+ - <csr-id-7cc2a00907381e93db266f31545b12ff76907e5d/> implement `SecuredLinkedList` as a `MerkleRegister`
+ - <csr-id-b87617e44e9b20b8a79864e30e29ecee86444352/> return error to client on unknown section key
+   If one of the spent proofs sent by the client have been signed with a key this section is not
+   currently aware of, return an error back to the client.
+   
+   This introduces a new SpentProofUnknownSectionKey variant to the messaging data errors, because none
+   of the existing variants seemed appropriate for this scenario.
+
+### Other
+
+ - <csr-id-b587893737bc51aee483f7cd53da782036dd6c5e/> unit tests for spentbook handler
+   Provide unit test coverage for the `SpentbookCmd::Spent` message handler.
+   
+   It's important to note that at this point, the failure cases only assert that no commands were
+   returned from the handler, because this is the way we deal with failures at the moment.
+   Unfortunately this means it's easy for there to be false positives because you can't check the error
+   type or message. I will look into changing this as a separate PR.
+   
+   Most of the changes here are related to testing infrastructure:
+   * Support setting a threshold when a secret key set is generated for the section. For use with the
+     genesis DBC generation, the threshold had to be set to 0.
+   * Support adults in the test section. The spent message generates data to be replicated on adults,
+     so the mechanisms for creating a test section were extended for this. There are now
+     `create_section` and `create_section_with_elders` functions, because some existing tests require
+     the condition where only elders have been marked as members.
+   * The genesis DBC is needed for these tests, so the scope of the function for generating it was
+     changed to `pub(crate)`.
+   * The `Cmd` struct was extended in the test module to provide utils to get at the content of
+     messages, which are used for test verification.
+   * Provide util function for wrapping a `ServiceMsg` inside a `WireMsg` and so on. Keeps the testing
+     code cleaner.
+   * Provide util function for extracting the spent proof share from the replicated data so that we can
+     verify the message handler assigned the correct values to its fields.
+   * Various util functions related to the use of DBCs were provided in a `dbc_utils` module. The doc
+     comments on the functions should hopefully make clear what they are for.
+   
+   A couple of superficial changes were also made to the message handler code:
+   * The key image sent by the client is validated (along with a test case for that).
+   * Change the format of debugging messages and comments to be more uniform.
+   * Move some code into functions scoped at `pub(crate)`. This is so they can be shared for use with
+     test setup. For further explanation, see the doc comments on these functions in the diff.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release over the course of 2 calendar days.
+ - 2 days passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - implement `SecuredLinkedList` as a `MerkleRegister` ([`7cc2a00`](https://github.com/maidsafe/safe_network/commit/7cc2a00907381e93db266f31545b12ff76907e5d))
+    - return error to client on unknown section key ([`b87617e`](https://github.com/maidsafe/safe_network/commit/b87617e44e9b20b8a79864e30e29ecee86444352))
+    - unit tests for spentbook handler ([`b587893`](https://github.com/maidsafe/safe_network/commit/b587893737bc51aee483f7cd53da782036dd6c5e))
+</details>
+
+## v0.10.1 (2022-08-25)
+
+### Chore
+
+ - <csr-id-401bc416c7aea65ae55e9adee2cbecf782c999cf/> sn_interface-0.10.1/sn_client-0.71.0/sn_node-0.66.1/sn_api-0.69.0/sn_cli-0.62.0
+ - <csr-id-d58f1c55e9502fd6e8a99509f7ca30640835458b/> make RegisterCmdId a hex-encodedstring
+ - <csr-id-fd6b97b37bb875404ef2ba7f5f35d5675c122ea0/> make RegisterCmds be stored under deterministic id
+
+### Bug Fixes
+
+ - <csr-id-175011ea4a14ef0ce2538ce9e69a6ffc8d47f2ac/> append RegsiterId as hex for storage folder
+   Previously we used bitdepth which can clash for low depths, even for
+   unique xornames.
+   
+   Now we also add the register folder id name, so we know all ops in a
+   given folder are for that register.
+ - <csr-id-604556e670d5fe0a9408bbd0d586363c7b4c0d6c/> Decode ReplicatedDataAddress from chunk filename
+   We were previously encoding a ReplicatedDataAddress, but
+   decoding as a ChunkAddress
+ - <csr-id-4da782096826f2074dac2a5628f9c9d9a85fcf1f/> paths for read/write RegisterCmd ops and support any order for reading them
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release.
+ - 1 day passed between releases.
+ - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.10.1/sn_client-0.71.0/sn_node-0.66.1/sn_api-0.69.0/sn_cli-0.62.0 ([`401bc41`](https://github.com/maidsafe/safe_network/commit/401bc416c7aea65ae55e9adee2cbecf782c999cf))
+    - append RegsiterId as hex for storage folder ([`175011e`](https://github.com/maidsafe/safe_network/commit/175011ea4a14ef0ce2538ce9e69a6ffc8d47f2ac))
+    - Decode ReplicatedDataAddress from chunk filename ([`604556e`](https://github.com/maidsafe/safe_network/commit/604556e670d5fe0a9408bbd0d586363c7b4c0d6c))
+    - make RegisterCmdId a hex-encodedstring ([`d58f1c5`](https://github.com/maidsafe/safe_network/commit/d58f1c55e9502fd6e8a99509f7ca30640835458b))
+    - paths for read/write RegisterCmd ops and support any order for reading them ([`4da7820`](https://github.com/maidsafe/safe_network/commit/4da782096826f2074dac2a5628f9c9d9a85fcf1f))
+    - make RegisterCmds be stored under deterministic id ([`fd6b97b`](https://github.com/maidsafe/safe_network/commit/fd6b97b37bb875404ef2ba7f5f35d5675c122ea0))
+</details>
+
 ## v0.10.0 (2022-08-23)
+
+<csr-id-2c8cbdf06993e86f7e5575c5dc856721a5ed08b7/>
+<csr-id-c8517a481e39bf688041cd8f8661bc663ee7bce7/>
+<csr-id-589f03ce8670544285f329fe35c19897d4bfced8/>
+<csr-id-9f64d681e285de57a54f571e98ff68f1bf39b6f1/>
+<csr-id-836c1ba8d17d380e8504325e14f46739e2688bb3/>
+<csr-id-1618cf6a93117942946d152efee24fe3c7020e55/>
+<csr-id-11b8182a3de636a760d899cb15d7184d8153545a/>
+<csr-id-e52028f1e9d7fcf19962a7643b272ba3a786c7c4/>
+<csr-id-28d95a2e959e32ee69a70bdc855cba1fff1fc8d8/>
+<csr-id-d3f66d6cfa838a5c65fb8f31fa68d48794b33dea/>
+<csr-id-f0fbe5fd9bec0b2865271bb139c9fcb4ec225884/>
 
 ### Chore
 
@@ -17,6 +141,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    Now we differentiate queries per adult/index, we may need more queries.
  - <csr-id-836c1ba8d17d380e8504325e14f46739e2688bb3/> check members need updating before verifying.
    During merge members we were spending a lot of CPU verifying, when we may not actually need the udpate at all
+
+### Chore
+
+ - <csr-id-43fcc7c517f95eab0e27ddc79cd9c6de3631c7c6/> sn_interface-0.10.0/sn_dysfunction-0.9.0/sn_client-0.70.0/sn_node-0.66.0/sn_api-0.68.0/sn_cli-0.61.0
 
 ### New Features
 
@@ -65,9 +193,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 18 commits contributed to the release over the course of 8 calendar days.
+ - 19 commits contributed to the release over the course of 8 calendar days.
  - 9 days passed between releases.
- - 18 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 19 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -77,6 +205,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.10.0/sn_dysfunction-0.9.0/sn_client-0.70.0/sn_node-0.66.0/sn_api-0.68.0/sn_cli-0.61.0 ([`43fcc7c`](https://github.com/maidsafe/safe_network/commit/43fcc7c517f95eab0e27ddc79cd9c6de3631c7c6))
     - remove ConnectivityCheck ([`f0f860e`](https://github.com/maidsafe/safe_network/commit/f0f860efcf89cb7bf51bddd6364a9bec33bbf3c3))
     - removing unused CreateRegister::Populated msg type ([`28d95a2`](https://github.com/maidsafe/safe_network/commit/28d95a2e959e32ee69a70bdc855cba1fff1fc8d8))
     - removing unused sn_node::dbs::Error variants and RegisterExtend cmd ([`d3f66d6`](https://github.com/maidsafe/safe_network/commit/d3f66d6cfa838a5c65fb8f31fa68d48794b33dea))
@@ -154,6 +283,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-d3a05a728be8752ea9ebff4e38e7c4c85e5db09b/>
 <csr-id-96da1171d0cac240f772e5d6a15c56f63441b4b3/>
 <csr-id-dd2eb21352223f6340064e0021f4a7df402cd5c9/>
+<csr-id-53f60c2327f8a69f0b2ef6d1a4e96644c10aa358/>
 
 ### Chore
 
@@ -374,9 +504,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - remove unused async ([`dedec48`](https://github.com/maidsafe/safe_network/commit/dedec486f85c1cf6cf2d538238f32e826e08da0a))
     - logging sn_consensus in CI, tweak section min and max elder age ([`879678e`](https://github.com/maidsafe/safe_network/commit/879678e986a722d216ee9a4f37e8ae398221a394))
 </details>
-
-<csr-unknown>
-This seems fine until you realize that relocating the node may failfor some reason and now we’re stuck holding this re-joined node.Also we don’t track why this node was removed from the section.They could have been a faulty elder that now is back in the samesection it had attacked with the same age which will likely cause itto become an elder again. prevent rejoins of archived nodes adds unique conn info validation to membership remove redundant generation field cleanup unused async box LRUCache to avoid stackoverflow<csr-unknown/>
 
 ## v0.8.2 (2022-07-10)
 

@@ -1113,7 +1113,95 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
+## v0.71.1 (2022-08-28)
+
+### New Features
+
+ - <csr-id-7cc2a00907381e93db266f31545b12ff76907e5d/> implement `SecuredLinkedList` as a `MerkleRegister`
+ - <csr-id-b87617e44e9b20b8a79864e30e29ecee86444352/> return error to client on unknown section key
+   If one of the spent proofs sent by the client have been signed with a key this section is not
+   currently aware of, return an error back to the client.
+   
+   This introduces a new SpentProofUnknownSectionKey variant to the messaging data errors, because none
+   of the existing variants seemed appropriate for this scenario.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release over the course of 2 calendar days.
+ - 2 days passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - implement `SecuredLinkedList` as a `MerkleRegister` ([`7cc2a00`](https://github.com/maidsafe/safe_network/commit/7cc2a00907381e93db266f31545b12ff76907e5d))
+    - return error to client on unknown section key ([`b87617e`](https://github.com/maidsafe/safe_network/commit/b87617e44e9b20b8a79864e30e29ecee86444352))
+</details>
+
+## v0.71.0 (2022-08-25)
+
+### Chore
+
+ - <csr-id-401bc416c7aea65ae55e9adee2cbecf782c999cf/> sn_interface-0.10.1/sn_client-0.71.0/sn_node-0.66.1/sn_api-0.69.0/sn_cli-0.62.0
+ - <csr-id-a46ac6e18bbdfdb331caf89f8bb562a7c762b64b/> churn example, wait longer before we attempt to read post-churn
+ - <csr-id-9fbb0672735306336f5020794a638f79752f0577/> further reduce query retries and query timeout
+ - <csr-id-f40277c1680f56b043c4865ff201c65b66926b2d/> reduce query timeout noe we;re faster in general
+
+### Bug Fixes
+
+ - <csr-id-604556e670d5fe0a9408bbd0d586363c7b4c0d6c/> Decode ReplicatedDataAddress from chunk filename
+   We were previously encoding a ReplicatedDataAddress, but
+   decoding as a ChunkAddress
+
+### New Features (BREAKING)
+
+ - <csr-id-a8b3cd855393d06a64734b34523e40ec00fb0580/> expose MAX_RETRIES for cmd/query ops in client builder
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release.
+ - 1 day passed between releases.
+ - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.10.1/sn_client-0.71.0/sn_node-0.66.1/sn_api-0.69.0/sn_cli-0.62.0 ([`401bc41`](https://github.com/maidsafe/safe_network/commit/401bc416c7aea65ae55e9adee2cbecf782c999cf))
+    - Decode ReplicatedDataAddress from chunk filename ([`604556e`](https://github.com/maidsafe/safe_network/commit/604556e670d5fe0a9408bbd0d586363c7b4c0d6c))
+    - churn example, wait longer before we attempt to read post-churn ([`a46ac6e`](https://github.com/maidsafe/safe_network/commit/a46ac6e18bbdfdb331caf89f8bb562a7c762b64b))
+    - expose MAX_RETRIES for cmd/query ops in client builder ([`a8b3cd8`](https://github.com/maidsafe/safe_network/commit/a8b3cd855393d06a64734b34523e40ec00fb0580))
+    - further reduce query retries and query timeout ([`9fbb067`](https://github.com/maidsafe/safe_network/commit/9fbb0672735306336f5020794a638f79752f0577))
+    - reduce query timeout noe we;re faster in general ([`f40277c`](https://github.com/maidsafe/safe_network/commit/f40277c1680f56b043c4865ff201c65b66926b2d))
+</details>
+
 ## v0.70.0 (2022-08-23)
+
+<csr-id-3b068764721cd74f4d52a279a606743415abff02/>
+<csr-id-2f8f8ca6ba0f2faae5bb4631c708988edf907725/>
+<csr-id-589f03ce8670544285f329fe35c19897d4bfced8/>
+<csr-id-ddbbb53d61d6c94b00a47dc2b708a2aeda870d96/>
+<csr-id-1235f7d8a92eb9f086c35696bf5c0a8baf67f2ac/>
+<csr-id-6471eb88f7ce8c060909930ac23c855f30e8690a/>
+<csr-id-06f5b607cdfbacba082612965630249e3c0f7300/>
+<csr-id-1618cf6a93117942946d152efee24fe3c7020e55/>
+<csr-id-11b8182a3de636a760d899cb15d7184d8153545a/>
+<csr-id-28d95a2e959e32ee69a70bdc855cba1fff1fc8d8/>
+<csr-id-d3f66d6cfa838a5c65fb8f31fa68d48794b33dea/>
+<csr-id-f0fbe5fd9bec0b2865271bb139c9fcb4ec225884/>
 
 ### Chore
 
@@ -1123,6 +1211,10 @@ needed, as they keypair itself contains the Arcs we need.
  - <csr-id-ddbbb53d61d6c94b00a47dc2b708a2aeda870d96/> leave out unnecessary Arc<RwLock>
  - <csr-id-1235f7d8a92eb9f086c35696bf5c0a8baf67f2ac/> remove unused Session member
  - <csr-id-6471eb88f7ce8c060909930ac23c855f30e8690a/> retry more times for connection fails w/ client
+
+### Chore
+
+ - <csr-id-43fcc7c517f95eab0e27ddc79cd9c6de3631c7c6/> sn_interface-0.10.0/sn_dysfunction-0.9.0/sn_client-0.70.0/sn_node-0.66.0/sn_api-0.68.0/sn_cli-0.61.0
 
 ### Bug Fixes
 
@@ -1170,9 +1262,9 @@ needed, as they keypair itself contains the Arcs we need.
 
 <csr-read-only-do-not-edit/>
 
- - 16 commits contributed to the release over the course of 8 calendar days.
+ - 17 commits contributed to the release over the course of 8 calendar days.
  - 9 days passed between releases.
- - 16 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 17 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1182,6 +1274,7 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.10.0/sn_dysfunction-0.9.0/sn_client-0.70.0/sn_node-0.66.0/sn_api-0.68.0/sn_cli-0.61.0 ([`43fcc7c`](https://github.com/maidsafe/safe_network/commit/43fcc7c517f95eab0e27ddc79cd9c6de3631c7c6))
     - removing unused CreateRegister::Populated msg type ([`28d95a2`](https://github.com/maidsafe/safe_network/commit/28d95a2e959e32ee69a70bdc855cba1fff1fc8d8))
     - removing unused sn_node::dbs::Error variants and RegisterExtend cmd ([`d3f66d6`](https://github.com/maidsafe/safe_network/commit/d3f66d6cfa838a5c65fb8f31fa68d48794b33dea))
     - adding more context information to sn_client::Error types ([`991ccd4`](https://github.com/maidsafe/safe_network/commit/991ccd452119137d9da046b7f222f091177e28f1))
@@ -1246,6 +1339,7 @@ needed, as they keypair itself contains the Arcs we need.
 <csr-id-d3a05a728be8752ea9ebff4e38e7c4c85e5db09b/>
 <csr-id-96da1171d0cac240f772e5d6a15c56f63441b4b3/>
 <csr-id-dd2eb21352223f6340064e0021f4a7df402cd5c9/>
+<csr-id-53f60c2327f8a69f0b2ef6d1a4e96644c10aa358/>
 
 ### Chore
 
@@ -1320,7 +1414,6 @@ needed, as they keypair itself contains the Arcs we need.
 
  - <csr-id-0041e18ab7d1a21e4debb39df9c4b116e002a5e5/> convert nodes joining interval to millis before passing it to launch-tool
    - Also pass the default prefix map file path as the network contacts file path to CLI node join cmd.
-- Minor refactoring to sn_client::test_spentbook_spend_dbc test.
 
 ### Refactor
 
@@ -1462,7 +1555,7 @@ needed, as they keypair itself contains the Arcs we need.
 </details>
 
 <csr-unknown>
- perform verification of input TX and spentproofs when depositing or reissuing a DBC add timeout for queries fix deadlock introduced after removal of Arc from NetworkPrefixMapRemoving the checks in compare_and_write_prefix_map and directlywriting the prefix_map fixed the issue more attempt when query too close to the spend cmd use Eyre instead of boxed error unused async in sn_client unused async remove and up-chain Remove unused Arc(RwLock) structure upon receiving an AE msg update client knowledge of network sections chains<csr-unknown/>
+Minor refactoring to sn_client::test_spentbook_spend_dbc test.<csr-unknown/>
 
 ## v0.68.2 (2022-07-10)
 
