@@ -63,15 +63,21 @@ fn random_vector(length: usize) -> Vec<u8> {
     bytes
 }
 
-/// We only testing with 4000 different data inputs.
-/// Making the first 4 bytes random shall be enough.
+/// During bench testing, each iteration need 4000 different data inputs.
+/// And it will be around 110 iterations in total to be undertaken.
+/// Given the changing bytes will give a range of:
+///     range = 2^(8*bytes_changing)
+/// The non-collision success rate will be:
+///     (1-1/range)*(1-2/range)*...*(1-num_of_different_data/range)
+/// Which, when having 4 changing bytes,
+/// for 4000 different data inputs, the rate will be 99.8%
+/// but after 10 bench iterations, drops to 83%,
+/// then being alost 0% after 110 iterations.
+/// Hence, choosing 8 bytes need to keeps changing.
 fn grows_vec_to_bytes(seed: &[u8]) -> Bytes {
     let mut bytes = BytesMut::from(seed);
     let mut rng = OsRng;
-    bytes[0] = rng.gen::<u8>();
-    bytes[1] = rng.gen::<u8>();
-    bytes[2] = rng.gen::<u8>();
-    bytes[3] = rng.gen::<u8>();
+    bytes.iter_mut().take(8).for_each(|b| *b = rng.gen::<u8>());
 
     Bytes::from(bytes)
 }
