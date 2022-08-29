@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1661699433859,
+  "lastUpdate": 1661766027966,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -20051,6 +20051,144 @@ window.BENCHMARK_DATA = {
             "name": "generating keys",
             "value": 5681820,
             "range": "± 421871",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "chriso83@protonmail.com",
+            "name": "Chris O'Neil",
+            "username": "jacderida"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "3a718d8c0957957a75250b044c9d1ad1b5874ab0",
+          "message": "chore: switch on clippy::unwrap_used as a warning\n\nsn_interface:\nAll usages were in testing code. They were either removed in favour of using the `?` operator or an\n`ok_or_else` with an error message. The `allow` attribute was applied for a couple of cases where\nthe usage was in a `proptest!` macro. This was agreed to be preferable to using `except`.\n\nsn_dysfunction:\nAll usages were in `proptest!` macros and therefore the `allow` attribute was applied.\n\nsn_node:\nA conversion from `sn_dbc::Error` to `sn_node::storage::Error` was added to remove an unwrap in\nthe bootstrapping process. The remainder were in test cases, with one `allow` added for use in a\n`proptest!` macro.\n\nsn_client:\nA couple of usages were found in little pattern matching functions. They were changed to return an\nIO error, which is the error type in the `Result`, the return type of the closure the code is called\nin. It wasn't possible to use the `eyre!` macro here because there was no conversion between the IO\nerror and the `eyre` error type.\n\nsn_api:\nOne usage was found while calculating the total amount for DBC reissues. The arithmetic for the\n`Token` type returns an `Option` with `None` in the case of an overflow. The unwrap was replaced\nwith an error.\n\nsn_cli:\nRemoved several usages from testing code. All usages were the unwrapping of an `Option`, which was\nreplaced with `ok_or_else` and an error message.",
+          "timestamp": "2022-08-29T10:17:03+02:00",
+          "tree_id": "2b1a77e4aaeedf7ebbe722b1f841cf187fa3eca4",
+          "url": "https://github.com/maidsafe/safe_network/commit/3a718d8c0957957a75250b044c9d1ad1b5874ab0"
+        },
+        "date": 1661766026869,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 1933943583,
+            "range": "± 101689033",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 1996922756,
+            "range": "± 4158934813",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 2118537621,
+            "range": "± 1570556112",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 468881354,
+            "range": "± 1457774651",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 487818604,
+            "range": "± 4238334",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 868598673,
+            "range": "± 32314594",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 13566503,
+            "range": "± 2801711",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 1635860315,
+            "range": "± 445371012",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 7891460984,
+            "range": "± 1671159961",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 241969555,
+            "range": "± 102008087",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1738602864,
+            "range": "± 907552747",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 4849583315,
+            "range": "± 410523599",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 4,
+            "range": "± 0",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 4,
+            "range": "± 0",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 4,
+            "range": "± 0",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 4,
+            "range": "± 0",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 5,
+            "range": "± 0",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 4,
+            "range": "± 0",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "generating keys",
+            "value": 5795841,
+            "range": "± 175432",
             "unit": "ns/iter"
           }
         ]
