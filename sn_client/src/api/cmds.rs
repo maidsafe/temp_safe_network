@@ -30,6 +30,11 @@ impl Client {
         self.send_cmd_with_retry_count(cmd, 1).await
     }
 
+    /// Sign data using the client keypair
+    pub fn sign(&self, data: &[u8]) -> Signature {
+        self.keypair.sign(data)
+    }
+
     // Send a Cmd to the network and await a response.
     // Cmds are automatically retried if an error is returned
     // This function is a private helper.
