@@ -152,14 +152,23 @@ upload-sn_node-musl-to-s3:
 	)
 
 .ONESHELL:
-run-local-baby-fleming:
+run-baby-fleming-clean-build:
 	pgrep sn_node | xargs kill -9
 	rm -rf ~/.safe
 	mkdir -p ~/.safe/node
 	cargo clean
-	cargo build --release --bin sn_node
-	cp target/release/sn_node ~/.safe/node
-	cargo run --release node run-baby-fleming
+	cargo build --bin sn_node
+	cp target/debug/sn_node ~/.safe/node
+	RUST_LOG=sn_node=debug cargo run node run-baby-fleming
+
+.ONESHELL:
+run-baby-fleming:
+	pgrep sn_node | xargs kill -9
+	rm -rf ~/.safe
+	mkdir -p ~/.safe/node
+	cargo build --bin sn_node
+	cp target/debug/sn_node ~/.safe/node
+	RUST_LOG=sn_node=debug cargo run node run-baby-fleming
 
 ci-unit-tests:
 	cargo test --no-run --release --package sn_interface --package sn_dysfunction --package sn_node

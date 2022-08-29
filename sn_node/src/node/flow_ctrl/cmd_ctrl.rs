@@ -193,8 +193,11 @@ impl CmdCtrl {
                         .await;
                 }
                 Err(error) => {
+                    debug!("Error processing command");
                     if let Error::CmdProcessingClientRespondError(ref cmds) = error {
+                        debug!("Will send error response back to client");
                         for cmd in cmds.clone() {
+                            trace!("Sending cmd to client: {:?}", cmd);
                             match cmd_process_api.send((cmd, Some(id))).await {
                                 Ok(_) => {
                                     //no issues
