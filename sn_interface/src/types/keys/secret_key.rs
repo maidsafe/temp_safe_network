@@ -89,6 +89,7 @@ impl Display for SecretKey {
 pub(crate) mod test_utils {
     use crate::messaging::system::KeyedSig;
     use crate::network_knowledge::{elder_count, supermajority};
+    use rand::RngCore;
     use std::ops::Deref;
 
     fn threshold() -> usize {
@@ -106,8 +107,12 @@ pub(crate) mod test_utils {
 
     impl SecretKeySet {
         pub fn random(threshold_size: Option<usize>) -> Self {
+            Self::random_with_rng(&mut rand::thread_rng(), threshold_size)
+        }
+
+        pub fn random_with_rng<R: RngCore>(rng: &mut R, threshold_size: Option<usize>) -> Self {
             let threshold_size = threshold_size.unwrap_or_else(threshold);
-            let poly = bls::poly::Poly::random(threshold_size, &mut rand::thread_rng());
+            let poly = bls::poly::Poly::random(threshold_size, rng);
             let key = bls::SecretKey::from_mut(&mut poly.evaluate(0));
             let set = bls::SecretKeySet::from(poly);
 
