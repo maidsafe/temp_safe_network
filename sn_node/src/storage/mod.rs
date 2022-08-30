@@ -67,11 +67,11 @@ impl DataStorage {
         keypair_for_spent_book: Keypair,
     ) -> Result<Option<StorageLevel>> {
         debug!("Replicating {data:?}");
-        match data.clone() {
+        match data {
             ReplicatedData::Chunk(chunk) => self.chunks.store(chunk).await?,
             ReplicatedData::RegisterLog(data) => {
                 info!("Updating register: {:?}", data.address);
-                self.registers.update(vec![data]).await?
+                self.registers.update(data).await?
             }
             ReplicatedData::RegisterWrite(cmd) => self.registers.write(cmd).await?,
             ReplicatedData::SpentbookWrite(cmd) => {
@@ -88,7 +88,7 @@ impl DataStorage {
                 // We now write the cmd received
                 self.registers.write(cmd).await?
             }
-            ReplicatedData::SpentbookLog(data) => self.registers.update(vec![data]).await?,
+            ReplicatedData::SpentbookLog(data) => self.registers.update(data).await?,
         };
 
         // check if we've filled another approx. 10%-points of our storage

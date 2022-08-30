@@ -61,7 +61,7 @@ impl ChunkStorage {
     fn chunk_filepath_to_address(path: &Path) -> Result<ChunkAddress> {
         let filename = path
             .file_name()
-            .ok_or(Error::NoFilename)?
+            .ok_or_else(|| Error::NoFilename(path.to_path_buf()))?
             .to_str()
             .ok_or(Error::InvalidFilename)?;
 
@@ -110,7 +110,7 @@ impl ChunkStorage {
     /// Store a chunk in the local disk store
     /// If that chunk was already in the local store, just overwrites it
     #[instrument(skip_all)]
-    pub(super) async fn store(&self, chunk: Chunk) -> Result<()> {
+    pub(super) async fn store(&self, chunk: &Chunk) -> Result<()> {
         let addr = chunk.address();
         let filepath = self.chunk_addr_to_filepath(addr)?;
 
@@ -175,10 +175,7 @@ mod tests {
         for _ in 0..10 {
             let chunk = Chunk::new(random_bytes(100));
 
-            storage
-                .store(chunk.clone())
-                .await
-                .expect("Failed to write chunk.");
+            storage.store(&chunk).await.expect("Failed to write chunk.");
 
             let read_chunk = storage
                 .get_chunk(chunk.address())
@@ -212,7 +209,7 @@ mod tests {
         // write all chunks
         let mut tasks = Vec::new();
         for c in chunks.iter() {
-            tasks.push(async { storage.store(c.clone()).await.map(|_| *c.address()) });
+            tasks.push(async { storage.store(c).await.map(|_| *c.address()) });
         }
         let results = join_all(tasks).await;
 
