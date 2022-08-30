@@ -130,8 +130,8 @@ pub enum Error {
     #[error("No such data: {0:?}")]
     NoSuchData(DataAddress),
     /// Chunk already exists for this node
-    #[error("Data already exists at this node")]
-    DataExists,
+    #[error("Data already exists at this node: {0:?}")]
+    DataExists(DataAddress),
     /// I/O error.
     #[error("I/O error: {0}")]
     Io(#[from] io::Error),
@@ -236,7 +236,7 @@ pub(crate) fn convert_to_error_msg(error: Error) -> ErrorMsg {
     match error {
         Error::InvalidOwner(key) => ErrorMsg::InvalidOwner(key),
         Error::NoSuchData(address) => ErrorMsg::DataNotFound(address),
-        Error::DataExists => ErrorMsg::DataExists,
+        Error::DataExists(address) => ErrorMsg::DataExists(address),
         Error::NetworkData(error) => convert_dt_error_to_error_msg(error),
         other => ErrorMsg::InvalidOperation(format!("Failed to perform operation: {:?}", other)),
     }

@@ -15,7 +15,7 @@ use std::{io, path::PathBuf};
 use thiserror::Error;
 use xor_name::XorName;
 
-/// Specialisation of `std::Result` for dbs.
+/// Specialisation of `std::Result` for storage mod.
 pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[allow(clippy::large_enum_variant)]
@@ -27,20 +27,14 @@ pub enum Error {
     #[error("Not enough space")]
     NotEnoughSpace,
     /// Register not found in local storage.
-    #[error("Register data ({addr:?}) not found in local storage at {path}")]
-    RegisterNotFound {
-        addr: RegisterAddress,
-        path: PathBuf,
-    },
+    #[error("Register data not found in local storage: {0:?}")]
+    RegisterNotFound(RegisterAddress),
     /// Chunk not found.
     #[error("Chunk not found: {0:?}")]
     ChunkNotFound(XorName),
     /// Data already exists for this node
-    #[error("Data already exists at this node")]
-    DataExists,
-    /// Invalid store found
-    #[error("A store was loaded, but found to be invalid: {0:?}")]
-    InvalidRegisterStore(RegisterAddress),
+    #[error("Data already exists at this node: {0:?}")]
+    DataExists(DataAddress),
     /// Storage not supported for type of data address
     #[error("Storage not supported for type of data address: {0:?}")]
     UnsupportedDataType(XorName),
@@ -66,8 +60,8 @@ pub enum Error {
     #[error("Path contains no file name: {0}")]
     NoFilename(PathBuf),
     /// Invalid filename
-    #[error("Invalid chunk filename")]
-    InvalidFilename,
+    #[error("Invalid chunk filename: {0}")]
+    InvalidFilename(PathBuf),
     /// Register command/op destinaation adddress mistmatch
     #[error(
         "Register command destination address ({cmd_dst_addr:?}) doesn't match stored Register address: {reg_addr:?}"
@@ -82,9 +76,9 @@ pub enum Error {
 pub(crate) fn convert_to_error_msg(error: Error) -> ErrorMsg {
     match error {
         Error::NotEnoughSpace => ErrorMsg::FailedToWriteFile,
-        Error::RegisterNotFound { addr, .. } => ErrorMsg::DataNotFound(DataAddress::Register(addr)),
+        Error::RegisterNotFound(address) => ErrorMsg::DataNotFound(DataAddress::Register(address)),
         Error::ChunkNotFound(xorname) => ErrorMsg::ChunkNotFound(xorname),
-        Error::DataExists => ErrorMsg::DataExists,
+        Error::DataExists(address) => ErrorMsg::DataExists(address),
         Error::NetworkData(error) => convert_dt_error_to_error_msg(error),
         other => ErrorMsg::InvalidOperation(format!("Failed to perform operation: {:?}", other)),
     }

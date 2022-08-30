@@ -8,7 +8,7 @@
 
 use super::{
     errors::convert_to_error_msg,
-    register_store::{RegisterLog, RegisterStore},
+    register_store::{RegisterStore, StoredRegister},
     Error, Result,
 };
 
@@ -23,7 +23,8 @@ use sn_interface::{
     },
     types::{
         register::{Action, EntryHash, Permissions, Policy, Register, User},
-        Keypair, PublicKey, RegisterAddress, ReplicatedRegisterLog, SPENTBOOK_TYPE_TAG,
+        DataAddress, Keypair, PublicKey, RegisterAddress, ReplicatedRegisterLog,
+        SPENTBOOK_TYPE_TAG,
     },
 };
 
@@ -32,11 +33,9 @@ use bincode::serialize;
 use std::{
     collections::BTreeMap,
     fmt::{self, Display, Formatter},
-    path::{Path, PathBuf},
+    path::Path,
 };
 use tracing::info;
-#[cfg(test)]
-use xor_name::Prefix;
 use xor_name::XorName;
 
 const REGISTER_STORE_DIR_NAME: &str = "register";
@@ -49,230 +48,87 @@ pub(super) struct RegisterStorage {
 
 impl RegisterStorage {
     /// Create new `RegisterStorage`
-    pub(crate) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
+    pub(super) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         let file_store = RegisterStore::new(path.join(REGISTER_STORE_DIR_NAME), used_space)?;
 
         Ok(Self { file_store })
     }
 
     #[allow(dead_code)]
-    pub(crate) async fn remove_register(&mut self, address: &RegisterAddress) -> Result<()> {
+    pub(super) async fn remove_register(&mut self, address: &RegisterAddress) -> Result<()> {
         trace!("Removing register, {:?}", address);
         self.file_store.delete_data(address).await
     }
 
-    pub(crate) async fn addrs(&self) -> Vec<RegisterAddress> {
+    pub(super) async fn addrs(&self) -> Vec<RegisterAddress> {
         self.file_store.list_all_reg_addrs().await
     }
 
     /// Used for replication of data to new Adults.
-    pub(crate) async fn get_register_replica(
+    pub(super) async fn get_register_replica(
         &self,
         address: &RegisterAddress,
     ) -> Result<ReplicatedRegisterLog> {
-        let (register, section_auth, op_log, _) = self.try_load_stored_register(address).await?;
-
-        // Build the replicaed register log assuming ops stored are all valid and correctly
-        // signed since we performed such validations before storing them.
-        Ok(ReplicatedRegisterLog {
-            address: *register.address(),
-            section_auth,
-            op_log,
-        })
+        let stored_reg = self.try_load_stored_register(address).await?;
+        if let Some((register, section_auth)) = stored_reg.state {
+            // Build the replicated register log assuming ops stored are all valid and correctly
+            // signed since we performed such validations before storing them.
+            Ok(ReplicatedRegisterLog {
+                address: *register.address(),
+                section_auth,
+                op_log: stored_reg.op_log,
+            })
+        } else {
+            Err(Error::RegisterNotFound(*address))
+        }
     }
 
-    // TODO: Use it for replication of data to new Adults.
-    #[cfg(test)]
-    async fn get_data_of(&mut self, prefix: Prefix) -> Result<Vec<ReplicatedRegisterLog>> {
-        let mut the_data = vec![];
+    /// Update our Register's replica on receiving data from other nodes.
+    pub(super) async fn update(&mut self, data: &ReplicatedRegisterLog) -> Result<()> {
+        debug!("Updating Register store: {:?}", data.address);
+        let mut stored_reg = self.try_load_stored_register(&data.address).await?;
 
-        let all_addrs = self.addrs().await;
-
-        // TODO: make this concurrent
-        for addr in all_addrs {
-            match self.try_load_stored_register(&addr).await {
-                Ok((register, section_auth, op_log, _)) => {
-                    if prefix.matches(register.name()) {
-                        let replica = ReplicatedRegisterLog {
-                            address: *register.address(),
-                            section_auth,
-                            op_log,
-                        };
-                        the_data.push(replica);
-                    }
-                }
-                Err(Error::RegisterNotFound { addr, .. }) => {
-                    return Err(Error::InvalidRegisterStore(addr))
-                }
-                Err(e) => return Err(e),
+        let mut log_to_write = Vec::new();
+        for replicated_cmd in data.op_log.iter() {
+            if let Err(err) = self
+                .try_to_apply_cmd_against_register_state(replicated_cmd, &mut stored_reg)
+                .await
+            {
+                warn!(
+                    "Discarding ReplicatedRegisterLog cmd {:?}: {:?}",
+                    replicated_cmd, err
+                );
+            } else {
+                log_to_write.push(replicated_cmd.clone());
             }
         }
 
-        Ok(the_data)
-    }
-
-    /// On receiving data from other nodes.
-    pub(crate) async fn update(&mut self, data: &ReplicatedRegisterLog) -> Result<()> {
-        debug!("Updating Register store");
-        let stored_reg = self
-            .file_store
-            .open_reg_log_from_disk(&data.address)
-            .await?;
-
-        let mut log_to_write = Vec::new();
-        let register = match stored_reg.state {
-            Some((register, _)) => Some(register),
-            None => data.op_log.iter().find_map(|op| match op {
-                RegisterCmd::Create {
-                    cmd:
-                        SignedRegisterCreate {
-                            op: CreateRegister { name, tag, policy },
-                            ..
-                        },
-                    section_auth: _,
-                } => {
-                    log_to_write.push(op.clone());
-                    Some(Register::new(*policy.owner(), *name, *tag, policy.clone()))
-                }
-                _ => None,
-            }),
-        };
-
-        let log_to_write = if let Some(mut reg) = register {
-            for replicated_cmd in data.op_log.iter() {
-                if let Err(err) = self.apply(replicated_cmd, &mut reg).await {
-                    warn!(
-                        "Discarding ReplicatedRegisterLog cmd {:?}: {:?}",
-                        replicated_cmd, err
-                    );
-                } else {
-                    log_to_write.push(replicated_cmd.clone());
-                }
-            }
-            &log_to_write
-        } else {
-            &data.op_log
-        };
-
-        // write the new cmds all to disk
+        // Write the new cmds all to disk
         self.file_store
-            .write_log_to_disk(log_to_write, &stored_reg.ops_log_path)
-            .await?;
-
-        Ok(())
+            .write_log_to_disk(&log_to_write, &stored_reg.op_log_path)
+            .await
     }
 
     /// --- Writing ---
 
-    pub(crate) async fn write(&mut self, cmd: &RegisterCmd) -> Result<()> {
+    pub(super) async fn write(&mut self, cmd: &RegisterCmd) -> Result<()> {
         info!("Writing register cmd: {:?}", cmd);
-        let log_path = match self.try_load_stored_register(&cmd.dst_address()).await {
-            Ok((mut register, _, _, log_path)) => {
-                self.apply(cmd, &mut register).await?;
-                log_path
-            }
-            Err(Error::RegisterNotFound { path, .. }) => {
-                // we still store the op
-                if let RegisterCmd::Create {
-                    cmd: SignedRegisterCreate { op, auth },
-                    ..
-                } = cmd
-                {
-                    debug!("Creating Register....");
-                    // TODO 1: in higher layers we must verify that the section_auth is from a proper section..!
-                    // TODO 2: Enable this check once we have section signature over the container key.
-                    // let public_key = section_auth.sig.public_key;
-                    // let _ = section_auth.verify_authority(key).or(Err(Error::InvalidSignature(PublicKey::Bls(public_key))))?;
-                    let public_key = auth.public_key;
-                    let _ = auth
-                        .clone()
-                        .verify_authority(serialize(op)?)
-                        .or(Err(Error::InvalidSignature(public_key)))?;
+        // Let's first try to load and reconstruct the replica of targetted Register
+        // we have in local storage, to then try to apply the new command onto it.
+        let mut stored_reg = self.try_load_stored_register(&cmd.dst_address()).await?;
 
-                    trace!("Creating new register");
-                }
-                path
-            }
-            Err(other) => return Err(other),
-        };
+        self.try_to_apply_cmd_against_register_state(cmd, &mut stored_reg)
+            .await?;
 
-        // write the (single cmd) log to disk
+        // Everything went fine, let's write the single cmd to disk
         self.file_store
-            .write_log_to_disk(&vec![cmd.clone()], &log_path)
+            .write_log_to_disk(&vec![cmd.clone()], &stored_reg.op_log_path)
             .await
-    }
-
-    // Try to apply the provided cmd to the register log and state, performing all vaidations
-    async fn apply(&mut self, cmd: &RegisterCmd, register: &mut Register) -> Result<()> {
-        // rough estimate of the RegisterCmd
-        let required_space = std::mem::size_of::<RegisterCmd>();
-        if !self.file_store.can_add(required_space) {
-            return Err(Error::NotEnoughSpace);
-        }
-
-        let cmd_dst_addr = cmd.dst_address();
-        if &cmd_dst_addr != register.address() {
-            return Err(Error::RegisterAddrMismatch {
-                cmd_dst_addr,
-                reg_addr: *register.address(),
-            });
-        }
-
-        match cmd {
-            RegisterCmd::Create { .. } => Err(Error::DataExists),
-            RegisterCmd::Edit(SignedRegisterEdit { op, auth }) => {
-                let public_key = auth.public_key;
-                let _ = auth
-                    .clone()
-                    .verify_authority(serialize(op)?)
-                    .or(Err(Error::InvalidSignature(public_key)))?;
-
-                info!("Editing Register");
-                register.check_permissions(Action::Write, Some(User::Key(public_key)))?;
-                let result = register
-                    .apply_op(op.edit.clone())
-                    .map_err(Error::NetworkData);
-
-                match result {
-                    Ok(()) => {
-                        trace!("Editing Register success!");
-                        Ok(())
-                    }
-                    Err(err) => {
-                        trace!("Editing Register failed!: {:?}", err);
-                        Err(err)
-                    }
-                }
-            }
-        }
-    }
-
-    /// Temporary helper function which makes sure there exists a Register for the spentbook,
-    /// this shouldn't be required once we have a Spentbook data type.
-    pub(crate) async fn create_spentbook_register(
-        &mut self,
-        address: &RegisterAddress,
-        pk: PublicKey,
-        keypair: Keypair,
-    ) -> Result<()> {
-        trace!("Creating new spentbook register: {:?}", address);
-
-        let mut permissions = BTreeMap::new();
-        let _ = permissions.insert(User::Anyone, Permissions::new(true));
-        let owner = User::Key(pk);
-        let policy = Policy { owner, permissions };
-
-        let cmd = create_reg_w_policy(*address.name(), SPENTBOOK_TYPE_TAG, policy, keypair)?;
-
-        match self.write(&cmd).await {
-            Ok(()) | Err(Error::DataExists) => Ok(()),
-            other => other,
-        }
     }
 
     /// --- Reading ---
 
-    pub(crate) async fn read(&self, read: &RegisterQuery, requester: User) -> NodeQueryResponse {
+    pub(super) async fn read(&self, read: &RegisterQuery, requester: User) -> NodeQueryResponse {
         trace!("Reading register {:?}", read.dst_address());
         let operation_id = match read.operation_id() {
             Ok(id) => id,
@@ -305,12 +161,16 @@ impl RegisterStorage {
         action: Action,
         requester: User,
     ) -> Result<Register> {
-        let (register, _, _, _) = self.try_load_stored_register(address).await?;
-        register
-            .check_permissions(action, Some(requester))
-            .map_err(Error::from)?;
+        let stored_reg = self.try_load_stored_register(address).await?;
+        if let Some((register, _)) = stored_reg.state {
+            register
+                .check_permissions(action, Some(requester))
+                .map_err(Error::from)?;
 
-        Ok(register)
+            Ok(register)
+        } else {
+            Err(Error::RegisterNotFound(*address))
+        }
     }
 
     /// Get entire Register.
@@ -419,39 +279,140 @@ impl RegisterStorage {
     // =========================== Helpers ====================================
     // ========================================================================
 
-    // Gets stored register log from disk, trying to reconstruct the Register
-    async fn try_load_stored_register(
-        &self,
-        addr: &RegisterAddress,
-    ) -> Result<(Register, SectionAuth, RegisterLog, PathBuf)> {
-        let stored_reg = self.file_store.open_reg_log_from_disk(addr).await?;
-        // if we have the Register creation cmd, apply all ops to reconstruct the Register
-        match stored_reg.state {
-            None => Err(Error::RegisterNotFound {
-                addr: *addr,
-                path: stored_reg.ops_log_path,
-            }),
-            Some((mut register, section_auth)) => {
-                for edit_op in stored_reg.ops_log.iter() {
-                    if let RegisterCmd::Edit(SignedRegisterEdit {
-                        op: EditRegister { edit, .. },
-                        ..
-                    }) = edit_op
-                    {
-                        register
-                            .apply_op(edit.clone())
-                            .map_err(Error::NetworkData)?;
-                    }
+    // Temporary helper function which makes sure there exists a Register for the spentbook,
+    // this shouldn't be required once we have a Spentbook data type.
+    pub(super) async fn create_spentbook_register(
+        &mut self,
+        address: &RegisterAddress,
+        pk: PublicKey,
+        keypair: Keypair,
+    ) -> Result<()> {
+        trace!("Creating new spentbook register: {:?}", address);
+
+        let mut permissions = BTreeMap::new();
+        let _ = permissions.insert(User::Anyone, Permissions::new(true));
+        let owner = User::Key(pk);
+        let policy = Policy { owner, permissions };
+
+        let cmd = create_reg_w_policy(*address.name(), SPENTBOOK_TYPE_TAG, policy, keypair)?;
+
+        match self.write(&cmd).await {
+            Ok(()) | Err(Error::DataExists(_)) => Ok(()),
+            other => other,
+        }
+    }
+
+    // Private helper which does all verification and tries to apply given cmd to given Register
+    // state. It accumulates the cmd, if valid, into the log so further calls can be made with
+    // the same state and log for other commands to be applied, as used by the `update` function.
+    async fn try_to_apply_cmd_against_register_state(
+        &mut self,
+        cmd: &RegisterCmd,
+        stored_reg: &mut StoredRegister,
+    ) -> Result<()> {
+        // If we have the target Register, try to apply the cmd, otherwise let's store
+        // the cmd in our storage anyway, whenever we receive the 'Register create' cmd
+        // it can be reconstructed from all cmds we hold. If this is a 'Register create'
+        // cmd let's verify is valid before accepting it, however 'Edits cmds' cannot be
+        // verified now untill we have the `Register create` cmd.
+        match (stored_reg.state.as_mut(), cmd) {
+            (Some((ref mut register, _)), cmd) => self.apply(cmd, register).await?,
+            (
+                None,
+                RegisterCmd::Create {
+                    cmd: SignedRegisterCreate { op, auth },
+                    section_auth,
+                },
+            ) => {
+                // the target Register is not in our store or we don't have the 'Register create',
+                // let's verify the create cmd we received is valid and try to apply stored cmds we may have.
+                let public_key = auth.public_key;
+                let _ = auth
+                    .clone()
+                    .verify_authority(serialize(op)?)
+                    .or(Err(Error::InvalidSignature(public_key)))?;
+
+                trace!("Creating new register: {:?}", cmd.dst_address());
+                // let's do a final check, let's try to apply all cmds to it,
+                // those which are new cmds were not validated yet, so let's do it now.
+                let mut register =
+                    Register::new(*op.policy.owner(), op.name, op.tag, op.policy.clone());
+
+                for cmd in stored_reg.op_log.iter() {
+                    self.apply(cmd, &mut register).await?;
                 }
 
-                Ok((
-                    register,
-                    section_auth,
-                    stored_reg.ops_log,
-                    stored_reg.ops_log_path,
-                ))
+                stored_reg.state = Some((register, section_auth.clone()));
+            }
+            (None, edit_cmd) => {
+                // we cannot validate it, but we'll store it
+                stored_reg.op_log.push(edit_cmd.clone());
             }
         }
+
+        Ok(())
+    }
+
+    // Try to apply the provided cmd to the register log and state, performing all vaidations
+    async fn apply(&mut self, cmd: &RegisterCmd, register: &mut Register) -> Result<()> {
+        let addr = cmd.dst_address();
+        if &addr != register.address() {
+            return Err(Error::RegisterAddrMismatch {
+                cmd_dst_addr: addr,
+                reg_addr: *register.address(),
+            });
+        }
+
+        match cmd {
+            RegisterCmd::Create { .. } => Err(Error::DataExists(DataAddress::Register(addr))),
+            RegisterCmd::Edit(SignedRegisterEdit { op, auth }) => {
+                let public_key = auth.public_key;
+                let _ = auth
+                    .clone()
+                    .verify_authority(serialize(op)?)
+                    .or(Err(Error::InvalidSignature(public_key)))?;
+
+                info!("Editing Register");
+                register.check_permissions(Action::Write, Some(User::Key(public_key)))?;
+                let result = register
+                    .apply_op(op.edit.clone())
+                    .map_err(Error::NetworkData);
+
+                match result {
+                    Ok(()) => {
+                        trace!("Editing Register success: {:?}", addr);
+                        Ok(())
+                    }
+                    Err(err) => {
+                        trace!("Editing Register failed {:?}: {:?}", addr, err);
+                        Err(err)
+                    }
+                }
+            }
+        }
+    }
+
+    // Gets stored register log from disk, trying to reconstruct the Register
+    // Note this doesn't perform any cmd sig/perms validation, it's only used when the log
+    // is read from disk which has already been validated before storing it.
+    async fn try_load_stored_register(&self, addr: &RegisterAddress) -> Result<StoredRegister> {
+        let mut stored_reg = self.file_store.open_reg_log_from_disk(addr).await?;
+        // if we have the Register creation cmd, apply all ops to reconstruct the Register
+        if let Some((register, _)) = &mut stored_reg.state {
+            for op in stored_reg.op_log.iter() {
+                if let RegisterCmd::Edit(SignedRegisterEdit {
+                    op: EditRegister { edit, .. },
+                    ..
+                }) = op
+                {
+                    register
+                        .apply_op(edit.clone())
+                        .map_err(Error::NetworkData)?;
+                }
+            }
+        }
+
+        Ok(stored_reg)
     }
 }
 
@@ -517,7 +478,6 @@ mod test {
     use eyre::{bail, eyre, Result};
     use rand::Rng;
     use tempfile::tempdir;
-    use xor_name::Prefix;
 
     #[tokio::test]
     async fn test_register_write() -> Result<()> {
@@ -541,8 +501,11 @@ mod test {
         match store.write(&cmd).await {
             Ok(()) => Err(eyre!("An error should occur for this test case")),
             Err(error) => match error {
-                Error::DataExists => {
-                    assert_eq!(error.to_string(), "Data already exists at this node");
+                Error::DataExists(addr) => {
+                    assert_eq!(
+                        error.to_string(),
+                        format!("Data already exists at this node: {:?}", addr)
+                    );
                     Ok(())
                 }
                 _ => Err(eyre!("A Error::DataExists variant was expected")),
@@ -557,30 +520,53 @@ mod test {
 
         // create register
         let (cmd, authority) = create_register()?;
+        let address = cmd.dst_address();
         store.write(&cmd).await?;
 
-        // export db
-        // get all data in db
-        let prefix = Prefix::new(0, cmd.name());
-        let for_update = store.get_data_of(prefix).await?;
+        // should fail to write same register again
+        match store.write(&cmd).await {
+            Ok(()) => {
+                return Err(eyre!("An error should occur for this test case"));
+            }
+            Err(error) => match error {
+                Error::DataExists(addr) => {
+                    assert_eq!(
+                        error.to_string(),
+                        format!("Data already exists at this node: {:?}", addr)
+                    );
+                }
+                _ => {
+                    return Err(eyre!("A Error::DataExists variant was expected"));
+                }
+            },
+        }
 
-        // create new db and update it with the data from first db
+        // export Registers, get all data we held in storage
+        let all_addrs = store.addrs().await;
+        let mut for_update = Vec::new();
+        for addr in all_addrs {
+            let replica = store.get_register_replica(&addr).await?;
+            for_update.push(replica);
+        }
+
+        // create new store and update it with the data from first store
         let mut new_store = new_store()?;
-
         for log in for_update {
             new_store.update(&log).await?;
         }
-        let address = cmd.dst_address();
-        // assert the same tests hold as for the first db
 
+        // assert the same tests hold as for the first store
         // should fail to write same register again, also on this new store
         match new_store.write(&cmd).await {
             Ok(()) => {
                 return Err(eyre!("An error should occur for this test case"));
             }
             Err(error) => match error {
-                Error::DataExists => {
-                    assert_eq!(error.to_string(), "Data already exists at this node");
+                Error::DataExists(addr) => {
+                    assert_eq!(
+                        error.to_string(),
+                        format!("Data already exists at this node: {:?}", addr)
+                    );
                 }
                 _ => {
                     return Err(eyre!("A Error::DataExists variant was expected"));

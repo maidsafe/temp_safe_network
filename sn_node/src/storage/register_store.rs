@@ -6,12 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{list_files_in, prefix_tree_path, Result};
+use super::{list_files_in, prefix_tree_path, Error, Result};
 
 use crate::UsedSpace;
 
 use sn_interface::{
-    messaging::data::{CreateRegister, SignedRegisterCreate},
+    messaging::data::SignedRegisterCreate,
     types::{
         register::Register,
         utils::{deserialise, serialise},
@@ -37,8 +37,8 @@ pub(super) type RegisterLog = Vec<RegisterCmd>;
 #[derive(Clone, Debug)]
 pub(super) struct StoredRegister {
     pub(super) state: Option<(Register, SectionAuth)>,
-    pub(super) ops_log: RegisterLog,
-    pub(super) ops_log_path: PathBuf,
+    pub(super) op_log: RegisterLog,
+    pub(super) op_log_path: PathBuf,
 }
 
 /// A disk store for Registers
@@ -92,10 +92,6 @@ impl RegisterStore {
         addrs.into_iter().map(|(_, addr)| addr).collect()
     }
 
-    pub(super) fn can_add(&self, size: usize) -> bool {
-        self.used_space.can_add(size)
-    }
-
     pub(super) async fn delete_data(&self, addr: &RegisterAddress) -> Result<()> {
         let filepath = self.address_to_filepath(addr)?;
         let meta = metadata(filepath.clone()).await?;
@@ -113,8 +109,8 @@ impl RegisterStore {
         let path = self.address_to_filepath(addr)?;
         let mut stored_reg = StoredRegister {
             state: None,
-            ops_log: RegisterLog::new(),
-            ops_log_path: path.clone(),
+            op_log: RegisterLog::new(),
+            op_log_path: path.clone(),
         };
 
         if !path.exists() {
@@ -132,21 +128,18 @@ impl RegisterStore {
                 .map(|serialized_data| deserialise::<RegisterCmd>(&serialized_data))
             {
                 Ok(Ok(reg_cmd)) => {
-                    stored_reg.ops_log.push(reg_cmd.clone());
+                    stored_reg.op_log.push(reg_cmd.clone());
 
                     if let RegisterCmd::Create {
-                        cmd:
-                            SignedRegisterCreate {
-                                op: CreateRegister { name, tag, policy },
-                                ..
-                            },
+                        cmd: SignedRegisterCreate { op, .. },
                         section_auth,
                     } = reg_cmd
                     {
                         // TODO: if we already have read a RegisterCreate op, check if there
                         // is any difference with this other one,...if so perhaps log a warning?
                         if stored_reg.state.is_none() {
-                            let register = Register::new(*policy.owner(), name, tag, policy);
+                            let register =
+                                Register::new(*op.policy.owner(), op.name, op.tag, op.policy);
                             stored_reg.state = Some((register, section_auth));
                         }
                     }
@@ -166,7 +159,14 @@ impl RegisterStore {
 
     /// Persists a RegisterLog to disk
     pub(super) async fn write_log_to_disk(&self, log: &RegisterLog, path: &Path) -> Result<()> {
-        trace!("Writing to register log at {}", path.display());
+        trace!(
+            "Writing to register log with {} cmd/s at {}",
+            log.len(),
+            path.display()
+        );
+        if log.is_empty() {
+            return Ok(());
+        }
 
         create_dir_all(path).await?;
 
@@ -175,12 +175,22 @@ impl RegisterStore {
             self.write_register_cmd(cmd, path).await?;
         }
 
-        trace!("Log writing successful at {}", path.display());
+        trace!(
+            "Log of {} cmd/s written successfully at {}",
+            log.len(),
+            path.display()
+        );
         Ok(())
     }
 
     /// Persists a RegisterCmd to disk
     pub(super) async fn write_register_cmd(&self, cmd: &RegisterCmd, path: &Path) -> Result<()> {
+        // rough estimate of the RegisterCmd
+        let required_space = std::mem::size_of::<RegisterCmd>();
+        if !self.used_space.can_add(required_space) {
+            return Err(Error::NotEnoughSpace);
+        }
+
         let reg_cmd_id = register_operation_id(cmd)?;
         let path = path.join(reg_cmd_id.clone());
 
