@@ -86,7 +86,7 @@ impl Display for SecretKey {
 }
 
 #[cfg(any(test, feature = "test-utils"))]
-pub mod test_utils {
+pub(crate) mod test_utils {
     use crate::messaging::system::KeyedSig;
     use crate::network_knowledge::{elder_count, supermajority};
     use std::ops::Deref;

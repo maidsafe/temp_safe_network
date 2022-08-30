@@ -117,7 +117,7 @@ pub enum Error {
     BlsError(#[from] BlsError),
 }
 
-pub fn convert_bincode_error(err: bincode::Error) -> Error {
+pub(crate) fn convert_bincode_error(err: bincode::Error) -> Error {
     Error::Serialisation(err.as_ref().to_string())
 }
 
