@@ -6,13 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{list_files_in, prefix_tree_path, Error, Result};
+use super::{list_files_in, prefix_tree_path, Result};
 
 use crate::UsedSpace;
 
-use sn_interface::types::{
-    utils::{deserialise, serialise},
-    RegisterAddress, RegisterCmd,
+use sn_interface::{
+    messaging::data::{CreateRegister, SignedRegisterCreate},
+    types::{
+        register::Register,
+        utils::{deserialise, serialise},
+        RegisterAddress, RegisterCmd, SectionAuth,
+    },
 };
 
 use bincode::serialize;
@@ -28,7 +32,14 @@ use xor_name::XorName;
 // Deterministic Id for a register Cmd, takes into account the underlying cmd, and all sigs
 type RegisterCmdId = String;
 
-pub(super) type RegisterLog = BTreeMap<RegisterCmdId, RegisterCmd>;
+pub(super) type RegisterLog = Vec<RegisterCmd>;
+
+#[derive(Clone, Debug)]
+pub(super) struct StoredRegister {
+    pub(super) state: Option<(Register, SectionAuth)>,
+    pub(super) ops_log: RegisterLog,
+    pub(super) ops_log_path: PathBuf,
+}
 
 /// A disk store for Registers
 #[derive(Clone, Debug)]
@@ -43,7 +54,7 @@ impl RegisterStore {
     /// If the location specified already contains a `RegisterStore`, it is simply used
     ///
     /// Used space of the dir is tracked
-    pub(crate) fn new<P: AsRef<Path>>(root_path: P, used_space: UsedSpace) -> Result<Self> {
+    pub(super) fn new<P: AsRef<Path>>(root_path: P, used_space: UsedSpace) -> Result<Self> {
         Ok(Self {
             file_store_path: root_path.as_ref().to_path_buf(),
             used_space,
@@ -61,7 +72,7 @@ impl RegisterStore {
         Ok(path.join(hex::encode(reg_id)))
     }
 
-    pub(crate) async fn list_all_reg_addrs(&self) -> Vec<RegisterAddress> {
+    pub(super) async fn list_all_reg_addrs(&self) -> Vec<RegisterAddress> {
         let iter = list_files_in(&self.file_store_path)
             .into_iter()
             .filter_map(|e| e.parent().map(|parent| (parent.to_path_buf(), e.clone())));
@@ -81,11 +92,11 @@ impl RegisterStore {
         addrs.into_iter().map(|(_, addr)| addr).collect()
     }
 
-    pub(crate) fn can_add(&self, size: usize) -> bool {
+    pub(super) fn can_add(&self, size: usize) -> bool {
         self.used_space.can_add(size)
     }
 
-    pub(crate) async fn delete_data(&self, addr: &RegisterAddress) -> Result<()> {
+    pub(super) async fn delete_data(&self, addr: &RegisterAddress) -> Result<()> {
         let filepath = self.address_to_filepath(addr)?;
         let meta = metadata(filepath.clone()).await?;
         remove_file(filepath).await?;
@@ -93,62 +104,75 @@ impl RegisterStore {
         Ok(())
     }
 
-    pub(crate) fn data_file_exists(&self, addr: &RegisterAddress) -> Result<bool> {
-        let filepath = self.address_to_filepath(addr)?;
-        Ok(filepath.exists())
-    }
-
     /// Opens the log of RegisterCmds for a given register address.
     /// Creates a new log if no data is found
-    pub(crate) async fn open_reg_log_from_disk(
+    pub(super) async fn open_reg_log_from_disk(
         &self,
         addr: &RegisterAddress,
-    ) -> Result<(RegisterLog, PathBuf)> {
-        let mut register_log = RegisterLog::new();
-
+    ) -> Result<StoredRegister> {
         let path = self.address_to_filepath(addr)?;
-        if path.exists() {
-            trace!("Register log path exists: {}", path.display());
-            for filepath in list_files_in(&path) {
-                let serialized_data = read(filepath).await?;
-                let cmd: RegisterCmd = deserialise(&serialized_data)?;
-                let _existing = register_log.insert(register_operation_id(&cmd)?, cmd);
-            }
-        } else {
+        let mut stored_reg = StoredRegister {
+            state: None,
+            ops_log: RegisterLog::new(),
+            ops_log_path: path.clone(),
+        };
+
+        if !path.exists() {
             trace!(
                 "Register log does not exist, creating a new one {}",
                 path.display()
             );
+            return Ok(stored_reg);
         }
 
-        Ok((register_log, path))
+        trace!("Register log path exists: {}", path.display());
+        for filepath in list_files_in(&path) {
+            match read(&filepath)
+                .await
+                .map(|serialized_data| deserialise::<RegisterCmd>(&serialized_data))
+            {
+                Ok(Ok(reg_cmd)) => {
+                    stored_reg.ops_log.push(reg_cmd.clone());
+
+                    if let RegisterCmd::Create {
+                        cmd:
+                            SignedRegisterCreate {
+                                op: CreateRegister { name, tag, policy },
+                                ..
+                            },
+                        section_auth,
+                    } = reg_cmd
+                    {
+                        // TODO: if we already have read a RegisterCreate op, check if there
+                        // is any difference with this other one,...if so perhaps log a warning?
+                        if stored_reg.state.is_none() {
+                            let register = Register::new(*policy.owner(), name, tag, policy);
+                            stored_reg.state = Some((register, section_auth));
+                        }
+                    }
+                }
+                other => {
+                    warn!(
+                        "Ignoring corrupted register cmd from storage found at {}: {:?}",
+                        filepath.display(),
+                        other
+                    )
+                }
+            }
+        }
+
+        Ok(stored_reg)
     }
 
     /// Persists a RegisterLog to disk
-    pub(crate) async fn append_and_write_log_to_disk(
-        &self,
-        cmd: RegisterCmd,
-        mut log: RegisterLog,
-        path: &Path,
-    ) -> Result<()> {
-        trace!(
-            "Appending cmd and writing to register log at {}",
-            path.display()
-        );
+    pub(super) async fn write_log_to_disk(&self, log: &RegisterLog, path: &Path) -> Result<()> {
+        trace!("Writing to register log at {}", path.display());
 
-        let reg_cmd_id = register_operation_id(&cmd)?;
+        create_dir_all(path).await?;
 
-        if log.contains_key(&reg_cmd_id) {
-            return Err(Error::RegCmdOperationExists(reg_cmd_id));
-        }
-
-        let _old_cmd = log.insert(reg_cmd_id, cmd);
-
-        create_dir_all(&path).await?;
-
-        for (reg_cmd_id, cmd) in log {
+        for cmd in log {
             // TODO do we want to fail here if one entry fails?
-            self.write_register_cmd(&reg_cmd_id, &cmd, path).await?;
+            self.write_register_cmd(cmd, path).await?;
         }
 
         trace!("Log writing successful at {}", path.display());
@@ -156,15 +180,10 @@ impl RegisterStore {
     }
 
     /// Persists a RegisterCmd to disk
-    pub(crate) async fn write_register_cmd(
-        &self,
-        reg_cmd_id: &RegisterCmdId,
-        cmd: &RegisterCmd,
-        path: &Path,
-    ) -> Result<()> {
-        let serialized_data = serialise(cmd)?;
-
+    pub(super) async fn write_register_cmd(&self, cmd: &RegisterCmd, path: &Path) -> Result<()> {
+        let reg_cmd_id = register_operation_id(cmd)?;
         let path = path.join(reg_cmd_id.clone());
+
         trace!("Writing cmd register log at {}", path.display());
         // it's deterministic, so they are exactly the same op so we can leave
         if path.exists() {
@@ -175,6 +194,7 @@ impl RegisterStore {
 
         let mut file = File::create(path).await?;
 
+        let serialized_data = serialise(cmd)?;
         file.write_all(&serialized_data).await?;
 
         self.used_space.increase(std::mem::size_of::<RegisterCmd>());
@@ -184,8 +204,8 @@ impl RegisterStore {
     }
 }
 
-/// Gets an operation id, deterministic for a RegisterCmd, it takes
-/// the full Cmd and all signers into consideration
+// Gets an operation id, deterministic for a RegisterCmd, it takes
+// the full Cmd and all signers into consideration
 fn register_operation_id(cmd: &RegisterCmd) -> Result<RegisterCmdId> {
     let mut hasher = Sha3::v256();
 
