@@ -570,7 +570,7 @@ impl Session {
                 let mut retries = 0;
 
                 let send_and_retry = || async {
-                    match link.send_with(msg_bytes_clone.clone(), None, listen).await {
+                    match link.send(msg_bytes_clone.clone(), listen).await {
                         Ok(()) => Ok(()),
                         Err(SendToOneError::Connection(err)) => {
                             Err(Error::QuicP2pConnection { peer, error: err })

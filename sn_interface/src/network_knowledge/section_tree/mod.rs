@@ -146,11 +146,8 @@ impl SectionTree {
     }
 
     /// Returns all known sections SAP.
-    pub fn all(&self) -> Vec<SectionAuthorityProvider> {
-        self.sections
-            .iter()
-            .map(|(_, sap)| sap.value.clone())
-            .collect()
+    pub fn all(&self) -> Vec<&SectionAuthorityProvider> {
+        self.sections.iter().map(|(_, sap)| &sap.value).collect()
     }
 
     /// Get `SectionAuthorityProvider` of a known section with the given prefix.
@@ -732,7 +729,7 @@ mod tests {
         ),
     > {
         (any::<u64>(), 0..max_sections).prop_map(move |(seed, size)| {
-            let (map, main_chain) = generate_random_section_tree(Some(seed as u64), size).unwrap();
+            let (map, main_chain) = generate_random_section_tree(Some(seed), size).unwrap();
             let mut rng = SmallRng::seed_from_u64(seed);
             let mut update_variations_list = Vec::new();
 

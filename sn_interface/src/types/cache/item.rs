@@ -16,8 +16,8 @@ pub struct Item<T> {
 
 #[derive(Clone, Copy, Debug)]
 struct Time {
-    pub start: Instant,
-    pub expiry: Instant,
+    start: Instant,
+    expiry: Instant,
 }
 
 impl<T> Item<T> {

@@ -6,7 +6,23 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-#![warn(clippy::unwrap_used)]
+#![forbid(
+    arithmetic_overflow,
+    mutable_transmutes,
+    no_mangle_const_items,
+    unknown_crate_types,
+    unsafe_code
+)]
+#![warn(
+    trivial_casts,
+    trivial_numeric_casts,
+    unreachable_pub,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    clippy::unicode_not_nfc,
+    clippy::unwrap_used
+)]
 
 //! SAFE network data types.
 

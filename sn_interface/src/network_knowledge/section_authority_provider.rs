@@ -97,7 +97,7 @@ impl Display for SectionAuthorityProvider {
     }
 }
 
-impl serde::Serialize for SectionAuthorityProvider {
+impl Serialize for SectionAuthorityProvider {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -111,7 +111,7 @@ impl serde::Serialize for SectionAuthorityProvider {
 // at the system's boundaries when we receive it and verify it.
 // This way we can make sure that this type means that the data can always be considered verified.
 // To achieve this, we will also need to get rid of the `into_state` (from `messaging`) below.
-impl<'de> serde::Deserialize<'de> for SectionAuthorityProvider {
+impl<'de> Deserialize<'de> for SectionAuthorityProvider {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,

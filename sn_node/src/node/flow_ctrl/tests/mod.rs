@@ -756,7 +756,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
                     .network_knowledge()
                     .section_tree()
                     .all(),
-                vec![signed_sap.value]
+                vec![&signed_sap.value]
             );
             Result::<()>::Ok(())
         })
