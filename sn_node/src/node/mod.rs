@@ -29,6 +29,7 @@ mod node_test_api;
 mod proposal;
 mod relocation;
 mod split_barrier;
+mod statemap;
 
 use self::{
     bootstrap::join_network,
@@ -85,7 +86,6 @@ mod core {
         },
         UsedSpace,
     };
-    use serde_json::json;
     use sn_dysfunction::{DysfunctionDetection, IssueType};
     #[cfg(feature = "traceroute")]
     use sn_interface::messaging::Entity;
@@ -111,7 +111,7 @@ mod core {
         net::SocketAddr,
         path::PathBuf,
         sync::Arc,
-        time::{Duration, SystemTime, UNIX_EPOCH},
+        time::{Duration, SystemTime},
     };
     use uluru::LRUCache;
 
@@ -285,7 +285,7 @@ mod core {
                 membership,
             };
 
-            node.log_statemap_metadata();
+            node.statemap_log_metadata();
 
             // Write the section tree to this node's root storage directory
             node.write_section_tree().await;
@@ -774,50 +774,6 @@ mod core {
             } else {
                 Entity::Adult(self.info().public_key())
             }
-        }
-
-        pub(crate) fn log_statemap_metadata(&self) {
-            let start_dur = match self.start_time.duration_since(UNIX_EPOCH) {
-                Ok(dur) => dur,
-                Err(e) => {
-                    error!("STATEMAP: failed to calculate start time {e:?}");
-                    return;
-                }
-            };
-            let secs = start_dur.as_secs();
-            let nanos = start_dur.subsec_nanos();
-            let name = self.name();
-            let states = json!({
-                "waiting-for-cmd": { "value": 0, "color": "#f9f9f9" },
-                "processing-cmd": { "value": 1, "color": "#850101" },
-            });
-
-            let metadata = json!({
-                "title": format!("States of {name}"),
-                "start": [secs, nanos],
-                "host": name,
-                "states": states
-            });
-
-            trace!("STATEMAP_METADATA: {metadata}");
-        }
-
-        pub(crate) fn log_statemap(&self, state: usize) {
-            // { "time": "1579579142", "entity": "<xorname>", "state": 6 }
-            let time = match SystemTime::now().duration_since(self.start_time) {
-                Ok(t) => t.as_nanos(),
-                Err(e) => {
-                    error!("STATEMAP: failed to read system time: {e:?}");
-                    return;
-                }
-            };
-            let name = self.name();
-            let entry = json!({
-                "time": format!("{}", time),
-                "entity": name,
-                "state": state,
-            });
-            info!("STATEMAP_ENTRY: {entry}")
         }
     }
 

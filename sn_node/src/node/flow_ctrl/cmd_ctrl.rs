@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::log_sleep;
+use crate::node::statemap;
 use crate::node::{
     flow_ctrl::{
         cmds::{Cmd, CmdJob},
@@ -162,7 +163,12 @@ impl CmdCtrl {
 
         let dispatcher = self.dispatcher.clone();
         let _ = tokio::task::spawn_local(async move {
-            dispatcher.node().read().await.log_statemap(1);
+            dispatcher
+                .node()
+                .read()
+                .await
+                .statemap_log_state(cmd.statemap_state());
+
             match dispatcher.process_cmd(cmd).await {
                 Ok(cmds) => {
                     monitoring.increment_cmds().await;
@@ -199,7 +205,11 @@ impl CmdCtrl {
                 }
             }
             throughpout.increment(); // both on fail and success
-            dispatcher.node().read().await.log_statemap(0);
+            dispatcher
+                .node()
+                .read()
+                .await
+                .statemap_log_state(statemap::State::Idle);
         });
         Ok(())
     }
