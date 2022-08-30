@@ -529,7 +529,7 @@ mod tests {
                                 // do nothing
                                 Ok(())
                             }
-                            Err(Error::DataExists) => {
+                            Err(Error::DataExists(_)) => {
                                 // also do nothing
                                 Ok(())
                             }
@@ -547,7 +547,8 @@ mod tests {
                 Op::Query(idx) => {
                     // +1 for a chance to get random xor_name
                     let key = get_xor_name(&model, idx % (model.len() + 1));
-                    let query = DataQueryVariant::GetChunk(ChunkAddress(key));
+                    let addr = ChunkAddress(key);
+                    let query = DataQueryVariant::GetChunk(addr);
                     let user = User::Anyone;
                     let stored_res = runtime.block_on(storage.query(&query, user));
                     let model_res = model.get(&key);
@@ -564,7 +565,7 @@ mod tests {
                         }
                         None => {
                             if let NodeQueryResponse::GetChunk(Ok(_)) = stored_res {
-                                return Err(Error::DataExists);
+                                return Err(Error::DataExists(DataAddress::Bytes(addr)));
                             }
                         }
                     }
@@ -585,7 +586,7 @@ mod tests {
                         }
                         None => {
                             if stored_data.is_ok() {
-                                return Err(Error::DataExists);
+                                return Err(Error::DataExists(addr));
                             }
                         }
                     }
@@ -603,7 +604,7 @@ mod tests {
                         }
                         None => {
                             if storage_res.is_ok() {
-                                return Err(Error::DataExists);
+                                return Err(Error::DataExists(addr));
                             }
                         }
                     }
