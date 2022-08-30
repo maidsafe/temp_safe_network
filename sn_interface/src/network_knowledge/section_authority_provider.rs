@@ -287,6 +287,12 @@ pub mod test_utils {
     use std::{cell::Cell, net::SocketAddr};
     use xor_name::Prefix;
 
+    // Get `Prefix` from st
+    pub fn prefix(s: &str) -> Result<Prefix> {
+        s.parse()
+            .map_err(|err| eyre!("failed to parse Prefix '{}': {}", s, err))
+    }
+
     // Generate unique SocketAddr for testing purposes
     pub fn gen_addr() -> SocketAddr {
         thread_local! {

@@ -390,25 +390,33 @@ impl SectionsDAG {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::{Error, SectionInfo, SectionsDAG};
+    use crate::types::SecretKeySet;
+    use crate::{
+        messaging::system::SectionAuth,
+        network_knowledge::test_utils::{prefix, random_sap_with_rng, section_signed},
+        SectionAuthorityProvider,
+    };
     use crdts::CmRDT;
     use eyre::{bail, eyre, Result};
     use proptest::prelude::{any, proptest, ProptestConfig, Strategy};
-    use rand::rngs::SmallRng;
-    use rand::{distributions::Standard, Rng, SeedableRng};
-    use std::collections::{BTreeMap, BTreeSet};
-    use std::fmt;
+    use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
+    use std::{
+        collections::{BTreeMap, BTreeSet},
+        fmt,
+    };
+    use xor_name::Prefix;
 
     #[test]
     fn insert_last() -> Result<()> {
-        let (mut last_sk, pk) = gen_keypair(None);
+        let (mut last_sk, pk) = gen_keypair();
         let mut dag = SectionsDAG::new(pk);
         let mut expected_keys = vec![pk];
 
         for _ in 0..10 {
             let last_pk = &expected_keys[expected_keys.len() - 1];
-            let (sk, info) = gen_signed_keypair(None, &last_sk);
+            let (sk, info) = gen_signed_keypair(&last_sk);
 
             dag.insert(last_pk, info.key, info.sig)?;
 
@@ -426,10 +434,10 @@ mod tests {
         //     |
         //     +-> pk_b
         //
-        let (sk_gen, pk_gen) = gen_keypair(None);
-        let (sk_a1, info_a1) = gen_signed_keypair(None, &sk_gen);
-        let (_, info_a2) = gen_signed_keypair(None, &sk_a1);
-        let (_, info_b) = gen_signed_keypair(None, &sk_gen);
+        let (sk_gen, pk_gen) = gen_keypair();
+        let (sk_a1, info_a1) = gen_signed_keypair(&sk_gen);
+        let (_, info_a2) = gen_signed_keypair(&sk_a1);
+        let (_, info_b) = gen_signed_keypair(&sk_gen);
 
         let mut dag = SectionsDAG::new(pk_gen);
         dag.insert(&pk_gen, info_a1.key, info_a1.sig)?;
@@ -467,13 +475,13 @@ mod tests {
         //                       |
         //                       +-> pk_c
         //
-        let (sk_gen, pk_gen) = gen_keypair(None);
-        let (sk_a1, info_a1) = gen_signed_keypair(None, &sk_gen);
-        let (_, info_a2) = gen_signed_keypair(None, &sk_a1);
-        let (sk_b1, info_b1) = gen_signed_keypair(None, &sk_gen);
-        let (sk_b2, info_b2) = gen_signed_keypair(None, &sk_b1);
-        let (_, info_b3) = gen_signed_keypair(None, &sk_b2);
-        let (_, info_c) = gen_signed_keypair(None, &sk_b2);
+        let (sk_gen, pk_gen) = gen_keypair();
+        let (sk_a1, info_a1) = gen_signed_keypair(&sk_gen);
+        let (_, info_a2) = gen_signed_keypair(&sk_a1);
+        let (sk_b1, info_b1) = gen_signed_keypair(&sk_gen);
+        let (sk_b2, info_b2) = gen_signed_keypair(&sk_b1);
+        let (_, info_b3) = gen_signed_keypair(&sk_b2);
+        let (_, info_c) = gen_signed_keypair(&sk_b2);
 
         // create DAG with genesis key
         let mut dag = SectionsDAG::new(pk_gen);
@@ -612,7 +620,7 @@ mod tests {
         );
 
         // trying to get branch from a random/non-existing key returns `KeyNotFound` error
-        let (_, random_pk) = gen_keypair(None);
+        let (_, random_pk) = gen_keypair();
         matches!(
             dag.single_branch_dag_for_key(&random_pk).err(),
             Some(Error::KeyNotFound(key)) if key == random_pk
@@ -623,8 +631,8 @@ mod tests {
 
     #[test]
     fn insert_duplicate_key() -> Result<()> {
-        let (sk_gen, pk_gen) = gen_keypair(None);
-        let (_, info_a) = gen_signed_keypair(None, &sk_gen);
+        let (sk_gen, pk_gen) = gen_keypair();
+        let (_, info_a) = gen_signed_keypair(&sk_gen);
 
         let mut dag = SectionsDAG::new(pk_gen);
         assert!(dag.insert(&pk_gen, info_a.key, info_a.sig.clone()).is_ok());
@@ -636,9 +644,9 @@ mod tests {
 
     #[test]
     fn invalid_signature() {
-        let (_, pk_gen) = gen_keypair(None);
+        let (_, pk_gen) = gen_keypair();
         let bad_sk_gen = bls::SecretKey::random();
-        let (_, info_a) = gen_signed_keypair(None, &bad_sk_gen);
+        let (_, info_a) = gen_signed_keypair(&bad_sk_gen);
 
         let mut dag = SectionsDAG::new(pk_gen);
         assert!(dag.insert(&pk_gen, info_a.key, info_a.sig).is_err());
@@ -646,9 +654,9 @@ mod tests {
 
     #[test]
     fn wrong_parent_child_order() -> Result<()> {
-        let (sk_gen, pk_gen) = gen_keypair(None);
-        let (sk_a1, info_a1) = gen_signed_keypair(None, &sk_gen);
-        let (_, info_a2) = gen_signed_keypair(None, &sk_a1);
+        let (sk_gen, pk_gen) = gen_keypair();
+        let (sk_a1, info_a1) = gen_signed_keypair(&sk_gen);
+        let (_, info_a2) = gen_signed_keypair(&sk_a1);
 
         let mut dag = SectionsDAG::new(pk_gen);
         // inserting child before parent
@@ -666,10 +674,10 @@ mod tests {
 
     #[test]
     fn merge() -> Result<()> {
-        let (sk_gen, pk_gen) = gen_keypair(None);
-        let (sk_a1, info_a1) = gen_signed_keypair(None, &sk_gen);
-        let (sk_a2, info_a2) = gen_signed_keypair(None, &sk_a1);
-        let (_, info_a3) = gen_signed_keypair(None, &sk_a2);
+        let (sk_gen, pk_gen) = gen_keypair();
+        let (sk_a1, info_a1) = gen_signed_keypair(&sk_gen);
+        let (sk_a2, info_a2) = gen_signed_keypair(&sk_a1);
+        let (_, info_a3) = gen_signed_keypair(&sk_a2);
 
         // main_dag: 0->1->2->3
         let mut main_dag = SectionsDAG::new(pk_gen);
@@ -731,14 +739,14 @@ mod tests {
         //     +-> pk_b1 -> pk_b2
         //              |
         //              +-> pk_c
-        let (sk_gen, pk_gen) = gen_keypair(None);
-        let (sk_a1, info_a1) = gen_signed_keypair(None, &sk_gen);
-        let (_, info_a2) = gen_signed_keypair(None, &sk_a1);
-        let (sk_b1, info_b1) = gen_signed_keypair(None, &sk_gen);
+        let (sk_gen, pk_gen) = gen_keypair();
+        let (sk_a1, info_a1) = gen_signed_keypair(&sk_gen);
+        let (_, info_a2) = gen_signed_keypair(&sk_a1);
+        let (sk_b1, info_b1) = gen_signed_keypair(&sk_gen);
         // pk_b1->pk_b2
-        let (_, info_b2) = gen_signed_keypair(None, &sk_b1);
+        let (_, info_b2) = gen_signed_keypair(&sk_b1);
         // pk_b1->pk_c
-        let (_, info_c) = gen_signed_keypair(None, &sk_b1);
+        let (_, info_c) = gen_signed_keypair(&sk_b1);
 
         let mut main_dag = SectionsDAG::new(pk_gen);
         // gen->pk_a1->pk_a2
@@ -769,9 +777,9 @@ mod tests {
 
     #[test]
     fn merge_fork() -> Result<()> {
-        let (sk_gen, pk_gen) = gen_keypair(None);
-        let (_, info_a) = gen_signed_keypair(None, &sk_gen);
-        let (_, info_b) = gen_signed_keypair(None, &sk_gen);
+        let (sk_gen, pk_gen) = gen_keypair();
+        let (_, info_a) = gen_signed_keypair(&sk_gen);
+        let (_, info_b) = gen_signed_keypair(&sk_gen);
 
         // dag_a: gen->pk_a
         // dag_b: gen->pk_b
@@ -797,11 +805,11 @@ mod tests {
 
     #[test]
     fn self_verify_invalid_sigs() -> Result<()> {
-        let (sk_gen, pk_gen) = gen_keypair(None);
-        let (sk1, info1) = gen_signed_keypair(None, &sk_gen);
-        let (_, info2) = gen_signed_keypair(None, &sk1);
-        let (sk3, mut info3) = gen_signed_keypair(None, &sk1);
-        let (_, info4) = gen_signed_keypair(None, &sk3);
+        let (sk_gen, pk_gen) = gen_keypair();
+        let (sk1, info1) = gen_signed_keypair(&sk_gen);
+        let (_, info2) = gen_signed_keypair(&sk1);
+        let (sk3, mut info3) = gen_signed_keypair(&sk1);
+        let (_, info4) = gen_signed_keypair(&sk3);
 
         // make a DAG with a fork but an invalid signature in section 3
         // gen->1->2
@@ -826,9 +834,9 @@ mod tests {
 
     #[test]
     fn verify_parent_during_split() -> Result<()> {
-        let (sk_gen, pk_gen) = gen_keypair(None);
-        let (_, info_a) = gen_signed_keypair(None, &sk_gen);
-        let (_, info_b) = gen_signed_keypair(None, &sk_gen);
+        let (sk_gen, pk_gen) = gen_keypair();
+        let (_, info_a) = gen_signed_keypair(&sk_gen);
+        let (_, info_b) = gen_signed_keypair(&sk_gen);
 
         let mut dag = SectionsDAG::new(pk_gen);
         dag.insert(&pk_gen, info_a.key, info_a.sig)?;
@@ -844,9 +852,9 @@ mod tests {
     #[test]
     fn verify_parents_during_churn() -> Result<()> {
         // gen -> pk_a1 -> pk_a2
-        let (sk_gen, pk_gen) = gen_keypair(None);
-        let (sk_a1, info_a1) = gen_signed_keypair(None, &sk_gen);
-        let (_, info_a2) = gen_signed_keypair(None, &sk_a1);
+        let (sk_gen, pk_gen) = gen_keypair();
+        let (sk_a1, info_a1) = gen_signed_keypair(&sk_gen);
+        let (_, info_a2) = gen_signed_keypair(&sk_a1);
 
         let mut dag = SectionsDAG::new(pk_gen);
         dag.insert(&pk_gen, info_a1.key, info_a1.sig)?;
@@ -860,10 +868,10 @@ mod tests {
 
     #[test]
     fn verify_children() -> Result<()> {
-        let (sk_gen, pk_gen) = gen_keypair(None);
-        let (_, info_a) = gen_signed_keypair(None, &sk_gen);
-        let (sk_b1, info_b1) = gen_signed_keypair(None, &sk_gen);
-        let (_, info_b2) = gen_signed_keypair(None, &sk_b1);
+        let (sk_gen, pk_gen) = gen_keypair();
+        let (_, info_a) = gen_signed_keypair(&sk_gen);
+        let (sk_b1, info_b1) = gen_signed_keypair(&sk_gen);
+        let (_, info_b2) = gen_signed_keypair(&sk_b1);
 
         let mut dag = SectionsDAG::new(pk_gen);
         dag.insert(&pk_gen, info_a.key, info_a.sig)?;
@@ -878,10 +886,10 @@ mod tests {
 
     #[test]
     fn verify_leaves() -> Result<()> {
-        let (sk_gen, pk_gen) = gen_keypair(None);
-        let (_, info_a) = gen_signed_keypair(None, &sk_gen);
-        let (sk_b1, info_b1) = gen_signed_keypair(None, &sk_gen);
-        let (_, info_b2) = gen_signed_keypair(None, &sk_b1);
+        let (sk_gen, pk_gen) = gen_keypair();
+        let (_, info_a) = gen_signed_keypair(&sk_gen);
+        let (sk_b1, info_b1) = gen_signed_keypair(&sk_gen);
+        let (_, info_b2) = gen_signed_keypair(&sk_b1);
 
         let mut sections_dag = SectionsDAG::new(pk_gen);
         sections_dag.insert(&pk_gen, info_a.key, info_a.sig)?;
@@ -895,10 +903,10 @@ mod tests {
     #[test]
     fn verify_ancestors() -> Result<()> {
         // gen -> pk_a1 -> pk_a2 -> pk_a3
-        let (sk_gen, pk_gen) = gen_keypair(None);
-        let (sk_a1, info_a1) = gen_signed_keypair(None, &sk_gen);
-        let (sk_a2, info_a2) = gen_signed_keypair(None, &sk_a1);
-        let (_, info_a3) = gen_signed_keypair(None, &sk_a2);
+        let (sk_gen, pk_gen) = gen_keypair();
+        let (sk_a1, info_a1) = gen_signed_keypair(&sk_gen);
+        let (sk_a2, info_a2) = gen_signed_keypair(&sk_a1);
+        let (_, info_a3) = gen_signed_keypair(&sk_a2);
 
         let mut dag = SectionsDAG::new(pk_gen);
         dag.insert(&pk_gen, info_a1.key, info_a1.sig)?;
@@ -921,23 +929,21 @@ mod tests {
     // back the original `SectionsDAG`
     proptest! {
         #![proptest_config(ProptestConfig {
-            cases: 20, .. ProptestConfig::default()
+            cases: 100, .. ProptestConfig::default()
         })]
         #[test]
         #[allow(clippy::unwrap_used)]
-        fn proptest_merge_sections_dag((main_dag, update_variations_list) in arb_sections_dag_and_partial_dags(100, 5)) {
-            for variation in update_variations_list {
+        fn proptest_merge_sections_dag((main_dag, list_of_partial_dags) in arb_sections_dag_and_partial_dags(100, false)) {
                 let mut dag = SectionsDAG::new(main_dag.genesis_key);
-                for partial_dag in variation {
+                for (partial_dag, _last_key_sap) in list_of_partial_dags {
                     dag.merge(partial_dag).unwrap();
                 }
                 assert_eq!(dag, main_dag);
-            }
         }
     }
 
     // Test helpers
-    fn assert_lists<I, J>(a: I, b: J) -> Result<()>
+    pub(crate) fn assert_lists<I, J>(a: I, b: J) -> Result<()>
     where
         I: IntoIterator,
         J: IntoIterator,
@@ -956,30 +962,21 @@ mod tests {
         for item1 in &vec1 {
             let idx2 = vec2.iter().position(|item2| *item2 == *item1);
             vec2.remove(idx2.ok_or_else(|| {
-                eyre!(
-                    "An item that was expected to be in list two was not found: {:?}",
-                    item1
-                )
+                eyre!("An item that was expected to be in list two was not found")
             })?);
         }
         assert_eq!(vec2.len(), 0);
         Ok(())
     }
 
-    fn gen_keypair(rng: Option<&mut SmallRng>) -> (bls::SecretKey, bls::PublicKey) {
-        let sk: bls::SecretKey = match rng {
-            Some(rng) => rng.sample(Standard),
-            None => bls::SecretKey::random(),
-        };
-
+    fn gen_keypair() -> (bls::SecretKey, bls::PublicKey) {
+        let sk_set = SecretKeySet::random(None);
+        let sk = sk_set.secret_key();
         (sk.clone(), sk.public_key())
     }
 
-    fn gen_signed_keypair(
-        rng: Option<&mut SmallRng>,
-        parent_sk: &bls::SecretKey,
-    ) -> (bls::SecretKey, SectionInfo) {
-        let (sk, pk) = gen_keypair(rng);
+    fn gen_signed_keypair(parent_sk: &bls::SecretKey) -> (bls::SecretKey, SectionInfo) {
+        let (sk, pk) = gen_keypair();
         let sig = sign(parent_sk, &pk);
         let info = SectionInfo { key: pk, sig };
         (sk, info)
@@ -991,111 +988,174 @@ mod tests {
             .expect("failed to serialize public key")
     }
 
-    // Generate an arbitrary sized `SectionsDAG` and a List<list of `SectionsDAG` which inserted in
-    // that order gives back the main_dag>; i.e., multiple variations of <list of SectionsDAG>
+    // Generate an arbitrary sized `SectionsDAG` and a list of partial_dags which inserted in
+    // that order gives back the main_dag
+    // new_information_only: if false, the partial_dags can end with keys which has been previously
+    // inserted, providing no new information. Useful in `SectionTree` proptest.
     #[allow(clippy::unwrap_used)]
-    fn arb_sections_dag_and_partial_dags(
+    pub(crate) fn arb_sections_dag_and_partial_dags(
         max_sections: usize,
-        update_variations: usize,
-    ) -> impl Strategy<Value = (SectionsDAG, Vec<Vec<SectionsDAG>>)> {
+        new_information_only: bool,
+    ) -> impl Strategy<
+        Value = (
+            SectionsDAG,
+            Vec<(SectionsDAG, SectionAuth<SectionAuthorityProvider>)>,
+        ),
+    > {
         (any::<u64>(), 2..=max_sections).prop_map(move |(seed, size)| {
             // size is [2, max_sections] size of 0,1 will give us back only the genesis_key and
             // hence we cannot obtain the partial dag
-            let main_dag = gen_random_sections_dag(Some(seed), size).unwrap();
-            let mut rng = SmallRng::seed_from_u64(seed);
-            let mut update_variations_list = Vec::new();
+            let (main_dag, map) = gen_random_sections_dag(Some(seed), size).unwrap();
+            let mut rng = StdRng::seed_from_u64(seed);
 
-            for _ in 0..update_variations {
-                let mut leaves: Vec<_> = main_dag.leaf_keys().into_iter().collect();
-                let mut inserted_keys = BTreeSet::from([main_dag.genesis_key]);
+            let mut leaves: Vec<_> = main_dag.leaf_keys().into_iter().collect();
+            let mut inserted_keys = BTreeSet::from([main_dag.genesis_key]);
 
-                let mut list_of_part_dags = Vec::new();
-                while !leaves.is_empty() {
-                    // get partial dag to a random leaf
-                    let random_leaf = *leaves
-                        .get(rng.gen::<usize>() % leaves.len())
-                        .expect("leaves cannot be empty");
+            let mut list_of_part_dags = Vec::new();
+            while !leaves.is_empty() {
+                // get partial dag to a random leaf
+                let random_leaf = *leaves
+                    .get(rng.gen::<usize>() % leaves.len())
+                    .expect("leaves cannot be empty");
 
-                    // a simple chain of keys containing (`random_leaf`, `genesis_key`]
-                    let mut ancestors = main_dag.get_ancestors(&random_leaf).unwrap();
-                    ancestors.reverse();
-                    ancestors.push(random_leaf);
+                let mut ancestors = main_dag.get_ancestors(&random_leaf).unwrap();
+                ancestors.reverse();
+                // a simple chain of keys from genesis_key, random_leaf
+                ancestors.push(random_leaf);
 
-                    // find the position of the first node which we have not inserted
-                    let first_unique_node_idx = ancestors
-                        .iter()
-                        .position(|key| !inserted_keys.contains(key))
-                        .expect("The leaf should not have been inserted, hence cannot be None");
+                // find the position of the first node which we have not inserted; cannot be 0
+                let first_unique_node_idx = ancestors
+                    .iter()
+                    .position(|key| !inserted_keys.contains(key))
+                    .expect("The leaf should not have been inserted, hence cannot be None");
 
-                    let rand_from_idx = if first_unique_node_idx != 0 {
-                        rng.gen_range(0..first_unique_node_idx)
+                let rand_from_idx = rng.gen_range(0..first_unique_node_idx);
+                let rand_to_idx = {
+                    // Consider the `SectionTree` is aware of the following section keys A->B->C
+                    // Now, the valid `SectionsDag` which can be inserted in the tree can be
+                    // [A/B/C to D/E/F] i.e., B->C->D is valid, C->D is valid, C is also valid
+                    // Where as A->B is invalid since we are providing old information to the tree
+                    let start = if new_information_only {
+                        // cannot be 0; hence `to` cannot be genesis
+                        first_unique_node_idx
                     } else {
-                        0
+                        // make sure `to` cannot be genesis since `merge` will throw error
+                        if rand_from_idx == 0 {
+                            rand_from_idx + 1
+                        } else {
+                            rand_from_idx
+                        }
                     };
-                    let rand_to_idx = rng.gen_range(rand_from_idx + 1..ancestors.len());
+                    rng.gen_range(start..ancestors.len())
+                };
+                let rand_from = ancestors[rand_from_idx];
+                let rand_to = ancestors[rand_to_idx];
+                // `merge` with just 1 key (i.e., empty dag) does not throw an error
+                let partial_dag = main_dag.partial_dag(&rand_from, &rand_to).unwrap();
 
-                    let rand_from = ancestors[rand_from_idx];
-                    let rand_to = ancestors[rand_to_idx];
-                    let partial_dag = main_dag.partial_dag(&rand_from, &rand_to).unwrap();
-
-                    // if the "to" key is a leaf, remove it from leaves
-                    if let Some(index) = leaves.iter().position(|key| *key == rand_to) {
-                        leaves.swap_remove(index);
-                    }
-                    // update the inserted list
-                    partial_dag.keys().for_each(|key| {
-                        inserted_keys.insert(*key);
-                    });
-
-                    list_of_part_dags.push(partial_dag);
+                // if the "to" key is a leaf, remove it from leaves
+                if let Some(index) = leaves.iter().position(|key| *key == rand_to) {
+                    leaves.swap_remove(index);
                 }
-                update_variations_list.push(list_of_part_dags);
+                // update the inserted list
+                partial_dag.keys().for_each(|key| {
+                    inserted_keys.insert(*key);
+                });
+
+                let last_key_sap = map.get(&rand_to).unwrap();
+                list_of_part_dags.push((partial_dag, last_key_sap.clone()));
             }
-            (main_dag, update_variations_list)
+            (main_dag, list_of_part_dags)
         })
     }
 
-    fn gen_random_sections_dag(seed: Option<u64>, n_sections: usize) -> Result<SectionsDAG> {
+    // Generate a random `SectionsDAG` and the SAP for each of the section key
+    pub(crate) fn gen_random_sections_dag(
+        seed: Option<u64>,
+        n_sections: usize,
+    ) -> Result<(
+        SectionsDAG,
+        BTreeMap<bls::PublicKey, SectionAuth<SectionAuthorityProvider>>,
+    )> {
         let mut rng = match seed {
-            Some(seed) => SmallRng::seed_from_u64(seed),
-            None => SmallRng::from_entropy(),
+            Some(seed) => StdRng::seed_from_u64(seed),
+            None => StdRng::from_entropy(),
         };
 
-        let (sk_gen, pk_gen) = gen_keypair(Some(&mut rng));
+        let (sap_gen, _, sk_gen) = random_sap_with_rng(&mut rng, Prefix::default(), 0, 0, None);
+        let sk_gen = sk_gen.secret_key();
+        let sap_gen = section_signed(sk_gen, sap_gen)?;
+        let pk_gen = sap_gen.public_key_set().public_key();
+
         let mut dag = SectionsDAG::new(pk_gen);
-        let mut sk_map: BTreeMap<bls::PublicKey, bls::SecretKey> = BTreeMap::new();
-        sk_map.insert(pk_gen, sk_gen);
+        let mut sections_map = BTreeMap::from([(pk_gen, (sk_gen.clone(), sap_gen))]);
         let mut count = 1;
 
         if n_sections <= 1 {
-            return Ok(dag);
+            // filter out sk
+            let map = sections_map
+                .iter()
+                .map(|(key, (_, sap))| (*key, sap.clone()))
+                .collect();
+            return Ok((dag, map));
         };
+        // insert a new section
+        fn insert<R: RngCore>(
+            prefix: Prefix,
+            parent_sk: &bls::SecretKey,
+            rng: &mut R,
+            sections_map: &mut BTreeMap<
+                bls::PublicKey,
+                (bls::SecretKey, SectionAuth<SectionAuthorityProvider>),
+            >,
+            dag: &mut SectionsDAG,
+        ) -> Result<()> {
+            let (sap, _, sk_set) = random_sap_with_rng(rng, prefix, 0, 0, None);
+            let sap = section_signed(sk_set.secret_key(), sap)?;
+            let key = sap.public_key_set().public_key();
+            let sig = sign(parent_sk, &key);
+            dag.insert(&parent_sk.public_key(), sap.section_key(), sig)?;
+            sections_map.insert(sap.section_key(), (sk_set.secret_key().clone(), sap));
+            Ok(())
+        }
+
+        // insert prefix 0,1
+        insert(prefix("0")?, sk_gen, &mut rng, &mut sections_map, &mut dag)?;
+        insert(prefix("1")?, sk_gen, &mut rng, &mut sections_map, &mut dag)?;
+
         while count < n_sections {
             let leaves: Vec<_> = dag.leaf_keys().into_iter().collect();
-            let pk_random_leaf = leaves
+            let pk_leaf = leaves
                 .get(rng.gen::<usize>() % leaves.len())
-                .ok_or_else(|| eyre!("This random public key was expected to be in the leaves"))?;
-            let sk_random_leaf = sk_map
-                .get(pk_random_leaf)
-                .ok_or_else(|| {
-                    eyre!("This random secret key was expected to be in the leaves collection")
-                })?
-                .clone();
+                .ok_or_else(|| eyre!("Leaves cannot be empty"))?;
+            let (sk_leaf, sap_leaf) = sections_map
+                .get(pk_leaf)
+                .cloned()
+                .ok_or_else(|| eyre!("leaf should be present"))?;
 
-            let (sk1, info1) = gen_signed_keypair(Some(&mut rng), &sk_random_leaf);
-            dag.insert(pk_random_leaf, info1.key, info1.sig)?;
-            sk_map.insert(info1.key, sk1);
             if rng.gen_range(0..2) % 2 == 0 {
-                // Split, insert extra one
-                let (sk2, info2) = gen_signed_keypair(Some(&mut rng), &sk_random_leaf);
-                dag.insert(pk_random_leaf, info2.key, info2.sig)?;
-                sk_map.insert(info2.key, sk2);
+                // Split, insert two sections; increment the prefix
+                let pref = prefix(format!("{:b}0", sap_leaf.prefix()).as_str())?;
+                insert(pref, &sk_leaf, &mut rng, &mut sections_map, &mut dag)?;
+                let pref = prefix(format!("{:b}1", sap_leaf.prefix()).as_str())?;
+                insert(pref, &sk_leaf, &mut rng, &mut sections_map, &mut dag)?;
                 count += 2;
             } else {
-                // Churn
+                // Churn; same prefix
+                insert(
+                    sap_leaf.prefix(),
+                    &sk_leaf,
+                    &mut rng,
+                    &mut sections_map,
+                    &mut dag,
+                )?;
                 count += 1;
             }
         }
-        Ok(dag)
+        let map = sections_map
+            .iter()
+            .map(|(key, (_, sap))| (*key, sap.clone()))
+            .collect();
+        Ok((dag, map))
     }
 }

@@ -65,4 +65,6 @@ pub enum Error {
     InvalidBranch,
     #[error("Partial DAG cannot be trusted: {0}")]
     UntrustedPartialDAG(String),
+    #[error("The Partial DAG should contain a single branch")]
+    MultipleBranchError,
 }

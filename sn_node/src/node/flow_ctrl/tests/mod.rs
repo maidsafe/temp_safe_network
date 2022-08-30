@@ -11,22 +11,23 @@ pub(crate) mod cmd_utils;
 pub(crate) mod dbc_utils;
 pub(crate) mod network_utils;
 
-use crate::comm::{Comm, MsgEvent};
-use crate::node::{
-    api::gen_genesis_dbc,
-    cfg::create_test_max_capacity_and_root_storage,
-    flow_ctrl::{dispatcher::Dispatcher, event_channel},
-    messages::WireMsgUtils,
-    messaging::{OutgoingMsg, Peers},
-    Cmd, Error, Event, MembershipEvent, Node, Proposal, Result as RoutingResult,
-    RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
+use crate::{
+    comm::{Comm, MsgEvent},
+    node::{
+        api::gen_genesis_dbc,
+        cfg::create_test_max_capacity_and_root_storage,
+        flow_ctrl::{dispatcher::Dispatcher, event_channel},
+        messages::WireMsgUtils,
+        messaging::{OutgoingMsg, Peers},
+        Cmd, Error, Event, MembershipEvent, Node, Proposal, Result as RoutingResult,
+        RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
+    },
+    storage::UsedSpace,
 };
-use crate::storage::UsedSpace;
 
 use cmd_utils::{handle_online_cmd, run_and_collect_cmds, wrap_service_msg_for_handling};
 use sn_consensus::Decision;
 use sn_dbc::{Hash, OwnerOnce, SpentProofShare, TransactionBuilder};
-use sn_interface::messaging::system::AntiEntropyKind;
 #[cfg(feature = "traceroute")]
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
@@ -34,16 +35,16 @@ use sn_interface::{
     messaging::{
         data::{DataCmd, Error as MessagingDataError, RegisterCmd, ServiceMsg, SpentbookCmd},
         system::{
-            JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState, NodeCmd,
-            NodeMsgAuthorityUtils, NodeState as NodeStateMsg, RelocateDetails, ResourceProof,
-            SectionAuth, SystemMsg,
+            AntiEntropyKind, JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig,
+            MembershipState, NodeCmd, NodeMsgAuthorityUtils, NodeState as NodeStateMsg,
+            RelocateDetails, ResourceProof, SectionAuth, SystemMsg,
         },
         Dst, MsgId, MsgType, SectionAuth as MsgKindSectionAuth, WireMsg,
     },
     network_knowledge::{
-        recommended_section_size, supermajority, test_utils::*, NetworkKnowledge, NodeInfo,
-        NodeState, SectionAuthorityProvider, SectionKeyShare, SectionsDAG, FIRST_SECTION_MAX_AGE,
-        FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
+        recommended_section_size, supermajority, test_utils::*, Error as NetworkKnowledgeError,
+        NetworkKnowledge, NodeInfo, NodeState, SectionAuthorityProvider, SectionKeyShare,
+        SectionsDAG, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
     },
     types::{keyed_signed, keys::ed25519, Peer, PublicKey, ReplicatedData, SecretKeySet},
 };
@@ -713,14 +714,19 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
                 bogus_section_pk,
             )?;
 
-            let _cmds = run_and_collect_cmds(
-                Cmd::ValidateMsg {
-                    origin: sender.peer(),
-                    wire_msg,
-                },
-                &dispatcher,
-            )
-            .await?;
+            assert!(matches!(
+                run_and_collect_cmds(
+                    Cmd::ValidateMsg {
+                        origin: sender.peer(),
+                        wire_msg,
+                    },
+                    &dispatcher,
+                )
+                .await,
+                Err(Error::NetworkKnowledge(
+                    NetworkKnowledgeError::UntrustedPartialDAG(_)
+                ))
+            ));
 
             assert_eq!(
                 dispatcher

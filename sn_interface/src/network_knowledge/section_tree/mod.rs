@@ -173,7 +173,7 @@ impl SectionTree {
         // Check if SAP signature is valid
         if !signed_sap.self_verify() {
             return Err(Error::UntrustedSectionAuthProvider(format!(
-                "invalid signature: {:?}",
+                "Invalid signature: {:?}",
                 signed_sap.value
             )));
         }
@@ -181,8 +181,29 @@ impl SectionTree {
         // Check if SAP's section key matches SAP signature's key
         if signed_sap.sig.public_key != signed_sap.section_key() {
             return Err(Error::UntrustedSectionAuthProvider(format!(
-                "section key doesn't match signature's key: {:?}",
+                "Section key doesn't match signature's key: {:?}",
                 signed_sap.value
+            )));
+        }
+
+        // Make sure the proof chain can be trusted,
+        // i.e. check each key is signed by its parent/predecessor key.
+        if !partial_dag.self_verify() {
+            return Err(Error::UntrustedPartialDAG(format!(
+                "Invalid partial_dag: {:?}",
+                partial_dag
+            )));
+        }
+
+        // Check the SAP's key is the last key of the proof chain
+        if partial_dag.leaf_keys().len() != 1 {
+            return Err(Error::MultipleBranchError);
+        }
+        if !partial_dag.leaf_keys().contains(&signed_sap.section_key()) {
+            return Err(Error::UntrustedPartialDAG(format!(
+                "Provided section key ({:?}, from prefix {:?}) is not the last key of the partial_dag",
+                signed_sap.section_key(),
+                signed_sap.prefix(),
             )));
         }
 
@@ -227,7 +248,8 @@ impl SectionTree {
                     // there is no need to bounce back here (assuming the sender is outdated) to
                     // avoid potential looping.
                     return Err(Error::UntrustedPartialDAG(format!(
-                        "provided proof_chain doesn't cover the SAP's key we currently know: {:?}",
+                        "Provided partial_dag doesn't cover the SAP's key we currently know: {:?}, {:?}",
+                        partial_dag,
                         sap.value
                     )));
                 }
@@ -237,31 +259,11 @@ impl SectionTree {
                 // trusted based on our own section chain and the provided proof chain.
                 if !partial_dag.check_trust(self.sections_dag.keys()) {
                     return Err(Error::UntrustedPartialDAG(format!(
-                        "none of the keys were found on our section chain: {:?}",
+                        "None of the keys were found on our section chain: {:?}",
                         signed_sap.value
                     )));
                 }
             }
-        }
-
-        // Make sure the proof chain can be trusted,
-        // i.e. check each key is signed by its parent/predecessor key.
-        if !partial_dag.self_verify() {
-            return Err(Error::UntrustedPartialDAG(format!(
-                "invalid proof chain: {:?}",
-                partial_dag
-            )));
-        }
-
-        // Check the SAP's key is the last key of the proof chain
-        let is_section_key_last = partial_dag.leaf_keys().contains(&signed_sap.section_key())
-            && partial_dag.leaf_keys().len() == 1;
-        if !is_section_key_last {
-            return Err(Error::UntrustedSectionAuthProvider(format!(
-                "section key ({:?}, from prefix {:?}) isn't in the last key in the proof chain provided.",
-                signed_sap.section_key(),
-                signed_sap.prefix(),
-            )));
         }
 
         // We can now update our knowledge of the remote section's SAP.
@@ -439,23 +441,15 @@ impl PartialEq for SectionTree {
 impl Eq for SectionTree {}
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
-    use crate::network_knowledge::test_utils::{random_sap, section_signed};
-    use eyre::{eyre, Context, Result};
-    // use proptest::{
-    //     prelude::{any, ProptestConfig, Strategy},
-    //     prop_assert, proptest,
-    // };
-    // use rand::{
-    //     prelude::{SeedableRng, SmallRng},
-    //     Rng,
-    // };
-    // use std::{
-    //     cell::RefCell,
-    //     collections::{BTreeMap, BTreeSet},
-    //     rc::Rc,
-    // };
+    use crate::network_knowledge::sections_dag::tests::assert_lists;
+    use crate::network_knowledge::{
+        sections_dag::tests::arb_sections_dag_and_partial_dags,
+        test_utils::{prefix, random_sap, section_signed},
+    };
+    use eyre::{Context, Result};
+    use proptest::{prelude::ProptestConfig, prop_assert_eq, proptest};
 
     #[test]
     fn insert_existing_prefix() -> Result<()> {
@@ -680,14 +674,14 @@ mod tests {
         let pk01 = section_auth_01.section_key();
         let sig01 = bincode::serialize(&pk01).map(|bytes| genesis_sk.sign(&bytes))?;
         dag_01.insert(&genesis_pk, pk01, sig01)?;
-        let _updated = map.update(section_auth_01, &dag_01);
+        assert!(map.update(section_auth_01, &dag_01)?);
 
         let mut dag_10 = dag;
         let section_auth_10 = gen_section_auth(p10)?;
         let pk10 = section_auth_10.section_key();
         let sig10 = bincode::serialize(&pk10).map(|bytes| genesis_sk.sign(&bytes))?;
         dag_10.insert(&genesis_pk, pk10, sig10)?;
-        let _updated = map.update(section_auth_10, &dag_10);
+        assert!(map.update(section_auth_10, &dag_10)?);
 
         let n01 = p01.substituted_in(xor_name::rand::random());
         let n10 = p10.substituted_in(xor_name::rand::random());
@@ -700,118 +694,52 @@ mod tests {
         Ok(())
     }
 
-    // proptest! {
-    //     #![proptest_config(ProptestConfig {
-    //         cases: 20, .. ProptestConfig::default()
-    //     })]
-    //     #[test]
-    //     #[allow(clippy::unwrap_used)]
-    //     fn proptest_section_tree_fields_should_stay_in_sync((main_chain, update_variations_list) in arb_sll_and_proof_chains(25, 3)) {
-    //         for variation in update_variations_list {
-    //             let mut section_tree = SectionTree::new(*main_chain.root_key());
-    //             for (proof_chain, sap) in &variation {
-    //                 let _ = section_tree.update(sap.clone(), proof_chain)?;
-    //             }
-    //             let synced = is_synced(&section_tree).unwrap();
-    //             prop_assert!(synced);
-    //         }
-    //     }
-    // }
-    //
-    // // Generate an arbitrary sized SecuredLinkedList and a List<list of proof_chains which inserted in
-    // // that order gives back the main_chain>; i.e., multiple variations of <list of proof_chains>
-    // #[allow(clippy::unwrap_used)]
-    // fn arb_sll_and_proof_chains(
-    //     max_sections: usize,
-    //     update_variations: usize,
-    // ) -> impl Strategy<
-    //     Value = (
-    //         SecuredLinkedList,
-    //         Vec<Vec<(SecuredLinkedList, SectionAuth<SectionAuthorityProvider>)>>,
-    //     ),
-    // > {
-    //     (any::<u64>(), 0..max_sections).prop_map(move |(seed, size)| {
-    //         let (map, main_chain) = generate_random_section_tree(Some(seed as u64), size).unwrap();
-    //         let mut rng = SmallRng::seed_from_u64(seed);
-    //         let mut update_variations_list = Vec::new();
-    //
-    //         for _ in 0..update_variations {
-    //             let mut leaves: Vec<(bls::PublicKey, Prefix)> = map
-    //                 .iter()
-    //                 .filter(|(_, (status, ..))| matches!(status, SectionStatus::None))
-    //                 .map(|(section_key, (.., sap))| (*section_key, sap.prefix()))
-    //                 .collect();
-    //             let mut inserted_keys = BTreeSet::new();
-    //             inserted_keys.insert(*main_chain.root_key());
-    //
-    //             let mut list_of_proofs = Vec::new();
-    //             while !leaves.is_empty() {
-    //                 // get proof chain to a random leaf
-    //                 let (random_leaf, _) = *leaves
-    //                     .get(rng.gen::<usize>() % leaves.len())
-    //                     .expect("leaves cannot be empty");
-    //                 let proof_chain = main_chain
-    //                     .get_proof_chain(main_chain.root_key(), &random_leaf)
-    //                     .expect("cannot be error");
-    //
-    //                 // create a sub-chain of the proof_chain by first selecting a random_root for the
-    //                 // proof and then selecting a random last_key.
-    //                 let possible_roots: Vec<bls::PublicKey> = proof_chain
-    //                     .keys()
-    //                     .filter(|proof_key| {
-    //                         // keep the proof_key if it has been inserted
-    //                         inserted_keys.iter().any(|ins_key| ins_key == *proof_key)
-    //                     })
-    //                     .cloned()
-    //                     .collect();
-    //                 let random_root = possible_roots
-    //                     .get(rng.gen::<usize>() % possible_roots.len())
-    //                     .expect("Cannot be None");
-    //
-    //                 // Consider the section_tree is aware of the prefix 011 with keys A->B->C
-    //                 // Now, our proof_chain can be [A/B/C to C/D/E/F]
-    //                 // i.e., B->C->D is valid, C->D is valid, C is also valid
-    //                 // but A->B is invalid since we are providing old information to the section_tree
-    //                 // Since proof_chain is a single branch, we can skip directly to "C" by len - 1
-    //                 let possible_last_keys: Vec<bls::PublicKey> = proof_chain
-    //                     .keys()
-    //                     .skip(possible_roots.len() - 1)
-    //                     .cloned()
-    //                     .collect();
-    //                 let random_last_key = possible_last_keys
-    //                     .get(rng.gen::<usize>() % possible_last_keys.len())
-    //                     .expect("Cannot be None");
-    //
-    //                 let proof_chain = proof_chain
-    //                     .get_proof_chain(random_root, random_last_key)
-    //                     .expect("cannot be error");
-    //
-    //                 // remove last_key from leaves if it's a leaf
-    //                 if let Some(index) = leaves.iter().position(|(key, _)| *key == *random_last_key)
-    //                 {
-    //                     leaves.swap_remove(index);
-    //                 }
-    //                 // update the inserted list
-    //                 proof_chain.keys().for_each(|key| {
-    //                     inserted_keys.insert(*key);
-    //                 });
-    //
-    //                 let (_, _, sap) = map.get(random_last_key).expect("cannot be error").clone();
-    //                 list_of_proofs.push((proof_chain, sap));
-    //             }
-    //             update_variations_list.push(list_of_proofs);
-    //         }
-    //         (main_chain, update_variations_list)
-    //     })
-    // }
+    #[test]
+    fn partial_dag_should_contain_a_single_branch_during_update() -> Result<()> {
+        let (mut map, genesis_sk, genesis_pk) = new_network_section_tree();
 
-    // Test helpers
+        let section_auth_0 = gen_section_auth(prefix("0")?)?;
+        let pk0 = section_auth_0.section_key();
+        let sig0 = bincode::serialize(&pk0).map(|bytes| genesis_sk.sign(&bytes))?;
+        let mut partial_dag = map.get_sections_dag().clone();
+        partial_dag.insert(&genesis_pk, pk0, sig0)?;
+        assert!(map.update(section_auth_0, &partial_dag)?);
 
-    fn prefix(s: &str) -> Result<Prefix> {
-        s.parse()
-            .map_err(|err| eyre!("failed to parse Prefix '{}': {}", s, err))
+        let section_auth_1 = gen_section_auth(prefix("1")?)?;
+        let pk1 = section_auth_1.section_key();
+        let sig1 = bincode::serialize(&pk1).map(|bytes| genesis_sk.sign(&bytes))?;
+        // instead of constructing a partial_dag from gen -> 1; we also include the branch '0'
+        // which will result in an error while updating the SectionTree
+        let mut partial_dag = map.get_sections_dag().clone();
+        partial_dag.insert(&genesis_pk, pk1, sig1)?;
+        assert!(matches!(
+            map.update(section_auth_1, &partial_dag),
+            Err(Error::MultipleBranchError)
+        ));
+
+        Ok(())
     }
 
+    proptest! {
+        #![proptest_config(ProptestConfig {
+            cases: 100, .. ProptestConfig::default()
+        })]
+        #[test]
+        #[allow(clippy::unwrap_used)]
+        fn proptest_section_tree_fields_should_stay_in_sync((main_dag, list_of_partial_dags) in arb_sections_dag_and_partial_dags(100, true)) {
+                let mut section_tree = SectionTree::new(*main_dag.genesis_key());
+                for (partial_dag, sap) in &list_of_partial_dags {
+                    let _ = section_tree.update(sap.clone(), partial_dag)?;
+                    // The `sections` are supposed to hold the SAP of the `sections_dag`'s leaves. Verify it
+                    assert_lists(section_tree.sections.values().map(|sap|sap.section_key()), section_tree.sections_dag.leaf_keys()).unwrap();
+                }
+                assert_lists(section_tree.sections.values().map(|sap|sap.section_key()), section_tree.sections_dag.leaf_keys()).unwrap();
+                // Finally, verify that we got the main_dag back
+                prop_assert_eq!(main_dag, section_tree.sections_dag);
+        }
+    }
+
+    // Test helpers
     fn gen_section_auth(prefix: Prefix) -> Result<SectionAuth<SectionAuthorityProvider>> {
         let (section_auth, _, secret_key_set) = random_sap(prefix, 5, 0, None);
         section_signed(secret_key_set.secret_key(), section_auth)
@@ -826,140 +754,4 @@ mod tests {
 
         (map, genesis_sk, genesis_pk)
     }
-
-    // // Check if the 'sections' and 'sections_dag' fields are in sync
-    // // Get the leaves of the 'sections_dag' from 'sections' and verify that the added
-    // // lengths from the leaves matches the actual length of the 'sections_dag'
-    // fn is_synced(section_tree: &SectionTree) -> Result<bool> {
-    //     let mut count: BTreeSet<bls::PublicKey> = BTreeSet::new();
-    //
-    //     for leaf_sap in section_tree.all() {
-    //         let chain = section_tree.sections_dag.get_proof_chain(
-    //             section_tree.sections_dag.root_key(),
-    //             &leaf_sap.section_key(),
-    //         )?;
-    //
-    //         for key in chain.keys() {
-    //             count.insert(*key);
-    //         }
-    //     }
-    //
-    //     Ok(section_tree.sections_dag.len() == count.len())
-    // }
-    //
-    // type SectionInfo = (
-    //     SectionStatus,
-    //     bls::SecretKey,
-    //     SectionAuth<SectionAuthorityProvider>,
-    // );
-    //
-    // // Generate a random SectionChain and the sap for all the sections
-    // fn generate_random_section_tree(
-    //     seed: Option<u64>,
-    //     n_sections: usize,
-    // ) -> Result<(BTreeMap<bls::PublicKey, SectionInfo>, SecuredLinkedList)> {
-    //     let mut rng = match seed {
-    //         Some(seed) => SmallRng::seed_from_u64(seed),
-    //         None => SmallRng::from_entropy(),
-    //     };
-    //     // map of each section key to its Status, SecretKey and SAP. A seection can have
-    //     // children only if its SectionStatus is None. i.e., without Churn/Split
-    //     let sections_map: Rc<RefCell<BTreeMap<bls::PublicKey, SectionInfo>>> =
-    //         Rc::new(RefCell::new(BTreeMap::new()));
-    //
-    //     // genesis section; inserted at the end
-    //     let (gen_sap, _, gen_sk) = random_sap(Prefix::default(), 0, 0, None);
-    //     let gen_sap_signed = section_signed(gen_sk.secret_key(), gen_sap.clone())?;
-    //     let mut chain = SecuredLinkedList::new(gen_sap.section_key());
-    //
-    //     //  if n_sections == 0, return early with just the genesis attached
-    //     if n_sections == 0 {
-    //         sections_map.borrow_mut().insert(
-    //             gen_sap.section_key(),
-    //             (
-    //                 SectionStatus::None,
-    //                 gen_sk.secret_key().clone(),
-    //                 gen_sap_signed,
-    //             ),
-    //         );
-    //         return Ok((sections_map.borrow().clone(), chain));
-    //     }
-    //
-    //     // insert a new section
-    //     let mut insert = |prefix: Prefix, parent_sk: &bls::SecretKey| -> Result<()> {
-    //         let (sap, _, sk) = random_sap(prefix, 0, 0, None);
-    //         let section_key_signed =
-    //             bincode::serialize(&sap.section_key()).map(|bytes| parent_sk.sign(&bytes))?;
-    //         let sap_signed = section_signed(sk.secret_key(), sap.clone())?;
-    //
-    //         sections_map.borrow_mut().insert(
-    //             sap.section_key(),
-    //             (SectionStatus::None, sk.secret_key().clone(), sap_signed),
-    //         );
-    //         chain.insert(
-    //             &parent_sk.public_key(),
-    //             sap.section_key(),
-    //             section_key_signed,
-    //         )?;
-    //         Ok(())
-    //     };
-    //
-    //     // initial sections
-    //     insert(prefix("0")?, gen_sk.secret_key())?;
-    //     insert(prefix("1")?, gen_sk.secret_key())?;
-    //
-    //     // +1 for genesis
-    //     while sections_map.borrow().len() + 1 < n_sections {
-    //         // get a random section only if its SectionStatus is None
-    //         let (_, p_sk, p_sap) = match sections_map
-    //             .borrow()
-    //             .iter()
-    //             .nth(rng.gen::<usize>() % sections_map.borrow().len())
-    //         {
-    //             Some((_, (status, _, _))) if !matches!(status, SectionStatus::None) => continue,
-    //             Some((pk, (_, sk, sap))) => (*pk, sk.clone(), sap.clone()),
-    //             None => continue,
-    //         };
-    //
-    //         let switch: i8 = rng.gen_range(0..2);
-    //         if switch % 2 == 0 {
-    //             // Churn event for the parent, so leads to single child with same prefix
-    //             insert(p_sap.prefix(), &p_sk)?;
-    //             // update parent
-    //             assert!(sections_map
-    //                 .borrow_mut()
-    //                 .insert(p_sap.section_key(), (SectionStatus::Churn, p_sk, p_sap))
-    //                 .is_some());
-    //         } else {
-    //             // Split event for the parent, so leads to 2 children
-    //             insert(prefix(format!("{:b}0", p_sap.prefix()).as_str())?, &p_sk)?;
-    //             insert(prefix(format!("{:b}1", p_sap.prefix()).as_str())?, &p_sk)?;
-    //             // update parent
-    //             assert!(sections_map
-    //                 .borrow_mut()
-    //                 .insert(p_sap.section_key(), (SectionStatus::Split, p_sk, p_sap))
-    //                 .is_some());
-    //         };
-    //     }
-    //
-    //     // insert genesis
-    //     sections_map.borrow_mut().insert(
-    //         gen_sap.section_key(),
-    //         (
-    //             SectionStatus::Split,
-    //             gen_sk.secret_key().clone(),
-    //             gen_sap_signed,
-    //         ),
-    //     );
-    //
-    //     return Ok((sections_map.borrow().clone(), chain));
-    // }
-    //
-    // // Denotes if a section has gone through Split/Churn
-    // #[derive(Debug, Clone, Copy)]
-    // enum SectionStatus {
-    //     Split,
-    //     Churn,
-    //     None,
-    // }
 }
