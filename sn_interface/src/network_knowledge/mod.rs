@@ -585,7 +585,6 @@ impl NetworkKnowledge {
         self.our_section_dag().has_key(key)
     }
 
-    // TODO roland why did they implement the old one?
     /// Return a vec of all known keys
     pub fn known_keys(&self) -> BTreeSet<bls::PublicKey> {
         self.section_tree

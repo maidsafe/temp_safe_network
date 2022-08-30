@@ -14,7 +14,11 @@ use crdts::{
     CmRDT,
 };
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
+use serde::{
+    de::Error as DeserializationError,
+    ser::{Error as SerializationError, SerializeMap},
+    Deserialize, Deserializer, Serialize, Serializer,
+};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Debug, Formatter},
@@ -50,12 +54,62 @@ impl Sha3Hash for SectionInfo {
 }
 
 /// A Merkle DAG of BLS keys where every key is signed by its parent key, except the genesis one.
-#[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct SectionsDAG {
     genesis_key: bls::PublicKey,
     dag: MerkleReg<SectionInfo>,
     dag_root: BTreeSet<bls::PublicKey>,
     hashes: BTreeMap<bls::PublicKey, Hash>,
+}
+
+impl Serialize for SectionsDAG {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut sections: Vec<(bls::PublicKey, SectionInfo)> = Vec::new();
+        let mut need_to_visit: Vec<(bls::PublicKey, Node<SectionInfo>)> = Vec::new();
+        for key in self.dag_root.iter() {
+            need_to_visit.push((
+                *self.genesis_key(),
+                self.get_node(key).map_err(S::Error::custom)?,
+            ));
+        }
+        while let Some((parent_key, current_node)) = need_to_visit.pop() {
+            need_to_visit.extend(
+                self.child_nodes(current_node.hash())
+                    .into_iter()
+                    .map(|child_node| (current_node.value.key, child_node)),
+            );
+            sections.push((parent_key, current_node.value));
+        }
+
+        let mut map = serializer.serialize_map(Some(2))?;
+        map.serialize_entry("genesis_key", &self.genesis_key)?;
+        map.serialize_entry("sections", &sections)?;
+        map.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for SectionsDAG {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct Intermediate {
+            genesis_key: bls::PublicKey,
+            sections: Vec<(bls::PublicKey, SectionInfo)>,
+        }
+        let inter: Intermediate = Deserialize::deserialize(deserializer)?;
+
+        let mut dag = SectionsDAG::new(inter.genesis_key);
+        for (parent, info) in inter.sections {
+            dag.insert(&parent, info.key, info.sig)
+                .map_err(D::Error::custom)?;
+        }
+        Ok(dag)
+    }
 }
 
 impl Debug for SectionsDAG {

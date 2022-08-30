@@ -782,7 +782,6 @@ mod tests {
         }
     }
 
-    // TODO roland why was second key == third key? causes error in new DAG
     // Creates a section chain with three blocks
     fn create_dag(last_key: BlsPublicKey) -> Result<(SectionsDAG, bls::SecretKeySet)> {
         // create chain with random genesis key
