@@ -1,4 +1,4 @@
-// Copyright 2021 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -67,9 +67,6 @@ fn criterion_benchmark(c: &mut Criterion) {
         };
 
         let client_pk = client.public_key();
-
-        // batch[0].clone()
-        // let payload = ServiceMsg::Cmd(batch[0].clone());
 
         let msg_id = MsgId::new();
 
