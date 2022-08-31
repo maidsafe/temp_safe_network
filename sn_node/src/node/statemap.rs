@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//! Instrumentation for statemaps: https://github.com/TritonDataCenter/statemap
+//! Instrumentation for statemaps: <https://github.com/TritonDataCenter/statemap>
 
 use super::core::Node;
 
