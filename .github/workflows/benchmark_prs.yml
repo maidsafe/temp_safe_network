@@ -46,11 +46,7 @@ jobs:
       - name: ubuntu install ripgrep
         run: sudo apt-get -y install ripgrep
 
-      #############################
-      ### Node Benchmark itself ###
-      #### Do not need network ####
-      #############################
-
+      # Node benchmark, which does not need the network to be set up
       - name: Bench sn_node
         shell: bash
         # Criterion outputs the actual bench results to stderr "2>&1 tee output.txt" takes stderr,
@@ -90,9 +86,9 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
 
 
-      ########################
-      ### Benchmark itself ###
-      ########################
+        ########################
+        ### Benchmark itself ###
+        ########################
 
       - name: Bench sn_client
         shell: bash
