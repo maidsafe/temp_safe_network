@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::log_sleep;
+use crate::node::statemap;
 use crate::node::{
     flow_ctrl::{
         cmds::{Cmd, CmdJob},
@@ -162,6 +163,12 @@ impl CmdCtrl {
 
         let dispatcher = self.dispatcher.clone();
         let _ = tokio::task::spawn_local(async move {
+            dispatcher
+                .node()
+                .read()
+                .await
+                .statemap_log_state(cmd.statemap_state());
+
             match dispatcher.process_cmd(cmd).await {
                 Ok(cmds) => {
                     monitoring.increment_cmds().await;
@@ -186,18 +193,38 @@ impl CmdCtrl {
                         .await;
                 }
                 Err(error) => {
+                    debug!("Error processing command");
+                    if let Error::CmdProcessingClientRespondError(ref cmds) = error {
+                        debug!("Will send error response back to client");
+                        for cmd in cmds.clone() {
+                            trace!("Sending cmd to client: {:?}", cmd);
+                            match cmd_process_api.send((cmd, Some(id))).await {
+                                Ok(_) => {
+                                    //no issues
+                                }
+                                Err(error) => {
+                                    error!("Could not enqueue child Cmd: {:?}", error);
+                                }
+                            }
+                        }
+                    }
                     node_event_sender
                         .send(Event::CmdProcessing(CmdProcessEvent::Failed {
                             id,
                             priority,
                             time: SystemTime::now(),
                             cmd_string,
-                            error: format!("{:?}", error),
+                            error: format!("{:?}", &error.to_string()),
                         }))
                         .await;
                 }
             }
             throughpout.increment(); // both on fail and success
+            dispatcher
+                .node()
+                .read()
+                .await
+                .statemap_log_state(statemap::State::Idle);
         });
         Ok(())
     }

@@ -137,8 +137,11 @@ impl Link {
                 // clean up failing connections at once, no nead to leak it outside of here
                 // next send (e.g. when retrying) will use/create a new connection
                 let id = &conn.id();
-                let _ = self.connections.remove(id);
-                let _ = self.queue.remove(id);
+                // We could write just `self.queue.remove(id)`, but the library warns for `unused_results`.
+                {
+                    let _ = self.connections.remove(id);
+                    let _ = self.queue.remove(id);
+                }
                 conn.close(Some(format!("{:?}", error)));
                 Err(SendToOneError::Send(error))
             }

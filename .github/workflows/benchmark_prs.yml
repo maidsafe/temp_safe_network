@@ -46,6 +46,13 @@ jobs:
       - name: ubuntu install ripgrep
         run: sudo apt-get -y install ripgrep
 
+      # Node benchmark, which does not need the network to be set up
+      - name: Bench sn_node
+        shell: bash
+        # Criterion outputs the actual bench results to stderr "2>&1 tee output.txt" takes stderr,
+        # passes to tee which displays it in the terminal and writes to output.txt
+        run: cargo criterion -p sn_node --output-format bencher 2>&1 | tee -a output.txt
+
       - name: Build sn_node bins
         run: cd sn_node && cargo build --release --bins
         timeout-minutes: 60
@@ -79,21 +86,15 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
 
 
-      ########################
-      ### Benchmark itself ###
-      ########################
+        ########################
+        ### Benchmark itself ###
+        ########################
 
       - name: Bench sn_client
         shell: bash
         # Criterion outputs the actual bench results to stderr "2>&1 tee output.txt" takes stderr,
         # passes to tee which displays it in the terminal and writes to output.txt
         run: cargo criterion -p sn_client --output-format bencher 2>&1 | tee -a output.txt
-
-      - name: Bench sn_node
-        shell: bash
-        # Criterion outputs the actual bench results to stderr "2>&1 tee output.txt" takes stderr,
-        # passes to tee which displays it in the terminal and writes to output.txt
-        run: cargo criterion -p sn_node --output-format bencher 2>&1 | tee -a output.txt
 
       - name: Bench sn_cli
         shell: bash

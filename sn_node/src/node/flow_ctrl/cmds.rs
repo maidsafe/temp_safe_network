@@ -8,7 +8,7 @@
 
 use crate::node::{
     messaging::{OutgoingMsg, Peers},
-    Proposal, XorName,
+    statemap, Proposal, XorName,
 };
 
 use sn_consensus::Decision;
@@ -102,7 +102,7 @@ impl CmdJob {
     }
 }
 
-/// Internal cmds for a node.
+/// Commands for a node.
 ///
 /// Cmds are used to connect different modules, allowing
 /// for a better modularization of the code base.
@@ -111,7 +111,7 @@ impl CmdJob {
 /// In other words, it enables enhanced flow control.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
-pub(crate) enum Cmd {
+pub enum Cmd {
     /// Cleanup node's PeerLinks, removing any unsused, unconnected peers
     CleanupPeerLinks,
     /// Validate `wire_msg` from `sender`.
@@ -256,6 +256,30 @@ impl Cmd {
             HandleValidServiceMsg { msg, .. } => msg.priority(),
 
             ValidateMsg { .. } => -9, // before it's validated, we cannot give it high prio, as it would be a spam vector
+        }
+    }
+
+    pub(crate) fn statemap_state(&self) -> statemap::State {
+        use statemap::State;
+        match self {
+            Cmd::CleanupPeerLinks => State::Comms,
+            Cmd::SendMsg { .. } => State::Comms,
+            Cmd::Comm(_) => State::Comms,
+            Cmd::HandlePeerFailedSend(_) => State::Comms,
+            Cmd::ValidateMsg { .. } => State::ProcessCmd,
+            Cmd::HandleValidSystemMsg { .. } => State::SystemMsg,
+            Cmd::HandleValidServiceMsg { .. } => State::ServiceMsg,
+            Cmd::TrackNodeIssueInDysfunction { .. } => State::Dysfunction,
+            Cmd::AddToPendingQueries { .. } => State::Dysfunction,
+            Cmd::HandleAgreement { .. } => State::Agreement,
+            Cmd::HandleMembershipDecision(_) => State::Membership,
+            Cmd::ProposeVoteNodesOffline(_) => State::Membership,
+            Cmd::HandleNewEldersAgreement { .. } => State::Handover,
+            Cmd::HandleDkgTimeout(_) => State::Dkg,
+            Cmd::HandleDkgOutcome { .. } => State::Dkg,
+            Cmd::HandleDkgFailure(_) => State::Dkg,
+            Cmd::ScheduleDkgTimeout { .. } => State::Dkg,
+            Cmd::EnqueueDataForReplication { .. } => State::Replication,
         }
     }
 }

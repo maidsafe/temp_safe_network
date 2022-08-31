@@ -23,7 +23,7 @@ use std::{
 use tiny_keccak::{Hasher, Sha3};
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
-pub struct SectionInfo {
+pub(crate) struct SectionInfo {
     key: bls::PublicKey,
     sig: bls::Signature,
 }
@@ -794,7 +794,7 @@ mod tests {
         (any::<u64>(), 2..=max_sections).prop_map(move |(seed, size)| {
             // size is [2, max_sections] size of 0,1 will give us back only the genesis_key and
             // hence we cannot obtain the partial dag
-            let main_dag = gen_random_sections_dag(Some(seed as u64), size).unwrap();
+            let main_dag = gen_random_sections_dag(Some(seed), size).unwrap();
             let mut rng = SmallRng::seed_from_u64(seed);
             let mut update_variations_list = Vec::new();
 

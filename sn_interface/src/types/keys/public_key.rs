@@ -234,7 +234,7 @@ impl UpperHex for PublicKey {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::utils;
     use super::*;
     use bls;
@@ -252,7 +252,7 @@ pub mod tests {
         ]
     }
 
-    pub fn gen_keys() -> Vec<PublicKey> {
+    fn gen_keys() -> Vec<PublicKey> {
         gen_keypairs().iter().map(PublicKey::from).collect()
     }
 

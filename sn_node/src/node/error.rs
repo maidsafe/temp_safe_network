@@ -8,7 +8,7 @@
 
 use super::Prefix;
 
-use crate::node::handover::Error as HandoverError;
+use crate::node::{flow_ctrl::cmds::Cmd, handover::Error as HandoverError};
 
 use sn_dbc::Error as DbcError;
 use sn_interface::{
@@ -203,6 +203,15 @@ pub enum Error {
     GenesisDbcError(String),
     #[error("DbcError: {0}")]
     DbcError(#[from] DbcError),
+    /// An error occurred while processing a command and we want to send a response back to the
+    /// client.
+    ///
+    /// It's not really a type of error as such, but rather a marker for the command processing
+    /// code that we want to send an acknowledgement back to the client. It enables command
+    /// processing (or message handling) to return errors for more robust unit testing. Previously
+    /// if there was an error we would return back an `Ok` result with an empty list of commands.
+    #[error("Error processing command. Response will be sent back to client.")]
+    CmdProcessingClientRespondError(Vec<Cmd>),
 }
 
 impl From<qp2p::ClientEndpointError> for Error {
