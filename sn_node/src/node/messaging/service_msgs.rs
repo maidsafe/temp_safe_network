@@ -180,29 +180,6 @@ impl Node {
 
         let query_response = response.convert();
 
-        // dont reply if data not found (but do keep peers around...)
-        if query_response.failed_with_data_not_found()
-            || (!query_response.is_success()
-                && self
-                    .capacity
-                    .is_full(&XorName::from(sending_node_pk))
-                    .unwrap_or(false))
-        {
-            // lets requeue waiting peers in case another adult has the data...
-            // if no more responses come in this query should eventually time out
-            // TODO: What happens if we keep getting queries / client for some data that's always not found?
-            // We need to handle that
-            let _prev = self
-                .pending_data_queries
-                .set((op_id, node_id), waiting_peers, None);
-            trace!(
-                "Node {:?}, reported data not found {:?}",
-                sending_node_pk,
-                op_id
-            );
-            return None;
-        }
-
         let msg = ServiceMsg::QueryResponse {
             response: query_response,
             correlation_id,
