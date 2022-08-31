@@ -63,8 +63,8 @@ impl DataStorage {
     pub async fn store(
         &mut self,
         data: &ReplicatedData,
-        pk_for_spent_book: PublicKey,
-        keypair_for_spent_book: Keypair,
+        section_pk: PublicKey,
+        node_keypair: Keypair,
     ) -> Result<Option<StorageLevel>> {
         debug!("Replicating {data:?}");
         match data {
@@ -75,18 +75,11 @@ impl DataStorage {
             }
             ReplicatedData::RegisterWrite(cmd) => self.registers.write(cmd).await?,
             ReplicatedData::SpentbookWrite(cmd) => {
-                // FIMXE: this is temporay logic to create a spentbook to make sure it exists.
+                // FIMXE: this is temporary logic to have spentbooks as Registers.
                 // Spentbooks shall always exist, and the section nodes shall create them by default.
                 self.registers
-                    .create_spentbook_register(
-                        &cmd.dst_address(),
-                        pk_for_spent_book,
-                        keypair_for_spent_book,
-                    )
+                    .write_spentbook_register(cmd, section_pk, node_keypair)
                     .await?;
-
-                // We now write the cmd received
-                self.registers.write(cmd).await?
             }
             ReplicatedData::SpentbookLog(data) => self.registers.update(data).await?,
         };

@@ -15,7 +15,7 @@ use sn_interface::{
     types::{
         register::Register,
         utils::{deserialise, serialise},
-        RegisterAddress, RegisterCmd, SectionAuth,
+        RegisterAddress, RegisterCmd,
     },
 };
 
@@ -36,7 +36,7 @@ pub(super) type RegisterLog = Vec<RegisterCmd>;
 
 #[derive(Clone, Debug)]
 pub(super) struct StoredRegister {
-    pub(super) state: Option<(Register, SectionAuth)>,
+    pub(super) state: Option<Register>,
     pub(super) op_log: RegisterLog,
     pub(super) op_log_path: PathBuf,
 }
@@ -132,7 +132,7 @@ impl RegisterStore {
 
                     if let RegisterCmd::Create {
                         cmd: SignedRegisterCreate { op, .. },
-                        section_auth,
+                        ..
                     } = reg_cmd
                     {
                         // TODO: if we already have read a RegisterCreate op, check if there
@@ -140,7 +140,7 @@ impl RegisterStore {
                         if stored_reg.state.is_none() {
                             let register =
                                 Register::new(*op.policy.owner(), op.name, op.tag, op.policy);
-                            stored_reg.state = Some((register, section_auth));
+                            stored_reg.state = Some(register);
                         }
                     }
                 }

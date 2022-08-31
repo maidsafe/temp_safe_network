@@ -40,7 +40,7 @@ use xor_name::XorName;
 
 const REGISTER_STORE_DIR_NAME: &str = "register";
 
-/// Operations over the data type Register.
+/// Operations over the Register data type and its storage.
 #[derive(Debug, Clone)]
 pub(super) struct RegisterStorage {
     file_store: RegisterStore,
@@ -55,7 +55,7 @@ impl RegisterStorage {
     }
 
     #[allow(dead_code)]
-    pub(super) async fn remove_register(&mut self, address: &RegisterAddress) -> Result<()> {
+    pub(super) async fn remove_register(&self, address: &RegisterAddress) -> Result<()> {
         trace!("Removing register, {:?}", address);
         self.file_store.delete_data(address).await
     }
@@ -70,21 +70,16 @@ impl RegisterStorage {
         address: &RegisterAddress,
     ) -> Result<ReplicatedRegisterLog> {
         let stored_reg = self.try_load_stored_register(address).await?;
-        if let Some((register, section_auth)) = stored_reg.state {
-            // Build the replicated register log assuming ops stored are all valid and correctly
-            // signed since we performed such validations before storing them.
-            Ok(ReplicatedRegisterLog {
-                address: *register.address(),
-                section_auth,
-                op_log: stored_reg.op_log,
-            })
-        } else {
-            Err(Error::RegisterNotFound(*address))
-        }
+        // Build the replicated register log assuming ops stored are all valid and correctly
+        // signed since we performed such validations before storing them.
+        Ok(ReplicatedRegisterLog {
+            address: *address,
+            op_log: stored_reg.op_log,
+        })
     }
 
     /// Update our Register's replica on receiving data from other nodes.
-    pub(super) async fn update(&mut self, data: &ReplicatedRegisterLog) -> Result<()> {
+    pub(super) async fn update(&self, data: &ReplicatedRegisterLog) -> Result<()> {
         debug!("Updating Register store: {:?}", data.address);
         let mut stored_reg = self.try_load_stored_register(&data.address).await?;
 
@@ -111,7 +106,7 @@ impl RegisterStorage {
 
     /// --- Writing ---
 
-    pub(super) async fn write(&mut self, cmd: &RegisterCmd) -> Result<()> {
+    pub(super) async fn write(&self, cmd: &RegisterCmd) -> Result<()> {
         info!("Writing register cmd: {:?}", cmd);
         // Let's first try to load and reconstruct the replica of targetted Register
         // we have in local storage, to then try to apply the new command onto it.
@@ -162,7 +157,7 @@ impl RegisterStorage {
         requester: User,
     ) -> Result<Register> {
         let stored_reg = self.try_load_stored_register(address).await?;
-        if let Some((register, _)) = stored_reg.state {
+        if let Some(register) = stored_reg.state {
             register
                 .check_permissions(action, Some(requester))
                 .map_err(Error::from)?;
@@ -281,32 +276,35 @@ impl RegisterStorage {
 
     // Temporary helper function which makes sure there exists a Register for the spentbook,
     // this shouldn't be required once we have a Spentbook data type.
-    pub(super) async fn create_spentbook_register(
-        &mut self,
-        address: &RegisterAddress,
-        pk: PublicKey,
-        keypair: Keypair,
+    pub(super) async fn write_spentbook_register(
+        &self,
+        cmd: &RegisterCmd,
+        section_pk: PublicKey,
+        node_keypair: Keypair,
     ) -> Result<()> {
+        let address = cmd.dst_address();
         trace!("Creating new spentbook register: {:?}", address);
 
         let mut permissions = BTreeMap::new();
         let _ = permissions.insert(User::Anyone, Permissions::new(true));
-        let owner = User::Key(pk);
+        let owner = User::Key(section_pk);
         let policy = Policy { owner, permissions };
 
-        let cmd = create_reg_w_policy(*address.name(), SPENTBOOK_TYPE_TAG, policy, keypair)?;
+        let create_cmd =
+            create_reg_w_policy(*address.name(), SPENTBOOK_TYPE_TAG, policy, node_keypair)?;
 
-        match self.write(&cmd).await {
-            Ok(()) | Err(Error::DataExists(_)) => Ok(()),
-            other => other,
-        }
+        self.update(&ReplicatedRegisterLog {
+            address,
+            op_log: [create_cmd, cmd.clone()].to_vec(),
+        })
+        .await
     }
 
     // Private helper which does all verification and tries to apply given cmd to given Register
     // state. It accumulates the cmd, if valid, into the log so further calls can be made with
     // the same state and log for other commands to be applied, as used by the `update` function.
     async fn try_to_apply_cmd_against_register_state(
-        &mut self,
+        &self,
         cmd: &RegisterCmd,
         stored_reg: &mut StoredRegister,
     ) -> Result<()> {
@@ -316,12 +314,15 @@ impl RegisterStorage {
         // cmd let's verify is valid before accepting it, however 'Edits cmds' cannot be
         // verified now untill we have the `Register create` cmd.
         match (stored_reg.state.as_mut(), cmd) {
-            (Some((ref mut register, _)), cmd) => self.apply(cmd, register).await?,
+            (Some(ref mut register), cmd) => {
+                self.apply(cmd, register).await?;
+                stored_reg.op_log.push(cmd.clone());
+            }
             (
                 None,
                 RegisterCmd::Create {
                     cmd: SignedRegisterCreate { op, auth },
-                    section_auth,
+                    ..
                 },
             ) => {
                 // the target Register is not in our store or we don't have the 'Register create',
@@ -342,7 +343,7 @@ impl RegisterStorage {
                     self.apply(cmd, &mut register).await?;
                 }
 
-                stored_reg.state = Some((register, section_auth.clone()));
+                stored_reg.state = Some(register);
             }
             (None, edit_cmd) => {
                 // we cannot validate it, but we'll store it
@@ -354,7 +355,7 @@ impl RegisterStorage {
     }
 
     // Try to apply the provided cmd to the register log and state, performing all vaidations
-    async fn apply(&mut self, cmd: &RegisterCmd, register: &mut Register) -> Result<()> {
+    async fn apply(&self, cmd: &RegisterCmd, register: &mut Register) -> Result<()> {
         let addr = cmd.dst_address();
         if &addr != register.address() {
             return Err(Error::RegisterAddrMismatch {
@@ -398,7 +399,7 @@ impl RegisterStorage {
     async fn try_load_stored_register(&self, addr: &RegisterAddress) -> Result<StoredRegister> {
         let mut stored_reg = self.file_store.open_reg_log_from_disk(addr).await?;
         // if we have the Register creation cmd, apply all ops to reconstruct the Register
-        if let Some((register, _)) = &mut stored_reg.state {
+        if let Some(register) = &mut stored_reg.state {
             for op in stored_reg.op_log.iter() {
                 if let RegisterCmd::Edit(SignedRegisterEdit {
                     op: EditRegister { edit, .. },
@@ -428,13 +429,13 @@ fn create_reg_w_policy(
     name: XorName,
     tag: u64,
     policy: Policy,
-    keypair: Keypair,
+    node_keypair: Keypair,
 ) -> Result<RegisterCmd> {
     let op = CreateRegister { name, tag, policy };
-    let signature = keypair.sign(&serialize(&op)?);
+    let signature = node_keypair.sign(&serialize(&op)?);
 
     let auth = ServiceAuth {
-        public_key: keypair.public_key(),
+        public_key: node_keypair.public_key(),
         signature,
     };
 
@@ -482,7 +483,7 @@ mod test {
     #[tokio::test]
     async fn test_register_write() -> Result<()> {
         // setup store
-        let mut store = new_store()?;
+        let store = new_store()?;
 
         // create register
         let (cmd, authority) = create_register()?;
@@ -516,7 +517,7 @@ mod test {
     #[tokio::test]
     async fn test_register_export() -> Result<()> {
         // setup store
-        let mut store = new_store()?;
+        let store = new_store()?;
 
         // create register
         let (cmd, authority) = create_register()?;
@@ -550,7 +551,7 @@ mod test {
         }
 
         // create new store and update it with the data from first store
-        let mut new_store = new_store()?;
+        let new_store = new_store()?;
         for log in for_update {
             new_store.update(&log).await?;
         }
@@ -593,7 +594,7 @@ mod test {
     #[tokio::test]
     async fn test_register_non_existing_entry() -> Result<()> {
         // setup store
-        let mut store = new_store()?;
+        let store = new_store()?;
 
         // create register
         let (cmd, authority) = create_register()?;
@@ -622,7 +623,7 @@ mod test {
     #[tokio::test]
     async fn test_register_non_existing_permissions() -> Result<()> {
         // setup store
-        let mut store = new_store()?;
+        let store = new_store()?;
 
         // create register
         let (cmd, authority) = create_register()?;

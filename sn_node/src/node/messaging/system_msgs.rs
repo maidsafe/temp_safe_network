@@ -461,7 +461,7 @@ impl Node {
                 let mut cmds = vec![];
 
                 let section_pk = PublicKey::Bls(self.network_knowledge.section_key());
-                let own_keypair = Keypair::Ed25519(self.keypair.clone());
+                let node_keypair = Keypair::Ed25519(self.keypair.clone());
 
                 for data in data_collection {
                     // We are an adult here, so just store away!
@@ -469,7 +469,7 @@ impl Node {
                     // well before this
                     match self
                         .data_storage
-                        .store(&data, section_pk, own_keypair.clone())
+                        .store(&data, section_pk, node_keypair.clone())
                         .await
                     {
                         Ok(level_report) => {
