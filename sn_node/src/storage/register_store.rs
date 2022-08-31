@@ -22,6 +22,7 @@ use sn_interface::{
 use bincode::serialize;
 use std::{
     collections::{btree_map::Entry, BTreeMap},
+    mem::size_of,
     path::{Path, PathBuf},
 };
 use tiny_keccak::{Hasher, Sha3};
@@ -54,14 +55,14 @@ impl RegisterStore {
     /// If the location specified already contains a `RegisterStore`, it is simply used
     ///
     /// Used space of the dir is tracked
-    pub(super) fn new<P: AsRef<Path>>(root_path: P, used_space: UsedSpace) -> Result<Self> {
+    pub(super) fn new(file_store_path: PathBuf, used_space: UsedSpace) -> Result<Self> {
         Ok(Self {
-            file_store_path: root_path.as_ref().to_path_buf(),
+            file_store_path,
             used_space,
         })
     }
 
-    fn address_to_filepath(&self, addr: &RegisterAddress) -> Result<PathBuf> {
+    pub(super) fn address_to_filepath(&self, addr: &RegisterAddress) -> Result<PathBuf> {
         // this is a unique identifier of the Register,
         // since it encodes both the xorname and tag.
         let reg_id = XorName::from_content(&serialize(addr)?);
@@ -130,13 +131,10 @@ impl RegisterStore {
                 Ok(Ok(reg_cmd)) => {
                     stored_reg.op_log.push(reg_cmd.clone());
 
-                    if let RegisterCmd::Create {
-                        cmd: SignedRegisterCreate { op, .. },
-                        ..
-                    } = reg_cmd
-                    {
+                    if let RegisterCmd::Create { cmd, .. } = reg_cmd {
                         // TODO: if we already have read a RegisterCreate op, check if there
                         // is any difference with this other one,...if so perhaps log a warning?
+                        let SignedRegisterCreate { op, .. } = cmd;
                         if stored_reg.state.is_none() {
                             let register =
                                 Register::new(*op.policy.owner(), op.name, op.tag, op.policy);
@@ -186,7 +184,7 @@ impl RegisterStore {
     /// Persists a RegisterCmd to disk
     pub(super) async fn write_register_cmd(&self, cmd: &RegisterCmd, path: &Path) -> Result<()> {
         // rough estimate of the RegisterCmd
-        let required_space = std::mem::size_of::<RegisterCmd>();
+        let required_space = size_of::<RegisterCmd>();
         if !self.used_space.can_add(required_space) {
             return Err(Error::NotEnoughSpace);
         }
@@ -198,7 +196,6 @@ impl RegisterStore {
         // it's deterministic, so they are exactly the same op so we can leave
         if path.exists() {
             trace!("RegisterCmd exists on disk, so was not written: {cmd:?}");
-            // TODO: should we error?
             return Ok(());
         }
 
@@ -207,7 +204,7 @@ impl RegisterStore {
         let serialized_data = serialise(cmd)?;
         file.write_all(&serialized_data).await?;
 
-        self.used_space.increase(std::mem::size_of::<RegisterCmd>());
+        self.used_space.increase(required_space);
 
         trace!("RegisterCmd writing successful for id {reg_cmd_id}");
         Ok(())

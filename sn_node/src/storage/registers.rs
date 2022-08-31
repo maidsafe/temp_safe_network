@@ -50,7 +50,6 @@ impl RegisterStorage {
     /// Create new `RegisterStorage`
     pub(super) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         let file_store = RegisterStore::new(path.join(REGISTER_STORE_DIR_NAME), used_space)?;
-
         Ok(Self { file_store })
     }
 
@@ -291,7 +290,7 @@ impl RegisterStorage {
         let policy = Policy { owner, permissions };
 
         let create_cmd =
-            create_reg_w_policy(*address.name(), SPENTBOOK_TYPE_TAG, policy, node_keypair)?;
+            create_reg_w_policy(*address.name(), SPENTBOOK_TYPE_TAG, policy, &node_keypair)?;
 
         self.update(&ReplicatedRegisterLog {
             address,
@@ -302,31 +301,24 @@ impl RegisterStorage {
 
     // Private helper which does all verification and tries to apply given cmd to given Register
     // state. It accumulates the cmd, if valid, into the log so further calls can be made with
-    // the same state and log for other commands to be applied, as used by the `update` function.
+    // the same state and log, as used by the `update` function.
+    // Note the cmd is always pushed to the log even if it's a duplicated cmd.
     async fn try_to_apply_cmd_against_register_state(
         &self,
         cmd: &RegisterCmd,
         stored_reg: &mut StoredRegister,
     ) -> Result<()> {
-        // If we have the target Register, try to apply the cmd, otherwise let's store
-        // the cmd in our storage anyway, whenever we receive the 'Register create' cmd
-        // it can be reconstructed from all cmds we hold. If this is a 'Register create'
-        // cmd let's verify is valid before accepting it, however 'Edits cmds' cannot be
-        // verified now untill we have the `Register create` cmd.
+        // If we have the target Register, try to apply the cmd, otherwise let's keep
+        // the cmd in the log anyway, whenever we receive the 'Register create' cmd
+        // it can be reconstructed from all cmds we hold in the log. If this is a 'Register create'
+        // cmd let's verify it's valid before accepting it, however 'Edits cmds' cannot be
+        // verified untill we have the `Register create` cmd.
         match (stored_reg.state.as_mut(), cmd) {
-            (Some(ref mut register), cmd) => {
-                self.apply(cmd, register).await?;
-                stored_reg.op_log.push(cmd.clone());
-            }
-            (
-                None,
-                RegisterCmd::Create {
-                    cmd: SignedRegisterCreate { op, auth },
-                    ..
-                },
-            ) => {
+            (Some(ref mut register), cmd) => self.apply(cmd, register).await?,
+            (None, RegisterCmd::Create { cmd, .. }) => {
                 // the target Register is not in our store or we don't have the 'Register create',
                 // let's verify the create cmd we received is valid and try to apply stored cmds we may have.
+                let SignedRegisterCreate { op, auth } = cmd;
                 let public_key = auth.public_key;
                 let _ = auth
                     .clone()
@@ -345,16 +337,14 @@ impl RegisterStorage {
 
                 stored_reg.state = Some(register);
             }
-            (None, edit_cmd) => {
-                // we cannot validate it, but we'll store it
-                stored_reg.op_log.push(edit_cmd.clone());
-            }
+            (None, _edit_cmd) => { /* we cannot validate it right now, but we'll store it */ }
         }
 
+        stored_reg.op_log.push(cmd.clone());
         Ok(())
     }
 
-    // Try to apply the provided cmd to the register log and state, performing all vaidations
+    // Try to apply the provided cmd to the register state, performing all op validations
     async fn apply(&self, cmd: &RegisterCmd, register: &mut Register) -> Result<()> {
         let addr = cmd.dst_address();
         if &addr != register.address() {
@@ -373,7 +363,7 @@ impl RegisterStorage {
                     .verify_authority(serialize(op)?)
                     .or(Err(Error::InvalidSignature(public_key)))?;
 
-                info!("Editing Register");
+                info!("Editing Register: {:?}", addr);
                 register.check_permissions(Action::Write, Some(User::Key(public_key)))?;
                 let result = register
                     .apply_op(op.edit.clone())
@@ -400,12 +390,9 @@ impl RegisterStorage {
         let mut stored_reg = self.file_store.open_reg_log_from_disk(addr).await?;
         // if we have the Register creation cmd, apply all ops to reconstruct the Register
         if let Some(register) = &mut stored_reg.state {
-            for op in stored_reg.op_log.iter() {
-                if let RegisterCmd::Edit(SignedRegisterEdit {
-                    op: EditRegister { edit, .. },
-                    ..
-                }) = op
-                {
+            for cmd in stored_reg.op_log.iter() {
+                if let RegisterCmd::Edit(SignedRegisterEdit { op, .. }) = cmd {
+                    let EditRegister { edit, .. } = op;
                     register
                         .apply_op(edit.clone())
                         .map_err(Error::NetworkData)?;
@@ -429,7 +416,7 @@ fn create_reg_w_policy(
     name: XorName,
     tag: u64,
     policy: Policy,
-    node_keypair: Keypair,
+    node_keypair: &Keypair,
 ) -> Result<RegisterCmd> {
     let op = CreateRegister { name, tag, policy };
     let signature = node_keypair.sign(&serialize(&op)?);
@@ -467,18 +454,240 @@ mod test {
     use super::{create_reg_w_policy, Error, RegisterStorage, UsedSpace};
     use sn_interface::{
         messaging::{
-            data::{RegisterCmd, RegisterQuery},
+            data::{EditRegister, RegisterCmd, RegisterQuery, SignedRegisterEdit},
             system::NodeQueryResponse,
+            ServiceAuth,
         },
         types::{
-            register::{EntryHash, Policy, User},
-            Keypair,
+            register::{EntryHash, Policy, Register, User},
+            DataAddress, Keypair,
         },
     };
 
+    use bincode::serialize;
     use eyre::{bail, eyre, Result};
-    use rand::Rng;
+    use rand::{distributions::Alphanumeric, Rng};
+    use std::collections::BTreeSet;
     use tempfile::tempdir;
+    use xor_name::XorName;
+
+    #[tokio::test]
+    async fn test_register_try_load_stored() -> Result<()> {
+        let store = new_store()?;
+
+        let (cmd_create, _, keypair, name, policy) = create_register()?;
+        let addr = cmd_create.dst_address();
+        let log_path = store.file_store.address_to_filepath(&addr)?;
+        let mut register = Register::new(*policy.owner(), name, 0, policy);
+
+        let stored_reg = store.try_load_stored_register(&addr).await?;
+        // it should *not* contain the create cmd
+        assert!(stored_reg.state.is_none());
+        assert!(stored_reg.op_log.is_empty());
+        assert_eq!(stored_reg.op_log_path, log_path);
+
+        store.write(&cmd_create).await?;
+        let stored_reg = store.try_load_stored_register(&addr).await?;
+        // it should contain the create cmd
+        assert_eq!(stored_reg.state.as_ref(), Some(&register));
+        assert_eq!(stored_reg.op_log, vec![cmd_create.clone()]);
+        assert_eq!(stored_reg.op_log_path, log_path);
+        assert_eq!(stored_reg.state.map(|reg| reg.size()), Some(0));
+
+        // let's now edit the register
+        let cmd_edit = edit_register(&mut register, &keypair)?;
+        store.write(&cmd_edit).await?;
+
+        let stored_reg = store.try_load_stored_register(&addr).await?;
+        // it should contain the create and edit cmds
+        assert_eq!(stored_reg.state.as_ref(), Some(&register));
+        assert_eq!(stored_reg.op_log.len(), 2);
+        assert!(
+            stored_reg
+                .op_log
+                .iter()
+                .all(|op| [&cmd_create, &cmd_edit].contains(&op)),
+            "Op log doesn't match"
+        );
+        assert_eq!(stored_reg.op_log_path, log_path);
+        assert_eq!(stored_reg.state.map(|reg| reg.size()), Some(1));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_register_try_load_stored_inverted_cmds_order() -> Result<()> {
+        let store = new_store()?;
+
+        let (cmd_create, _, keypair, name, policy) = create_register()?;
+        let addr = cmd_create.dst_address();
+        let log_path = store.file_store.address_to_filepath(&addr)?;
+        let mut register = Register::new(*policy.owner(), name, 0, policy);
+
+        // let's first store an edit cmd for the register
+        let cmd_edit = edit_register(&mut register, &keypair)?;
+        store.write(&cmd_edit).await?;
+
+        let stored_reg = store.try_load_stored_register(&addr).await?;
+        // it should contain the edit cmd only
+        assert_eq!(stored_reg.state, None);
+        assert_eq!(stored_reg.op_log, vec![cmd_edit.clone()]);
+        assert_eq!(stored_reg.op_log_path, log_path);
+
+        // and now store the create cmd for the register
+        store.write(&cmd_create).await?;
+
+        let stored_reg = store.try_load_stored_register(&addr).await?;
+        // it should contain the create and edit cmds
+        assert_eq!(stored_reg.state.as_ref(), Some(&register));
+        assert_eq!(stored_reg.op_log.len(), 2);
+        assert!(
+            stored_reg
+                .op_log
+                .iter()
+                .all(|op| [&cmd_create, &cmd_edit].contains(&op)),
+            "Op log doesn't match"
+        );
+        assert_eq!(stored_reg.op_log_path, log_path);
+        assert_eq!(stored_reg.state.map(|reg| reg.size()), Some(1));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_register_apply_cmd_against_state() -> Result<()> {
+        let store = new_store()?;
+
+        let (cmd_create, _, keypair, name, policy) = create_register()?;
+        let addr = cmd_create.dst_address();
+        let log_path = store.file_store.address_to_filepath(&addr)?;
+        let mut register = Register::new(*policy.owner(), name, 0, policy);
+        let mut stored_reg = store.try_load_stored_register(&addr).await?;
+
+        // apply the create cmd
+        store
+            .try_to_apply_cmd_against_register_state(&cmd_create, &mut stored_reg)
+            .await?;
+        // it should contain the create cmd
+        assert_eq!(stored_reg.state.as_ref(), Some(&register));
+        assert_eq!(stored_reg.op_log, vec![cmd_create.clone()]);
+        assert_eq!(stored_reg.op_log_path, log_path);
+        assert_eq!(stored_reg.state.as_ref().map(|reg| reg.size()), Some(0));
+
+        // apply the create cmd again should fail with DataExists
+        match store
+            .try_to_apply_cmd_against_register_state(&cmd_create, &mut stored_reg)
+            .await
+        {
+            Ok(()) => bail!("An error should occur for this test case"),
+            Err(Error::DataExists(DataAddress::Register(reported_addr))) => {
+                assert_eq!(addr, reported_addr)
+            }
+            Err(err) => bail!("A Error::DataExists variant was expected: {:?}", err),
+        }
+
+        // let's now apply an edit cmd
+        let cmd_edit = edit_register(&mut register, &keypair)?;
+        store
+            .try_to_apply_cmd_against_register_state(&cmd_edit, &mut stored_reg)
+            .await?;
+        // it should contain the create and edit cmds
+        assert_eq!(stored_reg.state.as_ref(), Some(&register));
+        assert_eq!(stored_reg.op_log.len(), 2);
+        assert!(
+            stored_reg
+                .op_log
+                .iter()
+                .all(|op| [&cmd_create, &cmd_edit].contains(&op)),
+            "Op log doesn't match"
+        );
+        assert_eq!(stored_reg.op_log_path, log_path);
+        assert_eq!(stored_reg.state.as_ref().map(|reg| reg.size()), Some(1));
+
+        // applying the edit cmd again shouldn't fail or alter the register content,
+        // although the log will contain the edit cmd duplicated
+        store
+            .try_to_apply_cmd_against_register_state(&cmd_edit, &mut stored_reg)
+            .await?;
+        assert_eq!(stored_reg.state.as_ref(), Some(&register));
+        assert_eq!(stored_reg.op_log.len(), 3);
+        assert!(
+            stored_reg
+                .op_log
+                .iter()
+                .all(|op| [&cmd_create, &cmd_edit].contains(&op)),
+            "Op log doesn't match"
+        );
+        assert_eq!(stored_reg.op_log_path, log_path);
+        assert_eq!(stored_reg.state.map(|reg| reg.size()), Some(1));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_register_apply_cmd_against_state_inverted_cmds_order() -> Result<()> {
+        let store = new_store()?;
+
+        let (cmd_create, _, keypair, name, policy) = create_register()?;
+        let addr = cmd_create.dst_address();
+        let log_path = store.file_store.address_to_filepath(&addr)?;
+        let mut register = Register::new(*policy.owner(), name, 0, policy);
+        let mut stored_reg = store.try_load_stored_register(&addr).await?;
+
+        // apply an edit cmd first
+        let cmd_edit = edit_register(&mut register, &keypair)?;
+        store
+            .try_to_apply_cmd_against_register_state(&cmd_edit, &mut stored_reg)
+            .await?;
+        // it should contain the edit cmd
+        assert_eq!(stored_reg.state, None);
+        assert_eq!(stored_reg.op_log, vec![cmd_edit.clone()]);
+        assert_eq!(stored_reg.op_log_path, log_path);
+
+        // applying the edit cmd again shouldn't fail,
+        // although the log will contain the edit cmd duplicated
+        store
+            .try_to_apply_cmd_against_register_state(&cmd_edit, &mut stored_reg)
+            .await?;
+        assert_eq!(stored_reg.state, None);
+        assert_eq!(stored_reg.op_log.len(), 2);
+        assert!(
+            stored_reg.op_log.iter().all(|op| op == &cmd_edit),
+            "Op log doesn't match"
+        );
+        assert_eq!(stored_reg.op_log_path, log_path);
+
+        // let's apply the create cmd now
+        store
+            .try_to_apply_cmd_against_register_state(&cmd_create, &mut stored_reg)
+            .await?;
+        // it should contain the create and edit cmds
+        assert_eq!(stored_reg.state.as_ref(), Some(&register));
+        assert_eq!(stored_reg.op_log.len(), 3);
+        assert!(
+            stored_reg
+                .op_log
+                .iter()
+                .all(|op| [&cmd_create, &cmd_edit].contains(&op)),
+            "Op log doesn't match"
+        );
+        assert_eq!(stored_reg.op_log_path, log_path);
+        assert_eq!(stored_reg.state.as_ref().map(|reg| reg.size()), Some(1));
+
+        // apply the create cmd again should fail with DataExists
+        match store
+            .try_to_apply_cmd_against_register_state(&cmd_create, &mut stored_reg)
+            .await
+        {
+            Ok(()) => bail!("An error should occur for this test case"),
+            Err(Error::DataExists(DataAddress::Register(reported_addr))) => {
+                assert_eq!(addr, reported_addr)
+            }
+            Err(err) => bail!("A Error::DataExists variant was expected: {:?}", err),
+        }
+
+        Ok(())
+    }
 
     #[tokio::test]
     async fn test_register_write() -> Result<()> {
@@ -486,7 +695,7 @@ mod test {
         let store = new_store()?;
 
         // create register
-        let (cmd, authority) = create_register()?;
+        let (cmd, authority, _, _, _) = create_register()?;
         store.write(&cmd).await?;
 
         // get register
@@ -501,16 +710,17 @@ mod test {
 
         match store.write(&cmd).await {
             Ok(()) => Err(eyre!("An error should occur for this test case")),
-            Err(error) => match error {
-                Error::DataExists(addr) => {
-                    assert_eq!(
-                        error.to_string(),
-                        format!("Data already exists at this node: {:?}", addr)
-                    );
-                    Ok(())
-                }
-                _ => Err(eyre!("A Error::DataExists variant was expected")),
-            },
+            Err(error @ Error::DataExists(_)) => {
+                assert_eq!(
+                    error.to_string(),
+                    format!(
+                        "Data already exists at this node: {:?}",
+                        DataAddress::Register(address)
+                    )
+                );
+                Ok(())
+            }
+            Err(err) => Err(eyre!("A Error::DataExists variant was expected: {:?}", err)),
         }
     }
 
@@ -519,70 +729,60 @@ mod test {
         // setup store
         let store = new_store()?;
 
-        // create register
-        let (cmd, authority) = create_register()?;
-        let address = cmd.dst_address();
-        store.write(&cmd).await?;
+        let (cmd_create, authority, keypair, name, policy) = create_register()?;
+        let addr = cmd_create.dst_address();
+        let mut register = Register::new(*policy.owner(), name, 0, policy);
+
+        // store the register along with a few edit ops
+        store.write(&cmd_create).await?;
+        for _ in 0..10 {
+            let cmd_edit = edit_register(&mut register, &keypair)?;
+            store.write(&cmd_edit).await?;
+        }
 
         // should fail to write same register again
-        match store.write(&cmd).await {
-            Ok(()) => {
-                return Err(eyre!("An error should occur for this test case"));
-            }
-            Err(error) => match error {
-                Error::DataExists(addr) => {
-                    assert_eq!(
-                        error.to_string(),
-                        format!("Data already exists at this node: {:?}", addr)
-                    );
-                }
-                _ => {
-                    return Err(eyre!("A Error::DataExists variant was expected"));
-                }
-            },
+        match store.write(&cmd_create).await {
+            Ok(()) => bail!("An error should occur for this test case"),
+            Err(error @ Error::DataExists(_)) => assert_eq!(
+                error.to_string(),
+                format!(
+                    "Data already exists at this node: {:?}",
+                    DataAddress::Register(addr)
+                )
+            ),
+            Err(err) => bail!("A Error::DataExists variant was expected: {:?}", err),
         }
 
         // export Registers, get all data we held in storage
         let all_addrs = store.addrs().await;
-        let mut for_update = Vec::new();
-        for addr in all_addrs {
-            let replica = store.get_register_replica(&addr).await?;
-            for_update.push(replica);
-        }
 
         // create new store and update it with the data from first store
         let new_store = new_store()?;
-        for log in for_update {
-            new_store.update(&log).await?;
+        for addr in all_addrs {
+            let replica = store.get_register_replica(&addr).await?;
+            new_store.update(&replica).await?;
         }
 
         // assert the same tests hold as for the first store
         // should fail to write same register again, also on this new store
-        match new_store.write(&cmd).await {
-            Ok(()) => {
-                return Err(eyre!("An error should occur for this test case"));
-            }
-            Err(error) => match error {
-                Error::DataExists(addr) => {
-                    assert_eq!(
-                        error.to_string(),
-                        format!("Data already exists at this node: {:?}", addr)
-                    );
-                }
-                _ => {
-                    return Err(eyre!("A Error::DataExists variant was expected"));
-                }
-            },
+        match new_store.write(&cmd_create).await {
+            Ok(()) => bail!("An error should occur for this test case"),
+            Err(error @ Error::DataExists(_)) => assert_eq!(
+                error.to_string(),
+                format!(
+                    "Data already exists at this node: {:?}",
+                    DataAddress::Register(addr)
+                )
+            ),
+            Err(err) => bail!("A Error::DataExists variant was expected: {:?}", err),
         }
 
         // should be able to read the same value from this new store also
-        let res = new_store
-            .read(&RegisterQuery::Get(address), authority)
-            .await;
+        let res = new_store.read(&RegisterQuery::Get(addr), authority).await;
 
         match res {
             NodeQueryResponse::GetRegister((Ok(reg), _)) => {
-                assert_eq!(reg.address(), &address, "Should have same address!");
+                assert_eq!(reg.address(), &addr, "Should have same address!");
                 assert_eq!(reg.owner(), authority, "Should have same owner!");
             }
             e => panic!("Could not read! {:?}", e),
@@ -597,13 +797,13 @@ mod test {
         let store = new_store()?;
 
         // create register
-        let (cmd, authority) = create_register()?;
-        store.write(&cmd).await?;
+        let (cmd_create, authority, _, _, _) = create_register()?;
+        store.write(&cmd_create).await?;
 
         let hash = EntryHash(rand::thread_rng().gen::<[u8; 32]>());
 
         // try get permissions of random user
-        let address = cmd.dst_address();
+        let address = cmd_create.dst_address();
         let res = store
             .read(&RegisterQuery::GetEntry { address, hash }, authority)
             .await;
@@ -626,13 +826,13 @@ mod test {
         let store = new_store()?;
 
         // create register
-        let (cmd, authority) = create_register()?;
-        store.write(&cmd).await?;
+        let (cmd_create, authority, _, _, _) = create_register()?;
+        store.write(&cmd_create).await?;
 
         let (user, _) = random_user();
 
         // try get permissions of random user
-        let address = cmd.dst_address();
+        let address = cmd_create.dst_address();
         let res = store
             .read(
                 &RegisterQuery::GetUserPermissions { address, user },
@@ -667,15 +867,36 @@ mod test {
         (authority, keypair)
     }
 
-    fn create_register() -> Result<(RegisterCmd, User)> {
+    fn create_register() -> Result<(RegisterCmd, User, Keypair, XorName, Policy)> {
         let (authority, keypair) = random_user();
         let policy = Policy {
             owner: authority,
             permissions: Default::default(),
         };
-        Ok((
-            create_reg_w_policy(xor_name::rand::random(), 0, policy, keypair)?,
-            authority,
-        ))
+        let xorname = xor_name::rand::random();
+        let cmd = create_reg_w_policy(xorname, 0, policy.clone(), &keypair)?;
+
+        Ok((cmd, authority, keypair, xorname, policy))
+    }
+
+    fn edit_register(register: &mut Register, keypair: &Keypair) -> Result<RegisterCmd> {
+        let data = rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(15)
+            .collect();
+        let (_, edit) = register.write(data, BTreeSet::default())?;
+        let op = EditRegister {
+            address: *register.address(),
+            edit,
+        };
+        let signature = keypair.sign(&serialize(&op)?);
+
+        Ok(RegisterCmd::Edit(SignedRegisterEdit {
+            op,
+            auth: ServiceAuth {
+                public_key: keypair.public_key(),
+                signature,
+            },
+        }))
     }
 }
