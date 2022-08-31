@@ -20,8 +20,6 @@ use std::io::{self, Write};
 use tokio::time::{sleep, Duration};
 use tracing::{debug, trace};
 
-const MAX_RETRY_ATTEMPTS: usize = 5;
-
 #[derive(Args, Debug)]
 pub struct CatCommands {
     /// The safe:// location to retrieve
@@ -38,17 +36,7 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe)
 
     let mut attempts = 0;
 
-    let mut content = safe.fetch(&url.to_string(), None).await;
-
-    while content.is_err() && attempts < MAX_RETRY_ATTEMPTS {
-        trace!("cat attempt #{:?}", attempts);
-        sleep(Duration::from_secs(1)).await;
-        content = safe.fetch(&url.to_string(), None).await;
-
-        attempts += 1;
-    }
-
-    let content = content?;
+    let content = safe.fetch(&url.to_string(), None).await?;
 
     match &content {
         SafeData::FilesContainer {
