@@ -159,6 +159,7 @@ mod core {
     pub(crate) type AeBackoffCache = LRUCache<(Peer, ExponentialBackoff), BACKOFF_CACHE_LIMIT>;
 
     pub(crate) struct Node {
+        #[allow(unused)]
         pub(crate) start_time: SystemTime,
         pub(crate) addr: SocketAddr, // does this change? if so... when? only at node start atm?
         pub(crate) event_sender: EventSender,

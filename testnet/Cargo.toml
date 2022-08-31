@@ -12,10 +12,11 @@ version = "0.1.0"
 
 
 [features]
-default = ["traceroute"]
+default = ["traceroute", "statemap"]
 # required to pass on flag to node builds
 chaos = []
 traceroute = []
+statemap = []
 
 [[bin]]
 path="bin.rs"
