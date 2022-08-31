@@ -8,7 +8,7 @@
 
 use super::{
     errors::convert_to_error_msg,
-    register_store::{RegisterStore, StoredRegister},
+    register_store::{RegisterLog, RegisterStore, StoredRegister},
     Error, Result,
 };
 
@@ -69,24 +69,24 @@ impl RegisterStorage {
         &self,
         address: &RegisterAddress,
     ) -> Result<ReplicatedRegisterLog> {
-        let stored_reg = self.try_load_stored_register(address).await?;
-        if let Some((register, section_auth)) = stored_reg.state {
-            // Build the replicated register log assuming ops stored are all valid and correctly
-            // signed since we performed such validations before storing them.
-            Ok(ReplicatedRegisterLog {
-                address: *register.address(),
-                section_auth,
-                op_log: stored_reg.op_log,
-            })
-        } else {
-            Err(Error::RegisterNotFound(*address))
-        }
+        let (register, section_auth, op_log) = self.try_load_stored_register(address).await?;
+
+        // Build the replicaed register log assuming ops stored are all valid and correctly
+        // signed since we performed such validations before storing them.
+        Ok(ReplicatedRegisterLog {
+            address: *register.address(),
+            section_auth,
+            op_log,
+        })
     }
 
     /// Update our Register's replica on receiving data from other nodes.
     pub(super) async fn update(&mut self, data: &ReplicatedRegisterLog) -> Result<()> {
         debug!("Updating Register store: {:?}", data.address);
-        let mut stored_reg = self.try_load_stored_register(&data.address).await?;
+        let mut stored_reg = self
+            .file_store
+            .open_reg_log_from_disk(&data.address)
+            .await?;
 
         let mut log_to_write = Vec::new();
         for replicated_cmd in data.op_log.iter() {
@@ -115,7 +115,10 @@ impl RegisterStorage {
         info!("Writing register cmd: {:?}", cmd);
         // Let's first try to load and reconstruct the replica of targetted Register
         // we have in local storage, to then try to apply the new command onto it.
-        let mut stored_reg = self.try_load_stored_register(&cmd.dst_address()).await?;
+        let mut stored_reg = self
+            .file_store
+            .open_reg_log_from_disk(&cmd.dst_address())
+            .await?;
 
         self.try_to_apply_cmd_against_register_state(cmd, &mut stored_reg)
             .await?;
@@ -161,16 +164,12 @@ impl RegisterStorage {
         action: Action,
         requester: User,
     ) -> Result<Register> {
-        let stored_reg = self.try_load_stored_register(address).await?;
-        if let Some((register, _)) = stored_reg.state {
-            register
-                .check_permissions(action, Some(requester))
-                .map_err(Error::from)?;
+        let (register, _, _) = self.try_load_stored_register(address).await?;
+        register
+            .check_permissions(action, Some(requester))
+            .map_err(Error::from)?;
 
-            Ok(register)
-        } else {
-            Err(Error::RegisterNotFound(*address))
-        }
+        Ok(register)
     }
 
     /// Get entire Register.
@@ -395,24 +394,30 @@ impl RegisterStorage {
     // Gets stored register log from disk, trying to reconstruct the Register
     // Note this doesn't perform any cmd sig/perms validation, it's only used when the log
     // is read from disk which has already been validated before storing it.
-    async fn try_load_stored_register(&self, addr: &RegisterAddress) -> Result<StoredRegister> {
-        let mut stored_reg = self.file_store.open_reg_log_from_disk(addr).await?;
+    async fn try_load_stored_register(
+        &self,
+        addr: &RegisterAddress,
+    ) -> Result<(Register, SectionAuth, RegisterLog)> {
+        let stored_reg = self.file_store.open_reg_log_from_disk(addr).await?;
         // if we have the Register creation cmd, apply all ops to reconstruct the Register
-        if let Some((register, _)) = &mut stored_reg.state {
-            for op in stored_reg.op_log.iter() {
-                if let RegisterCmd::Edit(SignedRegisterEdit {
-                    op: EditRegister { edit, .. },
-                    ..
-                }) = op
-                {
-                    register
-                        .apply_op(edit.clone())
-                        .map_err(Error::NetworkData)?;
+        match stored_reg.state {
+            None => Err(Error::RegisterNotFound(*addr)),
+            Some((mut register, section_auth)) => {
+                for op in stored_reg.op_log.iter() {
+                    if let RegisterCmd::Edit(SignedRegisterEdit {
+                        op: EditRegister { edit, .. },
+                        ..
+                    }) = op
+                    {
+                        register
+                            .apply_op(edit.clone())
+                            .map_err(Error::NetworkData)?;
+                    }
                 }
+
+                Ok((register, section_auth, stored_reg.op_log))
             }
         }
-
-        Ok(stored_reg)
     }
 }
 
@@ -471,7 +476,7 @@ mod test {
         },
         types::{
             register::{EntryHash, Policy, User},
-            Keypair,
+            Keypair, ReplicatedRegisterLog,
         },
     };
 
@@ -545,7 +550,12 @@ mod test {
         let all_addrs = store.addrs().await;
         let mut for_update = Vec::new();
         for addr in all_addrs {
-            let replica = store.get_register_replica(&addr).await?;
+            let (register, section_auth, op_log) = store.try_load_stored_register(&addr).await?;
+            let replica = ReplicatedRegisterLog {
+                address: *register.address(),
+                section_auth,
+                op_log,
+            };
             for_update.push(replica);
         }
 
