@@ -115,14 +115,16 @@ async fn main() -> Result<()> {
 
         // Keep features consistent to avoid recompiling when possible
         if cfg!(feature = "traceroute") {
-            println!("*** Building testnet with TRACEROUTE enabled. Watch out for traces. ***");
-            build_args.push("--features");
-            build_args.push("traceroute");
+            build_args.extend(["--features", "traceroute"]);
+        }
+
+        // Keep features consistent to avoid recompiling when possible
+        if cfg!(feature = "statemap") {
+            build_args.extend(["--features", "statemap"]);
         }
 
         if cfg!(feature = "unstable-wiremsg-debuginfo") {
-            build_args.push("--features");
-            build_args.push("unstable-wiremsg-debuginfo");
+            build_args.extend(["--features", "unstable-wiremsg-debuginfo"]);
         }
 
         if cmd_args.flame {

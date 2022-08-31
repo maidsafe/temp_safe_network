@@ -31,6 +31,7 @@ traceroute = ["sn_interface/traceroute"]
 # Needs to be built with RUSTFLAGS="--cfg tokio_unstable"
 tokio-console = ["console-subscriber"]
 otlp = [ "opentelemetry", "opentelemetry-otlp", "opentelemetry-semantic-conventions", "tracing-opentelemetry" ]
+statemap = []
 
 [dependencies]
 backoff = { version = "~0.4.0", features = [ "tokio" ] }
