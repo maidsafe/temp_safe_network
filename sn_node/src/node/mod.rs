@@ -111,7 +111,7 @@ mod core {
         net::SocketAddr,
         path::PathBuf,
         sync::Arc,
-        time::{Duration, SystemTime},
+        time::Duration,
     };
     use uluru::LRUCache;
 
@@ -157,8 +157,6 @@ mod core {
     pub(crate) type AeBackoffCache = LRUCache<(Peer, ExponentialBackoff), BACKOFF_CACHE_LIMIT>;
 
     pub(crate) struct Node {
-        #[allow(unused)]
-        pub(crate) start_time: SystemTime,
         pub(crate) addr: SocketAddr, // does this change? if so... when? only at node start atm?
         pub(crate) event_sender: EventSender,
         root_storage_dir: PathBuf,
@@ -258,7 +256,6 @@ mod core {
             };
 
             let node = Self {
-                start_time: SystemTime::now(),
                 addr,
                 keypair,
                 network_knowledge,

@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::log_sleep;
-use crate::node::statemap;
 use crate::node::{
     flow_ctrl::{
         cmds::{Cmd, CmdJob},
@@ -199,7 +198,7 @@ impl CmdCtrl {
                 .node()
                 .read()
                 .await
-                .statemap_log_state(statemap::State::Idle);
+                .statemap_log_state(sn_interface::statemap::State::Idle);
         });
     }
 }

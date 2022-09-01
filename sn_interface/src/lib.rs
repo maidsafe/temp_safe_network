@@ -32,6 +32,8 @@ pub mod messaging;
 pub mod network_knowledge;
 // Types on the safe network
 pub mod types;
+// Statemap states
+pub mod statemap;
 
 #[macro_use]
 extern crate tracing;
