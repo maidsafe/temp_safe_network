@@ -469,7 +469,7 @@ impl Node {
                     // well before this
                     match self
                         .data_storage
-                        .store(&data, section_pk, node_keypair.clone())
+                        .store(&data, section_pk, &node_keypair)
                         .await
                     {
                         Ok(level_report) => {

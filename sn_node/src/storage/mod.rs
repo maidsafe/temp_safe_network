@@ -64,7 +64,7 @@ impl DataStorage {
         &mut self,
         data: &ReplicatedData,
         section_pk: PublicKey,
-        node_keypair: Keypair,
+        node_keypair: &Keypair,
     ) -> Result<Option<StorageLevel>> {
         debug!("Replicating {data:?}");
         match data {
@@ -302,7 +302,7 @@ mod tests {
         let keypair = Keypair::new_ed25519();
 
         // Store the chunk
-        let _ = storage.store(&replicated_data, pk, keypair).await?;
+        let _ = storage.store(&replicated_data, pk, &keypair).await?;
 
         // Test local fetch
         let fetched_data = storage
@@ -355,7 +355,7 @@ mod tests {
         let keypair = Keypair::new_ed25519();
 
         // Store the chunk
-        let _ = storage.store(&replicated_chunk, pk, keypair).await?;
+        let _ = storage.store(&replicated_chunk, pk, &keypair).await?;
 
         let keys = storage.data_addrs().await;
 
@@ -434,7 +434,7 @@ mod tests {
         let keypair = Keypair::new_ed25519();
 
         // Store the chunk
-        let _ = storage.store(&replicated_register, pk, keypair).await?;
+        let _ = storage.store(&replicated_register, pk, &keypair).await?;
 
         let keys = storage.data_addrs().await;
 
@@ -517,7 +517,7 @@ mod tests {
                         }
                     };
                     runtime.block_on(async {
-                        match storage.store(&data, owner_pk, owner_keypair.clone()).await {
+                        match storage.store(&data, owner_pk, &owner_keypair).await {
                             Ok(_) => {
                                 // do nothing
                                 Ok(())

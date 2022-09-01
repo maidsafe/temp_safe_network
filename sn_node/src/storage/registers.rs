@@ -79,7 +79,7 @@ impl RegisterStorage {
 
     /// Update our Register's replica on receiving data from other nodes.
     pub(super) async fn update(&self, data: &ReplicatedRegisterLog) -> Result<()> {
-        debug!("Updating Register store: {:?}", data.address);
+        println!("Updating Register store: {:?}", data.address);
         let mut stored_reg = self.try_load_stored_register(&data.address).await?;
 
         let mut log_to_write = Vec::new();
@@ -88,11 +88,16 @@ impl RegisterStorage {
                 .try_to_apply_cmd_against_register_state(replicated_cmd, &mut stored_reg)
                 .await
             {
-                warn!(
+                println!(
                     "Discarding ReplicatedRegisterLog cmd {:?}: {:?}",
                     replicated_cmd, err
                 );
             } else {
+                println!(
+                    "TO STORE state? {}: {:?}",
+                    stored_reg.state.is_some(),
+                    replicated_cmd
+                );
                 log_to_write.push(replicated_cmd.clone());
             }
         }
@@ -279,10 +284,10 @@ impl RegisterStorage {
         &self,
         cmd: &RegisterCmd,
         section_pk: PublicKey,
-        node_keypair: Keypair,
+        node_keypair: &Keypair,
     ) -> Result<()> {
         let address = cmd.dst_address();
-        trace!("Creating new spentbook register: {:?}", address);
+        println!("Creating new spentbook register: {:?}", address);
 
         let mut permissions = BTreeMap::new();
         let _ = permissions.insert(User::Anyone, Permissions::new(true));
@@ -290,7 +295,7 @@ impl RegisterStorage {
         let policy = Policy { owner, permissions };
 
         let create_cmd =
-            create_reg_w_policy(*address.name(), SPENTBOOK_TYPE_TAG, policy, &node_keypair)?;
+            create_reg_w_policy(*address.name(), SPENTBOOK_TYPE_TAG, policy, node_keypair)?;
 
         self.update(&ReplicatedRegisterLog {
             address,
@@ -314,7 +319,10 @@ impl RegisterStorage {
         // cmd let's verify it's valid before accepting it, however 'Edits cmds' cannot be
         // verified untill we have the `Register create` cmd.
         match (stored_reg.state.as_mut(), cmd) {
-            (Some(ref mut register), cmd) => self.apply(cmd, register).await?,
+            (Some(ref mut register), cmd) => {
+                println!("APPLY EDIT: {:?}", cmd.dst_address());
+                self.apply(cmd, register).await?
+            }
             (None, RegisterCmd::Create { cmd, .. }) => {
                 // the target Register is not in our store or we don't have the 'Register create',
                 // let's verify the create cmd we received is valid and try to apply stored cmds we may have.
@@ -325,7 +333,7 @@ impl RegisterStorage {
                     .verify_authority(serialize(op)?)
                     .or(Err(Error::InvalidSignature(public_key)))?;
 
-                trace!("Creating new register: {:?}", cmd.dst_address());
+                println!("APPLY CREATE new register: {:?}", cmd.dst_address());
                 // let's do a final check, let's try to apply all cmds to it,
                 // those which are new cmds were not validated yet, so let's do it now.
                 let mut register =
@@ -337,10 +345,14 @@ impl RegisterStorage {
 
                 stored_reg.state = Some(register);
             }
-            (None, _edit_cmd) => { /* we cannot validate it right now, but we'll store it */ }
+            (None, _edit_cmd) => {
+                println!("SAVE EDIT: {:?}", cmd.dst_address());
+                /* we cannot validate it right now, but we'll store it */
+            }
         }
 
         stored_reg.op_log.push(cmd.clone());
+        println!("APPLY END: {:?}", stored_reg.state);
         Ok(())
     }
 
@@ -375,7 +387,7 @@ impl RegisterStorage {
                         Ok(())
                     }
                     Err(err) => {
-                        trace!("Editing Register failed {:?}: {:?}", addr, err);
+                        println!("Editing Register failed {:?}: {:?}", addr, err);
                         Err(err)
                     }
                 }
@@ -784,10 +796,113 @@ mod test {
             NodeQueryResponse::GetRegister((Ok(reg), _)) => {
                 assert_eq!(reg.address(), &addr, "Should have same address!");
                 assert_eq!(reg.owner(), authority, "Should have same owner!");
+                assert_eq!(reg, register, "Should have same register!");
+                assert_eq!(reg.read(), register.read(), "Should have same entries!");
             }
             e => panic!("Could not read! {:?}", e),
         }
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_register_concurrent_spentbook_reg_writes() -> Result<()> {
+        // setup store
+        let store = std::sync::Arc::new(new_store()?);
+
+        for j in 0..2000 {
+            println!(">>>>>>>>>>>>>>>>>>>>> {}", j);
+            let (cmd_create, authority, keypair, name, policy) = create_register()?;
+            let addr = cmd_create.dst_address();
+            let mut register = Register::new(*policy.owner(), name, 0, policy);
+
+            // store a few edit ops concurrently
+            let mut tasks = Vec::new();
+            let mut log = Vec::new();
+            const AMOUNT: usize = 7;
+            for i in 0..AMOUNT {
+                let cmd_edit = edit_register(&mut register, &keypair)?;
+                log.push(cmd_edit.clone());
+                let store2 = store.clone();
+                let keypair2 = keypair.clone();
+                tasks.push(async move {
+                    println!("spentbook write #{}", i);
+                    store2
+                        .write_spentbook_register(&cmd_edit, keypair2.public_key(), &keypair2)
+                        .await
+                        .unwrap();
+                });
+            }
+
+            let local = tokio::task::LocalSet::new();
+            for t in tasks {
+                let _ = local.spawn_local(t);
+            }
+            local.await;
+            println!("GOOD! {}", register.size());
+            let stored_reg = store.try_load_stored_register(&addr).await?;
+            println!("GOOD! at {}", stored_reg.op_log_path.display());
+            println!(">>>>>len {}", stored_reg.op_log.len());
+            let mut q = false;
+
+            if let Some(reg) = stored_reg.state {
+                let a = reg.read();
+                let b = register.read();
+                if a != b {
+                    println!(">>>>>#A {:?}", a);
+                    println!(">>>>>#B {:?}", b);
+                    q = true;
+                }
+            } else {
+                q = true;
+            }
+
+            // should be able to read the same value from this new store also
+            match store.read(&RegisterQuery::Get(addr), authority).await {
+                NodeQueryResponse::GetRegister((Ok(reg), _)) => {
+                    assert_eq!(reg.address(), &addr, "Should have same address!");
+                    assert_eq!(reg.owner(), authority, "Should have same owner!");
+                    //assert_eq!(reg.read(), register.read(), "Should have same entries!");
+                    if reg.size() != register.size() {
+                        let a = reg.read();
+                        let b = register.read();
+                        println!("REG SIZE DONT MATCH {} -- {}", reg.size(), a != b);
+                        if a != b {
+                            println!(">>>>>assert#A {:?}", a);
+                            println!(">>>>>assert#B {:?}", b);
+                        }
+                        q = true;
+                    }
+                }
+                e => panic!("Could not read! {:?}", e),
+            }
+
+            if q {
+                for m in stored_reg.op_log.iter() {
+                    println!(">>>>>no-state-log## {:?}", m);
+                }
+
+                for m in log.iter() {
+                    println!(">>>>>no-state-op-original## {:?}", m);
+                }
+                bail!("FAILED!!!!");
+            }
+
+            // create new store and update it with the data from first store
+            let new_store = new_store()?;
+            let replica = store.get_register_replica(&addr).await?;
+            new_store.update(&replica).await?;
+
+            // should be able to read the same value from this new store also
+            match new_store.read(&RegisterQuery::Get(addr), authority).await {
+                NodeQueryResponse::GetRegister((Ok(reg), _)) => {
+                    assert_eq!(reg.address(), &addr, "Should have same address!");
+                    assert_eq!(reg.owner(), authority, "Should have same owner!");
+                    assert_eq!(reg.read(), register.read(), "Should have same entries!");
+                }
+                e => panic!("Could not read! {:?}", e),
+            }
+        }
         Ok(())
     }
 
