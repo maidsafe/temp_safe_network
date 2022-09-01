@@ -273,6 +273,9 @@ impl SystemMsg {
             SystemMsg::NodeCmd(_) => State::Node,
             SystemMsg::NodeQuery(_) => State::Node,
             SystemMsg::NodeQueryResponse { .. } => State::Node,
+            #[cfg(feature = "back-pressure")]
+            // Inter-node comms for backpressure
+            SystemMsg::BackPressure(_) => State::SystemMsg,
         }
     }
 }
