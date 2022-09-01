@@ -105,7 +105,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         Err(_error) => panic!("Could not serialize the msg bytes"),
     };
 
-    group.throughput(Throughput::Bytes((&msg_bytes.len() * dsts.len()) as u64));
+    group.throughput(Throughput::Bytes((msg_bytes.len() * dsts.len()) as u64));
 
     // upload and read
     group.bench_with_input(
