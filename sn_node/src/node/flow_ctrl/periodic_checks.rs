@@ -85,9 +85,7 @@ impl FlowCtrl {
 
         for cmd in cmds {
             // dont use sender here incase channel gets full
-            if let Err(error) = self.fire_and_forget(cmd).await {
-                error!("Error pushing node periodic cmd to controller: {error:?}");
-            }
+            self.fire_and_forget(cmd).await;
         }
     }
 
@@ -96,22 +94,17 @@ impl FlowCtrl {
         &mut self,
         last_section_probe: &mut Instant,
     ) {
-        let now = Instant::now();
         let mut cmds = vec![];
 
         // if we've passed enough time, section probe
         if last_section_probe.elapsed() > SECTION_PROBE_INTERVAL {
-            *last_section_probe = now;
-            if let Some(cmd) = Self::probe_the_section(self.node.clone()).await {
-                cmds.push(cmd);
-            }
+            *last_section_probe = Instant::now();
+            cmds.push(Self::probe_the_section(self.node.clone()).await);
         }
 
         for cmd in cmds {
             // dont use sender here incase channel gets full
-            if let Err(error) = self.fire_and_forget(cmd).await {
-                error!("Error pushing adult node periodic cmd to controller: {error:?}");
-            }
+            self.fire_and_forget(cmd).await;
         }
     }
 
@@ -171,9 +164,7 @@ impl FlowCtrl {
 
         for cmd in cmds {
             // dont use sender here incase channel gets full
-            if let Err(error) = self.fire_and_forget(cmd).await {
-                error!("Error pushing adult node periodic cmd to controller: {error:?}");
-            }
+            self.fire_and_forget(cmd).await;
         }
     }
 
@@ -235,20 +226,12 @@ impl FlowCtrl {
 
     /// Generates a probe msg, which goes to our elders in order to
     /// passively maintain network knowledge over time
-    async fn probe_the_section(node: Arc<RwLock<Node>>) -> Option<Cmd> {
+    async fn probe_the_section(node: Arc<RwLock<Node>>) -> Cmd {
         let node = node.read().await;
 
         // Send a probe message to an elder
         info!("Starting to probe section");
-
-        let prefix = node.network_knowledge().prefix();
-
-        // Send a probe message to an elder
-        if !prefix.is_empty() {
-            Some(node.generate_section_probe_msg())
-        } else {
-            None
-        }
+        node.generate_section_probe_msg()
     }
 
     /// Generates a probe msg, which goes to all section elders in order to

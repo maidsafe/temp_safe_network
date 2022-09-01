@@ -14,7 +14,7 @@ use crate::node::{
         dispatcher::Dispatcher,
         event_channel::EventSender,
     },
-    CmdProcessEvent, Error, Event, RateLimits, Result,
+    CmdProcessEvent, Error, Event, RateLimits,
 };
 
 use custom_debug::Debug;
@@ -48,7 +48,6 @@ pub(crate) struct CmdCtrl {
     cmd_queue: PriorityQueue<CmdJob, Priority>,
     attempted: CmdThroughput,
     monitoring: RateLimits,
-    stopped: bool,
     pub(crate) dispatcher: Arc<Dispatcher>,
     id_counter: usize,
 }
@@ -59,7 +58,6 @@ impl CmdCtrl {
             cmd_queue: PriorityQueue::new(),
             attempted: CmdThroughput::default(),
             monitoring,
-            stopped: false,
             dispatcher: Arc::new(dispatcher),
             id_counter: 0,
         }
@@ -69,7 +67,7 @@ impl CmdCtrl {
         self.dispatcher.node()
     }
 
-    pub(crate) async fn push(&mut self, cmd: Cmd) -> Result<()> {
+    pub(crate) async fn push(&mut self, cmd: Cmd) {
         self.push_internal(cmd, None).await
     }
 
@@ -78,32 +76,13 @@ impl CmdCtrl {
         !self.cmd_queue.is_empty()
     }
 
-    // consume self
-    // NB that clones could still exist, however they would be in the disconnected state
-    #[allow(unused)]
-    pub(crate) async fn stop(mut self) {
-        self.stopped = true;
-        self.cmd_queue.clear();
-    }
-
-    async fn push_internal(&mut self, cmd: Cmd, parent_id: Option<usize>) -> Result<()> {
-        if self.stopped().await {
-            // should not happen (be reachable)
-            return Err(Error::InvalidState);
-        }
-
+    async fn push_internal(&mut self, cmd: Cmd, parent_id: Option<usize>) {
         self.id_counter += 1;
 
         let job = CmdJob::new(self.id_counter, parent_id, cmd, SystemTime::now());
 
         let prio = job.priority();
         let _ = self.cmd_queue.push(job, prio);
-        Ok(())
-    }
-
-    // could be accessed via a clone
-    async fn stopped(&self) -> bool {
-        self.stopped
     }
 
     /// Get the next Cmd going off of priority
@@ -131,11 +110,7 @@ impl CmdCtrl {
         job: CmdJob,
         cmd_process_api: tokio::sync::mpsc::Sender<(Cmd, Option<usize>)>,
         node_event_sender: EventSender,
-    ) -> Result<()> {
-        if self.stopped().await {
-            return Err(Error::CmdCtrlStopped);
-        }
-
+    ) {
         #[cfg(feature = "test-utils")]
         {
             debug!("Cmd queue length: {}", self.cmd_queue.len());
@@ -226,7 +201,6 @@ impl CmdCtrl {
                 .await
                 .statemap_log_state(statemap::State::Idle);
         });
-        Ok(())
     }
 }
 
