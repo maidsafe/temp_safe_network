@@ -43,8 +43,8 @@ pub enum Error {
         found: u8,
     },
     /// Provided data already exists on the network
-    #[error("Data provided already exists")]
-    DataExists,
+    #[error("Data provided already exists: {0:?}")]
+    DataExists(DataAddress),
     /// Entry could not be found on the data
     #[error("Requested entry not found")]
     NoSuchEntry,

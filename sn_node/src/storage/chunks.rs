@@ -12,7 +12,7 @@ use super::{
 
 use sn_interface::{
     messaging::system::NodeQueryResponse,
-    types::{log_markers::LogMarker, Chunk, ChunkAddress},
+    types::{log_markers::LogMarker, Chunk, ChunkAddress, DataAddress},
 };
 
 use bytes::Bytes;
@@ -44,14 +44,14 @@ impl ChunkStorage {
     /// If the location specified already contains a `ChunkStorage`, it is simply used
     ///
     /// Used space of the dir is tracked
-    pub(crate) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
+    pub(super) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         Ok(Self {
             file_store_path: path.join(CHUNKS_STORE_DIR_NAME),
             used_space,
         })
     }
 
-    pub(crate) fn addrs(&self) -> Vec<ChunkAddress> {
+    pub(super) fn addrs(&self) -> Vec<ChunkAddress> {
         list_files_in(&self.file_store_path)
             .iter()
             .filter_map(|filepath| Self::chunk_filepath_to_address(filepath).ok())
@@ -61,9 +61,9 @@ impl ChunkStorage {
     fn chunk_filepath_to_address(path: &Path) -> Result<ChunkAddress> {
         let filename = path
             .file_name()
-            .ok_or(Error::NoFilename)?
+            .ok_or_else(|| Error::NoFilename(path.to_path_buf()))?
             .to_str()
-            .ok_or(Error::InvalidFilename)?;
+            .ok_or_else(|| Error::InvalidFilename(path.to_path_buf()))?;
 
         let xorname = XorName(<[u8; 32]>::from_hex(filename)?);
         Ok(ChunkAddress(xorname))
@@ -77,7 +77,7 @@ impl ChunkStorage {
     }
 
     #[allow(dead_code)]
-    pub(crate) async fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
+    pub(super) async fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
         trace!("Removing chunk, {:?}", address);
         let filepath = self.chunk_addr_to_filepath(address)?;
         let meta = metadata(filepath.clone()).await?;
@@ -86,7 +86,7 @@ impl ChunkStorage {
         Ok(())
     }
 
-    pub(crate) async fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
+    pub(super) async fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
         debug!("Getting chunk {:?}", address);
 
         let file_path = self.chunk_addr_to_filepath(address)?;
@@ -102,7 +102,7 @@ impl ChunkStorage {
     }
 
     // Read chunk from local store and return NodeQueryResponse
-    pub(crate) async fn get(&self, address: &ChunkAddress) -> NodeQueryResponse {
+    pub(super) async fn get(&self, address: &ChunkAddress) -> NodeQueryResponse {
         trace!("{:?}", LogMarker::ChunkQueryReceviedAtAdult);
         NodeQueryResponse::GetChunk(self.get_chunk(address).await.map_err(convert_to_error_msg))
     }
@@ -110,7 +110,7 @@ impl ChunkStorage {
     /// Store a chunk in the local disk store
     /// If that chunk was already in the local store, just overwrites it
     #[instrument(skip_all)]
-    pub(super) async fn store(&self, chunk: Chunk) -> Result<()> {
+    pub(super) async fn store(&self, chunk: &Chunk) -> Result<()> {
         let addr = chunk.address();
         let filepath = self.chunk_addr_to_filepath(addr)?;
 
@@ -120,7 +120,7 @@ impl ChunkStorage {
                 self, addr
             );
             // Nothing more to do here
-            return Err(Error::DataExists);
+            return Err(Error::DataExists(DataAddress::Bytes(*addr)));
         }
 
         // cheap extra security check for space (prone to race conditions)
@@ -175,10 +175,7 @@ mod tests {
         for _ in 0..10 {
             let chunk = Chunk::new(random_bytes(100));
 
-            storage
-                .store(chunk.clone())
-                .await
-                .expect("Failed to write chunk.");
+            storage.store(&chunk).await.expect("Failed to write chunk.");
 
             let read_chunk = storage
                 .get_chunk(chunk.address())
@@ -212,7 +209,7 @@ mod tests {
         // write all chunks
         let mut tasks = Vec::new();
         for c in chunks.iter() {
-            tasks.push(async { storage.store(c.clone()).await.map(|_| *c.address()) });
+            tasks.push(async { storage.store(c).await.map(|_| *c.address()) });
         }
         let results = join_all(tasks).await;
 

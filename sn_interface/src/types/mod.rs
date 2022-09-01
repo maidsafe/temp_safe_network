@@ -56,8 +56,6 @@ pub const SPENTBOOK_TYPE_TAG: u64 = 0;
 pub struct ReplicatedRegisterLog {
     ///
     pub address: RegisterAddress,
-    /// This is a duplicated entry as it should exist in first cmd
-    pub section_auth: SectionAuth,
     ///
     pub op_log: Vec<RegisterCmd>,
 }

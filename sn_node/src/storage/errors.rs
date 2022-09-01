@@ -11,11 +11,11 @@ use sn_interface::{
     types::{convert_dt_error_to_error_msg, DataAddress, PublicKey, RegisterAddress},
 };
 
-use std::io;
+use std::{io, path::PathBuf};
 use thiserror::Error;
 use xor_name::XorName;
 
-/// Specialisation of `std::Result` for dbs.
+/// Specialisation of `std::Result` for storage mod.
 pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[allow(clippy::large_enum_variant)]
@@ -33,14 +33,8 @@ pub enum Error {
     #[error("Chunk not found: {0:?}")]
     ChunkNotFound(XorName),
     /// Data already exists for this node
-    #[error("Data already exists at this node")]
-    DataExists,
-    /// Register op already exists for this node. Pass in the RegCmdId
-    #[error("RegCmd Operation already exists at this node: {0}")]
-    RegCmdOperationExists(String),
-    /// Invalid store found
-    #[error("A store was loaded, but found to be invalid")]
-    InvalidStore,
+    #[error("Data already exists at this node: {0:?}")]
+    DataExists(DataAddress),
     /// Storage not supported for type of data address
     #[error("Storage not supported for type of data address: {0:?}")]
     UnsupportedDataType(XorName),
@@ -63,11 +57,19 @@ pub enum Error {
     #[error("Messaging error:: {0}")]
     Messaging(#[from] sn_interface::messaging::data::Error),
     /// No filename found
-    #[error("Path contains no file name")]
-    NoFilename,
+    #[error("Path contains no file name: {0}")]
+    NoFilename(PathBuf),
     /// Invalid filename
-    #[error("Invalid chunk filename")]
-    InvalidFilename,
+    #[error("Invalid chunk filename: {0}")]
+    InvalidFilename(PathBuf),
+    /// Register command/op destinaation adddress mistmatch
+    #[error(
+        "Register command destination address ({cmd_dst_addr:?}) doesn't match stored Register address: {reg_addr:?}"
+    )]
+    RegisterAddrMismatch {
+        cmd_dst_addr: RegisterAddress,
+        reg_addr: RegisterAddress,
+    },
 }
 
 /// Convert db error to messaging error message for sending over the network.
@@ -76,7 +78,7 @@ pub(crate) fn convert_to_error_msg(error: Error) -> ErrorMsg {
         Error::NotEnoughSpace => ErrorMsg::FailedToWriteFile,
         Error::RegisterNotFound(address) => ErrorMsg::DataNotFound(DataAddress::Register(address)),
         Error::ChunkNotFound(xorname) => ErrorMsg::ChunkNotFound(xorname),
-        Error::DataExists => ErrorMsg::DataExists,
+        Error::DataExists(address) => ErrorMsg::DataExists(address),
         Error::NetworkData(error) => convert_dt_error_to_error_msg(error),
         other => ErrorMsg::InvalidOperation(format!("Failed to perform operation: {:?}", other)),
     }
