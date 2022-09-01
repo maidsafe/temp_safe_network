@@ -93,7 +93,7 @@ mod core {
         messaging::{
             data::OperationId,
             signature_aggregator::SignatureAggregator,
-            system::{DkgSessionId, NodeState, SystemMsg},
+            system::{DkgSessionId, NodeState},
             AuthorityProof, SectionAuth, SectionAuthorityProvider,
         },
         network_knowledge::{
@@ -319,20 +319,13 @@ mod core {
             }
 
             let matching_section = self.network_knowledge.section_by_name(&dst)?;
-
-            let section_key = matching_section.section_key();
             let recipients = matching_section.elders_set();
 
-            info!(
-                "ProbeMsg target {:?} w/key {:?}",
-                matching_section.prefix(),
-                section_key
-            );
+            let probe = self.network_knowledge.anti_entropy_probe();
 
-            Ok(self.send_system_msg(
-                SystemMsg::AntiEntropyProbe(section_key),
-                Peers::Multiple(recipients),
-            ))
+            info!("ProbeMsg target {:?}: {probe:?}", matching_section.prefix());
+
+            Ok(self.send_system_msg(probe, Peers::Multiple(recipients)))
         }
 
         /// Generates a SectionProbeMsg with our current knowledge,
@@ -341,7 +334,6 @@ mod core {
         pub(crate) fn generate_section_probe_msg(&self) -> Cmd {
             let our_section = self.network_knowledge.authority_provider();
             let recipients = our_section.elders_set();
-            let our_key = our_section.section_key();
 
             info!(
                 "ProbeMsg target our section {:?} recipients {:?}",
@@ -349,10 +341,8 @@ mod core {
                 recipients,
             );
 
-            self.send_system_msg(
-                SystemMsg::AntiEntropyProbe(our_key),
-                Peers::Multiple(recipients),
-            )
+            let probe = self.network_knowledge.anti_entropy_probe();
+            self.send_system_msg(probe, Peers::Multiple(recipients))
         }
 
         /// returns names that are relatively dysfunctional

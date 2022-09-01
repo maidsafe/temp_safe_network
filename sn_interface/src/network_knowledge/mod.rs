@@ -312,6 +312,10 @@ impl NetworkKnowledge {
         true
     }
 
+    pub fn anti_entropy_probe(&self) -> SystemMsg {
+        SystemMsg::AntiEntropyProbe(self.section_key())
+    }
+
     /// Update our network knowledge if the provided SAP is valid and can be verified
     /// with the provided proof chain.
     /// If the '`update_sap`' flag is set to 'true', the provided SAP and chain will be
