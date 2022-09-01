@@ -71,17 +71,13 @@ impl FlowCtrl {
     /// Process the next pending cmds
     async fn process_next_cmd(&mut self) {
         if let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {
-            if let Err(error) = self
-                .cmd_ctrl
+            self.cmd_ctrl
                 .process_cmd_job(
                     next_cmd_job,
                     self.cmd_sender_channel.clone(),
                     self.outgoing_node_event_sender.clone(),
                 )
                 .await
-            {
-                error!("Error during cmd processing: {error:?}");
-            }
         }
     }
 
@@ -89,11 +85,7 @@ impl FlowCtrl {
     async fn enqeue_new_cmds_from_channel(&mut self) -> Result<()> {
         loop {
             match self.incoming_cmds_from_apis.try_recv() {
-                Ok((cmd, _id)) => {
-                    if let Err(error) = self.fire_and_forget(cmd).await {
-                        error!("Error pushing node cmd from CmdChannel to controller: {error:?}");
-                    }
-                }
+                Ok((cmd, _id)) => self.fire_and_forget(cmd).await,
                 Err(TryRecvError::Empty) => {
                     // do nothing else
                     return Ok(());
@@ -114,9 +106,7 @@ impl FlowCtrl {
                     let cmd = self.handle_new_msg_event(msg).await;
 
                     // dont use sender here incase channel gets full
-                    if let Err(error) = self.fire_and_forget(cmd).await {
-                        error!("Error pushing node msg as cmd to controller: {error:?}");
-                    }
+                    self.fire_and_forget(cmd).await;
                 }
                 Err(TryRecvError::Empty) => {
                     // do nothing else
@@ -211,9 +201,8 @@ impl FlowCtrl {
     }
 
     /// Does not await the completion of the cmd.
-    pub(crate) async fn fire_and_forget(&mut self, cmd: Cmd) -> Result<()> {
-        self.cmd_ctrl.push(cmd).await?;
-        Ok(())
+    pub(crate) async fn fire_and_forget(&mut self, cmd: Cmd) {
+        self.cmd_ctrl.push(cmd).await
     }
 
     // Listen for a new incoming connection event and handle it.

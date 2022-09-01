@@ -85,9 +85,7 @@ impl FlowCtrl {
 
         for cmd in cmds {
             // dont use sender here incase channel gets full
-            if let Err(error) = self.fire_and_forget(cmd).await {
-                error!("Error pushing node periodic cmd to controller: {error:?}");
-            }
+            self.fire_and_forget(cmd).await;
         }
     }
 
@@ -109,9 +107,7 @@ impl FlowCtrl {
 
         for cmd in cmds {
             // dont use sender here incase channel gets full
-            if let Err(error) = self.fire_and_forget(cmd).await {
-                error!("Error pushing adult node periodic cmd to controller: {error:?}");
-            }
+            self.fire_and_forget(cmd).await;
         }
     }
 
@@ -171,9 +167,7 @@ impl FlowCtrl {
 
         for cmd in cmds {
             // dont use sender here incase channel gets full
-            if let Err(error) = self.fire_and_forget(cmd).await {
-                error!("Error pushing adult node periodic cmd to controller: {error:?}");
-            }
+            self.fire_and_forget(cmd).await;
         }
     }
 
