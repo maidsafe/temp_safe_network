@@ -244,6 +244,37 @@ impl SystemMsg {
             | SystemMsg::NodeQueryResponse { .. } => NODE_DATA_MSG_PRIORITY,
         }
     }
+
+    pub fn statemap_states(&self) -> crate::statemap::State {
+        use crate::statemap::State;
+        match self {
+            SystemMsg::AntiEntropy { .. } => State::AntiEntropy,
+            SystemMsg::AntiEntropyProbe { .. } => State::AntiEntropy,
+            SystemMsg::Relocate(_) => State::Relocate,
+            SystemMsg::MembershipAE(_) => State::Membership,
+            SystemMsg::MembershipVotes(_) => State::Membership,
+            SystemMsg::JoinRequest(_) => State::Join,
+            SystemMsg::JoinResponse(_) => State::Join,
+            SystemMsg::JoinAsRelocatedRequest(_) => State::Join,
+            SystemMsg::JoinAsRelocatedResponse(_) => State::Join,
+            SystemMsg::DkgStart(_) => State::Dkg,
+            SystemMsg::DkgSessionUnknown { .. } => State::Dkg,
+            SystemMsg::DkgSessionInfo { .. } => State::Dkg,
+            SystemMsg::DkgMessage { .. } => State::Dkg,
+            SystemMsg::DkgNotReady { .. } => State::Dkg,
+            SystemMsg::DkgRetry { .. } => State::Dkg,
+            SystemMsg::DkgFailureObservation { .. } => State::Dkg,
+            SystemMsg::DkgFailureAgreement(_) => State::Dkg,
+            SystemMsg::HandoverVotes(_) => State::Handover,
+            SystemMsg::HandoverAE(_) => State::Handover,
+            SystemMsg::Propose { .. } => State::Propose,
+            SystemMsg::NodeEvent(_) => State::Node,
+            SystemMsg::NodeMsgError { .. } => State::Node,
+            SystemMsg::NodeCmd(_) => State::Node,
+            SystemMsg::NodeQuery(_) => State::Node,
+            SystemMsg::NodeQueryResponse { .. } => State::Node,
+        }
+    }
 }
 
 impl Display for SystemMsg {

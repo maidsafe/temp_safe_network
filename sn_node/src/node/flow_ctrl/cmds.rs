@@ -8,7 +8,7 @@
 
 use crate::node::{
     messaging::{OutgoingMsg, Peers},
-    statemap, Proposal, XorName,
+    Proposal, XorName,
 };
 
 use sn_consensus::Decision;
@@ -259,15 +259,15 @@ impl Cmd {
         }
     }
 
-    pub(crate) fn statemap_state(&self) -> statemap::State {
-        use statemap::State;
+    pub(crate) fn statemap_state(&self) -> sn_interface::statemap::State {
+        use sn_interface::statemap::State;
         match self {
             Cmd::CleanupPeerLinks => State::Comms,
             Cmd::SendMsg { .. } => State::Comms,
             Cmd::Comm(_) => State::Comms,
             Cmd::HandlePeerFailedSend(_) => State::Comms,
-            Cmd::ValidateMsg { .. } => State::ProcessCmd,
-            Cmd::HandleValidSystemMsg { .. } => State::SystemMsg,
+            Cmd::ValidateMsg { .. } => State::Validation,
+            Cmd::HandleValidSystemMsg { msg, .. } => msg.statemap_states(),
             Cmd::HandleValidServiceMsg { .. } => State::ServiceMsg,
             Cmd::TrackNodeIssueInDysfunction { .. } => State::Dysfunction,
             Cmd::AddToPendingQueries { .. } => State::Dysfunction,
