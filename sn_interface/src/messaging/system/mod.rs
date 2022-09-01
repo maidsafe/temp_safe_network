@@ -275,7 +275,7 @@ impl SystemMsg {
             SystemMsg::NodeQueryResponse { .. } => State::Node,
             #[cfg(feature = "back-pressure")]
             // Inter-node comms for backpressure
-            SystemMsg::BackPressure(_) => State::SystemMsg,
+            SystemMsg::BackPressure(_) => State::BackPressure,
         }
     }
 }

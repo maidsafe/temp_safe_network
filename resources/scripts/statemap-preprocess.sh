@@ -26,4 +26,4 @@ end_time=$(cat safe_states.out | rg 'time' | jq -sr 'max_by(.time | tonumber) | 
 echo "Generated statemap data at $out_file"
 echo "Render the statemap SVG with"
 echo ""
-echo "    statemap -b $begin_time -e $end_time -c 100000 $out_file > safe.svg"
+echo "    statemap --sortby=Idle -b $begin_time -e $end_time -c 100000 $out_file > safe.svg"
