@@ -66,7 +66,7 @@ fn main() -> Result<()> {
                         "*** REPORT: The following cmds were found for cmd id {} ***",
                         cmd_id
                     );
-                    for (cmd_id, log_entries) in report.iter() {
+                    for (cmd_id, log_entries) in &report {
                         println!("==> Log entries for sub-cmd {}:", cmd_id);
                         for log_entry in log_entries.iter() {
                             println!("{}", log_entry);
@@ -83,7 +83,7 @@ fn main() -> Result<()> {
                         "*** REPORT: The following cmds were found for msg id {} ***",
                         msg_id
                     );
-                    for (cmd_id, log_entries) in report.iter() {
+                    for (cmd_id, log_entries) in &report {
                         println!("==> Log entries for sub-cmd {}:", cmd_id);
                         for log_entry in log_entries.iter() {
                             println!("{}", log_entry);
@@ -97,7 +97,7 @@ fn main() -> Result<()> {
                     println!("** No errors detected in any of the logs scanned! **");
                 } else {
                     println!("*** REPORT: The following issues were detected ***");
-                    for (logfile, log_entries) in report.iter() {
+                    for (logfile, log_entries) in &report {
                         println!("Cmds not completed in log {}:", logfile);
                         for log_entry in log_entries.iter() {
                             println!("{}", log_entry);
@@ -296,7 +296,7 @@ fn inspect_log_files(args: &CmdArgs) -> Result<BTreeMap<String, Vec<String>>> {
 
     println!("-------------------------");
     println!("LogMarker Stats: (markers found across all log files): ");
-    for (marker, count) in info.clone().counts.into_iter() {
+    for (marker, count) in info.clone().counts {
         println!("{} found: {} times", marker, count);
     }
     println!("-------------------------");
@@ -387,28 +387,28 @@ fn check_completed_cmds(
     let mut flattened_spawned: BTreeMap<CmdId, String> = BTreeMap::default();
     for (_root_cmd_id, sub_cmds) in spawned.iter() {
         // TODO: Do we want the root here too?
-        for (cmd_id, log_entry) in sub_cmds.cmd_logs.iter() {
+        for (cmd_id, log_entry) in &sub_cmds.cmd_logs {
             let _ = flattened_spawned.insert(cmd_id.to_string(), log_entry.to_string());
         }
     }
     let mut flattened_started: BTreeMap<CmdId, String> = BTreeMap::default();
     for (_root_cmd_id, sub_cmds) in started.iter() {
         // TODO: Do we want the root here too?
-        for (cmd_id, log_entry) in sub_cmds.cmd_logs.iter() {
+        for (cmd_id, log_entry) in &sub_cmds.cmd_logs {
             let _ = flattened_started.insert(cmd_id.to_string(), log_entry.to_string());
         }
     }
     let mut flattened_succeeded: BTreeMap<CmdId, String> = BTreeMap::default();
     for (_root_cmd_id, sub_cmds) in succeeded.iter() {
         // TODO: Do we want the root here too?
-        for (cmd_id, log_entry) in sub_cmds.cmd_logs.iter() {
+        for (cmd_id, log_entry) in &sub_cmds.cmd_logs {
             let _ = flattened_succeeded.insert(cmd_id.to_string(), log_entry.to_string());
         }
     }
     let mut flattened_failed: BTreeMap<CmdId, String> = BTreeMap::default();
     for (_root_cmd_id, sub_cmds) in failed.iter() {
         // TODO: Do we want the root here too?
-        for (cmd_id, log_entry) in sub_cmds.cmd_logs.iter() {
+        for (cmd_id, log_entry) in &sub_cmds.cmd_logs {
             let _ = flattened_failed.insert(cmd_id.to_string(), log_entry.to_string());
         }
     }

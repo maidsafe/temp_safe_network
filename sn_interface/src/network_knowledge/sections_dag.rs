@@ -173,7 +173,7 @@ impl SectionsDAG {
         }
         // insert all the nodes from `other`
         let mut need_to_visit: Vec<(bls::PublicKey, Node<SectionInfo>)> = Vec::new();
-        for key in other.dag_root.iter() {
+        for key in &other.dag_root {
             need_to_visit.push((*other.genesis_key(), other.get_node(key)?));
         }
         while let Some((parent_key, current_node)) = need_to_visit.pop() {

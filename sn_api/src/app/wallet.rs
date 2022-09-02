@@ -207,7 +207,7 @@ impl Safe {
         };
 
         let mut balances = WalletSpendableDbcs::default();
-        for (entry_hash, (key, value)) in entries.iter() {
+        for (entry_hash, (key, value)) in &entries {
             let xorurl_str = std::str::from_utf8(value)?;
             let dbc_xorurl = SafeUrl::from_xorurl(xorurl_str)?;
             let dbc_bytes = self.fetch_data(&dbc_xorurl, None).await?;
@@ -237,7 +237,7 @@ impl Safe {
 
         // Iterate through the DBCs adding up the amounts
         let mut total_balance = Token::from_nano(0);
-        for (name, (dbc, _)) in balances.iter() {
+        for (name, (dbc, _)) in &balances {
             debug!("Checking spendable balance named: {}", name);
 
             let balance = match dbc.amount_secrets_bearer() {
@@ -313,7 +313,7 @@ impl Safe {
     ) -> Result<Vec<Dbc>> {
         let mut total_output_amount = Token::zero();
         let mut outputs_owners = Vec::<(Token, OwnerOnce)>::new();
-        for (amount, owner_pk) in outputs.into_iter() {
+        for (amount, owner_pk) in outputs {
             let output_amount = parse_tokens_amount(&amount)?;
             if output_amount.as_nano() == 0 {
                 return Err(Error::InvalidAmount(
@@ -351,7 +351,7 @@ impl Safe {
         let mut input_dbcs_entries_hash = BTreeSet::<EntryHash>::new();
         let mut total_input_amount = 0;
         let mut change_amount = total_output_amount;
-        for (name, (dbc, entry_hash)) in spendable_dbcs.into_iter() {
+        for (name, (dbc, entry_hash)) in spendable_dbcs {
             let dbc_balance = match dbc.amount_secrets_bearer() {
                 Ok(amount_secrets) => amount_secrets.amount(),
                 Err(err) => {

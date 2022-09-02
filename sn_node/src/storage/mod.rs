@@ -494,7 +494,7 @@ mod tests {
         let mut storage = DataStorage::new(path, used_space)?;
         let owner_pk = PublicKey::Bls(bls::SecretKey::random().public_key());
         let owner_keypair = Keypair::new_ed25519();
-        for op in ops.into_iter() {
+        for op in ops {
             match op {
                 Op::Store(flag, chunk_size) => {
                     let data = match flag.rem_euclid(2) {

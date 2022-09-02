@@ -234,7 +234,7 @@ impl DysfunctionDetection {
 
         self.nodes.retain(|x| current_members.contains(x));
 
-        for node in nodes_being_removed.iter() {
+        for node in &nodes_being_removed {
             let _ = self.communication_issues.remove(node);
             let _ = self.knowledge_issues.remove(node);
             let _ = self.dkg_issues.remove(node);

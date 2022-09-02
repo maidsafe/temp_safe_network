@@ -215,7 +215,7 @@ impl Config {
 
         // get SectionTree from cli_config if they are not in network_contacts_dir
         let mut remove_list: Vec<String> = Vec::new();
-        for (network_name, net_info) in self.settings.networks.iter_mut() {
+        for (network_name, net_info) in &mut self.settings.networks {
             match net_info {
                 NetworkInfo::Local(path, ref mut genesis_key) => {
                     match genesis_key {
@@ -296,7 +296,7 @@ impl Config {
         }
 
         // add unaccounted SectionTree from network_contacts_dir to cli_config
-        for (filename, present) in dir_files_checklist.iter() {
+        for (filename, present) in &dir_files_checklist {
             if !present {
                 let path = self.network_contacts_dir.join(filename);
                 if let Ok(network_contacts) = Self::retrieve_local_network_contacts(&path).await {
@@ -780,7 +780,7 @@ pub mod test_utils {
                 }
             }
 
-            for (_, present) in network_contacts_checklist.iter() {
+            for present in network_contacts_checklist.values() {
                 if !present {
                     return Err(eyre!("Extra network found in the settings!"));
                 }

@@ -370,7 +370,7 @@ pub mod test_utils {
         let mut votes = vec![nodes[0].cast_vote(first_vote)?];
 
         while let Some(vote) = votes.pop() {
-            for node in nodes.iter_mut() {
+            for node in &mut nodes {
                 match node.handle_signed_vote(vote.clone())? {
                     VoteResponse::WaitingForMoreVotes => (),
                     VoteResponse::Broadcast(vote) => votes.push(vote),

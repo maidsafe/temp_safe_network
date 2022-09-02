@@ -174,7 +174,7 @@ impl Safe {
 
         // We parse each entry in the Register as a 'MultimapKeyValue'
         let mut multimap = Multimap::new();
-        for (hash, entry) in entries.iter() {
+        for (hash, entry) in &entries {
             if entry == MULTIMAP_REMOVED_MARK {
                 // this is a tombstone entry created to delete some old entries
                 continue;

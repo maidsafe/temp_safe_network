@@ -335,7 +335,7 @@ impl Node {
         spent_transactions: &BTreeSet<RingCtTransaction>,
     ) -> Result<Vec<(KeyImage, Vec<Commitment>)>> {
         let mut public_commitments_info = Vec::<(KeyImage, Vec<Commitment>)>::new();
-        for mlsag in tx.mlsags.iter() {
+        for mlsag in &tx.mlsags {
             // For each public key in ring, look up the matching Commitment
             // using the SpentProofs and spent TX set provided by the client.
             let commitments: Vec<Commitment> = mlsag
@@ -436,7 +436,7 @@ impl Node {
         }
 
         // Verify each spent proof is signed by a known section key (or the genesis key).
-        for pk in spent_proofs_keys.iter() {
+        for pk in &spent_proofs_keys {
             if !self.network_knowledge.verify_section_key_is_known(pk) {
                 warn!(
                     "Dropping spend request: spent proof is signed by unknown section with public \

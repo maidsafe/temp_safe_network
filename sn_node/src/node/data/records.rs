@@ -213,7 +213,7 @@ impl Node {
                     if target.cmp_distance(name, &closest_not_full.name()) == Ordering::Less {
                         // get the actual peer if closer
                         let mut the_closer_peer = None;
-                        for adult in adults.iter() {
+                        for adult in &adults {
                             if &adult.name() == name {
                                 the_closer_peer = Some(adult)
                             }

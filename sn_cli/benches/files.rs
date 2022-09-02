@@ -39,7 +39,7 @@ fn bench_cli_put(c: &mut Criterion) -> Result<()> {
     let mut group = c.benchmark_group("cli_put");
     let tmp_dir = TempDir::new().unwrap();
 
-    for size in [TINY_FILE, SIZE_100KB, SIZE_250KB, SIZE_500KB, SIZE_1MB].iter() {
+    for size in &[TINY_FILE, SIZE_100KB, SIZE_250KB, SIZE_500KB, SIZE_1MB] {
         group.throughput(Throughput::Bytes(random_data(*size).len() as u64));
 
         group.bench_function(BenchmarkId::new("put", size), |b| {
@@ -62,7 +62,7 @@ fn bench_cli_cat(c: &mut Criterion) -> Result<()> {
     let mut group = c.benchmark_group("cli_cat");
     let tmp_dir = TempDir::new().unwrap();
 
-    for size in [TINY_FILE, SIZE_100KB, SIZE_250KB, SIZE_500KB, SIZE_1MB].iter() {
+    for size in &[TINY_FILE, SIZE_100KB, SIZE_250KB, SIZE_500KB, SIZE_1MB] {
         group.throughput(Throughput::Bytes(random_data(*size).len() as u64));
 
         group.bench_function(BenchmarkId::new("cat", size), |b| {

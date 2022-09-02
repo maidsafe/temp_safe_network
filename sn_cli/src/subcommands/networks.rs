@@ -132,7 +132,7 @@ pub async fn networks_commander(
             println!();
 
             let sections_dag = network_contacts.get_sections_dag();
-            for sap in network_contacts.all().iter() {
+            for sap in &network_contacts.all() {
                 let section_key = sap.section_key();
                 println!("Prefix '{}'", sap.prefix());
                 println!("----------------------------------");
@@ -150,7 +150,7 @@ pub async fn networks_commander(
 
                 let mut sorted_elders = sap.elders().collect::<Vec<_>>();
                 sorted_elders.sort_by_key(|elder| elder.age());
-                for elder in sorted_elders.iter() {
+                for elder in &sorted_elders {
                     table.add_row(vec![
                         elder.name().into(),
                         Cell::new(elder.age().to_string()).set_alignment(CellAlignment::Right),

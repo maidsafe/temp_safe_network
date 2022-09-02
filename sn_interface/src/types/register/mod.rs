@@ -418,7 +418,7 @@ mod tests {
 
         // now verify that the items are the same in all replicas
         let r0 = &replicas[0];
-        for r in replicas.iter() {
+        for r in &replicas {
             assert_eq!(r.crdt, r0.crdt);
         }
 
