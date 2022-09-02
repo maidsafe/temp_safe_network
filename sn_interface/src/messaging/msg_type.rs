@@ -71,10 +71,10 @@ impl MsgType {
     pub fn priority(&self) -> i32 {
         match self {
             // node <-> node system comms
-            MsgType::System { msg, .. } => msg.priority(),
+            Self::System { msg, .. } => msg.priority(),
             // client <-> node service comms
             #[cfg(any(feature = "chunks", feature = "registers"))]
-            MsgType::Service { msg, .. } => msg.priority(),
+            Self::Service { msg, .. } => msg.priority(),
         }
     }
 }
@@ -82,8 +82,8 @@ impl MsgType {
 impl Display for MsgType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            MsgType::System { msg, .. } => write!(f, "MsgType::System({})", msg),
-            MsgType::Service { msg, .. } => write!(f, "MsgType::Service({})", msg),
+            Self::System { msg, .. } => write!(f, "MsgType::System({})", msg),
+            Self::Service { msg, .. } => write!(f, "MsgType::Service({})", msg),
         }
     }
 }

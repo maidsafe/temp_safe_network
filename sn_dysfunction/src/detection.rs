@@ -308,8 +308,8 @@ mod tests {
     impl NodeQualityScored {
         fn get_failure_rate(&self) -> &f32 {
             match self {
-                NodeQualityScored::Good(r) => r,
-                NodeQualityScored::Bad(r) => r,
+                Self::Good(r) => r,
+                Self::Bad(r) => r,
             }
         }
     }

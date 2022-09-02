@@ -37,7 +37,7 @@ impl Session {
     // Listen for incoming msgs on a connection
     #[instrument(skip_all, level = "debug")]
     pub(crate) fn spawn_msg_listener_thread(
-        session: Session,
+        session: Self,
         peer: Peer,
         conn: qp2p::Connection,
         mut incoming_msgs: IncomingMsgs,
@@ -122,7 +122,7 @@ impl Session {
     pub(crate) async fn handle_msg(
         msg: MsgType,
         src_peer: Peer,
-        mut session: Session,
+        mut session: Self,
     ) -> Result<(), Error> {
         match msg.clone() {
             MsgType::Service { msg_id, msg, .. } => {
@@ -216,7 +216,7 @@ impl Session {
     // Handle msgs intended for client consumption (re: queries + cmds)
     #[instrument(skip(session), level = "debug")]
     fn handle_client_msg(
-        session: Session,
+        session: Self,
         msg_id: MsgId,
         msg: ServiceMsg,
         src_peer: Peer,

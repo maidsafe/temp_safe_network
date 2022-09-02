@@ -52,7 +52,7 @@ impl NodeAuth {
         keypair: &EdKeypair,
         payload: impl AsRef<[u8]>,
     ) -> AuthorityProof<Self> {
-        AuthorityProof(NodeAuth {
+        AuthorityProof(Self {
             section_pk,
             node_ed_pk: keypair.public,
             signature: keypair.sign(payload.as_ref()),
@@ -97,7 +97,7 @@ impl SectionAuth {
             return Err(AggregatorError::InvalidShare);
         }
 
-        Ok(AuthorityProof(SectionAuth {
+        Ok(AuthorityProof(Self {
             src_name: share.src_name,
             sig,
         }))

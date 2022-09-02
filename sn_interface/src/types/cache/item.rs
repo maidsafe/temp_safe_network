@@ -29,7 +29,7 @@ impl<T> Item<T> {
                 expiry: start + duration,
             }
         });
-        Item { object, time }
+        Self { object, time }
     }
 
     pub fn expired(&self) -> bool {

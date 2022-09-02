@@ -35,17 +35,17 @@ impl NodeMsgAuthority {
     /// Returns the `XorName` of the authority used for the auth signing
     pub fn get_auth_xorname(&self) -> XorName {
         match self.clone() {
-            NodeMsgAuthority::BlsShare(auth_proof) => {
+            Self::BlsShare(auth_proof) => {
                 let auth = auth_proof.into_inner();
                 auth.src_name
             }
-            NodeMsgAuthority::Node(auth_proof) => {
+            Self::Node(auth_proof) => {
                 let auth = auth_proof.into_inner();
                 let pk = auth.node_ed_pk;
 
                 XorName::from(PublicKey::from(pk))
             }
-            NodeMsgAuthority::Section(auth_proof) => {
+            Self::Section(auth_proof) => {
                 let auth = auth_proof.into_inner();
                 auth.src_name
             }

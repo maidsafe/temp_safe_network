@@ -207,7 +207,7 @@ impl NetworkKnowledge {
     pub fn first_node(
         peer: Peer,
         genesis_sk_set: bls::SecretKeySet,
-    ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
+    ) -> Result<(Self, SectionKeyShare)> {
         let public_key_set = genesis_sk_set.public_keys();
         let secret_key_index = 0u8;
         let secret_key_share = genesis_sk_set.secret_key_share(secret_key_index as u64);
@@ -216,7 +216,7 @@ impl NetworkKnowledge {
         let section_auth =
             create_first_section_authority_provider(&public_key_set, &secret_key_share, peer)?;
 
-        let network_knowledge = NetworkKnowledge::new(
+        let network_knowledge = Self::new(
             genesis_key,
             SecuredLinkedList::new(genesis_key),
             section_auth,

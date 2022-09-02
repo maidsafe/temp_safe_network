@@ -200,82 +200,78 @@ impl SystemMsg {
         };
         match self {
             // DKG messages
-            SystemMsg::DkgStart { .. }
-            | SystemMsg::DkgSessionUnknown { .. }
-            | SystemMsg::DkgSessionInfo { .. }
-            | SystemMsg::DkgNotReady { .. }
-            | SystemMsg::DkgRetry { .. }
-            | SystemMsg::DkgMessage { .. }
-            | SystemMsg::DkgFailureObservation { .. }
-            | SystemMsg::DkgFailureAgreement(_) => DKG_MSG_PRIORITY,
+            Self::DkgStart { .. }
+            | Self::DkgSessionUnknown { .. }
+            | Self::DkgSessionInfo { .. }
+            | Self::DkgNotReady { .. }
+            | Self::DkgRetry { .. }
+            | Self::DkgMessage { .. }
+            | Self::DkgFailureObservation { .. }
+            | Self::DkgFailureAgreement(_) => DKG_MSG_PRIORITY,
 
             // Inter-node comms for AE updates
-            SystemMsg::AntiEntropy { .. } | SystemMsg::AntiEntropyProbe(_) => {
-                ANTIENTROPY_MSG_PRIORITY
-            }
+            Self::AntiEntropy { .. } | Self::AntiEntropyProbe(_) => ANTIENTROPY_MSG_PRIORITY,
 
             // Join responses
-            SystemMsg::JoinResponse(_) | SystemMsg::JoinAsRelocatedResponse(_) => {
-                JOIN_RESPONSE_PRIORITY
-            }
+            Self::JoinResponse(_) | Self::JoinAsRelocatedResponse(_) => JOIN_RESPONSE_PRIORITY,
 
-            SystemMsg::Propose { .. }
-            | SystemMsg::MembershipVotes(_)
-            | SystemMsg::MembershipAE(_)
-            | SystemMsg::HandoverAE(_)
-            | SystemMsg::HandoverVotes(_) => MEMBERSHIP_PRIORITY,
+            Self::Propose { .. }
+            | Self::MembershipVotes(_)
+            | Self::MembershipAE(_)
+            | Self::HandoverAE(_)
+            | Self::HandoverVotes(_) => MEMBERSHIP_PRIORITY,
 
             // Inter-node comms for joining, relocating etc.
-            SystemMsg::Relocate(_)
-            | SystemMsg::JoinRequest(_)
-            | SystemMsg::JoinAsRelocatedRequest(_) => JOIN_RELOCATE_MSG_PRIORITY,
+            Self::Relocate(_) | Self::JoinRequest(_) | Self::JoinAsRelocatedRequest(_) => {
+                JOIN_RELOCATE_MSG_PRIORITY
+            }
 
             #[cfg(feature = "back-pressure")]
             // Inter-node comms for backpressure
-            SystemMsg::BackPressure(_) => BACKPRESSURE_MSG_PRIORITY,
+            Self::BackPressure(_) => BACKPRESSURE_MSG_PRIORITY,
 
-            SystemMsg::NodeMsgError { .. } => NODE_DATA_MSG_PRIORITY,
+            Self::NodeMsgError { .. } => NODE_DATA_MSG_PRIORITY,
 
             #[cfg(any(feature = "chunks", feature = "registers"))]
             // Inter-node comms related to processing client requests
-            SystemMsg::NodeCmd(_)
-            | SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData { .. })
-            | SystemMsg::NodeQuery(_)
-            | SystemMsg::NodeQueryResponse { .. } => NODE_DATA_MSG_PRIORITY,
+            Self::NodeCmd(_)
+            | Self::NodeEvent(NodeEvent::CouldNotStoreData { .. })
+            | Self::NodeQuery(_)
+            | Self::NodeQueryResponse { .. } => NODE_DATA_MSG_PRIORITY,
         }
     }
 
     pub fn statemap_states(&self) -> crate::statemap::State {
         use crate::statemap::State;
         match self {
-            SystemMsg::AntiEntropy { .. } => State::AntiEntropy,
-            SystemMsg::AntiEntropyProbe { .. } => State::AntiEntropy,
-            SystemMsg::Relocate(_) => State::Relocate,
-            SystemMsg::MembershipAE(_) => State::Membership,
-            SystemMsg::MembershipVotes(_) => State::Membership,
-            SystemMsg::JoinRequest(_) => State::Join,
-            SystemMsg::JoinResponse(_) => State::Join,
-            SystemMsg::JoinAsRelocatedRequest(_) => State::Join,
-            SystemMsg::JoinAsRelocatedResponse(_) => State::Join,
-            SystemMsg::DkgStart(_) => State::Dkg,
-            SystemMsg::DkgSessionUnknown { .. } => State::Dkg,
-            SystemMsg::DkgSessionInfo { .. } => State::Dkg,
-            SystemMsg::DkgMessage { .. } => State::Dkg,
-            SystemMsg::DkgNotReady { .. } => State::Dkg,
-            SystemMsg::DkgRetry { .. } => State::Dkg,
-            SystemMsg::DkgFailureObservation { .. } => State::Dkg,
-            SystemMsg::DkgFailureAgreement(_) => State::Dkg,
-            SystemMsg::HandoverVotes(_) => State::Handover,
-            SystemMsg::HandoverAE(_) => State::Handover,
-            SystemMsg::Propose { .. } => State::Propose,
-            SystemMsg::NodeEvent(_) => State::Node,
-            SystemMsg::NodeMsgError { .. } => State::Node,
-            SystemMsg::NodeCmd(_) => State::Node,
-            SystemMsg::NodeQuery(_) => State::Node,
-            SystemMsg::NodeQueryResponse { .. } => State::Node,
+            Self::AntiEntropy { .. } => State::AntiEntropy,
+            Self::AntiEntropyProbe { .. } => State::AntiEntropy,
+            Self::Relocate(_) => State::Relocate,
+            Self::MembershipAE(_) => State::Membership,
+            Self::MembershipVotes(_) => State::Membership,
+            Self::JoinRequest(_) => State::Join,
+            Self::JoinResponse(_) => State::Join,
+            Self::JoinAsRelocatedRequest(_) => State::Join,
+            Self::JoinAsRelocatedResponse(_) => State::Join,
+            Self::DkgStart(_) => State::Dkg,
+            Self::DkgSessionUnknown { .. } => State::Dkg,
+            Self::DkgSessionInfo { .. } => State::Dkg,
+            Self::DkgMessage { .. } => State::Dkg,
+            Self::DkgNotReady { .. } => State::Dkg,
+            Self::DkgRetry { .. } => State::Dkg,
+            Self::DkgFailureObservation { .. } => State::Dkg,
+            Self::DkgFailureAgreement(_) => State::Dkg,
+            Self::HandoverVotes(_) => State::Handover,
+            Self::HandoverAE(_) => State::Handover,
+            Self::Propose { .. } => State::Propose,
+            Self::NodeEvent(_) => State::Node,
+            Self::NodeMsgError { .. } => State::Node,
+            Self::NodeCmd(_) => State::Node,
+            Self::NodeQuery(_) => State::Node,
+            Self::NodeQueryResponse { .. } => State::Node,
             #[cfg(feature = "back-pressure")]
             // Inter-node comms for backpressure
-            SystemMsg::BackPressure(_) => State::BackPressure,
+            Self::BackPressure(_) => State::BackPressure,
         }
     }
 }
@@ -283,42 +279,42 @@ impl SystemMsg {
 impl Display for SystemMsg {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            SystemMsg::AntiEntropy { .. } => write!(f, "SystemMsg::AntiEntropy"),
-            SystemMsg::AntiEntropyProbe { .. } => write!(f, "SystemMsg::AntiEntropyProbe"),
-            SystemMsg::Relocate { .. } => write!(f, "SystemMsg::Relocate"),
-            SystemMsg::MembershipVotes { .. } => write!(f, "SystemMsg::MembershipVotes"),
-            SystemMsg::MembershipAE { .. } => write!(f, "SystemMsg::MembershipAE"),
-            SystemMsg::JoinRequest { .. } => write!(f, "SystemMsg::JoinRequest"),
-            SystemMsg::JoinResponse { .. } => write!(f, "SystemMsg::JoinResponse"),
-            SystemMsg::JoinAsRelocatedRequest { .. } => {
+            Self::AntiEntropy { .. } => write!(f, "SystemMsg::AntiEntropy"),
+            Self::AntiEntropyProbe { .. } => write!(f, "SystemMsg::AntiEntropyProbe"),
+            Self::Relocate { .. } => write!(f, "SystemMsg::Relocate"),
+            Self::MembershipVotes { .. } => write!(f, "SystemMsg::MembershipVotes"),
+            Self::MembershipAE { .. } => write!(f, "SystemMsg::MembershipAE"),
+            Self::JoinRequest { .. } => write!(f, "SystemMsg::JoinRequest"),
+            Self::JoinResponse { .. } => write!(f, "SystemMsg::JoinResponse"),
+            Self::JoinAsRelocatedRequest { .. } => {
                 write!(f, "SystemMsg::JoinAsRelocatedRequest")
             }
-            SystemMsg::JoinAsRelocatedResponse { .. } => {
+            Self::JoinAsRelocatedResponse { .. } => {
                 write!(f, "SystemMsg::JoinAsRelocatedResponse")
             }
-            SystemMsg::DkgStart { .. } => write!(f, "SystemMsg::DkgStart"),
-            SystemMsg::DkgSessionUnknown { .. } => write!(f, "SystemMsg::DkgSessionUnknown"),
-            SystemMsg::DkgSessionInfo { .. } => write!(f, "SystemMsg::DkgSessionInfo"),
-            SystemMsg::DkgMessage { .. } => write!(f, "SystemMsg::DkgMessage"),
-            SystemMsg::DkgNotReady { .. } => write!(f, "SystemMsg::DkgNotReady"),
-            SystemMsg::DkgRetry { .. } => write!(f, "SystemMsg::DkgRetry"),
-            SystemMsg::DkgFailureObservation { .. } => {
+            Self::DkgStart { .. } => write!(f, "SystemMsg::DkgStart"),
+            Self::DkgSessionUnknown { .. } => write!(f, "SystemMsg::DkgSessionUnknown"),
+            Self::DkgSessionInfo { .. } => write!(f, "SystemMsg::DkgSessionInfo"),
+            Self::DkgMessage { .. } => write!(f, "SystemMsg::DkgMessage"),
+            Self::DkgNotReady { .. } => write!(f, "SystemMsg::DkgNotReady"),
+            Self::DkgRetry { .. } => write!(f, "SystemMsg::DkgRetry"),
+            Self::DkgFailureObservation { .. } => {
                 write!(f, "SystemMsg::DkgFailureObservation")
             }
-            SystemMsg::DkgFailureAgreement { .. } => write!(f, "SystemMsg::DkgFailureAgreement"),
-            SystemMsg::HandoverVotes { .. } => write!(f, "SystemMsg::HandoverVotes"),
-            SystemMsg::HandoverAE { .. } => write!(f, "SystemMsg::HandoverAE"),
-            SystemMsg::Propose { .. } => write!(f, "SystemMsg::Propose"),
-            SystemMsg::NodeEvent { .. } => write!(f, "SystemMsg::NodeEvent"),
-            SystemMsg::NodeMsgError { .. } => write!(f, "SystemMsg::NodeMsgError"),
+            Self::DkgFailureAgreement { .. } => write!(f, "SystemMsg::DkgFailureAgreement"),
+            Self::HandoverVotes { .. } => write!(f, "SystemMsg::HandoverVotes"),
+            Self::HandoverAE { .. } => write!(f, "SystemMsg::HandoverAE"),
+            Self::Propose { .. } => write!(f, "SystemMsg::Propose"),
+            Self::NodeEvent { .. } => write!(f, "SystemMsg::NodeEvent"),
+            Self::NodeMsgError { .. } => write!(f, "SystemMsg::NodeMsgError"),
             #[cfg(any(feature = "chunks", feature = "registers"))]
-            SystemMsg::NodeCmd { .. } => write!(f, "SystemMsg::NodeCmd"),
+            Self::NodeCmd { .. } => write!(f, "SystemMsg::NodeCmd"),
             #[cfg(any(feature = "chunks", feature = "registers"))]
-            SystemMsg::NodeQuery { .. } => write!(f, "SystemMsg::NodeQuery"),
+            Self::NodeQuery { .. } => write!(f, "SystemMsg::NodeQuery"),
             #[cfg(any(feature = "chunks", feature = "registers"))]
-            SystemMsg::NodeQueryResponse { .. } => write!(f, "SystemMsg::NodeQueryResponse"),
+            Self::NodeQueryResponse { .. } => write!(f, "SystemMsg::NodeQueryResponse"),
             #[cfg(feature = "back-pressure")]
-            SystemMsg::BackPressure { .. } => write!(f, "SystemMsg::BackPressure"),
+            Self::BackPressure { .. } => write!(f, "SystemMsg::BackPressure"),
         }
     }
 }

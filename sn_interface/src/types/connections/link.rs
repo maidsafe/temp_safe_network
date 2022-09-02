@@ -345,8 +345,8 @@ impl SendToOneError {
     pub(crate) fn is_local_close(&self) -> bool {
         matches!(
             self,
-            SendToOneError::Connection(qp2p::ConnectionError::Closed(qp2p::Close::Local))
-                | SendToOneError::Send(qp2p::SendError::ConnectionLost(
+            Self::Connection(qp2p::ConnectionError::Closed(qp2p::Close::Local))
+                | Self::Send(qp2p::SendError::ConnectionLost(
                     qp2p::ConnectionError::Closed(qp2p::Close::Local)
                 ))
         )
@@ -361,7 +361,7 @@ struct ExpiringConn {
 
 impl ExpiringConn {
     fn new(conn: qp2p::Connection) -> Self {
-        ExpiringConn {
+        Self {
             conn,
             expiry: Arc::new(RwLock::new(expiration())),
         }

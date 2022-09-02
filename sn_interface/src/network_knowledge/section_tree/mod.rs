@@ -82,7 +82,7 @@ impl SectionTree {
                 ))
             })?;
 
-        SectionTree::from_bytes(&section_tree_content)
+        Self::from_bytes(&section_tree_content)
     }
 
     /// Returns the genesis key of the Network

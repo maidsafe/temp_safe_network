@@ -139,7 +139,7 @@ impl DkgFailureSig {
         failed_participants: &BTreeSet<XorName>,
         session_id: DkgSessionId,
     ) -> Self {
-        DkgFailureSig {
+        Self {
             public_key: keypair.public,
             signature: ed25519::sign(&hashed_failure(&session_id, failed_participants), keypair),
             session_id,

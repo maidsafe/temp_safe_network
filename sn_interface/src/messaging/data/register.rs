@@ -166,26 +166,27 @@ impl RegisterQuery {
     /// Request variant.
     pub fn error(&self, error: Error) -> Result<QueryResponse> {
         match *self {
-            RegisterQuery::Get(_) => Ok(QueryResponse::GetRegister((
+            Self::Get(_) => Ok(QueryResponse::GetRegister((
                 Err(error),
                 self.operation_id()?,
             ))),
-            RegisterQuery::Read(_) => Ok(QueryResponse::ReadRegister((
+            Self::Read(_) => Ok(QueryResponse::ReadRegister((
                 Err(error),
                 self.operation_id()?,
             ))),
-            RegisterQuery::GetPolicy(_) => Ok(QueryResponse::GetRegisterPolicy((
+            Self::GetPolicy(_) => Ok(QueryResponse::GetRegisterPolicy((
                 Err(error),
                 self.operation_id()?,
             ))),
-            RegisterQuery::GetUserPermissions { .. } => Ok(
-                QueryResponse::GetRegisterUserPermissions((Err(error), self.operation_id()?)),
-            ),
-            RegisterQuery::GetEntry { .. } => Ok(QueryResponse::GetRegisterEntry((
+            Self::GetUserPermissions { .. } => Ok(QueryResponse::GetRegisterUserPermissions((
                 Err(error),
                 self.operation_id()?,
             ))),
-            RegisterQuery::GetOwner(_) => Ok(QueryResponse::GetRegisterOwner((
+            Self::GetEntry { .. } => Ok(QueryResponse::GetRegisterEntry((
+                Err(error),
+                self.operation_id()?,
+            ))),
+            Self::GetOwner(_) => Ok(QueryResponse::GetRegisterOwner((
                 Err(error),
                 self.operation_id()?,
             ))),
@@ -195,24 +196,24 @@ impl RegisterQuery {
     /// Returns the dst address for the request. (Scoped to Private/Public)
     pub fn dst_address(&self) -> RegisterAddress {
         match self {
-            RegisterQuery::Get(ref address)
-            | RegisterQuery::Read(ref address)
-            | RegisterQuery::GetPolicy(ref address)
-            | RegisterQuery::GetUserPermissions { ref address, .. }
-            | RegisterQuery::GetEntry { ref address, .. }
-            | RegisterQuery::GetOwner(ref address) => *address,
+            Self::Get(ref address)
+            | Self::Read(ref address)
+            | Self::GetPolicy(ref address)
+            | Self::GetUserPermissions { ref address, .. }
+            | Self::GetEntry { ref address, .. }
+            | Self::GetOwner(ref address) => *address,
         }
     }
 
     /// Returns the xorname of the data for request.
     pub fn dst_name(&self) -> XorName {
         match self {
-            RegisterQuery::Get(ref address)
-            | RegisterQuery::Read(ref address)
-            | RegisterQuery::GetPolicy(ref address)
-            | RegisterQuery::GetUserPermissions { ref address, .. }
-            | RegisterQuery::GetEntry { ref address, .. }
-            | RegisterQuery::GetOwner(ref address) => *address.name(),
+            Self::Get(ref address)
+            | Self::Read(ref address)
+            | Self::GetPolicy(ref address)
+            | Self::GetUserPermissions { ref address, .. }
+            | Self::GetEntry { ref address, .. }
+            | Self::GetOwner(ref address) => *address.name(),
         }
     }
 

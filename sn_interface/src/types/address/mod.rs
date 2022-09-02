@@ -42,23 +42,23 @@ impl DataAddress {
     }
 
     ///
-    pub fn register(name: XorName, tag: u64) -> DataAddress {
-        DataAddress::Register(RegisterAddress::new(name, tag))
+    pub fn register(name: XorName, tag: u64) -> Self {
+        Self::Register(RegisterAddress::new(name, tag))
     }
 
     ///
-    pub fn bytes(name: XorName) -> DataAddress {
-        DataAddress::Bytes(ChunkAddress(name))
+    pub fn bytes(name: XorName) -> Self {
+        Self::Bytes(ChunkAddress(name))
     }
 
     ///
-    pub fn safe_key(name: XorName) -> DataAddress {
-        DataAddress::SafeKey(name)
+    pub fn safe_key(name: XorName) -> Self {
+        Self::SafeKey(name)
     }
 
     ///
-    pub fn spentbook(name: XorName) -> DataAddress {
-        DataAddress::Spentbook(SpentbookAddress::new(name))
+    pub fn spentbook(name: XorName) -> Self {
+        Self::Spentbook(SpentbookAddress::new(name))
     }
 }
 
