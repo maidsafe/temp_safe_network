@@ -99,13 +99,14 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
                 section_key,
             )?;
 
-            let original_bytes = wire_msg.serialize_and_cache_bytes()?;
+            let original_bytes = wire_msg.serialize()?;
 
             let all_cmds = run_and_collect_cmds(
                 Cmd::ValidateMsg {
                     origin: new_node.peer(),
                     wire_msg,
-                    original_bytes,
+
+
                 },
                 &dispatcher,
             )
@@ -171,13 +172,14 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
                 section_key,
             )?;
 
-            let original_bytes = wire_msg.serialize_and_cache_bytes()?;
+            let original_bytes = wire_msg.serialize()?;
 
             let _ = run_and_collect_cmds(
                 Cmd::ValidateMsg {
                     origin: new_node.peer(),
                     wire_msg,
-                    original_bytes,
+
+
                 },
                 &dispatcher,
             )
@@ -255,13 +257,14 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
                 section_key,
             )?;
 
-            let original_bytes = wire_msg.serialize_and_cache_bytes()?;
+            let original_bytes = wire_msg.serialize()?;
 
             let _ = run_and_collect_cmds(
                 Cmd::ValidateMsg {
                     origin: relocated_node.peer(),
                     wire_msg,
-                    original_bytes,
+
+
                 },
                 &dispatcher,
             )
@@ -660,13 +663,14 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
             let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
-            let original_bytes = wire_msg.serialize_and_cache_bytes()?;
+            let original_bytes = wire_msg.serialize()?;
 
             let _cmds = run_and_collect_cmds(
                 Cmd::ValidateMsg {
                     origin: old_node.peer(),
                     wire_msg,
-                    original_bytes,
+
+
                 },
                 &dispatcher,
             )
@@ -727,13 +731,14 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
                 bogus_section_pk,
             )?;
 
-            let original_bytes = wire_msg.serialize_and_cache_bytes()?;
+            let original_bytes = wire_msg.serialize()?;
 
             let _cmds = run_and_collect_cmds(
                 Cmd::ValidateMsg {
                     origin: sender.peer(),
                     wire_msg,
-                    original_bytes,
+
+
                 },
                 &dispatcher,
             )

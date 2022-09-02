@@ -230,9 +230,7 @@ impl Node {
             }
         };
 
-        let (header, dst, payload) = bounced_msg;
-
-        let (msg_to_resend, msg_id, dst) = match WireMsg::deserialize(header, dst, payload)? {
+        let (msg_to_resend, msg_id, dst) = match WireMsg::deserialize(bounced_msg)? {
             MsgType::System {
                 msg, msg_id, dst, ..
             } => (msg, msg_id, dst),
@@ -446,7 +444,7 @@ mod tests {
                 let dst_section_key = env.node.network_knowledge().section_key();
 
                 let cmd = env.node.check_for_entropy(
-                    msg.serialize_and_cache_bytes()?,
+                    &msg,
                     &dst_section_key,
                     dst_name,
                     &sender,
@@ -515,18 +513,17 @@ mod tests {
             let other_sk = bls::SecretKey::random();
             let other_pk = other_sk.public_key();
 
-            let msg = env.create_msg(&env.other_sap.prefix(), other_pk)?;
+            let wire_msg = env.create_msg(&env.other_sap.prefix(), other_pk)?;
             let sender = env.node.info().peer();
 
             // since it's not aware of the other prefix, it will redirect to self
             let dst_section_key = other_pk;
             let dst_name = env.other_sap.prefix().name();
 
-            let original_bytes = msg.serialize_and_cache_bytes()?;
             let cmd = env
                 .node
                 .check_for_entropy(
-                    original_bytes.clone(),
+                    &wire_msg,
                     &dst_section_key,
                     dst_name,
                     &sender,
@@ -558,7 +555,7 @@ mod tests {
             let cmd = env
                 .node
                 .check_for_entropy(
-                    original_bytes,
+                    &wire_msg,
                     &dst_section_key,
                     dst_name,
                     &sender,
@@ -598,7 +595,7 @@ mod tests {
             let cmd = env
                 .node
                 .check_for_entropy(
-                    msg.serialize_and_cache_bytes()?,
+                    &msg,
                     dst_section_key,
                     dst_name,
                     &sender,
@@ -640,7 +637,7 @@ mod tests {
             let cmd = env
                 .node
                 .check_for_entropy(
-                    msg.serialize_and_cache_bytes()?,
+                    &msg,
                     dst_section_key,
                     dst_name,
                     &sender,

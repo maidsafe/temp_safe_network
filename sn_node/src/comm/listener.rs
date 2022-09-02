@@ -60,8 +60,7 @@ impl MsgListener {
         while let Some(result) = incoming_msgs.next().await.transpose() {
             match result {
                 Ok(msg_bytes) => {
-                    let (header, dst, payload) = msg_bytes;
-                    let wire_msg = match WireMsg::from(header, dst, payload) {
+                    let wire_msg = match WireMsg::from(msg_bytes) {
                         Ok(wire_msg) => wire_msg,
                         Err(error) => {
                             // TODO: should perhaps rather drop this connection.. as it is a spam vector

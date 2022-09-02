@@ -1020,12 +1020,11 @@ mod tests {
 
         debug!("wire msg built");
 
-        let original_bytes = wire_msg.serialize_and_cache_bytes()?;
+        let original_bytes = wire_msg.serialize()?;
 
         recv_tx.try_send(MsgEvent::Received {
             sender: bootstrap_node.peer(),
             wire_msg,
-            original_bytes,
         })?;
 
         Ok(())

@@ -7,11 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::wire_msg_header::WireMsgHeader;
-use crate::messaging::{
+use crate::{messaging::{
     data::{ServiceError, ServiceMsg},
     system::SystemMsg,
     AuthKind, AuthorityProof, Dst, Error, MsgId, MsgType, NodeMsgAuthority, Result, ServiceAuth,
-};
+}, types::register::User};
 use bytes::Bytes;
 use custom_debug::Debug;
 use serde::Serialize;
@@ -152,7 +152,9 @@ impl WireMsg {
 
     /// Attempts to create an instance of `WireMsg` by deserialising the bytes provided.
     /// To succeed, the bytes should contain at least a valid `WireMsgHeader`.
-    pub fn from(header_bytes: Bytes, dst_bytes: Bytes, payload: Bytes) -> Result<Self> {
+    pub fn from(bytes:UsrMsgBytes) -> Result<Self> {
+
+        let (header_bytes, dst_bytes, payload) = bytes;
         // Deserialize the header bytes first
         let header = WireMsgHeader::from(header_bytes.clone())?;
         let dst: Dst = rmp_serde::from_slice(&dst_bytes).map_err(|err| {
@@ -327,8 +329,8 @@ impl WireMsg {
 
     /// Convenience function which creates a temporary `WireMsg` from the provided
     /// bytes, returning the deserialized message.
-    pub fn deserialize(header: Bytes, dst: Bytes, payload: Bytes) -> Result<MsgType> {
-        Self::from(header, dst, payload)?.into_msg()
+    pub fn deserialize(bytes: UsrMsgBytes) -> Result<MsgType> {
+        Self::from(bytes)?.into_msg()
     }
 
     /// Convenience function which validates the signature on a `ServiceMsg`.

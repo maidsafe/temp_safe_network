@@ -489,8 +489,8 @@ mod tests {
                 let peer0_msg = new_test_msg(dst(peer0))?;
                 let peer1_msg = new_test_msg(dst(peer1))?;
 
-                comm.send(peer0, peer0_msg.clone()).await?;
-                comm.send(peer1, peer1_msg.clone()).await?;
+                comm.send(peer0, peer0_msg.msg_id(), peer0_msg.serialize()?).await?;
+                comm.send(peer1, peer1_msg.msg_id(), peer1_msg.serialize()?).await?;
 
                 if let Some(bytes) = rx0.recv().await {
                     assert_eq!(WireMsg::from(bytes)?, peer0_msg);
@@ -528,7 +528,8 @@ mod tests {
 
                 let invalid_peer = get_invalid_peer().await?;
                 let invalid_addr = invalid_peer.addr();
-                let result = comm.send(invalid_peer, new_test_msg(dst(invalid_peer))?).await;
+                let msg = new_test_msg(dst(invalid_peer))?;
+                let result = comm.send(invalid_peer, msg.msg_id(), msg.serialize()?).await;
 
                 assert_matches!(result, Err(Error::FailedSend(peer)) => assert_eq!(peer.addr(), invalid_addr));
 
@@ -557,7 +558,7 @@ mod tests {
                 let peer = Peer::new(name, recv_addr);
                 let msg0 = new_test_msg(dst(peer))?;
 
-                send_comm.send(peer, msg0.clone()).await?;
+                send_comm.send(peer, msg0.msg_id(), msg0.serialize()?).await?;
 
                 let mut msg0_received = false;
 
@@ -574,7 +575,7 @@ mod tests {
                 }
 
                 let msg1 = new_test_msg(dst(peer))?;
-                send_comm.send(peer, msg1.clone()).await?;
+                send_comm.send(peer, msg1.msg_id(), msg1.serialize()?).await?;
 
                 let mut msg1_received = false;
 
@@ -614,7 +615,7 @@ mod tests {
                 let peer = Peer::new(xor_name::rand::random(), addr0);
                 let msg = new_test_msg(dst(peer))?;
                 // Send a message to establish the connection
-                comm1.send(peer, msg).await?;
+                comm1.send(peer, msg.msg_id(), msg.serialize()?).await?;
 
                 assert_matches!(rx0.recv().await, Some(MsgEvent::Received { .. }));
 
@@ -659,7 +660,7 @@ mod tests {
         ))
     }
 
-    async fn new_peer() -> Result<(Peer, Receiver<Bytes>)> {
+    async fn new_peer() -> Result<(Peer, Receiver<UsrMsgBytes>)> {
         let (endpoint, mut incoming_connections, _) =
             Endpoint::new_peer(local_addr(), &[], Config::default()).await?;
         let addr = endpoint.public_addr();
