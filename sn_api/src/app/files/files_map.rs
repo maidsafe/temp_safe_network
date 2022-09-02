@@ -265,13 +265,13 @@ fn filesmap_chroot(urlpath: &str, files_map: &FilesMap) -> Result<FilesMap> {
     } else {
         urlpath.to_string()
     };
-    files_map.iter().for_each(|(filepath, fileitem)| {
+    for (filepath, fileitem) in files_map.iter() {
         if filepath.starts_with(&folder_path) {
             let mut new_path = filepath.clone();
             new_path.replace_range(..folder_path.len(), "");
             filtered_filesmap.insert(new_path, fileitem.clone());
         }
-    });
+    }
 
     if filtered_filesmap.is_empty() {
         Err(Error::ContentError(format!(

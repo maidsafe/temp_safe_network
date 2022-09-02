@@ -519,9 +519,9 @@ fn populate_cmds_tree_for_msgs(
     println!("Looking for cmds spawned from msg id {}", msg_id);
 
     if let Some(ids) = info.cmd_by_msg_id.get(msg_id) {
-        ids.iter().for_each(|root_cmd_id| {
+        for root_cmd_id in ids.iter() {
             populate_cmds_tree(spawned, started, succeeded, failed, report, root_cmd_id);
-        });
+        }
     }
 }
 
