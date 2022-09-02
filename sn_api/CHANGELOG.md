@@ -5,7 +5,62 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.70.0 (2022-09-02)
+
+### Chore
+
+ - <csr-id-f31bd5df469a16d39e6b03de605981ad303a2be3/> replace for_each with for loop
+ - <csr-id-dd89cac97da96ffe26ae78c4b7b62aa952ec53fc/> replace implicit clones with clone
+ - <csr-id-921438659ccaf65b2ea8cc00efb61d8146ef71ef/> unneeded iter methods removal
+ - <csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/> switch on clippy::unwrap_used as a warning
+
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release over the course of 4 calendar days.
+ - 7 days passed between releases.
+ - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - replace for_each with for loop ([`f31bd5d`](https://github.com/maidsafe/safe_network/commit/f31bd5df469a16d39e6b03de605981ad303a2be3))
+    - replace implicit clones with clone ([`dd89cac`](https://github.com/maidsafe/safe_network/commit/dd89cac97da96ffe26ae78c4b7b62aa952ec53fc))
+    - unneeded iter methods removal ([`9214386`](https://github.com/maidsafe/safe_network/commit/921438659ccaf65b2ea8cc00efb61d8146ef71ef))
+    - switch on clippy::unwrap_used as a warning ([`3a718d8`](https://github.com/maidsafe/safe_network/commit/3a718d8c0957957a75250b044c9d1ad1b5874ab0))
+</details>
+
 ## v0.69.0 (2022-08-25)
+
+### Chore
+
+ - <csr-id-401bc416c7aea65ae55e9adee2cbecf782c999cf/> sn_interface-0.10.1/sn_client-0.71.0/sn_node-0.66.1/sn_api-0.69.0/sn_cli-0.62.0
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 1 day passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.10.1/sn_client-0.71.0/sn_node-0.66.1/sn_api-0.69.0/sn_cli-0.62.0 ([`401bc41`](https://github.com/maidsafe/safe_network/commit/401bc416c7aea65ae55e9adee2cbecf782c999cf))
+</details>
 
 ## v0.68.0 (2022-08-23)
 
@@ -15,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-1618cf6a93117942946d152efee24fe3c7020e55/>
 <csr-id-63172ab4ab9fc87bc17b09c6fd384679a37a40f0/>
 <csr-id-f0fbe5fd9bec0b2865271bb139c9fcb4ec225884/>
+<csr-id-43fcc7c517f95eab0e27ddc79cd9c6de3631c7c6/>
 
 ### Chore
 
@@ -50,7 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - 8 commits contributed to the release over the course of 8 calendar days.
  - 9 days passed between releases.
- - 8 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 8 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -172,7 +228,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - 35 commits contributed to the release over the course of 33 calendar days.
  - 34 days passed between releases.
- - 30 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 30 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -219,9 +275,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - show the DBC owner in the wallet displayed by cat cmd ([`1b3f051`](https://github.com/maidsafe/safe_network/commit/1b3f0516cf899c2fc0d101ce9cf0079c95bbfd7b))
 </details>
 
-<csr-unknown>
-Have the CLI wallet deposit command to perform a verification is the supplied DBC has beenalready spent before depositing into a wallet.Allow users to provide a --force flag with the CLI wallet deposit command to skip theverification of DBC already spent and force the deposit into the wallet.Display the owner of each DBC when cat-ing a wallet.Align to the right the balance of each DBC when cat-ing a wallet.Shorten the default name set to DBC when deposited in a wallet.Make the name of the change DBC automatically deposited in the wallet unique.<csr-unknown/>
-
 ## v0.66.3 (2022-07-10)
 
 <csr-id-49e223e2c07695b4c63e253ba19ce43ec24d7112/>
@@ -241,7 +294,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 4 commits contributed to the release over the course of 1 calendar day.
  - 2 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -270,7 +323,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 <csr-read-only-do-not-edit/>
 
  - 4 commits contributed to the release.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -314,7 +367,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 10 commits contributed to the release over the course of 1 calendar day.
  - 2 days passed between releases.
- - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -374,7 +427,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 9 commits contributed to the release over the course of 4 calendar days.
  - 8 days passed between releases.
- - 9 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 9 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -489,7 +542,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 9 commits contributed to the release over the course of 1 calendar day.
  - 5 days passed between releases.
- - 9 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 9 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -529,7 +582,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 2 commits contributed to the release.
  - 5 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -566,7 +619,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -613,7 +666,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 13 commits contributed to the release over the course of 1 calendar day.
  - 8 days passed between releases.
- - 10 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 10 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -663,7 +716,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 5 commits contributed to the release over the course of 1 calendar day.
  - 2 days passed between releases.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -735,7 +788,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 13 commits contributed to the release over the course of 4 calendar days.
  - 8 days passed between releases.
- - 11 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 11 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -774,7 +827,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 1 commit contributed to the release.
  - 2 days passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -801,7 +854,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 2 commits contributed to the release.
  - 3 days passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -829,7 +882,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 1 commit contributed to the release.
  - 3 days passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -861,7 +914,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 2 commits contributed to the release.
  - 8 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -893,7 +946,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 5 commits contributed to the release.
  - 3 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -933,7 +986,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 3 commits contributed to the release over the course of 11 calendar days.
  - 13 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -993,7 +1046,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 10 commits contributed to the release over the course of 7 calendar days.
  - 8 days passed between releases.
- - 10 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 10 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1050,7 +1103,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 6 commits contributed to the release.
  - 5 days passed between releases.
- - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1086,7 +1139,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 2 commits contributed to the release over the course of 2 calendar days.
  - 14 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1156,7 +1209,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 7 commits contributed to the release over the course of 1 calendar day.
  - 3 days passed between releases.
- - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 7 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1192,7 +1245,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 2 commits contributed to the release.
  - 5 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1222,7 +1275,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 2 commits contributed to the release over the course of 5 calendar days.
  - 17 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1262,7 +1315,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 7 commits contributed to the release over the course of 2 calendar days.
  - 9 days passed between releases.
- - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1295,7 +1348,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 1 commit contributed to the release.
  - 5 days passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1381,7 +1434,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 7 commits contributed to the release over the course of 3 calendar days.
  - 3 days passed between releases.
- - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1420,7 +1473,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 4 commits contributed to the release.
  - 4 days passed between releases.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1515,7 +1568,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 9 commits contributed to the release over the course of 2 calendar days.
  - 2 days passed between releases.
- - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 7 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1590,7 +1643,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 2 commits contributed to the release.
  - 3 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1707,7 +1760,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 4 commits contributed to the release over the course of 2 calendar days.
  - 6 days passed between releases.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1748,7 +1801,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 5 commits contributed to the release over the course of 1 calendar day.
  - 1 day passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1802,7 +1855,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 16 commits contributed to the release over the course of 13 calendar days.
  - 13 days passed between releases.
- - 8 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 8 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1861,7 +1914,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 <csr-read-only-do-not-edit/>
 
  - 3 commits contributed to the release.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1897,7 +1950,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 5 commits contributed to the release over the course of 1 calendar day.
  - 1 day passed between releases.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1940,7 +1993,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 <csr-read-only-do-not-edit/>
 
  - 6 commits contributed to the release.
- - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1983,7 +2036,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2017,7 +2070,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2051,7 +2104,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2085,7 +2138,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 <csr-read-only-do-not-edit/>
 
  - 3 commits contributed to the release.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2118,7 +2171,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2163,7 +2216,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 6 commits contributed to the release over the course of 11 calendar days.
  - 11 days passed between releases.
- - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2215,7 +2268,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 7 commits contributed to the release over the course of 6 calendar days.
  - 6 days passed between releases.
- - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 7 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2249,7 +2302,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2278,7 +2331,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2331,7 +2384,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 11 commits contributed to the release over the course of 2 calendar days.
  - 5 days passed between releases.
- - 11 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 11 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2443,7 +2496,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 33 commits contributed to the release over the course of 14 calendar days.
  - 15 days passed between releases.
- - 33 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 33 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2505,7 +2558,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2538,7 +2591,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2569,7 +2622,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2609,7 +2662,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 <csr-read-only-do-not-edit/>
 
  - 4 commits contributed to the release.
- - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2639,7 +2692,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 
  - 1 commit contributed to the release.
  - 8 days passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -3084,7 +3137,7 @@ Have the CLI wallet deposit command to perform a verification is the supplied DB
 <csr-read-only-do-not-edit/>
 
  - 205 commits contributed to the release over the course of 431 calendar days.
- - 173 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 173 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 1 unique issue was worked on: [#6](https://github.com/maidsafe/safe_network/issues/6)
 
 ### Commit Details

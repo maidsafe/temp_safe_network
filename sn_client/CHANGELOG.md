@@ -1113,7 +1113,65 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
+## v0.72.0 (2022-09-02)
+
+### Chore
+
+ - <csr-id-921438659ccaf65b2ea8cc00efb61d8146ef71ef/> unneeded iter methods removal
+ - <csr-id-f5d436fba99e0e9c258c7ab3c3a256be3be58f84/> applied use_self lint
+ - <csr-id-388cd223677ecfa2e790c54c0df8ecb18c77299c/> change throughput measure
+   use Bytes.len, not the size of the Bytes struct!
+ - <csr-id-5c54848b726188f273ffa16ee2870976914bb815/> adds missing bench to cargo.toml for client
+ - <csr-id-b040ea14e53247094838de6f1fa9af2830b051fa/> sn_interface lints and fixes
+   Apply lints used in other crates, as far as they can easily be applied.
+   The `unused_results` lint has been left out, as that is too much
+   cleaning up to do, just like adding documentation to all the public
+   interfaces.
+ - <csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/> switch on clippy::unwrap_used as a warning
+
+
+### Other
+
+ - <csr-id-a4e84ef4608a13ecc2f14dd87f5c23d185185513/> move benches that dont need the network ahead of network launch
+   In order to fail faster
+ - <csr-id-d251dbeb2e44707623c3bbb1215784b1bd4fae06/> add msg serialization benchmark
+   This should allow us to evaluate any changes to msg serialisation
+   in order to reduce time/memory when resending the same message to many
+   peers
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 10 commits contributed to the release over the course of 4 calendar days.
+ - 4 days passed between releases.
+ - 8 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - unneeded iter methods removal ([`9214386`](https://github.com/maidsafe/safe_network/commit/921438659ccaf65b2ea8cc00efb61d8146ef71ef))
+    - applied use_self lint ([`f5d436f`](https://github.com/maidsafe/safe_network/commit/f5d436fba99e0e9c258c7ab3c3a256be3be58f84))
+    - chore(clippy) ([`d9ee11d`](https://github.com/maidsafe/safe_network/commit/d9ee11d228f8ac9f2d6cd3d09f1a1e29276100d1))
+    - change throughput measure ([`388cd22`](https://github.com/maidsafe/safe_network/commit/388cd223677ecfa2e790c54c0df8ecb18c77299c))
+    - adds missing bench to cargo.toml for client ([`5c54848`](https://github.com/maidsafe/safe_network/commit/5c54848b726188f273ffa16ee2870976914bb815))
+    - toml ([`4aa9b02`](https://github.com/maidsafe/safe_network/commit/4aa9b02f375a30132712ca97306e5f2e9a8d36f7))
+    - move benches that dont need the network ahead of network launch ([`a4e84ef`](https://github.com/maidsafe/safe_network/commit/a4e84ef4608a13ecc2f14dd87f5c23d185185513))
+    - add msg serialization benchmark ([`d251dbe`](https://github.com/maidsafe/safe_network/commit/d251dbeb2e44707623c3bbb1215784b1bd4fae06))
+    - sn_interface lints and fixes ([`b040ea1`](https://github.com/maidsafe/safe_network/commit/b040ea14e53247094838de6f1fa9af2830b051fa))
+    - switch on clippy::unwrap_used as a warning ([`3a718d8`](https://github.com/maidsafe/safe_network/commit/3a718d8c0957957a75250b044c9d1ad1b5874ab0))
+</details>
+
 ## v0.71.1 (2022-08-28)
+
+### Chore
+
+ - <csr-id-2b268209e6910472558145a5d08b99e968550221/> sn_interface-0.10.2/sn_client-0.71.1/sn_node-0.66.2/sn_cli-0.62.1
 
 ### New Features
 
@@ -1129,9 +1187,9 @@ needed, as they keypair itself contains the Arcs we need.
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release over the course of 2 calendar days.
- - 2 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits contributed to the release over the course of 2 calendar days.
+ - 3 days passed between releases.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1141,11 +1199,17 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.10.2/sn_client-0.71.1/sn_node-0.66.2/sn_cli-0.62.1 ([`2b26820`](https://github.com/maidsafe/safe_network/commit/2b268209e6910472558145a5d08b99e968550221))
     - implement `SecuredLinkedList` as a `MerkleRegister` ([`7cc2a00`](https://github.com/maidsafe/safe_network/commit/7cc2a00907381e93db266f31545b12ff76907e5d))
     - return error to client on unknown section key ([`b87617e`](https://github.com/maidsafe/safe_network/commit/b87617e44e9b20b8a79864e30e29ecee86444352))
 </details>
 
 ## v0.71.0 (2022-08-25)
+
+<csr-id-401bc416c7aea65ae55e9adee2cbecf782c999cf/>
+<csr-id-a46ac6e18bbdfdb331caf89f8bb562a7c762b64b/>
+<csr-id-9fbb0672735306336f5020794a638f79752f0577/>
+<csr-id-f40277c1680f56b043c4865ff201c65b66926b2d/>
 
 ### Chore
 
@@ -1170,7 +1234,7 @@ needed, as they keypair itself contains the Arcs we need.
 
  - 6 commits contributed to the release.
  - 1 day passed between releases.
- - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1202,6 +1266,7 @@ needed, as they keypair itself contains the Arcs we need.
 <csr-id-28d95a2e959e32ee69a70bdc855cba1fff1fc8d8/>
 <csr-id-d3f66d6cfa838a5c65fb8f31fa68d48794b33dea/>
 <csr-id-f0fbe5fd9bec0b2865271bb139c9fcb4ec225884/>
+<csr-id-43fcc7c517f95eab0e27ddc79cd9c6de3631c7c6/>
 
 ### Chore
 
@@ -1264,7 +1329,7 @@ needed, as they keypair itself contains the Arcs we need.
 
  - 17 commits contributed to the release over the course of 8 calendar days.
  - 9 days passed between releases.
- - 17 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 17 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1474,7 +1539,7 @@ needed, as they keypair itself contains the Arcs we need.
 
  - 68 commits contributed to the release over the course of 32 calendar days.
  - 34 days passed between releases.
- - 65 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 65 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1554,9 +1619,6 @@ needed, as they keypair itself contains the Arcs we need.
     - move to dev-dependencies ([`5aeb15c`](https://github.com/maidsafe/safe_network/commit/5aeb15c8c309c16878dde510f68b0e5c2122cd8c))
 </details>
 
-<csr-unknown>
-Minor refactoring to sn_client::test_spentbook_spend_dbc test.<csr-unknown/>
-
 ## v0.68.2 (2022-07-10)
 
 <csr-id-19ddebad43aa53822cb7e781913ba34b848e2c89/>
@@ -1594,7 +1656,7 @@ Minor refactoring to sn_client::test_spentbook_spend_dbc test.<csr-unknown/>
 
  - 10 commits contributed to the release over the course of 2 calendar days.
  - 2 days passed between releases.
- - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1663,7 +1725,7 @@ Minor refactoring to sn_client::test_spentbook_spend_dbc test.<csr-unknown/>
 
  - 15 commits contributed to the release over the course of 1 calendar day.
  - 2 days passed between releases.
- - 9 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 9 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1743,7 +1805,7 @@ Minor refactoring to sn_client::test_spentbook_spend_dbc test.<csr-unknown/>
 
  - 10 commits contributed to the release over the course of 6 calendar days.
  - 6 days passed between releases.
- - 10 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 10 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1792,7 +1854,7 @@ Minor refactoring to sn_client::test_spentbook_spend_dbc test.<csr-unknown/>
 
  - 4 commits contributed to the release.
  - 2 days passed between releases.
- - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1826,7 +1888,7 @@ Minor refactoring to sn_client::test_spentbook_spend_dbc test.<csr-unknown/>
 
  - 4 commits contributed to the release over the course of 1 calendar day.
  - 2 days passed between releases.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1871,7 +1933,7 @@ Minor refactoring to sn_client::test_spentbook_spend_dbc test.<csr-unknown/>
 
  - 6 commits contributed to the release over the course of 2 calendar days.
  - 3 days passed between releases.
- - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1910,7 +1972,7 @@ Minor refactoring to sn_client::test_spentbook_spend_dbc test.<csr-unknown/>
 
  - 3 commits contributed to the release.
  - 5 days passed between releases.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1948,7 +2010,7 @@ Minor refactoring to sn_client::test_spentbook_spend_dbc test.<csr-unknown/>
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1999,7 +2061,7 @@ Minor refactoring to sn_client::test_spentbook_spend_dbc test.<csr-unknown/>
 
  - 12 commits contributed to the release over the course of 2 calendar days.
  - 8 days passed between releases.
- - 10 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 10 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2043,7 +2105,7 @@ Minor refactoring to sn_client::test_spentbook_spend_dbc test.<csr-unknown/>
 
  - 4 commits contributed to the release over the course of 1 calendar day.
  - 2 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2092,7 +2154,7 @@ Minor refactoring to sn_client::test_spentbook_spend_dbc test.<csr-unknown/>
 
  - 8 commits contributed to the release over the course of 4 calendar days.
  - 8 days passed between releases.
- - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 7 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2144,7 +2206,7 @@ Minor refactoring to sn_client::test_spentbook_spend_dbc test.<csr-unknown/>
 
  - 6 commits contributed to the release over the course of 1 calendar day.
  - 2 days passed between releases.
- - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2176,7 +2238,7 @@ Minor refactoring to sn_client::test_spentbook_spend_dbc test.<csr-unknown/>
 
  - 2 commits contributed to the release.
  - 3 days passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2211,7 +2273,7 @@ Minor refactoring to sn_client::test_spentbook_spend_dbc test.<csr-unknown/>
 
  - 3 commits contributed to the release over the course of 1 calendar day.
  - 3 days passed between releases.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2248,7 +2310,7 @@ Minor refactoring to sn_client::test_spentbook_spend_dbc test.<csr-unknown/>
 
  - 3 commits contributed to the release.
  - 8 days passed between releases.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2281,7 +2343,7 @@ Minor refactoring to sn_client::test_spentbook_spend_dbc test.<csr-unknown/>
 
  - 5 commits contributed to the release.
  - 3 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2377,7 +2439,7 @@ Minor refactoring to sn_client::test_spentbook_spend_dbc test.<csr-unknown/>
 <csr-read-only-do-not-edit/>
 
  - 22 commits contributed to the release over the course of 326 calendar days.
- - 19 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 19 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
