@@ -272,7 +272,7 @@ impl SectionTree {
         // root/child key in our sections_dag. Checked in the above match statement.
         self.sections_dag.join(proof_chain.clone())?;
 
-        for (prefix, section_key) in self.sections.iter() {
+        for (prefix, section_key) in &self.sections {
             debug!(
                 "Known prefix,section_key after update: {:?} = {:?}",
                 prefix, section_key

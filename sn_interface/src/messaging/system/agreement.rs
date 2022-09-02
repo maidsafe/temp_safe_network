@@ -75,7 +75,7 @@ impl DkgSessionId {
 
         hasher.update(&self.section_chain_len.to_le_bytes());
 
-        for member in self.bootstrap_members.iter() {
+        for member in &self.bootstrap_members {
             hasher.update(&member.name);
         }
     }

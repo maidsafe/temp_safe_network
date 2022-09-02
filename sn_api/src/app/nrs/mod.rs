@@ -270,7 +270,7 @@ fn convert_multimap_to_nrs_set(
             .filter(|x| x.1 == public_name)
             .filter(|x| x.0 != version)
             .collect::<BTreeSet<(VersionHash, String, SafeUrl)>>();
-        for entry in duplicate_entries.iter() {
+        for entry in &duplicate_entries {
             versioned_set.remove(entry);
         }
         let set: BTreeSet<(String, SafeUrl)> = versioned_set

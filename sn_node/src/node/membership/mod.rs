@@ -223,7 +223,7 @@ impl Membership {
         );
 
         for (decision, _) in self.history.values() {
-            for (node_state, _sig) in decision.proposals.iter() {
+            for node_state in decision.proposals.keys() {
                 match node_state.state {
                     MembershipState::Joined => {
                         continue;
@@ -251,8 +251,8 @@ impl Membership {
             return Ok(members);
         }
 
-        for (history_gen, (decision, _)) in self.history.iter() {
-            for (node_state, _sig) in decision.proposals.iter() {
+        for (history_gen, (decision, _)) in &self.history {
+            for node_state in decision.proposals.keys() {
                 match node_state.state {
                     MembershipState::Joined => {
                         let _ = members.insert(node_state.name, node_state.clone());

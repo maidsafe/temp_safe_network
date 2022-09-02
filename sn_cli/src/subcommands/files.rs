@@ -433,7 +433,7 @@ async fn process_tree_command(
     // Transform flat list in `files_map` to a hierarchy in `top`
     let mut files: u64 = 0;
     let mut dirs: u64 = 0;
-    for (name, file_details) in files_map.iter() {
+    for (name, file_details) in &files_map {
         let path_parts: Vec<String> = name
             .to_string()
             .trim_matches('/')

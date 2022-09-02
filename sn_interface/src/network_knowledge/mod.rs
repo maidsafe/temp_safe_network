@@ -494,7 +494,7 @@ impl NetworkKnowledge {
         let mut there_was_an_update = false;
         let our_current_members = self.section_peers.members();
 
-        for node_state in peers.iter() {
+        for node_state in &peers {
             if our_current_members.contains(node_state) {
                 // we already know of this one, so nothing to do here.
                 continue;
