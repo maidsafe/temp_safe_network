@@ -590,11 +590,7 @@ mod tests {
 
                     let storage_res = runtime.block_on(storage.remove(&addr));
                     match model.remove(&key) {
-                        Some(_) => {
-                            if let Err(err) = storage_res {
-                                return Err(err);
-                            }
-                        }
+                        Some(_) => storage_res?,
                         None => {
                             if storage_res.is_ok() {
                                 return Err(Error::DataExists(addr));
