@@ -515,6 +515,12 @@ impl Session {
     }
 
     #[instrument(skip_all, level = "trace")]
+    /// Send the msg over the wire. This should be used in a loop in case any errors
+    /// here mean we could not send the message.
+    ///
+    /// Any non-critical errors here are logged, but not returned.
+    ///
+    /// The calling function is expected to handle retry logic atop this.
     pub(super) async fn send_msg(
         &self,
         nodes: Vec<Peer>,
@@ -563,34 +569,24 @@ impl Session {
             match r {
                 Ok((peer_name, send_result)) => match send_result {
                     Err(Error::QuicP2pSend {
-                        peer,
                         error:
                             SendError::ConnectionLost(ConnectionError::Closed(Close::Application {
                                 reason,
-                                error_code,
+                                ..
                             })),
+                        ..
                     }) => {
                         warn!(
                             "Connection was closed by node {}, reason: {:?}",
                             peer_name,
                             String::from_utf8(reason.to_vec())
                         );
-                        last_error = Some(Error::QuicP2pSend {
-                            peer,
-                            error: SendError::ConnectionLost(ConnectionError::Closed(
-                                Close::Application { reason, error_code },
-                            )),
-                        });
                     }
                     Err(Error::QuicP2pSend {
-                        peer,
                         error: SendError::ConnectionLost(error),
+                        ..
                     }) => {
                         warn!("Connection to {} was lost: {:?}", peer_name, error);
-                        last_error = Some(Error::QuicP2pSend {
-                            peer,
-                            error: SendError::ConnectionLost(error),
-                        });
                     }
                     Err(error) => {
                         warn!(
@@ -622,6 +618,9 @@ impl Session {
 
         if failures > successful_sends {
             warn!("More errors when sending a message than successes");
+            // If we've only had connection errors, those are not stored in `last_error` (but they are logged)
+            // Such errors are not fatal to the program and you can normally simply retry by calling
+            // send_msg again.
             if let Some(error) = last_error {
                 warn!("The relevant error is: {error}");
                 return Err(error);
