@@ -168,7 +168,7 @@ impl Handover {
         if let Some(decision) = &self.consensus.decision {
             // deterministically choose a single sap_candidate
             // sn_consensus decides on a set, we deterministically pick the min as the handover winner
-            decision.proposals.keys().min().map(|s| s.to_owned())
+            decision.proposals.keys().min().cloned()
         } else {
             None
         }

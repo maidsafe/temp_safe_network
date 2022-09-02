@@ -119,10 +119,7 @@ impl Node {
                 sap1.prefix(),
                 sap2.prefix()
             );
-            self.propose_handover_consensus(SapCandidate::SectionSplit(
-                sap1.to_owned(),
-                sap2.to_owned(),
-            ))
+            self.propose_handover_consensus(SapCandidate::SectionSplit(sap1.clone(), sap2.clone()))
         } else {
             debug!("Waiting for more split handover candidates");
             Ok(None)

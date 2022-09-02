@@ -252,7 +252,7 @@ pub(crate) fn get_file_link_and_metadata(
                 }
             }
 
-            return Ok((Some(link.to_owned()), Some(enriched_file_info)));
+            return Ok((Some(link.clone()), Some(enriched_file_info)));
         }
     }
     Ok((None, None))

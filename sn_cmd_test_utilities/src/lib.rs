@@ -403,7 +403,7 @@ pub mod util {
             .assert()
             .code(code)
             .get_output()
-            .to_owned())
+            .clone())
     }
 
     // Executes arbitrary `safe` cmds and returns

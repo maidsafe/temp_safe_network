@@ -83,7 +83,7 @@ impl Safe {
             ))
         })?;
 
-        let data = serialised_entry.to_vec();
+        let data = serialised_entry.clone();
         let safeurl = SafeUrl::from_url(multimap_url)?;
         let address = match safeurl.address() {
             DataAddress::Register(reg_address) => reg_address,

@@ -205,7 +205,7 @@ impl DysfunctionDetection {
     /// If there are no unfulfilled operations tracked, an empty list will be returned.
     pub fn get_unfulfilled_ops(&self, node: XorName) -> Vec<OperationId> {
         if let Some(val) = self.unfulfilled_ops.get(&node) {
-            return val.to_vec().iter().map(|(op_id, _)| *op_id).collect();
+            return val.clone().iter().map(|(op_id, _)| *op_id).collect();
         }
         Vec::new()
     }
