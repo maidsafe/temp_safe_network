@@ -63,10 +63,10 @@ pub fn read_stdin_response() -> Result<String> {
     stdin()
         .read_line(&mut user_input)
         .with_context(|| "Error occurred when attempting to get input from stdin".to_string())?;
-    if let Some('\n') = user_input.chars().next_back() {
+    if user_input.ends_with('\n') {
         user_input.pop();
     }
-    if let Some('\r') = user_input.chars().next_back() {
+    if user_input.ends_with('\r') {
         user_input.pop();
     }
     Ok(user_input)

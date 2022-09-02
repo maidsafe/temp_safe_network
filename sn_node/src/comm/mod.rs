@@ -408,7 +408,7 @@ fn setup(
 #[cfg(feature = "back-pressure")]
 async fn count_msgs(back_pressure: BackPressure, mut msg_counter: Receiver<()>) {
     debug!("Entered msg counting listener loop.");
-    while let Some(()) = msg_counter.recv().await {
+    while msg_counter.recv().await == Some(()) {
         back_pressure.count_msg().await;
     }
     debug!("Exited msg counting listener loop..!");
