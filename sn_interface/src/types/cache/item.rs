@@ -40,7 +40,7 @@ impl<T> Item<T> {
 
     pub fn elapsed(&self) -> u128 {
         self.time
-            .map(|time| Instant::now() - time.start)
+            .map(|time| time.start.elapsed())
             .unwrap_or_default()
             .as_millis()
     }
