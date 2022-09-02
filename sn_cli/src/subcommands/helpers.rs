@@ -233,9 +233,9 @@ where
 pub fn print_nrs_map(nrs_map: &NrsMap) {
     println!("Listing NRS map contents:");
     let summary = nrs_map.get_map_summary();
-    summary.iter().for_each(|(pub_name, link)| {
+    for (pub_name, link) in summary.iter() {
         println!("{}: {}", pub_name, link);
-    });
+    }
 }
 
 // returns singular or plural version of string, based on count.

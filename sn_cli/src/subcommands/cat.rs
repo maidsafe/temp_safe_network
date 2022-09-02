@@ -63,7 +63,7 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe)
                 );
                 let mut table = Table::new();
                 table.add_row(&vec!["Name", "Type", "Size", "Created", "Modified", "Link"]);
-                files_map.iter().for_each(|(name, file_item)| {
+                for (name, file_item) in files_map.iter() {
                     table.add_row(&vec![
                         name,
                         &file_item["type"],
@@ -72,7 +72,7 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe)
                         &file_item["modified"],
                         file_item.get("link").unwrap_or(&String::default()),
                     ]);
-                });
+                }
                 println!("{table}");
             } else {
                 println!(
