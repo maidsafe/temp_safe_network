@@ -54,7 +54,7 @@ pub(crate) struct Session {
 }
 
 fn is_dkg_behind(expected: Phase, actual: Phase) -> bool {
-    if let (Phase::Contribution, Phase::Initialization) = (expected, actual) {
+    if (expected, actual) == (Phase::Contribution, Phase::Initialization) {
         true
     } else {
         trace!("Our DKG session is ahead. Skipping DkgAE");
