@@ -249,7 +249,7 @@ impl Client {
 
     #[instrument(skip_all, level = "trace")]
     async fn try_get_chunks(
-        client: &Client,
+        client: &Self,
         chunks_info: Vec<ChunkInfo>,
     ) -> Result<Vec<EncryptedChunk>> {
         let expected_count = chunks_info.len();

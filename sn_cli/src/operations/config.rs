@@ -183,9 +183,9 @@ impl Config {
         fs::create_dir_all(network_contacts_dir.as_path()).await?;
         let mut dbc_owner_sk_path = pb.clone();
         dbc_owner_sk_path.push("credentials");
-        let dbc_owner = Config::get_dbc_owner(&dbc_owner_sk_path)?;
+        let dbc_owner = Self::get_dbc_owner(&dbc_owner_sk_path)?;
 
-        let config = Config {
+        let config = Self {
             settings,
             cli_config_path: cli_config_path.clone(),
             network_contacts_dir,

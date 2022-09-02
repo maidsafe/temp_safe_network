@@ -81,14 +81,14 @@ impl RelocateDetails {
         peer: &Peer,
         dst: XorName,
         age: u8,
-    ) -> RelocateDetails {
+    ) -> Self {
         let genesis_key = *network_knowledge.genesis_key();
 
         let dst_section_key = network_knowledge
             .section_by_name(&dst)
             .map_or_else(|_| genesis_key, |section_auth| section_auth.section_key());
 
-        RelocateDetails {
+        Self {
             previous_name: peer.name(),
             dst,
             dst_section_key,

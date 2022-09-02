@@ -82,11 +82,11 @@ impl DataQueryVariant {
     pub fn address(&self) -> DataAddress {
         match self {
             #[cfg(feature = "chunks")]
-            DataQueryVariant::GetChunk(address) => DataAddress::Bytes(*address),
+            Self::GetChunk(address) => DataAddress::Bytes(*address),
             #[cfg(feature = "registers")]
-            DataQueryVariant::Register(read) => DataAddress::Register(read.dst_address()),
+            Self::Register(read) => DataAddress::Register(read.dst_address()),
             #[cfg(feature = "spentbook")]
-            DataQueryVariant::Spentbook(read) => {
+            Self::Spentbook(read) => {
                 DataAddress::Spentbook(SpentbookAddress::new(*read.dst_address().name()))
             }
         }
@@ -99,11 +99,11 @@ impl DataQueryVariant {
     pub fn operation_id(&self) -> Result<OperationId> {
         match self {
             #[cfg(feature = "chunks")]
-            DataQueryVariant::GetChunk(address) => chunk_operation_id(address),
+            Self::GetChunk(address) => chunk_operation_id(address),
             #[cfg(feature = "registers")]
-            DataQueryVariant::Register(read) => read.operation_id(),
+            Self::Register(read) => read.operation_id(),
             #[cfg(feature = "spentbook")]
-            DataQueryVariant::Spentbook(read) => read.operation_id(),
+            Self::Spentbook(read) => read.operation_id(),
         }
     }
 }

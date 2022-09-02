@@ -564,7 +564,7 @@ impl Session {
                 let link = session.peer_links.get_or_create(&peer).await;
 
                 let listen = |conn, incoming_msgs| {
-                    Session::spawn_msg_listener_thread(session.clone(), peer, conn, incoming_msgs);
+                    Self::spawn_msg_listener_thread(session.clone(), peer, conn, incoming_msgs);
                 };
 
                 let mut retries = 0;

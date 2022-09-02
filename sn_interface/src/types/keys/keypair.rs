@@ -55,7 +55,7 @@ impl OwnerType {
         };
         match signature {
             Signature::Bls(sig) => {
-                if let OwnerType::Multi(set) = self {
+                if let Self::Multi(set) = self {
                     set.public_key().verify(sig, data)
                 } else {
                     false
@@ -63,7 +63,7 @@ impl OwnerType {
             }
             ed @ Signature::Ed25519(_) => self.public_key().verify(ed, data).is_ok(),
             Signature::BlsShare(share) => {
-                if let OwnerType::Multi(set) = self {
+                if let Self::Multi(set) = self {
                     let pubkey_share = set.public_key_share(share.index);
                     pubkey_share.verify(&share.share, data)
                 } else {
@@ -97,9 +97,9 @@ pub trait Encryption: Sync + Send {
 impl Signing for Keypair {
     fn id(&self) -> OwnerType {
         match self {
-            Keypair::Ed25519(pair) => OwnerType::Single(PublicKey::Ed25519(pair.public)),
-            Keypair::Bls(pair) => OwnerType::Single(PublicKey::Bls(pair.public)),
-            Keypair::BlsShare(share) => OwnerType::Multi(share.public_key_set.clone()),
+            Self::Ed25519(pair) => OwnerType::Single(PublicKey::Ed25519(pair.public)),
+            Self::Bls(pair) => OwnerType::Single(PublicKey::Bls(pair.public)),
+            Self::BlsShare(share) => OwnerType::Multi(share.public_key_set.clone()),
         }
     }
 

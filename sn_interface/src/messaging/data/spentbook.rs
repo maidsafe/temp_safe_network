@@ -44,7 +44,7 @@ impl SpentbookQuery {
     /// Request variant.
     pub fn error(&self, error: Error) -> Result<QueryResponse> {
         match *self {
-            SpentbookQuery::SpentProofShares(_) => Ok(QueryResponse::SpentProofShares((
+            Self::SpentProofShares(_) => Ok(QueryResponse::SpentProofShares((
                 Err(error),
                 self.operation_id()?,
             ))),
@@ -54,7 +54,7 @@ impl SpentbookQuery {
     /// Returns the dst address for the request.
     pub fn dst_address(&self) -> SpentbookAddress {
         match self {
-            SpentbookQuery::SpentProofShares(address) => *address,
+            Self::SpentProofShares(address) => *address,
         }
     }
 

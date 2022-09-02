@@ -145,7 +145,7 @@ impl SectionsDAG {
             }
         }
         // create the SectionsDAG and apply the CRDT ops
-        let mut dag = SectionsDAG::new(*from);
+        let mut dag = Self::new(*from);
         let mut parent = *from;
         for node in crdt_ops.into_iter().rev() {
             let key = node.value.key;
