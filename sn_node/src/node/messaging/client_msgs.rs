@@ -86,6 +86,9 @@ impl MyNode {
         #[cfg(feature = "traceroute")]
         traceroute.0.push(self.identity());
 
+        let new_msg_id = MsgId::new();
+
+        debug!("SendMSg formed for {:?}", new_msg_id);
         Cmd::SendMsg {
             msg: OutgoingMsg::Client(msg),
             msg_id: MsgId::new(),
