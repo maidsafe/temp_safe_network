@@ -27,10 +27,7 @@ pub(crate) async fn upload_file_to_net(safe: &Safe, path: &Path) -> Result<XorUr
     let data = Bytes::from(data);
 
     let mut mime_type_for_xorurl = mime_guess::from_path(&path).first_raw();
-    let result = match safe
-        .store_bytes(data.to_owned(), mime_type_for_xorurl)
-        .await
-    {
+    let result = match safe.store_bytes(data.clone(), mime_type_for_xorurl).await {
         Ok(xorurl) => Ok(xorurl),
         Err(Error::InvalidMediaType(_)) => {
             // Let's then upload it and set media-type to be simply raw content

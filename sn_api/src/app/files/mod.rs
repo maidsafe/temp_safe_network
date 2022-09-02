@@ -911,7 +911,7 @@ async fn files_map_sync(
                         };
 
                         processed_files.insert(
-                            local_file_name.to_path_buf(),
+                            local_file_name.clone(),
                             FilesMapChange::Failed(format!("{}", err_type)),
                         );
                         info!("Skipping file \"{}\" since a file named \"{}\" with {} content already exists on target. You can use the 'force' flag to replace the existing file with the new one", local_file_name.display(), normalised_file_name, comp_str);
@@ -1317,7 +1317,7 @@ mod tests {
             .collect();
 
         let file_xorurl = safe
-            .store_bytes(Bytes::from(random_content.to_owned()), None)
+            .store_bytes(Bytes::from(random_content.clone()), None)
             .await?;
 
         let retrieved = retry_loop!(safe.files_get(&file_xorurl, None));

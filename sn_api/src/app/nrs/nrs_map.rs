@@ -60,7 +60,7 @@ impl NrsMap {
                     "NRS: public name resolution is: {} => {}",
                     public_name, link
                 );
-                Ok(Some(link.to_owned()))
+                Ok(Some(link.clone()))
             }
             None => {
                 debug!("NRS: No link found for public name: {}", public_name);
