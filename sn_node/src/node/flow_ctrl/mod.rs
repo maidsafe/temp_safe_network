@@ -33,7 +33,7 @@ use tokio::{
     time::Instant,
 };
 
-const PROCESS_BATCH_COUNT: usize = 5;
+const PROCESS_BATCH_COUNT: usize = 25;
 
 /// Listens for incoming msgs and forms Cmds for each,
 /// Periodically triggers other Cmd Processes (eg health checks, dysfunction etc)
@@ -164,6 +164,11 @@ impl FlowCtrl {
             let mut continue_with_periodics = false;
             // we go through all pending cmds in this loop
             while self.cmd_ctrl.has_items_queued() && !continue_with_periodics {
+                if let Err(error) = self.enqeue_new_cmds_from_channel().await {
+                    error!("{error:?}");
+                    break;
+                }
+
                 process_batch_count += 1;
                 self.process_next_cmd().await;
 
