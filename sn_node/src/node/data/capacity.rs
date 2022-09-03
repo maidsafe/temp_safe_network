@@ -58,7 +58,7 @@ impl Capacity {
     /// Storage levels of nodes in the section.
     pub(super) fn levels(&self) -> BTreeMap<XorName, StorageLevel> {
         let mut map = BTreeMap::new();
-        for (name, level) in self.adult_levels.iter() {
+        for (name, level) in &self.adult_levels {
             let _prev = map.insert(*name, *level);
         }
         map
@@ -76,7 +76,7 @@ impl Capacity {
     /// Full chunk storing nodes in the section (considered full when at >= `MIN_LEVEL_WHEN_FULL`).
     pub(super) fn full_adults(&self) -> BTreeSet<XorName> {
         let mut set = BTreeSet::new();
-        for (name, level) in self.adult_levels.iter() {
+        for (name, level) in &self.adult_levels {
             if level.value() >= MIN_LEVEL_WHEN_FULL {
                 let _changed = set.insert(*name);
             }

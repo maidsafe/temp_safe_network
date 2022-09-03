@@ -102,7 +102,7 @@ fn bench_data_storage_writes(c: &mut Criterion) -> Result<()> {
 
     let size_ranges = [100, 1_000, 4_000];
 
-    for size in size_ranges.iter() {
+    for size in &size_ranges {
         let data_set: Vec<_> = (0..*size)
             .map(|_| create_random_register_replicated_data())
             .collect();
@@ -125,7 +125,7 @@ fn bench_data_storage_writes(c: &mut Criterion) -> Result<()> {
         );
     }
 
-    for size in size_ranges.iter() {
+    for size in &size_ranges {
         let seed = random_vector(NONSENSE_CHUNK_SIZE);
         group.bench_with_input(
             BenchmarkId::new("chunk writes", size),
@@ -163,7 +163,7 @@ fn bench_data_storage_reads(c: &mut Criterion) -> Result<()> {
 
     let size_ranges = [100, 1_000, 4_000];
 
-    for size in size_ranges.iter() {
+    for size in &size_ranges {
         group.bench_with_input(BenchmarkId::new("register_keys", size), size, |b, &size| {
             let storage = get_new_data_store()
                 .context("Could not create a temp data store")
@@ -181,12 +181,12 @@ fn bench_data_storage_reads(c: &mut Criterion) -> Result<()> {
             }
 
             b.iter(|| {
-                let _keys = storage.data_addrs();
+                let _keys = runtime.block_on(storage.data_addrs());
             })
         });
     }
 
-    for size in size_ranges.iter() {
+    for size in &size_ranges {
         group.bench_with_input(BenchmarkId::new("chunk keys", size), size, |b, &size| {
             let mut storage = get_new_data_store()
                 .context("Could not create a temp data store")
@@ -204,7 +204,7 @@ fn bench_data_storage_reads(c: &mut Criterion) -> Result<()> {
             }
 
             b.iter(|| {
-                let _keys = storage.data_addrs();
+                let _keys = runtime.block_on(storage.data_addrs());
             })
         });
     }

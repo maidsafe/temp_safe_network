@@ -84,9 +84,9 @@ impl PublicKey {
     /// Returns the bytes of the underlying public key.
     pub fn to_bytes(self) -> Vec<u8> {
         match self {
-            PublicKey::Ed25519(pub_key) => pub_key.to_bytes().into(),
-            PublicKey::Bls(pub_key) => pub_key.to_bytes().into(),
-            PublicKey::BlsShare(pub_key) => pub_key.to_bytes().into(),
+            Self::Ed25519(pub_key) => pub_key.to_bytes().into(),
+            Self::Bls(pub_key) => pub_key.to_bytes().into(),
+            Self::BlsShare(pub_key) => pub_key.to_bytes().into(),
         }
     }
 
@@ -159,7 +159,7 @@ impl Hash for PublicKey {
 }
 
 impl Ord for PublicKey {
-    fn cmp(&self, other: &PublicKey) -> Ordering {
+    fn cmp(&self, other: &Self) -> Ordering {
         utils::serialise(&self)
             .unwrap_or_default()
             .cmp(&utils::serialise(other).unwrap_or_default())
@@ -167,7 +167,7 @@ impl Ord for PublicKey {
 }
 
 impl PartialOrd for PublicKey {
-    fn partial_cmp(&self, other: &PublicKey) -> Option<Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
@@ -176,12 +176,12 @@ impl From<PublicKey> for XorName {
     fn from(public_key: PublicKey) -> Self {
         let bytes = match public_key {
             PublicKey::Ed25519(pub_key) => {
-                return XorName(pub_key.to_bytes());
+                return Self(pub_key.to_bytes());
             }
             PublicKey::Bls(pub_key) => pub_key.to_bytes(),
             PublicKey::BlsShare(pub_key) => pub_key.to_bytes(),
         };
-        let mut xor_name: XorName = xor_name::rand::random();
+        let mut xor_name: Self = xor_name::rand::random();
         xor_name.0.clone_from_slice(&bytes[..XOR_NAME_LEN]);
         xor_name
     }

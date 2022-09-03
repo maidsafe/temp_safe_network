@@ -911,7 +911,7 @@ async fn files_map_sync(
                         };
 
                         processed_files.insert(
-                            local_file_name.to_path_buf(),
+                            local_file_name.clone(),
                             FilesMapChange::Failed(format!("{}", err_type)),
                         );
                         info!("Skipping file \"{}\" since a file named \"{}\" with {} content already exists on target. You can use the 'force' flag to replace the existing file with the new one", local_file_name.display(), normalised_file_name, comp_str);
@@ -944,7 +944,7 @@ async fn files_map_sync(
 
     // Finally, unless 'delete' was set keep the files that are currently
     // in FilesContainer but not in source location
-    current_files_map.iter().for_each(|(file_name, file_item)| {
+    for (file_name, file_item) in current_files_map.iter() {
         if !delete {
             updated_files_map.insert(file_name.to_string(), file_item.clone());
         } else {
@@ -957,7 +957,7 @@ async fn files_map_sync(
             processed_files.insert(PathBuf::from(file_name), FilesMapChange::Removed(xorurl));
             success_count += 1;
         }
-    });
+    }
 
     Ok((processed_files, updated_files_map, success_count))
 }
@@ -1102,7 +1102,7 @@ fn files_map_remove_path(
             dst_path.display().to_string()
         };
 
-        files_map.iter().for_each(|(file_path, file_item)| {
+        for (file_path, file_item) in files_map.iter() {
             // if the current file_path is a subfolder we remove it
             if file_path.starts_with(&folder_path) {
                 // note: files have link property, dirs and symlinks do not
@@ -1116,7 +1116,7 @@ fn files_map_remove_path(
             } else {
                 new_files_map.insert(file_path.to_string(), file_item.clone());
             }
-        });
+        }
         (success_count, new_files_map)
     } else {
         let file_item = files_map
@@ -1317,7 +1317,7 @@ mod tests {
             .collect();
 
         let file_xorurl = safe
-            .store_bytes(Bytes::from(random_content.to_owned()), None)
+            .store_bytes(Bytes::from(random_content.clone()), None)
             .await?;
 
         let retrieved = retry_loop!(safe.files_get(&file_xorurl, None));

@@ -66,22 +66,22 @@ impl State {
     pub fn metadata_json() -> serde_json::Value {
         // Colors generated with https://mokole.com/palette.html
         serde_json::json!({
-            "Idle": { "value": State::Idle as usize, "color": "#f9f9f9" },
-            "Validation": { "value": State::Validation as usize, "color": "#7f0000" },
-            "Comms": { "value": State::Comms as usize, "color": "#808000" },
-            "Dysfunction": { "value": State::Dysfunction as usize, "color": "#000080" },
-            "BackPressure": { "value": State::BackPressure as usize, "color": "#ff0000" },
-            "ServiceMsg": { "value": State::ServiceMsg as usize, "color": "#00ced1" },
-            "Dkg": { "value": State::Dkg as usize, "color": "#ffa500" },
-            "Agreement": { "value": State::Agreement as usize, "color": "#7fff00" },
-            "Membership": { "value": State::Membership as usize, "color": "#e9967a" },
-            "Handover": { "value": State::Handover as usize, "color": "#0000ff" },
-            "Replication": { "value": State::Replication as usize, "color": "#ff00ff" },
-            "AntiEntropy": { "value": State::AntiEntropy as usize, "color": "#1e90ff" },
-            "Relocate": { "value": State::Relocate as usize, "color": "#ffff54" },
-            "Join": { "value": State::Join as usize, "color": "#dda0dd" },
-            "Propose": { "value": State::Propose as usize, "color": "#ff1493" },
-            "Node": { "value": State::Node as usize, "color": "#98fb98" },
+            "Idle": { "value": Self::Idle as usize, "color": "#f9f9f9" },
+            "Validation": { "value": Self::Validation as usize, "color": "#7f0000" },
+            "Comms": { "value": Self::Comms as usize, "color": "#808000" },
+            "Dysfunction": { "value": Self::Dysfunction as usize, "color": "#000080" },
+            "BackPressure": { "value": Self::BackPressure as usize, "color": "#ff0000" },
+            "ServiceMsg": { "value": Self::ServiceMsg as usize, "color": "#00ced1" },
+            "Dkg": { "value": Self::Dkg as usize, "color": "#ffa500" },
+            "Agreement": { "value": Self::Agreement as usize, "color": "#7fff00" },
+            "Membership": { "value": Self::Membership as usize, "color": "#e9967a" },
+            "Handover": { "value": Self::Handover as usize, "color": "#0000ff" },
+            "Replication": { "value": Self::Replication as usize, "color": "#ff00ff" },
+            "AntiEntropy": { "value": Self::AntiEntropy as usize, "color": "#1e90ff" },
+            "Relocate": { "value": Self::Relocate as usize, "color": "#ffff54" },
+            "Join": { "value": Self::Join as usize, "color": "#dda0dd" },
+            "Propose": { "value": Self::Propose as usize, "color": "#ff1493" },
+            "Node": { "value": Self::Node as usize, "color": "#98fb98" },
         })
     }
 }

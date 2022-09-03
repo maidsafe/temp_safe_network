@@ -61,11 +61,11 @@ impl Session {
         local_addr: SocketAddr,
         cmd_ack_wait: Duration,
         network_contacts: SectionTree,
-    ) -> Result<Session> {
+    ) -> Result<Self> {
         let endpoint = Endpoint::new_client(local_addr, qp2p_config)?;
         let peer_links = PeerLinks::new(endpoint.clone());
 
-        let session = Session {
+        let session = Self {
             pending_queries: Arc::new(DashMap::default()),
             pending_cmds: Arc::new(DashMap::default()),
             endpoint,

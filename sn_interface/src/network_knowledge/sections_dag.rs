@@ -145,7 +145,7 @@ impl SectionsDAG {
             }
         }
         // create the SectionsDAG and apply the CRDT ops
-        let mut dag = SectionsDAG::new(*from);
+        let mut dag = Self::new(*from);
         let mut parent = *from;
         for node in crdt_ops.into_iter().rev() {
             let key = node.value.key;
@@ -173,7 +173,7 @@ impl SectionsDAG {
         }
         // insert all the nodes from `other`
         let mut need_to_visit: Vec<(bls::PublicKey, Node<SectionInfo>)> = Vec::new();
-        for key in other.dag_root.iter() {
+        for key in &other.dag_root {
             need_to_visit.push((*other.genesis_key(), other.get_node(key)?));
         }
         while let Some((parent_key, current_node)) = need_to_visit.pop() {

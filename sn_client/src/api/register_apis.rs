@@ -42,7 +42,7 @@ impl Client {
     /// Starts publishing from the index when called again with the same WAL.
     #[instrument(skip(self), level = "debug")]
     pub async fn publish_register_ops(&self, wal: RegisterWriteAheadLog) -> Result<(), Error> {
-        for cmd in wal.iter() {
+        for cmd in &wal {
             self.send_cmd(cmd.clone()).await?;
         }
         Ok(())

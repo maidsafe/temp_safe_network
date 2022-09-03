@@ -158,7 +158,7 @@ impl ServiceMsg {
 
         match self {
             // Client <-> node service comms
-            ServiceMsg::Cmd(_) => SERVICE_CMD_PRIORITY,
+            Self::Cmd(_) => SERVICE_CMD_PRIORITY,
             _ => SERVICE_QUERY_PRIORITY,
         }
     }
@@ -167,16 +167,16 @@ impl ServiceMsg {
 impl Display for ServiceMsg {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            ServiceMsg::Cmd(cmd) => write!(f, "ServiceMsg::Cmd({:?})", cmd),
-            ServiceMsg::CmdAck { correlation_id } => {
+            Self::Cmd(cmd) => write!(f, "ServiceMsg::Cmd({:?})", cmd),
+            Self::CmdAck { correlation_id } => {
                 write!(f, "ServiceMsg::CmdAck({:?})", correlation_id)
             }
-            ServiceMsg::CmdError { error, .. } => write!(f, "ServiceMsg::CmdError({:?})", error),
-            ServiceMsg::Query(query) => write!(f, "ServiceMsg::Query({:?})", query),
-            ServiceMsg::QueryResponse { response, .. } => {
+            Self::CmdError { error, .. } => write!(f, "ServiceMsg::CmdError({:?})", error),
+            Self::Query(query) => write!(f, "ServiceMsg::Query({:?})", query),
+            Self::QueryResponse { response, .. } => {
                 write!(f, "ServiceMsg::QueryResponse({:?})", response)
             }
-            ServiceMsg::ServiceError(error) => write!(f, "ServiceMsg::ServiceError({:?})", error),
+            Self::ServiceError(error) => write!(f, "ServiceMsg::ServiceError({:?})", error),
         }
     }
 }

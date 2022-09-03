@@ -85,7 +85,7 @@ impl SignatureAggregator {
         let expiration = self.expiration;
         let mut to_remove = vec![];
 
-        for (digest, state) in self.map.iter() {
+        for (digest, state) in &self.map {
             if state.modified.elapsed() >= expiration {
                 to_remove.push(*digest);
             }

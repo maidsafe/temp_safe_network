@@ -60,7 +60,7 @@ impl FromStr for VersionHash {
 impl From<&EntryHash> for VersionHash {
     fn from(entry_hash: &EntryHash) -> Self {
         VersionHash {
-            entry_hash: entry_hash.to_owned(),
+            entry_hash: *entry_hash,
         }
     }
 }

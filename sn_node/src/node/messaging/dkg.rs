@@ -48,7 +48,7 @@ impl Node {
 
         // remove ourself from recipients
         let our_name = self.info().name();
-        for recipient in recipients.into_iter() {
+        for recipient in recipients {
             if recipient.name() == our_name {
                 handle = true;
             } else {

@@ -239,19 +239,19 @@ impl DysfunctionDetection {
     }
 
     fn cleanup_time_sensistive_checks(&mut self) -> Result<()> {
-        for (_name, issues) in self.communication_issues.iter_mut() {
+        for issues in &mut self.communication_issues.values_mut() {
             issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
         }
 
-        for (_name, issues) in self.probe_issues.iter_mut() {
+        for issues in &mut self.probe_issues.values_mut() {
             issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
         }
 
-        for (_name, issues) in self.knowledge_issues.iter_mut() {
+        for issues in &mut self.knowledge_issues.values_mut() {
             issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
         }
 
-        for (_name, issues) in self.dkg_issues.iter_mut() {
+        for issues in &mut self.dkg_issues.values_mut() {
             issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
         }
 
@@ -308,8 +308,8 @@ mod tests {
     impl NodeQualityScored {
         fn get_failure_rate(&self) -> &f32 {
             match self {
-                NodeQualityScored::Good(r) => r,
-                NodeQualityScored::Bad(r) => r,
+                Self::Good(r) => r,
+                Self::Bad(r) => r,
             }
         }
     }
@@ -845,7 +845,7 @@ mod tests {
             Runtime::new().unwrap().block_on(async {
                 let nodes = (0..node_count).map(|_| random_xorname()).collect::<Vec<XorName>>();
                 let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
-                for node in nodes.iter() {
+                for node in &nodes {
                     for _ in 0..issue_count {
                         dysfunctional_detection.track_issue(
                             *node, issue_type.clone());
@@ -871,7 +871,7 @@ mod tests {
                         score_results.op_scores
                     },
                 };
-                for node in nodes.iter() {
+                for node in &nodes {
                     assert_eq!(*scores.get(node).unwrap(), 0.0);
                 }
             })

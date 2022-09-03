@@ -83,7 +83,7 @@ impl RegisterStorage {
         let mut stored_reg = self.try_load_stored_register(&data.address).await?;
 
         let mut log_to_write = Vec::new();
-        for replicated_cmd in data.op_log.iter() {
+        for replicated_cmd in &data.op_log {
             if let Err(err) = self
                 .try_to_apply_cmd_against_register_state(replicated_cmd, &mut stored_reg)
                 .await
@@ -339,7 +339,7 @@ impl RegisterStorage {
                 let mut register =
                     Register::new(*op.policy.owner(), op.name, op.tag, op.policy.clone());
 
-                for cmd in stored_reg.op_log.iter() {
+                for cmd in &stored_reg.op_log {
                     self.apply(cmd, &mut register).await?;
                 }
 
@@ -402,7 +402,7 @@ impl RegisterStorage {
         let mut stored_reg = self.file_store.open_reg_log_from_disk(addr).await?;
         // if we have the Register creation cmd, apply all ops to reconstruct the Register
         if let Some(register) = &mut stored_reg.state {
-            for cmd in stored_reg.op_log.iter() {
+            for cmd in &stored_reg.op_log {
                 if let RegisterCmd::Edit(SignedRegisterEdit { op, .. }) = cmd {
                     let EditRegister { edit, .. } = op;
                     register

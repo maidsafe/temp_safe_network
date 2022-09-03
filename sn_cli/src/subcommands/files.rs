@@ -433,7 +433,7 @@ async fn process_tree_command(
     // Transform flat list in `files_map` to a hierarchy in `top`
     let mut files: u64 = 0;
     let mut dirs: u64 = 0;
-    for (name, file_details) in files_map.iter() {
+    for (name, file_details) in &files_map {
         let path_parts: Vec<String> = name
             .to_string()
             .trim_matches('/')
@@ -726,7 +726,7 @@ fn print_files_map(
     // 3. modified timestamp,
     // 4. file/directory name
     table.add_row(&vec!["SIZE", "CREATED", "MODIFIED", "NAME"]);
-    files_map.iter().for_each(|(name, file_item)| {
+    for (name, file_item) in files_map.iter() {
         total_bytes += file_item["size"].parse().unwrap_or(0);
         if name.ends_with('/') {
             table.add_row(&vec![
@@ -753,7 +753,7 @@ fn print_files_map(
                 &name_field,
             ]);
         }
-    });
+    }
     println!(
         "Files: {}   Size: {}   Total Files: {}   Total Size: {}",
         cwd_files, cwd_size, total_files, total_bytes

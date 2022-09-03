@@ -75,7 +75,7 @@ impl DkgSessionId {
 
         hasher.update(&self.section_chain_len.to_le_bytes());
 
-        for member in self.bootstrap_members.iter() {
+        for member in &self.bootstrap_members {
             hasher.update(&member.name);
         }
     }
@@ -139,7 +139,7 @@ impl DkgFailureSig {
         failed_participants: &BTreeSet<XorName>,
         session_id: DkgSessionId,
     ) -> Self {
-        DkgFailureSig {
+        Self {
             public_key: keypair.public,
             signature: ed25519::sign(&hashed_failure(&session_id, failed_participants), keypair),
             session_id,
