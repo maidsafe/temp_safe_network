@@ -4,19 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.62.1 (2022-08-28)
+## v0.63.0 (2022-09-04)
 
-### Test
+### Chore
 
- - <csr-id-5776b75465d8bb7eb2d2de30e558b9480e9dc8c3/> use `httpmock` to test remote network contacts
+ - <csr-id-f31bd5df469a16d39e6b03de605981ad303a2be3/> replace for_each with for loop
+ - <csr-id-921438659ccaf65b2ea8cc00efb61d8146ef71ef/> unneeded iter methods removal
+ - <csr-id-f5d436fba99e0e9c258c7ab3c3a256be3be58f84/> applied use_self lint
+ - <csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/> switch on clippy::unwrap_used as a warning
+
+
+### Refactor
+
+ - <csr-id-39dd5a043c75492e416bb9371015a1365b06fa01/> small tweaks; clippy::equatable_if_let
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release over the course of 2 calendar days.
- - 2 days passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 5 commits contributed to the release over the course of 4 calendar days.
+ - 4 days passed between releases.
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -26,10 +34,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - replace for_each with for loop ([`f31bd5d`](https://github.com/maidsafe/safe_network/commit/f31bd5df469a16d39e6b03de605981ad303a2be3))
+    - unneeded iter methods removal ([`9214386`](https://github.com/maidsafe/safe_network/commit/921438659ccaf65b2ea8cc00efb61d8146ef71ef))
+    - applied use_self lint ([`f5d436f`](https://github.com/maidsafe/safe_network/commit/f5d436fba99e0e9c258c7ab3c3a256be3be58f84))
+    - small tweaks; clippy::equatable_if_let ([`39dd5a0`](https://github.com/maidsafe/safe_network/commit/39dd5a043c75492e416bb9371015a1365b06fa01))
+    - switch on clippy::unwrap_used as a warning ([`3a718d8`](https://github.com/maidsafe/safe_network/commit/3a718d8c0957957a75250b044c9d1ad1b5874ab0))
+</details>
+
+## v0.62.1 (2022-08-28)
+
+<csr-id-5776b75465d8bb7eb2d2de30e558b9480e9dc8c3/>
+
+### Test
+
+ - <csr-id-5776b75465d8bb7eb2d2de30e558b9480e9dc8c3/> use `httpmock` to test remote network contacts
+
+### Chore
+
+ - <csr-id-2b268209e6910472558145a5d08b99e968550221/> sn_interface-0.10.2/sn_client-0.71.1/sn_node-0.66.2/sn_cli-0.62.1
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release over the course of 2 calendar days.
+ - 3 days passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.10.2/sn_client-0.71.1/sn_node-0.66.2/sn_cli-0.62.1 ([`2b26820`](https://github.com/maidsafe/safe_network/commit/2b268209e6910472558145a5d08b99e968550221))
     - use `httpmock` to test remote network contacts ([`5776b75`](https://github.com/maidsafe/safe_network/commit/5776b75465d8bb7eb2d2de30e558b9480e9dc8c3))
 </details>
 
 ## v0.62.0 (2022-08-25)
+
+<csr-id-401bc416c7aea65ae55e9adee2cbecf782c999cf/>
 
 ### Chore
 
@@ -41,7 +87,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 1 commit contributed to the release.
  - 1 day passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -102,7 +148,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 10 commits contributed to the release over the course of 8 calendar days.
  - 9 days passed between releases.
- - 10 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 10 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -229,7 +275,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 35 commits contributed to the release over the course of 33 calendar days.
  - 34 days passed between releases.
- - 31 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 31 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -303,7 +349,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 2 commits contributed to the release over the course of 1 calendar day.
  - 2 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -330,7 +376,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -378,7 +424,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 13 commits contributed to the release over the course of 1 calendar day.
  - 2 days passed between releases.
- - 8 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 8 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -462,7 +508,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 13 commits contributed to the release over the course of 6 calendar days.
  - 8 days passed between releases.
- - 13 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 13 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -601,7 +647,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 12 commits contributed to the release over the course of 1 calendar day.
  - 2 days passed between releases.
- - 11 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 11 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -644,7 +690,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 3 commits contributed to the release over the course of 3 calendar days.
  - 5 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -680,7 +726,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 3 commits contributed to the release.
  - 2 days passed between releases.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -718,7 +764,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -760,7 +806,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 8 commits contributed to the release over the course of 2 calendar days.
  - 6 days passed between releases.
- - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -800,7 +846,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 2 commits contributed to the release.
  - 1 day passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -839,7 +885,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 3 commits contributed to the release over the course of 2 calendar days.
  - 2 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -919,7 +965,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 16 commits contributed to the release over the course of 4 calendar days.
  - 8 days passed between releases.
- - 15 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 15 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -961,7 +1007,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 1 commit contributed to the release.
  - 2 days passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -988,7 +1034,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 2 commits contributed to the release.
  - 3 days passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1016,7 +1062,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 1 commit contributed to the release.
  - 3 days passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1048,7 +1094,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 4 commits contributed to the release over the course of 8 calendar days.
  - 11 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1096,7 +1142,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 7 commits contributed to the release over the course of 11 calendar days.
  - 13 days passed between releases.
- - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1177,7 +1223,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 10 commits contributed to the release over the course of 4 calendar days.
  - 8 days passed between releases.
- - 10 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 10 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1227,7 +1273,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 4 commits contributed to the release.
  - 5 days passed between releases.
- - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1268,7 +1314,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 3 commits contributed to the release over the course of 2 calendar days.
  - 9 days passed between releases.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1309,7 +1355,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 3 commits contributed to the release over the course of 1 calendar day.
  - 5 days passed between releases.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1362,7 +1408,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 4 commits contributed to the release over the course of 1 calendar day.
  - 3 days passed between releases.
- - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1395,7 +1441,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 2 commits contributed to the release.
  - 18 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1434,7 +1480,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 2 commits contributed to the release.
  - 2 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1466,7 +1512,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 2 commits contributed to the release.
  - 2 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1508,7 +1554,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 7 commits contributed to the release over the course of 2 calendar days.
  - 3 days passed between releases.
- - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1555,7 +1601,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 2 commits contributed to the release.
  - 5 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1609,7 +1655,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 3 commits contributed to the release.
  - 2 days passed between releases.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1650,7 +1696,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 2 commits contributed to the release.
  - 2 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1725,7 +1771,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 7 commits contributed to the release over the course of 3 calendar days.
  - 3 days passed between releases.
- - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1762,7 +1808,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 3 commits contributed to the release.
  - 4 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1826,7 +1872,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 6 commits contributed to the release over the course of 2 calendar days.
  - 2 days passed between releases.
- - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1885,7 +1931,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 2 commits contributed to the release.
  - 3 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1959,7 +2005,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 3 commits contributed to the release over the course of 2 calendar days.
  - 6 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1999,7 +2045,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 5 commits contributed to the release over the course of 1 calendar day.
  - 1 day passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2092,7 +2138,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 16 commits contributed to the release over the course of 13 calendar days.
  - 13 days passed between releases.
- - 8 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 8 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2168,7 +2214,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 9 commits contributed to the release over the course of 1 calendar day.
  - 1 day passed between releases.
- - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2215,7 +2261,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2247,7 +2293,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2279,7 +2325,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2344,7 +2390,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 6 commits contributed to the release over the course of 10 calendar days.
  - 11 days passed between releases.
- - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2425,7 +2471,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 8 commits contributed to the release over the course of 6 calendar days.
  - 6 days passed between releases.
- - 8 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 8 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2469,7 +2515,7 @@ This is a manually generated changelog, as `smart-release` seemed to have some i
 <csr-read-only-do-not-edit/>
 
  - 3 commits contributed to the release.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -2629,7 +2675,7 @@ This is a manual changelog entry. Subsequent CLI releases will use the automated
 
  - 17 commits contributed to the release over the course of 6 calendar days.
  - 7 days passed between releases.
- - 17 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 17 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -3711,7 +3757,7 @@ like files with 0 bytes in them any more.
 <csr-read-only-do-not-edit/>
 
  - 153 commits contributed to the release over the course of 452 calendar days.
- - 126 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 126 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
