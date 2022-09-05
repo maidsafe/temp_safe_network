@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1662396204778,
+  "lastUpdate": 1662400781767,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -21605,6 +21605,150 @@ window.BENCHMARK_DATA = {
             "name": "generating keys",
             "value": 4617451,
             "range": "± 275956",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "b62c056b0b28f67a40d9e036b2d64b36fd5380bd",
+          "message": "Merge #1545\n\n1545: fix: always resend query to adults r=bochaco a=joshuef\n\nRemove a potential source of errors. We _always_ send on queries now. Regardless if the client already exists in `pending_queries`. There's a reason they're re-requesting.\r\n\r\nWhen we have cache implemented at elders we can short circuit this there... but otherwise we should treat each request equally.\n\nCo-authored-by: Josh Wilson <joshuef@gmail.com>",
+          "timestamp": "2022-09-05T15:40:45Z",
+          "tree_id": "4f70ad78016295f0fecd2f95eff14f18417662da",
+          "url": "https://github.com/maidsafe/safe_network/commit/b62c056b0b28f67a40d9e036b2d64b36fd5380bd"
+        },
+        "date": 1662400779101,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/generating bytes to send the same msg to various Dsts",
+            "value": 6975301,
+            "range": "± 456146",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 1945339438,
+            "range": "± 3723597495",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 2000695511,
+            "range": "± 213381464",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 2116501980,
+            "range": "± 3763305729",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 468336411,
+            "range": "± 460545046",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 490738639,
+            "range": "± 161571028",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 901331446,
+            "range": "± 228304255",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 39655293,
+            "range": "± 27438879",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 1657991823,
+            "range": "± 414582089",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 8173765828,
+            "range": "± 1443143703",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 126179633,
+            "range": "± 32975112",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1291791453,
+            "range": "± 335011462",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 4736136670,
+            "range": "± 531298288",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 47887006,
+            "range": "± 3654571",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 553974827,
+            "range": "± 91559881",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1965934012,
+            "range": "± 189519356",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 12853189,
+            "range": "± 787434",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 121039561,
+            "range": "± 15370999",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 421755023,
+            "range": "± 21544301",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "generating keys",
+            "value": 6339286,
+            "range": "± 474369",
             "unit": "ns/iter"
           }
         ]
