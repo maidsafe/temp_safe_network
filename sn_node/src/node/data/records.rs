@@ -103,10 +103,6 @@ impl Node {
             if peers.len() > MAX_WAITING_PEERS_PER_QUERY {
                 warn!("Dropping query from {source_client:?}, there are more than {MAX_WAITING_PEERS_PER_QUERY} waiting already");
                 return Ok(vec![]);
-            } else {
-                // we don't respond to the actual query, as we're still within data query timeout
-                // we rely on the data query cache timeout to decide as/when we'll be re-sending a query to adults
-                return Ok(cmds);
             }
         }
 
