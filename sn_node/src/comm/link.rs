@@ -19,7 +19,7 @@ use std::{
 };
 
 type Priority = u64;
-type ConnId = usize;
+type ConnId = String; // Socket Addr + Connection.id()
 
 // Capacity is needed since we cannot control how many connections
 // another node opens to us (however, if they run the same code that
@@ -136,11 +136,11 @@ impl Link {
             Err(error) => {
                 // clean up failing connections at once, no nead to leak it outside of here
                 // next send (e.g. when retrying) will use/create a new connection
-                let id = &conn.id();
+                let id = get_unique_connection_id_per_peer(&conn);
                 // We could write just `self.queue.remove(id)`, but the library warns for `unused_results`.
                 {
-                    let _ = self.connections.remove(id);
-                    let _ = self.queue.remove(id);
+                    let _ = self.connections.remove(&id);
+                    let _ = self.queue.remove(&id);
                 }
                 conn.close(Some(format!("{:?}", error)));
                 Err(SendToOneError::Send(error))
@@ -150,28 +150,16 @@ impl Link {
 
     async fn get_or_connect(&mut self) -> Result<qp2p::Connection, SendToOneError> {
         // get the most recently used connection
-        match self.queue.peek_max().map(|(id, _prio)| *id) {
+        match self.queue.peek_max().map(|(id, _prio)| id) {
             None => self.create_connection().await,
-            Some(id) => self.read_conn(id).await,
+            Some(id) => self.read_conn(id.to_string()).await,
         }
     }
 
-    /// Is this Link currently connected?
-    #[allow(unused)]
-    pub(crate) fn is_connected(&self) -> bool {
-        // get the most recently used connection
-
-        self.queue
-            .peek_max()
-            .and_then(|(id, _)| self.connections.get(id))
-            .map(|conn| !conn.expired())
-            .unwrap_or(false)
-    }
-
-    async fn read_conn(&mut self, id: usize) -> Result<qp2p::Connection, SendToOneError> {
+    async fn read_conn(&mut self, id: ConnId) -> Result<qp2p::Connection, SendToOneError> {
         match self.connections.get(&id).cloned() {
             Some(item) => {
-                self.touch(item.conn.id());
+                self.touch(get_unique_connection_id_per_peer(&item.conn));
                 Ok(item.conn)
             }
             None => self.create_connection().await,
@@ -185,11 +173,12 @@ impl Link {
             .await
             .map_err(SendToOneError::Connection)?;
 
+        let id = get_unique_connection_id_per_peer(&conn);
         trace!(
             "{} to {} (id: {})",
             LogMarker::ConnectionOpened,
             conn.remote_address(),
-            conn.id()
+            id
         );
 
         self.insert(conn.clone());
@@ -200,9 +189,9 @@ impl Link {
     }
 
     fn insert(&mut self, conn: qp2p::Connection) {
-        let id = conn.id();
+        let id = get_unique_connection_id_per_peer(&conn);
 
-        let _ = self.connections.insert(id, ExpiringConn::new(conn));
+        let _ = self.connections.insert(id.clone(), ExpiringConn::new(conn));
 
         let prio = self.priority();
         let _ = self.queue.push(id, prio);
@@ -261,7 +250,10 @@ impl Link {
             let _ = self.queue.remove(&id);
 
             if let Some(item) = self.connections.remove(&id) {
-                trace!("Connection expired: {}", item.conn.id());
+                trace!(
+                    "Connection expired: {}",
+                    get_unique_connection_id_per_peer(&item.conn)
+                );
                 item.conn.close(Some("Connection expired.".to_string()));
             }
         }
@@ -281,6 +273,18 @@ impl Link {
             }
         }
     }
+}
+
+/// Takes a qp2p Connection, and provides a globally unique id of that connection
+///
+/// Internally this prefaces the qp2p conn.id() with the conn.remove_address
+/// which should make this unique for the node (if no other node has the same SocketAddress...
+/// which should not be possible)
+fn get_unique_connection_id_per_peer(conn: &qp2p::Connection) -> ConnId {
+    let socket = conn.remote_address();
+    let conn_id = conn.id();
+
+    format!("{}{}", socket, conn_id)
 }
 
 /// Errors that can be returned from `Comm::send_to_one`.
