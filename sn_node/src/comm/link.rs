@@ -19,7 +19,7 @@ use std::{
 };
 
 type Priority = u64;
-type ConnId = usize;
+type ConnId = String;
 
 // Capacity is needed since we cannot control how many connections
 // another node opens to us (however, if they run the same code that
@@ -150,7 +150,7 @@ impl Link {
 
     async fn get_or_connect(&mut self) -> Result<qp2p::Connection, SendToOneError> {
         // get the most recently used connection
-        match self.queue.peek_max().map(|(id, _prio)| *id) {
+        match self.queue.peek_max().map(|(id, _prio)| id.clone()) {
             None => self.create_connection().await,
             Some(id) => self.read_conn(id).await,
         }
@@ -168,7 +168,7 @@ impl Link {
             .unwrap_or(false)
     }
 
-    async fn read_conn(&mut self, id: usize) -> Result<qp2p::Connection, SendToOneError> {
+    async fn read_conn(&mut self, id: ConnId) -> Result<qp2p::Connection, SendToOneError> {
         match self.connections.get(&id).cloned() {
             Some(item) => {
                 self.touch(item.conn.id());
@@ -202,7 +202,7 @@ impl Link {
     fn insert(&mut self, conn: qp2p::Connection) {
         let id = conn.id();
 
-        let _ = self.connections.insert(id, ExpiringConn::new(conn));
+        let _ = self.connections.insert(id.clone(), ExpiringConn::new(conn));
 
         let prio = self.priority();
         let _ = self.queue.push(id, prio);

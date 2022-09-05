@@ -25,7 +25,7 @@ use tokio::sync::{Mutex, RwLock};
 use xor_name::XorName;
 
 type Priority = u64;
-type ConnId = usize;
+type ConnId = String;
 
 // Capacity is needed since we cannot control how many connections
 // another node opens to us (however, if they run the same code that
@@ -159,7 +159,13 @@ impl Link {
         listen: F,
     ) -> Result<qp2p::Connection, SendToOneError> {
         // get the most recently used connection
-        let res = { self.queue.read().await.peek_max().map(|(id, _prio)| *id) };
+        let res = {
+            self.queue
+                .read()
+                .await
+                .peek_max()
+                .map(|(id, _prio)| id.clone())
+        };
 
         match res {
             None => {
@@ -169,7 +175,13 @@ impl Link {
                 // first caller will find none again, but the subsequent callers
                 // will access only after the first one finished creating a new connection
                 // thus will find a connection here:
-                let res = { self.queue.read().await.peek_max().map(|(id, _prio)| *id) };
+                let res = {
+                    self.queue
+                        .read()
+                        .await
+                        .peek_max()
+                        .map(|(id, _prio)| id.clone())
+                };
                 if let Some(id) = res {
                     self.read_conn(id, listen).await
                 } else {
@@ -184,7 +196,13 @@ impl Link {
     pub(crate) async fn is_connected(&self) -> bool {
         self.remove_expired().await;
         // get the most recently used connection
-        let res = { self.queue.read().await.peek_max().map(|(id, _prio)| *id) };
+        let res = {
+            self.queue
+                .read()
+                .await
+                .peek_max()
+                .map(|(id, _prio)| id.clone())
+        };
         match res {
             None => false,
             Some(id) => match self.connections.read().await.get(&id) {
@@ -196,7 +214,7 @@ impl Link {
 
     async fn read_conn<F: Fn(qp2p::Connection, IncomingMsgs)>(
         &self,
-        id: usize,
+        id: ConnId,
         listen: F,
     ) -> Result<qp2p::Connection, SendToOneError> {
         let res = { self.connections.read().await.get(&id).cloned() };
@@ -241,7 +259,7 @@ impl Link {
                 .connections
                 .write()
                 .await
-                .insert(id, ExpiringConn::new(conn));
+                .insert(id.clone(), ExpiringConn::new(conn));
         }
         {
             let _ = self.queue.write().await.push(id, self.priority().await);
@@ -295,7 +313,7 @@ impl Link {
             let read_items = self.connections.read().await;
             for (id, conn) in read_items.iter() {
                 if conn.expired().await {
-                    expired_ids.push(*id);
+                    expired_ids.push(id.clone());
                 }
             }
         }
