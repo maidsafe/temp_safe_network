@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    errors::convert_to_error_msg,
     register_store::{RegisterStore, StoredRegister},
     Error, Result,
 };
@@ -178,7 +177,7 @@ impl RegisterStorage {
             Ok(register) => Ok(register),
             Err(error) => {
                 error!("Error reading register from disk {error:?}");
-                Err(convert_to_error_msg(error))
+                Err(error.into())
             }
         };
 
@@ -196,7 +195,7 @@ impl RegisterStorage {
             Err(error) => Err(error),
         };
 
-        NodeQueryResponse::ReadRegister((result.map_err(convert_to_error_msg), operation_id))
+        NodeQueryResponse::ReadRegister((result.map_err(|error| error.into()), operation_id))
     }
 
     async fn get_owner(
@@ -207,7 +206,7 @@ impl RegisterStorage {
     ) -> NodeQueryResponse {
         let result = match self.get_register(&address, Action::Read, requester).await {
             Ok(res) => Ok(res.owner()),
-            Err(error) => Err(convert_to_error_msg(error)),
+            Err(error) => Err(error.into()),
         };
 
         NodeQueryResponse::GetRegisterOwner((result, operation_id))
@@ -226,7 +225,7 @@ impl RegisterStorage {
             .and_then(|register| register.get(hash).map(|c| c.clone()).map_err(Error::from))
         {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_msg(error)),
+            Err(error) => Err(error.into()),
         };
 
         NodeQueryResponse::GetRegisterEntry((result, operation_id))
@@ -245,7 +244,7 @@ impl RegisterStorage {
             .and_then(|register| register.permissions(user).map_err(Error::from))
         {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_msg(error)),
+            Err(error) => Err(error.into()),
         };
 
         NodeQueryResponse::GetRegisterUserPermissions((result, operation_id))
@@ -263,7 +262,7 @@ impl RegisterStorage {
             .map(|register| register.policy().clone())
         {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_msg(error)),
+            Err(error) => Err(error.into()),
         };
 
         NodeQueryResponse::GetRegisterPolicy((result, operation_id))

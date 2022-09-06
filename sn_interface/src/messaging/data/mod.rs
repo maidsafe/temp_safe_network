@@ -251,41 +251,17 @@ impl QueryResponse {
     pub fn failed_with_data_not_found(&self) -> bool {
         use QueryResponse::*;
 
-        match self {
-            GetChunk(result) => match result {
-                Ok(_) => false,
-                Err(error) => matches!(*error, ErrorMsg::ChunkNotFound(_)),
-            },
-            GetRegister((result, _op_id)) => match result {
-                Ok(_) => false,
-                Err(error) => matches!(*error, ErrorMsg::DataNotFound(_)),
-            },
-            GetRegisterEntry((result, _op_id)) => match result {
-                Ok(_) => false,
-                Err(error) => matches!(*error, ErrorMsg::DataNotFound(_)),
-            },
-            GetRegisterOwner((result, _op_id)) => match result {
-                Ok(_) => false,
-                Err(error) => matches!(*error, ErrorMsg::DataNotFound(_)),
-            },
-            ReadRegister((result, _op_id)) => match result {
-                Ok(_) => false,
-                Err(error) => matches!(*error, ErrorMsg::DataNotFound(_)),
-            },
-            GetRegisterPolicy((result, _op_id)) => match result {
-                Ok(_) => false,
-                Err(error) => matches!(*error, ErrorMsg::DataNotFound(_)),
-            },
-            GetRegisterUserPermissions((result, _op_id)) => match result {
-                Ok(_) => false,
-                Err(error) => matches!(*error, ErrorMsg::DataNotFound(_)),
-            },
-            SpentProofShares((result, _op_id)) => match result {
-                Ok(_) => false,
-                Err(error) => matches!(*error, ErrorMsg::DataNotFound(_)),
-            },
-            FailedToCreateOperationId => false,
-        }
+        matches!(
+            self,
+            GetChunk(Err(ErrorMsg::DataNotFound(_)))
+                | GetRegister((Err(ErrorMsg::DataNotFound(_)), _))
+                | GetRegisterEntry((Err(ErrorMsg::DataNotFound(_)), _))
+                | GetRegisterOwner((Err(ErrorMsg::DataNotFound(_)), _))
+                | ReadRegister((Err(ErrorMsg::DataNotFound(_)), _))
+                | GetRegisterPolicy((Err(ErrorMsg::DataNotFound(_)), _))
+                | GetRegisterUserPermissions((Err(ErrorMsg::DataNotFound(_)), _))
+                | SpentProofShares((Err(ErrorMsg::DataNotFound(_)), _))
+        )
     }
 
     /// Retrieves the operation identifier for this response, use in tracking node liveness
@@ -297,10 +273,7 @@ impl QueryResponse {
         match self {
             GetChunk(result) => match result {
                 Ok(chunk) => chunk_operation_id(chunk.address()),
-                Err(ErrorMsg::ChunkNotFound(name)) => chunk_operation_id(&ChunkAddress(*name)),
-                Err(ErrorMsg::DataNotFound(DataAddress::Bytes(address))) => {
-                    chunk_operation_id(address)
-                }
+                Err(ErrorMsg::DataNotFound(DataAddress::Bytes(name))) => chunk_operation_id(name),
                 Err(ErrorMsg::DataNotFound(another_address)) => {
                     error!(
                         "{:?} address returned when we were expecting a ChunkAddress",

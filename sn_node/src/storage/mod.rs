@@ -185,7 +185,7 @@ impl DataStorage {
                     .await
                     .map(ReplicatedData::SpentbookLog)
             }
-            DataAddress::SafeKey(xorname) => Err(Error::UnsupportedDataType(*xorname)),
+            other => Err(Error::UnsupportedDataType(*other)),
         }
     }
 
@@ -198,7 +198,7 @@ impl DataStorage {
                 let reg_addr = RegisterAddress::new(*addr.name(), SPENTBOOK_TYPE_TAG);
                 self.registers.remove_register(&reg_addr).await
             }
-            DataAddress::SafeKey(xorname) => Err(Error::UnsupportedDataType(*xorname)),
+            other => Err(Error::UnsupportedDataType(*other)),
         }
     }
 

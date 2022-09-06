@@ -189,6 +189,7 @@ impl From<qp2p::SendError> for Error {
     }
 }
 
+// Convert node error to messaging error message for sending over the network.
 impl From<Error> for ErrorMsg {
     fn from(error: Error) -> ErrorMsg {
         match error {
