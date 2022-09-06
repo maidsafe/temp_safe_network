@@ -626,7 +626,7 @@ impl Session {
         }
 
         if failures > successful_sends {
-            warn!("More errors when sending a message than successes");
+            warn!("More errors when sending a message than successes, last_error: {:?}", last_error);
             // If we've only had connection errors, those are not stored in `last_error` (but they are logged)
             // Such errors are not fatal to the program and you can normally simply retry by calling
             // send_msg again.
