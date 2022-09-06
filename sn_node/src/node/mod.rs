@@ -87,7 +87,7 @@ mod core {
     };
     use sn_dysfunction::{DysfunctionDetection, IssueType};
     #[cfg(feature = "traceroute")]
-    use sn_interface::messaging::{AuthorityProof, Entity, SectionAuth};
+    use sn_interface::messaging::Entity;
 
     use sn_interface::{
         messaging::{

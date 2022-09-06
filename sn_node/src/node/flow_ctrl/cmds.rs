@@ -260,10 +260,7 @@ impl Cmd {
             Cmd::HandleMembershipDecision(_) => State::Membership,
             Cmd::ProposeVoteNodesOffline(_) => State::Membership,
             Cmd::HandleNewEldersAgreement { .. } => State::Handover,
-            Cmd::HandleDkgTimeout(_) => State::Dkg,
             Cmd::HandleDkgOutcome { .. } => State::Dkg,
-            Cmd::HandleDkgFailure(_) => State::Dkg,
-            Cmd::ScheduleDkgTimeout { .. } => State::Dkg,
             Cmd::EnqueueDataForReplication { .. } => State::Replication,
         }
     }
