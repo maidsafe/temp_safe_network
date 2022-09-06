@@ -247,23 +247,6 @@ impl QueryResponse {
         }
     }
 
-    /// Returns true if data was not found
-    pub fn failed_with_data_not_found(&self) -> bool {
-        use QueryResponse::*;
-
-        matches!(
-            self,
-            GetChunk(Err(ErrorMsg::DataNotFound(_)))
-                | GetRegister((Err(ErrorMsg::DataNotFound(_)), _))
-                | GetRegisterEntry((Err(ErrorMsg::DataNotFound(_)), _))
-                | GetRegisterOwner((Err(ErrorMsg::DataNotFound(_)), _))
-                | ReadRegister((Err(ErrorMsg::DataNotFound(_)), _))
-                | GetRegisterPolicy((Err(ErrorMsg::DataNotFound(_)), _))
-                | GetRegisterUserPermissions((Err(ErrorMsg::DataNotFound(_)), _))
-                | SpentProofShares((Err(ErrorMsg::DataNotFound(_)), _))
-        )
-    }
-
     /// Retrieves the operation identifier for this response, use in tracking node liveness
     /// and responses at clients.
     pub fn operation_id(&self) -> Result<OperationId> {

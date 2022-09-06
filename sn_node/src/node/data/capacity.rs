@@ -15,8 +15,7 @@ use std::collections::{BTreeMap, BTreeSet};
 // The number of separate copies of a chunk which should be maintained.
 pub(crate) const MIN_LEVEL_WHEN_FULL: u8 = 9; // considered full when >= 90 %.
 
-/// A util for sharing the
-/// info on data capacity among the
+/// A util for sharing the info on data capacity among the
 /// chunk storing nodes in the section.
 #[derive(Default)]
 pub(crate) struct Capacity {
@@ -24,14 +23,7 @@ pub(crate) struct Capacity {
 }
 
 impl Capacity {
-    /// Whether the adult is considered full.
-    /// This happens when it has reported at least `MIN_LEVEL_WHEN_FULL`.
-    pub(crate) fn is_full(&self, adult: &XorName) -> Option<bool> {
-        let level = self.adult_levels.get(adult)?.value();
-        Some(level >= MIN_LEVEL_WHEN_FULL)
-    }
-
-    pub(super) fn add_new_adult(&mut self, adult: XorName) {
+    pub(crate) fn add_new_adult(&mut self, adult: XorName) {
         info!("Adding new adult:{adult} to Capacity tracker");
 
         if let Some(old_entry) = self.adult_levels.insert(adult, StorageLevel::zero()) {
@@ -41,7 +33,7 @@ impl Capacity {
     }
 
     /// Avg usage by nodes in the section, a value between 0 and 10.
-    pub(super) fn avg_usage(&self) -> u8 {
+    pub(crate) fn avg_usage(&self) -> u8 {
         let mut total = 0_usize;
         // not sure if necessary, but now we'll be working with an isolated snapshot:
         let levels = self.adult_levels.values().collect_vec();
@@ -56,16 +48,12 @@ impl Capacity {
     }
 
     /// Storage levels of nodes in the section.
-    pub(super) fn levels(&self) -> BTreeMap<XorName, StorageLevel> {
-        let mut map = BTreeMap::new();
-        for (name, level) in &self.adult_levels {
-            let _prev = map.insert(*name, *level);
-        }
-        map
+    pub(crate) fn levels(&self) -> BTreeMap<XorName, StorageLevel> {
+        self.adult_levels.clone()
     }
 
     /// Nodes and storage levels of nodes matching the prefix.
-    pub(super) fn levels_matching(&self, prefix: Prefix) -> BTreeMap<XorName, StorageLevel> {
+    pub(crate) fn levels_matching(&self, prefix: Prefix) -> BTreeMap<XorName, StorageLevel> {
         self.levels()
             .iter()
             .filter(|(name, _)| prefix.matches(name))
@@ -74,24 +62,22 @@ impl Capacity {
     }
 
     /// Full chunk storing nodes in the section (considered full when at >= `MIN_LEVEL_WHEN_FULL`).
-    pub(super) fn full_adults(&self) -> BTreeSet<XorName> {
-        let mut set = BTreeSet::new();
-        for (name, level) in &self.adult_levels {
-            if level.value() >= MIN_LEVEL_WHEN_FULL {
-                let _changed = set.insert(*name);
-            }
-        }
-        set
+    pub(crate) fn full_adults(&self) -> BTreeSet<XorName> {
+        self.adult_levels
+            .iter()
+            .filter(|(_, level)| level.value() >= MIN_LEVEL_WHEN_FULL)
+            .map(|(name, _)| *name)
+            .collect()
     }
 
-    pub(super) fn set_adult_levels(&mut self, levels: BTreeMap<XorName, StorageLevel>) {
-        for (name, level) in levels {
+    pub(crate) fn set_adult_levels(&mut self, levels: BTreeMap<XorName, StorageLevel>) {
+        levels.into_iter().for_each(|(name, level)| {
             let _changed = self.set_adult_level(name, level);
-        }
+        })
     }
 
     /// Returns whether the level changed or not.
-    pub(super) fn set_adult_level(&mut self, adult: XorName, new_level: StorageLevel) -> bool {
+    pub(crate) fn set_adult_level(&mut self, adult: XorName, new_level: StorageLevel) -> bool {
         {
             if let Some(level) = self.adult_levels.get_mut(&adult) {
                 let current_level = { level.value() };
@@ -128,16 +114,7 @@ impl Capacity {
 
     /// Registered holders not present in provided list of members
     /// will be removed from `adult_levels` and no longer tracked for liveness.
-    pub(super) fn retain_members_only(&mut self, members: &BTreeSet<XorName>) {
-        let absent_adults: Vec<_> = self
-            .adult_levels
-            .iter()
-            .filter(|(key, _)| !members.contains(key))
-            .map(|(key, _)| *key)
-            .collect();
-
-        for adult in &absent_adults {
-            let _level = self.adult_levels.remove(adult);
-        }
+    pub(crate) fn retain_members_only(&mut self, members: &BTreeSet<XorName>) {
+        self.adult_levels.retain(|name, _| members.contains(name))
     }
 }
