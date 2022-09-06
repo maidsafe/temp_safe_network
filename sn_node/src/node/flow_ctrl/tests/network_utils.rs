@@ -6,7 +6,7 @@ use crate::node::{
         event_channel,
         event_channel::{EventReceiver, EventSender},
     },
-    relocation_check, ChurnId, Node, RateLimits,
+    relocation_check, ChurnId, Node,
 };
 use crate::storage::UsedSpace;
 use bls::Signature;
@@ -297,13 +297,7 @@ pub(crate) fn gen_info(age: u8, prefix: Option<Prefix>) -> NodeInfo {
 
 pub(crate) async fn create_comm() -> Result<Comm> {
     let (tx, _rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
-    Ok(Comm::first_node(
-        (Ipv4Addr::LOCALHOST, 0).into(),
-        Default::default(),
-        RateLimits::new(),
-        tx,
-    )
-    .await?)
+    Ok(Comm::first_node((Ipv4Addr::LOCALHOST, 0).into(), Default::default(), tx).await?)
 }
 
 /// Create a `Proposal::Online` whose agreement handling triggers relocation of a node with the

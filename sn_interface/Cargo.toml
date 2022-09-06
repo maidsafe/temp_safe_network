@@ -12,7 +12,6 @@ version = "0.14.0"
 
 [features]
 default = ["chunks", "registers", "spentbook", "traceroute"]
-back-pressure = []
 chunks = []
 registers = []
 spentbook = []

@@ -188,9 +188,6 @@ pub(crate) enum Cmd {
     ScheduleDkgTimeout { duration: Duration, token: u64 },
     /// Proposes peers as offline
     ProposeVoteNodesOffline(BTreeSet<XorName>),
-    /// Comm Commands
-    #[allow(unused)]
-    Comm(crate::comm::Cmd),
 }
 
 impl Cmd {
@@ -241,8 +238,6 @@ impl Cmd {
 
             ScheduleDkgTimeout { .. } => 8,
 
-            Comm(_) => 7,
-
             AddToPendingQueries { .. } => 6,
 
             // See [`MsgType`] for the priority constants and the range of possible values.
@@ -258,7 +253,6 @@ impl Cmd {
         match self {
             Cmd::CleanupPeerLinks => State::Comms,
             Cmd::SendMsg { .. } => State::Comms,
-            Cmd::Comm(_) => State::Comms,
             Cmd::HandleFailedSendToNode { .. } => State::Comms,
             Cmd::ValidateMsg { .. } => State::Validation,
             Cmd::HandleValidSystemMsg { msg, .. } => msg.statemap_states(),
@@ -320,7 +314,6 @@ impl fmt::Display for Cmd {
             }
             Cmd::ProposeVoteNodesOffline(_) => write!(f, "ProposeOffline"),
             Cmd::AddToPendingQueries { .. } => write!(f, "AddToPendingQueries"),
-            Cmd::Comm(comm) => write!(f, "Comm({:?})", comm),
         }
     }
 }

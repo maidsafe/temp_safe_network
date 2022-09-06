@@ -13,20 +13,13 @@ use crate::node::{
         dispatcher::Dispatcher,
         event_channel::EventSender,
     },
-    CmdProcessEvent, Event, RateLimits,
+    CmdProcessEvent, Event,
 };
 
-use custom_debug::Debug;
 use priority_queue::PriorityQueue;
 use std::time::SystemTime;
-use std::{
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
-use tokio::{sync::RwLock, time::Instant};
+use std::{sync::Arc, time::Duration};
+use tokio::sync::RwLock;
 
 type Priority = i32;
 
@@ -44,18 +37,14 @@ const EMPTY_QUEUE_SLEEP_TIME: Duration = Duration::from_millis(100);
 /// and start with the most important things first".
 pub(crate) struct CmdCtrl {
     cmd_queue: PriorityQueue<CmdJob, Priority>,
-    attempted: CmdThroughput,
-    monitoring: RateLimits,
     pub(crate) dispatcher: Arc<Dispatcher>,
     id_counter: usize,
 }
 
 impl CmdCtrl {
-    pub(crate) fn new(dispatcher: Dispatcher, monitoring: RateLimits) -> Self {
+    pub(crate) fn new(dispatcher: Dispatcher) -> Self {
         Self {
             cmd_queue: PriorityQueue::new(),
-            attempted: CmdThroughput::default(),
-            monitoring,
             dispatcher: Arc::new(dispatcher),
             id_counter: 0,
         }
@@ -90,13 +79,7 @@ impl CmdCtrl {
 
     /// Wait if required by the cmd rate monitoring
     pub(crate) async fn wait_if_not_processing_at_expected_rate(&self) {
-        let expected_rate = self.monitoring.max_cmds_per_s().await;
-        let actual_rate = self.attempted.value();
-        if actual_rate > expected_rate {
-            let diff = actual_rate - expected_rate;
-            debug!("Cmd throughput is too high, waiting to reduce throughput");
-            log_sleep!(Duration::from_millis((diff * 10_f64) as u64));
-        } else if self.cmd_queue.is_empty() {
+        if self.cmd_queue.is_empty() {
             trace!("Empty queue, waiting {EMPTY_QUEUE_SLEEP_TIME:?} to not loop heavily");
             log_sleep!(EMPTY_QUEUE_SLEEP_TIME);
         }
@@ -120,9 +103,6 @@ impl CmdCtrl {
         let cmd_string = cmd.clone().to_string();
         let priority = job.priority();
 
-        let throughpout = self.attempted.clone();
-        let monitoring = self.monitoring.clone();
-
         node_event_sender
             .send(Event::CmdProcessing(CmdProcessEvent::Started {
                 id,
@@ -144,8 +124,6 @@ impl CmdCtrl {
 
             match dispatcher.process_cmd(cmd).await {
                 Ok(cmds) => {
-                    monitoring.increment_cmds().await;
-
                     for cmd in cmds {
                         match cmd_process_api.send((cmd, Some(id))).await {
                             Ok(_) => {
@@ -178,40 +156,11 @@ impl CmdCtrl {
                         .await;
                 }
             }
-            throughpout.increment(); // both on fail and success
             dispatcher
                 .node()
                 .read()
                 .await
                 .statemap_log_state(sn_interface::statemap::State::Idle);
         });
-    }
-}
-
-#[derive(Clone, Debug)]
-struct CmdThroughput {
-    msgs: Arc<AtomicUsize>,
-    since: Instant,
-}
-
-impl Default for CmdThroughput {
-    fn default() -> Self {
-        Self {
-            msgs: Arc::new(AtomicUsize::new(0)),
-            since: Instant::now(),
-        }
-    }
-}
-
-impl CmdThroughput {
-    fn increment(&self) {
-        let _ = self.msgs.fetch_add(1, Ordering::SeqCst);
-    }
-
-    // msgs / s
-    fn value(&self) -> f64 {
-        let msgs = self.msgs.load(Ordering::SeqCst);
-        let seconds = (Instant::now() - self.since).as_secs();
-        msgs as f64 / f64::max(1.0, seconds as f64)
     }
 }

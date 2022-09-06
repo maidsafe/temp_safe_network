@@ -127,12 +127,7 @@ impl Link {
             self.peer
         );
         match conn.send_with(bytes, priority, retry_config).await {
-            Ok(()) => {
-                #[cfg(feature = "back-pressure")]
-                self.listener.count_msg().await;
-
-                Ok(())
-            }
+            Ok(()) => Ok(()),
             Err(error) => {
                 // clean up failing connections at once, no nead to leak it outside of here
                 // next send (e.g. when retrying) will use/create a new connection

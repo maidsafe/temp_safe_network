@@ -6,8 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-#[cfg(feature = "back-pressure")]
-use super::CmdCtrl;
 use super::FlowCtrl;
 
 use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Node, Result};
@@ -30,8 +28,6 @@ use tokio::{sync::RwLock, time::Instant};
 
 const PROBE_INTERVAL: Duration = Duration::from_secs(30);
 const MISSING_VOTE_INTERVAL: Duration = Duration::from_secs(5);
-#[cfg(feature = "back-pressure")]
-const BACKPRESSURE_INTERVAL: Duration = Duration::from_secs(60);
 const SECTION_PROBE_INTERVAL: Duration = Duration::from_secs(300);
 const LINK_CLEANUP_INTERVAL: Duration = Duration::from_secs(120);
 const DATA_BATCH_INTERVAL: Duration = Duration::from_millis(50);
@@ -47,7 +43,6 @@ impl FlowCtrl {
         &mut self,
         last_link_cleanup: &mut Instant,
         last_data_batch_check: &mut Instant,
-        #[cfg(feature = "back-pressure")] last_backpressure_check: &mut Instant,
     ) {
         let now = Instant::now();
         let mut cmds = vec![];
@@ -56,15 +51,6 @@ impl FlowCtrl {
         if last_link_cleanup.elapsed() > LINK_CLEANUP_INTERVAL {
             *last_link_cleanup = now;
             cmds.push(Cmd::CleanupPeerLinks);
-        }
-
-        #[cfg(feature = "back-pressure")]
-        if last_backpressure_check.elapsed() > BACKPRESSURE_INTERVAL {
-            *last_backpressure_check = now;
-
-            if let Some(cmd) = Self::report_backpressure(self.node.clone(), &self.cmd_ctrl).await {
-                cmds.push(cmd)
-            }
         }
 
         // if we've passed enough time, batch outgoing data
@@ -359,37 +345,6 @@ impl FlowCtrl {
         }
 
         cmds
-    }
-
-    /// Periodically send back-pressure reports to our section.
-    ///
-    /// We do not send reports outside of the section as most messages will come from within our section
-    /// (and there's no easy way to determine what incoming mesages are spam, or joining nodes etc)
-    /// Worst case is after a split, nodes sending messaging from a sibling section to update us may not
-    /// know about our load just now. Though that would only be AE messages... and if backpressure is working we should
-    /// not be overloaded...
-    #[cfg(feature = "back-pressure")]
-    async fn report_backpressure(the_node: Arc<RwLock<Node>>, cmd_ctrl: &CmdCtrl) -> Option<Cmd> {
-        info!("Firing off backpressure reports");
-        let node = the_node.read().await;
-        let our_info = node.info();
-        let mut members = node.network_knowledge().members();
-        let _ = members.remove(&our_info.peer());
-
-        drop(node);
-
-        if let Some(load_report) = cmd_ctrl.dispatcher.comm().tolerated_msgs_per_s().await {
-            trace!("New BackPressure report to disseminate: {:?}", load_report);
-            // TODO: use comms to send report to anyone connected? (can we ID end users there?)
-            let cmd = the_node.read().await.send_system_msg(
-                SystemMsg::BackPressure(load_report),
-                Peers::Multiple(members),
-            );
-
-            Some(cmd)
-        } else {
-            None
-        }
     }
 }
 

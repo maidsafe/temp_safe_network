@@ -19,7 +19,7 @@ use crate::node::{
     },
     join_network,
     logging::{log_ctx::LogCtx, run_system_logger},
-    Config, Error, Node, RateLimits, Result,
+    Config, Error, Node, Result,
 };
 use crate::UsedSpace;
 
@@ -151,7 +151,6 @@ async fn bootstrap_node(
         .local_addr
         .unwrap_or_else(|| SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0)));
 
-    let monitoring = RateLimits::new();
     let (event_sender, event_receiver) = event_channel::new(EVENT_CHANNEL_SIZE);
 
     let (node, comm) = if config.is_first() {
@@ -168,7 +167,6 @@ async fn bootstrap_node(
         let comm = Comm::first_node(
             local_addr,
             config.network_config().clone(),
-            monitoring.clone(),
             connection_event_tx,
         )
         .await?;
@@ -238,7 +236,6 @@ async fn bootstrap_node(
             local_addr,
             bootstrap_nodes.as_slice(),
             config.network_config().clone(),
-            monitoring.clone(),
             connection_event_tx,
         )
         .await?;
@@ -280,7 +277,7 @@ async fn bootstrap_node(
     };
 
     let node = Arc::new(RwLock::new(node));
-    let cmd_ctrl = CmdCtrl::new(Dispatcher::new(node.clone(), comm), monitoring);
+    let cmd_ctrl = CmdCtrl::new(Dispatcher::new(node.clone(), comm));
     let (msg_and_period_ctrl, cmd_channel) =
         FlowCtrl::new(cmd_ctrl, connection_event_rx, event_sender);
 
