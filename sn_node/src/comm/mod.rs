@@ -352,6 +352,8 @@ impl Comm {
             recipient,
         );
         let peer = self.get_or_create(&recipient).await;
+
+        trace!("Peer session got.");
         peer.send(msg_id, bytes).await
     }
 }

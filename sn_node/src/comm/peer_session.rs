@@ -94,6 +94,7 @@ impl PeerSession {
             error!("Error while sending Send command {e:?}");
         }
 
+        trace!("Send job sent");
         Ok(watcher)
     }
 
