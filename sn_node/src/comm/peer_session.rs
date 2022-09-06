@@ -190,7 +190,6 @@ impl PeerSessionWorker {
     async fn send(&mut self, mut job: SendJob) -> SessionStatus {
         let id = job.msg_id;
 
-
         trace!("Performing sendjob: {id:?}");
 
         if job.retries > MAX_SENDJOB_RETRIES {

@@ -166,7 +166,6 @@ impl FlowCtrl {
             while self.cmd_ctrl.has_items_queued()
             // && !continue_with_periodics
             {
-
                 // process_batch_count += 1;
                 self.process_next_cmd().await;
 
