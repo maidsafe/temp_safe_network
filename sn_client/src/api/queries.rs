@@ -68,7 +68,6 @@ impl Client {
         let mut attempts = 1;
         let dst = query.variant.dst_name();
 
-
         loop {
             let msg = ServiceMsg::Query(query.clone());
             let serialised_query = WireMsg::serialize_msg_payload(&msg)?;

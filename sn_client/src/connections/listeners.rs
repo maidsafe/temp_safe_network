@@ -13,8 +13,8 @@ use crate::{
     Error, Result,
 };
 
-use qp2p::UsrMsgBytes;
 use dashmap::DashSet;
+use qp2p::UsrMsgBytes;
 use sn_interface::{
     at_least_one_correct_elder,
     messaging::{
