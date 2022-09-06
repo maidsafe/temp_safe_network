@@ -82,7 +82,7 @@ impl DkgVoter {
         if session_id.elders.len() == 1 {
             let secret_key_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
             let section_auth = SectionAuthorityProvider::from_dkg_session(
-                session_id,
+                &session_id,
                 secret_key_set.public_keys(),
             );
             return Ok(vec![Cmd::HandleDkgOutcome {

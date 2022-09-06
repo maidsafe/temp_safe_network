@@ -143,7 +143,7 @@ impl SectionAuthorityProvider {
         }
     }
 
-    pub fn from_dkg_session(session_id: DkgSessionId, pk_set: PublicKeySet) -> Self {
+    pub fn from_dkg_session(session_id: &DkgSessionId, pk_set: PublicKeySet) -> Self {
         Self::new(
             session_id.elder_peers(),
             session_id.prefix,
