@@ -373,24 +373,25 @@ impl Node {
         sender: Peer,
         our_id: usize,
         vote_response: VoteResponse,
-    ) -> Vec<Cmd> {
+    ) -> (Vec<Cmd>, Vec<Cmd>) {
+        let mut cmds = vec![];
+        let mut ae_cmds = vec![];
         match vote_response {
-            VoteResponse::WaitingForMoreVotes => {
-                vec![]
-            }
+            VoteResponse::WaitingForMoreVotes => {}
             VoteResponse::RequestAntiEntropy => {
-                vec![self.request_dkg_ae(session_id, sender)]
+                ae_cmds.push(self.request_dkg_ae(session_id, sender))
             }
             VoteResponse::BroadcastVote(vote) => {
-                vec![self.broadcast_dkg_votes(session_id, pub_keys, our_id, vec![*vote])]
+                cmds.push(self.broadcast_dkg_votes(session_id, pub_keys, our_id, vec![*vote]))
             }
             VoteResponse::DkgComplete(new_pubs, new_sec) => {
                 debug!("DkgComplete s{:?}", session_id.sum());
-                vec![acknowledge_dkg_oucome(
+                cmds.push(acknowledge_dkg_oucome(
                     session_id, our_id, new_pubs, new_sec,
-                )]
+                ))
             }
         }
+        (cmds, ae_cmds)
     }
 
     pub(crate) fn handle_dkg_votes(
@@ -430,13 +431,16 @@ impl Node {
         // handle vote
         let mut cmds: Vec<Cmd> = Vec::new();
         let mut ae_cmds: Vec<Cmd> = Vec::new();
+        let mut is_old_gossip = true;
+        let their_votes_len = votes.len();
         for v in votes {
             match self.dkg_voter.handle_dkg_vote(session_id, v.clone()) {
                 Ok((vote_response, learned_something)) => {
                     if learned_something {
                         self.dkg_voter.learned_something_from_message();
+                        is_old_gossip = false;
                     }
-                    let cmd = self.handle_vote_response(
+                    let (cmd, ae_cmd) = self.handle_vote_response(
                         session_id,
                         pub_keys.clone(),
                         sender,
@@ -450,6 +454,7 @@ impl Node {
                         );
                     }
                     cmds.extend(cmd);
+                    ae_cmds.extend(ae_cmd);
                 }
                 Err(err) => {
                     error!(
@@ -464,7 +469,53 @@ impl Node {
         if cmds.is_empty() {
             cmds.append(&mut ae_cmds);
         }
+
+        // if their un-interesting gossip is missing votes, send them ours
+        if is_old_gossip && their_votes_len != 1 {
+            let mut manual_ae = match self.gossip_missing_votes(session_id, sender, their_votes_len)
+            {
+                Ok(g) => g,
+                Err(err) => {
+                    error!(
+                        "Error gossiping s{} id:{our_id:?} from {sender:?}: {err:?}",
+                        session_id.sum()
+                    );
+                    vec![]
+                }
+            };
+            cmds.append(&mut manual_ae);
+        }
+
         Ok(cmds)
+    }
+
+    /// Gossips all our votes if they have less votes than us
+    /// Assumes we know all their votes so the length difference is enough to know that they
+    /// are missing votes
+    fn gossip_missing_votes(
+        &self,
+        session_id: &DkgSessionId,
+        sender: Peer,
+        their_votes_len: usize,
+    ) -> Result<Vec<Cmd>> {
+        let our_votes = self.dkg_voter.get_all_votes(session_id)?;
+        if their_votes_len < our_votes.len() {
+            let pub_keys = self.dkg_voter.get_dkg_keys(session_id)?;
+            trace!(
+                "{} s{}: gossip including missing votes to {sender:?}",
+                LogMarker::DkgBroadcastVote,
+                session_id.sum()
+            );
+            let node_msg = SystemMsg::DkgVotes {
+                session_id: session_id.clone(),
+                pub_keys,
+                votes: our_votes,
+            };
+            let cmd = self.send_system_msg(node_msg, Peers::Single(sender));
+            Ok(vec![cmd])
+        } else {
+            Ok(vec![])
+        }
     }
 
     pub(crate) fn handle_dkg_anti_entropy(
