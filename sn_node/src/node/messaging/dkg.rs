@@ -54,8 +54,7 @@ fn acknowledge_dkg_oucome(
         pub_key_set.public_key(),
     );
 
-    let section_auth =
-        SectionAuthorityProvider::from_dkg_session(session_id.clone(), pub_key_set.clone());
+    let section_auth = SectionAuthorityProvider::from_dkg_session(session_id, pub_key_set.clone());
 
     let outcome = SectionKeyShare {
         public_key_set: pub_key_set,

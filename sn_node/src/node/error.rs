@@ -17,7 +17,6 @@ use sn_interface::{
     types::{convert_dt_error_to_error_msg, DataAddress, Peer, PublicKey},
 };
 
-use bls::PublicKey as BlsPublicKey;
 use ed25519::Signature;
 use std::{io, net::SocketAddr};
 use thiserror::Error;
@@ -111,9 +110,9 @@ pub enum Error {
     #[error("Double Key Attack Detected from: {0:?}")]
     DoubleKeyAttackDetected(
         XorName,
-        Box<BlsPublicKey>,
+        Box<bls::PublicKey>,
         Signature,
-        Box<BlsPublicKey>,
+        Box<bls::PublicKey>,
         Signature,
     ),
     /// Dkg error
