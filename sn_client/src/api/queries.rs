@@ -93,7 +93,6 @@ impl Client {
             .await;
 
             match res {
-                // TODO: when we return errors, check if it's a NotFound error and retry.
                 Ok(Ok(query_result)) => break Ok(query_result),
                 Ok(Err(err)) if attempts > self.max_retries => {
                     debug!(
