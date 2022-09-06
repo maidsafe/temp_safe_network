@@ -178,6 +178,38 @@ impl Dispatcher {
                     }
                 }
             }
+            Cmd::UpdateNetworkAndHandleValidServiceMsg {
+                proof_chain,
+                signed_sap,
+                msg_id,
+                msg,
+                origin,
+                auth,
+                #[cfg(feature = "traceroute")]
+                traceroute,
+            } => {
+                debug!("Updating network knowledge before handling message");
+                let mut node = self.node.write().await;
+                let name = node.name();
+                let skp = node.section_keys_provider.clone();
+                let updated = node.network_knowledge.update_knowledge_if_valid(
+                    signed_sap,
+                    &proof_chain,
+                    None,
+                    &name,
+                    &skp,
+                )?;
+                debug!("Network knowledge was updated: {updated}");
+                node.handle_valid_service_msg(
+                    msg_id,
+                    msg,
+                    auth,
+                    origin,
+                    #[cfg(feature = "traceroute")]
+                    traceroute,
+                )
+                .await
+            }
             Cmd::HandleValidSystemMsg {
                 origin,
                 msg_id,

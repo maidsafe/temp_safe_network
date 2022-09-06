@@ -211,7 +211,41 @@ impl Node {
                 tx,
                 spent_proofs,
                 spent_transactions,
+                updated_proof_chain,
+                signed_sap,
             })) => {
+                info!("Processing spend request for key image: {:?}", key_image);
+                if let Some(proof_chain) = updated_proof_chain {
+                    debug!(
+                        "Received updated proof chain with the request. Will return new command \
+                        to update the network knowledge before processing the spend."
+                    );
+                    // To avoid a loop, recompose the message without the updated proof_chain.
+                    let updated_service_msg =
+                        ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                            key_image,
+                            tx,
+                            spent_proofs,
+                            spent_transactions,
+                            updated_proof_chain: None,
+                            signed_sap: None,
+                        }));
+                    let update_command = Cmd::UpdateNetworkAndHandleValidServiceMsg {
+                        proof_chain,
+                        signed_sap: signed_sap.ok_or_else(|| {
+                            Error::SpentbookError(
+                                "A signed section authority provider must also be provided with an \
+                                updated proof chain".to_string())
+                        })?,
+                        msg_id,
+                        msg: updated_service_msg,
+                        origin,
+                        auth,
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
+                    };
+                    return Ok(vec![update_command]);
+                }
                 let spent_proof_share = self.gen_spent_proof_share(
                     &key_image,
                     &tx,
@@ -366,8 +400,6 @@ impl Node {
         spent_proofs: &BTreeSet<SpentProof>,
         spent_transactions: &BTreeSet<RingCtTransaction>,
     ) -> Result<SpentProofShare> {
-        info!("Processing spend request for key image: {:?}", key_image);
-
         // Verify spent proof signatures are valid.
         let mut spent_proofs_keys = BTreeSet::new();
         for proof in spent_proofs.iter() {
@@ -393,7 +425,10 @@ impl Node {
                     key {:?}",
                     pk
                 );
-                return Err(Error::SpentProofUnknownSectionKey(*pk));
+                return Err(Error::SpentProofUnknownSectionKey(
+                    *pk,
+                    self.network_knowledge.section_key(),
+                ));
             }
         }
 

@@ -160,9 +160,12 @@ pub enum Error {
     /// Spentbook error
     #[error("Spentbook Error: {0}")]
     SpentbookError(String),
-    /// Failed to verify a spent proof since it's signed by an unknown section key
-    #[error("Spent proof is signed by unknown section key: {0:?}")]
-    SpentProofUnknownSectionKey(bls::PublicKey),
+    /// A DBC spend request could not be processed because the processing section was unaware of
+    /// the section that signed one of the input spent proofs.
+    #[error(
+        "Spent proof is signed by section key {0:?} that is unknown to the current section {1:?}"
+    )]
+    SpentProofUnknownSectionKey(bls::PublicKey, bls::PublicKey),
     /// Error occurred when minting the Genesis DBC.
     #[error("Genesis DBC error:: {0}")]
     GenesisDbcError(String),
@@ -206,7 +209,9 @@ impl From<Error> for ErrorMsg {
                 found,
             },
             Error::DataExists(address) => ErrorMsg::DataExists(address),
-            Error::SpentProofUnknownSectionKey(pk) => ErrorMsg::SpentProofUnknownSectionKey(pk),
+            Error::SpentProofUnknownSectionKey(unknown_section_key, current_section_key) => {
+                ErrorMsg::SpentProofUnknownSectionKey(unknown_section_key, current_section_key)
+            }
             Error::NetworkData(error) => convert_dt_error_to_error_msg(error),
             other => {
                 ErrorMsg::InvalidOperation(format!("Failed to perform operation: {:?}", other))

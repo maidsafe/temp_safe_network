@@ -1237,6 +1237,8 @@ async fn spentbook_spend_service_message_should_replicate_to_adults_and_send_ack
                         tx: tx.clone(),
                         spent_proofs,
                         spent_transactions,
+                        updated_proof_chain: None,
+                        signed_sap: None,
                     })),
                     peer,
                 )?,
@@ -1303,6 +1305,8 @@ async fn spentbook_spend_spent_proof_with_invalid_pk_should_return_spentbook_err
                         tx,
                         spent_proofs,
                         spent_transactions,
+                        updated_proof_chain: None,
+                        signed_sap: None,
                     })),
                     peer,
                 )?,
@@ -1342,7 +1346,7 @@ async fn spentbook_spend_spent_proof_with_key_not_in_section_chain_should_return
         .run_until(async move {
             init_logger();
             let replication_count = 5;
-            let (dispatcher, _, peer, _) =
+            let (dispatcher, _, peer, section_sk_set) =
                 network_utils::TestNodeBuilder::new(Prefix::default().pushed(true), elder_count())
                     .adult_count(6)
                     .section_sk_threshold(0)
@@ -1361,6 +1365,8 @@ async fn spentbook_spend_spent_proof_with_key_not_in_section_chain_should_return
                         tx,
                         spent_proofs,
                         spent_transactions,
+                        updated_proof_chain: None,
+                        signed_sap: None,
                     })),
                     peer,
                 )?,
@@ -1378,9 +1384,10 @@ async fn spentbook_spend_spent_proof_with_key_not_in_section_chain_should_return
             assert_eq!(cmds.len(), 1);
             let cmd_err = cmds[0].get_error()?;
             let section_key = sk_set.public_keys().public_key();
+            let current_section_key = section_sk_set.public_keys().public_key();
             assert_eq!(
                 cmd_err,
-                MessagingDataError::SpentProofUnknownSectionKey(section_key),
+                MessagingDataError::SpentProofUnknownSectionKey(section_key, current_section_key),
                 "A different error was expected for this case: {:?}",
                 cmd_err
             );
@@ -1431,6 +1438,8 @@ async fn spentbook_spend_spent_proofs_do_not_relate_to_input_dbcs_should_return_
                         tx: new_dbc2.transaction.clone(),
                         spent_proofs: genesis_dbc.spent_proofs.clone(),
                         spent_transactions: genesis_dbc.spent_transactions.clone(),
+                        updated_proof_chain: None,
+                        signed_sap: None,
                     })),
                     peer,
                 )?,
@@ -1500,6 +1509,8 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
                         tx: new_dbc2.transaction.clone(),
                         spent_proofs: new_dbc.spent_proofs.clone(),
                         spent_transactions: new_dbc.spent_transactions.clone(),
+                        updated_proof_chain: None,
+                        signed_sap: None,
                     })),
                     peer,
                 )?,
@@ -1567,6 +1578,8 @@ async fn spentbook_spend_with_random_key_image_should_return_spentbook_error() -
                         tx: new_dbc2.transaction.clone(),
                         spent_proofs: new_dbc.spent_proofs.clone(),
                         spent_transactions: new_dbc.spent_transactions.clone(),
+                        updated_proof_chain: None,
+                        signed_sap: None,
                     })),
                     peer,
                 )?,
@@ -1594,6 +1607,79 @@ async fn spentbook_spend_with_random_key_image_should_return_spentbook_error() -
                 cmd_err
             );
             Ok(())
+        })
+        .await
+}
+
+/// This could potentially be the start of a case for the updated proof chain and SAP being sent
+/// with the spend request, but I don't know exactly what the conditions are for getting the
+/// network knowledge to update correctly.
+#[tokio::test]
+#[ignore]
+async fn spentbook_spend_with_updated_proof_chain_network_knowledge_should_be_updated() -> Result<()>
+{
+    let local = tokio::task::LocalSet::new();
+    local
+        .run_until(async move {
+            init_logger();
+            let replication_count = 5;
+            let (dispatcher, section, peer, sk_set) =
+                network_utils::TestNodeBuilder::new(Prefix::default().pushed(false), elder_count())
+                    .adult_count(6)
+                    .section_sk_threshold(0)
+                    .data_copy_count(replication_count)
+                    .build()
+                    .await?;
+
+            let sk = sk_set.secret_key();
+            let mut proof_chain = section.our_section_dag().clone();
+            let last = *proof_chain.last_key();
+
+            let (other_section, _, _) =
+                network_utils::create_section_with_random_sap(Prefix::default().pushed(true))?;
+            let other_signed_sap = other_section.signed_sap();
+            let other_proof_chain = other_section.our_section_dag().clone();
+            let other_section_key = *other_proof_chain.last_key();
+            let sig = sk.sign(other_section_key.to_bytes());
+            let _ = proof_chain.insert(&last, other_section_key, sig);
+
+            let (key_image, tx, spent_proofs, spent_transactions) =
+                dbc_utils::get_genesis_dbc_spend_info(&sk_set)?;
+
+            // Need to use spent proofs with the new key
+            let cmds = run_and_collect_cmds(
+                wrap_service_msg_for_handling(
+                    ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                        key_image,
+                        tx: tx.clone(),
+                        spent_proofs,
+                        spent_transactions,
+                        updated_proof_chain: Some(proof_chain),
+                        signed_sap: Some(other_signed_sap),
+                    })),
+                    peer,
+                )?,
+                &dispatcher,
+            )
+            .await?;
+
+            assert_eq!(cmds.len(), 3);
+            let update_cmd = cmds[0].clone();
+            assert_matches!(
+                update_cmd,
+                Cmd::UpdateNetworkAndHandleValidServiceMsg { .. }
+            );
+
+            let proof_chain = dispatcher
+                .node()
+                .read()
+                .await
+                .network_knowledge()
+                .our_section_dag();
+            debug!("proof chain = {:?}", proof_chain);
+            assert_eq!(proof_chain.len(), 2);
+
+            Result::<()>::Ok(())
         })
         .await
 }

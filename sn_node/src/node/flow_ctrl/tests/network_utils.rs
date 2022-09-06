@@ -213,6 +213,14 @@ impl TestNodeBuilder {
     }
 }
 
+pub(crate) fn create_section_with_random_sap(
+    prefix: Prefix,
+) -> Result<(NetworkKnowledge, SectionAuthorityProvider, SecretKeySet)> {
+    let (sap, _, sk_set) = random_sap(prefix, elder_count(), 0, Some(0));
+    let (section, _) = create_section(&sk_set, &sap)?;
+    Ok((section, sap, sk_set))
+}
+
 /// Creates a section where all elders and adults are marked as joined members.
 ///
 /// Can be used for tests requiring adults to be members of the section, e.g., when you expect
