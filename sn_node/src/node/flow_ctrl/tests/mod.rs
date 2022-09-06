@@ -1308,25 +1308,26 @@ async fn spentbook_spend_spent_proof_with_invalid_pk_should_return_spentbook_err
             )
             .await;
 
-            match result {
-                Ok(cmds) => {
-                    assert_eq!(cmds.len(), 1);
-                    let cmd_err = cmds[0].get_error()?;
-                    assert_eq!(
-                        cmd_err,
-                        MessagingDataError::InvalidOperation(format!(
-                            "Failed to perform operation: SpentbookError(\"Spent proof \
-                            signature {:?} is invalid\")",
-                            pk
-                        ))
-                    );
-                    Ok(())
-                }
-                Err(err) => Err(eyre!(
+            let cmds = result.map_err(|err| {
+                eyre!(
                     "A cmd to send the error to the client was expected for this case: {:?}",
                     err
+                )
+            })?;
+
+            assert_eq!(cmds.len(), 1);
+            let cmd_err = cmds[0].get_error()?;
+            assert_eq!(
+                cmd_err,
+                MessagingDataError::InvalidOperation(format!(
+                    "Failed to perform operation: SpentbookError(\"Spent proof \
+                    signature {:?} is invalid\")",
+                    pk
                 )),
-            }
+                "A different error was expected for this case: {:?}",
+                cmd_err
+            );
+            Ok(())
         })
         .await
 }
@@ -1365,22 +1366,23 @@ async fn spentbook_spend_spent_proof_with_key_not_in_section_chain_should_return
             )
             .await;
 
-            match result {
-                Ok(cmds) => {
-                    assert_eq!(cmds.len(), 1);
-                    let cmd_err = cmds[0].get_error()?;
-                    let section_key = sk_set.public_keys().public_key();
-                    assert_eq!(
-                        cmd_err,
-                        MessagingDataError::SpentProofUnknownSectionKey(section_key)
-                    );
-                    Ok(())
-                }
-                Err(err) => Err(eyre!(
+            let cmds = result.map_err(|err| {
+                eyre!(
                     "A cmd to send the error to the client was expected for this case: {:?}",
                     err
-                )),
-            }
+                )
+            })?;
+
+            assert_eq!(cmds.len(), 1);
+            let cmd_err = cmds[0].get_error()?;
+            let section_key = sk_set.public_keys().public_key();
+            assert_eq!(
+                cmd_err,
+                MessagingDataError::SpentProofUnknownSectionKey(section_key),
+                "A different error was expected for this case: {:?}",
+                cmd_err
+            );
+            Ok(())
         })
         .await
 }
@@ -1434,26 +1436,27 @@ async fn spentbook_spend_spent_proofs_do_not_relate_to_input_dbcs_should_return_
             )
             .await;
 
-            match result {
-                Ok(cmds) => {
-                    assert_eq!(cmds.len(), 1);
-                    let cmd_err = cmds[0].get_error()?;
-                    assert_eq!(
-                        cmd_err,
-                        MessagingDataError::InvalidOperation(
-                            "Failed to perform operation: SpentbookError(\"The number of \
-                            spent proofs (0) does not match the number of input \
-                            public keys (1)\")"
-                                .to_string()
-                        )
-                    );
-                    Ok(())
-                }
-                Err(err) => Err(eyre!(
+            let cmds = result.map_err(|err| {
+                eyre!(
                     "A cmd to send the error to the client was expected for this case: {:?}",
                     err
-                )),
-            }
+                )
+            })?;
+
+            assert_eq!(cmds.len(), 1);
+            let cmd_err = cmds[0].get_error()?;
+            assert_eq!(
+                cmd_err,
+                MessagingDataError::InvalidOperation(
+                    "Failed to perform operation: SpentbookError(\"The number of \
+                            spent proofs (0) does not match the number of input \
+                            public keys (1)\")"
+                        .to_string()
+                ),
+                "A different error was expected for this case: {:?}",
+                cmd_err
+            );
+            Ok(())
         })
         .await
 }
@@ -1502,25 +1505,26 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
             )
             .await;
 
-            match result {
-                Ok(cmds) => {
-                    assert_eq!(cmds.len(), 1);
-                    let cmd_err = cmds[0].get_error()?;
-                    assert_eq!(
-                        cmd_err,
-                        MessagingDataError::InvalidOperation(
-                            "Failed to perform operation: SpentbookError(\"The DBC \
-                            transaction must have at least one input\")"
-                                .to_string()
-                        )
-                    );
-                    Ok(())
-                }
-                Err(err) => Err(eyre!(
+            let cmds = result.map_err(|err| {
+                eyre!(
                     "A cmd to send the error to the client was expected for this case: {:?}",
                     err
-                )),
-            }
+                )
+            })?;
+
+            assert_eq!(cmds.len(), 1);
+            let cmd_err = cmds[0].get_error()?;
+            assert_eq!(
+                cmd_err,
+                MessagingDataError::InvalidOperation(
+                    "Failed to perform operation: SpentbookError(\"The DBC \
+                            transaction must have at least one input\")"
+                        .to_string()
+                ),
+                "A different error was expected for this case: {:?}",
+                cmd_err
+            );
+            Ok(())
         })
         .await
 }
@@ -1568,25 +1572,26 @@ async fn spentbook_spend_with_random_key_image_should_return_spentbook_error() -
             )
             .await;
 
-            match result {
-                Ok(cmds) => {
-                    assert_eq!(cmds.len(), 1);
-                    let cmd_err = cmds[0].get_error()?;
-                    assert_eq!(
-                        cmd_err,
-                        MessagingDataError::InvalidOperation(format!(
-                            "Failed to perform operation: SpentbookError(\"There are no \
-                            commitments for the given key image {:?}\")",
-                            pk
-                        ))
-                    );
-                    Ok(())
-                }
-                Err(err) => Err(eyre!(
+            let cmds = result.map_err(|err| {
+                eyre!(
                     "A cmd to send the error to the client was expected for this case: {:?}",
                     err
+                )
+            })?;
+
+            assert_eq!(cmds.len(), 1);
+            let cmd_err = cmds[0].get_error()?;
+            assert_eq!(
+                cmd_err,
+                MessagingDataError::InvalidOperation(format!(
+                    "Failed to perform operation: SpentbookError(\"There are no \
+                            commitments for the given key image {:?}\")",
+                    pk
                 )),
-            }
+                "A different error was expected for this case: {:?}",
+                cmd_err
+            );
+            Ok(())
         })
         .await
 }

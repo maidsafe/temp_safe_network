@@ -6,9 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{
-    errors::convert_to_error_msg, list_files_in, prefix_tree_path, Error, Result, UsedSpace,
-};
+use super::{list_files_in, prefix_tree_path, Error, Result, UsedSpace};
 
 use sn_interface::{
     messaging::system::NodeQueryResponse,
@@ -104,7 +102,7 @@ impl ChunkStorage {
     // Read chunk from local store and return NodeQueryResponse
     pub(super) async fn get(&self, address: &ChunkAddress) -> NodeQueryResponse {
         trace!("{:?}", LogMarker::ChunkQueryReceviedAtAdult);
-        NodeQueryResponse::GetChunk(self.get_chunk(address).await.map_err(convert_to_error_msg))
+        NodeQueryResponse::GetChunk(self.get_chunk(address).await.map_err(|error| error.into()))
     }
 
     /// Store a chunk in the local disk store

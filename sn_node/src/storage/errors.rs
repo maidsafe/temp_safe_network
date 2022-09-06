@@ -8,7 +8,7 @@
 
 use sn_interface::{
     messaging::data::Error as ErrorMsg,
-    types::{convert_dt_error_to_error_msg, DataAddress, PublicKey, RegisterAddress},
+    types::{convert_dt_error_to_error_msg, ChunkAddress, DataAddress, PublicKey, RegisterAddress},
 };
 
 use std::{io, path::PathBuf};
@@ -37,7 +37,7 @@ pub enum Error {
     DataExists(DataAddress),
     /// Storage not supported for type of data address
     #[error("Storage not supported for type of data address: {0:?}")]
-    UnsupportedDataType(XorName),
+    UnsupportedDataType(DataAddress),
     /// Data owner provided is invalid.
     #[error("Provided PublicKey could not validate signature {0:?}")]
     InvalidSignature(PublicKey),
@@ -72,14 +72,22 @@ pub enum Error {
     },
 }
 
-/// Convert db error to messaging error message for sending over the network.
-pub(crate) fn convert_to_error_msg(error: Error) -> ErrorMsg {
-    match error {
-        Error::NotEnoughSpace => ErrorMsg::FailedToWriteFile,
-        Error::RegisterNotFound(address) => ErrorMsg::DataNotFound(DataAddress::Register(address)),
-        Error::ChunkNotFound(xorname) => ErrorMsg::ChunkNotFound(xorname),
-        Error::DataExists(address) => ErrorMsg::DataExists(address),
-        Error::NetworkData(error) => convert_dt_error_to_error_msg(error),
-        other => ErrorMsg::InvalidOperation(format!("Failed to perform operation: {:?}", other)),
+// Convert storage error to messaging error message for sending over the network.
+impl From<Error> for ErrorMsg {
+    fn from(error: Error) -> ErrorMsg {
+        match error {
+            Error::NotEnoughSpace => ErrorMsg::FailedToWriteFile,
+            Error::RegisterNotFound(address) => {
+                ErrorMsg::DataNotFound(DataAddress::Register(address))
+            }
+            Error::ChunkNotFound(xorname) => {
+                ErrorMsg::DataNotFound(DataAddress::Bytes(ChunkAddress(xorname)))
+            }
+            Error::DataExists(address) => ErrorMsg::DataExists(address),
+            Error::NetworkData(error) => convert_dt_error_to_error_msg(error),
+            other => {
+                ErrorMsg::InvalidOperation(format!("Failed to perform operation: {:?}", other))
+            }
+        }
     }
 }
