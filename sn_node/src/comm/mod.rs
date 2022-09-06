@@ -6,15 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-#[cfg(feature = "back-pressure")]
-mod back_pressure;
-
 mod link;
 mod listener;
 mod peer_session;
-
-#[cfg(feature = "back-pressure")]
-use self::back_pressure::BackPressure;
 
 use self::{
     link::Link,
@@ -23,7 +17,7 @@ use self::{
 };
 
 use crate::log_sleep;
-use crate::node::{Error, RateLimits, Result};
+use crate::node::{Error, Result};
 use qp2p::UsrMsgBytes;
 
 use sn_interface::{
@@ -45,17 +39,7 @@ use tokio::{
 pub(crate) struct Comm {
     our_endpoint: Endpoint,
     msg_listener: MsgListener,
-    #[cfg(feature = "back-pressure")]
-    back_pressure: BackPressure,
     sessions: Arc<DashMap<Peer, PeerSession>>,
-}
-
-/// Commands for interacting with Comm.
-#[derive(Debug, Clone)]
-pub(crate) enum Cmd {
-    #[cfg(feature = "back-pressure")]
-    /// Set message rate for peer to the desired msgs per second
-    Regulate { peer: Peer, msgs_per_s: f64 },
 }
 
 impl Comm {
@@ -63,7 +47,6 @@ impl Comm {
     pub(crate) async fn first_node(
         local_addr: SocketAddr,
         config: qp2p::Config,
-        monitoring: RateLimits,
         incoming_msg_pipe: Sender<MsgEvent>,
     ) -> Result<Self> {
         // Doesn't bootstrap, just creates an endpoint to listen to
@@ -71,12 +54,7 @@ impl Comm {
         let (our_endpoint, incoming_connections, _) =
             Endpoint::new_peer(local_addr, Default::default(), config).await?;
 
-        let (comm, _) = setup_comms(
-            our_endpoint,
-            incoming_connections,
-            monitoring,
-            incoming_msg_pipe,
-        );
+        let (comm, _) = setup_comms(our_endpoint, incoming_connections, incoming_msg_pipe);
 
         Ok(comm)
     }
@@ -86,7 +64,7 @@ impl Comm {
         local_addr: SocketAddr,
         bootstrap_nodes: &[SocketAddr],
         config: qp2p::Config,
-        monitoring: RateLimits,
+        // monitoring: RateLimits,
         incoming_msg_pipe: Sender<MsgEvent>,
     ) -> Result<(Self, SocketAddr)> {
         debug!("Starting bootstrap process with bootstrap nodes: {bootstrap_nodes:?}");
@@ -97,7 +75,7 @@ impl Comm {
         let (comm, msg_listener) = setup_comms(
             our_endpoint,
             incoming_connections,
-            monitoring,
+            // monitoring,
             incoming_msg_pipe,
         );
 
@@ -107,13 +85,6 @@ impl Comm {
         msg_listener.listen(connection, incoming_msgs);
 
         Ok((comm, remote_address))
-    }
-
-    pub(crate) async fn handle_cmd(&self, cmd: Cmd) {
-        match cmd {
-            #[cfg(feature = "back-pressure")]
-            Cmd::Regulate { peer, msgs_per_s } => self.regulate(&peer, msgs_per_s).await,
-        }
     }
 
     pub(crate) fn socket_addr(&self) -> SocketAddr {
@@ -190,21 +161,6 @@ impl Comm {
             });
         connectivity_endpoint.close();
         result
-    }
-
-    #[cfg(feature = "back-pressure")]
-    /// Returns our caller-specific tolerated msgs per s, if the value has changed significantly.
-    pub(crate) async fn tolerated_msgs_per_s(&self) -> Option<f64> {
-        let sessions = self.sessions.len();
-        self.back_pressure.tolerated_msgs_per_s(sessions).await
-    }
-
-    #[cfg(feature = "back-pressure")]
-    /// Regulates comms with the specified peer
-    /// according to the tolerated msgs per s provided by it.
-    pub(crate) async fn regulate(&self, peer: &Peer, msgs_per_s: f64) {
-        let session = self.get_or_create(peer).await;
-        session.update_send_rate(msgs_per_s).await;
     }
 
     #[tracing::instrument(skip(self, bytes))]
@@ -359,10 +315,10 @@ impl Comm {
 fn setup_comms(
     our_endpoint: Endpoint,
     incoming_connections: IncomingConnections,
-    monitoring: RateLimits,
+    // monitoring: RateLimits,
     incoming_msg_pipe: Sender<MsgEvent>,
 ) -> (Comm, MsgListener) {
-    let (comm, msg_listener) = setup(our_endpoint, monitoring, incoming_msg_pipe);
+    let (comm, msg_listener) = setup(our_endpoint, incoming_msg_pipe);
 
     listen_for_incoming_msgs(msg_listener.clone(), incoming_connections);
 
@@ -370,45 +326,20 @@ fn setup_comms(
 }
 
 #[tracing::instrument(skip_all)]
-fn setup(
-    our_endpoint: Endpoint,
-    #[cfg(feature = "back-pressure")] monitoring: RateLimits,
-    #[cfg(not(feature = "back-pressure"))] _monitoring: RateLimits,
-    receive_msg: Sender<MsgEvent>,
-) -> (Comm, MsgListener) {
-    #[cfg(feature = "back-pressure")]
-    let back_pressure = BackPressure::new(monitoring);
+fn setup(our_endpoint: Endpoint, receive_msg: Sender<MsgEvent>) -> (Comm, MsgListener) {
     let (add_connection, conn_receiver) = mpsc::channel(100);
-    #[cfg(feature = "back-pressure")]
-    let (count_msg, msg_counter) = mpsc::channel(1000);
-    #[cfg(not(feature = "back-pressure"))]
-    let (count_msg, _msg_counter) = mpsc::channel(1000);
 
-    let msg_listener = MsgListener::new(add_connection, receive_msg, count_msg);
+    let msg_listener = MsgListener::new(add_connection, receive_msg);
 
     let comm = Comm {
         our_endpoint,
         msg_listener: msg_listener.clone(),
-        #[cfg(feature = "back-pressure")]
-        back_pressure: back_pressure.clone(),
         sessions: Arc::new(DashMap::new()),
     };
 
-    #[cfg(feature = "back-pressure")]
-    let _ = task::spawn_local(async move { count_msgs(back_pressure, msg_counter).await });
     let _ = task::spawn_local(receive_conns(comm.clone(), conn_receiver));
 
     (comm, msg_listener)
-}
-
-#[tracing::instrument(skip_all)]
-#[cfg(feature = "back-pressure")]
-async fn count_msgs(back_pressure: BackPressure, mut msg_counter: Receiver<()>) {
-    debug!("Entered msg counting listener loop.");
-    while msg_counter.recv().await == Some(()) {
-        back_pressure.count_msg().await;
-    }
-    debug!("Exited msg counting listener loop..!");
 }
 
 #[tracing::instrument(skip_all)]
@@ -479,8 +410,7 @@ mod tests {
         local
             .run_until(async move {
                 let (tx, _rx) = mpsc::channel(1);
-                let comm = Comm::first_node(local_addr(), Config::default(), RateLimits::new(), tx)
-                    .await?;
+                let comm = Comm::first_node(local_addr(), Config::default(), tx).await?;
 
                 let (peer0, mut rx0) = new_peer().await?;
                 let (peer1, mut rx1) = new_peer().await?;
@@ -522,7 +452,6 @@ mod tests {
                         idle_timeout: Some(Duration::from_millis(1)),
                         ..Config::default()
                     },
-                    RateLimits::new(),
                     tx,
                 )
                 .await?;
@@ -548,9 +477,7 @@ mod tests {
         local
             .run_until(async move {
                 let (tx, _rx) = mpsc::channel(1);
-                let send_comm =
-                    Comm::first_node(local_addr(), Config::default(), RateLimits::new(), tx)
-                        .await?;
+                let send_comm = Comm::first_node(local_addr(), Config::default(), tx).await?;
 
                 let (recv_endpoint, mut incoming_connections, _) =
                     Endpoint::new_peer(local_addr(), &[], Config::default()).await?;
@@ -607,15 +534,10 @@ mod tests {
         local
             .run_until(async move {
                 let (tx, mut rx0) = mpsc::channel(1);
-                let comm0 =
-                    Comm::first_node(local_addr(), Config::default(), RateLimits::new(), tx)
-                        .await?;
+                let comm0 = Comm::first_node(local_addr(), Config::default(), tx.clone()).await?;
                 let addr0 = comm0.socket_addr();
 
-                let (tx, _rx) = mpsc::channel(1);
-                let comm1 =
-                    Comm::first_node(local_addr(), Config::default(), RateLimits::new(), tx)
-                        .await?;
+                let comm1 = Comm::first_node(local_addr(), Config::default(), tx).await?;
 
                 let peer = Peer::new(xor_name::rand::random(), addr0);
                 let msg = new_test_msg(dst(peer))?;

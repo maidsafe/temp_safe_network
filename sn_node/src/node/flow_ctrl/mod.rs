@@ -138,8 +138,6 @@ impl FlowCtrl {
         let mut last_data_batch_check = Instant::now();
         let mut last_link_cleanup = Instant::now();
         let mut last_dysfunction_check = Instant::now();
-        #[cfg(feature = "back-pressure")]
-        let mut last_backpressure_check = Instant::now();
 
         // the internal process loop
         loop {
@@ -179,8 +177,6 @@ impl FlowCtrl {
             self.enqueue_cmds_for_standard_periodic_checks(
                 &mut last_link_cleanup,
                 &mut last_data_batch_check,
-                #[cfg(feature = "back-pressure")]
-                &mut last_backpressure_check,
             )
             .await;
 

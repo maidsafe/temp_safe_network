@@ -29,18 +29,15 @@ pub(crate) enum ListenerEvent {
 pub(crate) struct MsgListener {
     add_connection: mpsc::Sender<ListenerEvent>,
     receive_msg: mpsc::Sender<MsgEvent>,
-    count_msg: mpsc::Sender<()>,
 }
 
 impl MsgListener {
     pub(crate) fn new(
         add_connection: mpsc::Sender<ListenerEvent>,
         receive_msg: mpsc::Sender<MsgEvent>,
-        count_msg: mpsc::Sender<()>,
     ) -> Self {
         Self {
             add_connection,
-            count_msg,
             receive_msg,
         }
     }
@@ -92,9 +89,6 @@ impl MsgListener {
                     {
                         error!("Error pushing msg onto internal msg channel... {error:?}");
                     }
-
-                    // count incoming msgs..
-                    let _ = self.count_msg.send(());
                 }
                 Err(error) => {
                     // TODO: should we propagate this?
@@ -104,14 +98,5 @@ impl MsgListener {
         }
 
         trace!(%conn_id, %remote_address, "{}", LogMarker::ConnectionClosed);
-    }
-
-    // count outgoing msgs
-    #[cfg(feature = "back-pressure")]
-    pub(crate) async fn count_msg(&self) {
-        if let Err(err) = self.count_msg.send(()).await {
-            // this is really a problem as we rely on this counting, make sure this doesn't normally error!
-            debug!("Error when trying to count outgoing msg..! {}", err);
-        }
     }
 }

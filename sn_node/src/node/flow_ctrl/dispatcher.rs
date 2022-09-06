@@ -52,12 +52,6 @@ impl Dispatcher {
         self.node.clone()
     }
 
-    #[cfg(feature = "back-pressure")]
-    // Currently only used in cmd ctrl backpressure features
-    pub(crate) fn comm(&self) -> &Comm {
-        &self.comm
-    }
-
     /// Handles a single cmd.
     pub(crate) async fn process_cmd(&self, cmd: Cmd) -> Result<Vec<Cmd>> {
         match cmd {
@@ -281,10 +275,6 @@ impl Dispatcher {
             Cmd::ProposeVoteNodesOffline(names) => {
                 let mut node = self.node.write().await;
                 node.cast_offline_proposals(&names)
-            }
-            Cmd::Comm(comm_cmd) => {
-                self.comm.handle_cmd(comm_cmd).await;
-                Ok(vec![])
             }
         }
     }

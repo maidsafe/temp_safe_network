@@ -25,7 +25,6 @@ name = "routing_stress"
 [features]
 default = ["traceroute", "statemap"]
 chaos = []
-back-pressure = ["sn_interface/back-pressure"]
 unstable-wiremsg-debuginfo = []
 traceroute = ["sn_interface/traceroute"]
 # Needs to be built with RUSTFLAGS="--cfg tokio_unstable"

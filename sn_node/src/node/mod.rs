@@ -23,7 +23,6 @@ mod logging;
 mod membership;
 mod messages;
 mod messaging;
-mod monitoring;
 mod node_starter;
 mod node_test_api;
 mod proposal;
@@ -58,7 +57,7 @@ pub use self::{
 
 pub use crate::storage::DataStorage;
 
-pub(crate) use self::monitoring::RateLimits;
+// pub(crate) use self::monitoring::RateLimits;
 #[cfg(test)]
 pub(crate) use relocation::{check as relocation_check, ChurnId};
 

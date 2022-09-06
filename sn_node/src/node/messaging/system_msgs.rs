@@ -191,20 +191,6 @@ impl Node {
                 cmds.push(self.send_ae_update_to_nodes(recipients, section_key));
                 Ok(cmds)
             }
-            #[cfg(feature = "back-pressure")]
-            SystemMsg::BackPressure(msgs_per_s) => {
-                trace!(
-                    "Handling msg: BackPressure with requested {} msgs/s, from {}: {:?}",
-                    msgs_per_s,
-                    sender,
-                    msg_id
-                );
-                // TODO: Factor in med/long term backpressure into general node liveness calculations
-                Ok(vec![Cmd::Comm(crate::comm::Cmd::Regulate {
-                    peer: sender,
-                    msgs_per_s,
-                })])
-            }
             // The AcceptedOnlineShare for relocation will be received here.
             SystemMsg::JoinResponse(join_response) => {
                 match *join_response {

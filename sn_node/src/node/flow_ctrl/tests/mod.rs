@@ -18,7 +18,7 @@ use crate::node::{
     flow_ctrl::{dispatcher::Dispatcher, event_channel},
     messages::WireMsgUtils,
     messaging::{OutgoingMsg, Peers},
-    Cmd, Error, Event, MembershipEvent, Node, Proposal, RateLimits, Result as RoutingResult,
+    Cmd, Error, Event, MembershipEvent, Node, Proposal, Result as RoutingResult,
     RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
 };
 use crate::storage::UsedSpace;
@@ -856,7 +856,6 @@ async fn msg_to_self() -> Result<()> {
         let comm = Comm::first_node(
             (Ipv4Addr::LOCALHOST, 0).into(),
             Default::default(),
-            RateLimits::new(),
             comm_tx,
         )
         .await?;

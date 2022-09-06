@@ -23,9 +23,6 @@ pub(crate) const JOIN_RESPONSE_PRIORITY: i32 = 4;
 pub(crate) const MEMBERSHIP_PRIORITY: i32 = 4;
 // our joining to the network
 pub(crate) const JOIN_RELOCATE_MSG_PRIORITY: i32 = 2;
-#[cfg(feature = "back-pressure")]
-// reporting backpressure isn't time critical, so fairly low
-pub(crate) const BACKPRESSURE_MSG_PRIORITY: i32 = 0;
 // not maintaining network structure, so can wait
 pub(crate) const NODE_DATA_MSG_PRIORITY: i32 = -6;
 #[cfg(any(feature = "chunks", feature = "registers"))]
