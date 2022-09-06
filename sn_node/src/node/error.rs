@@ -8,18 +8,16 @@
 
 use super::Prefix;
 
-use crate::node::{flow_ctrl::cmds::Cmd, handover::Error as HandoverError};
+use crate::node::handover::Error as HandoverError;
 
 use sn_dbc::Error as DbcError;
 use sn_interface::{
     messaging::data::Error as ErrorMsg,
-    types::{convert_dt_error_to_error_msg, DataAddress, Peer, PublicKey},
+    types::{convert_dt_error_to_error_msg, DataAddress, Peer},
 };
 
-use secured_linked_list::error::Error as SecuredLinkedListError;
 use std::{io, net::SocketAddr};
 use thiserror::Error;
-use xor_name::XorName;
 
 /// The type returned by the `sn_routing` message handling methods.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -28,8 +26,6 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Debug, Error)]
 #[allow(missing_docs)]
 pub enum Error {
-    #[error("CmdCtrl has stopped.")]
-    CmdCtrlStopped,
     /// This should not be possible as the channel is stored in node, and used to process child commands
     #[error("No more Cmds will be received or processed. CmdChannel senders have been dropped. ")]
     CmdCtrlChannelDropped,
@@ -44,27 +40,11 @@ pub enum Error {
     InvalidDkgPrefix,
     #[error("No membership data exists when it is needed.")]
     NoMembershipFound,
-    #[error("Max retries reached for processing cmd, cmd dropped.")]
-    MaxCmdRetriesReached(usize),
-    #[error("Cmd job watcher dropped for some unknown reason.")]
-    CmdJobWatcherDropped,
-    #[error("Permit was not retrieved in 500 loops")]
-    CouldNotGetPermitInTime,
     #[cfg(feature = "chaos")]
     #[error("[Chaos] feature flag induced a crash at startup")]
     ChaoticStartupCrash,
-    #[error("Node prioritisation semaphore was closed early.")]
-    SemaphoreClosed,
-    #[error("There was a problem during acquisition of a tokio::sync::semaphore permit.")]
-    PermitAcquisitionFailed,
     #[error("Section authority provider cannot be trusted: {0}")]
     UntrustedSectionAuthProvider(String),
-    #[error("Proof chain cannot be trusted: {0}")]
-    UntrustedProofChain(String),
-    #[error("Cannot route. Delivery group size: {}, candidates: {}.", _0, _1)]
-    CannotRoute(usize, usize),
-    #[error("Empty recipient list")]
-    EmptyRecipientList,
     #[error("Could not connect to any bootstrap contact")]
     BootstrapFailed,
     #[error("Cannot connect to the endpoint: {0}")]
@@ -83,26 +63,14 @@ pub enum Error {
     MissingSecretKeyShare(bls::PublicKey),
     #[error("Failed to send a message to {0}")]
     FailedSend(Peer),
-    #[error("Link to peer has been dropped {0}")]
-    PeerLinkDropped(Peer),
-    #[error("Invalid section chain: {0}")]
-    InvalidSectionChain(#[from] SecuredLinkedListError),
     #[error("Messaging protocol error: {0}")]
     Messaging(#[from] sn_interface::messaging::Error),
     #[error("Membership error: {0}")]
     Membership(#[from] crate::node::membership::Error),
-    #[error("Invalid payload")]
-    InvalidPayload,
     #[error("The section is currently set to not allow taking any new node")]
     TryJoinLater,
     #[error("No matching Section")]
     NoMatchingSection,
-    #[error(
-        "A JoinResponse was reeived after we've already joined the network. It has been ignored."
-    )]
-    AlreadyJoinedTheNetwork,
-    #[error("No matching Elder")]
-    NoMatchingElder,
     #[error("Node cannot join the network since it is not externally reachable: {0}")]
     NodeNotReachable(SocketAddr),
     /// Timeout when trying to join the network
@@ -114,21 +82,18 @@ pub enum Error {
     /// Database error.
     #[error("Database error:: {0}")]
     Database(#[from] crate::storage::Error),
-    /// Not enough in the section to perform Chunk operation
-    #[error("Not enough Adults available in Section({0:?}) to perform operation")]
-    NoAdults(Prefix),
-    /// Not Section PublicKey.
-    #[error("Not section public key returned from routing")]
-    NoSectionPublicKey,
-    /// Not Section PublicKeySet.
-    #[error("Not section public key set returned from routing")]
-    NoSectionPublicKeySet,
-    /// Not Section PublicKey.
-    #[error("Not section public key returned from routing for xorname {0}")]
-    NoSectionPublicKeyKnown(XorName),
-    /// Key, Value pair not found.
-    #[error("No such data: {0:?}")]
-    NoSuchData(DataAddress),
+    /// Insufficient number of Adults found to perform data operation
+    #[error(
+        "Not enough Adults available at section {prefix:?}. Expected {expected}, found {found}."
+    )]
+    InsufficientAdults {
+        /// The prefix of the section.
+        prefix: Prefix,
+        /// Expected number of Adults for minimum replication.
+        expected: u8,
+        /// Actual number of Adults found to hold the data.
+        found: u8,
+    },
     /// Chunk already exists for this node
     #[error("Data already exists at this node: {0:?}")]
     DataExists(DataAddress),
@@ -153,9 +118,6 @@ pub enum Error {
     /// Network Knowledge error.
     #[error("Network data error:: {0}")]
     NetworkKnowledge(#[from] sn_interface::network_knowledge::Error),
-    /// Data owner provided is invalid.
-    #[error("Provided PublicKey is not a valid owner. Provided PublicKey: {0}")]
-    InvalidOwner(PublicKey),
     /// Signature verification failed
     #[error("Invalid signature")]
     InvalidSignature,
@@ -198,20 +160,15 @@ pub enum Error {
     /// Spentbook error
     #[error("Spentbook Error: {0}")]
     SpentbookError(String),
+    /// Failed to verify a spent proof since it's signed by an unknown section key
+    #[error("Spent proof is signed by unknown section key: {0:?}")]
+    SpentProofUnknownSectionKey(bls::PublicKey),
     /// Error occurred when minting the Genesis DBC.
     #[error("Genesis DBC error:: {0}")]
     GenesisDbcError(String),
+    /// Error thrown by DBC public API
     #[error("DbcError: {0}")]
     DbcError(#[from] DbcError),
-    /// An error occurred while processing a command and we want to send a response back to the
-    /// client.
-    ///
-    /// It's not really a type of error as such, but rather a marker for the command processing
-    /// code that we want to send an acknowledgement back to the client. It enables command
-    /// processing (or message handling) to return errors for more robust unit testing. Previously
-    /// if there was an error we would return back an `Ok` result with an empty list of commands.
-    #[error("Error processing command. Response will be sent back to client.")]
-    CmdProcessingClientRespondError(Vec<Cmd>),
 }
 
 impl From<qp2p::ClientEndpointError> for Error {
@@ -232,12 +189,24 @@ impl From<qp2p::SendError> for Error {
     }
 }
 
-pub(crate) fn convert_to_error_msg(error: Error) -> ErrorMsg {
-    match error {
-        Error::InvalidOwner(key) => ErrorMsg::InvalidOwner(key),
-        Error::NoSuchData(address) => ErrorMsg::DataNotFound(address),
-        Error::DataExists(address) => ErrorMsg::DataExists(address),
-        Error::NetworkData(error) => convert_dt_error_to_error_msg(error),
-        other => ErrorMsg::InvalidOperation(format!("Failed to perform operation: {:?}", other)),
+impl From<Error> for ErrorMsg {
+    fn from(error: Error) -> ErrorMsg {
+        match error {
+            Error::InsufficientAdults {
+                prefix,
+                expected,
+                found,
+            } => ErrorMsg::InsufficientAdults {
+                prefix,
+                expected,
+                found,
+            },
+            Error::DataExists(address) => ErrorMsg::DataExists(address),
+            Error::SpentProofUnknownSectionKey(pk) => ErrorMsg::SpentProofUnknownSectionKey(pk),
+            Error::NetworkData(error) => convert_dt_error_to_error_msg(error),
+            other => {
+                ErrorMsg::InvalidOperation(format!("Failed to perform operation: {:?}", other))
+            }
+        }
     }
 }

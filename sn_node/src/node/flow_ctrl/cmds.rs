@@ -111,7 +111,7 @@ impl CmdJob {
 /// In other words, it enables enhanced flow control.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
-pub enum Cmd {
+pub(crate) enum Cmd {
     /// Cleanup node's PeerLinks, removing any unsused, unconnected peers
     CleanupPeerLinks,
     /// Validate `wire_msg` from `sender`.

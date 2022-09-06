@@ -71,8 +71,9 @@ pub enum Error {
     /// Destination is either outdated or incorrect
     #[error("Destination is either outdated or wrong")]
     WrongDestination,
-    #[error("Spent proof was signed with unknown section key")]
-    SpentProofUnknownSectionKey,
+    /// Failed to verify a spent proof since it's signed by unknown section key
+    #[error("Spent proof was signed with unknown section key: {0:?}")]
+    SpentProofUnknownSectionKey(bls::PublicKey),
     /// Failed to seriliase the Cmd for hashing
     #[error("Cmd could not be serialised")]
     CouldNotSerialiseCmd,

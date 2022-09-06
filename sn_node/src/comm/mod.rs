@@ -51,9 +51,8 @@ pub(crate) struct Comm {
 }
 
 /// Commands for interacting with Comm.
-#[allow(unused)]
 #[derive(Debug, Clone)]
-pub enum Cmd {
+pub(crate) enum Cmd {
     #[cfg(feature = "back-pressure")]
     /// Set message rate for peer to the desired msgs per second
     Regulate { peer: Peer, msgs_per_s: f64 },

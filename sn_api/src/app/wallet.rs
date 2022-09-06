@@ -574,6 +574,7 @@ mod tests {
         new_safe_instance_with_dbc, new_safe_instance_with_dbc_owner, GENESIS_DBC,
     };
     use anyhow::{anyhow, Result};
+    use sn_client::{Error as ClientError, ErrorMsg};
     use sn_dbc::{Error as DbcError, Owner};
 
     #[tokio::test]
@@ -1213,9 +1214,18 @@ mod tests {
 
         // It shall detect no spent proofs for this TX, thus fail to reissue
         match safe.wallet_reissue(&wallet_xorurl, "0.1", None).await {
-            Err(Error::DbcReissueError(msg)) => {
-                assert!(msg
-                    .starts_with("Failed to spend input, 0 proof shares obtained from spentbook"));
+            Err(Error::ClientError(ClientError::ErrorCmd {
+                source: ErrorMsg::InvalidOperation(msg),
+                ..
+            })) => {
+                assert_eq!(
+                    msg,
+                    format!(
+                        "Failed to perform operation: SpentbookError(\"Spent proof \
+                        signature {:?} is invalid\")",
+                        random_pk
+                    )
+                );
                 Ok(())
             }
             Err(err) => Err(anyhow!("Error returned is not the expected: {:?}", err)),
