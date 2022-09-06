@@ -5,10 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.70.0 (2022-09-04)
+## v0.71.0 (2022-09-06)
 
 ### Chore
 
+ - <csr-id-d28fdf3ddd0a39f7bbc6426e1e71d990319b0ec7/> sn_interface-0.11.0/sn_dysfunction-0.10.0/sn_client-0.72.0/sn_node-0.67.0/sn_api-0.70.0/sn_cli-0.63.0
  - <csr-id-f31bd5df469a16d39e6b03de605981ad303a2be3/> replace for_each with for loop
  - <csr-id-dd89cac97da96ffe26ae78c4b7b62aa952ec53fc/> replace implicit clones with clone
  - <csr-id-921438659ccaf65b2ea8cc00efb61d8146ef71ef/> unneeded iter methods removal
@@ -19,9 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 4 commits contributed to the release over the course of 4 calendar days.
- - 7 days passed between releases.
- - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 5 commits contributed to the release over the course of 7 calendar days.
+ - 11 days passed between releases.
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -31,13 +32,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.11.0/sn_dysfunction-0.10.0/sn_client-0.72.0/sn_node-0.67.0/sn_api-0.70.0/sn_cli-0.63.0 ([`d28fdf3`](https://github.com/maidsafe/safe_network/commit/d28fdf3ddd0a39f7bbc6426e1e71d990319b0ec7))
     - replace for_each with for loop ([`f31bd5d`](https://github.com/maidsafe/safe_network/commit/f31bd5df469a16d39e6b03de605981ad303a2be3))
     - replace implicit clones with clone ([`dd89cac`](https://github.com/maidsafe/safe_network/commit/dd89cac97da96ffe26ae78c4b7b62aa952ec53fc))
     - unneeded iter methods removal ([`9214386`](https://github.com/maidsafe/safe_network/commit/921438659ccaf65b2ea8cc00efb61d8146ef71ef))
     - switch on clippy::unwrap_used as a warning ([`3a718d8`](https://github.com/maidsafe/safe_network/commit/3a718d8c0957957a75250b044c9d1ad1b5874ab0))
 </details>
 
+## v0.70.0 (2022-09-04)
+
+<csr-id-f31bd5df469a16d39e6b03de605981ad303a2be3/>
+<csr-id-dd89cac97da96ffe26ae78c4b7b62aa952ec53fc/>
+<csr-id-921438659ccaf65b2ea8cc00efb61d8146ef71ef/>
+<csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/>
+
+### Chore
+
+ - <csr-id-f31bd5df469a16d39e6b03de605981ad303a2be3/> replace for_each with for loop
+ - <csr-id-dd89cac97da96ffe26ae78c4b7b62aa952ec53fc/> replace implicit clones with clone
+ - <csr-id-921438659ccaf65b2ea8cc00efb61d8146ef71ef/> unneeded iter methods removal
+ - <csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/> switch on clippy::unwrap_used as a warning
+
+
 ## v0.69.0 (2022-08-25)
+
+<csr-id-401bc416c7aea65ae55e9adee2cbecf782c999cf/>
 
 ### Chore
 

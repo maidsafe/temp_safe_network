@@ -5,7 +5,184 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.68.0 (2022-09-06)
+
+### Chore
+
+ - <csr-id-d28fdf3ddd0a39f7bbc6426e1e71d990319b0ec7/> sn_interface-0.11.0/sn_dysfunction-0.10.0/sn_client-0.72.0/sn_node-0.67.0/sn_api-0.70.0/sn_cli-0.63.0
+ - <csr-id-bcbca889993268429636b003c5ae50ed6cbda527/> nightly question_mark lint applied
+ - <csr-id-dd89cac97da96ffe26ae78c4b7b62aa952ec53fc/> replace implicit clones with clone
+ - <csr-id-921438659ccaf65b2ea8cc00efb61d8146ef71ef/> unneeded iter methods removal
+ - <csr-id-933f4282fce2e28a1956fd1b50cc8061a68e1515/> makefile targets for easier local network use
+   There are now two targets for running a local network, one that does a clean build and one that
+   doesn't. The nodes have debug logging set and also use a debug build for speed.
+   
+   Also added some additional logging output to the command processing code to indicate the return of
+   an error to the client.
+   
+   This also fixes up a mistake made while resolving a merge conflict.
+ - <csr-id-b040ea14e53247094838de6f1fa9af2830b051fa/> sn_interface lints and fixes
+   Apply lints used in other crates, as far as they can easily be applied.
+   The `unused_results` lint has been left out, as that is too much
+   cleaning up to do, just like adding documentation to all the public
+   interfaces.
+ - <csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/> switch on clippy::unwrap_used as a warning
+
+
+### New Features
+
+ - <csr-id-08a0a8eb75a0ca9d51fa321686d17dbcf97fc04e/> fix time alignment; more states; mv to sn_interface
+ - <csr-id-5b43e28eba3cb81d3122fe7d62737a2f51e174d6/> use err result to send errors back to client
+   Previously the mechanism for handling errors in `handle_valid_service_msg` was to return an `Ok`
+   result with an empty list of commands, or if you wanted to send an error response back to the
+   client, to include a command in that `Ok` result.
+   
+   A new `CmdProcessingClientRespondError` variant is added to `Error` to enable returning an `Err`
+   result when we want to return an error back to the client. When the command processing code
+   encounters this error variant, it will process the commands included in the error, which will be the
+   information to send back to the client.
+   
+   The intention is also to return `Err` results from `handle_valid_service_msg` when any errors are
+   encountered, not just for the limited few we want to send back to the client.
+ - <csr-id-b1a5590e84eb7a0f4872e42de61c3c5d33ae9fdf/> move statemap logs behind feature flag
+ - <csr-id-5b9bb3bd70741fa7bd9cf0db3dbdf7284d62f343/> breakdown states by cmd type
+ - <csr-id-1abeb803bfb7effbbb23d1fad75b341d2f3c9402/> better colors
+ - <csr-id-8badef313d6f78e0183402983120f2184c130407/> some minimal infrastructure for generating statemaps
+
+### Bug Fixes
+
+ - <csr-id-7c207e407533c09108ae6668d51b398caf896f0f/> always resend query to adults
+ - <csr-id-6bdc82295dfdcaa617c7c1e36d2b72f085e50042/> update qp2p for unique ids
+   Latest qp2p should provide global unique connection id
+   
+   previously duplication of ids could have been breaking
+   connection management
+ - <csr-id-d20f4e0aed02f99d44d5d1407bb7a42b67baf878/> send adult -> elder ae probes before split
+ - <csr-id-fec85dbc3b857458de5c09a02490eab7c1227b40/> avoid testing data collision during bench test
+
+### Other
+
+ - <csr-id-906625895228de811515e7b71d5f55d067964d24/> fix missing block on in data_store bench
+ - <csr-id-7d8956a8d7ac2bf0961b90b19c48e89dda6cfb21/> fix missing await in data_storage bench
+
+### Refactor
+
+ - <csr-id-39dd5a043c75492e416bb9371015a1365b06fa01/> small tweaks; clippy::equatable_if_let
+ - <csr-id-183d7f83985a36deeb5933ae9b1880df21da2866/> skip spentbook register creation if it already exists
+ - <csr-id-070f7d8902c3bbc2a88b3be1a8f44de3c2726df6/> optimise the way we apply and save replicated Register cmds on local storage
+ - <csr-id-4a9d4c4bdc8f81d11ea78f888368f64d76754d8e/> remove stopped state from CmdCtrl
+ - <csr-id-63958a8629c9fbca8e6604edb17d9b61ca92a4ee/> move probe creation to network knowledge
+ - <csr-id-9f9a95614991197b240b3c1a363eb4e5946d3fae/> err result from gen spent proof share
+   The spent proof share generation function now returns `SpentProofShare` directly rather than an
+   `Option`, and we return `Err` results rather than `Ok(None)`. The unit tests were then updated to
+   check for specific kinds of errors. The calling code is also a bit cleaner since it can just use the
+   `?` operator.
+   
+   Note the use of an `allow` attribute to suppress a Clippy warning about this function having too
+   many arguments. The additional arguments are just required for the composition of the error that
+   gets sent back to the client, which I consider justified. Otherwise this error will need to be
+   handled in a special way outside the function, which is an unnecessary complication.
+ - <csr-id-62bc8d6d24b7c82bd3a27ceb43cd53d8077ff6b2/> separating internal chunk from register store implementation layer
+
+### Test
+
+ - <csr-id-277d925aa3ed5ff01eab8c1d2488f653cfe6effc/> unit tests for register storage key internal helper functions
+
+### New Features (BREAKING)
+
+ - <csr-id-f5361d91f8215585651229eb6dc2535f2ecb631c/> update qp2p to use UsrMsgBytes and avoid reserializing bytes
+   This makes use of udpate qp2p to avoid having to reserialise the
+   WireMsgheader for every message when we're just updating the Dst.
+   
+   This in turn avoids the neccesity to clone the msg payload when
+   serilizing; allowing us to to use the shared data struct Bytes for all
+   parts, reducing both compute and memory use.
+
+### Refactor (BREAKING)
+
+ - <csr-id-a6685348578fe546576bd13405e6485d984b3487/> improving internal helpers in register storage mod to reuse some logic/code
+   - Removing some storage Error types, while adding more context information to others.
+   - Allowing the Register storage to store 'Register edit' cmds even when the 'Register create' cmd
+   is not found in the local replica/store yet.
+ - <csr-id-ed9f627d0e2c42ab1b7386888cced751ae28f98a/> removing unnecessary ReplicatedDataAddress type
+ - <csr-id-5b73b33b683991be9e9f6440c3d8d568edab3ad6/> removing unnecessary types
+ - <csr-id-b7530feb40987f433ff12c5176cfdbc375359dc6/> moving encoding/decoding utilities of data addresses types to storage impl
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 35 commits contributed to the release over the course of 7 calendar days.
+ - 8 days passed between releases.
+ - 32 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - update qp2p to use UsrMsgBytes and avoid reserializing bytes ([`f5361d9`](https://github.com/maidsafe/safe_network/commit/f5361d91f8215585651229eb6dc2535f2ecb631c))
+    - Merge #1545 ([`b62c056`](https://github.com/maidsafe/safe_network/commit/b62c056b0b28f67a40d9e036b2d64b36fd5380bd))
+    - always resend query to adults ([`7c207e4`](https://github.com/maidsafe/safe_network/commit/7c207e407533c09108ae6668d51b398caf896f0f))
+    - update qp2p for unique ids ([`6bdc822`](https://github.com/maidsafe/safe_network/commit/6bdc82295dfdcaa617c7c1e36d2b72f085e50042))
+    - sn_interface-0.11.0/sn_dysfunction-0.10.0/sn_client-0.72.0/sn_node-0.67.0/sn_api-0.70.0/sn_cli-0.63.0 ([`d28fdf3`](https://github.com/maidsafe/safe_network/commit/d28fdf3ddd0a39f7bbc6426e1e71d990319b0ec7))
+    - fix missing block on in data_store bench ([`9066258`](https://github.com/maidsafe/safe_network/commit/906625895228de811515e7b71d5f55d067964d24))
+    - fix missing await in data_storage bench ([`7d8956a`](https://github.com/maidsafe/safe_network/commit/7d8956a8d7ac2bf0961b90b19c48e89dda6cfb21))
+    - nightly question_mark lint applied ([`bcbca88`](https://github.com/maidsafe/safe_network/commit/bcbca889993268429636b003c5ae50ed6cbda527))
+    - replace implicit clones with clone ([`dd89cac`](https://github.com/maidsafe/safe_network/commit/dd89cac97da96ffe26ae78c4b7b62aa952ec53fc))
+    - unneeded iter methods removal ([`9214386`](https://github.com/maidsafe/safe_network/commit/921438659ccaf65b2ea8cc00efb61d8146ef71ef))
+    - small tweaks; clippy::equatable_if_let ([`39dd5a0`](https://github.com/maidsafe/safe_network/commit/39dd5a043c75492e416bb9371015a1365b06fa01))
+    - unit tests for register storage key internal helper functions ([`277d925`](https://github.com/maidsafe/safe_network/commit/277d925aa3ed5ff01eab8c1d2488f653cfe6effc))
+    - skip spentbook register creation if it already exists ([`183d7f8`](https://github.com/maidsafe/safe_network/commit/183d7f83985a36deeb5933ae9b1880df21da2866))
+    - improving internal helpers in register storage mod to reuse some logic/code ([`a668534`](https://github.com/maidsafe/safe_network/commit/a6685348578fe546576bd13405e6485d984b3487))
+    - optimise the way we apply and save replicated Register cmds on local storage ([`070f7d8`](https://github.com/maidsafe/safe_network/commit/070f7d8902c3bbc2a88b3be1a8f44de3c2726df6))
+    - fix time alignment; more states; mv to sn_interface ([`08a0a8e`](https://github.com/maidsafe/safe_network/commit/08a0a8eb75a0ca9d51fa321686d17dbcf97fc04e))
+    - send adult -> elder ae probes before split ([`d20f4e0`](https://github.com/maidsafe/safe_network/commit/d20f4e0aed02f99d44d5d1407bb7a42b67baf878))
+    - remove stopped state from CmdCtrl ([`4a9d4c4`](https://github.com/maidsafe/safe_network/commit/4a9d4c4bdc8f81d11ea78f888368f64d76754d8e))
+    - move probe creation to network knowledge ([`63958a8`](https://github.com/maidsafe/safe_network/commit/63958a8629c9fbca8e6604edb17d9b61ca92a4ee))
+    - makefile targets for easier local network use ([`933f428`](https://github.com/maidsafe/safe_network/commit/933f4282fce2e28a1956fd1b50cc8061a68e1515))
+    - err result from gen spent proof share ([`9f9a956`](https://github.com/maidsafe/safe_network/commit/9f9a95614991197b240b3c1a363eb4e5946d3fae))
+    - use err result to send errors back to client ([`5b43e28`](https://github.com/maidsafe/safe_network/commit/5b43e28eba3cb81d3122fe7d62737a2f51e174d6))
+    - chore(clippy) ([`611fc23`](https://github.com/maidsafe/safe_network/commit/611fc23f9174aabf85c7adea7159677c1508d388))
+    - move statemap logs behind feature flag ([`b1a5590`](https://github.com/maidsafe/safe_network/commit/b1a5590e84eb7a0f4872e42de61c3c5d33ae9fdf))
+    - breakdown states by cmd type ([`5b9bb3b`](https://github.com/maidsafe/safe_network/commit/5b9bb3bd70741fa7bd9cf0db3dbdf7284d62f343))
+    - better colors ([`1abeb80`](https://github.com/maidsafe/safe_network/commit/1abeb803bfb7effbbb23d1fad75b341d2f3c9402))
+    - some minimal infrastructure for generating statemaps ([`8badef3`](https://github.com/maidsafe/safe_network/commit/8badef313d6f78e0183402983120f2184c130407))
+    - sn_interface lints and fixes ([`b040ea1`](https://github.com/maidsafe/safe_network/commit/b040ea14e53247094838de6f1fa9af2830b051fa))
+    - Merge branch 'main' into avoid_testing_data_collision ([`60c368b`](https://github.com/maidsafe/safe_network/commit/60c368b8494eaeb219572c2304bf787a168cfee0))
+    - avoid testing data collision during bench test ([`fec85db`](https://github.com/maidsafe/safe_network/commit/fec85dbc3b857458de5c09a02490eab7c1227b40))
+    - switch on clippy::unwrap_used as a warning ([`3a718d8`](https://github.com/maidsafe/safe_network/commit/3a718d8c0957957a75250b044c9d1ad1b5874ab0))
+    - separating internal chunk from register store implementation layer ([`62bc8d6`](https://github.com/maidsafe/safe_network/commit/62bc8d6d24b7c82bd3a27ceb43cd53d8077ff6b2))
+    - removing unnecessary ReplicatedDataAddress type ([`ed9f627`](https://github.com/maidsafe/safe_network/commit/ed9f627d0e2c42ab1b7386888cced751ae28f98a))
+    - removing unnecessary types ([`5b73b33`](https://github.com/maidsafe/safe_network/commit/5b73b33b683991be9e9f6440c3d8d568edab3ad6))
+    - moving encoding/decoding utilities of data addresses types to storage impl ([`b7530fe`](https://github.com/maidsafe/safe_network/commit/b7530feb40987f433ff12c5176cfdbc375359dc6))
+</details>
+
 ## v0.67.0 (2022-09-04)
+
+<csr-id-bcbca889993268429636b003c5ae50ed6cbda527/>
+<csr-id-dd89cac97da96ffe26ae78c4b7b62aa952ec53fc/>
+<csr-id-921438659ccaf65b2ea8cc00efb61d8146ef71ef/>
+<csr-id-933f4282fce2e28a1956fd1b50cc8061a68e1515/>
+<csr-id-b040ea14e53247094838de6f1fa9af2830b051fa/>
+<csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/>
+<csr-id-906625895228de811515e7b71d5f55d067964d24/>
+<csr-id-7d8956a8d7ac2bf0961b90b19c48e89dda6cfb21/>
+<csr-id-39dd5a043c75492e416bb9371015a1365b06fa01/>
+<csr-id-183d7f83985a36deeb5933ae9b1880df21da2866/>
+<csr-id-070f7d8902c3bbc2a88b3be1a8f44de3c2726df6/>
+<csr-id-4a9d4c4bdc8f81d11ea78f888368f64d76754d8e/>
+<csr-id-63958a8629c9fbca8e6604edb17d9b61ca92a4ee/>
+<csr-id-9f9a95614991197b240b3c1a363eb4e5946d3fae/>
+<csr-id-62bc8d6d24b7c82bd3a27ceb43cd53d8077ff6b2/>
+<csr-id-277d925aa3ed5ff01eab8c1d2488f653cfe6effc/>
+<csr-id-a6685348578fe546576bd13405e6485d984b3487/>
+<csr-id-ed9f627d0e2c42ab1b7386888cced751ae28f98a/>
+<csr-id-5b73b33b683991be9e9f6440c3d8d568edab3ad6/>
+<csr-id-b7530feb40987f433ff12c5176cfdbc375359dc6/>
 
 ### Chore
 
@@ -91,58 +268,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-5b73b33b683991be9e9f6440c3d8d568edab3ad6/> removing unnecessary types
  - <csr-id-b7530feb40987f433ff12c5176cfdbc375359dc6/> moving encoding/decoding utilities of data addresses types to storage impl
 
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 30 commits contributed to the release over the course of 4 calendar days.
- - 4 days passed between releases.
- - 28 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - fix missing block on in data_store bench ([`9066258`](https://github.com/maidsafe/safe_network/commit/906625895228de811515e7b71d5f55d067964d24))
-    - fix missing await in data_storage bench ([`7d8956a`](https://github.com/maidsafe/safe_network/commit/7d8956a8d7ac2bf0961b90b19c48e89dda6cfb21))
-    - nightly question_mark lint applied ([`bcbca88`](https://github.com/maidsafe/safe_network/commit/bcbca889993268429636b003c5ae50ed6cbda527))
-    - replace implicit clones with clone ([`dd89cac`](https://github.com/maidsafe/safe_network/commit/dd89cac97da96ffe26ae78c4b7b62aa952ec53fc))
-    - unneeded iter methods removal ([`9214386`](https://github.com/maidsafe/safe_network/commit/921438659ccaf65b2ea8cc00efb61d8146ef71ef))
-    - small tweaks; clippy::equatable_if_let ([`39dd5a0`](https://github.com/maidsafe/safe_network/commit/39dd5a043c75492e416bb9371015a1365b06fa01))
-    - unit tests for register storage key internal helper functions ([`277d925`](https://github.com/maidsafe/safe_network/commit/277d925aa3ed5ff01eab8c1d2488f653cfe6effc))
-    - skip spentbook register creation if it already exists ([`183d7f8`](https://github.com/maidsafe/safe_network/commit/183d7f83985a36deeb5933ae9b1880df21da2866))
-    - improving internal helpers in register storage mod to reuse some logic/code ([`a668534`](https://github.com/maidsafe/safe_network/commit/a6685348578fe546576bd13405e6485d984b3487))
-    - optimise the way we apply and save replicated Register cmds on local storage ([`070f7d8`](https://github.com/maidsafe/safe_network/commit/070f7d8902c3bbc2a88b3be1a8f44de3c2726df6))
-    - fix time alignment; more states; mv to sn_interface ([`08a0a8e`](https://github.com/maidsafe/safe_network/commit/08a0a8eb75a0ca9d51fa321686d17dbcf97fc04e))
-    - send adult -> elder ae probes before split ([`d20f4e0`](https://github.com/maidsafe/safe_network/commit/d20f4e0aed02f99d44d5d1407bb7a42b67baf878))
-    - remove stopped state from CmdCtrl ([`4a9d4c4`](https://github.com/maidsafe/safe_network/commit/4a9d4c4bdc8f81d11ea78f888368f64d76754d8e))
-    - move probe creation to network knowledge ([`63958a8`](https://github.com/maidsafe/safe_network/commit/63958a8629c9fbca8e6604edb17d9b61ca92a4ee))
-    - makefile targets for easier local network use ([`933f428`](https://github.com/maidsafe/safe_network/commit/933f4282fce2e28a1956fd1b50cc8061a68e1515))
-    - err result from gen spent proof share ([`9f9a956`](https://github.com/maidsafe/safe_network/commit/9f9a95614991197b240b3c1a363eb4e5946d3fae))
-    - use err result to send errors back to client ([`5b43e28`](https://github.com/maidsafe/safe_network/commit/5b43e28eba3cb81d3122fe7d62737a2f51e174d6))
-    - chore(clippy) ([`611fc23`](https://github.com/maidsafe/safe_network/commit/611fc23f9174aabf85c7adea7159677c1508d388))
-    - move statemap logs behind feature flag ([`b1a5590`](https://github.com/maidsafe/safe_network/commit/b1a5590e84eb7a0f4872e42de61c3c5d33ae9fdf))
-    - breakdown states by cmd type ([`5b9bb3b`](https://github.com/maidsafe/safe_network/commit/5b9bb3bd70741fa7bd9cf0db3dbdf7284d62f343))
-    - better colors ([`1abeb80`](https://github.com/maidsafe/safe_network/commit/1abeb803bfb7effbbb23d1fad75b341d2f3c9402))
-    - some minimal infrastructure for generating statemaps ([`8badef3`](https://github.com/maidsafe/safe_network/commit/8badef313d6f78e0183402983120f2184c130407))
-    - sn_interface lints and fixes ([`b040ea1`](https://github.com/maidsafe/safe_network/commit/b040ea14e53247094838de6f1fa9af2830b051fa))
-    - Merge branch 'main' into avoid_testing_data_collision ([`60c368b`](https://github.com/maidsafe/safe_network/commit/60c368b8494eaeb219572c2304bf787a168cfee0))
-    - avoid testing data collision during bench test ([`fec85db`](https://github.com/maidsafe/safe_network/commit/fec85dbc3b857458de5c09a02490eab7c1227b40))
-    - switch on clippy::unwrap_used as a warning ([`3a718d8`](https://github.com/maidsafe/safe_network/commit/3a718d8c0957957a75250b044c9d1ad1b5874ab0))
-    - separating internal chunk from register store implementation layer ([`62bc8d6`](https://github.com/maidsafe/safe_network/commit/62bc8d6d24b7c82bd3a27ceb43cd53d8077ff6b2))
-    - removing unnecessary ReplicatedDataAddress type ([`ed9f627`](https://github.com/maidsafe/safe_network/commit/ed9f627d0e2c42ab1b7386888cced751ae28f98a))
-    - removing unnecessary types ([`5b73b33`](https://github.com/maidsafe/safe_network/commit/5b73b33b683991be9e9f6440c3d8d568edab3ad6))
-    - moving encoding/decoding utilities of data addresses types to storage impl ([`b7530fe`](https://github.com/maidsafe/safe_network/commit/b7530feb40987f433ff12c5176cfdbc375359dc6))
-</details>
-
 ## v0.66.2 (2022-08-28)
 
 <csr-id-b587893737bc51aee483f7cd53da782036dd6c5e/>
 <csr-id-69b45973a58f9a866984b660fa13fef50d9f906e/>
+<csr-id-2b268209e6910472558145a5d08b99e968550221/>
 
 ### New Features
 

@@ -1113,7 +1113,93 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
+## v0.73.0 (2022-09-06)
+
+### Chore
+
+ - <csr-id-d28fdf3ddd0a39f7bbc6426e1e71d990319b0ec7/> sn_interface-0.11.0/sn_dysfunction-0.10.0/sn_client-0.72.0/sn_node-0.67.0/sn_api-0.70.0/sn_cli-0.63.0
+ - <csr-id-921438659ccaf65b2ea8cc00efb61d8146ef71ef/> unneeded iter methods removal
+ - <csr-id-f5d436fba99e0e9c258c7ab3c3a256be3be58f84/> applied use_self lint
+ - <csr-id-388cd223677ecfa2e790c54c0df8ecb18c77299c/> change throughput measure
+   use Bytes.len, not the size of the Bytes struct!
+ - <csr-id-5c54848b726188f273ffa16ee2870976914bb815/> adds missing bench to cargo.toml for client
+ - <csr-id-b040ea14e53247094838de6f1fa9af2830b051fa/> sn_interface lints and fixes
+   Apply lints used in other crates, as far as they can easily be applied.
+   The `unused_results` lint has been left out, as that is too much
+   cleaning up to do, just like adding documentation to all the public
+   interfaces.
+ - <csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/> switch on clippy::unwrap_used as a warning
+
+
+### Bug Fixes
+
+ - <csr-id-6bdc82295dfdcaa617c7c1e36d2b72f085e50042/> update qp2p for unique ids
+   Latest qp2p should provide global unique connection id
+   
+   previously duplication of ids could have been breaking
+   connection management
+
+### Other
+
+ - <csr-id-a4e84ef4608a13ecc2f14dd87f5c23d185185513/> move benches that dont need the network ahead of network launch
+   In order to fail faster
+ - <csr-id-d251dbeb2e44707623c3bbb1215784b1bd4fae06/> add msg serialization benchmark
+   This should allow us to evaluate any changes to msg serialisation
+   in order to reduce time/memory when resending the same message to many
+   peers
+
+### New Features (BREAKING)
+
+ - <csr-id-f5361d91f8215585651229eb6dc2535f2ecb631c/> update qp2p to use UsrMsgBytes and avoid reserializing bytes
+   This makes use of udpate qp2p to avoid having to reserialise the
+   WireMsgheader for every message when we're just updating the Dst.
+   
+   This in turn avoids the neccesity to clone the msg payload when
+   serilizing; allowing us to to use the shared data struct Bytes for all
+   parts, reducing both compute and memory use.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 14 commits contributed to the release over the course of 7 calendar days.
+ - 8 days passed between releases.
+ - 11 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - update qp2p to use UsrMsgBytes and avoid reserializing bytes ([`f5361d9`](https://github.com/maidsafe/safe_network/commit/f5361d91f8215585651229eb6dc2535f2ecb631c))
+    - Merge #1545 ([`b62c056`](https://github.com/maidsafe/safe_network/commit/b62c056b0b28f67a40d9e036b2d64b36fd5380bd))
+    - update qp2p for unique ids ([`6bdc822`](https://github.com/maidsafe/safe_network/commit/6bdc82295dfdcaa617c7c1e36d2b72f085e50042))
+    - sn_interface-0.11.0/sn_dysfunction-0.10.0/sn_client-0.72.0/sn_node-0.67.0/sn_api-0.70.0/sn_cli-0.63.0 ([`d28fdf3`](https://github.com/maidsafe/safe_network/commit/d28fdf3ddd0a39f7bbc6426e1e71d990319b0ec7))
+    - unneeded iter methods removal ([`9214386`](https://github.com/maidsafe/safe_network/commit/921438659ccaf65b2ea8cc00efb61d8146ef71ef))
+    - applied use_self lint ([`f5d436f`](https://github.com/maidsafe/safe_network/commit/f5d436fba99e0e9c258c7ab3c3a256be3be58f84))
+    - chore(clippy) ([`d9ee11d`](https://github.com/maidsafe/safe_network/commit/d9ee11d228f8ac9f2d6cd3d09f1a1e29276100d1))
+    - change throughput measure ([`388cd22`](https://github.com/maidsafe/safe_network/commit/388cd223677ecfa2e790c54c0df8ecb18c77299c))
+    - adds missing bench to cargo.toml for client ([`5c54848`](https://github.com/maidsafe/safe_network/commit/5c54848b726188f273ffa16ee2870976914bb815))
+    - toml ([`4aa9b02`](https://github.com/maidsafe/safe_network/commit/4aa9b02f375a30132712ca97306e5f2e9a8d36f7))
+    - move benches that dont need the network ahead of network launch ([`a4e84ef`](https://github.com/maidsafe/safe_network/commit/a4e84ef4608a13ecc2f14dd87f5c23d185185513))
+    - add msg serialization benchmark ([`d251dbe`](https://github.com/maidsafe/safe_network/commit/d251dbeb2e44707623c3bbb1215784b1bd4fae06))
+    - sn_interface lints and fixes ([`b040ea1`](https://github.com/maidsafe/safe_network/commit/b040ea14e53247094838de6f1fa9af2830b051fa))
+    - switch on clippy::unwrap_used as a warning ([`3a718d8`](https://github.com/maidsafe/safe_network/commit/3a718d8c0957957a75250b044c9d1ad1b5874ab0))
+</details>
+
 ## v0.72.0 (2022-09-04)
+
+<csr-id-921438659ccaf65b2ea8cc00efb61d8146ef71ef/>
+<csr-id-f5d436fba99e0e9c258c7ab3c3a256be3be58f84/>
+<csr-id-388cd223677ecfa2e790c54c0df8ecb18c77299c/>
+<csr-id-5c54848b726188f273ffa16ee2870976914bb815/>
+<csr-id-b040ea14e53247094838de6f1fa9af2830b051fa/>
+<csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/>
+<csr-id-a4e84ef4608a13ecc2f14dd87f5c23d185185513/>
+<csr-id-d251dbeb2e44707623c3bbb1215784b1bd4fae06/>
 
 ### Chore
 
@@ -1139,35 +1225,9 @@ needed, as they keypair itself contains the Arcs we need.
    in order to reduce time/memory when resending the same message to many
    peers
 
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 10 commits contributed to the release over the course of 4 calendar days.
- - 4 days passed between releases.
- - 8 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - unneeded iter methods removal ([`9214386`](https://github.com/maidsafe/safe_network/commit/921438659ccaf65b2ea8cc00efb61d8146ef71ef))
-    - applied use_self lint ([`f5d436f`](https://github.com/maidsafe/safe_network/commit/f5d436fba99e0e9c258c7ab3c3a256be3be58f84))
-    - chore(clippy) ([`d9ee11d`](https://github.com/maidsafe/safe_network/commit/d9ee11d228f8ac9f2d6cd3d09f1a1e29276100d1))
-    - change throughput measure ([`388cd22`](https://github.com/maidsafe/safe_network/commit/388cd223677ecfa2e790c54c0df8ecb18c77299c))
-    - adds missing bench to cargo.toml for client ([`5c54848`](https://github.com/maidsafe/safe_network/commit/5c54848b726188f273ffa16ee2870976914bb815))
-    - toml ([`4aa9b02`](https://github.com/maidsafe/safe_network/commit/4aa9b02f375a30132712ca97306e5f2e9a8d36f7))
-    - move benches that dont need the network ahead of network launch ([`a4e84ef`](https://github.com/maidsafe/safe_network/commit/a4e84ef4608a13ecc2f14dd87f5c23d185185513))
-    - add msg serialization benchmark ([`d251dbe`](https://github.com/maidsafe/safe_network/commit/d251dbeb2e44707623c3bbb1215784b1bd4fae06))
-    - sn_interface lints and fixes ([`b040ea1`](https://github.com/maidsafe/safe_network/commit/b040ea14e53247094838de6f1fa9af2830b051fa))
-    - switch on clippy::unwrap_used as a warning ([`3a718d8`](https://github.com/maidsafe/safe_network/commit/3a718d8c0957957a75250b044c9d1ad1b5874ab0))
-</details>
-
 ## v0.71.1 (2022-08-28)
+
+<csr-id-2b268209e6910472558145a5d08b99e968550221/>
 
 ### Chore
 

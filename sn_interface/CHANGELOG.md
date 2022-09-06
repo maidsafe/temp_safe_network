@@ -6,7 +6,113 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## v0.12.0 (2022-09-06)
+
+### Chore
+
+ - <csr-id-d28fdf3ddd0a39f7bbc6426e1e71d990319b0ec7/> sn_interface-0.11.0/sn_dysfunction-0.10.0/sn_client-0.72.0/sn_node-0.67.0/sn_api-0.70.0/sn_cli-0.63.0
+ - <csr-id-997517764347857f71674567364b7dbb852d8b10/> more idiomatic time code
+ - <csr-id-921438659ccaf65b2ea8cc00efb61d8146ef71ef/> unneeded iter methods removal
+ - <csr-id-f5d436fba99e0e9c258c7ab3c3a256be3be58f84/> applied use_self lint
+ - <csr-id-b040ea14e53247094838de6f1fa9af2830b051fa/> sn_interface lints and fixes
+   Apply lints used in other crates, as far as they can easily be applied.
+   The `unused_results` lint has been left out, as that is too much
+   cleaning up to do, just like adding documentation to all the public
+   interfaces.
+ - <csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/> switch on clippy::unwrap_used as a warning
+
+
+### New Features
+
+ - <csr-id-19abbe20724770e618e5d038f238bdf4b3de6ea2/> rename SystemMsg to BackPressure
+ - <csr-id-08a0a8eb75a0ca9d51fa321686d17dbcf97fc04e/> fix time alignment; more states; mv to sn_interface
+
+### Bug Fixes
+
+ - <csr-id-6bdc82295dfdcaa617c7c1e36d2b72f085e50042/> update qp2p for unique ids
+   Latest qp2p should provide global unique connection id
+   
+   previously duplication of ids could have been breaking
+   connection management
+ - <csr-id-95930d61dcb191d18ae417db4bf8a223b13824db/> add back-pressure system msg
+
+### Refactor
+
+ - <csr-id-183d7f83985a36deeb5933ae9b1880df21da2866/> skip spentbook register creation if it already exists
+ - <csr-id-63958a8629c9fbca8e6604edb17d9b61ca92a4ee/> move probe creation to network knowledge
+ - <csr-id-62bc8d6d24b7c82bd3a27ceb43cd53d8077ff6b2/> separating internal chunk from register store implementation layer
+
+### New Features (BREAKING)
+
+ - <csr-id-f5361d91f8215585651229eb6dc2535f2ecb631c/> update qp2p to use UsrMsgBytes and avoid reserializing bytes
+   This makes use of udpate qp2p to avoid having to reserialise the
+   WireMsgheader for every message when we're just updating the Dst.
+   
+   This in turn avoids the neccesity to clone the msg payload when
+   serilizing; allowing us to to use the shared data struct Bytes for all
+   parts, reducing both compute and memory use.
+
+### Refactor (BREAKING)
+
+ - <csr-id-a6685348578fe546576bd13405e6485d984b3487/> improving internal helpers in register storage mod to reuse some logic/code
+   - Removing some storage Error types, while adding more context information to others.
+   - Allowing the Register storage to store 'Register edit' cmds even when the 'Register create' cmd
+   is not found in the local replica/store yet.
+ - <csr-id-ed9f627d0e2c42ab1b7386888cced751ae28f98a/> removing unnecessary ReplicatedDataAddress type
+ - <csr-id-5b73b33b683991be9e9f6440c3d8d568edab3ad6/> removing unnecessary types
+ - <csr-id-b7530feb40987f433ff12c5176cfdbc375359dc6/> moving encoding/decoding utilities of data addresses types to storage impl
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 19 commits contributed to the release over the course of 7 calendar days.
+ - 8 days passed between releases.
+ - 18 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - update qp2p to use UsrMsgBytes and avoid reserializing bytes ([`f5361d9`](https://github.com/maidsafe/safe_network/commit/f5361d91f8215585651229eb6dc2535f2ecb631c))
+    - Merge #1545 ([`b62c056`](https://github.com/maidsafe/safe_network/commit/b62c056b0b28f67a40d9e036b2d64b36fd5380bd))
+    - update qp2p for unique ids ([`6bdc822`](https://github.com/maidsafe/safe_network/commit/6bdc82295dfdcaa617c7c1e36d2b72f085e50042))
+    - sn_interface-0.11.0/sn_dysfunction-0.10.0/sn_client-0.72.0/sn_node-0.67.0/sn_api-0.70.0/sn_cli-0.63.0 ([`d28fdf3`](https://github.com/maidsafe/safe_network/commit/d28fdf3ddd0a39f7bbc6426e1e71d990319b0ec7))
+    - more idiomatic time code ([`9975177`](https://github.com/maidsafe/safe_network/commit/997517764347857f71674567364b7dbb852d8b10))
+    - unneeded iter methods removal ([`9214386`](https://github.com/maidsafe/safe_network/commit/921438659ccaf65b2ea8cc00efb61d8146ef71ef))
+    - applied use_self lint ([`f5d436f`](https://github.com/maidsafe/safe_network/commit/f5d436fba99e0e9c258c7ab3c3a256be3be58f84))
+    - skip spentbook register creation if it already exists ([`183d7f8`](https://github.com/maidsafe/safe_network/commit/183d7f83985a36deeb5933ae9b1880df21da2866))
+    - improving internal helpers in register storage mod to reuse some logic/code ([`a668534`](https://github.com/maidsafe/safe_network/commit/a6685348578fe546576bd13405e6485d984b3487))
+    - rename SystemMsg to BackPressure ([`19abbe2`](https://github.com/maidsafe/safe_network/commit/19abbe20724770e618e5d038f238bdf4b3de6ea2))
+    - add back-pressure system msg ([`95930d6`](https://github.com/maidsafe/safe_network/commit/95930d61dcb191d18ae417db4bf8a223b13824db))
+    - fix time alignment; more states; mv to sn_interface ([`08a0a8e`](https://github.com/maidsafe/safe_network/commit/08a0a8eb75a0ca9d51fa321686d17dbcf97fc04e))
+    - move probe creation to network knowledge ([`63958a8`](https://github.com/maidsafe/safe_network/commit/63958a8629c9fbca8e6604edb17d9b61ca92a4ee))
+    - sn_interface lints and fixes ([`b040ea1`](https://github.com/maidsafe/safe_network/commit/b040ea14e53247094838de6f1fa9af2830b051fa))
+    - switch on clippy::unwrap_used as a warning ([`3a718d8`](https://github.com/maidsafe/safe_network/commit/3a718d8c0957957a75250b044c9d1ad1b5874ab0))
+    - separating internal chunk from register store implementation layer ([`62bc8d6`](https://github.com/maidsafe/safe_network/commit/62bc8d6d24b7c82bd3a27ceb43cd53d8077ff6b2))
+    - removing unnecessary ReplicatedDataAddress type ([`ed9f627`](https://github.com/maidsafe/safe_network/commit/ed9f627d0e2c42ab1b7386888cced751ae28f98a))
+    - removing unnecessary types ([`5b73b33`](https://github.com/maidsafe/safe_network/commit/5b73b33b683991be9e9f6440c3d8d568edab3ad6))
+    - moving encoding/decoding utilities of data addresses types to storage impl ([`b7530fe`](https://github.com/maidsafe/safe_network/commit/b7530feb40987f433ff12c5176cfdbc375359dc6))
+</details>
+
 ## v0.11.0 (2022-09-04)
+
+<csr-id-997517764347857f71674567364b7dbb852d8b10/>
+<csr-id-921438659ccaf65b2ea8cc00efb61d8146ef71ef/>
+<csr-id-f5d436fba99e0e9c258c7ab3c3a256be3be58f84/>
+<csr-id-b040ea14e53247094838de6f1fa9af2830b051fa/>
+<csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/>
+<csr-id-183d7f83985a36deeb5933ae9b1880df21da2866/>
+<csr-id-63958a8629c9fbca8e6604edb17d9b61ca92a4ee/>
+<csr-id-62bc8d6d24b7c82bd3a27ceb43cd53d8077ff6b2/>
+<csr-id-a6685348578fe546576bd13405e6485d984b3487/>
+<csr-id-ed9f627d0e2c42ab1b7386888cced751ae28f98a/>
+<csr-id-5b73b33b683991be9e9f6440c3d8d568edab3ad6/>
+<csr-id-b7530feb40987f433ff12c5176cfdbc375359dc6/>
 
 ### Chore
 
@@ -46,42 +152,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-5b73b33b683991be9e9f6440c3d8d568edab3ad6/> removing unnecessary types
  - <csr-id-b7530feb40987f433ff12c5176cfdbc375359dc6/> moving encoding/decoding utilities of data addresses types to storage impl
 
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 15 commits contributed to the release over the course of 4 calendar days.
- - 4 days passed between releases.
- - 15 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - more idiomatic time code ([`9975177`](https://github.com/maidsafe/safe_network/commit/997517764347857f71674567364b7dbb852d8b10))
-    - unneeded iter methods removal ([`9214386`](https://github.com/maidsafe/safe_network/commit/921438659ccaf65b2ea8cc00efb61d8146ef71ef))
-    - applied use_self lint ([`f5d436f`](https://github.com/maidsafe/safe_network/commit/f5d436fba99e0e9c258c7ab3c3a256be3be58f84))
-    - skip spentbook register creation if it already exists ([`183d7f8`](https://github.com/maidsafe/safe_network/commit/183d7f83985a36deeb5933ae9b1880df21da2866))
-    - improving internal helpers in register storage mod to reuse some logic/code ([`a668534`](https://github.com/maidsafe/safe_network/commit/a6685348578fe546576bd13405e6485d984b3487))
-    - rename SystemMsg to BackPressure ([`19abbe2`](https://github.com/maidsafe/safe_network/commit/19abbe20724770e618e5d038f238bdf4b3de6ea2))
-    - add back-pressure system msg ([`95930d6`](https://github.com/maidsafe/safe_network/commit/95930d61dcb191d18ae417db4bf8a223b13824db))
-    - fix time alignment; more states; mv to sn_interface ([`08a0a8e`](https://github.com/maidsafe/safe_network/commit/08a0a8eb75a0ca9d51fa321686d17dbcf97fc04e))
-    - move probe creation to network knowledge ([`63958a8`](https://github.com/maidsafe/safe_network/commit/63958a8629c9fbca8e6604edb17d9b61ca92a4ee))
-    - sn_interface lints and fixes ([`b040ea1`](https://github.com/maidsafe/safe_network/commit/b040ea14e53247094838de6f1fa9af2830b051fa))
-    - switch on clippy::unwrap_used as a warning ([`3a718d8`](https://github.com/maidsafe/safe_network/commit/3a718d8c0957957a75250b044c9d1ad1b5874ab0))
-    - separating internal chunk from register store implementation layer ([`62bc8d6`](https://github.com/maidsafe/safe_network/commit/62bc8d6d24b7c82bd3a27ceb43cd53d8077ff6b2))
-    - removing unnecessary ReplicatedDataAddress type ([`ed9f627`](https://github.com/maidsafe/safe_network/commit/ed9f627d0e2c42ab1b7386888cced751ae28f98a))
-    - removing unnecessary types ([`5b73b33`](https://github.com/maidsafe/safe_network/commit/5b73b33b683991be9e9f6440c3d8d568edab3ad6))
-    - moving encoding/decoding utilities of data addresses types to storage impl ([`b7530fe`](https://github.com/maidsafe/safe_network/commit/b7530feb40987f433ff12c5176cfdbc375359dc6))
-</details>
-
 ## v0.10.2 (2022-08-28)
 
 <csr-id-b587893737bc51aee483f7cd53da782036dd6c5e/>
+<csr-id-2b268209e6910472558145a5d08b99e968550221/>
 
 ### New Features
 
