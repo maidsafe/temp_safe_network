@@ -94,7 +94,7 @@ impl PeerSession {
             error!("Error while sending Send command {e:?}");
         }
 
-        trace!("Send job sent");
+        trace!("Send job sent: {msg_id:?}");
         Ok(watcher)
     }
 
@@ -189,6 +189,10 @@ impl PeerSessionWorker {
 
     async fn send(&mut self, mut job: SendJob) -> SessionStatus {
         let id = job.msg_id;
+
+
+        trace!("Performing sendjob: {id:?}");
+
         if job.retries > MAX_SENDJOB_RETRIES {
             job.reporter.send(SendStatus::MaxRetriesReached);
             return SessionStatus::Ok;

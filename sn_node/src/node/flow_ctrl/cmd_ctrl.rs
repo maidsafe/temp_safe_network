@@ -118,6 +118,9 @@ impl CmdCtrl {
         let id = job.id();
         let cmd = job.clone().into_cmd();
 
+
+        trace!("Processing cmd: {cmd:?}");
+
         let cmd_string = cmd.clone().to_string();
         let priority = job.priority();
 
@@ -125,16 +128,18 @@ impl CmdCtrl {
         let monitoring = self.monitoring.clone();
 
         node_event_sender
-            .send(Event::CmdProcessing(CmdProcessEvent::Started {
-                id,
-                parent_id: job.parent_id(),
-                priority,
-                cmd_creation_time: job.created_at(),
-                time: SystemTime::now(),
-                cmd_string: cmd.to_string(),
-            }))
-            .await;
+        .send(Event::CmdProcessing(CmdProcessEvent::Started {
+            id,
+            parent_id: job.parent_id(),
+            priority,
+            cmd_creation_time: job.created_at(),
+            time: SystemTime::now(),
+            cmd_string: cmd.to_string(),
+        }))
+        .await;
 
+
+        trace!("about to spawn for processing cmd: {cmd:?}");
         let dispatcher = self.dispatcher.clone();
         let _ = tokio::task::spawn_local(async move {
             dispatcher
@@ -145,9 +150,9 @@ impl CmdCtrl {
 
             match dispatcher.process_cmd(cmd).await {
                 Ok(cmds) => {
-                    monitoring.increment_cmds().await;
 
                     for cmd in cmds {
+                        monitoring.increment_cmds().await;
                         match cmd_process_api.send((cmd, Some(id))).await {
                             Ok(_) => {
                                 //no issues

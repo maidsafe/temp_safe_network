@@ -163,22 +163,25 @@ impl FlowCtrl {
 
             let mut continue_with_periodics = false;
             // we go through all pending cmds in this loop
-            while self.cmd_ctrl.has_items_queued() && !continue_with_periodics {
+            while self.cmd_ctrl.has_items_queued()
+            // && !continue_with_periodics
+            {
+
+                process_batch_count += 1;
+                self.process_next_cmd().await;
+
                 if let Err(error) = self.enqeue_new_cmds_from_channel().await {
                     error!("{error:?}");
                     break;
                 }
 
-                process_batch_count += 1;
-                self.process_next_cmd().await;
-
-                if process_batch_count > PROCESS_BATCH_COUNT {
-                    // let's start fresh,
-                    // adding any periodic check on top and
-                    // topping up the queue with any new msg that's come in
-                    // or been generated from existing cmds
-                    continue_with_periodics = true;
-                }
+                // if process_batch_count > PROCESS_BATCH_COUNT {
+                //     // let's start fresh,
+                //     // adding any periodic check on top and
+                //     // topping up the queue with any new msg that's come in
+                //     // or been generated from existing cmds
+                //     continue_with_periodics = true;
+                // }
             }
 
             self.enqueue_cmds_for_standard_periodic_checks(
@@ -213,6 +216,7 @@ impl FlowCtrl {
 
     /// Does not await the completion of the cmd.
     pub(crate) async fn fire_and_forget(&mut self, cmd: Cmd) {
+        trace!("Enqueuing cmd: {cmd:?}");
         self.cmd_ctrl.push(cmd).await
     }
 
