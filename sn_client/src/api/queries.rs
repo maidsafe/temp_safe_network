@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use std::collections::BTreeSet;
+
 use super::Client;
 use crate::{connections::QueryResult, errors::Error};
 
@@ -67,6 +69,8 @@ impl Client {
         let _ = span.enter();
         let mut attempts = 1;
         let dst = query.variant.dst_name();
+
+        let mut data_not_found_count = BTreeSet::default();
         loop {
             let msg = ServiceMsg::Query(query.clone());
             let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
@@ -93,7 +97,23 @@ impl Client {
             .await;
 
             match res {
-                Ok(Ok(query_result)) => break Ok(query_result),
+                Ok(Ok(query_result)) => {
+                    if query_result.is_data_not_found() {
+                        let _existed = data_not_found_count.insert(query.adult_index);
+                        // if we've received DataNotFound from each adult_index,
+                        // we can return that error
+                        if data_not_found_count.len() == data_copy_count() {
+                            return Ok(query_result);
+                        }
+                    } else {
+                        return Ok(query_result);
+                    }
+
+                    warn!(
+                        "{query:?} DataNotFound returned from adult_index: {:?}",
+                        query.adult_index
+                    )
+                }
                 Ok(Err(err)) if attempts > self.max_retries => {
                     debug!(
                         "Retries ({}) all failed returning no response for {:?}",

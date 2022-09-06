@@ -234,15 +234,33 @@ impl QueryResponse {
     /// Returns true if the result returned is a success or not
     pub fn is_success(&self) -> bool {
         use QueryResponse::*;
+        matches!(
+            self,
+            GetChunk(Err(ErrorMsg::DataNotFound(_)))
+                | GetRegister((Err(ErrorMsg::DataNotFound(_)), _))
+                | GetRegisterEntry((Err(ErrorMsg::DataNotFound(_)), _))
+                | GetRegisterOwner((Err(ErrorMsg::DataNotFound(_)), _))
+                | ReadRegister((Err(ErrorMsg::DataNotFound(_)), _))
+                | GetRegisterPolicy((Err(ErrorMsg::DataNotFound(_)), _))
+                | GetRegisterUserPermissions((Err(ErrorMsg::DataNotFound(_)), _))
+                | SpentProofShares((Err(ErrorMsg::DataNotFound(_)), _))
+        )
+    }
+
+    /// Returns true if the result returned is DataNotFound
+    pub fn is_data_not_found(&self) -> bool {
+        use QueryResponse::*;
         match self {
-            GetChunk(result) => result.is_ok(),
-            GetRegister((result, _op_id)) => result.is_ok(),
-            GetRegisterEntry((result, _op_id)) => result.is_ok(),
-            GetRegisterOwner((result, _op_id)) => result.is_ok(),
-            ReadRegister((result, _op_id)) => result.is_ok(),
-            GetRegisterPolicy((result, _op_id)) => result.is_ok(),
-            GetRegisterUserPermissions((result, _op_id)) => result.is_ok(),
-            SpentProofShares((result, _op_id)) => result.is_ok(),
+            GetChunk(result) => matches!(result, Err(Error::DataNotFound(_))),
+            GetRegister((result, _op_id)) => matches!(result, Err(Error::DataNotFound(_))),
+            GetRegisterEntry((result, _op_id)) => matches!(result, Err(Error::DataNotFound(_))),
+            GetRegisterOwner((result, _op_id)) => matches!(result, Err(Error::DataNotFound(_))),
+            ReadRegister((result, _op_id)) => matches!(result, Err(Error::DataNotFound(_))),
+            GetRegisterPolicy((result, _op_id)) => matches!(result, Err(Error::DataNotFound(_))),
+            GetRegisterUserPermissions((result, _op_id)) => {
+                matches!(result, Err(Error::DataNotFound(_)))
+            }
+            SpentProofShares((result, _op_id)) => matches!(result, Err(Error::DataNotFound(_))),
             FailedToCreateOperationId => false,
         }
     }
