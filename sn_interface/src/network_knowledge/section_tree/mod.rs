@@ -161,6 +161,19 @@ impl SectionTree {
         self.sections.get(prefix)
     }
 
+    /// Get signed `SectionAuthorityProvider` of a known section with the given section key.
+    pub fn get_signed_by_key(
+        &self,
+        section_key: &bls::PublicKey,
+    ) -> Option<&SectionAuth<SectionAuthorityProvider>> {
+        for (_, signed_sap) in self.sections.iter() {
+            if signed_sap.public_key_set().public_key() == *section_key {
+                return Some(signed_sap);
+            }
+        }
+        None
+    }
+
     /// Update our `SectionTree` if the provided update can be verified
     /// Returns true if an update was made
     pub fn update(&mut self, section_tree_update: SectionTreeUpdate) -> Result<bool> {

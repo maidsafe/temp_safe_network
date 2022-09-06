@@ -1237,8 +1237,7 @@ async fn spentbook_spend_service_message_should_replicate_to_adults_and_send_ack
                         tx: tx.clone(),
                         spent_proofs,
                         spent_transactions,
-                        updated_proof_chain: None,
-                        signed_sap: None,
+                        network_knowledge: None,
                     })),
                     peer,
                 )?,
@@ -1305,8 +1304,7 @@ async fn spentbook_spend_spent_proof_with_invalid_pk_should_return_spentbook_err
                         tx,
                         spent_proofs,
                         spent_transactions,
-                        updated_proof_chain: None,
-                        signed_sap: None,
+                        network_knowledge: None,
                     })),
                     peer,
                 )?,
@@ -1365,8 +1363,7 @@ async fn spentbook_spend_spent_proof_with_key_not_in_section_chain_should_return
                         tx,
                         spent_proofs,
                         spent_transactions,
-                        updated_proof_chain: None,
-                        signed_sap: None,
+                        network_knowledge: None,
                     })),
                     peer,
                 )?,
@@ -1438,8 +1435,7 @@ async fn spentbook_spend_spent_proofs_do_not_relate_to_input_dbcs_should_return_
                         tx: new_dbc2.transaction.clone(),
                         spent_proofs: genesis_dbc.spent_proofs.clone(),
                         spent_transactions: genesis_dbc.spent_transactions.clone(),
-                        updated_proof_chain: None,
-                        signed_sap: None,
+                        network_knowledge: None,
                     })),
                     peer,
                 )?,
@@ -1509,8 +1505,7 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
                         tx: new_dbc2.transaction.clone(),
                         spent_proofs: new_dbc.spent_proofs.clone(),
                         spent_transactions: new_dbc.spent_transactions.clone(),
-                        updated_proof_chain: None,
-                        signed_sap: None,
+                        network_knowledge: None,
                     })),
                     peer,
                 )?,
@@ -1578,8 +1573,7 @@ async fn spentbook_spend_with_random_key_image_should_return_spentbook_error() -
                         tx: new_dbc2.transaction.clone(),
                         spent_proofs: new_dbc.spent_proofs.clone(),
                         spent_transactions: new_dbc.spent_transactions.clone(),
-                        updated_proof_chain: None,
-                        signed_sap: None,
+                        network_knowledge: None,
                     })),
                     peer,
                 )?,
@@ -1654,8 +1648,7 @@ async fn spentbook_spend_with_updated_proof_chain_network_knowledge_should_be_up
                         tx: tx.clone(),
                         spent_proofs,
                         spent_transactions,
-                        updated_proof_chain: Some(proof_chain),
-                        signed_sap: Some(other_signed_sap),
+                        network_knowledge: Some((proof_chain, other_signed_sap)),
                     })),
                     peer,
                 )?,
@@ -1676,7 +1669,6 @@ async fn spentbook_spend_with_updated_proof_chain_network_knowledge_should_be_up
                 .await
                 .network_knowledge()
                 .our_section_dag();
-            debug!("proof chain = {:?}", proof_chain);
             assert_eq!(proof_chain.len(), 2);
 
             Result::<()>::Ok(())

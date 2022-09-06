@@ -9,9 +9,12 @@
 use super::{Error, QueryResponse, Result};
 
 use crate::messaging::data::OperationId;
+use crate::messaging::system::SectionAuth;
+use crate::network_knowledge::SectionAuthorityProvider;
 use crate::types::{utils, SpentbookAddress};
 use tiny_keccak::{Hasher, Sha3};
 
+use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
 use sn_dbc::{KeyImage, RingCtTransaction, SpentProof};
 use std::collections::BTreeSet;
@@ -29,13 +32,19 @@ pub enum SpentbookQuery {
 #[allow(clippy::large_enum_variant)]
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub enum SpentbookCmd {
-    /// Request sent to Elders to log a key image (and associated Tx) to be logged as spent,
-    /// returning the spent proof signature share to the sender once all verifications were successfull.
+    /// Request to Elders to log a key image and its associated transaction as spent.
+    ///
+    /// If successful, a spent proof signature share will be returned to the sender.
+    ///
+    /// There is an optional `network_knowledge` field to submit an updated proof chain and the
+    /// latest SAP for that proof chain. This can be used in the case where one of the spent proofs
+    /// was signed with a section key that the spend request section was not aware of.
     Spend {
         key_image: KeyImage,
         tx: RingCtTransaction,
         spent_proofs: BTreeSet<SpentProof>,
         spent_transactions: BTreeSet<RingCtTransaction>,
+        network_knowledge: Option<(SecuredLinkedList, SectionAuth<SectionAuthorityProvider>)>,
     },
 }
 

@@ -211,11 +211,10 @@ impl Node {
                 tx,
                 spent_proofs,
                 spent_transactions,
-                updated_proof_chain,
-                signed_sap,
+                network_knowledge,
             })) => {
                 info!("Processing spend request for key image: {:?}", key_image);
-                if let Some(proof_chain) = updated_proof_chain {
+                if let Some((proof_chain, signed_sap)) = network_knowledge {
                     debug!(
                         "Received updated proof chain with the request. Will return new command \
                         to update the network knowledge before processing the spend."
@@ -227,16 +226,11 @@ impl Node {
                             tx,
                             spent_proofs,
                             spent_transactions,
-                            updated_proof_chain: None,
-                            signed_sap: None,
+                            network_knowledge: None,
                         }));
                     let update_command = Cmd::UpdateNetworkAndHandleValidServiceMsg {
                         proof_chain,
-                        signed_sap: signed_sap.ok_or_else(|| {
-                            Error::SpentbookError(
-                                "A signed section authority provider must also be provided with an \
-                                updated proof chain".to_string())
-                        })?,
+                        signed_sap,
                         msg_id,
                         msg: updated_service_msg,
                         origin,

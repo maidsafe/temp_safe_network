@@ -181,4 +181,13 @@ pub enum Error {
         /// Number of Chunks generated
         chunked: usize,
     },
+    /// Errors from the secured linked list crate.
+    #[error(transparent)]
+    SecuredLinkedList(#[from] secured_linked_list::error::Error),
+    /// Occurs if a signed SAP cannot be obtained for a section key.
+    #[error("A signed section authority provider was not found for section key {0:?}")]
+    SignedSapNotFound(PublicKey),
+    /// Occurs if a DBC spend command eventually fails after a number of retry attempts.
+    #[error("The DBC spend request failed after several retry attempts")]
+    DbcSpendRetryAttemptsExceeded,
 }
