@@ -85,9 +85,6 @@ impl Session {
         wire_msg.append_trace(&mut Traceroute(vec![Entity::Client(client_pk)]));
 
         // The insertion of channel will be executed AFTER the completion of the `send_message`.
-        // let (sender, mut receiver) = channel::<CmdResponse>(elders_len);
-        // let _ = self.pending_cmds.insert(msg_id, sender);
-
         self.send_msg(elders, wire_msg, msg_id).await?;
         trace!("Cmd msg {:?} sent", msg_id);
 
@@ -527,14 +524,12 @@ impl Session {
     pub(super) async fn send_msg(
         &self,
         nodes: Vec<Peer>,
-        mut wire_msg: WireMsg,
+        wire_msg: WireMsg,
         msg_id: MsgId,
     ) -> Result<()> {
-        let bytes = wire_msg.serialize_and_cache_bytes()?;
+        let bytes = wire_msg.serialize()?;
 
         let mut last_error = None;
-        drop(wire_msg);
-
         // Send message to all Elders concurrently
         let mut tasks = Vec::default();
 
