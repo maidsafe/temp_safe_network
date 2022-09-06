@@ -14,9 +14,12 @@ use crate::node::{
 };
 
 #[cfg(feature = "traceroute")]
-use sn_interface::{messaging::Entity, messaging::Traceroute, types::PublicKey};
+use sn_interface::{messaging::Entity, messaging::Traceroute};
 use sn_interface::{
-    messaging::{AuthKind, Dst, MsgId, WireMsg},
+    messaging::{
+        data::{CmdError, ServiceMsg},
+        AuthKind, Dst, MsgId, WireMsg,
+    },
     types::Peer,
 };
 
@@ -145,18 +148,37 @@ impl Dispatcher {
                 origin,
                 auth,
                 #[cfg(feature = "traceroute")]
-                traceroute,
+                mut traceroute,
             } => {
                 let node = self.node.read().await;
-                node.handle_valid_service_msg(
-                    msg_id,
-                    msg,
-                    auth,
-                    origin,
-                    #[cfg(feature = "traceroute")]
-                    traceroute,
-                )
-                .await
+                match node
+                    .handle_valid_service_msg(
+                        msg_id,
+                        msg,
+                        auth,
+                        origin,
+                        #[cfg(feature = "traceroute")]
+                        traceroute.clone(),
+                    )
+                    .await
+                {
+                    Ok(cmds) => Ok(cmds),
+                    Err(err) => {
+                        debug!("Will send error response back to client");
+
+                        #[cfg(feature = "traceroute")]
+                        traceroute.0.push(node.identity());
+
+                        let cmd = cmd_error_response(
+                            err,
+                            origin,
+                            msg_id,
+                            #[cfg(feature = "traceroute")]
+                            traceroute,
+                        );
+                        Ok(vec![cmd])
+                    }
+                }
             }
             Cmd::HandleValidSystemMsg {
                 origin,
@@ -282,6 +304,27 @@ async fn sleep_facility(duration: Duration) {
     log_sleep!(Duration::from_millis(duration.as_millis() as u64));
 }
 
+/// Forms a `CmdError` msg to send back to the client
+fn cmd_error_response(
+    error: Error,
+    target: Peer,
+    msg_id: MsgId,
+    #[cfg(feature = "traceroute")] traceroute: Traceroute,
+) -> Cmd {
+    let the_error_msg = ServiceMsg::CmdError {
+        error: CmdError::Data(error.into()),
+        correlation_id: msg_id,
+    };
+
+    Cmd::SendMsg {
+        msg: OutgoingMsg::Service(the_error_msg),
+        msg_id: MsgId::new(),
+        recipients: Peers::Single(target),
+        #[cfg(feature = "traceroute")]
+        traceroute,
+    }
+}
+
 // Serializes and signs the msg,
 // and produces one [`WireMsg`] instance per recipient -
 // the last step before passing it over to comms module.
@@ -305,7 +348,7 @@ fn into_msg_bytes(
 
     #[cfg(feature = "traceroute")]
     let trace = Trace {
-        entity: entity(node),
+        entity: node.identity(),
         traceroute,
     };
 
@@ -335,16 +378,6 @@ fn into_msg_bytes(
     }
 
     Ok(msgs)
-}
-
-#[cfg(feature = "traceroute")]
-fn entity(node: &Node) -> Entity {
-    let key = PublicKey::Ed25519(node.info().keypair.public);
-    if node.is_elder() {
-        Entity::Elder(key)
-    } else {
-        Entity::Adult(key)
-    }
 }
 
 #[cfg(feature = "traceroute")]

@@ -15,7 +15,7 @@ use sn_interface::{
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Proposal {
+pub(crate) enum Proposal {
     VoteNodeOffline(NodeState),
     SectionInfo(SectionAuthorityProvider),
     NewElders(SectionAuth<SectionAuthorityProvider>),

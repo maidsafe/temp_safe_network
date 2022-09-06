@@ -35,14 +35,14 @@ use std::collections::BTreeSet;
 
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
-pub enum OutgoingMsg {
+pub(crate) enum OutgoingMsg {
     System(SystemMsg),
     Service(ServiceMsg),
     DstAggregated((BlsShareAuth, Bytes)),
 }
 
 #[derive(Debug, Clone)]
-pub enum Peers {
+pub(crate) enum Peers {
     Single(Peer),
     Multiple(BTreeSet<Peer>),
 }

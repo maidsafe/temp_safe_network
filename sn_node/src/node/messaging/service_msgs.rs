@@ -21,8 +21,7 @@ use sn_interface::{
     data_copy_count,
     messaging::{
         data::{
-            CmdError, DataCmd, DataQueryVariant, EditRegister, Error as ErrorMsg, ServiceMsg,
-            SignedRegisterEdit, SpentbookCmd,
+            DataCmd, DataQueryVariant, EditRegister, ServiceMsg, SignedRegisterEdit, SpentbookCmd,
         },
         system::{NodeQueryResponse, SystemMsg},
         AuthorityProof, EndUser, MsgId, ServiceAuth,
@@ -39,26 +38,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
 impl Node {
-    /// Forms a `CmdError` msg to send back to the client
-    pub(crate) fn send_cmd_error_response(
-        &self,
-        error: CmdError,
-        target: Peer,
-        msg_id: MsgId,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
-    ) -> Cmd {
-        let the_error_msg = ServiceMsg::CmdError {
-            error,
-            correlation_id: msg_id,
-        };
-        self.send_service_msg(
-            the_error_msg,
-            Peers::Single(target),
-            #[cfg(feature = "traceroute")]
-            traceroute,
-        )
-    }
-
     /// Forms a `CmdAck` msg to send back to the client
     pub(crate) fn send_cmd_ack(
         &self,
@@ -247,10 +226,6 @@ impl Node {
                     &tx,
                     &spent_proofs,
                     &spent_transactions,
-                    msg_id,
-                    origin,
-                    #[cfg(feature = "traceroute")]
-                    traceroute.clone(),
                 )?;
                 let reg_cmd = self.gen_register_cmd(&key_image, &spent_proof_share)?;
                 ReplicatedData::SpentbookWrite(reg_cmd)
@@ -285,20 +260,11 @@ impl Node {
         // make sure the expected replication factor is achieved
         if data_copy_count() > targets.len() {
             error!("InsufficientAdults for storing data reliably");
-            let error = CmdError::Data(ErrorMsg::InsufficientAdults {
+            return Err(Error::InsufficientAdults {
                 prefix: self.network_knowledge().prefix(),
                 expected: data_copy_count() as u8,
                 found: targets.len() as u8,
             });
-            cmds.push(self.send_cmd_error_response(
-                error,
-                origin,
-                msg_id,
-                #[cfg(feature = "traceroute")]
-                traceroute,
-            ));
-            // return early with error sent to client
-            return Ok(cmds);
         }
 
         // the replication msg sent to adults
@@ -402,19 +368,12 @@ impl Node {
     }
 
     /// Generate a spent proof share from the information provided by the client.
-    ///
-    /// The additional arguments here are just for composing the error that gets sent back to the
-    /// client, which seems justified, hence the use of the `allow` attribute.
-    #[allow(clippy::too_many_arguments)]
     fn gen_spent_proof_share(
         &self,
         key_image: &KeyImage,
         tx: &RingCtTransaction,
         spent_proofs: &BTreeSet<SpentProof>,
         spent_transactions: &BTreeSet<RingCtTransaction>,
-        msg_id: MsgId,
-        origin: Peer,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<SpentProofShare> {
         info!("Processing spend request for key image: {:?}", key_image);
 
@@ -443,14 +402,7 @@ impl Node {
                     key {:?}",
                     pk
                 );
-                return Err(Error::CmdProcessingClientRespondError(vec![self
-                    .send_cmd_error_response(
-                        CmdError::Data(ErrorMsg::SpentProofUnknownSectionKey),
-                        origin,
-                        msg_id,
-                        #[cfg(feature = "traceroute")]
-                        traceroute,
-                    )]));
+                return Err(Error::SpentProofUnknownSectionKey(*pk));
             }
         }
 

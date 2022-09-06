@@ -7,8 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    error::convert_to_error_msg, messaging::Peers, Cmd, Error, Node, Prefix, Result,
-    MAX_WAITING_PEERS_PER_QUERY,
+    messaging::Peers, Cmd, Error, Node, Prefix, Result, MAX_WAITING_PEERS_PER_QUERY,
 };
 
 use sn_dysfunction::IssueType;
@@ -17,7 +16,7 @@ use sn_interface::messaging::Traceroute;
 use sn_interface::{
     data_copy_count,
     messaging::{
-        data::{CmdError, DataQuery, MetadataExchange, StorageLevel},
+        data::{DataQuery, MetadataExchange, StorageLevel},
         system::{NodeCmd, NodeQuery, SystemMsg},
         AuthorityProof, EndUser, MsgId, ServiceAuth,
     },
@@ -57,7 +56,7 @@ impl Node {
         msg_id: MsgId,
         auth: AuthorityProof<ServiceAuth>,
         source_client: Peer,
-        #[cfg(feature = "traceroute")] mut traceroute: Traceroute,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         let address = query.variant.address();
         let operation_id = query.variant.operation_id()?;
@@ -71,22 +70,15 @@ impl Node {
         let targets = self.target_data_holders_including_full(address.name());
 
         // Query only the nth adult
-        let target = if let Some(peer) = targets.into_iter().nth(query.adult_index) {
-            peer
+        let target = if let Some(peer) = targets.iter().nth(query.adult_index) {
+            *peer
         } else {
-            let error = convert_to_error_msg(Error::NoAdults(self.network_knowledge().prefix()));
             debug!("No targets found for {msg_id:?}");
-
-            #[cfg(feature = "traceroute")]
-            traceroute.0.push(self.identity());
-
-            return Ok(vec![self.send_cmd_error_response(
-                CmdError::Data(error),
-                source_client,
-                msg_id,
-                #[cfg(feature = "traceroute")]
-                traceroute,
-            )]);
+            return Err(Error::InsufficientAdults {
+                prefix: self.network_knowledge().prefix(),
+                expected: query.adult_index as u8 + 1,
+                found: targets.len() as u8,
+            });
         };
 
         let mut cmds = vec![Cmd::AddToPendingQueries {
