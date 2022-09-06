@@ -58,7 +58,7 @@ impl Node {
 
         let src_name = session_id.prefix.name();
         let msg = SystemMsg::DkgStart(session_id);
-        let (auth, payload) = self.get_auth(msg.clone(), src_name)?;
+        let (auth, payload) = self.get_auth(&msg, src_name)?;
 
         if !others.is_empty() {
             cmds.push(Cmd::send_msg(
@@ -82,7 +82,7 @@ impl Node {
         Ok(cmds)
     }
 
-    fn get_auth(&self, msg: SystemMsg, src_name: XorName) -> Result<(BlsShareAuth, Bytes)> {
+    fn get_auth(&self, msg: &SystemMsg, src_name: XorName) -> Result<(BlsShareAuth, Bytes)> {
         let section_key = self.network_knowledge.section_key();
         let key_share = self
             .section_keys_provider

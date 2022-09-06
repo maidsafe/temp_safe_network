@@ -326,7 +326,7 @@ impl Session {
 
         self.complete = true;
         let section_auth = SectionAuthorityProvider::from_dkg_session(
-            self.session_id.clone(),
+            &self.session_id,
             outcome.public_key_set.clone(),
         );
 
