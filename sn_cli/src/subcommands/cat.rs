@@ -17,8 +17,7 @@ use color_eyre::{eyre::WrapErr, Result};
 use comfy_table::Table;
 use sn_api::{resolver::SafeData, ContentType, Safe, SafeUrl};
 use std::io::{self, Write};
-use tokio::time::{sleep, Duration};
-use tracing::{debug, trace};
+use tracing::debug;
 
 #[derive(Args, Debug)]
 pub struct CatCommands {
@@ -34,11 +33,7 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe)
     let url = get_target_url(&link)?;
     debug!("Running cat for: {}", &url.to_string());
 
-    let mut attempts = 0;
-
-    let content = safe.fetch(&url.to_string(), None).await?;
-
-    match &content {
+    match safe.fetch(&url.to_string(), None).await? {
         SafeData::FilesContainer {
             version, files_map, ..
         } => {
@@ -72,18 +67,18 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe)
         SafeData::PublicFile { data, .. } => {
             if cmd.hexdump {
                 // Render hex representation of file
-                println!("{}", pretty_hex::pretty_hex(data));
+                println!("{}", pretty_hex::pretty_hex(&data));
             } else {
                 // Render file
                 io::stdout()
-                    .write_all(data)
+                    .write_all(&data)
                     .context("Failed to print out the content of the file")?;
             }
         }
         SafeData::NrsMapContainer { nrs_map, .. } => {
             if OutputFmt::Pretty == output_fmt {
                 println!("NRS Map Container at {}", url);
-                print_nrs_map(nrs_map);
+                print_nrs_map(&nrs_map);
             } else {
                 println!(
                     "{}",
@@ -95,11 +90,11 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe)
             println!("No content to show since the URL targets a SafeKey. Use the 'dog' command to obtain additional information about the targeted SafeKey.");
         }
         SafeData::Multimap { xorurl, data, .. } => {
-            let safeurl = SafeUrl::from_xorurl(xorurl)?;
+            let safeurl = SafeUrl::from_xorurl(&xorurl)?;
             if safeurl.content_type() == ContentType::Wallet {
                 if OutputFmt::Pretty == output_fmt {
                     println!("Spendable balances of wallet at \"{}\":", xorurl);
-                    let table = gen_wallet_table(safe, data).await?;
+                    let table = gen_wallet_table(safe, &data).await?;
                     println!("{table}");
                 } else {
                     println!("{}", serialise_output(&(url.to_string(), data), output_fmt));
