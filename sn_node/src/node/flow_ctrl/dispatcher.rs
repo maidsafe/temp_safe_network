@@ -16,10 +16,7 @@ use crate::node::{
 #[cfg(feature = "traceroute")]
 use sn_interface::{messaging::Entity, messaging::Traceroute};
 use sn_interface::{
-    messaging::{
-        data::{CmdError, ServiceMsg},
-        AuthKind, Dst, MsgId, WireMsg,
-    },
+    messaging::{AuthKind, Dst, MsgId, WireMsg},
     types::Peer,
 };
 
@@ -159,7 +156,7 @@ impl Dispatcher {
                 origin,
                 auth,
                 #[cfg(feature = "traceroute")]
-                mut traceroute,
+                traceroute,
             } => {
                 let node = self.node.read().await;
                 match node
@@ -176,11 +173,7 @@ impl Dispatcher {
                     Ok(cmds) => Ok(cmds),
                     Err(err) => {
                         debug!("Will send error response back to client");
-
-                        #[cfg(feature = "traceroute")]
-                        traceroute.0.push(node.identity());
-
-                        let cmd = cmd_error_response(
+                        let cmd = node.cmd_error_response(
                             err,
                             origin,
                             msg_id,
@@ -208,7 +201,6 @@ impl Dispatcher {
                     .await
                 {
                     debug!("handling valid msg {:?}", msg_id);
-
                     node.handle_valid_system_msg(
                         msg_id,
                         msg_authority,
@@ -216,7 +208,7 @@ impl Dispatcher {
                         origin,
                         &self.comm,
                         #[cfg(feature = "traceroute")]
-                        traceroute,
+                        traceroute.clone(),
                     )
                     .await
                 } else {
@@ -314,27 +306,6 @@ impl Dispatcher {
 
 async fn sleep_facility(duration: Duration) {
     log_sleep!(Duration::from_millis(duration.as_millis() as u64));
-}
-
-/// Forms a `CmdError` msg to send back to the client
-fn cmd_error_response(
-    error: Error,
-    target: Peer,
-    msg_id: MsgId,
-    #[cfg(feature = "traceroute")] traceroute: Traceroute,
-) -> Cmd {
-    let the_error_msg = ServiceMsg::CmdError {
-        error: CmdError::Data(error.into()),
-        correlation_id: msg_id,
-    };
-
-    Cmd::SendMsg {
-        msg: OutgoingMsg::Service(the_error_msg),
-        msg_id: MsgId::new(),
-        recipients: Peers::Single(target),
-        #[cfg(feature = "traceroute")]
-        traceroute,
-    }
 }
 
 // Serializes and signs the msg,

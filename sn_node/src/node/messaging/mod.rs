@@ -20,7 +20,7 @@ mod signing;
 mod system_msgs;
 mod update_section;
 
-use crate::node::{flow_ctrl::cmds::Cmd, Node, Result, DATA_QUERY_LIMIT};
+use crate::node::{flow_ctrl::cmds::Cmd, Error, Node, Result, DATA_QUERY_LIMIT};
 
 use sn_interface::{
     messaging::{
@@ -96,11 +96,11 @@ impl Node {
                 // Check for entropy before we proceed further
                 // Anythign returned here means there's an issue and we should
                 // short-circuit below
-                let cmds = self.apply_ae(&origin, &msg, &wire_msg, &dst).await?;
+                let ae_cmds = self.apply_ae(&origin, &msg, &wire_msg, &dst).await?;
 
-                if !cmds.is_empty() {
+                if !ae_cmds.is_empty() {
                     // short circuit and send those AE responses
-                    return Ok(cmds);
+                    return Ok(ae_cmds);
                 }
 
                 #[cfg(feature = "traceroute")]
@@ -141,11 +141,18 @@ impl Node {
                 }
 
                 // First we check if it's query and we have too many on the go at the moment...
-                if let ServiceMsg::Query(_) = msg {
+                if let ServiceMsg::Query(query) = &msg {
                     // we have a query, check if we have too many on the go....
                     if self.pending_data_queries.len() > DATA_QUERY_LIMIT {
                         warn!("Pending queries length exceeded, dropping query {msg:?}");
-                        return Ok(vec![]);
+                        let cmd = self.cmd_error_response(
+                            Error::CannotHandleQuery(query.clone()),
+                            origin,
+                            msg_id,
+                            #[cfg(feature = "traceroute")]
+                            wire_msg.traceroute(),
+                        );
+                        return Ok(vec![cmd]);
                     }
                 }
 
@@ -189,11 +196,10 @@ impl Node {
         wire_msg: &WireMsg,
         dst: &Dst,
     ) -> Result<Vec<Cmd>> {
-        let mut cmds = vec![];
         // Adult nodes don't need to carry out entropy checking,
         // however the message shall always be handled.
         if !self.is_elder() {
-            return Ok(cmds);
+            return Ok(vec![]);
         }
         // For the case of receiving a join request not matching our prefix,
         // we just let the join request handler to deal with it later on.
@@ -209,19 +215,20 @@ impl Node {
                     "Entropy check skipped for {:?}, handling message directly",
                     wire_msg.msg_id()
                 );
-                Ok(cmds)
+                Ok(vec![])
             }
             _ => {
                 if let Some(ae_cmd) =
                     self.check_for_entropy(wire_msg, &dst.section_key, dst.name, origin)?
                 {
                     // we want to log issues with any node repeatedly out of sync here...
-                    cmds.push(Cmd::TrackNodeIssueInDysfunction {
-                        name: origin.name(),
-                        issue: sn_dysfunction::IssueType::Knowledge,
-                    });
-
-                    cmds.push(ae_cmd);
+                    let cmds = vec![
+                        Cmd::TrackNodeIssueInDysfunction {
+                            name: origin.name(),
+                            issue: sn_dysfunction::IssueType::Knowledge,
+                        },
+                        ae_cmd,
+                    ];
 
                     return Ok(cmds);
                 }
@@ -231,7 +238,7 @@ impl Node {
                     wire_msg.msg_id()
                 );
 
-                Ok(cmds)
+                Ok(vec![])
             }
         }
     }
