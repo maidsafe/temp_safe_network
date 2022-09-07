@@ -54,7 +54,7 @@ pub(crate) struct PeerSession {
 
 impl PeerSession {
     pub(crate) fn new(link: Link) -> PeerSession {
-        let (sender, receiver) = mpsc::channel(1000);
+        let (sender, receiver) = mpsc::channel(10_000);
 
         let _ =
             tokio::task::spawn_local(PeerSessionWorker::new(link, sender.clone()).run(receiver));
