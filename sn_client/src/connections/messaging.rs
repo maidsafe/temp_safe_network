@@ -91,7 +91,7 @@ impl Session {
         self.send_msg(elders, wire_msg, msg_id).await?;
         trace!("Cmd msg {:?} sent", msg_id);
 
-        let expected_acks = elders_len * 2 / 3 + 1;
+        let expected_acks = elders_len;
 
         // We are not wait for the receive of majority of cmd Acks.
         // This could be further strict to wait for ALL the Acks get received.
@@ -105,11 +105,12 @@ impl Session {
             if let Some(acks_we_have) = self.pending_cmds.get(&msg_id) {
                 let acks = acks_we_have.value();
 
-                let received_ack_count = acks.len();
+                let received_response_count = acks.len();
 
                 let mut error_count = 0;
                 let mut return_error = None;
 
+                // track received errors
                 for refmulti in acks.iter() {
                     let (ack_src, error) = refmulti.key();
                     if return_error.is_none() {
@@ -118,8 +119,8 @@ impl Session {
 
                     if error.is_some() {
                         error!(
-                            "received error response {:?} of cmd {:?} from {:?}, so far {} acks vs. {} errors",
-                            error, msg_id, ack_src, received_ack_count, error_count
+                            "received error response {:?} of cmd {:?} from {:?}, so far {} respones and {} of them are errors",
+                            error, msg_id, ack_src, received_response_count, error_count
                         );
                         error_count += 1;
                     }
@@ -139,11 +140,13 @@ impl Session {
                     }
                 }
 
-                if received_ack_count >= expected_acks {
+                let actual_ack_count = received_response_count - error_count;
+
+                if actual_ack_count >= expected_acks {
                     break;
                 }
 
-                debug!("insufficient acks returned so far: {received_ack_count}/{expected_acks}");
+                debug!("insufficient acks returned so far: {actual_ack_count}/{expected_acks}");
             }
 
             if ack_checks >= max_ack_checks {
