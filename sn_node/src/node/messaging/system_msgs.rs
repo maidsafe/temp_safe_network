@@ -482,9 +482,21 @@ impl Node {
 
                             cmds.push(self.send_msg_to_our_elders(msg))
                         }
-                        Err(error) => {
-                            // the rest seem to be non-problematic errors.. (?)
+                        Err(error @ StorageError::DataExists(_)) => {
                             error!("Problem storing data, but it was ignored: {error}");
+                        }
+                        Err(error) => {
+                            // let's report the error to Elder, it can store it in
+                            // another Adult, and we don't get penalised ??
+                            error!("Problem storing data, reporting to Elders: {error}");
+                            let node_id = PublicKey::from(self.keypair.public);
+                            let msg = SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData {
+                                node_id,
+                                data,
+                                full: false,
+                            });
+
+                            cmds.push(self.send_system_msg(msg, Peers::Single(sender)))
                         }
                     }
                 }
