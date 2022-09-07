@@ -31,13 +31,12 @@ begin_time=$(cat safe_states.out | rg 'time' | jq -sr 'min_by(.time | tonumber) 
 end_time=$(cat safe_states.out | rg 'time' | jq -sr 'max_by(.time | tonumber) | .time')
 statemap_cmd="statemap --sortby=Idle -b $begin_time -e $end_time -c 100000 $out_file"
 
-echo "Wrote statemap data to $out_file"
-
 if [[ $* == *--run-statemap* ]]
 then
-    echo "Generating statemap svg"
     $(statemap_cmd)
 else
+    echo "Wrote statemap data to $out_file"
+
     echo "Render the statemap SVG with"
     echo ""
     echo "    $statemap_cmd > save.svg"
