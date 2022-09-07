@@ -262,6 +262,24 @@ mod tests {
         Ok(())
     }
 
+    // This test is an example, which will fail as entry hashes (and therefore version on a files container, _can_ be the same...)
+    // So why are we seeing this at the files container level?
+    #[test]
+    fn check_register_hashes_different() -> eyre::Result<()> {
+        let (_, register) = &mut create_reg_replicas(1)[0];
+        let (_, register2) = &mut create_reg_replicas(1)[0];
+
+        let entry1 = random_register_entry();
+
+        let (entry1_hash, _) = register.write(entry1.clone(), BTreeSet::new())?;
+
+        let (entry2_hash, _) = register2.write(entry1.clone(), BTreeSet::new())?;
+
+        assert_ne!(entry1_hash, entry2_hash);
+
+        Ok(())
+    }
+
     #[test]
     fn register_get_by_hash() -> eyre::Result<()> {
         let (_, register) = &mut create_reg_replicas(1)[0];
