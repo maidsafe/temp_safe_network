@@ -1113,7 +1113,19 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
+## v0.74.0 (2022-09-07)
+
 ## v0.73.0 (2022-09-06)
+
+<csr-id-d28fdf3ddd0a39f7bbc6426e1e71d990319b0ec7/>
+<csr-id-921438659ccaf65b2ea8cc00efb61d8146ef71ef/>
+<csr-id-f5d436fba99e0e9c258c7ab3c3a256be3be58f84/>
+<csr-id-388cd223677ecfa2e790c54c0df8ecb18c77299c/>
+<csr-id-5c54848b726188f273ffa16ee2870976914bb815/>
+<csr-id-b040ea14e53247094838de6f1fa9af2830b051fa/>
+<csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/>
+<csr-id-a4e84ef4608a13ecc2f14dd87f5c23d185185513/>
+<csr-id-d251dbeb2e44707623c3bbb1215784b1bd4fae06/>
 
 ### Chore
 
@@ -1130,6 +1142,10 @@ needed, as they keypair itself contains the Arcs we need.
    interfaces.
  - <csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/> switch on clippy::unwrap_used as a warning
 
+
+### Chore
+
+ - <csr-id-1b9e0a6564e9564201ef3a3e04adb0bfbef6ac14/> sn_interface-0.12.0/sn_dysfunction-0.11.0/sn_client-0.73.0/sn_node-0.68.0/sn_api-0.71.0/sn_cli-0.64.0
 
 ### Bug Fixes
 
@@ -1162,9 +1178,9 @@ needed, as they keypair itself contains the Arcs we need.
 
 <csr-read-only-do-not-edit/>
 
- - 14 commits contributed to the release over the course of 7 calendar days.
+ - 15 commits contributed to the release over the course of 8 calendar days.
  - 8 days passed between releases.
- - 11 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 12 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1174,6 +1190,7 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.12.0/sn_dysfunction-0.11.0/sn_client-0.73.0/sn_node-0.68.0/sn_api-0.71.0/sn_cli-0.64.0 ([`1b9e0a6`](https://github.com/maidsafe/safe_network/commit/1b9e0a6564e9564201ef3a3e04adb0bfbef6ac14))
     - update qp2p to use UsrMsgBytes and avoid reserializing bytes ([`f5361d9`](https://github.com/maidsafe/safe_network/commit/f5361d91f8215585651229eb6dc2535f2ecb631c))
     - Merge #1545 ([`b62c056`](https://github.com/maidsafe/safe_network/commit/b62c056b0b28f67a40d9e036b2d64b36fd5380bd))
     - update qp2p for unique ids ([`6bdc822`](https://github.com/maidsafe/safe_network/commit/6bdc82295dfdcaa617c7c1e36d2b72f085e50042))

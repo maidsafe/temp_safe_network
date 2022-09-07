@@ -5,7 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.12.0 (2022-09-07)
+
 ## v0.11.0 (2022-09-06)
+
+<csr-id-d28fdf3ddd0a39f7bbc6426e1e71d990319b0ec7/>
+<csr-id-dd89cac97da96ffe26ae78c4b7b62aa952ec53fc/>
+<csr-id-921438659ccaf65b2ea8cc00efb61d8146ef71ef/>
+<csr-id-f5d436fba99e0e9c258c7ab3c3a256be3be58f84/>
+<csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/>
 
 ### Chore
 
@@ -16,13 +24,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/> switch on clippy::unwrap_used as a warning
 
 
+### Chore
+
+ - <csr-id-1b9e0a6564e9564201ef3a3e04adb0bfbef6ac14/> sn_interface-0.12.0/sn_dysfunction-0.11.0/sn_client-0.73.0/sn_node-0.68.0/sn_api-0.71.0/sn_cli-0.64.0
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 5 commits contributed to the release over the course of 7 calendar days.
+ - 6 commits contributed to the release over the course of 8 calendar days.
  - 13 days passed between releases.
- - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -32,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.12.0/sn_dysfunction-0.11.0/sn_client-0.73.0/sn_node-0.68.0/sn_api-0.71.0/sn_cli-0.64.0 ([`1b9e0a6`](https://github.com/maidsafe/safe_network/commit/1b9e0a6564e9564201ef3a3e04adb0bfbef6ac14))
     - sn_interface-0.11.0/sn_dysfunction-0.10.0/sn_client-0.72.0/sn_node-0.67.0/sn_api-0.70.0/sn_cli-0.63.0 ([`d28fdf3`](https://github.com/maidsafe/safe_network/commit/d28fdf3ddd0a39f7bbc6426e1e71d990319b0ec7))
     - replace implicit clones with clone ([`dd89cac`](https://github.com/maidsafe/safe_network/commit/dd89cac97da96ffe26ae78c4b7b62aa952ec53fc))
     - unneeded iter methods removal ([`9214386`](https://github.com/maidsafe/safe_network/commit/921438659ccaf65b2ea8cc00efb61d8146ef71ef))
