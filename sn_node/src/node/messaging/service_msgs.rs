@@ -21,8 +21,8 @@ use sn_interface::{
     data_copy_count,
     messaging::{
         data::{
-            CmdError, DataCmd, DataQueryVariant, EditRegister, ServiceMsg, SignedRegisterEdit,
-            SpentbookCmd,
+            CmdError, DataCmd, DataQueryVariant, EditRegister, OperationId, ServiceMsg,
+            SignedRegisterEdit, SpentbookCmd,
         },
         system::{NodeQueryResponse, SystemMsg},
         AuthorityProof, EndUser, MsgId, ServiceAuth,
@@ -134,18 +134,9 @@ impl Node {
         response: NodeQueryResponse,
         user: EndUser,
         sending_node_pk: PublicKey,
+        op_id: OperationId,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Option<Cmd> {
-        let op_id = if let Ok(op_id) = response.operation_id() {
-            op_id
-        } else {
-            warn!(
-                "There is no operation id. Dropping chunk query response from Adult {}, to user: {}.",
-                sending_node_pk, user.0
-            );
-            return None;
-        };
-
         debug!(
             "Handling data read @ elders, received from {:?}, op id: {:?}",
             sending_node_pk, op_id
