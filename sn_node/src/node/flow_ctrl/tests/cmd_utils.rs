@@ -186,7 +186,7 @@ impl Cmd {
         match self {
             Cmd::SendMsg { msg, .. } => match msg {
                 OutgoingMsg::Service(service_msg) => match service_msg {
-                    ServiceMsg::CmdError { error, .. } => match error {
+                    ServiceMsg::Error { error, .. } => match error {
                         CmdError::Data(err) => Ok(err.clone()),
                     },
                     _ => Err(eyre!("A ServiceMsg::CmdError variant was expected")),

@@ -16,7 +16,7 @@ mod register;
 mod spentbook;
 
 pub use self::{
-    cmd::DataCmd,
+    cmd::{DataCmd, DataCmdId},
     data_exchange::{MetadataExchange, StorageLevel},
     errors::{Error, Result},
     query::DataQuery,
@@ -121,23 +121,23 @@ pub enum ServiceMsg {
     /// An error response to a [`Cmd`].
     ///
     /// [`Cmd`]: Self::Cmd
-    CmdError {
+    Error {
         /// The error.
         error: CmdError,
         /// ID of causing [`Cmd`] message.
         ///
         /// [`Cmd`]: Self::Cmd
-        correlation_id: MsgId,
+        msg_id: MsgId,
     },
     /// A message indicating that an error occurred as a node was handling a client's message.
     ServiceError(ServiceError),
     /// CmdAck will be sent back to the client when the handling on the
     /// receiving Elder has been succeeded.
     CmdAck {
-        /// ID of causing [`Cmd`] message.
+        /// ID of causing [`Cmd`].
         ///
         /// [`Cmd`]: Self::Cmd
-        correlation_id: MsgId,
+        data_cmd_id: DataCmdId,
     },
 }
 
@@ -168,10 +168,10 @@ impl Display for ServiceMsg {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::Cmd(cmd) => write!(f, "ServiceMsg::Cmd({:?})", cmd),
-            Self::CmdAck { correlation_id } => {
-                write!(f, "ServiceMsg::CmdAck({:?})", correlation_id)
+            Self::CmdAck { data_cmd_id } => {
+                write!(f, "ServiceMsg::CmdAck({:?})", data_cmd_id)
             }
-            Self::CmdError { error, .. } => write!(f, "ServiceMsg::CmdError({:?})", error),
+            Self::Error { error, .. } => write!(f, "ServiceMsg::CmdError({:?})", error),
             Self::Query(query) => write!(f, "ServiceMsg::Query({:?})", query),
             Self::QueryResponse { response, .. } => {
                 write!(f, "ServiceMsg::QueryResponse({:?})", response)
@@ -188,7 +188,10 @@ impl Display for ServiceMsg {
 pub enum CmdError {
     /// An error response to a [`DataCmd`].
     // FIXME: `Cmd` is not an enum, so should this be?
-    Data(Error), // DataError enum for better differentiation?
+    Data {
+        error: Error,
+        data_cmd_id: Option<DataCmdId>,
+    }, // DataError enum for better differentiation?
 }
 
 /// The response to a query, containing the query result.

@@ -18,7 +18,7 @@ use qp2p::UsrMsgBytes;
 use sn_interface::{
     at_least_one_correct_elder,
     messaging::{
-        data::{CmdError, ServiceMsg},
+        data::{CmdError, DataCmdId, ServiceMsg},
         system::{AntiEntropyKind, KeyedSig, NodeMsgAuthorityUtils, SectionAuth, SystemMsg},
         AuthKind, AuthorityProof, Dst, MsgId, MsgType, NodeMsgAuthority, ServiceAuth, WireMsg,
     },
@@ -195,7 +195,7 @@ impl Session {
     #[instrument(skip(cmds), level = "debug")]
     fn send_cmd_response(
         cmds: PendingCmdAcks,
-        correlation_id: MsgId,
+        correlation_id: Option<DataCmdId>,
         src: SocketAddr,
         error: Option<CmdError>,
     ) {
@@ -203,14 +203,18 @@ impl Session {
             debug!("CmdError was received for {correlation_id:?}: {:?}", error);
         }
 
-        if let Some(mut received_acks) = cmds.get_mut(&correlation_id) {
-            let acks = received_acks.value_mut();
+        if let Some(cmd_id) = correlation_id {
+            if let Some(mut received_acks) = cmds.get_mut(&cmd_id) {
+                let acks = received_acks.value_mut();
 
-            let _prior = acks.insert((src, error));
+                let _prior = acks.insert((src, error));
+            } else {
+                let received = DashSet::new();
+                let _nonexistent = received.insert((src, error));
+                let _non_prior = cmds.insert(cmd_id, Arc::new(received));
+            }
         } else {
-            let received = DashSet::new();
-            let _nonexistent = received.insert((src, error));
-            let _non_prior = cmds.insert(correlation_id, Arc::new(received));
+            warn!("No correlating DataCmdId returned");
         }
     }
 
@@ -276,21 +280,21 @@ impl Session {
                         warn!("Ignoring query response without operation id");
                     }
                 }
-                ServiceMsg::CmdError {
-                    error,
-                    correlation_id,
-                    ..
-                } => {
-                    Self::send_cmd_response(cmds, correlation_id, src_peer.addr(), Some(error));
+                ServiceMsg::Error { error, msg_id: _, .. } => {
+                    let (_error, data_cmd_id) = match error.clone() {
+                        CmdError::Data { error, data_cmd_id } => (error, data_cmd_id),
+                    };
+
+                    Self::send_cmd_response(cmds, data_cmd_id, src_peer.addr(), Some(error));
                 }
-                ServiceMsg::CmdAck { correlation_id } => {
+                ServiceMsg::CmdAck { data_cmd_id } => {
                     debug!(
-                        "CmdAck was received for Message{:?} w/ID: {:?} from {:?}",
+                        "CmdAck was received for Message{:?} w/CmdId: {:?} from {:?}",
                         msg_id,
-                        correlation_id,
+                        data_cmd_id,
                         src_peer.addr()
                     );
-                    Self::send_cmd_response(cmds, correlation_id, src_peer.addr(), None);
+                    Self::send_cmd_response(cmds, Some(data_cmd_id), src_peer.addr(), None);
                 }
                 _ => {
                     warn!("Ignoring unexpected msg type received: {:?}", msg);

@@ -13,7 +13,7 @@ use crate::Result;
 use sn_interface::{
     messaging::{
         data::{CmdError, OperationId, QueryResponse},
-        MsgId,
+        DataCmdId, MsgId,
     },
     network_knowledge::SectionTree,
     types::PeerLinks,
@@ -32,7 +32,7 @@ type CmdResponse = (SocketAddr, Option<CmdError>);
 
 /// As we receive ACKs, we write the ACKd peer here for checking.
 /// TODO: This could be a mem leak for long running clients.
-type PendingCmdAcks = Arc<DashMap<MsgId, Arc<DashSet<CmdResponse>>>>;
+type PendingCmdAcks = Arc<DashMap<DataCmdId, Arc<DashSet<CmdResponse>>>>;
 
 #[derive(Debug)]
 pub struct QueryResult {

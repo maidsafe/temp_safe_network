@@ -6,11 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{CmdError, Error, RegisterCmd, SpentbookCmd};
+use super::{CmdError, Error, RegisterCmd, Result, SpentbookCmd};
+use crate::types::utils::serialise;
 use crate::types::{Chunk, DataAddress};
 use serde::{Deserialize, Serialize};
+use tiny_keccak::{Hasher, Sha3};
 use xor_name::XorName;
 
+pub type DataCmdId = String;
 /// Data cmds - creating, updating, or removing data.
 ///
 /// See the [`types`] module documentation for more details of the types supported by the Safe
@@ -38,15 +41,18 @@ pub enum DataCmd {
 impl DataCmd {
     /// Creates a Response containing an error, with the Response variant corresponding to the
     /// cmd variant.
-    pub fn error(&self, error: Error) -> CmdError {
+    pub fn error(&self, error: Error, cmd_id: DataCmdId) -> CmdError {
         use DataCmd::*;
         match self {
             #[cfg(feature = "chunks")]
-            StoreChunk(_) => CmdError::Data(error),
+            StoreChunk(_) => CmdError::Data {
+                error,
+                data_cmd_id: Some(cmd_id),
+            },
             #[cfg(feature = "registers")]
-            Register(c) => c.error(error),
+            Register(c) => c.error(error, cmd_id),
             #[cfg(feature = "spentbook")]
-            Spentbook(c) => c.error(error),
+            Spentbook(c) => c.error(error, cmd_id),
         }
     }
 
@@ -70,5 +76,18 @@ impl DataCmd {
             #[cfg(feature = "spentbook")]
             Spentbook(c) => c.name(),
         }
+    }
+
+    /// Returns the DataCmdId
+    pub fn data_cmd_id(&self) -> Result<DataCmdId> {
+        let mut hasher = Sha3::v256();
+
+        let bytes = serialise(self).map_err(|_| Error::DataCmdSerialisation)?;
+        let mut output = [0; 64];
+        hasher.update(&bytes);
+        hasher.finalize(&mut output);
+
+        let id = hex::encode(output);
+        Ok(id)
     }
 }

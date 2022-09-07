@@ -21,8 +21,9 @@ use sn_interface::{
     data_copy_count,
     messaging::{
         data::{
-            CmdError, DataCmd, DataQueryVariant, EditRegister, OperationId, ServiceMsg,
-            SignedRegisterEdit, SpentbookCmd,
+            CmdError, DataCmd, DataCmdId, DataQueryVariant, EditRegister, OperationId, ServiceMsg,
+            SignedRegisterEdit,
+            SpentbookCmd,
         },
         system::{NodeQueryResponse, SystemMsg},
         AuthorityProof, EndUser, MsgId, ServiceAuth,
@@ -43,10 +44,10 @@ impl Node {
     pub(crate) fn send_cmd_ack(
         &self,
         target: Peer,
-        correlation_id: MsgId,
+        data_cmd_id: DataCmdId,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Cmd {
-        let the_ack_msg = ServiceMsg::CmdAck { correlation_id };
+        let the_ack_msg = ServiceMsg::CmdAck { data_cmd_id };
         self.send_service_msg(
             the_ack_msg,
             Peers::Single(target),
@@ -205,6 +206,11 @@ impl Node {
 
         trace!("{:?} {:?}", LogMarker::ServiceMsgToBeHandled, msg);
 
+        let data_cmd_id = match &msg {
+            ServiceMsg::Cmd(cmd) => Some(cmd.data_cmd_id()?),
+            _ => None,
+        };
+
         // extract the data from the request
         let data = match msg {
             // These reads/writes are for adult nodes...
@@ -269,13 +275,15 @@ impl Node {
             traceroute.clone(),
         ));
 
-        // the ack sent to client
-        cmds.push(self.send_cmd_ack(
-            origin,
-            msg_id,
-            #[cfg(feature = "traceroute")]
-            traceroute,
-        ));
+        if let Some(data_cmd_id) = data_cmd_id {
+            // the ack sent to client
+            cmds.push(self.send_cmd_ack(
+                origin,
+                data_cmd_id,
+                #[cfg(feature = "traceroute")]
+                traceroute,
+            ));
+        }
 
         Ok(cmds)
     }
