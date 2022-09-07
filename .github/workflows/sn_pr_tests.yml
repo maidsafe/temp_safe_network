@@ -323,6 +323,21 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: matrix.os != 'windows-latest'
 
+      - name: Generate StateMap
+        shell: bash
+        continue-on-error: true
+        run: |
+          cargo install --git https://github.com/TritonDataCenter/statemap.git
+          ./resources/scripts/statemap.sh --run-statemap > safe_statemap.svg
+
+      - name: Upload StateMap
+        uses: actions/upload-artifact@main
+        with:
+          name: statemap_e2e_${{matrix.os}}.svg
+          path: safe_statemap.svg
+        if: failure()
+        continue-on-error: true
+
       - name: Tar log files
         shell: bash
         continue-on-error: true
@@ -477,6 +492,21 @@ jobs:
         continue-on-error: true
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
 
+      - name: Generate StateMap
+        shell: bash
+        continue-on-error: true
+        run: |
+          cargo install --git https://github.com/TritonDataCenter/statemap.git
+          ./resources/scripts/statemap.sh --run-statemap > safe_statemap.svg
+
+      - name: Upload StateMap
+        uses: actions/upload-artifact@main
+        with:
+          name: statemap_e2e_split_self_hosted_ubuntu.svg
+          path: safe_statemap.svg
+        if: failure()
+        continue-on-error: true
+
       - name: Tar log files
         shell: bash
         continue-on-error: true
@@ -590,6 +620,20 @@ jobs:
         # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
         run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
 
+      - name: Generate StateMap
+        shell: bash
+        continue-on-error: true
+        run: |
+          cargo install --git https://github.com/TritonDataCenter/statemap.git
+          ./resources/scripts/statemap.sh --run-statemap > safe_statemap.svg
+
+      - name: Upload StateMap
+        uses: actions/upload-artifact@main
+        with:
+          name: statemap_api_${{matrix.os}}.svg
+          path: safe_statemap.svg
+        if: failure()
+        continue-on-error: true
 
       - name: Print Network Log Stats
         shell: bash
@@ -698,6 +742,22 @@ jobs:
         if: matrix.os != 'windows-latest'
         # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
         run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
+
+      - name: Generate StateMap
+        shell: bash
+        continue-on-error: true
+        run: |
+          cargo install --git https://github.com/TritonDataCenter/statemap.git
+          ./resources/scripts/statemap.sh --run-statemap > safe_statemap.svg
+
+      - name: Upload StateMap
+        uses: actions/upload-artifact@main
+        with:
+          name: statemap_cli_${{matrix.os}}.svg
+          path: safe_statemap.svg
+        if: failure()
+        continue-on-error: true
+
 
       - name: Print Network Log Stats
         shell: bash

@@ -12,6 +12,13 @@ then
     exit 1
 fi
 
+if ! command -v statemap &> /dev/null
+then
+    echo "Statemap could not be found and is required, install with"
+    echo "cargo install --git https://github.com/TritonDataCenter/statemap.git"
+    exit 1
+fi
+
 log_dir="$HOME/.safe/node/local-test-network"
 genesis_log_dir="$HOME/.safe/node/local-test-network/sn-node-genesis"
 out_file="safe_states.out"
@@ -22,8 +29,16 @@ rg -IN ".*STATEMAP_ENTRY: " "$log_dir" --replace "" | jq -s 'sort_by(.time|tonum
 
 begin_time=$(cat safe_states.out | rg 'time' | jq -sr 'min_by(.time | tonumber) | .time')
 end_time=$(cat safe_states.out | rg 'time' | jq -sr 'max_by(.time | tonumber) | .time')
+statemap_cmd="statemap --sortby=Idle -b $begin_time -e $end_time -c 100000 $out_file"
 
-echo "Generated statemap data at $out_file"
-echo "Render the statemap SVG with"
-echo ""
-echo "    statemap --sortby=Idle -b $begin_time -e $end_time -c 100000 $out_file > safe.svg"
+echo "Wrote statemap data to $out_file"
+
+if [[ $* == *--run-statemap* ]]
+then
+    echo "Generating statemap svg"
+    $(statemap_cmd)
+else
+    echo "Render the statemap SVG with"
+    echo ""
+    echo "    $statemap_cmd > save.svg"
+fi
