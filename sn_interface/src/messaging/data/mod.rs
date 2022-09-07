@@ -234,17 +234,17 @@ impl QueryResponse {
     /// Returns true if the result returned is a success or not
     pub fn is_success(&self) -> bool {
         use QueryResponse::*;
-        matches!(
-            self,
-            GetChunk(Err(ErrorMsg::DataNotFound(_)))
-                | GetRegister((Err(ErrorMsg::DataNotFound(_)), _))
-                | GetRegisterEntry((Err(ErrorMsg::DataNotFound(_)), _))
-                | GetRegisterOwner((Err(ErrorMsg::DataNotFound(_)), _))
-                | ReadRegister((Err(ErrorMsg::DataNotFound(_)), _))
-                | GetRegisterPolicy((Err(ErrorMsg::DataNotFound(_)), _))
-                | GetRegisterUserPermissions((Err(ErrorMsg::DataNotFound(_)), _))
-                | SpentProofShares((Err(ErrorMsg::DataNotFound(_)), _))
-        )
+        match self {
+            GetChunk(result) => result.is_ok(),
+            GetRegister((result, _op_id)) => result.is_ok(),
+            GetRegisterEntry((result, _op_id)) => result.is_ok(),
+            GetRegisterOwner((result, _op_id)) => result.is_ok(),
+            ReadRegister((result, _op_id)) => result.is_ok(),
+            GetRegisterPolicy((result, _op_id)) => result.is_ok(),
+            GetRegisterUserPermissions((result, _op_id)) => result.is_ok(),
+            SpentProofShares((result, _op_id)) => result.is_ok(),
+            FailedToCreateOperationId => false,
+        }
     }
 
     /// Returns true if the result returned is DataNotFound
