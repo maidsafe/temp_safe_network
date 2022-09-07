@@ -156,19 +156,6 @@ impl Node {
 
                 Ok(vec![])
             }
-            SystemMsg::NodeMsgError {
-                error,
-                correlation_id,
-            } => {
-                trace!(
-                    "From {:?}({:?}), received error {:?} correlated to {:?}",
-                    msg_authority.src_location(),
-                    msg_id,
-                    error,
-                    correlation_id
-                );
-                Ok(vec![])
-            }
             SystemMsg::AntiEntropy {
                 section_auth,
                 section_signed,
@@ -517,35 +504,31 @@ impl Node {
                     .into_iter()
                     .collect())
             }
-            SystemMsg::NodeQuery(node_query) => {
-                match node_query {
-                    // A request from EndUser - via elders - for locally stored data
-                    NodeQuery::Data {
-                        query,
+            SystemMsg::NodeQuery(NodeQuery::Data {
+                query,
+                auth,
+                origin,
+                correlation_id,
+            }) => {
+                // A request from EndUser - via elders - for locally stored data
+                debug!(
+                    "Handle NodeQuery with msg_id {:?} and correlation_id {:?}",
+                    msg_id, correlation_id,
+                );
+                // There is no point in verifying a sig from a sender A or B here.
+                // Send back response to the sending elder
+                Ok(vec![
+                    self.handle_data_query_at_adult(
+                        correlation_id,
+                        &query,
                         auth,
                         origin,
-                        correlation_id,
-                    } => {
-                        debug!(
-                            "Handle NodeQuery with msg_id {:?} and correlation_id {:?}",
-                            msg_id, correlation_id,
-                        );
-                        // There is no point in verifying a sig from a sender A or B here.
-                        // Send back response to the sending elder
-                        Ok(vec![
-                            self.handle_data_query_at_adult(
-                                correlation_id,
-                                &query,
-                                auth,
-                                origin,
-                                sender,
-                                #[cfg(feature = "traceroute")]
-                                traceroute,
-                            )
-                            .await,
-                        ])
-                    }
-                }
+                        sender,
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
+                    )
+                    .await,
+                ])
             }
             SystemMsg::NodeQueryResponse {
                 response,

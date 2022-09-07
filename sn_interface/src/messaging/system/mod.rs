@@ -162,15 +162,6 @@ pub enum SystemMsg {
     },
     /// Events are facts about something that happened on a node.
     NodeEvent(NodeEvent),
-    /// The returned error, from any msg handling on recipient node.
-    NodeMsgError {
-        /// The error.
-        // TODO: return node::Error instead
-        error: crate::messaging::data::Error,
-        /// ID of causing cmd.
-        correlation_id: MsgId,
-    },
-
     #[cfg(any(feature = "chunks", feature = "registers"))]
     /// Cmds are orders to perform some operation, only sent internally in the network.
     NodeCmd(NodeCmd),
@@ -230,8 +221,6 @@ impl SystemMsg {
             // Inter-node comms for backpressure
             Self::BackPressure(_) => BACKPRESSURE_MSG_PRIORITY,
 
-            Self::NodeMsgError { .. } => NODE_DATA_MSG_PRIORITY,
-
             #[cfg(any(feature = "chunks", feature = "registers"))]
             // Inter-node comms related to processing client requests
             Self::NodeCmd(_)
@@ -265,7 +254,6 @@ impl SystemMsg {
             Self::HandoverAE(_) => State::Handover,
             Self::Propose { .. } => State::Propose,
             Self::NodeEvent(_) => State::Node,
-            Self::NodeMsgError { .. } => State::Node,
             Self::NodeCmd(_) => State::Node,
             Self::NodeQuery(_) => State::Node,
             Self::NodeQueryResponse { .. } => State::Node,
@@ -306,7 +294,6 @@ impl Display for SystemMsg {
             Self::HandoverAE { .. } => write!(f, "SystemMsg::HandoverAE"),
             Self::Propose { .. } => write!(f, "SystemMsg::Propose"),
             Self::NodeEvent { .. } => write!(f, "SystemMsg::NodeEvent"),
-            Self::NodeMsgError { .. } => write!(f, "SystemMsg::NodeMsgError"),
             #[cfg(any(feature = "chunks", feature = "registers"))]
             Self::NodeCmd { .. } => write!(f, "SystemMsg::NodeCmd"),
             #[cfg(any(feature = "chunks", feature = "registers"))]

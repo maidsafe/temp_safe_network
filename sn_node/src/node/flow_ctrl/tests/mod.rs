@@ -34,7 +34,7 @@ use sn_interface::{
     messaging::{
         data::{DataCmd, Error as MessagingDataError, RegisterCmd, ServiceMsg, SpentbookCmd},
         system::{
-            JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState,
+            JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState, NodeCmd,
             NodeMsgAuthorityUtils, NodeState as NodeStateMsg, RelocateDetails, ResourceProof,
             SectionAuth, SystemMsg,
         },
@@ -875,10 +875,7 @@ async fn msg_to_self() -> Result<()> {
         let info = node.info();
         let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
-        let node_msg = SystemMsg::NodeMsgError {
-            error: sn_interface::messaging::data::Error::FailedToWriteFile,
-            correlation_id: MsgId::new(),
-        };
+        let node_msg = SystemMsg::NodeCmd(NodeCmd::ReplicateData(vec![]));
 
         // don't use the cmd collection fn, as it skips Cmd::SendMsg
         let cmds = dispatcher

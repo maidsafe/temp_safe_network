@@ -9,7 +9,7 @@
 #![recursion_limit = "256"]
 
 use sn_interface::{
-    messaging::{data::Error::FailedToWriteFile, system::SystemMsg, MsgId},
+    messaging::system::{NodeCmd, SystemMsg},
     types::Cache,
 };
 use sn_node::node::{
@@ -436,10 +436,7 @@ impl Network {
         // section health to appear lower than it actually is.
 
         // just some valid message
-        let msg = SystemMsg::NodeMsgError {
-            error: FailedToWriteFile,
-            correlation_id: MsgId::new(),
-        };
+        let msg = SystemMsg::NodeCmd(NodeCmd::ReplicateData(vec![]));
 
         let recipients = node.our_elders().await;
 
