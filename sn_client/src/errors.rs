@@ -30,6 +30,9 @@ pub enum Error {
     /// Failed to obtain network contacts to bootstrap to
     #[error("Failed to obtain network contacts to bootstrap to: {0}")]
     NetworkContacts(String),
+    /// Serialization error while trying to generate DataCmdId
+    #[error("Failed to serialize DataCmd.")]
+    CouldNotSerializeDataCmd,
     /// InsufficientAcksReceived
     #[error("Did not receive sufficient ACK messages from elders to be sure this cmd passed.")]
     InsufficientAcksReceived,

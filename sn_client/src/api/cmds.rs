@@ -11,7 +11,7 @@ use crate::Error;
 
 use sn_interface::{
     messaging::{
-        data::{DataCmd, ServiceMsg},
+        data::{DataCmd, DataCmdId, ServiceMsg},
         ServiceAuth, WireMsg,
     },
     types::{PublicKey, Signature},
@@ -47,6 +47,11 @@ impl Client {
         let client_pk = self.public_key();
         let dst_name = cmd.dst_name();
 
+        // let cmd_id = cmd.data_cmd_id()?;
+        let cmd_id = cmd
+            .data_cmd_id()
+            .map_err(|_| Error::CouldNotSerializeDataCmd)?;
+
         let debug_cmd = format!("{:?}", cmd);
 
         let serialised_cmd = {
@@ -73,12 +78,16 @@ impl Client {
 
         let mut attempt = 1;
         loop {
-            debug!("Attempting {:?} (attempt #{})", debug_cmd, attempt);
+            debug!(
+                "Attempting send cmd {:?} (attempt #{}). CmdId: {:?}",
+                debug_cmd, attempt, cmd_id
+            );
 
             let res = self
                 .send_signed_cmd(
                     dst_name,
                     client_pk,
+                    cmd_id.clone(),
                     serialised_cmd.clone(),
                     signature.clone(),
                 )
@@ -113,6 +122,7 @@ impl Client {
         &self,
         dst_address: XorName,
         client_pk: PublicKey,
+        cmd_id: DataCmdId,
         serialised_cmd: Bytes,
         signature: Signature,
     ) -> Result<(), Error> {
@@ -125,6 +135,7 @@ impl Client {
             .send_cmd(
                 dst_address,
                 auth,
+                cmd_id,
                 serialised_cmd,
                 #[cfg(feature = "traceroute")]
                 self.public_key(),
