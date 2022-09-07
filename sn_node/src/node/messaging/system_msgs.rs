@@ -473,7 +473,6 @@ impl Node {
                         Err(StorageError::NotEnoughSpace) => {
                             // storage full
                             error!("Not enough space to store more data");
-
                             let node_id = PublicKey::from(self.keypair.public);
                             let msg = SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData {
                                 node_id,
@@ -535,28 +534,44 @@ impl Node {
                 correlation_id,
                 user,
             } => {
-                debug!(
-                    "{:?}: op_id {:?}, correlation_id: {correlation_id:?}, sender: {sender} origin msg_id: {:?}",
-                    LogMarker::ChunkQueryResponseReceviedFromAdult,
-                    response.operation_id().map(|s| s.to_string()).unwrap_or_else(|_| "None".to_string()),
-                    msg_id
-                );
-                let sending_nodes_pk = match msg_authority {
-                    NodeMsgAuthority::Node(auth) => PublicKey::from(auth.into_inner().node_ed_pk),
-                    _ => return Err(Error::InvalidQueryResponseAuthority),
+                let op_id = if let Ok(op_id) = response.operation_id() {
+                    op_id
+                } else {
+                    debug!(
+                        "{:?}: op_id None, correlation_id: {correlation_id:?}, sender: {sender} origin msg_id: {msg_id:?}",
+                        LogMarker::ChunkQueryResponseReceviedFromAdult,
+                    );
+                    warn!(
+                        "There is no operation id. Dropping chunk query response from Adult {sender}, for user: {}.",
+                        user.0
+                    );
+                    return Ok(vec![]);
                 };
-                Ok(self
-                    .handle_data_query_response_at_elder(
-                        correlation_id,
-                        response,
-                        user,
-                        sending_nodes_pk,
-                        #[cfg(feature = "traceroute")]
-                        traceroute,
-                    )
-                    .await
-                    .into_iter()
-                    .collect())
+
+                debug!(
+                    "{:?}: op_id {op_id:?}, correlation_id: {correlation_id:?}, sender: {sender} origin msg_id: {msg_id:?}",
+                    LogMarker::ChunkQueryResponseReceviedFromAdult,
+                );
+
+                match msg_authority {
+                    NodeMsgAuthority::Node(auth) => {
+                        let sending_nodes_pk = PublicKey::from(auth.into_inner().node_ed_pk);
+                        Ok(self
+                            .handle_data_query_response_at_elder(
+                                correlation_id,
+                                response,
+                                user,
+                                sending_nodes_pk,
+                                op_id,
+                                #[cfg(feature = "traceroute")]
+                                traceroute,
+                            )
+                            .await
+                            .into_iter()
+                            .collect())
+                    }
+                    _ => Err(Error::InvalidQueryResponseAuthority),
+                }
             }
             SystemMsg::DkgSessionUnknown {
                 session_id,
