@@ -33,7 +33,7 @@ statemap_cmd="statemap --sortby=Idle -b $begin_time -e $end_time -c 100000 $out_
 
 if [[ $* == *--run-statemap* ]]
 then
-    $(statemap_cmd)
+    $statemap_cmd
 else
     echo "Wrote statemap data to $out_file"
 
