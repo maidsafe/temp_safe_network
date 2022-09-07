@@ -250,19 +250,17 @@ impl QueryResponse {
     /// Returns true if the result returned is DataNotFound
     pub fn is_data_not_found(&self) -> bool {
         use QueryResponse::*;
-        match self {
-            GetChunk(result) => matches!(result, Err(Error::DataNotFound(_))),
-            GetRegister((result, _op_id)) => matches!(result, Err(Error::DataNotFound(_))),
-            GetRegisterEntry((result, _op_id)) => matches!(result, Err(Error::DataNotFound(_))),
-            GetRegisterOwner((result, _op_id)) => matches!(result, Err(Error::DataNotFound(_))),
-            ReadRegister((result, _op_id)) => matches!(result, Err(Error::DataNotFound(_))),
-            GetRegisterPolicy((result, _op_id)) => matches!(result, Err(Error::DataNotFound(_))),
-            GetRegisterUserPermissions((result, _op_id)) => {
-                matches!(result, Err(Error::DataNotFound(_)))
-            }
-            SpentProofShares((result, _op_id)) => matches!(result, Err(Error::DataNotFound(_))),
-            FailedToCreateOperationId => false,
-        }
+        matches!(
+            self,
+            GetChunk(Err(Error::DataNotFound(_)))
+                | GetRegister((Err(Error::DataNotFound(_)), _))
+                | GetRegisterEntry((Err(Error::DataNotFound(_)), _))
+                | GetRegisterOwner((Err(Error::DataNotFound(_)), _))
+                | ReadRegister((Err(Error::DataNotFound(_)), _))
+                | GetRegisterPolicy((Err(Error::DataNotFound(_)), _))
+                | GetRegisterUserPermissions((Err(Error::DataNotFound(_)), _))
+                | SpentProofShares((Err(Error::DataNotFound(_)), _))
+        )
     }
 
     /// Retrieves the operation identifier for this response, use in tracking node liveness

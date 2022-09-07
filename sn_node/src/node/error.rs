@@ -12,7 +12,7 @@ use crate::node::handover::Error as HandoverError;
 
 use sn_dbc::Error as DbcError;
 use sn_interface::{
-    messaging::data::Error as ErrorMsg,
+    messaging::data::{DataQuery, Error as ErrorMsg},
     types::{convert_dt_error_to_error_msg, DataAddress, Peer},
 };
 
@@ -169,6 +169,9 @@ pub enum Error {
     /// Error thrown by DBC public API
     #[error("DbcError: {0}")]
     DbcError(#[from] DbcError),
+    /// Cannot handle more queries at this point
+    #[error("Cannot handle more queries at this point: {0:?}")]
+    CannotHandleQuery(DataQuery),
 }
 
 impl From<qp2p::ClientEndpointError> for Error {

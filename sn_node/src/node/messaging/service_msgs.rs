@@ -21,7 +21,8 @@ use sn_interface::{
     data_copy_count,
     messaging::{
         data::{
-            DataCmd, DataQueryVariant, EditRegister, ServiceMsg, SignedRegisterEdit, SpentbookCmd,
+            CmdError, DataCmd, DataQueryVariant, EditRegister, ServiceMsg, SignedRegisterEdit,
+            SpentbookCmd,
         },
         system::{NodeQueryResponse, SystemMsg},
         AuthorityProof, EndUser, MsgId, ServiceAuth,
@@ -42,14 +43,33 @@ impl Node {
     pub(crate) fn send_cmd_ack(
         &self,
         target: Peer,
-        msg_id: MsgId,
+        correlation_id: MsgId,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Cmd {
-        let the_ack_msg = ServiceMsg::CmdAck {
-            correlation_id: msg_id,
-        };
+        let the_ack_msg = ServiceMsg::CmdAck { correlation_id };
         self.send_service_msg(
             the_ack_msg,
+            Peers::Single(target),
+            #[cfg(feature = "traceroute")]
+            traceroute,
+        )
+    }
+
+    /// Forms a `CmdError` msg to send back to the client
+    pub(crate) fn cmd_error_response(
+        &self,
+        error: Error,
+        target: Peer,
+        correlation_id: MsgId,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
+    ) -> Cmd {
+        let the_error_msg = ServiceMsg::CmdError {
+            error: CmdError::Data(error.into()),
+            correlation_id,
+        };
+
+        self.send_service_msg(
+            the_error_msg,
             Peers::Single(target),
             #[cfg(feature = "traceroute")]
             traceroute,
@@ -61,8 +81,11 @@ impl Node {
         &self,
         msg: ServiceMsg,
         recipients: Peers,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
+        #[cfg(feature = "traceroute")] mut traceroute: Traceroute,
     ) -> Cmd {
+        #[cfg(feature = "traceroute")]
+        traceroute.0.push(self.identity());
+
         Cmd::SendMsg {
             msg: OutgoingMsg::Service(msg),
             msg_id: MsgId::new(),
