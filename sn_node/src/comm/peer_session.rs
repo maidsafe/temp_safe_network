@@ -8,29 +8,33 @@
 
 use super::Link;
 
-use crate::{log_sleep, node::Result};
+#[cfg(feature = "back-pressure")]
+use crate::log_sleep;
+use crate::node::Result;
 
 use qp2p::RetryConfig;
 use qp2p::UsrMsgBytes;
 use sn_interface::messaging::MsgId;
 
 use custom_debug::Debug;
-use std::{
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
-use tokio::{sync::mpsc, time::Instant};
 
-// TODO: temporarily disable priority while we transition to channels
-// type Priority = i32;
+#[cfg(feature = "back-pressure")]
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
+#[cfg(feature = "back-pressure")]
+use std::time::Duration;
+use tokio::sync::mpsc;
+#[cfg(feature = "back-pressure")]
+use tokio::time::Instant;
 
 /// These retries are how may _new_ connection attempts do we make.
 /// If we fail all of these, HandlePeerFailedSend will be triggered
 /// for section nodes, which in turn kicks off a ConnectivityTest
 const MAX_SENDJOB_RETRIES: usize = 3;
+
+#[cfg(feature = "back-pressure")]
 const DEFAULT_DESIRED_RATE: f64 = 10.0; // 10 msgs / s
 
 #[derive(Debug)]
@@ -121,8 +125,11 @@ enum SessionStatus {
 struct PeerSessionWorker {
     queue: mpsc::Sender<SessionCmd>,
     link: Link,
+    #[cfg(feature = "back-pressure")]
     sent: MsgThroughput,
+    #[cfg(feature = "back-pressure")]
     attempted: MsgThroughput,
+    #[cfg(feature = "back-pressure")]
     peer_desired_rate: f64, // msgs per s
 }
 
@@ -131,8 +138,11 @@ impl PeerSessionWorker {
         Self {
             queue,
             link,
+            #[cfg(feature = "back-pressure")]
             sent: MsgThroughput::default(),
+            #[cfg(feature = "back-pressure")]
             attempted: MsgThroughput::default(),
+            #[cfg(feature = "back-pressure")]
             peer_desired_rate: DEFAULT_DESIRED_RATE,
         }
     }
@@ -192,12 +202,14 @@ impl PeerSessionWorker {
             return SessionStatus::Ok;
         }
 
+        #[cfg(feature = "back-pressure")]
         let actual_rate = self.attempted.value();
+        #[cfg(feature = "back-pressure")]
         if actual_rate > self.peer_desired_rate {
             let diff = actual_rate - self.peer_desired_rate;
             log_sleep!(Duration::from_millis((diff * 10_f64) as u64));
         }
-
+        #[cfg(feature = "back-pressure")]
         self.attempted.increment(); // both on fail and success
 
         let send_resp = self
@@ -208,6 +220,7 @@ impl PeerSessionWorker {
         match send_resp {
             Ok(_) => {
                 job.reporter.send(SendStatus::Sent);
+                #[cfg(feature = "back-pressure")]
                 self.sent.increment(); // on success
             }
             Err(err) if err.is_local_close() => {
@@ -234,11 +247,13 @@ impl PeerSessionWorker {
 }
 
 #[derive(Clone, Debug)]
+#[cfg(feature = "back-pressure")]
 struct MsgThroughput {
     msgs: Arc<AtomicUsize>,
     since: Instant,
 }
 
+#[cfg(feature = "back-pressure")]
 impl Default for MsgThroughput {
     fn default() -> Self {
         Self {
@@ -248,12 +263,15 @@ impl Default for MsgThroughput {
     }
 }
 
+#[cfg(feature = "back-pressure")]
 impl MsgThroughput {
+    #[cfg(feature = "back-pressure")]
     fn increment(&self) {
         let _ = self.msgs.fetch_add(1, Ordering::SeqCst);
     }
 
     // msgs / s
+    #[cfg(feature = "back-pressure")]
     fn value(&self) -> f64 {
         let msgs = self.msgs.load(Ordering::SeqCst);
         let seconds = (Instant::now() - self.since).as_secs();
