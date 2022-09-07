@@ -327,6 +327,7 @@ jobs:
         shell: bash
         continue-on-error: true
         run: |
+          unset RUST_FLAGS
           cargo install --git https://github.com/TritonDataCenter/statemap.git
           ./resources/scripts/statemap.sh --run-statemap > safe_statemap.svg
 
@@ -496,6 +497,7 @@ jobs:
         shell: bash
         continue-on-error: true
         run: |
+          unset RUST_FLAGS
           cargo install --git https://github.com/TritonDataCenter/statemap.git
           ./resources/scripts/statemap.sh --run-statemap > safe_statemap.svg
 
@@ -624,6 +626,7 @@ jobs:
         shell: bash
         continue-on-error: true
         run: |
+          unset RUST_FLAGS
           cargo install --git https://github.com/TritonDataCenter/statemap.git
           ./resources/scripts/statemap.sh --run-statemap > safe_statemap.svg
 
@@ -747,6 +750,7 @@ jobs:
         shell: bash
         continue-on-error: true
         run: |
+          unset RUST_FLAGS
           cargo install --git https://github.com/TritonDataCenter/statemap.git
           ./resources/scripts/statemap.sh --run-statemap > safe_statemap.svg
 
