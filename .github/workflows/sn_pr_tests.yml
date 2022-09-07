@@ -329,7 +329,7 @@ jobs:
         run: |
           unset RUSTFLAGS # Disable `-D warnings` since statemap is 3rd party
           cargo install --git https://github.com/TritonDataCenter/statemap.git
-          ./resources/scripts/statemap.sh --run-statemap > safe_statemap.svg
+          ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
 
       - name: Upload StateMap
         uses: actions/upload-artifact@main
@@ -499,7 +499,7 @@ jobs:
         run: |
           unset RUSTFLAGS # Disable `-D warnings` since statemap is 3rd party
           cargo install --git https://github.com/TritonDataCenter/statemap.git
-          ./resources/scripts/statemap.sh --run-statemap > safe_statemap.svg
+          ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
 
       - name: Upload StateMap
         uses: actions/upload-artifact@main
@@ -628,7 +628,7 @@ jobs:
         run: |
           unset RUSTFLAGS # Disable `-D warnings` since statemap is 3rd party
           cargo install --git https://github.com/TritonDataCenter/statemap.git
-          ./resources/scripts/statemap.sh --run-statemap > safe_statemap.svg
+          ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
 
       - name: Upload StateMap
         uses: actions/upload-artifact@main
@@ -752,7 +752,7 @@ jobs:
         run: |
           unset RUSTFLAGS # Disable `-D warnings` since statemap is 3rd party
           cargo install --git https://github.com/TritonDataCenter/statemap.git
-          ./resources/scripts/statemap.sh --run-statemap > safe_statemap.svg
+          ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
 
       - name: Upload StateMap
         uses: actions/upload-artifact@main
