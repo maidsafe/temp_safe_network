@@ -48,6 +48,7 @@ pub use self::{
     authority::{
         AuthorityProof, BlsShareAuth, NodeAuth, SectionAuth, ServiceAuth, VerifyAuthority,
     },
+    data::DataCmdId,
     dst::Dst,
     errors::{Error, Result},
     msg_id::{MsgId, MESSAGE_ID_LEN},

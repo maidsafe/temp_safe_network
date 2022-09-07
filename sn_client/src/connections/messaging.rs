@@ -12,7 +12,10 @@ use crate::{Error, Result};
 
 #[cfg(feature = "traceroute")]
 use sn_interface::{
-    messaging::{data::CmdError, Entity, Traceroute},
+    messaging::{
+        data::{CmdError, DataCmdId},
+        Entity, Traceroute,
+    },
     types::PublicKey,
 };
 
@@ -30,7 +33,7 @@ use bytes::Bytes;
 use futures::future::join_all;
 use qp2p::{Close, ConnectionError, SendError};
 use rand::{rngs::OsRng, seq::SliceRandom};
-use std::time::Duration;
+use std::{collections::BTreeSet, time::Duration};
 use tokio::{sync::mpsc::channel, task::JoinHandle};
 use tracing::{debug, error, trace, warn};
 use xor_name::XorName;
@@ -57,6 +60,7 @@ impl Session {
         &self,
         dst_address: XorName,
         auth: ServiceAuth,
+        cmd_id: DataCmdId,
         payload: Bytes,
         #[cfg(feature = "traceroute")] client_pk: PublicKey,
     ) -> Result<()> {
@@ -88,7 +92,7 @@ impl Session {
         wire_msg.append_trace(&mut Traceroute(vec![Entity::Client(client_pk)]));
 
         // The insertion of channel will be executed AFTER the completion of the `send_message`.
-        self.send_msg(elders, wire_msg, msg_id).await?;
+        self.send_msg(elders.clone(), wire_msg, msg_id).await?;
         trace!("Cmd msg {:?} sent", msg_id);
 
         let expected_acks = elders_len;
@@ -100,9 +104,10 @@ impl Session {
         let mut ack_checks = 0;
         let max_ack_checks = 100;
         let interval = Duration::from_millis(50);
+        let mut received_responses_from = BTreeSet::default();
 
         loop {
-            if let Some(acks_we_have) = self.pending_cmds.get(&msg_id) {
+            if let Some(acks_we_have) = self.pending_cmds.get(&cmd_id) {
                 let acks = acks_we_have.value();
 
                 let received_response_count = acks.len();
@@ -113,15 +118,18 @@ impl Session {
                 // track received errors
                 for refmulti in acks.iter() {
                     let (ack_src, error) = refmulti.key();
+
+                    let _preexisting = received_responses_from.insert(*ack_src);
+
                     if return_error.is_none() {
                         return_error = error.clone();
                     }
 
+                    debug!(
+                        "received error response {:?} of cmd {:?} from {:?}, so far {} respones and {} of them are errors",
+                        error, msg_id, ack_src, received_response_count, error_count
+                    );
                     if error.is_some() {
-                        error!(
-                            "received error response {:?} of cmd {:?} from {:?}, so far {} respones and {} of them are errors",
-                            error, msg_id, ack_src, received_response_count, error_count
-                        );
                         error_count += 1;
                     }
                 }
@@ -129,13 +137,17 @@ impl Session {
                 // first exit if too many errors:
                 if error_count >= expected_acks {
                     error!(
-                        "Received majority of error response for cmd {:?}: {:?}",
-                        msg_id, return_error
+                        "Received majority of error response for cmd {:?} : {:?}: {:?}",
+                        cmd_id, msg_id, return_error
                     );
                     // attempt to cleanup... though more acks may come in..
-                    let _ = self.pending_cmds.remove(&msg_id);
+                    let _ = self.pending_cmds.remove(&cmd_id);
 
-                    if let Some(CmdError::Data(source)) = return_error {
+                    if let Some(CmdError::Data {
+                        error: source,
+                        data_cmd_id: _,
+                    }) = return_error
+                    {
                         return Err(Error::ErrorCmd { source, msg_id });
                     }
                 }
@@ -146,16 +158,28 @@ impl Session {
                     break;
                 }
 
-                debug!("insufficient acks returned so far: {actual_ack_count}/{expected_acks}");
+                debug!("insufficient acks returned so far for {cmd_id:?}: {actual_ack_count}/{expected_acks}");
             }
 
             if ack_checks >= max_ack_checks {
+                let missing_responses: Vec<Peer> = elders
+                    .iter()
+                    .cloned()
+                    .filter(|p| !received_responses_from.contains(&p.addr()))
+                    .collect();
+
+                warn!("Missing Responses from: {:?}", missing_responses);
                 return Err(Error::InsufficientAcksReceived);
             }
 
             ack_checks += 1;
 
-            trace!("{:?} current ack waiting loop count {}", msg_id, ack_checks,);
+            trace!(
+                "{:?} current ack waiting loop count {}: {:?}",
+                cmd_id,
+                ack_checks,
+                msg_id
+            );
             tokio::time::sleep(interval).await;
         }
 

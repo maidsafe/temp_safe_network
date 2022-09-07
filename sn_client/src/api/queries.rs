@@ -69,6 +69,8 @@ impl Client {
         let _ = span.enter();
         let mut attempts = 1;
         let dst = query.variant.dst_name();
+        let mut data_not_found_count = BTreeSet::default();
+
         loop {
             let msg = ServiceMsg::Query(query.clone());
             let serialised_query = WireMsg::serialize_msg_payload(&msg)?;

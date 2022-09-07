@@ -147,6 +147,7 @@ impl Node {
                         warn!("Pending queries length exceeded, dropping query {msg:?}");
                         let cmd = self.cmd_error_response(
                             Error::CannotHandleQuery(query.clone()),
+                            None,
                             origin,
                             msg_id,
                             #[cfg(feature = "traceroute")]

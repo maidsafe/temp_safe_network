@@ -21,7 +21,7 @@ use sn_interface::{
     data_copy_count,
     messaging::{
         data::{
-            CmdError, DataCmd, DataQueryVariant, EditRegister, OperationId, ServiceMsg,
+            CmdError, DataCmd, DataCmdId, DataQueryVariant, EditRegister, OperationId, ServiceMsg,
             SignedRegisterEdit, SpentbookCmd,
         },
         system::{NodeQueryResponse, SystemMsg},
@@ -43,10 +43,10 @@ impl Node {
     pub(crate) fn send_cmd_ack(
         &self,
         target: Peer,
-        correlation_id: MsgId,
+        data_cmd_id: DataCmdId,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Cmd {
-        let the_ack_msg = ServiceMsg::CmdAck { correlation_id };
+        let the_ack_msg = ServiceMsg::CmdAck { data_cmd_id };
         self.send_service_msg(
             the_ack_msg,
             Peers::Single(target),
@@ -59,13 +59,17 @@ impl Node {
     pub(crate) fn cmd_error_response(
         &self,
         error: Error,
+        data_cmd_id: Option<DataCmdId>,
         target: Peer,
-        correlation_id: MsgId,
+        msg_id: MsgId,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Cmd {
-        let the_error_msg = ServiceMsg::CmdError {
-            error: CmdError::Data(error.into()),
-            correlation_id,
+        let the_error_msg = ServiceMsg::Error {
+            error: CmdError::Data {
+                error: error.into(),
+                data_cmd_id,
+            },
+            msg_id,
         };
 
         self.send_service_msg(
@@ -205,6 +209,11 @@ impl Node {
 
         trace!("{:?} {:?}", LogMarker::ServiceMsgToBeHandled, msg);
 
+        let data_cmd_id = match &msg {
+            ServiceMsg::Cmd(cmd) => Some(cmd.data_cmd_id()?),
+            _ => None,
+        };
+
         // extract the data from the request
         let data = match msg {
             // These reads/writes are for adult nodes...
@@ -269,13 +278,15 @@ impl Node {
             traceroute.clone(),
         ));
 
-        // the ack sent to client
-        cmds.push(self.send_cmd_ack(
-            origin,
-            msg_id,
-            #[cfg(feature = "traceroute")]
-            traceroute,
-        ));
+        if let Some(data_cmd_id) = data_cmd_id {
+            // the ack sent to client
+            cmds.push(self.send_cmd_ack(
+                origin,
+                data_cmd_id,
+                #[cfg(feature = "traceroute")]
+                traceroute,
+            ));
+        }
 
         Ok(cmds)
     }

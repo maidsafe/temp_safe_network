@@ -56,4 +56,7 @@ pub enum Error {
     /// Failed to verify a spent proof since it's signed by unknown section key
     #[error("Spent proof was signed with unknown section key: {0:?}")]
     SpentProofUnknownSectionKey(bls::PublicKey),
+    /// DataCmd could not be serialised
+    #[error("DataCmd could not be serialised")]
+    DataCmdSerialisation,
 }
