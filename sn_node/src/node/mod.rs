@@ -592,11 +592,6 @@ mod core {
 
                     cmds.extend(self.promote_and_demote_elders_except(&BTreeSet::new())?);
 
-                    // NB TODO make sure this in only called once (after handover)
-                    // and that it cannot interfere with the handover voting process as it resets the handover state completely
-                    // NB TODO we should keep a copy of old handover states (since they contain valuable information like who is faulty)
-                    self.initialize_handover()?;
-
                     // Whenever there is an elders change, casting a round of joins_allowed
                     // proposals to sync this particular state.
                     cmds.extend(self.propose(Proposal::JoinsAllowed(self.joins_allowed))?);
