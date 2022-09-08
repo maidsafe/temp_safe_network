@@ -52,7 +52,7 @@ async fn main() -> Result<()> {
         .unwrap_or_else(|_| println!("Error initializing logger"));
 
     // First lets build the network and testnet launcher, to ensure we're on the latest version
-    let args: Vec<&str> = vec!["build", "--release"];
+    let args: Vec<&str> = vec!["build", "--release", "--features", "statemap"];
 
     println!("Building current sn_node");
     let _child = Command::new("cargo")
