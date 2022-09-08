@@ -69,3 +69,6 @@ fake_node_data.json
 cargo-flamegraph.stacks
 *flame.svg
 *flamegraph.svg
+
+#statemap
+safe.svg
