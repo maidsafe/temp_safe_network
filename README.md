@@ -34,6 +34,27 @@ Once you have your network running you can simply run `cargo test --release`. Th
 
 In general it can be useful to scope your test running, eg `cargo test --release client` will run _only_ the client tests. Or perhaps you want to ignore `proptests` as they can be quite long: `cargo test --release client --skip proptest`
 
+## Development Tools
+
+### Statemaps
+
+It's possible to generate [statemaps](https://github.com/TritonDataCenter/statemap) to get a wider view of what's going on in a network.
+
+Steps:
+
+0. Install `statemap`
+
+```
+cargo install --git https://github.com/TritonDataCenter/statemap.git
+```
+
+1. [Start a testnet](#running-a-local-testnet), make sure to have the `statemap` feature enabled.
+
+2. Run `./resources/scripts/statemap-preprocess.sh` to extract statemap states from the node logs.
+
+3. After the script completes, it will output a `statemap` command, execute the command to generate the statemap SVG.
+
+4. Open the SVG in a browser
 
 
 ## Releases
