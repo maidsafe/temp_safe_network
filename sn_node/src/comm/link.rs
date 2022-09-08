@@ -120,13 +120,13 @@ impl Link {
         priority: i32,
         retry_config: Option<&RetryConfig>,
     ) -> Result<(), SendToOneError> {
-        let conn = self.get_or_connect().await?;
         trace!(
-            "We have {} open connections to node {:?}.",
+            "We have {} open connections to peer {:?}.",
             self.queue.len(),
             self.peer
         );
-        match conn.send_with(bytes, priority, retry_config).await {
+        let conn = self.get_or_connect().await?;
+        let res = match conn.send_with(bytes, priority, retry_config).await {
             Ok(()) => {
                 #[cfg(feature = "back-pressure")]
                 self.listener.count_msg().await;
@@ -145,7 +145,10 @@ impl Link {
                 conn.close(Some(format!("{:?}", error)));
                 Err(SendToOneError::Send(error))
             }
-        }
+        };
+
+        trace!("We have sent on qp2pppppppp");
+        res
     }
 
     async fn get_or_connect(&mut self) -> Result<qp2p::Connection, SendToOneError> {
