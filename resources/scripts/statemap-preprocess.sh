@@ -29,7 +29,7 @@ rg -IN ".*STATEMAP_ENTRY: " "$log_dir" --replace "" | jq -s 'sort_by(.time|tonum
 
 begin_time=$(cat safe_states.out | rg 'time' | jq -sr 'min_by(.time | tonumber) | .time')
 end_time=$(cat safe_states.out | rg 'time' | jq -sr 'max_by(.time | tonumber) | .time')
-statemap_cmd="statemap --sortby=Idle -b $begin_time -e $end_time -c 100000 $out_file"
+statemap_cmd="statemap --sortby=Idle -b $begin_time -e $end_time -c 300000 $out_file"
 
 if [[ $* == *--run-statemap* ]]
 then
