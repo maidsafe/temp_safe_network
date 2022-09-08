@@ -38,9 +38,11 @@ In general it can be useful to scope your test running, eg `cargo test --release
 
 ### Statemaps
 
-It's possible to generate [statemaps](https://github.com/TritonDataCenter/statemap) to get a wider view of what's going on in a network.
+> Note: Statemaps are automatically generated for CI integration tests
 
-Steps:
+[Statemaps](https://github.com/TritonDataCenter/statemap) can be useful to get a wider view of what's going on in a network. 
+
+Steps to generate:
 
 0. Install `statemap`
 
