@@ -367,7 +367,12 @@ impl FlowCtrl {
         info!("Firing off backpressure reports");
         let node = the_node.read().await;
         let our_info = node.info();
-        let mut members = node.network_knowledge().members();
+        let mut members = BTreeSet::from_iter(
+            node.network_knowledge()
+                .section_members()
+                .into_values()
+                .map(|n| *n.peer()),
+        );
         let _ = members.remove(&our_info.peer());
 
         drop(node);
