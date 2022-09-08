@@ -155,6 +155,41 @@ impl SectionsDAG {
         Ok(dag)
     }
 
+    /// Get a partial `SectionsDAG` with a single branch which contains the given `key`,
+    /// from the genesis to the last key of any of its children branches.
+    /// It also returns the last key of the (single) branch the returned DAG contains.
+    /// Returns `Error::KeyNotFound` if the `key` key is not present in the DAG;
+    pub fn single_branch_dag_for_key(
+        &self,
+        key: &bls::PublicKey,
+    ) -> Result<(Self, bls::PublicKey)> {
+        let mut last_key = if &self.genesis_key == key {
+            match self.dag_root.iter().next() {
+                Some(child_key) => *child_key,
+                None => return Ok((Self::new(*key), *key)),
+            }
+        } else {
+            *key
+        };
+
+        let mut partial_dag = self.partial_dag(&self.genesis_key, &last_key)?;
+        while let Some(child_node) = self
+            .get_hash(&last_key)
+            .map(|hash| self.child_nodes(hash))?
+            // TODO: allow to select which branch ??
+            .get(0)
+        {
+            partial_dag.insert(
+                &last_key,
+                child_node.value.key,
+                child_node.value.sig.clone(),
+            )?;
+            last_key = child_node.value.key;
+        }
+
+        Ok((partial_dag, last_key))
+    }
+
     /// Update our current `SectionsDAG` with the keys from another `SectionsDAG`
     /// Returns `Error::InvalidSignature` if the provided DAG fails signature verification
     /// Returns `Error::KeyNotFound` if the genesis_key of either of the DAGs is not present in the
@@ -356,9 +391,9 @@ impl SectionsDAG {
 
 #[cfg(test)]
 mod tests {
-    use super::{SectionInfo, SectionsDAG};
+    use super::{Error, SectionInfo, SectionsDAG};
     use crdts::CmRDT;
-    use eyre::{eyre, Result};
+    use eyre::{bail, eyre, Result};
     use proptest::prelude::{any, proptest, ProptestConfig, Strategy};
     use rand::rngs::SmallRng;
     use rand::{distributions::Standard, Rng, SeedableRng};
@@ -420,6 +455,169 @@ mod tests {
         assert!(dag.partial_dag(&info_a2.key, &pk_gen).is_err());
         assert!(dag.partial_dag(&info_a1.key, &info_b.key).is_err());
         assert!(dag.self_verify());
+        Ok(())
+    }
+
+    #[test]
+    fn get_chain_from_genesis_to_last() -> Result<()> {
+        // We use a DAG with three branches, a, b and c:
+        //  gen -> pk_a1 -> pk_a2
+        //     |
+        //     +-> pk_b1 -> pk_b2 -> pk_b3
+        //                       |
+        //                       +-> pk_c
+        //
+        let (sk_gen, pk_gen) = gen_keypair(None);
+        let (sk_a1, info_a1) = gen_signed_keypair(None, &sk_gen);
+        let (_, info_a2) = gen_signed_keypair(None, &sk_a1);
+        let (sk_b1, info_b1) = gen_signed_keypair(None, &sk_gen);
+        let (sk_b2, info_b2) = gen_signed_keypair(None, &sk_b1);
+        let (_, info_b3) = gen_signed_keypair(None, &sk_b2);
+        let (_, info_c) = gen_signed_keypair(None, &sk_b2);
+
+        // create DAG with genesis key
+        let mut dag = SectionsDAG::new(pk_gen);
+
+        // branch from genesis now is a partial DAG with just [genesis key]
+        let (partial_gen, last_key_gen) = dag.single_branch_dag_for_key(&pk_gen)?;
+        assert!(partial_gen.self_verify());
+        assert_eq!(last_key_gen, pk_gen);
+        assert_lists(partial_gen.keys(), &vec![pk_gen])?;
+
+        // let's insert only a1 into the DAG for now
+        dag.insert(&pk_gen, info_a1.key, info_a1.sig)?;
+
+        // branch from genesis or a1 is a partial DAG with [genesis key, a1]
+        let (partial_gen, last_key_gen) = dag.single_branch_dag_for_key(&pk_gen)?;
+        let (partial_a1, last_key_a1) = dag.single_branch_dag_for_key(&info_a1.key)?;
+        assert!(partial_gen.self_verify());
+        assert!(partial_a1.self_verify());
+        assert_eq!(last_key_gen, info_a1.key);
+        assert_eq!(last_key_a1, info_a1.key);
+        assert_lists(partial_gen.keys(), &vec![pk_gen, info_a1.key])?;
+        assert_lists(partial_a1.keys(), partial_gen.keys())?;
+
+        // let's now insert a2 into the DAG
+        dag.insert(&info_a1.key, info_a2.key, info_a2.sig)?;
+
+        // branch from genesis, a1 or a2 is a partial DAG with [genesis key, a1, a2]
+        let (partial_gen, last_key_gen) = dag.single_branch_dag_for_key(&pk_gen)?;
+        let (partial_a1, last_key_a1) = dag.single_branch_dag_for_key(&info_a1.key)?;
+        let (partial_a2, last_key_a2) = dag.single_branch_dag_for_key(&info_a2.key)?;
+        assert!(partial_gen.self_verify());
+        assert!(partial_a1.self_verify());
+        assert!(partial_a2.self_verify());
+        assert_eq!(last_key_gen, info_a2.key);
+        assert_eq!(last_key_a1, info_a2.key);
+        assert_eq!(last_key_a2, info_a2.key);
+        assert_lists(partial_gen.keys(), &vec![pk_gen, info_a1.key, info_a2.key])?;
+        assert_lists(partial_a1.keys(), partial_gen.keys())?;
+        assert_lists(partial_a2.keys(), partial_gen.keys())?;
+
+        // let's now insert the other two branches (b and c) into the DAG
+        dag.insert(&pk_gen, info_b1.key, info_b1.sig)?;
+        dag.insert(&info_b1.key, info_b2.key, info_b2.sig)?;
+        dag.insert(&info_b2.key, info_b3.key, info_b3.sig)?;
+        dag.insert(&info_b2.key, info_c.key, info_c.sig)?;
+        assert!(dag.self_verify());
+        assert_lists(
+            dag.keys(),
+            &vec![
+                pk_gen,
+                info_a1.key,
+                info_a2.key,
+                info_b1.key,
+                info_b2.key,
+                info_b3.key,
+                info_c.key,
+            ],
+        )?;
+
+        let (partial_gen, last_key_gen) = dag.single_branch_dag_for_key(&pk_gen)?;
+        let (partial_a1, last_key_a1) = dag.single_branch_dag_for_key(&info_a1.key)?;
+        let (partial_a2, last_key_a2) = dag.single_branch_dag_for_key(&info_a2.key)?;
+        let (partial_b1, last_key_b1) = dag.single_branch_dag_for_key(&info_b1.key)?;
+        let (partial_b2, last_key_b2) = dag.single_branch_dag_for_key(&info_b2.key)?;
+        let (partial_b3, last_key_b3) = dag.single_branch_dag_for_key(&info_b3.key)?;
+        let (partial_c, last_key_c) = dag.single_branch_dag_for_key(&info_c.key)?;
+        assert!(partial_gen.self_verify());
+        assert!(partial_a1.self_verify());
+        assert!(partial_a2.self_verify());
+        assert!(partial_b1.self_verify());
+        assert!(partial_b2.self_verify());
+        assert!(partial_b3.self_verify());
+        assert!(partial_c.self_verify());
+
+        // branch from a1 or a2 has a2 as the last key
+        assert_eq!(last_key_a1, info_a2.key);
+        assert_eq!(last_key_a2, info_a2.key);
+
+        // branch from b1 or b2 has either b3 or c as the last key
+        assert!((last_key_b1 == info_b3.key) ^ (last_key_b1 == info_c.key));
+        assert!((last_key_b2 == info_b3.key) ^ (last_key_b2 == info_c.key));
+
+        // branch from b3 has b3 as the last key
+        assert_eq!(last_key_b3, info_b3.key);
+
+        // branch from c has c as the last key
+        assert_eq!(last_key_c, info_c.key);
+
+        // branch from genesis has either a2, b3 or c as the last key
+        assert!(
+            (last_key_gen == info_a2.key)
+                ^ (last_key_gen == info_b3.key)
+                ^ (last_key_gen == info_c.key)
+        );
+
+        // branch from a1 or a2 is a partial DAG with [genesis key, a1, a2]
+        assert_lists(partial_a1.keys(), &vec![pk_gen, info_a1.key, info_a2.key])?;
+        assert_lists(partial_a1.keys(), partial_a2.keys())?;
+
+        // branch from b3 is a partial DAG with [genesis key, b1, b2, b3]
+        assert_lists(
+            partial_b3.keys(),
+            &vec![pk_gen, info_b1.key, info_b2.key, info_b3.key],
+        )?;
+
+        // branch from c is a partial DAG with [genesis key, b1, b2, c]
+        assert_lists(
+            partial_c.keys(),
+            &vec![pk_gen, info_b1.key, info_b2.key, info_c.key],
+        )?;
+
+        // branch from b1 is a partial DAG with either:
+        // - [genesis key, b1, b2, b3]
+        // - or [genesis key, b1, b2, c]
+        assert!(
+            assert_lists(partial_b1.keys(), partial_b3.keys()).is_ok()
+                ^ assert_lists(partial_b1.keys(), partial_c.keys()).is_ok()
+        );
+
+        // branch from b2 is a partial DAG with either:
+        // - [genesis key, b1, b2, b3]
+        // - or [genesis key, b1, b2, c]
+        assert!(
+            assert_lists(partial_b2.keys(), partial_b3.keys()).is_ok()
+                ^ assert_lists(partial_b2.keys(), partial_c.keys()).is_ok()
+        );
+
+        // branch from genesis key is a partial DAG with either:
+        // - [genesis key, a1, a2]
+        // - or [genesis key, b1, b2, b3]
+        // - or [genesis key, b1, b2, c]
+        assert!(
+            assert_lists(partial_gen.keys(), partial_a2.keys()).is_ok()
+                ^ assert_lists(partial_gen.keys(), partial_b3.keys()).is_ok()
+                ^ assert_lists(partial_gen.keys(), partial_c.keys()).is_ok()
+        );
+
+        // trying to get branch from a random/non-existing key returns `KeyNotFound` error
+        let (_, random_pk) = gen_keypair(None);
+        matches!(
+            dag.single_branch_dag_for_key(&random_pk).err(),
+            Some(Error::KeyNotFound(key)) if key == random_pk
+        );
+
         Ok(())
     }
 
@@ -748,11 +946,20 @@ mod tests {
     {
         let vec1: Vec<_> = a.into_iter().collect();
         let mut vec2: Vec<_> = b.into_iter().collect();
-        assert_eq!(vec1.len(), vec2.len());
+        if vec1.len() != vec2.len() {
+            bail!(
+                "Lists lengths don't match: {} vs. {}",
+                vec1.len(),
+                vec2.len()
+            );
+        }
         for item1 in &vec1 {
             let idx2 = vec2.iter().position(|item2| *item2 == *item1);
             vec2.remove(idx2.ok_or_else(|| {
-                eyre!("An item that was expected to be in list two was not found")
+                eyre!(
+                    "An item that was expected to be in list two was not found: {:?}",
+                    item1
+                )
             })?);
         }
         assert_eq!(vec2.len(), 0);
