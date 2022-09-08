@@ -13,7 +13,6 @@ use crdts::{
     merkle_reg::{Hash, MerkleReg, Node, Sha3Hash},
     CmRDT,
 };
-use itertools::Itertools;
 use serde::{
     de::Error as DeserializationError,
     ser::{Error as SerializationError, SerializeMap},
@@ -114,7 +113,27 @@ impl<'de> Deserialize<'de> for SectionsDAG {
 
 impl Debug for SectionsDAG {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{:?}", self.keys().format(", "))
+        let keys: Vec<_> = self.keys().cloned().collect();
+        let mut parent_indices: Vec<usize> = Vec::new();
+        for key in keys.iter() {
+            match self.get_parent_key(key).map_err(|_| fmt::Error)? {
+                None => parent_indices.push(usize::MAX),
+                Some(parent_key) => {
+                    let idx = keys
+                        .iter()
+                        .position(|key| *key == parent_key)
+                        .ok_or(fmt::Error)?;
+                    parent_indices.push(idx)
+                }
+            }
+        }
+        write!(
+            formatter,
+            "{:?}",
+            keys.into_iter()
+                .zip(parent_indices.into_iter())
+                .collect::<Vec<_>>()
+        )
     }
 }
 
