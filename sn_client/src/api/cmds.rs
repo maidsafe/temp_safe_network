@@ -78,7 +78,10 @@ impl Client {
 
         let mut attempt = 1;
         loop {
-            debug!("Attempting send cmd {:?} (attempt #{}). CmdId: {:?}", debug_cmd, attempt, cmd_id);
+            debug!(
+                "Attempting send cmd {:?} (attempt #{}). CmdId: {:?}",
+                debug_cmd, attempt, cmd_id
+            );
 
             let res = self
                 .send_signed_cmd(

@@ -280,7 +280,9 @@ impl Session {
                         warn!("Ignoring query response without operation id");
                     }
                 }
-                ServiceMsg::Error { error, msg_id: _, .. } => {
+                ServiceMsg::Error {
+                    error, msg_id: _, ..
+                } => {
                     let (_error, data_cmd_id) = match error.clone() {
                         CmdError::Data { error, data_cmd_id } => (error, data_cmd_id),
                     };

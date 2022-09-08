@@ -22,8 +22,7 @@ use sn_interface::{
     messaging::{
         data::{
             CmdError, DataCmd, DataCmdId, DataQueryVariant, EditRegister, OperationId, ServiceMsg,
-            SignedRegisterEdit,
-            SpentbookCmd,
+            SignedRegisterEdit, SpentbookCmd,
         },
         system::{NodeQueryResponse, SystemMsg},
         AuthorityProof, EndUser, MsgId, ServiceAuth,
@@ -60,13 +59,17 @@ impl Node {
     pub(crate) fn cmd_error_response(
         &self,
         error: Error,
+        data_cmd_id: Option<DataCmdId>,
         target: Peer,
-        correlation_id: MsgId,
+        msg_id: MsgId,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Cmd {
-        let the_error_msg = ServiceMsg::CmdError {
-            error: CmdError::Data(error.into()),
-            correlation_id,
+        let the_error_msg = ServiceMsg::Error {
+            error: CmdError::Data {
+                error: error.into(),
+                data_cmd_id,
+            },
+            msg_id,
         };
 
         self.send_service_msg(

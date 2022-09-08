@@ -33,7 +33,7 @@ use bytes::Bytes;
 use futures::future::join_all;
 use qp2p::{Close, ConnectionError, SendError};
 use rand::{rngs::OsRng, seq::SliceRandom};
-use std::{time::Duration, collections::BTreeSet};
+use std::{collections::BTreeSet, time::Duration};
 use tokio::{sync::mpsc::channel, task::JoinHandle};
 use tracing::{debug, error, trace, warn};
 use xor_name::XorName;
@@ -119,7 +119,7 @@ impl Session {
                 for refmulti in acks.iter() {
                     let (ack_src, error) = refmulti.key();
 
-                    let _preexisting = received_responses_from.insert(ack_src.clone());
+                    let _preexisting = received_responses_from.insert(*ack_src);
 
                     if return_error.is_none() {
                         return_error = error.clone();
@@ -138,8 +138,7 @@ impl Session {
                 if error_count >= expected_acks {
                     error!(
                         "Received majority of error response for cmd {:?} : {:?}: {:?}",
-                        cmd_id,
-                        msg_id, return_error
+                        cmd_id, msg_id, return_error
                     );
                     // attempt to cleanup... though more acks may come in..
                     let _ = self.pending_cmds.remove(&cmd_id);
@@ -163,7 +162,11 @@ impl Session {
             }
 
             if ack_checks >= max_ack_checks {
-                let missing_responses: Vec<Peer> = elders.iter().cloned().filter(|p| !received_responses_from.contains(&p.addr())).collect();
+                let missing_responses: Vec<Peer> = elders
+                    .iter()
+                    .cloned()
+                    .filter(|p| !received_responses_from.contains(&p.addr()))
+                    .collect();
 
                 warn!("Missing Responses from: {:?}", missing_responses);
                 return Err(Error::InsufficientAcksReceived);
@@ -171,7 +174,12 @@ impl Session {
 
             ack_checks += 1;
 
-            trace!("{:?} current ack waiting loop count {}: {:?}", cmd_id, ack_checks,msg_id);
+            trace!(
+                "{:?} current ack waiting loop count {}: {:?}",
+                cmd_id,
+                ack_checks,
+                msg_id
+            );
             tokio::time::sleep(interval).await;
         }
 

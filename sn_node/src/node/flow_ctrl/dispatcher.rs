@@ -13,7 +13,7 @@ use crate::node::{
     Cmd, Error, Node, Result,
 };
 
-use sn_interface::messaging::DataCmdId;
+use sn_interface::messaging::data::ServiceMsg;
 #[cfg(feature = "traceroute")]
 use sn_interface::{messaging::Entity, messaging::Traceroute};
 use sn_interface::{
