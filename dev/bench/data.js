@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1662580283562,
+  "lastUpdate": 1662627860826,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -23045,6 +23045,150 @@ window.BENCHMARK_DATA = {
             "name": "generating keys",
             "value": 4569099,
             "range": "± 102857",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "joshuef@gmail.com",
+            "name": "Josh Wilson",
+            "username": "joshuef"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "829f9fbfefc001e73d1aa6a00c4c6ac5de4c87d3",
+          "message": "fix: add missing back-pressure feature gate to code",
+          "timestamp": "2022-09-08T10:00:36+02:00",
+          "tree_id": "e197425b1a9f499275b4e25a64086ae7ade5c00b",
+          "url": "https://github.com/maidsafe/safe_network/commit/829f9fbfefc001e73d1aa6a00c4c6ac5de4c87d3"
+        },
+        "date": 1662627857971,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 6056772,
+            "range": "± 1190551",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 1924320951,
+            "range": "± 137979905",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 2007999254,
+            "range": "± 4055325476",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 2115083443,
+            "range": "± 42335078",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 466229377,
+            "range": "± 308321823",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 490663669,
+            "range": "± 1241056445",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 703330576,
+            "range": "± 2692989331",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 56290604,
+            "range": "± 7411235",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 1584926994,
+            "range": "± 252194621",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 6522240396,
+            "range": "± 443855193",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 140422335,
+            "range": "± 49706232",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1355563387,
+            "range": "± 180155657",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 5315086480,
+            "range": "± 453450672",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 60668697,
+            "range": "± 2826797",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 595429051,
+            "range": "± 125105166",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 2297770429,
+            "range": "± 208602536",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 14249223,
+            "range": "± 1196436",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 122053900,
+            "range": "± 6521251",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 448777651,
+            "range": "± 44067264",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "generating keys",
+            "value": 6169875,
+            "range": "± 268298",
             "unit": "ns/iter"
           }
         ]
