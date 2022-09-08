@@ -53,10 +53,10 @@ impl FlowCtrl {
         let mut cmds = vec![];
 
         // happens regardless of if elder or adult
-        if last_link_cleanup.elapsed() > LINK_CLEANUP_INTERVAL {
-            *last_link_cleanup = now;
-            cmds.push(Cmd::CleanupPeerLinks);
-        }
+        // if last_link_cleanup.elapsed() > LINK_CLEANUP_INTERVAL {
+        //     *last_link_cleanup = now;
+        //     cmds.push(Cmd::CleanupPeerLinks);
+        // }
 
         #[cfg(feature = "back-pressure")]
         if last_backpressure_check.elapsed() > BACKPRESSURE_INTERVAL {
