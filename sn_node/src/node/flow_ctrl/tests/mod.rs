@@ -260,6 +260,8 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
 
 #[tokio::test]
 async fn handle_agreement_on_online() -> Result<()> {
+    init_logger();
+
     let (event_sender, mut event_receiver) =
         event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE);
     let local = tokio::task::LocalSet::new();
@@ -288,7 +290,7 @@ async fn handle_agreement_on_online() -> Result<()> {
                     assert_eq!(age, MIN_ADULT_AGE);
             });
 
-            Result::<()>::Ok(())
+            Ok(())
         })
         .await
 }

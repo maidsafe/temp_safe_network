@@ -21,6 +21,7 @@ use sn_interface::{
 };
 use std::collections::BTreeSet;
 
+#[derive(Debug)]
 pub(crate) struct HandleOnlineStatus {
     pub(crate) node_approval_sent: bool,
     pub(crate) relocate_details: Option<RelocateDetails>,

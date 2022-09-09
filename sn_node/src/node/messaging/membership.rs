@@ -101,8 +101,8 @@ impl Node {
             .network_knowledge
             .handle_membership_decision(decision.clone())?;
 
-        for (new_info, signature) in joining_nodes.iter().cloned() {
-            cmds.extend(self.handle_node_joined(new_info, signature).await);
+        for (new_info, _signature) in joining_nodes.iter().cloned() {
+            self.handle_node_joined(new_info).await;
         }
 
         for (new_info, signature) in leaving_nodes.iter().cloned() {
@@ -148,35 +148,18 @@ impl Node {
         Ok(cmds)
     }
 
-    async fn handle_node_joined(&mut self, new_info: NodeState, signature: Signature) -> Vec<Cmd> {
-        let sig = KeyedSig {
-            public_key: self.network_knowledge.section_key(),
-            signature,
-        };
+    async fn handle_node_joined(&mut self, node: NodeState) {
+        self.add_new_adult_to_trackers(node.name);
 
-        let new_info = SectionAuth {
-            value: new_info.into_state(),
-            sig,
-        };
-
-        if !self.network_knowledge.update_member(new_info.clone()) {
-            info!("ignore Online: {}", new_info.peer());
-            return vec![];
-        }
-
-        self.add_new_adult_to_trackers(new_info.name());
-
-        info!("handle Online: {}", new_info.peer());
+        info!("Node came online: {}", node.peer());
 
         // still used for testing
         self.send_event(Event::Membership(MembershipEvent::MemberJoined {
-            name: new_info.name(),
-            previous_name: new_info.previous_name(),
-            age: new_info.age(),
+            name: node.name,
+            previous_name: node.previous_name,
+            age: node.age(),
         }))
         .await;
-
-        vec![]
     }
 
     // Send `NodeApproval` to a joining node which makes it a section member
