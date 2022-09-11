@@ -614,7 +614,7 @@ mod tests {
             });
 
             // Send JoinResponse::Approved
-            let signed_sap = section_signed(sk, section_auth.clone())?;
+            let section_auth = section_signed(&sk, section_auth.clone())?;
             let decision = section_decision(&sk_set, NodeState::joined(peer, None).to_msg())?;
             let section_pk = signed_sap.section_key();
             let section_tree_update = {

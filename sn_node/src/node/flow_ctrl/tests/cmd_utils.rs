@@ -28,7 +28,7 @@ pub(crate) struct HandleOnlineStatus {
 
 pub(crate) async fn handle_online_cmd(
     peer: &Peer,
-    sk_set: &SecretKeySet,
+    sk_set: &bls::SecretKeySet,
     dispatcher: &Dispatcher,
     section_auth: &SectionAuthorityProvider,
 ) -> Result<HandleOnlineStatus> {

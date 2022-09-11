@@ -44,7 +44,7 @@ use sn_interface::{
     network_knowledge::{
         recommended_section_size, supermajority, test_utils::*, Error as NetworkKnowledgeError,
         NetworkKnowledge, NodeInfo, NodeState, SectionAuthorityProvider, SectionKeyShare,
-        SectionTree, SectionsDAG, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
+        SectionTree, SectionsDAG, SectionKeysProvider, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
     },
     types::{keyed_signed, keys::ed25519, Peer, PublicKey, ReplicatedData, SecretKeySet},
 };
@@ -230,7 +230,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
                 Some(relocated_node_old_name),
                 relocate_details,
             );
-            let relocate_proof = section_signed(sk_set.secret_key(), node_state.to_msg())?;
+            let relocate_proof = section_signed(&sk_set.secret_key(), node_state.to_msg())?;
 
             let signature_over_new_name =
                 ed25519::sign(&relocated_node.name().0, &relocated_node_old_keypair);
@@ -324,7 +324,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                 0,
             );
             let section_tree_update = {
-                let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
+                let signed_sap = section_signed(&sk_set.secret_key(), section_auth.clone())?;
                 SectionTreeUpdate::new(signed_sap, section_chain)
             };
 
@@ -333,7 +333,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
 
             for peer in section_auth.elders() {
                 let node_state = NodeState::joined(*peer, None);
-                let sig = prove(sk_set.secret_key(), &node_state)?;
+                let sig = prove(&sk_set.secret_key(), &node_state)?;
                 let _updated = section.update_member(SectionAuth {
                     value: node_state,
                     sig,
@@ -480,7 +480,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
 
             let node_state = NodeState::left(existing_peer, None);
             let proposal = Proposal::VoteNodeOffline(node_state.clone());
-            let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
+            let sig = keyed_signed(&sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
             let _cmds =
                 run_and_collect_cmds(Cmd::HandleAgreement { proposal, sig }, &dispatcher).await?;
@@ -504,11 +504,11 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
         .run_until(async move {
             let (section_auth, mut nodes, sk_set) = network_utils::create_section_auth();
 
-            let (section, _) = network_utils::create_section(&sk_set, &section_auth)?;
+            let (section, _) = network_utils::create_section(&sk_set, &section_auth, None, None)?;
 
             let existing_peer = network_utils::create_peer(MIN_ADULT_AGE);
             let node_state = NodeState::joined(existing_peer, None);
-            let node_state = section_signed(sk_set.secret_key(), node_state)?;
+            let node_state = section_signed(&sk_set.secret_key(), node_state)?;
             let _updated = section.update_member(node_state);
 
             // Pick the elder to remove.
@@ -528,7 +528,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
                     .await?;
             // Handle agreement on the Offline proposal
             let proposal = Proposal::VoteNodeOffline(remove_node_state.clone());
-            let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
+            let sig = keyed_signed(&sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
             let _cmds =
                 run_and_collect_cmds(Cmd::HandleAgreement { proposal, sig }, &dispatcher).await?;
@@ -782,20 +782,20 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
             };
             let (section_auth, mut nodes, sk_set) = random_sap(prefix, elder_count(), 0, None);
             let (section, section_key_share) =
-                network_utils::create_section(&sk_set, &section_auth)?;
+                network_utils::create_section(&sk_set, &section_auth, None, None)?;
 
             let mut adults = section_size - elder_count();
             while adults > 0 {
                 adults -= 1;
                 let non_elder_peer = network_utils::create_peer(MIN_ADULT_AGE);
                 let node_state = NodeState::joined(non_elder_peer, None);
-                let node_state = section_signed(sk_set.secret_key(), node_state)?;
+                let node_state = section_signed(&sk_set.secret_key(), node_state)?;
                 assert!(section.update_member(node_state));
             }
 
             let non_elder_peer = network_utils::create_peer(MIN_ADULT_AGE - 1);
             let node_state = NodeState::joined(non_elder_peer, None);
-            let node_state = section_signed(sk_set.secret_key(), node_state)?;
+            let node_state = section_signed(&sk_set.secret_key(), node_state)?;
             assert!(section.update_member(node_state));
             let node = nodes.remove(0);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
@@ -1609,15 +1609,14 @@ async fn spentbook_spend_with_random_key_image_should_return_spentbook_error() -
 /// with the spend request, but I don't know exactly what the conditions are for getting the
 /// network knowledge to update correctly.
 #[tokio::test]
-#[ignore]
-async fn spentbook_spend_with_updated_proof_chain_network_knowledge_should_be_updated() -> Result<()>
-{
+//#[ignore]
+async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node() -> Result<()> {
     let local = tokio::task::LocalSet::new();
     local
         .run_until(async move {
             init_logger();
             let replication_count = 5;
-            let (dispatcher, section, peer, sk_set) =
+            let (dispatcher, section, peer, genesis_sk_set) =
                 network_utils::TestNodeBuilder::new(Prefix::default().pushed(false), elder_count())
                     .adult_count(6)
                     .section_sk_threshold(0)
@@ -1625,30 +1624,73 @@ async fn spentbook_spend_with_updated_proof_chain_network_knowledge_should_be_up
                     .build()
                     .await?;
 
-            let sk = sk_set.secret_key();
-            let mut proof_chain = section.our_section_dag().clone();
-            let last = *proof_chain.last_key();
+            // At this point, only the genesis key should be in the proof chain on this node.
+            let tree = dispatcher
+                .node()
+                .read()
+                .await
+                .network_knowledge()
+                .section_tree()
+                .clone();
+            let proof_chain = tree.get_sections_dag().clone();
+            assert_eq!(proof_chain.len(), 1);
 
-            let (other_section, _, _) =
-                network_utils::create_section_with_random_sap(Prefix::default().pushed(true))?;
-            let other_signed_sap = other_section.signed_sap();
-            let other_proof_chain = other_section.our_section_dag().clone();
-            let other_section_key = *other_proof_chain.last_key();
-            let sig = sk.sign(other_section_key.to_bytes());
-            let _ = proof_chain.insert(&last, other_section_key, sig);
+            // This will create a section with the following proof chain:
+            // genesis_key -> other_section_key
+            // The key share also needs to be added to the section keys provider, which is stored
+            // on the node.
+            let other_section_key = bls::SecretKey::random();
+            let (other_section, _, other_section_key_share) =
+                network_utils::TestNodeBuilder::new(Prefix::default().pushed(true), elder_count())
+                    .genesis_sk_set(genesis_sk_set.clone())
+                    .parent_section_tree(section.section_tree().clone())
+                    .adult_count(6)
+                    .section_sk_threshold(0)
+                    .other_section_keys(vec![other_section_key.clone()])
+                    .build_section()
+                    .await?;
+            dispatcher
+                .node()
+                .write()
+                .await
+                .section_keys_provider
+                .insert(other_section_key_share.clone());
 
-            let (key_image, tx, spent_proofs, spent_transactions) =
-                dbc_utils::get_genesis_dbc_spend_info(&sk_set)?;
+            // Reissue a couple of DBC from genesis. They will be reissued using the section keys
+            // provider and SAP from the other section, hence the spent proofs will be signed with
+            // the unknown section key.
+            // The owners of the DBCs here don't really matter, so we just use random keys.
+            let skp = SectionKeysProvider::new(Some(other_section_key_share.clone()));
+            let sap = other_section.signed_sap();
+            let genesis_dbc = gen_genesis_dbc(&genesis_sk_set)?;
+            let new_dbc =
+                dbc_utils::reissue_dbc(&genesis_dbc, 10, &bls::SecretKey::random(), &sap, &skp)?;
+            let new_dbc2 =
+                dbc_utils::reissue_dbc(&new_dbc, 5, &bls::SecretKey::random(), &sap, &skp)?;
+            let new_dbc2_spent_proof =
+                new_dbc2.spent_proofs.iter().next().ok_or_else(|| {
+                    eyre!("This DBC should have been reissued with a spent proof")
+                })?;
+            assert_eq!(
+                new_dbc2_spent_proof.spentbook_pub_key,
+                other_section_key.public_key()
+            );
 
-            // Need to use spent proofs with the new key
+            // Finally, spend new_dbc2 as part of the input for another reissue.
+            // It needs to be associated with a valid transaction, which is why the util function
+            // is used. Again, the owner of the output DBCs don't really matter, so a random key is
+            // used.
+            let proof_chain = other_section.our_section_dag();
+            let (key_image, tx) =
+                dbc_utils::get_input_dbc_spend_info(&new_dbc2, 2, &bls::SecretKey::random())?;
             let cmds = run_and_collect_cmds(
                 wrap_service_msg_for_handling(
                     ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                         key_image,
-                        tx: tx.clone(),
-                        spent_proofs,
-                        spent_transactions,
-                        network_knowledge: Some((proof_chain, other_signed_sap)),
+                        tx,
+                        spent_proofs: new_dbc2.spent_proofs,
+                        spent_transactions: new_dbc2.spent_transactions,
+                        network_knowledge: Some((proof_chain, sap)),
                     })),
                     peer,
                 )?,
@@ -1656,6 +1698,9 @@ async fn spentbook_spend_with_updated_proof_chain_network_knowledge_should_be_up
             )
             .await?;
 
+            // The commands returned here should include the new command to update the network
+            // knowledge and also the other two commands to replicate the spent proof shares and
+            // the ack command, but we've already validated the other two as part of another test.
             assert_eq!(cmds.len(), 3);
             let update_cmd = cmds[0].clone();
             assert_matches!(
@@ -1663,13 +1708,30 @@ async fn spentbook_spend_with_updated_proof_chain_network_knowledge_should_be_up
                 Cmd::UpdateNetworkAndHandleValidServiceMsg { .. }
             );
 
-            let proof_chain = dispatcher
+            // Now the proof chain should have the other section key.
+            let tree = dispatcher
                 .node()
                 .read()
                 .await
                 .network_knowledge()
-                .our_section_dag();
+                .section_tree()
+                .clone();
+            let proof_chain = tree.get_sections_dag().clone();
             assert_eq!(proof_chain.len(), 2);
+            let mut proof_chain_iter = proof_chain.keys();
+            let genesis_key = genesis_sk_set.public_keys().public_key();
+            assert_eq!(
+                genesis_key,
+                *proof_chain_iter
+                    .next()
+                    .ok_or_else(|| eyre!("The proof chain should include the genesis key"))?
+            );
+            assert_eq!(
+                other_section_key.public_key(),
+                *proof_chain_iter
+                    .next()
+                    .ok_or_else(|| eyre!("The proof chain should include the other section key"))?
+            );
 
             Result::<()>::Ok(())
         })

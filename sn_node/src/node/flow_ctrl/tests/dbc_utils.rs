@@ -147,6 +147,39 @@ pub(crate) fn reissue_dbc(
     Ok(output_dbc)
 }
 
+pub(crate) fn get_input_dbc_spend_info(
+    input: &Dbc,
+    amount: u64,
+    output_owner_sk: &bls::SecretKey,
+) -> Result<(PublicKey, RingCtTransaction)> {
+    let output_amount = Token::from_nano(amount);
+    let input_amount = input.amount_secrets_bearer()?.amount();
+    let change_amount = input_amount
+        .checked_sub(output_amount)
+        .ok_or_else(|| eyre!("The input amount minus the amount must evaluate to a valid value"))?;
+
+    let mut rng = rand::thread_rng();
+    let output_owner = Owner::from(output_owner_sk.clone());
+    let dbc_builder = TransactionBuilder::default()
+        .set_decoys_per_input(0)
+        .set_require_all_decoys(false)
+        .add_input_dbc_bearer(input)?
+        .add_output_by_amount(
+            output_amount,
+            OwnerOnce::from_owner_base(output_owner, &mut rng),
+        )
+        .add_output_by_amount(
+            change_amount,
+            OwnerOnce::from_owner_base(input.owner_base().clone(), &mut rng),
+        )
+        .build(rng)?;
+    let inputs = dbc_builder.inputs();
+    let first = inputs
+        .first()
+        .ok_or_else(|| eyre!("There must be at least one input on the transaction"))?;
+    Ok(first.clone())
+}
+
 pub(crate) fn reissue_invalid_dbc_with_no_inputs(
     input: &Dbc,
     amount: u64,

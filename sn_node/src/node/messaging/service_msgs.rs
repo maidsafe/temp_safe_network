@@ -216,8 +216,8 @@ impl Node {
                 info!("Processing spend request for key image: {:?}", key_image);
                 if let Some((proof_chain, signed_sap)) = network_knowledge {
                     debug!(
-                        "Received updated proof chain with the request. Will return new command \
-                        to update the network knowledge before processing the spend."
+                        "Received updated network knowledge with the request. Will return new command \
+                        to update the node network knowledge before processing the spend."
                     );
                     // To avoid a loop, recompose the message without the updated proof_chain.
                     let updated_service_msg =
