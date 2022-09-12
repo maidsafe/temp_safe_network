@@ -13,13 +13,12 @@ use bls::Signature;
 use ed25519_dalek::Keypair;
 use eyre::{bail, eyre, Context, Result};
 use sn_consensus::Decision;
-use sn_interface::network_knowledge::SectionTree;
 use sn_interface::{
     elder_count,
     messaging::{system::NodeState as NodeStateMsg, SectionTreeUpdate},
     network_knowledge::{
         test_utils::*, NetworkKnowledge, NodeInfo, NodeState, SectionAuthorityProvider,
-        SectionKeyShare, SectionsDAG, SectionTree, MIN_ADULT_AGE,
+        SectionKeyShare, SectionTree, SectionsDAG, MIN_ADULT_AGE,
     },
     types::{keys::ed25519, Peer, SecretKeySet},
 };
@@ -420,19 +419,21 @@ fn do_create_section(
         let last_key = other_section_keys
             .last()
             .ok_or_else(|| eyre!("The section keys list must be populated"))?;
-        let share_index = section_chain.len() - 1;
+        let share_index = other_section_keys.len() - 1;
         (section_chain, last_key.clone(), share_index)
     } else {
-        let section_chain = SecuredLinkedList::new(genesis_ks.public_keys().public_key());
+        let section_chain = SectionsDAG::new(genesis_ks.public_keys().public_key());
         (section_chain, genesis_ks.secret_key(), 0)
     };
+
     let signed_sap = section_signed(&last_sk, section_auth.clone())?;
-    let section = NetworkKnowledge::new(
-        *section_chain.root_key(),
-        section_chain,
-        signed_sap,
-        parent_section_tree,
-    )?;
+    let section_tree_update = SectionTreeUpdate::new(signed_sap, section_chain);
+    let section_tree = if let Some(parent_section_tree) = parent_section_tree {
+        parent_section_tree
+    } else {
+        SectionTree::new(genesis_ks.public_keys().public_key())
+    };
+    let section = NetworkKnowledge::new(section_tree, section_tree_update)?;
 
     let sks = bls::SecretKeySet::from_bytes(last_sk.to_bytes().to_vec())?;
     let section_key_share = create_section_key_share(&sks, share_index);
@@ -442,8 +443,8 @@ fn do_create_section(
 fn make_section_chain(
     genesis_key: &bls::SecretKey,
     other_keys: &Vec<bls::SecretKey>,
-) -> Result<SecuredLinkedList> {
-    let mut section_chain = SecuredLinkedList::new(genesis_key.public_key());
+) -> Result<SectionsDAG> {
+    let mut section_chain = SectionsDAG::new(genesis_key.public_key());
     let mut parent = genesis_key.clone();
     for key in other_keys {
         let sig = parent.sign(key.public_key().to_bytes());

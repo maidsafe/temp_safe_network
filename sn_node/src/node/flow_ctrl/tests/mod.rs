@@ -44,7 +44,8 @@ use sn_interface::{
     network_knowledge::{
         recommended_section_size, supermajority, test_utils::*, Error as NetworkKnowledgeError,
         NetworkKnowledge, NodeInfo, NodeState, SectionAuthorityProvider, SectionKeyShare,
-        SectionTree, SectionsDAG, SectionKeysProvider, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
+        SectionKeysProvider, SectionTree, SectionsDAG, FIRST_SECTION_MAX_AGE,
+        FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
     },
     types::{keyed_signed, keys::ed25519, Peer, PublicKey, ReplicatedData, SecretKeySet},
 };
@@ -307,7 +308,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let local = tokio::task::LocalSet::new();
     local
         .run_until(async move {
-            let sk_set = SecretKeySet::random(None);
+            let sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
             let pk = sk_set.secret_key().public_key();
             let section_chain = SectionsDAG::new(pk);
 
@@ -575,7 +576,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             let mut section_chain = SectionsDAG::new(pk0);
             assert!(section_chain.insert(&pk0, pk1, pk1_signature).is_ok());
             let section_tree_update = {
-                let signed_old_sap = section_signed(sk_set1.secret_key(), old_sap.clone())?;
+                let signed_old_sap = section_signed(&sk_set1.secret_key(), old_sap.clone())?;
                 SectionTreeUpdate::new(signed_old_sap, section_chain.clone())
             };
             let network_knowledge =
@@ -1633,7 +1634,7 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
                 .section_tree()
                 .clone();
             let proof_chain = tree.get_sections_dag().clone();
-            assert_eq!(proof_chain.len(), 1);
+            assert_eq!(proof_chain.keys().into_iter().count(), 1);
 
             // This will create a section with the following proof chain:
             // genesis_key -> other_section_key
@@ -1680,7 +1681,7 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
             // It needs to be associated with a valid transaction, which is why the util function
             // is used. Again, the owner of the output DBCs don't really matter, so a random key is
             // used.
-            let proof_chain = other_section.our_section_dag();
+            let proof_chain = other_section.section_chain();
             let (key_image, tx) =
                 dbc_utils::get_input_dbc_spend_info(&new_dbc2, 2, &bls::SecretKey::random())?;
             let cmds = run_and_collect_cmds(
@@ -1717,7 +1718,7 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
                 .section_tree()
                 .clone();
             let proof_chain = tree.get_sections_dag().clone();
-            assert_eq!(proof_chain.len(), 2);
+            assert_eq!(proof_chain.keys().into_iter().count(), 2);
             let mut proof_chain_iter = proof_chain.keys();
             let genesis_key = genesis_sk_set.public_keys().public_key();
             assert_eq!(

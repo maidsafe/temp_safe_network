@@ -12,10 +12,7 @@ use crate::Error;
 
 use sn_dbc::{KeyImage, RingCtTransaction, SpentProof, SpentProofShare};
 use sn_interface::{
-    messaging::data::{
-        DataCmd, DataQueryVariant, Error as NetworkDataError, QueryResponse, SpentbookCmd,
-        SpentbookQuery,
-    },
+    messaging::data::{DataCmd, DataQueryVariant, QueryResponse, SpentbookCmd, SpentbookQuery},
     types::SpentbookAddress,
 };
 
@@ -45,66 +42,14 @@ impl Client {
         spent_proofs: BTreeSet<SpentProof>,
         spent_transactions: BTreeSet<RingCtTransaction>,
     ) -> Result<(), Error> {
-        let mut cmd = SpentbookCmd::Spend {
+        let cmd = SpentbookCmd::Spend {
             key_image,
             tx: tx.clone(),
             spent_proofs: spent_proofs.clone(),
             spent_transactions: spent_transactions.clone(),
             network_knowledge: None,
         };
-        let mut attempts = 1;
-        debug!("Attempting DBC spend request.");
-        debug!(
-            "Will reattempt if spent proof was signed with a section key that is unknown to the \
-            processing section."
-        );
-        loop {
-            let result = self.send_cmd(DataCmd::Spentbook(cmd)).await;
-            match result {
-                Ok(()) => {
-                    return Ok(());
-                }
-                Err(err) => match err {
-                    Error::ErrorCmd {
-                        source:
-                            NetworkDataError::SpentProofUnknownSectionKey(
-                                current_section_key,
-                                unknown_section_key,
-                            ),
-                        ..
-                    } => {
-                        debug!("Encountered unknown section key during spend request.");
-                        debug!(
-                            "Will obtain updated network knowledge and retry. \
-                                Attempts made: {attempts}"
-                        );
-                        attempts += 1;
-                        if attempts > 5 {
-                            error!("DBC spend request failed after 5 retry attempts");
-                            return Err(Error::DbcSpendRetryAttemptsExceeded);
-                        }
-                        let network = self.session.network.read().await;
-                        let proof_chain = network
-                            .get_sections_dag()
-                            .get_proof_chain(&current_section_key, &unknown_section_key)?;
-                        let signed_sap = network
-                            .get_signed_by_key(&unknown_section_key)
-                            .ok_or(Error::SignedSapNotFound(unknown_section_key))?;
-                        cmd = SpentbookCmd::Spend {
-                            key_image,
-                            tx: tx.clone(),
-                            spent_proofs: spent_proofs.clone(),
-                            spent_transactions: spent_transactions.clone(),
-                            network_knowledge: Some((proof_chain, signed_sap.clone())),
-                        };
-                        continue;
-                    }
-                    _ => {
-                        return Err(err);
-                    }
-                },
-            }
-        }
+        self.send_cmd(DataCmd::Spentbook(cmd)).await
     }
 
     //----------------------

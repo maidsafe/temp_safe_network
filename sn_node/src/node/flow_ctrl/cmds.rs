@@ -21,7 +21,7 @@ use sn_interface::{
         system::{DkgFailureSigSet, KeyedSig, NodeState, SectionAuth, SystemMsg},
         AuthorityProof, MsgId, NodeMsgAuthority, ServiceAuth, WireMsg,
     },
-    network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
+    network_knowledge::{SectionAuthorityProvider, SectionKeyShare, SectionsDAG},
     types::{DataAddress, Peer},
 };
 
@@ -146,7 +146,7 @@ pub(crate) enum Cmd {
         traceroute: Traceroute,
     },
     UpdateNetworkAndHandleValidServiceMsg {
-        proof_chain: SecuredLinkedList,
+        proof_chain: SectionsDAG,
         signed_sap: SectionAuth<SectionAuthorityProvider>,
         msg_id: MsgId,
         msg: ServiceMsg,

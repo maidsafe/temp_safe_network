@@ -10,11 +10,10 @@ use super::{Error, QueryResponse, Result};
 
 use crate::messaging::data::OperationId;
 use crate::messaging::system::SectionAuth;
-use crate::network_knowledge::SectionAuthorityProvider;
+use crate::network_knowledge::{SectionAuthorityProvider, SectionsDAG};
 use crate::types::{utils, SpentbookAddress};
 use tiny_keccak::{Hasher, Sha3};
 
-use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
 use sn_dbc::{KeyImage, RingCtTransaction, SpentProof};
 use std::collections::BTreeSet;
@@ -44,7 +43,7 @@ pub enum SpentbookCmd {
         tx: RingCtTransaction,
         spent_proofs: BTreeSet<SpentProof>,
         spent_transactions: BTreeSet<RingCtTransaction>,
-        network_knowledge: Option<(SecuredLinkedList, SectionAuth<SectionAuthorityProvider>)>,
+        network_knowledge: Option<(SectionsDAG, SectionAuth<SectionAuthorityProvider>)>,
     },
 }
 

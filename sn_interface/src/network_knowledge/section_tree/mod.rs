@@ -271,25 +271,6 @@ impl SectionTree {
             }
         }
 
-        // Make sure the proof chain can be trusted,
-        // i.e. check each key is signed by its parent/predecessor key.
-        if !proof_chain.self_verify() {
-            return Err(Error::UntrustedProofChain(format!(
-                "invalid proof chain: {:?}",
-                proof_chain
-            )));
-        }
-
-        // Check the SAP's key is the last key of the proof chain
-        if *proof_chain.last_key() != signed_sap.section_key() {
-            return Err(Error::UntrustedSectionAuthProvider(format!(
-                "section key ({:?}, from prefix {:?}) isn't in the last key in the proof chain provided. (Which ends with ({:?}))",
-                signed_sap.section_key(),
-                signed_sap.prefix(),
-                proof_chain.last_key()
-            )));
-        }
-
         // We can now update our knowledge of the remote section's SAP.
         // Note: we don't expect the same SAP to be found in our records
         // for the prefix since we've already checked that above.
@@ -794,7 +775,7 @@ pub(crate) mod tests {
     // Test helpers
     fn gen_section_auth(prefix: Prefix) -> Result<SectionAuth<SectionAuthorityProvider>> {
         let (section_auth, _, secret_key_set) = random_sap(prefix, 5, 0, None);
-        section_signed(secret_key_set.secret_key(), section_auth)
+        section_signed(&secret_key_set.secret_key(), section_auth)
             .context(format!("Failed to generate SAP for prefix {:?}", prefix))
     }
 

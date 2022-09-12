@@ -1191,7 +1191,7 @@ pub(crate) mod tests {
 
         let (sap_gen, _, sk_gen) = random_sap_with_rng(&mut rng, Prefix::default(), 0, 0, None);
         let sk_gen = sk_gen.secret_key();
-        let sap_gen = section_signed(sk_gen, sap_gen)?;
+        let sap_gen = section_signed(&sk_gen, sap_gen)?;
         let pk_gen = sap_gen.public_key_set().public_key();
 
         let mut dag = SectionsDAG::new(pk_gen);
@@ -1218,17 +1218,17 @@ pub(crate) mod tests {
             dag: &mut SectionsDAG,
         ) -> Result<()> {
             let (sap, _, sk_set) = random_sap_with_rng(rng, prefix, 0, 0, None);
-            let sap = section_signed(sk_set.secret_key(), sap)?;
+            let sap = section_signed(&sk_set.secret_key(), sap)?;
             let key = sap.public_key_set().public_key();
             let sig = sign(parent_sk, &key);
             dag.insert(&parent_sk.public_key(), sap.section_key(), sig)?;
-            sections_map.insert(sap.section_key(), (sk_set.secret_key().clone(), sap));
+            sections_map.insert(sap.section_key(), (sk_set.secret_key(), sap));
             Ok(())
         }
 
         // insert prefix 0,1
-        insert(prefix("0")?, sk_gen, &mut rng, &mut sections_map, &mut dag)?;
-        insert(prefix("1")?, sk_gen, &mut rng, &mut sections_map, &mut dag)?;
+        insert(prefix("0")?, &sk_gen, &mut rng, &mut sections_map, &mut dag)?;
+        insert(prefix("1")?, &sk_gen, &mut rng, &mut sections_map, &mut dag)?;
 
         while count < n_sections {
             let leaves: Vec<_> = dag.leaf_keys().into_iter().collect();
