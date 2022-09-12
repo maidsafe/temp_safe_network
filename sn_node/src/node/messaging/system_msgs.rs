@@ -315,8 +315,10 @@ impl Node {
             }
             SystemMsg::DkgStart(session_id) => {
                 trace!(
-                    "Handling msg: DkgStart s{} from {}",
+                    "Handling msg: DkgStart s{} {:?}: {} elders from {}",
                     session_id.sum(),
+                    session_id.prefix,
+                    session_id.elders.len(),
                     sender
                 );
                 self.log_dkg_session(&sender.name());

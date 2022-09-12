@@ -40,7 +40,7 @@ pub(crate) struct DkgVoter {
     dkg_ephemeral_keys: HashMap<Digest256, DkgEphemeralKeys>,
     /// Once we've got our ephemeral keys, we can go on with DKG with DKG states
     /// keyed by DkgSessionId hash
-    dkg_states: HashMap<Digest256, DkgState<bls::rand::rngs::OsRng>>,
+    dkg_states: HashMap<Digest256, DkgState>,
     // last dkg message timestamp
     last_received_dkg_msg_time: Option<Instant>,
 }
@@ -51,7 +51,7 @@ fn create_dkg_state(
     participant_index: usize,
     secret_key: BlsSecretKey,
     pub_keys: DkgPubKeys,
-) -> Result<DkgState<bls::rand::rngs::OsRng>> {
+) -> Result<DkgState> {
     let mut rng = bls::rand::rngs::OsRng;
     let threshold = threshold(session_id.elders.len());
     let mut public_keys: BTreeMap<NodeId, BlsPublicKey> = BTreeMap::new();
@@ -107,44 +107,42 @@ pub(crate) fn check_key(
 
 impl DkgVoter {
     /// Generate ephemeral secret key and save the key pair
-    /// If we already have a key for the current session_id, this function mutates nothing
-    /// In both cases it returns the pub key for our secret key and a signature over this pub key
+    /// If we already have a key for the current session_id,
+    /// this function mutates nothing and returns an error
     pub(crate) fn gen_ephemeral_key(
         &mut self,
         session_id_hash: Digest256,
         our_name: XorName,
         keypair: &Arc<Keypair>,
     ) -> Result<(BlsPublicKey, Signature)> {
-        // gen temp new key
+        // error out if we already have a key
+        if self.dkg_ephemeral_keys.get(&session_id_hash).is_some() {
+            return Err(Error::DkgEphemeralKeyAlreadyGenerated);
+        }
+
+        // gen new key
         let new_secret_key: BlsSecretKey = bls::rand::random();
         let new_pub_key = new_secret_key.public_key();
         let serialized = bincode::serialize(&new_pub_key)?;
+        let sig = types::keys::ed25519::sign(&serialized, keypair);
+        let ephemeral_keys = DkgEphemeralKeys {
+            secret_key: new_secret_key,
+            pub_keys: BTreeMap::from_iter([(our_name, (new_pub_key, sig))]),
+        };
 
         // insert the key if we don't already have it
-        let ephemeral_keys = self
+        let _did_insert = self
             .dkg_ephemeral_keys
-            .entry(session_id_hash)
-            .or_insert_with(|| {
-                let sig = types::keys::ed25519::sign(&serialized, keypair);
-                DkgEphemeralKeys {
-                    secret_key: new_secret_key,
-                    pub_keys: BTreeMap::from_iter([(our_name, (new_pub_key, sig))]),
-                }
-            });
+            .insert(session_id_hash, ephemeral_keys);
 
-        // return the key and sig
-        let (pub_key, sig) = ephemeral_keys
-            .pub_keys
-            .get(&our_name)
-            .ok_or(Error::InvalidState)?;
         debug!(
             "Signing Dkg ephemeral key s{} from {:?} sig: {:?} pubkey: {:?}",
             session_id_hash.iter().sum::<u8>(),
             our_name,
             sig,
-            pub_key,
+            new_pub_key,
         );
-        Ok((*pub_key, *sig))
+        Ok((new_pub_key, sig))
     }
 
     pub(crate) fn last_received_dkg_message(&self) -> Option<Instant> {
@@ -241,6 +239,13 @@ impl DkgVoter {
                     Box::new(*already_had),
                     *old_sig,
                 ));
+            } else {
+                debug!(
+                    "Ignoring known ephemeral key from {} in s{}",
+                    key_owner,
+                    session_id.sum()
+                );
+                return Ok(false);
             }
         }
 
@@ -314,10 +319,19 @@ impl DkgVoter {
         &mut self,
         session_id: &DkgSessionId,
         vote: DkgSignedVote,
-    ) -> Result<(VoteResponse, bool)> {
+    ) -> Result<VoteResponse> {
+        let rng = bls::rand::rngs::OsRng;
         match self.dkg_states.get_mut(&session_id.hash()) {
-            Some(state) => Ok(state.handle_signed_vote(vote)?),
+            Some(state) => Ok(state.handle_signed_vote(vote, rng)?),
             None => Err(Error::NoDkgStateForSession(session_id.clone())),
+        }
+    }
+
+    /// Checks a dkg session for termination
+    pub(crate) fn reached_termination(&self, session_id: &DkgSessionId) -> Result<bool> {
+        match self.dkg_states.get(&session_id.hash()) {
+            Some(state) => Ok(state.reached_termination()?),
+            None => Ok(false),
         }
     }
 

@@ -201,14 +201,26 @@ impl Node {
         // ignore DkgStart from old chains
         let current_chain_len = self.network_knowledge.chain_len();
         if session_id.section_chain_len < current_chain_len {
-            trace!("Skipping DkgStart for older chain: s{:?}", session_id.sum());
+            trace!("Skipping DkgStart for older chain: s{}", session_id.sum());
             return Ok(vec![]);
         }
 
         // gen key
         let (ephemeral_pub_key, sig) =
-            self.dkg_voter
-                .gen_ephemeral_key(session_id.hash(), our_name, &self.keypair)?;
+            match self
+                .dkg_voter
+                .gen_ephemeral_key(session_id.hash(), our_name, &self.keypair)
+            {
+                Ok(k) => k,
+                Err(Error::DkgEphemeralKeyAlreadyGenerated) => {
+                    trace!(
+                        "Skipping already acknowledged DkgStart s{}",
+                        session_id.sum()
+                    );
+                    return Ok(vec![]);
+                }
+                Err(e) => return Err(e),
+            };
 
         // assert people can check key
         assert!(check_key(&session_id, our_name, ephemeral_pub_key, sig).is_ok());
@@ -376,7 +388,7 @@ impl Node {
         let mut cmds = vec![];
         let mut ae_cmds = vec![];
         match vote_response {
-            VoteResponse::WaitingForMoreVotes => {}
+            VoteResponse::WaitingForMoreVotes | VoteResponse::IgnoringKnownVote => {}
             VoteResponse::RequestAntiEntropy => {
                 ae_cmds.push(self.request_dkg_ae(session_id, sender))
             }
@@ -384,7 +396,12 @@ impl Node {
                 cmds.push(self.broadcast_dkg_votes(session_id, pub_keys, our_id, vec![*vote]))
             }
             VoteResponse::DkgComplete(new_pubs, new_sec) => {
-                debug!("DkgComplete s{:?}", session_id.sum());
+                debug!(
+                    "DkgComplete s{:?} {:?}: {} elders",
+                    session_id.sum(),
+                    session_id.prefix,
+                    session_id.elders.len()
+                );
                 cmds.push(acknowledge_dkg_oucome(
                     session_id, our_id, new_pubs, new_sec,
                 ))
@@ -434,8 +451,13 @@ impl Node {
         let their_votes_len = votes.len();
         for v in votes {
             match self.dkg_voter.handle_dkg_vote(session_id, v.clone()) {
-                Ok((vote_response, learned_something)) => {
-                    if learned_something {
+                Ok(vote_response) => {
+                    debug!(
+                        "Dkg s{}: {:?} after: {v:?}",
+                        session_id.sum(),
+                        vote_response,
+                    );
+                    if !matches!(vote_response, VoteResponse::IgnoringKnownVote) {
                         self.dkg_voter.learned_something_from_message();
                         is_old_gossip = false;
                     }
@@ -446,12 +468,6 @@ impl Node {
                         our_id,
                         vote_response,
                     );
-                    if cmds.is_empty() {
-                        debug!(
-                            "Dkg s{}: WaitingForMoreVotes after: {v:?}",
-                            session_id.sum()
-                        );
-                    }
                     cmds.extend(cmd);
                     ae_cmds.extend(ae_cmd);
                 }
@@ -640,6 +656,25 @@ impl Node {
                 );
                 continue;
             };
+
+            // skip if we already reached termination
+            match self.dkg_voter.reached_termination(&session_info.session_id) {
+                Ok(true) => {
+                    trace!(
+                        "Skipping DKG gossip for s{} as we have reached termination",
+                        session_info.session_id.sum()
+                    );
+                    continue;
+                }
+                Ok(false) => {}
+                Err(err) => {
+                    error!(
+                        "DKG failed gossip in s{}: {:?}",
+                        session_info.session_id.sum(),
+                        err
+                    );
+                }
+            }
 
             // gossip votes else gossip our key
             if let Ok(votes) = self.dkg_voter.get_all_votes(&session_info.session_id) {

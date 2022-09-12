@@ -100,6 +100,9 @@ pub enum Error {
     /// Received a dkg message from an invalid Xorname
     #[error("Invalid Xorname: {0:?}")]
     InvalidXorname(XorName),
+    /// Already generated our Dkg ephemeral key
+    #[error("Already generated our Dkg ephemeral key")]
+    DkgEphemeralKeyAlreadyGenerated,
     /// Received a dkg message from a node that is not in dkg session
     #[error("Node not in dkg session: {0:?}")]
     NodeNotInDkgSession(XorName),
