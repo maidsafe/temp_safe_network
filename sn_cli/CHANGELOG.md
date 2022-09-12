@@ -4,7 +4,53 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## v0.66.0 (2022-09-09)
+
+## v0.65.0 (2022-09-07)
+
+### Chore
+
+ - <csr-id-fe659c5685289fe0071b54298dcac394e83c0dce/> sn_interface-0.13.0/sn_dysfunction-0.12.0/sn_client-0.74.0/sn_node-0.69.0/sn_api-0.72.0/sn_cli-0.65.0
+
+### New Features
+
+ - <csr-id-ca06800ce5b863ebad1f2bf9456fa33c08476df0/> cat does not retry on error
+   The error is a meaningful error from the network, and if the user feels
+   the error should not happen incorrect it's really up to the client to
+   retry, not the cli.
+
+### Refactor
+
+ - <csr-id-638bcdfea4cbc713d8a4faecec7ed8538317fa29/> minor refactor to Capacity functions impl, plus removing unused fns
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.13.0/sn_dysfunction-0.12.0/sn_client-0.74.0/sn_node-0.69.0/sn_api-0.72.0/sn_cli-0.65.0 ([`fe659c5`](https://github.com/maidsafe/safe_network/commit/fe659c5685289fe0071b54298dcac394e83c0dce))
+    - minor refactor to Capacity functions impl, plus removing unused fns ([`638bcdf`](https://github.com/maidsafe/safe_network/commit/638bcdfea4cbc713d8a4faecec7ed8538317fa29))
+    - cat does not retry on error ([`ca06800`](https://github.com/maidsafe/safe_network/commit/ca06800ce5b863ebad1f2bf9456fa33c08476df0))
+</details>
+
 ## v0.64.0 (2022-09-06)
+
+<csr-id-d28fdf3ddd0a39f7bbc6426e1e71d990319b0ec7/>
+<csr-id-f31bd5df469a16d39e6b03de605981ad303a2be3/>
+<csr-id-921438659ccaf65b2ea8cc00efb61d8146ef71ef/>
+<csr-id-f5d436fba99e0e9c258c7ab3c3a256be3be58f84/>
+<csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/>
+<csr-id-39dd5a043c75492e416bb9371015a1365b06fa01/>
 
 ### Chore
 
@@ -15,6 +61,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - <csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/> switch on clippy::unwrap_used as a warning
 
 
+### Chore
+
+ - <csr-id-1b9e0a6564e9564201ef3a3e04adb0bfbef6ac14/> sn_interface-0.12.0/sn_dysfunction-0.11.0/sn_client-0.73.0/sn_node-0.68.0/sn_api-0.71.0/sn_cli-0.64.0
+
 ### Refactor
 
  - <csr-id-39dd5a043c75492e416bb9371015a1365b06fa01/> small tweaks; clippy::equatable_if_let
@@ -23,9 +73,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 6 commits contributed to the release over the course of 7 calendar days.
+ - 7 commits contributed to the release over the course of 8 calendar days.
  - 8 days passed between releases.
- - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 7 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -35,6 +85,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.12.0/sn_dysfunction-0.11.0/sn_client-0.73.0/sn_node-0.68.0/sn_api-0.71.0/sn_cli-0.64.0 ([`1b9e0a6`](https://github.com/maidsafe/safe_network/commit/1b9e0a6564e9564201ef3a3e04adb0bfbef6ac14))
     - sn_interface-0.11.0/sn_dysfunction-0.10.0/sn_client-0.72.0/sn_node-0.67.0/sn_api-0.70.0/sn_cli-0.63.0 ([`d28fdf3`](https://github.com/maidsafe/safe_network/commit/d28fdf3ddd0a39f7bbc6426e1e71d990319b0ec7))
     - replace for_each with for loop ([`f31bd5d`](https://github.com/maidsafe/safe_network/commit/f31bd5df469a16d39e6b03de605981ad303a2be3))
     - unneeded iter methods removal ([`9214386`](https://github.com/maidsafe/safe_network/commit/921438659ccaf65b2ea8cc00efb61d8146ef71ef))
