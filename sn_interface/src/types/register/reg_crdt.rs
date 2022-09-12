@@ -154,3 +154,47 @@ impl RegisterCrdt {
             .collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use xor_name::XorName;
+
+    #[test]
+    fn creating_entry_hash() -> Result<()> {
+        let mut rng = rand::thread_rng();
+        let address_1 = RegisterAddress {
+            name: XorName::random(&mut rng),
+            tag: 0,
+        };
+        let address_2 = RegisterAddress {
+            name: XorName::random(&mut rng),
+            tag: 0,
+        };
+
+        let mut crdt_1 = RegisterCrdt::new(address_1);
+        let mut crdt_2 = RegisterCrdt::new(address_2);
+        let mut parents = BTreeSet::new();
+
+        let entry_1 = vec![0x1, 0x1];
+        // Different RegisterCrdt shall create same hashes for the same entry from root
+        let (entry_hash_1, _) = crdt_1.write(entry_1.clone(), parents.clone(), User::Anyone)?;
+        let (entry_hash_2, _) = crdt_2.write(entry_1, parents.clone(), User::Anyone)?;
+        assert!(entry_hash_1 == entry_hash_2);
+
+        let entry_2 = vec![0x2, 0x2];
+        // RegisterCrdt shall create differnt hashes for different entries from root
+        let (entry_hash_1_2, _) = crdt_1.write(entry_2, parents.clone(), User::Anyone)?;
+        assert!(entry_hash_1 != entry_hash_1_2);
+
+        let entry_3 = vec![0x3, 0x3];
+        // Different RegisterCrdt shall create same hashes for the same entry from same parents
+        let _ = parents.insert(entry_hash_1);
+        let (entry_hash_1_3, _) = crdt_1.write(entry_3.clone(), parents.clone(), User::Anyone)?;
+        let (entry_hash_2_3, _) = crdt_1.write(entry_3, parents, User::Anyone)?;
+        assert!(entry_hash_1_3 == entry_hash_2_3);
+
+        Ok(())
+    }
+}
