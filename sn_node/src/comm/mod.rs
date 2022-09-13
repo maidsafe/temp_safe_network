@@ -208,17 +208,29 @@ impl Comm {
     }
 
     #[tracing::instrument(skip(self, bytes))]
-    pub(crate) async fn send(&self, peer: Peer, msg_id: MsgId, bytes: UsrMsgBytes) -> Result<()> {
-        let watcher = self.send_to_one(peer, msg_id, bytes).await;
-
+    pub(crate) async fn send(
+        &self,
+        peer: Peer,
+        msg_id: MsgId,
+        bytes: UsrMsgBytes,
+        is_msg_for_client: bool,
+    ) -> Result<()> {
+        let watcher = self
+            .send_to_one(peer, msg_id, bytes, is_msg_for_client)
+            .await;
+        // if let Some(watcher) = watcher_res {
         match watcher {
-            Ok(watcher) => {
+            Ok(Some(watcher)) => {
                 if Self::is_sent(watcher, msg_id, peer).await {
                     trace!("Msg {msg_id:?} sent to {peer:?}");
                     Ok(())
                 } else {
                     Err(Error::FailedSend(peer))
                 }
+            }
+            Ok(None) => {
+                Ok(())
+                // no watcher......
             }
             Err(error) => {
                 // there is only one type of error returned: [`Error::InvalidState`]
@@ -230,15 +242,19 @@ impl Comm {
                     peer
                 );
                 error!(
-                    "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed as we have disconnected from the peer. (Error is: {})",
-                    msg_id,
-                    peer.addr(),
-                    peer.name(),
-                    error,
-                );
+                        "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed as we have disconnected from the peer. (Error is: {})",
+                        msg_id,
+                        peer.addr(),
+                        peer.name(),
+                        error,
+                    );
                 Err(Error::FailedSend(peer))
             }
         }
+        // }
+        // else {
+        //     Ok(())
+        // }
     }
 
     async fn is_sent(mut watcher: SendWatcher, msg_id: MsgId, peer: Peer) -> bool {
@@ -301,14 +317,18 @@ impl Comm {
 
     /// Get a PeerSession if it already exists, otherwise create and insert
     #[instrument(skip(self))]
-    async fn get_or_create(&self, peer: &Peer) -> PeerSession {
-        if let Some(entry) = self.sessions.get(peer) {
-            return entry.value().clone();
+    async fn get_or_create(&self, peer: &Peer, require_existing: bool) -> Option<PeerSession> {
+        if require_existing {
+            if let Some(entry) = self.sessions.get(peer) {
+                return Some(entry.value().clone());
+            } else {
+                return None;
+            }
         }
         let link = Link::new(*peer, self.our_endpoint.clone(), self.msg_listener.clone());
         let session = PeerSession::new(link);
         let _ = self.sessions.insert(*peer, session.clone());
-        session
+        Some(session)
     }
 
     /// Any number of incoming qp2p:Connections can be added.
@@ -338,7 +358,8 @@ impl Comm {
         recipient: Peer,
         msg_id: MsgId,
         bytes: UsrMsgBytes,
-    ) -> Result<SendWatcher> {
+        is_msg_for_client: bool,
+    ) -> Result<Option<SendWatcher>> {
         let bytes_len = {
             let (h, d, p) = bytes.clone();
             h.len() + d.len() + p.len()
@@ -350,8 +371,13 @@ impl Comm {
             msg_id,
             recipient,
         );
-        let peer = self.get_or_create(&recipient).await;
-        peer.send(msg_id, bytes).await
+
+        if let Some(peer) = self.get_or_create(&recipient, is_msg_for_client).await {
+            return Ok(Some(peer.send(msg_id, bytes).await?));
+        } else {
+            debug!("No client conn exists to send this msg on.... {msg_id:?}");
+            Ok(None)
+        }
     }
 }
 
