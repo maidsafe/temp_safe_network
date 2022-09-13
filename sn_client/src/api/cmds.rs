@@ -64,7 +64,7 @@ impl Client {
 
         let mut backoff = ExponentialBackoff {
             initial_interval: Duration::from_millis(500),
-            max_interval: Duration::from_secs(20),
+            max_interval: Duration::from_secs(5),
             max_elapsed_time: Some(op_limit),
             randomization_factor: 0.5,
             ..Default::default()

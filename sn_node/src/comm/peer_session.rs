@@ -84,7 +84,7 @@ impl PeerSession {
     }
 
     #[instrument(skip(self, bytes))]
-    pub(crate) async fn send(&self, msg_id: MsgId, bytes: UsrMsgBytes) -> Result<SendWatcher> {
+    pub(crate) async fn sendddd(&self, msg_id: MsgId, bytes: UsrMsgBytes, is_msg_for_client: bool) -> Result<SendWatcher> {
         let (watcher, reporter) = status_watching();
 
         let job = SendJob {
@@ -92,6 +92,7 @@ impl PeerSession {
             bytes,
             retries: 0,
             reporter,
+            is_msg_for_client
         };
 
         if let Err(e) = self.channel.send(SessionCmd::Send(job)).await {
@@ -199,8 +200,8 @@ impl PeerSessionWorker {
 
     async fn send(&mut self, mut job: SendJob) -> SessionStatus {
         let id = job.msg_id;
-
-        trace!("Performing sendjob: {id:?}");
+        let should_establish_new_connection =  !job.is_msg_for_client;
+        trace!("Performing sendjob: {id:?} , should_establish_new_connection? {should_establish_new_connection}");
 
         if job.retries > MAX_SENDJOB_RETRIES {
             job.reporter.send(SendStatus::MaxRetriesReached);
@@ -219,7 +220,7 @@ impl PeerSessionWorker {
 
         let send_resp = self
             .link
-            .send_with(job.bytes.clone(), 0, Some(&RetryConfig::default()))
+            .send_with(job.bytes.clone(), 0, Some(&RetryConfig::default()), should_establish_new_connection)
             .await;
 
         match send_resp {
@@ -291,6 +292,7 @@ pub(crate) struct SendJob {
     bytes: UsrMsgBytes,
     retries: usize, // TAI: Do we need this if we are using QP2P's retry
     reporter: StatusReporting,
+    pub(crate) is_msg_for_client: bool
 }
 
 impl PartialEq for SendJob {
