@@ -107,7 +107,7 @@ impl WireMsg {
     /// Once the caller obtains both the serialized payload and `MsgKind`,
     /// it can invoke the `new_msg` function to instantiate a `WireMsg`.
     pub fn serialize_msg_payload<T: Serialize>(msg: &T) -> Result<Bytes> {
-        let payload_vec = rmp_serde::to_vec_named(&msg).map_err(|err| {
+        let payload_vec = bincode::serialize(&msg).map_err(|err| {
             Error::Serialisation(format!(
                 "could not serialize message payload with Msgpack: {}",
                 err
@@ -118,7 +118,7 @@ impl WireMsg {
     }
     /// Serializes the dst provided.
     fn serialize_dst_payload(dst: &Dst) -> Result<Bytes> {
-        let dst_vec = rmp_serde::to_vec_named(dst).map_err(|err| {
+        let dst_vec = bincode::serialize(dst).map_err(|err| {
             Error::Serialisation(format!(
                 "could not serialize dst payload with Msgpack: {}",
                 err
@@ -156,7 +156,7 @@ impl WireMsg {
         let (header_bytes, dst_bytes, payload) = bytes;
         // Deserialize the header bytes first
         let header = WireMsgHeader::from(header_bytes.clone())?;
-        let dst: Dst = rmp_serde::from_slice(&dst_bytes).map_err(|err| {
+        let dst: Dst = bincode::deserialize(&dst_bytes).map_err(|err| {
             Error::FailedToParse(format!(
                 "Message dst couldn't be deserialized from the dst bytes: {}",
                 err
@@ -239,7 +239,7 @@ impl WireMsg {
         match self.header.msg_envelope.auth.clone() {
             #[cfg(any(feature = "chunks", feature = "registers"))]
             AuthKind::Service(auth) => {
-                let msg: ServiceMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
+                let msg: ServiceMsg = bincode::deserialize(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Data message payload as Msgpack: {}", err))
                 })?;
 
@@ -261,7 +261,7 @@ impl WireMsg {
                 })
             }
             AuthKind::Node(node_signed) => {
-                let msg: SystemMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
+                let msg: SystemMsg = bincode::deserialize(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Node signed message payload as Msgpack: {}", err))
                 })?;
 
@@ -276,7 +276,7 @@ impl WireMsg {
                 })
             }
             AuthKind::NodeBlsShare(bls_share_signed) => {
-                let msg: SystemMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
+                let msg: SystemMsg = bincode::deserialize(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!(
                         "Node message payload (BLS share signed) as Msgpack: {}",
                         err

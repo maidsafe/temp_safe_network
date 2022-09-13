@@ -128,7 +128,7 @@ impl WireMsgHeader {
         // ...finally, we read the message envelope bytes
         let msg_envelope_bytes = &bytes[HeaderMeta::SIZE..meta.header_len()];
         let msg_envelope: MsgEnvelope =
-            rmp_serde::from_slice(msg_envelope_bytes).map_err(|err| {
+            bincode::deserialize(msg_envelope_bytes).map_err(|err| {
                 Error::FailedToParse(format!(
                     "source authority couldn't be deserialized from the header: {}",
                     err
@@ -146,7 +146,7 @@ impl WireMsgHeader {
     /// Write header metadata and msg envelope info into a provided buffer
     pub fn serialize(&self) -> Result<Bytes> {
         // first serialise the msg envelope so we can figure out the total header size
-        let msg_envelope_vec = rmp_serde::to_vec_named(&self.msg_envelope).map_err(|err| {
+        let msg_envelope_vec = bincode::serialize(&self.msg_envelope).map_err(|err| {
             Error::Serialisation(format!(
                 "could not serialize message envelope with Msgpack: {}",
                 err

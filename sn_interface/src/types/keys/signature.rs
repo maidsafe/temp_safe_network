@@ -97,10 +97,10 @@ mod tests {
     #[test]
     fn ed25519_rmp_roundtrip() -> Result<()> {
         let signature = gen_ed25519_sig()?;
-        let serialized = rmp_serde::to_vec(&signature)?;
+        let serialized = bincode::serialize(&signature)?;
 
         assert_eq!(
-            rmp_serde::from_read::<_, Signature>(&serialized[..])?,
+            bincode::deserialize::<Signature>(&serialized[..])?,
             signature
         );
 

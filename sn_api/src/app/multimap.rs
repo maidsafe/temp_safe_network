@@ -76,7 +76,7 @@ impl Safe {
         replace: BTreeSet<EntryHash>,
     ) -> Result<EntryHash> {
         debug!("Inserting '{:?}' into Multimap at {}", entry, multimap_url);
-        let serialised_entry = rmp_serde::to_vec_named(&entry).map_err(|err| {
+        let serialised_entry = bincode::serialize(&entry).map_err(|err| {
             Error::Serialisation(format!(
                 "Couldn't serialise the Multimap entry '{:?}': {:?}",
                 entry, err
@@ -222,7 +222,7 @@ impl Safe {
     }
 
     fn decode_multimap_entry(entry: &[u8]) -> Result<MultimapKeyValue> {
-        rmp_serde::from_slice(entry)
+        bincode::deserialize(entry)
             .map_err(|err| Error::ContentError(format!("Couldn't parse Multimap entry: {:?}", err)))
     }
 }

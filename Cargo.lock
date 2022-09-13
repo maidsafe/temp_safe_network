@@ -2743,12 +2743,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "paste"
-version = "1.0.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1de2e551fb905ac83f73f7aedf2f0cb4a0da7e35efa24a202a936269f1f18e1"
-
-[[package]]
 name = "pbkdf2"
 version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3475,28 +3469,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rmp"
-version = "0.8.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44519172358fd6d58656c86ab8e7fbc9e1490c3e8f14d35ed78ca0dd07403c9f"
-dependencies = [
- "byteorder",
- "num-traits",
- "paste",
-]
-
-[[package]]
-name = "rmp-serde"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25786b0d276110195fa3d6f3f31299900cf71dfbd6c28450f3f58a0e7f7a347e"
-dependencies = [
- "byteorder",
- "rmp",
- "serde",
-]
-
-[[package]]
 name = "rustc-demangle"
 version = "0.1.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3907,7 +3879,6 @@ dependencies = [
  "rand 0.8.5",
  "rand_core 0.5.1",
  "relative-path",
- "rmp-serde",
  "serde",
  "serde_json",
  "sha3",
@@ -3962,7 +3933,6 @@ dependencies = [
  "rcgen",
  "relative-path",
  "reqwest",
- "rmp-serde",
  "self_update",
  "serde",
  "serde_json",
@@ -4014,7 +3984,6 @@ dependencies = [
  "rand 0.8.5",
  "rand_xorshift 0.2.0",
  "rayon",
- "rmp-serde",
  "secured_linked_list",
  "self_encryption",
  "serde",
@@ -4137,7 +4106,6 @@ dependencies = [
  "rand 0.8.5",
  "rand_xorshift 0.2.0",
  "rayon",
- "rmp-serde",
  "secured_linked_list",
  "self_encryption",
  "serde",
@@ -4220,7 +4188,6 @@ dependencies = [
  "rand_xorshift 0.2.0",
  "rayon",
  "resource_proof",
- "rmp-serde",
  "secured_linked_list",
  "self_encryption",
  "self_update",

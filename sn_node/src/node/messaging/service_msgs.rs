@@ -460,7 +460,7 @@ impl Node {
             policy,
         );
 
-        let entry = Bytes::from(rmp_serde::to_vec_named(spent_proof_share).map_err(|err| {
+        let entry = Bytes::from(bincode::serialize(spent_proof_share).map_err(|err| {
             Error::SpentbookError(format!(
                 "Failed to serialise SpentProofShare to insert it into the spentbook (Register): {:?}",
                 err

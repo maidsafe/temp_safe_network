@@ -425,7 +425,7 @@ mod tests {
                 (msg, bytes)
             };
             let deserialized_msg: ServiceMsg =
-                rmp_serde::from_slice(&serialised_cmd).map_err(|err| {
+                bincode::deserialize(&serialised_cmd).map_err(|err| {
                     crate::messaging::Error::FailedToParse(format!(
                         "Data message payload as Msgpack: {}",
                         err

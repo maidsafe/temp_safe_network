@@ -31,7 +31,7 @@ pub(crate) fn get_spent_proof_share_from_replicated_data(
         ReplicatedData::SpentbookWrite(reg_cmd) => match reg_cmd {
             RegisterCmd::Edit(signed_edit) => {
                 let entry = signed_edit.op.edit.crdt_op.value;
-                let spent_proof_share: SpentProofShare = rmp_serde::from_slice(&entry)?;
+                let spent_proof_share: SpentProofShare = bincode::deserialize(&entry)?;
                 Ok(spent_proof_share)
             }
             _ => Err(eyre!("A RegisterCmd::Edit variant was expected")),

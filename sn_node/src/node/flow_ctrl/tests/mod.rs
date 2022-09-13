@@ -389,7 +389,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                     _ => continue,
                 };
 
-                let actual_elder_candidates = match rmp_serde::from_slice(&payload) {
+                let actual_elder_candidates = match bincode::deserialize(&payload) {
                     Ok(SystemMsg::DkgStart(session)) => session.elders,
                     _ => continue,
                 };

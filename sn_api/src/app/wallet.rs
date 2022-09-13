@@ -212,7 +212,7 @@ impl Safe {
             let dbc_xorurl = SafeUrl::from_xorurl(xorurl_str)?;
             let dbc_bytes = self.fetch_data(&dbc_xorurl, None).await?;
 
-            let dbc: Dbc = match rmp_serde::from_slice(&dbc_bytes) {
+            let dbc: Dbc = match bincode::deserialize(&dbc_bytes) {
                 Ok(dbc) => dbc,
                 Err(err) => {
                     warn!("Ignoring entry found in wallet since it cannot be deserialised as a valid DBC: {:?}", err);
@@ -430,7 +430,7 @@ impl Safe {
             return Err(Error::InvalidInput("Only bearer DBC's are supported at this point by the wallet. Please deposit a bearer DBC's.".to_string()));
         }
 
-        let dbc_bytes = Bytes::from(rmp_serde::to_vec_named(dbc).map_err(|err| {
+        let dbc_bytes = Bytes::from(bincode::serialize(dbc).map_err(|err| {
             Error::Serialisation(format!(
                 "Failed to serialise DBC to insert it into the wallet: {:?}",
                 err

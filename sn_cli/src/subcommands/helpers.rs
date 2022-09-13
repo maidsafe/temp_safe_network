@@ -164,7 +164,7 @@ pub async fn gen_wallet_table(safe: &Safe, multimap: &Multimap) -> Result<Table>
         let xorurl_str = std::str::from_utf8(value)?;
         let dbc_bytes = safe.files_get(xorurl_str, None).await?;
 
-        let dbc: Dbc = match rmp_serde::from_slice(&dbc_bytes) {
+        let dbc: Dbc = match bincode::deserialize(&dbc_bytes) {
             Ok(dbc) => dbc,
             Err(err) => {
                 warn!("Ignoring entry found in wallet since it cannot be deserialised as a valid DBC: {:?}", err);

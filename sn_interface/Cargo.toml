@@ -45,7 +45,7 @@ qp2p = "~0.30.0"
 rand = "~0.8.5"
 rand-07 = { package = "rand", version = "0.7.3" } # required till ed25519-dalek upgrades to rand v0.8
 rayon = "1.5.1"
-rmp-serde = "1.0.0"
+#rmp-serde = "1.1.0"
 secured_linked_list = "~0.5.3"
 self_encryption = "~0.27.5"
 serde = { version = "1.0.111", features = ["derive", "rc"] }

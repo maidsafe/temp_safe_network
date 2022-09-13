@@ -137,7 +137,7 @@ impl DataStorage {
                             let entries = reg.read();
                             for (_, entry) in entries {
                                 // Deserialise spent proof share from the entry
-                                let spent_proof_share: SpentProofShare = match rmp_serde::from_slice(&entry) {
+                                let spent_proof_share: SpentProofShare = match bincode::deserialize(&entry) {
                                     Ok(proof) => proof,
                                     Err(err) => {
                                         warn!("Ignoring entry found in Spentbook since it cannot be deserialised as a valid SpentProofShare: {:?}", err);
