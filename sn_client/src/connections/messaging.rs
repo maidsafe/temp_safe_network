@@ -91,7 +91,7 @@ impl Session {
 
         self.send_msg(elders, wire_msg, msg_id).await?;
 
-        let expected_acks = elders_len * 2 / 3 + 1;
+        let expected_acks = elders_len;
 
         // We are not wait for the receive of majority of cmd Acks.
         // This could be further strict to wait for ALL the Acks get received.
