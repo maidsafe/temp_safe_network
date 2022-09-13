@@ -70,7 +70,7 @@ sn_dbc = { version = "8.1.0", features = ["serdes"] }
 sn_dysfunction = { path = "../sn_dysfunction", version = "^0.14.0" }
 sn_interface = { path = "../sn_interface", version = "^0.15.0" }
 sn_sdkg = { git = "https://github.com/maidsafe/sn_sdkg" }
-# sn_sdkg = "0.1.0"
+# sn_sdkg = { path = "../../sn_sdkg" }
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_bytes = "~0.11.5"
 serde_json = "1.0.53"
