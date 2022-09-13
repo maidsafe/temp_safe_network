@@ -19,7 +19,7 @@ use sn_interface::{
     },
 };
 
-use bls::{PublicKey as BlsPublicKey, SecretKey as BlsSecretKey};
+use bls::{PublicKey as BlsPublicKey, PublicKeySet, SecretKey as BlsSecretKey, SecretKeyShare};
 use sn_sdkg::{DkgSignedVote, DkgState, NodeId, VoteResponse};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
@@ -332,6 +332,24 @@ impl DkgVoter {
         match self.dkg_states.get(&session_id.hash()) {
             Some(state) => Ok(state.reached_termination()?),
             None => Ok(false),
+        }
+    }
+
+    /// Get the DKG outome
+    pub(crate) fn outcome(
+        &self,
+        session_id: &DkgSessionId,
+    ) -> Result<Option<(NodeId, PublicKeySet, SecretKeyShare)>> {
+        match self.dkg_states.get(&session_id.hash()) {
+            Some(state) => {
+                let our_id = state.id();
+                if let Some((pks, sks)) = state.outcome()? {
+                    Ok(Some((our_id, pks, sks)))
+                } else {
+                    Ok(None)
+                }
+            }
+            None => Err(Error::NoDkgStateForSession(session_id.clone())),
         }
     }
 

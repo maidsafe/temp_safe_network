@@ -77,7 +77,7 @@ pub enum LogMarker {
     DkgHandleEphemeralPubKey,
     DkgBroadcastVote,
     DkgVotesHandling,
-    DkgSessionComplete,
+    DkgComplete,
     HandlingDkgSuccessfulOutcome,
     HandlingNewEldersAgreement,
     NewSignedSap,

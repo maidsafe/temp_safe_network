@@ -47,15 +47,7 @@ fn acknowledge_dkg_oucome(
     pub_key_set: PublicKeySet,
     sec_key_share: SecretKeyShare,
 ) -> Cmd {
-    trace!(
-        "{} s{}: {:?}",
-        LogMarker::DkgSessionComplete,
-        session_id.sum(),
-        pub_key_set.public_key(),
-    );
-
     let section_auth = SectionAuthorityProvider::from_dkg_session(session_id, pub_key_set.clone());
-
     let outcome = SectionKeyShare {
         public_key_set: pub_key_set,
         index: participant_index,
@@ -396,11 +388,13 @@ impl Node {
                 cmds.push(self.broadcast_dkg_votes(session_id, pub_keys, our_id, vec![*vote]))
             }
             VoteResponse::DkgComplete(new_pubs, new_sec) => {
-                debug!(
-                    "DkgComplete s{:?} {:?}: {} elders",
+                trace!(
+                    "{} s{:?} {:?}: {} elders: {:?}",
+                    LogMarker::DkgComplete,
                     session_id.sum(),
                     session_id.prefix,
-                    session_id.elders.len()
+                    session_id.elders.len(),
+                    new_pubs.public_key(),
                 );
                 cmds.push(acknowledge_dkg_oucome(
                     session_id, our_id, new_pubs, new_sec,
@@ -640,6 +634,38 @@ impl Node {
         vec![cmd]
     }
 
+    pub(crate) fn had_sap_change_since(&self, session_id: &DkgSessionId) -> bool {
+        self.network_knowledge.chain_len() != session_id.section_chain_len
+    }
+
+    pub(crate) fn gossip_handover_trigger(&self, session_id: &DkgSessionId) -> Vec<Cmd> {
+        match self.dkg_voter.outcome(session_id) {
+            Ok(Some((our_id, new_pubs, new_sec))) => {
+                trace!(
+                    "Gossiping DKG outcome for s{} as we didn't notice SAP change",
+                    session_id.sum()
+                );
+                let cmd = acknowledge_dkg_oucome(session_id, our_id.into(), new_pubs, new_sec);
+                vec![cmd]
+            }
+            Ok(None) => {
+                error!(
+                    "Missing DKG outcome for s{}, when trying to gossip outcome",
+                    session_id.sum()
+                );
+                vec![]
+            }
+            Err(e) => {
+                error!(
+                    "Failed to get DKG outcome for s{}, when trying to gossip outcome: {}",
+                    session_id.sum(),
+                    e
+                );
+                vec![]
+            }
+        }
+    }
+
     /// For all the ongoing DKG sessions, sends out all the current known votes to all DKG
     /// participants if we don't have any votes yet, sends out our ephemeral key
     pub(crate) fn dkg_gossip_msgs(&self) -> Vec<Cmd> {
@@ -664,6 +690,11 @@ impl Node {
                         "Skipping DKG gossip for s{} as we have reached termination",
                         session_info.session_id.sum()
                     );
+
+                    if !self.had_sap_change_since(&session_info.session_id) {
+                        cmds.extend(self.gossip_handover_trigger(&session_info.session_id));
+                    }
+
                     continue;
                 }
                 Ok(false) => {}
