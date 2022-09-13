@@ -14,7 +14,7 @@ use sn_dbc::Error as DbcError;
 use sn_interface::{
     messaging::data::{DataQuery, Error as ErrorMsg},
     messaging::system::DkgSessionId,
-    types::{convert_dt_error_to_error_msg, DataAddress, Peer, PublicKey},
+    types::{convert_dt_error_to_error_msg, DataAddress, Peer},
 };
 
 use ed25519::Signature;

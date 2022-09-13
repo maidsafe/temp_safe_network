@@ -31,7 +31,6 @@ use sn_interface::{
             JoinResponse,
             NodeCmd,
             NodeEvent,
-            NodeMsgAuthorityUtils,
             NodeQuery,
             Proposal as ProposalMsg,
             SystemMsg,

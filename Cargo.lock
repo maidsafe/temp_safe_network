@@ -181,7 +181,7 @@ version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "83e21f3a490c72b3b0cf44962180e60045de2925d8dff97918f7ee43c8f637c7"
 dependencies = [
- "autocfg",
+ "autocfg 1.1.0",
  "concurrent-queue",
  "futures-lite",
  "libc",
@@ -220,7 +220,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02111fd8655a613c25069ea89fc8d9bb89331fa77486eb3bc059ee757cfa481c"
 dependencies = [
  "async-io",
- "autocfg",
+ "autocfg 1.1.0",
  "blocking",
  "cfg-if",
  "event-listener",
@@ -2584,7 +2584,7 @@ version = "0.9.75"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5f9bd0c2710541a3cda73d6f9ac4f1b240de4ae261065d309dbe73d9dceb42f"
 dependencies = [
- "autocfg",
+ "autocfg 1.1.0",
  "cc",
  "libc",
  "pkg-config",
@@ -2845,7 +2845,7 @@ version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "899b00b9c8ab553c743b3e11e87c5c7d423b2a2de229ba95b24a756344748011"
 dependencies = [
- "autocfg",
+ "autocfg 1.1.0",
  "cfg-if",
  "libc",
  "log",
@@ -4314,7 +4314,7 @@ dependencies = [
 [[package]]
 name = "sn_sdkg"
 version = "0.1.0"
-source = "git+https://github.com/maidsafe/sn_sdkg#267e0273f941e5bc5f1c52e55543bb3c6f4c8b6a"
+source = "git+https://github.com/maidsafe/sn_sdkg?branch=main#05a5a7d6494df97a323956983582cf9ffdc8e297"
 dependencies = [
  "bincode",
  "blsttc",
@@ -4640,7 +4640,7 @@ version = "1.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "89797afd69d206ccd11fb0ea560a44bbb87731d020670e79416d442919257d42"
 dependencies = [
- "autocfg",
+ "autocfg 1.1.0",
  "bytes",
  "libc",
  "memchr",

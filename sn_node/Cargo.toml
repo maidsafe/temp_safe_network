@@ -69,7 +69,7 @@ sn_consensus = "3.1.2"
 sn_dbc = { version = "8.1.0", features = ["serdes"] }
 sn_dysfunction = { path = "../sn_dysfunction", version = "^0.14.0" }
 sn_interface = { path = "../sn_interface", version = "^0.15.0" }
-sn_sdkg = { git = "https://github.com/maidsafe/sn_sdkg" }
+sn_sdkg = { git = "https://github.com/maidsafe/sn_sdkg", branch = "main" }
 # sn_sdkg = { path = "../../sn_sdkg" }
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_bytes = "~0.11.5"
