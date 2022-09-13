@@ -8,12 +8,12 @@
 
 use super::{CmdError, Error, QueryResponse, Result};
 
-use crate::messaging::{data::OperationId, SectionAuth};
+use crate::messaging::{data::OperationId, SectionAuth, ServiceAuth};
 #[allow(unused_imports)] // needed by rustdocs links
 use crate::types::register::Register;
 use crate::types::{
     register::{Entry, EntryHash, Policy, RegisterOp, User},
-    RegisterAddress,
+    utils, RegisterAddress,
 };
 use tiny_keccak::{Hasher, Sha3};
 
@@ -133,7 +133,7 @@ pub struct SignedRegisterCreate {
     /// A signature carrying authority to perform the operation.
     ///
     /// This will be verified against the register's owner and permissions.
-    pub auth: crate::messaging::ServiceAuth,
+    pub auth: ServiceAuth,
 }
 
 /// A [`Register`] write operation signed by the requester.
@@ -144,7 +144,7 @@ pub struct SignedRegisterEdit {
     /// A signature carrying authority to perform the operation.
     ///
     /// This will be verified against the register's owner and permissions.
-    pub auth: crate::messaging::ServiceAuth,
+    pub auth: ServiceAuth,
 }
 
 impl SignedRegisterCreate {
@@ -221,10 +221,10 @@ impl RegisterQuery {
     /// and responses at clients.
     /// Must be the same as the query response
     pub fn operation_id(&self) -> Result<OperationId> {
-        let bytes = crate::types::utils::encode(&self).map_err(|_| Error::NoOperationId)?;
+        let bytes = utils::serialise(&self).map_err(|_| Error::NoOperationId)?;
         let mut hasher = Sha3::v256();
         let mut output = [0; 32];
-        hasher.update(bytes.as_bytes());
+        hasher.update(&bytes);
         hasher.finalize(&mut output);
         Ok(OperationId(output))
     }

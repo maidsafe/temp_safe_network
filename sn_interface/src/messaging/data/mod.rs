@@ -68,10 +68,10 @@ impl Debug for OperationId {
 
 /// Return operation Id of a chunk
 pub fn chunk_operation_id(address: &ChunkAddress) -> Result<OperationId> {
-    let bytes = utils::encode(address).map_err(|_| Error::NoOperationId)?;
+    let bytes = utils::serialise(address).map_err(|_| Error::NoOperationId)?;
     let mut hasher = Sha3::v256();
     let mut output = [0; 32];
-    hasher.update(bytes.as_bytes());
+    hasher.update(&bytes);
     hasher.finalize(&mut output);
 
     Ok(OperationId(output))
