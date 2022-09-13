@@ -8,12 +8,12 @@
 
 use super::{CmdError, Error, QueryResponse, Result};
 
-use crate::messaging::{data::OperationId, SectionAuth};
+use crate::messaging::{data::OperationId, SectionAuth, ServiceAuth};
 #[allow(unused_imports)] // needed by rustdocs links
 use crate::types::register::Register;
 use crate::types::{
     register::{Entry, EntryHash, Policy, RegisterOp, User},
-    RegisterAddress,
+    utils, RegisterAddress,
 };
 use tiny_keccak::{Hasher, Sha3};
 
@@ -133,7 +133,7 @@ pub struct SignedRegisterCreate {
     /// A signature carrying authority to perform the operation.
     ///
     /// This will be verified against the register's owner and permissions.
-    pub auth: crate::messaging::ServiceAuth,
+    pub auth: ServiceAuth,
 }
 
 /// A [`Register`] write operation signed by the requester.
@@ -144,7 +144,7 @@ pub struct SignedRegisterEdit {
     /// A signature carrying authority to perform the operation.
     ///
     /// This will be verified against the register's owner and permissions.
-    pub auth: crate::messaging::ServiceAuth,
+    pub auth: ServiceAuth,
 }
 
 impl SignedRegisterCreate {
@@ -165,31 +165,17 @@ impl RegisterQuery {
     /// Creates a Response containing an error, with the Response variant corresponding to the
     /// Request variant.
     pub fn error(&self, error: Error) -> Result<QueryResponse> {
+        let op_id = self.operation_id()?;
         match *self {
-            Self::Get(_) => Ok(QueryResponse::GetRegister((
-                Err(error),
-                self.operation_id()?,
-            ))),
-            Self::Read(_) => Ok(QueryResponse::ReadRegister((
-                Err(error),
-                self.operation_id()?,
-            ))),
-            Self::GetPolicy(_) => Ok(QueryResponse::GetRegisterPolicy((
-                Err(error),
-                self.operation_id()?,
-            ))),
+            Self::Get(_) => Ok(QueryResponse::GetRegister((Err(error), op_id))),
+            Self::Read(_) => Ok(QueryResponse::ReadRegister((Err(error), op_id))),
+            Self::GetPolicy(_) => Ok(QueryResponse::GetRegisterPolicy((Err(error), op_id))),
             Self::GetUserPermissions { .. } => Ok(QueryResponse::GetRegisterUserPermissions((
                 Err(error),
-                self.operation_id()?,
+                op_id,
             ))),
-            Self::GetEntry { .. } => Ok(QueryResponse::GetRegisterEntry((
-                Err(error),
-                self.operation_id()?,
-            ))),
-            Self::GetOwner(_) => Ok(QueryResponse::GetRegisterOwner((
-                Err(error),
-                self.operation_id()?,
-            ))),
+            Self::GetEntry { .. } => Ok(QueryResponse::GetRegisterEntry((Err(error), op_id))),
+            Self::GetOwner(_) => Ok(QueryResponse::GetRegisterOwner((Err(error), op_id))),
         }
     }
 
@@ -221,10 +207,10 @@ impl RegisterQuery {
     /// and responses at clients.
     /// Must be the same as the query response
     pub fn operation_id(&self) -> Result<OperationId> {
-        let bytes = crate::types::utils::encode(&self).map_err(|_| Error::NoOperationId)?;
+        let bytes = utils::serialise(&self).map_err(|_| Error::NoOperationId)?;
         let mut hasher = Sha3::v256();
         let mut output = [0; 32];
-        hasher.update(bytes.as_bytes());
+        hasher.update(&bytes);
         hasher.finalize(&mut output);
         Ok(OperationId(output))
     }

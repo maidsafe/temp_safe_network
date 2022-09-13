@@ -68,10 +68,10 @@ impl Debug for OperationId {
 
 /// Return operation Id of a chunk
 pub fn chunk_operation_id(address: &ChunkAddress) -> Result<OperationId> {
-    let bytes = utils::encode(address).map_err(|_| Error::NoOperationId)?;
+    let bytes = utils::serialise(address).map_err(|_| Error::NoOperationId)?;
     let mut hasher = Sha3::v256();
     let mut output = [0; 32];
-    hasher.update(bytes.as_bytes());
+    hasher.update(&bytes);
     hasher.finalize(&mut output);
 
     Ok(OperationId(output))
@@ -234,17 +234,17 @@ impl QueryResponse {
     /// Returns true if the result returned is a success or not
     pub fn is_success(&self) -> bool {
         use QueryResponse::*;
-        match self {
-            GetChunk(result) => result.is_ok(),
-            GetRegister((result, _op_id)) => result.is_ok(),
-            GetRegisterEntry((result, _op_id)) => result.is_ok(),
-            GetRegisterOwner((result, _op_id)) => result.is_ok(),
-            ReadRegister((result, _op_id)) => result.is_ok(),
-            GetRegisterPolicy((result, _op_id)) => result.is_ok(),
-            GetRegisterUserPermissions((result, _op_id)) => result.is_ok(),
-            SpentProofShares((result, _op_id)) => result.is_ok(),
-            FailedToCreateOperationId => false,
-        }
+        matches!(
+            self,
+            GetChunk(Ok(_))
+                | GetRegister((Ok(_), _))
+                | GetRegisterEntry((Ok(_), _))
+                | GetRegisterOwner((Ok(_), _))
+                | ReadRegister((Ok(_), _))
+                | GetRegisterPolicy((Ok(_), _))
+                | GetRegisterUserPermissions((Ok(_), _))
+                | SpentProofShares((Ok(_), _))
+        )
     }
 
     /// Returns true if the result returned is DataNotFound
