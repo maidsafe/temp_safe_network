@@ -28,10 +28,10 @@ pub use self::{
     spentbook::{SpentbookCmd, SpentbookQuery},
 };
 
-use crate::messaging::{data::Error as ErrorMsg, MsgId};
+use crate::messaging::MsgId;
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register, User},
-    utils, Chunk, ChunkAddress, DataAddress,
+    utils, Chunk, ChunkAddress,
 };
 
 use bytes::Bytes;
@@ -202,7 +202,7 @@ pub enum QueryResponse {
     /// Response to [`GetChunk`]
     ///
     /// [`GetChunk`]: crate::messaging::data::DataQueryVariant::GetChunk
-    GetChunk(Result<Chunk>),
+    GetChunk((Result<Chunk>, OperationId)),
     //
     // ===== Register Data =====
     //
@@ -236,7 +236,7 @@ impl QueryResponse {
         use QueryResponse::*;
         matches!(
             self,
-            GetChunk(Ok(_))
+            GetChunk((Ok(_), _))
                 | GetRegister((Ok(_), _))
                 | GetRegisterEntry((Ok(_), _))
                 | GetRegisterOwner((Ok(_), _))
@@ -252,7 +252,7 @@ impl QueryResponse {
         use QueryResponse::*;
         matches!(
             self,
-            GetChunk(Err(Error::DataNotFound(_)))
+            GetChunk((Err(Error::DataNotFound(_)), _))
                 | GetRegister((Err(Error::DataNotFound(_)), _))
                 | GetRegisterEntry((Err(Error::DataNotFound(_)), _))
                 | GetRegisterOwner((Err(Error::DataNotFound(_)), _))
@@ -270,22 +270,8 @@ impl QueryResponse {
 
         // TODO: Operation Id should eventually encompass _who_ the op is for.
         match self {
-            GetChunk(result) => match result {
-                Ok(chunk) => chunk_operation_id(chunk.address()),
-                Err(ErrorMsg::DataNotFound(DataAddress::Bytes(name))) => chunk_operation_id(name),
-                Err(ErrorMsg::DataNotFound(another_address)) => {
-                    error!(
-                        "{:?} address returned when we were expecting a ChunkAddress",
-                        another_address
-                    );
-                    Err(Error::NoOperationId)
-                }
-                Err(another_error) => {
-                    error!("Could not form operation id: {:?}", another_error);
-                    Err(Error::InvalidQueryResponseErrorForOperationId)
-                }
-            },
-            GetRegister((_, operation_id))
+            GetChunk((_, operation_id))
+            | GetRegister((_, operation_id))
             | GetRegisterEntry((_, operation_id))
             | GetRegisterOwner((_, operation_id))
             | ReadRegister((_, operation_id))
@@ -331,8 +317,8 @@ impl TryFrom<QueryResponse> for Chunk {
     type Error = TryFromError;
     fn try_from(response: QueryResponse) -> std::result::Result<Self, Self::Error> {
         match response {
-            QueryResponse::GetChunk(Ok(data)) => Ok(data),
-            QueryResponse::GetChunk(Err(error)) => Err(TryFromError::Response(error)),
+            QueryResponse::GetChunk((Ok(data), _op_id)) => Ok(data),
+            QueryResponse::GetChunk((Err(error), _op_id)) => Err(TryFromError::Response(error)),
             _ => Err(TryFromError::WrongType),
         }
     }
@@ -396,15 +382,16 @@ mod tests {
 
         let i_data = Chunk::new(Bytes::from(vec![1, 3, 1, 4]));
         let e = Error::AccessDenied(key);
+        let op_id = chunk_operation_id(i_data.address())?;
         assert_eq!(
             i_data,
-            GetChunk(Ok(i_data.clone()))
+            GetChunk((Ok(i_data.clone()), op_id))
                 .try_into()
                 .map_err(|_| eyre!("Mismatched types".to_string()))?
         );
         assert_eq!(
             Err(TryFromError::Response(e.clone())),
-            Chunk::try_from(GetChunk(Err(e)))
+            Chunk::try_from(GetChunk((Err(e), op_id)))
         );
 
         Ok(())

@@ -50,9 +50,6 @@ pub enum Error {
     /// There was an error forming the OperationId
     #[error("Operation id could not be derived.")]
     NoOperationId,
-    /// Error is not valid for operation id generation. This should not absolve a pending (and thus far unfulfilled) operation
-    #[error("Could not generate operation id for chunk retrieval. Error was not 'DataNotFound'.")]
-    InvalidQueryResponseErrorForOperationId,
     /// Failed to verify a spent proof since it's signed by unknown section key
     #[error("Spent proof was signed with unknown section key: {0:?}")]
     SpentProofUnknownSectionKey(bls::PublicKey),

@@ -241,14 +241,14 @@ impl Session {
         let response = loop {
             let mut error_response = None;
             match (receiver.recv().await, chunk_addr) {
-                (Some(QueryResponse::GetChunk(Ok(chunk))), Some(chunk_addr)) => {
+                (Some(QueryResponse::GetChunk((Ok(chunk), op_id))), Some(chunk_addr)) => {
                     // We are dealing with Chunk query responses, thus we validate its hash
                     // matches its xorname, if so, we don't need to await for more responses
                     debug!("Chunk QueryResponse received is: {:#?}", chunk);
 
                     if chunk_addr.name() == chunk.name() {
                         trace!("Valid Chunk received for {:?}", msg_id);
-                        break Some(QueryResponse::GetChunk(Ok(chunk)));
+                        break Some(QueryResponse::GetChunk((Ok(chunk), op_id)));
                     } else {
                         // the Chunk content doesn't match its XorName,
                         // this is suspicious and it could be a byzantine node
@@ -259,7 +259,7 @@ impl Session {
                 // Erring on the side of positivity. \
                 // Saving error, but not returning until we have more responses in
                 // (note, this will overwrite prior errors, so we'll just return whichever was last received)
-                (response @ Some(QueryResponse::GetChunk(Err(_))), Some(_))
+                (response @ Some(QueryResponse::GetChunk((Err(_), _))), Some(_))
                 | (response @ Some(QueryResponse::GetRegister((Err(_), _))), None)
                 | (response @ Some(QueryResponse::GetRegisterPolicy((Err(_), _))), None)
                 | (response @ Some(QueryResponse::GetRegisterOwner((Err(_), _))), None)

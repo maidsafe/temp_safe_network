@@ -317,7 +317,10 @@ mod tests {
 
         let query_response = storage.query(&query, user).await;
 
-        assert_eq!(query_response, NodeQueryResponse::GetChunk(Ok(chunk)));
+        assert_eq!(
+            query_response,
+            NodeQueryResponse::GetChunk((Ok(chunk), query.operation_id()?))
+        );
 
         // Remove from storage
         storage.remove(&replicated_data.address()).await?;
@@ -548,7 +551,7 @@ mod tests {
 
                     match model_res {
                         Some(m_res) => {
-                            if let NodeQueryResponse::GetChunk(Ok(s_chunk)) = stored_res {
+                            if let NodeQueryResponse::GetChunk((Ok(s_chunk), _)) = stored_res {
                                 if let ReplicatedData::Chunk(m_chunk) = m_res {
                                     assert_eq!(*m_chunk, s_chunk);
                                 }
@@ -557,7 +560,7 @@ mod tests {
                             }
                         }
                         None => {
-                            if let NodeQueryResponse::GetChunk(Ok(_)) = stored_res {
+                            if let NodeQueryResponse::GetChunk((Ok(_), _)) = stored_res {
                                 return Err(Error::DataExists(DataAddress::Bytes(addr)));
                             }
                         }

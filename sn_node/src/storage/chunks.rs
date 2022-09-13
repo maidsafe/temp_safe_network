@@ -9,7 +9,7 @@
 use super::{list_files_in, prefix_tree_path, Error, Result, UsedSpace};
 
 use sn_interface::{
-    messaging::system::NodeQueryResponse,
+    messaging::{data::chunk_operation_id, system::NodeQueryResponse},
     types::{log_markers::LogMarker, Chunk, ChunkAddress, DataAddress},
 };
 
@@ -102,7 +102,13 @@ impl ChunkStorage {
     // Read chunk from local store and return NodeQueryResponse
     pub(super) async fn get(&self, address: &ChunkAddress) -> NodeQueryResponse {
         trace!("{:?}", LogMarker::ChunkQueryReceviedAtAdult);
-        NodeQueryResponse::GetChunk(self.get_chunk(address).await.map_err(|error| error.into()))
+        match chunk_operation_id(address) {
+            Ok(op_id) => NodeQueryResponse::GetChunk((
+                self.get_chunk(address).await.map_err(|error| error.into()),
+                op_id,
+            )),
+            Err(_) => NodeQueryResponse::FailedToCreateOperationId,
+        }
     }
 
     /// Store a chunk in the local disk store

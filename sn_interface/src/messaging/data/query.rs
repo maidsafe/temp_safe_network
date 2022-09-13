@@ -57,7 +57,10 @@ impl DataQueryVariant {
         use DataQueryVariant::*;
         match self {
             #[cfg(feature = "chunks")]
-            GetChunk(_) => Ok(QueryResponse::GetChunk(Err(error))),
+            GetChunk(addr) => Ok(QueryResponse::GetChunk((
+                Err(error),
+                chunk_operation_id(addr)?,
+            ))),
             #[cfg(feature = "registers")]
             Register(q) => q.error(error),
             #[cfg(feature = "spentbook")]

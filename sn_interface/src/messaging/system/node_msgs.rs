@@ -89,7 +89,7 @@ pub enum NodeQueryResponse {
     /// Response to [`GetChunk`]
     ///
     /// [`GetChunk`]: crate::messaging::data::DataQueryVariant::GetChunk
-    GetChunk(Result<Chunk>),
+    GetChunk((Result<Chunk>, OperationId)),
     //
     // ===== Register Data =====
     //
