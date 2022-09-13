@@ -9,7 +9,7 @@
 use super::{CmdError, Error, QueryResponse, Result};
 
 use crate::messaging::data::OperationId;
-use crate::types::SpentbookAddress;
+use crate::types::{utils, SpentbookAddress};
 use tiny_keccak::{Hasher, Sha3};
 
 use serde::{Deserialize, Serialize};
@@ -67,10 +67,10 @@ impl SpentbookQuery {
     /// and responses at clients.
     /// Must be the same as the query response
     pub fn operation_id(&self) -> Result<OperationId> {
-        let bytes = crate::types::utils::encode(&self).map_err(|_| Error::NoOperationId)?;
+        let bytes = utils::serialise(&self).map_err(|_| Error::NoOperationId)?;
         let mut hasher = Sha3::v256();
         let mut output = [0; 32];
-        hasher.update(bytes.as_bytes());
+        hasher.update(&bytes);
         hasher.finalize(&mut output);
         Ok(OperationId(output))
     }
