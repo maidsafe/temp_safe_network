@@ -63,8 +63,6 @@ pub enum Error {
     MissingSecretKeyShare(bls::PublicKey),
     #[error("Failed to send a message to {0}")]
     FailedSend(Peer),
-    #[error("Link to peer has been dropped {0}")]
-    PeerLinkDropped(Peer),
     #[error("Messaging protocol error: {0}")]
     Messaging(#[from] sn_interface::messaging::Error),
     #[error("Membership error: {0}")]

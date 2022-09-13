@@ -325,8 +325,6 @@ impl NetworkKnowledge {
 
     /// Update our network knowledge if the provided SAP is valid and can be verified
     /// with the provided proof chain.
-    /// If the '`update_sap`' flag is set to 'true', the provided SAP and chain will be
-    /// set as our current.
     pub fn update_knowledge_if_valid(
         &mut self,
         signed_sap: SectionAuth<SectionAuthorityProvider>,
@@ -338,60 +336,37 @@ impl NetworkKnowledge {
         let mut there_was_an_update = false;
         let provided_sap = signed_sap.value.clone();
 
-        // Update the network section tree
+        // Do we have the key share needed to perform elder duties?
+        let we_have_a_share_of_this_key = section_keys_provider
+            .key_share(&signed_sap.section_key())
+            .is_ok();
+        // check we should be _becoming_ an elder
+        let we_should_become_an_elder = provided_sap.contains_elder(our_name);
+        trace!("we_have_a_share_of_this_key: {we_have_a_share_of_this_key}, we_should_become_an_elder: {we_should_become_an_elder}");
+
+        // This prevent us from updating our NetworkKnowledge based on an AE message where
+        // we don't have the key share for the new SAP, making this node unable to sign section
+        // messages and possibly being kicked out of the group of Elders.
+        if we_should_become_an_elder && !we_have_a_share_of_this_key {
+            warn!("We should be an elder, but we're missing the keyshare!, ignoring update");
+            return Ok(false);
+        };
+        if we_have_a_share_of_this_key && !we_should_become_an_elder {
+            warn!("We have the keyshare but we are not an elder");
+        };
+
+        // If the update is for a different prefix, we just update the section_tree; else we should
+        // update the section_tree and signed_sap together. Or else they might go out of sync and
+        // querying section_tree using signed_sap will result in undesirable effect
         match self.section_tree.update(signed_sap.clone(), partial_dag) {
             Ok(true) => {
                 there_was_an_update = true;
-                debug!(
+                info!(
                     "Updated network section tree with SAP for {:?}",
                     provided_sap.prefix()
                 );
-
-                // and if we are... do we have the key share needed to perform elder duties
-                let mut we_have_a_share_of_this_key = false;
-
-                // lets find out if we should be an elder after the change
-                let we_are_an_adult = !self.is_elder(our_name);
-
-                // check we should not be _becoming_ an elder
-                let we_should_become_an_elder = if we_are_an_adult {
-                    provided_sap.contains_elder(our_name)
-                } else {
-                    true
-                };
-
-                if !we_are_an_adult || we_should_become_an_elder {
-                    we_have_a_share_of_this_key = section_keys_provider
-                        .key_share(&signed_sap.section_key())
-                        .is_ok();
-                }
-
-                trace!(
-                    "we_are_an_adult: {we_are_an_adult},we_have_a_share_of_this_key: {we_have_a_share_of_this_key}"
-                );
-
-                // if we're an adult, we accept the validated sap
-                // if we have a keyshare, we're an eder and we should continue with this validated sap
-                // if we are an elder candidate, only switch to the new sap when have the key share
-                let switch_to_new_sap =
-                    we_have_a_share_of_this_key || (we_are_an_adult && !we_should_become_an_elder);
-
-                trace!(
-                    "update_knowledge_if_valid: will switch_to_new_sap {:?}",
-                    switch_to_new_sap
-                );
-
-                // if we're not an adult, but we don't have a key share...
-                // something is wrong
-                if !we_are_an_adult && !we_have_a_share_of_this_key {
-                    error!("We should be an elder, but we're missing the keyshare!");
-                }
-
-                // We try to update our SAP and own chain only if we were flagged to,
-                // otherwise this update could be due to an AE message and we still don't have
-                // the key share for the new SAP, making this node unable to sign section messages
-                // and possibly being kicked out of the group of Elders.
-                if switch_to_new_sap && provided_sap.prefix().matches(our_name) {
+                // update the signed_sap only if the prefix matches
+                if provided_sap.prefix().matches(our_name) {
                     let our_prev_prefix = self.prefix();
                     // Remove any peer which doesn't belong to our new section's prefix
                     self.section_peers.retain(&provided_sap.prefix());
@@ -426,6 +401,7 @@ impl NetworkKnowledge {
                     "Anti-Entropy: discarded SAP for {:?} since we failed to update section tree with: {:?}",
                     provided_sap.prefix(), err
                 );
+                return Err(err);
             }
         }
 

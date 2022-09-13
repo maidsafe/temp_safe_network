@@ -558,11 +558,6 @@ mod core {
                 return Ok(vec![]);
             }
 
-            if new.section_key == old.section_key {
-                // there was no change
-                return Ok(vec![]);
-            }
-
             let mut cmds = vec![];
 
             if new.is_elder {

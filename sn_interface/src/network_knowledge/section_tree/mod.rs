@@ -269,22 +269,23 @@ impl SectionTree {
         // We can now update our knowledge of the remote section's SAP.
         // Note: we don't expect the same SAP to be found in our records
         // for the prefix since we've already checked that above.
-        let changed = self.insert(signed_sap);
-
-        // update our sections_dag with the proof_chain. Cannot be an error, since in cases where we
-        // have outdated SAP (aware of prefix)/ not aware of the prefix, we have the proof_chains's
-        // root/child key in our sections_dag. Checked in the above match statement.
-        self.sections_dag.merge(partial_dag.clone())?;
-
-        for (prefix, section_key) in &self.sections {
-            debug!(
-                "Known prefix,section_key after update: {:?} = {:?}",
-                prefix, section_key
-            );
+        if self.insert(signed_sap) {
+            // update our sections_dag with the proof_chain. Cannot be an error, since in cases where we
+            // have outdated SAP (aware of prefix)/ not aware of the prefix, we have the proof_chains's
+            // root/child key in our sections_dag. Checked in the above match statement.
+            self.sections_dag.merge(partial_dag.clone())?;
+            for (prefix, section_key) in &self.sections {
+                debug!(
+                    "Known prefix,section_key after update: {:?} = {:?}",
+                    prefix, section_key
+                );
+            }
+            debug!("updated sections_dag: {:?}", self.sections_dag);
+            Ok(true)
+        } else {
+            debug!("SectionTree not updated");
+            Ok(false)
         }
-        debug!("updated sections_dag: {:?}", self.sections_dag);
-
-        Ok(changed)
     }
 
     /// Returns the known section public keys.
