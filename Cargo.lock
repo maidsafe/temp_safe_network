@@ -4314,7 +4314,7 @@ dependencies = [
 [[package]]
 name = "sn_sdkg"
 version = "0.1.0"
-source = "git+https://github.com/maidsafe/sn_sdkg?branch=main#05a5a7d6494df97a323956983582cf9ffdc8e297"
+source = "git+https://github.com/maidsafe/sn_sdkg?rev=5c21993#5c2199353cfe0b3c0e88e206a409e505bd807310"
 dependencies = [
  "bincode",
  "blsttc",
