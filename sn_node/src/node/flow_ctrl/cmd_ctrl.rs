@@ -65,8 +65,8 @@ impl CmdCtrl {
         self.dispatcher.node()
     }
 
-    pub(crate) async fn push(&mut self, cmd: Cmd) {
-        self.push_internal(cmd, None).await
+    pub(crate) async fn push(&mut self, cmd: Cmd, parent_id: Option<usize>) {
+        self.push_internal(cmd, parent_id).await
     }
 
     /// Does the cmd_queue contain _anything_

@@ -85,7 +85,7 @@ impl FlowCtrl {
 
         for cmd in cmds {
             // dont use sender here incase channel gets full
-            self.fire_and_forget(cmd).await;
+            self.fire_and_forget(cmd, None).await;
         }
     }
 
@@ -104,7 +104,7 @@ impl FlowCtrl {
 
         for cmd in cmds {
             // dont use sender here incase channel gets full
-            self.fire_and_forget(cmd).await;
+            self.fire_and_forget(cmd, None).await;
         }
     }
 
@@ -164,7 +164,7 @@ impl FlowCtrl {
 
         for cmd in cmds {
             // dont use sender here incase channel gets full
-            self.fire_and_forget(cmd).await;
+            self.fire_and_forget(cmd, None).await;
         }
     }
 

@@ -85,7 +85,7 @@ impl FlowCtrl {
     async fn enqeue_new_cmds_from_channel(&mut self) -> Result<()> {
         loop {
             match self.incoming_cmds_from_apis.try_recv() {
-                Ok((cmd, _id)) => self.fire_and_forget(cmd).await,
+                Ok((cmd, id)) => self.fire_and_forget(cmd, id).await,
                 Err(TryRecvError::Empty) => {
                     // do nothing else
                     return Ok(());
@@ -112,7 +112,7 @@ impl FlowCtrl {
                     };
 
                     // dont use sender here incase channel gets full
-                    self.fire_and_forget(cmd).await;
+                    self.fire_and_forget(cmd, None).await;
                 }
                 Err(TryRecvError::Empty) => {
                     // do nothing else
@@ -207,8 +207,8 @@ impl FlowCtrl {
     }
 
     /// Does not await the completion of the cmd.
-    pub(crate) async fn fire_and_forget(&mut self, cmd: Cmd) {
-        self.cmd_ctrl.push(cmd).await
+    pub(crate) async fn fire_and_forget(&mut self, cmd: Cmd, parent_id: Option<usize>) {
+        self.cmd_ctrl.push(cmd, parent_id).await
     }
 
     // Listen for a new incoming connection event and handle it.
