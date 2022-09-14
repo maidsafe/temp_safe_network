@@ -200,6 +200,56 @@ mod tests {
     }
 
     #[test]
+    fn register_generate_entry_hash() -> Result<()> {
+        let authority_keypair = Keypair::new_ed25519();
+        let authority = User::Key(authority_keypair.public_key());
+
+        let name: XorName = xor_name::rand::random();
+        let tag = 43_000u64;
+
+        let mut replica1 = Register::new(
+            authority,
+            name,
+            tag,
+            Policy {
+                owner: authority,
+                permissions: BTreeMap::default(),
+            },
+        );
+        let mut replica2 = Register::new(
+            authority,
+            name,
+            tag,
+            Policy {
+                owner: authority,
+                permissions: BTreeMap::default(),
+            },
+        );
+
+        // Different item from same replica's root shall having different entry_hash
+        let item1 = random_register_entry();
+        let item2 = random_register_entry();
+        let (entry_hash1_1, _) = replica1.write(item1.clone(), BTreeSet::new())?;
+        let (entry_hash1_2, _) = replica1.write(item2, BTreeSet::new())?;
+        assert!(entry_hash1_1 != entry_hash1_2);
+
+        // Same item from different replica's root shall remain same
+        let (entry_hash2_1, _) = replica2.write(item1, BTreeSet::new())?;
+        assert_eq!(entry_hash1_1, entry_hash2_1);
+
+        let mut parents = BTreeSet::new();
+        // Different item from different replica with same parents shall be different
+        let _ = parents.insert(entry_hash1_1);
+        let item3 = random_register_entry();
+        let item4 = random_register_entry();
+        let (entry_hash1_1_3, _) = replica1.write(item3, parents.clone())?;
+        let (entry_hash2_1_4, _) = replica2.write(item4, parents.clone())?;
+        assert!(entry_hash1_1_3 != entry_hash2_1_4);
+
+        Ok(())
+    }
+
+    #[test]
     fn register_concurrent_write_ops() -> Result<()> {
         let authority_keypair1 = Keypair::new_ed25519();
         let authority1 = User::Key(authority_keypair1.public_key());
