@@ -317,13 +317,9 @@ impl Comm {
 
     /// Get a PeerSession if it already exists, otherwise create and insert
     #[instrument(skip(self))]
-    async fn get_or_create(&self, peer: &Peer, require_existing: bool) -> Option<PeerSession> {
-        if require_existing {
-            if let Some(entry) = self.sessions.get(peer) {
-                return Some(entry.value().clone());
-            } else {
-                return None;
-            }
+    async fn get_or_create(&self, peer: &Peer) -> Option<PeerSession> {
+        if let Some(entry) = self.sessions.get(peer) {
+            return Some(entry.value().clone());
         }
         let link = Link::new(*peer, self.our_endpoint.clone(), self.msg_listener.clone());
         let session = PeerSession::new(link);
@@ -372,8 +368,11 @@ impl Comm {
             recipient
         );
 
-        if let Some(peer) = self.get_or_create(&recipient, is_msg_for_client).await {
-            return Ok(Some(peer.sendddd(msg_id, bytes, is_msg_for_client).await?));
+        if let Some(peer) = self.get_or_create(&recipient).await {
+            Ok(Some(
+                peer.send_using_session(msg_id, bytes, is_msg_for_client)
+                    .await?,
+            ))
         } else {
             debug!("No client conn exists to send this msg on.... {msg_id:?}");
             Ok(None)

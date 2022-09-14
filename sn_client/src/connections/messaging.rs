@@ -133,7 +133,6 @@ impl Session {
                 Err(_err) => {
                     // this is not an error..the channel is just empty atm
                 }
-
             }
             attempts += 1;
             if attempts >= expected_cmd_ack_wait_attempts {

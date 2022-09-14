@@ -84,7 +84,7 @@ impl PeerSession {
     }
 
     #[instrument(skip(self, bytes))]
-    pub(crate) async fn sendddd(
+    pub(crate) async fn send_using_session(
         &self,
         msg_id: MsgId,
         bytes: UsrMsgBytes,
