@@ -119,7 +119,7 @@ impl Link {
         bytes: UsrMsgBytes,
         priority: i32,
         retry_config: Option<&RetryConfig>,
-        should_establish_new_connection: bool
+        should_establish_new_connection: bool,
     ) -> Result<(), SendToOneError> {
         let conn = self.get_or_connect(should_establish_new_connection).await?;
         trace!(
@@ -149,17 +149,19 @@ impl Link {
         }
     }
 
-    async fn get_or_connect(&mut self, should_establish_new_connection: bool) -> Result<qp2p::Connection, SendToOneError> {
+    async fn get_or_connect(
+        &mut self,
+        should_establish_new_connection: bool,
+    ) -> Result<qp2p::Connection, SendToOneError> {
         // get the most recently used connection
         match self.queue.peek_max().map(|(id, _prio)| id.clone()) {
             None => {
                 if should_establish_new_connection {
                     self.create_connection().await
-                }
-                else {
+                } else {
                     Err(SendToOneError::NoConnection)
                 }
-            },
+            }
             Some(id) => self.read_conn(id).await,
         }
     }
@@ -299,7 +301,7 @@ pub(crate) enum SendToOneError {
     ///
     Send(qp2p::SendError),
     /// No Connection Exists to send on, as required by should_establish_new_connection
-    NoConnection
+    NoConnection,
 }
 
 impl SendToOneError {
@@ -311,7 +313,8 @@ impl SendToOneError {
             SendToOneError::Connection(qp2p::ConnectionError::Closed(qp2p::Close::Local))
                 | SendToOneError::Send(qp2p::SendError::ConnectionLost(
                     qp2p::ConnectionError::Closed(qp2p::Close::Local)
-                )) | SendToOneError::NoConnection
+                ))
+                | SendToOneError::NoConnection
         )
     }
 }

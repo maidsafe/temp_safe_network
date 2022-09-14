@@ -646,7 +646,9 @@ mod tests {
                 let peer = Peer::new(xor_name::rand::random(), addr0);
                 let msg = new_test_msg(dst(peer))?;
                 // Send a message to establish the connection
-                comm1.send_out_bytes(peer, msg.msg_id(), msg.serialize()?).await?;
+                comm1
+                    .send_out_bytes(peer, msg.msg_id(), msg.serialize()?)
+                    .await?;
 
                 assert_matches!(rx0.recv().await, Some(MsgEvent::Received { .. }));
 
