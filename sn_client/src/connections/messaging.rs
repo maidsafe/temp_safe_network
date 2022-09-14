@@ -158,7 +158,7 @@ impl Session {
                     break;
                 }
 
-                tokio::time::sleep(Duration::from_millis(50)).await;
+                // tokio::time::sleep(Duration::from_millis(50)).await;
 
                 debug!("insufficient acks returned so far for {cmd_id:?}: {actual_ack_count}/{expected_acks}");
             }
