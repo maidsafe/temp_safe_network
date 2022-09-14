@@ -486,6 +486,62 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn register_hashes_dont_clash() -> Result<()> {
+        init_logger();
+        let start_span =
+            tracing::info_span!("test__register_write_without_publish_start").entered();
+
+        let client = create_test_client().await?;
+
+        let name = xor_name::rand::random();
+        let tag = 10;
+        let owner = User::Key(client.public_key());
+
+        let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
+        client.publish_register_ops(batch).await?;
+
+        let value_1 = random_register_entry();
+
+        // Different entries written to the same rigister from root shall giving different hash
+        let (value1_hash, _batch) = client
+            .write_to_register(address, value_1.clone(), BTreeSet::new())
+            .await?;
+
+        let value_2 = random_register_entry();
+        drop(start_span);
+        let second_span =
+            tracing::info_span!("test__register_write_without_publish__second_write").entered();
+
+        let (value2_hash, _batch) = client
+            .write_to_register(address, value_2.clone(), BTreeSet::new())
+            .await?;
+
+        assert!(value1_hash != value2_hash);
+
+        // Different entries written to the same rigister from the same children shall giving different hash
+        let mut children = BTreeSet::new();
+        let _ = children.insert(value1_hash);
+
+        let value_3 = random_register_entry();
+        drop(second_span);
+        let _third_span =
+            tracing::info_span!("test__register_write_without_publish__third_write").entered();
+
+        let (value1_3_hash, _batch) = client
+            .write_to_register(address, value_3.clone(), children.clone())
+            .await?;
+        let (value1_2_hash, _batch) = client
+            .write_to_register(address, value_2.clone(), children.clone())
+            .await?;
+        assert!(value1_2_hash != value1_3_hash);
+
+        // Same entry written to the same rigister with different children shall giving different hash
+        assert!(value2_hash != value1_2_hash);
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn register_write() -> Result<()> {
         init_logger();
         let start_span = tracing::info_span!("test__register_write_start").entered();
