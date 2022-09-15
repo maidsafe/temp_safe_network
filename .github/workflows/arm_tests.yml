@@ -6,7 +6,6 @@ on:
 
 env:
   RUST_BACKTRACE: 1
-  RUSTFLAGS: "-D warnings"
 
 jobs:
   tests:
@@ -55,4 +54,4 @@ jobs:
         run: cross test --release --target ${{ matrix.target }} url
 
       - name: Run Data Types tests
-        run: cross test --release --target ${{ matrix.target }} types 
+        run: cross test --release --target ${{ matrix.target }} types

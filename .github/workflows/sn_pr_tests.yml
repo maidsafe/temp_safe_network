@@ -12,7 +12,6 @@ concurrency:
 
 env:
   CARGO_INCREMENTAL: 0  # bookkeeping for incremental builds has overhead, not useful in CI.
-  RUSTFLAGS: "-D warnings"
   SAFE_AUTH_PASSPHRASE: "x"
   SAFE_AUTH_PASSWORD: "y"
   NODE_COUNT: 15
@@ -327,7 +326,6 @@ jobs:
         shell: bash
         continue-on-error: true
         run: |
-          unset RUSTFLAGS # Disable `-D warnings` since statemap is 3rd party
           cargo install --git https://github.com/TritonDataCenter/statemap.git
           ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
 
@@ -496,7 +494,6 @@ jobs:
         shell: bash
         continue-on-error: true
         run: |
-          unset RUSTFLAGS # Disable `-D warnings` since statemap is 3rd party
           cargo install --git https://github.com/TritonDataCenter/statemap.git
           ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
 
@@ -624,7 +621,6 @@ jobs:
         shell: bash
         continue-on-error: true
         run: |
-          unset RUSTFLAGS # Disable `-D warnings` since statemap is 3rd party
           cargo install --git https://github.com/TritonDataCenter/statemap.git
           ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
 
@@ -747,7 +743,6 @@ jobs:
         shell: bash
         continue-on-error: true
         run: |
-          unset RUSTFLAGS # Disable `-D warnings` since statemap is 3rd party
           cargo install --git https://github.com/TritonDataCenter/statemap.git
           ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
 

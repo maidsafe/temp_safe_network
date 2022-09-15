@@ -15,7 +15,6 @@ permissions:
 env:
   CARGO_INCREMENTAL: '0'
   RUST_BACKTRACE: 1
-  RUSTFLAGS: "-D warnings"
   NODE_COUNT: 15
 
 jobs:
@@ -127,4 +126,3 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           # Push and deploy GitHub pages branch automatically
           auto-push: true
-
