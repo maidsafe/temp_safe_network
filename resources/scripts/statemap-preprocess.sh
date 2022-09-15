@@ -20,11 +20,10 @@ then
 fi
 
 log_dir="$HOME/.safe/node/local-test-network"
-genesis_log_dir="$HOME/.safe/node/local-test-network/sn-node-genesis"
 out_file="safe_states.out"
 
 # Extract statemap metadata
-rg -IN ".*STATEMAP_METADATA: " "$genesis_log_dir" --replace "" > "$out_file"
+rg -IN ".*STATEMAP_METADATA: " "$log_dir" --replace "" | head -n1 > "$out_file"
 rg -IN ".*STATEMAP_ENTRY: " "$log_dir" --replace "" | jq -s 'sort_by(.time|tonumber)' | jq -c '.[]' >> "$out_file"
 
 begin_time=$(cat safe_states.out | rg 'time' | jq -sr 'min_by(.time | tonumber) | .time')
