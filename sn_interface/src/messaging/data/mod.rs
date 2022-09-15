@@ -156,7 +156,7 @@ impl Display for ClientMsg {
 /// The response to a query, containing the query result.
 /// Response operation id should match query `operation_id`
 #[allow(clippy::large_enum_variant, clippy::type_complexity)]
-#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug, Hash)]
 pub enum QueryResponse {
     //
     // ===== Chunk =====
