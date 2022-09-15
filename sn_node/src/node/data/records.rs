@@ -184,7 +184,7 @@ impl MyNode {
             .collect::<BTreeSet<_>>();
 
         trace!(
-            "Chunk holders of {:?} are non-full adults: {:?} and full adults: {:?}",
+            "Data holders of {:?} are non-full adults: {:?} and full adults: {:?}",
             target,
             candidates,
             full_adults
