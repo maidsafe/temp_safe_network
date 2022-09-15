@@ -71,4 +71,5 @@ cargo-flamegraph.stacks
 *flamegraph.svg
 
 #statemap
+safe_states.out
 safe.svg
