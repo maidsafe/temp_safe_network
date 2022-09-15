@@ -25,7 +25,6 @@ on:
 env:
   CARGO_INCREMENTAL: '0'
   RUST_BACKTRACE: 1
-  RUSTFLAGS: "-D warnings"
 
 jobs:
   launch-testnet:
