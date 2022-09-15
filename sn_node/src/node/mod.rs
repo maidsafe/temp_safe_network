@@ -387,36 +387,31 @@ mod core {
             }
         }
 
-        /// Generate a new section info(s) based on the current set of members,
-        /// excluding any member matching a name in the provided `excluded_names` set.
+        /// Generates section infos for the best elder candidate among the members at the given generation
         /// Returns a set of candidate `DkgSessionId`'s.
-        pub(crate) fn promote_and_demote_elders(
+        pub(crate) fn best_elder_candidates_at_gen(
             &mut self,
-            excluded_names: &BTreeSet<XorName>,
+            membership_gen: u64,
         ) -> Vec<DkgSessionId> {
             let sap = self.network_knowledge.section_auth();
             let chain_len = self.network_knowledge.section_chain_len();
 
-            // get current gen and members
-            let current_gen;
+            // get members for membership gen
             let members: BTreeMap<XorName, NodeState> = if let Some(m) = self.membership.as_ref() {
-                current_gen = m.generation();
-                m.current_section_members()
+                m.section_members(membership_gen)
+                    .unwrap_or_default()
                     .iter()
-                    .filter(|(name, _node_state)| !excluded_names.contains(*name))
                     .map(|(n, s)| (*n, s.clone()))
                     .collect()
             } else {
-                error!(
-                "attempted to promote and demote elders when we don't have a membership instance"
-            );
+                error!("Attempted to find best elder candidates when we don't have a membership instance");
                 return vec![];
             };
 
             // Try splitting
             trace!("{}", LogMarker::SplitAttempt);
             if let Some((zero_dkg_id, one_dkg_id)) =
-                try_split_dkg(&members, &sap, chain_len, current_gen)
+                try_split_dkg(&members, &sap, chain_len, membership_gen)
             {
                 debug!(
                     "Upon section split attempt, section size: zero {:?}, one {:?}",
@@ -444,18 +439,12 @@ mod core {
             // Candidates for elders out of all the nodes in the section, even out of the
             // relocating nodes if there would not be enough instead.
             let sap = self.network_knowledge.section_auth();
-            let elder_candidates = elder_candidates(
-                members
-                    .values()
-                    .cloned()
-                    .filter(|node| !excluded_names.contains(&node.name)),
-                &sap,
-            );
+            let elder_candidates = elder_candidates(members.values().cloned(), &sap);
             let current_elders = BTreeSet::from_iter(sap.elders().copied());
 
             info!(
                 "ELDER CANDIDATES (current gen:{}) {}: {:?}",
-                current_gen,
+                membership_gen,
                 elder_candidates.len(),
                 elder_candidates
             );
@@ -476,7 +465,6 @@ mod core {
                 warn!("Ignore attempt to shrink the elders");
                 trace!("current_names  {:?}", current_elders);
                 trace!("expected_names {:?}", elder_candidates);
-                trace!("excluded_names {:?}", excluded_names);
                 trace!("section_peers {:?}", members);
                 vec![]
             } else {
@@ -490,7 +478,7 @@ mod core {
                     ),
                     section_chain_len: chain_len,
                     bootstrap_members: BTreeSet::from_iter(members.into_values()),
-                    membership_gen: current_gen,
+                    membership_gen,
                 };
                 // track init of DKG
                 for candidate in session_id.elders.keys() {
@@ -498,6 +486,18 @@ mod core {
                 }
 
                 vec![session_id]
+            }
+        }
+
+        /// Generates section infos for the current best elder candidate among the current members
+        /// Returns a set of candidate `DkgSessionId`'s.
+        pub(crate) fn best_elder_candidates(&mut self) -> Vec<DkgSessionId> {
+            match self.membership.as_ref() {
+                Some(m) => self.best_elder_candidates_at_gen(m.generation()),
+                None => {
+                    error!("Attempted to find best elder candidates when we don't have a membership instance");
+                    vec![]
+                }
             }
         }
 
@@ -598,7 +598,7 @@ mod core {
                     // The section-key has changed, we are now able to function as an elder.
                     self.initialize_elder_state()?;
 
-                    cmds.extend(self.promote_and_demote_elders_except(&BTreeSet::new())?);
+                    cmds.extend(self.trigger_dkg()?);
 
                     // Whenever there is an elders change, casting a round of joins_allowed
                     // proposals to sync this particular state.

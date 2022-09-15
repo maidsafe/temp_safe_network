@@ -54,12 +54,12 @@ impl Node {
     #[instrument(skip(self), level = "trace")]
     async fn handle_section_info_agreement(
         &mut self,
-        section_auth: SectionAuthorityProvider,
+        sap: SectionAuthorityProvider,
         sig: KeyedSig,
     ) -> Result<Option<Cmd>> {
         // check if section matches our prefix
-        let equal_prefix = section_auth.prefix() == self.network_knowledge.prefix();
-        let is_extension_prefix = section_auth
+        let equal_prefix = sap.prefix() == self.network_knowledge.prefix();
+        let is_extension_prefix = sap
             .prefix()
             .is_extension_of(&self.network_knowledge.prefix());
         if !equal_prefix && !is_extension_prefix {
@@ -67,29 +67,23 @@ impl Node {
             // a remote section here, that is done with a AE msg response.
             debug!(
                 "Ignoring Proposal::SectionInfo since prefix doesn't match ours: {:?}",
-                section_auth
+                sap
             );
             return Ok(None);
         }
-        debug!(
-            "Updating section info for our prefix: {:?}",
-            section_auth.prefix()
-        );
+        debug!("Updating section info for our prefix: {:?}", sap.prefix());
 
-        // check if SAP is already in our network knowledge
-        let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
-        // TODO: on dkg-failure, we may have tried to re-start DKG with some
-        //       elders excluded, this check here uses the empty set for the
-        //       excluded_candidates which would prevent a dkg-retry from
-        //       succeeding.
-        let dkg_sessions_info = self.promote_and_demote_elders(&BTreeSet::new());
+        // check if at the given memberhip gen, the elders candidates are matching
+        let membership_gen = sap.membership_gen();
+        let signed_section_auth = SectionAuth::new(sap, sig.clone());
+        let dkg_sessions_info = self.best_elder_candidates_at_gen(membership_gen);
 
-        let agreeing_elders = BTreeSet::from_iter(signed_section_auth.names());
+        let elder_candidates = BTreeSet::from_iter(signed_section_auth.names());
         if dkg_sessions_info
             .iter()
-            .all(|session| !session.elder_names().eq(agreeing_elders.iter().copied()))
+            .all(|session| !session.elder_names().eq(elder_candidates.iter().copied()))
         {
-            warn!("SectionInfo out of date, ignore");
+            error!("Elder candidates don't match best elder candidates at given gen in received section agreement, ignoring it.");
             return Ok(None);
         };
 

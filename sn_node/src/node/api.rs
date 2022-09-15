@@ -27,7 +27,7 @@ use sn_dbc::{
     rng, Dbc, Hash, IndexedSignatureShare, MlsagMaterial, Owner, OwnerOnce, RevealedCommitment,
     SpentProofContent, SpentProofShare, Token, TransactionBuilder, TrueInput,
 };
-use std::{collections::BTreeSet, net::SocketAddr, path::PathBuf, sync::Arc};
+use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 use xor_name::XorName;
 
 impl Node {
@@ -126,13 +126,10 @@ impl Node {
     // Generate a new section info based on the current set of members, but
     // excluding the ones in the provided list. And if the outcome list of candidates
     // differs from the current elders, trigger a DKG.
-    pub(crate) fn promote_and_demote_elders_except(
-        &mut self,
-        excluded_names: &BTreeSet<XorName>,
-    ) -> Result<Vec<Cmd>> {
+    pub(crate) fn trigger_dkg(&mut self) -> Result<Vec<Cmd>> {
         debug!("{}", LogMarker::TriggeringPromotionAndDemotion);
         let mut cmds = vec![];
-        for session_id in self.promote_and_demote_elders(excluded_names) {
+        for session_id in self.best_elder_candidates() {
             cmds.extend(self.send_dkg_start(session_id)?);
         }
 
