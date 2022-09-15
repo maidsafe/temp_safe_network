@@ -331,6 +331,13 @@ mod core {
                 recipients,
             );
 
+            info!(
+                "Are we a member? {}",
+                self.network_knowledge
+                    .section_members()
+                    .contains_key(&self.name())
+            );
+
             let probe = self.network_knowledge.anti_entropy_probe();
             self.send_system_msg(probe, Peers::Multiple(recipients))
         }
@@ -539,14 +546,11 @@ mod core {
             &mut self,
             old: &StateSnapshot,
         ) -> Result<Vec<Cmd>> {
+            info!("Updating on elder change");
             let new = self.state_snapshot();
 
             if new.section_key == old.section_key {
-                // there was no change
-                return Ok(vec![]);
-            }
-
-            if new.section_key == old.section_key {
+                info!("elder-change - No change");
                 // there was no change
                 return Ok(vec![]);
             }

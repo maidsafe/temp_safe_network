@@ -312,6 +312,19 @@ impl NetworkKnowledge {
     }
 
     pub fn anti_entropy_probe(&self) -> SystemMsg {
+        info!(
+            "Generating AE Probe: {:?}, section_key={:?}={:?}, chain_len={}, membership_gen={}, members={}, adults={}x{{{}}}, elders={}x{{{}}}",
+            self.prefix(),
+            self.section_key(),
+            Vec::from_iter(self.section_tree.sections_dag.keys()),
+            self.section_tree.sections_dag.len(),
+            self.membership_gen(),
+            self.section_members().len(),
+            self.adults().len(),
+            Vec::from_iter(self.adults().iter().map(|p| format!("{}",p.name()))).join(", "),
+            self.elders().len(),
+            Vec::from_iter(self.elders().iter().map(|p| format!("{}",p.name()))).join(", "),
+        );
         SystemMsg::AntiEntropyProbe {
             section_key: self.section_key(),
             membership_gen: Some(self.membership_gen()),
@@ -384,7 +397,7 @@ impl NetworkKnowledge {
                 // otherwise this update could be due to an AE message and we still don't have
                 // the key share for the new SAP, making this node unable to sign section messages
                 // and possibly being kicked out of the group of Elders.
-                if switch_to_new_sap && provided_sap.prefix().matches(our_name) {
+                if provided_sap.prefix().matches(our_name) {
                     let our_prev_prefix = self.prefix();
                     // Remove any peer which doesn't belong to our new section's prefix
                     self.section_peers.retain(&provided_sap.prefix());

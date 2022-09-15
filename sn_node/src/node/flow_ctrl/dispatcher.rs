@@ -260,18 +260,21 @@ impl Dispatcher {
                 for data in data_batch {
                     trace!("data being enqueued for replication {:?}", data);
                     let mut node = self.node.write().await;
-                    if let Some(peers_set) = node.pending_data_to_replicate_to_peers.get_mut(&data)
-                    {
-                        debug!("data already queued, adding peer");
-                        let _existed = peers_set.insert(recipient);
-                    } else {
-                        let mut peers_set = BTreeSet::new();
-                        let _existed = peers_set.insert(recipient);
-                        let _existed = node
-                            .pending_data_to_replicate_to_peers
-                            .insert(data, peers_set);
-                    };
+                    let peers_set = node
+                        .pending_data_to_replicate_to_peers
+                        .entry(data)
+                        .or_default();
+                    let _ = peers_set.insert(recipient);
                 }
+
+                info!(
+                    "{} items queued for data replication",
+                    self.node
+                        .read()
+                        .await
+                        .pending_data_to_replicate_to_peers
+                        .len()
+                );
                 Ok(vec![])
             }
             Cmd::ScheduleDkgTimeout { duration, token } => Ok(self

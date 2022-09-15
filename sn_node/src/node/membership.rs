@@ -211,19 +211,22 @@ impl Node {
         &mut self,
         decision: Decision<NodeState>,
     ) -> Result<Vec<Cmd>> {
-        info!(
-            "Membership - decided {:?}",
-            BTreeSet::from_iter(decision.proposals.keys())
-        );
-        let membership = self.membership()?;
-        self.membership = Some(Consensus::from(
-            membership.secret_key.clone(),
-            membership.elders.clone(),
-            membership.n_elders,
-        ));
+        let gen = decision.generation()?;
+        let proposals = BTreeSet::from_iter(decision.proposals.keys());
+        info!("Membership - decided gen={gen}, proposal={proposals:?}",);
+
+        if let Ok(membership) = self.membership() {
+            self.membership = Some(Consensus::from(
+                membership.secret_key.clone(),
+                membership.elders.clone(),
+                membership.n_elders,
+            ));
+        }
 
         self.membership_last_received_vote_time = None;
-        self.handle_membership_decision(decision).await
+        let cmds = self.handle_membership_decision(decision).await?;
+
+        Ok(cmds)
     }
 
     async fn membership_process_vote_response(

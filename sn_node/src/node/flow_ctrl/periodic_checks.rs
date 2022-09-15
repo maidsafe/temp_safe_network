@@ -32,8 +32,8 @@ const PROBE_INTERVAL: Duration = Duration::from_secs(30);
 const MISSING_VOTE_INTERVAL: Duration = Duration::from_secs(5);
 #[cfg(feature = "back-pressure")]
 const BACKPRESSURE_INTERVAL: Duration = Duration::from_secs(60);
-const SECTION_PROBE_INTERVAL: Duration = Duration::from_secs(300);
-const LINK_CLEANUP_INTERVAL: Duration = Duration::from_secs(120);
+const SECTION_PROBE_INTERVAL: Duration = Duration::from_secs(1);
+const LINK_CLEANUP_INTERVAL: Duration = Duration::from_secs(10);
 const DATA_BATCH_INTERVAL: Duration = Duration::from_millis(50);
 const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 // 30 adult nodes checked per minute., so each node should be queried 10x in 10 mins
@@ -100,6 +100,7 @@ impl FlowCtrl {
         if last_section_probe.elapsed() > SECTION_PROBE_INTERVAL {
             *last_section_probe = Instant::now();
             cmds.push(Self::probe_the_section(self.node.clone()).await);
+            cmds.push(self.node.clone().read().await.ask_for_any_new_data().await);
         }
 
         for cmd in cmds {
@@ -284,6 +285,10 @@ impl FlowCtrl {
         let mut rng = rand::rngs::OsRng;
         let data_queued = {
             let node = node.read().await;
+            let queue_len = node.pending_data_to_replicate_to_peers.len();
+            if queue_len > 0 {
+                info!("replicating queued data, {} items in queue", queue_len);
+            }
             // choose a data to replicate at random
             let data_queued = node
                 .pending_data_to_replicate_to_peers

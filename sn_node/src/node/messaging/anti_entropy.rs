@@ -186,6 +186,7 @@ impl Node {
         };
 
         let mut cmds = vec![];
+        let mut updated = false;
         for decision in membership_decisions.iter().cloned() {
             let current_gen = self.network_knowledge.membership_gen();
             let decision_gen = decision.generation()?;
@@ -195,9 +196,10 @@ impl Node {
             }
 
             cmds.extend(self.membership_process_decision(decision).await?);
+            updated = true;
         }
 
-        let updated = self.network_knowledge.update_knowledge_if_valid(
+        updated |= self.network_knowledge.update_knowledge_if_valid(
             signed_sap.clone(),
             &proof_chain,
             // membership_decisions.clone(),
@@ -210,7 +212,7 @@ impl Node {
         cmds.extend(self.update_on_elder_change(&snapshot).await?);
 
         // Only trigger reorganize data when there is a membership change happens.
-        if updated && self.is_not_elder() {
+        if self.is_not_elder() {
             // only done if adult, since as an elder we dont want to get any more
             // data for our name (elders will eventually be caching data in general)
             cmds.push(self.ask_for_any_new_data().await);
@@ -220,16 +222,6 @@ impl Node {
             self.write_section_tree().await;
             let prefix = section_auth.prefix();
             info!("SectionTree written to disk with update for prefix {prefix:?}");
-
-            // check if we've been kicked out of the section
-            if snapshot.members.contains(&self.name())
-                && !self.state_snapshot().members.contains(&self.name())
-            {
-                error!("Detected that we've been removed from the section");
-                self.send_event(Event::Membership(MembershipEvent::RemovedFromSection))
-                    .await;
-                return Err(Error::RemovedFromSection);
-            }
         }
 
         // Check if we need to resend any messsages and who should we send it to.

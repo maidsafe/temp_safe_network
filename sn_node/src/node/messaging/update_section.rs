@@ -39,7 +39,7 @@ impl Node {
         }
 
         let adults = self.network_knowledge.adults();
-        let adults_names = adults.iter().map(|p2p_node| p2p_node.name());
+        let adults_names = BTreeSet::from_iter(adults.iter().map(|p2p_node| p2p_node.name()));
 
         let mut data_for_sender = vec![];
         for data in data_i_have {
@@ -48,20 +48,20 @@ impl Node {
             }
 
             let holder_adult_list: BTreeSet<_> = adults_names
-                .clone()
+                .iter()
                 .sorted_by(|lhs, rhs| data.name().cmp_distance(lhs, rhs))
                 .take(data_copy_count())
                 .collect();
 
-            if holder_adult_list.contains(&sender.name()) {
-                debug!(
-                    "{:?} batch data {:?} to: {:?} ",
-                    LogMarker::QueuingMissingReplicatedData,
-                    data,
-                    sender
-                );
-                data_for_sender.push(data);
-            }
+            // if holder_adult_list.contains(&sender.name()) {
+            debug!(
+                "{:?} batch data {:?} to: {:?} ",
+                LogMarker::QueuingMissingReplicatedData,
+                data,
+                sender
+            );
+            data_for_sender.push(data);
+            // }
         }
 
         if data_for_sender.is_empty() {
@@ -88,12 +88,33 @@ impl Node {
         let adults = self.network_knowledge.adults();
         let elders = self.network_knowledge.elders();
 
+        let members = self.network_knowledge.section_members();
+        info!(
+            "Network Data before asking for new data: {:?}",
+            data_i_have.len()
+        );
+        info!(
+            "Network Membership before asking for new data: {:?} {:?}",
+            members.len(),
+            members
+        );
+        info!(
+            "Network Elders before asking for new data: {:?} {:?}",
+            elders.len(),
+            elders
+        );
+        info!(
+            "Network Adults before asking for new data: {:?} {:?}",
+            adults.len(),
+            adults
+        );
+
         // find data targets that are not us.
         let mut target_members = adults
             .into_iter()
-            .sorted_by(|lhs, rhs| my_name.cmp_distance(&lhs.name(), &rhs.name()))
+            // .sorted_by(|lhs, rhs| my_name.cmp_distance(&lhs.name(), &rhs.name()))
             .filter(|peer| peer.name() != my_name)
-            .take(data_copy_count())
+            // .take(data_copy_count())
             .collect::<BTreeSet<_>>();
 
         trace!(
@@ -103,9 +124,7 @@ impl Node {
         );
 
         // also send to our elders in case they are holding but were just promoted
-        for elder in elders {
-            let _existed = target_members.insert(elder);
-        }
+        target_members.extend(elders);
 
         if target_members.is_empty() {
             warn!("We have no peers to ask for data!");

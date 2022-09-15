@@ -43,7 +43,7 @@ pub struct SectionTree {
     /// Map of sections prefixes to their latest signed section authority providers.
     sections: BTreeMap<Prefix, SectionAuth<SectionAuthorityProvider>>,
     /// A DAG containing all section chains of the whole network that we are aware of
-    sections_dag: SecuredLinkedList,
+    pub sections_dag: SecuredLinkedList,
 }
 
 impl SectionTree {

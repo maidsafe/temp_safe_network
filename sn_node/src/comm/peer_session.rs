@@ -150,9 +150,8 @@ impl PeerSessionWorker {
     async fn run(#[allow(unused_mut)] mut self, mut channel: mpsc::Receiver<SessionCmd>) {
         while let Some(session_cmd) = channel.recv().await {
             trace!(
-                "Processing session {:?} cmd: {:?}",
-                self.link.peer(),
-                session_cmd
+                "Processing session with {:?} cmd: {session_cmd:?}",
+                self.link.peer().name()
             );
 
             let status = match session_cmd {
@@ -285,12 +284,13 @@ pub(crate) struct SendJob {
     #[debug(skip)]
     bytes: UsrMsgBytes,
     retries: usize, // TAI: Do we need this if we are using QP2P's retry
+    #[debug(skip)]
     reporter: StatusReporting,
 }
 
 impl PartialEq for SendJob {
     fn eq(&self, other: &Self) -> bool {
-        self.msg_id == other.msg_id && self.bytes == other.bytes && self.retries == other.retries
+        (&self.msg_id, &self.bytes, &self.retries) == (&other.msg_id, &other.bytes, &other.retries)
     }
 }
 

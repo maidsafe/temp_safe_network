@@ -180,11 +180,11 @@ impl Node {
             } => {
                 trace!("Handling msg: AE Probe from {sender}: {msg_id:?} - section_key={section_key:?}, membership={membership_gen:?}");
                 let mut cmds = vec![];
-                if !self.is_elder() {
-                    // early return here as we do not get health checks as adults,
-                    // normal AE rules should have applied
-                    return Ok(cmds);
-                }
+                // if !self.is_elder() {
+                //     // early return here as we do not get health checks as adults,
+                //     // normal AE rules should have applied
+                //     return Ok(cmds);
+                // }
 
                 let mut recipients = BTreeSet::new();
                 let _existed = recipients.insert(sender);
