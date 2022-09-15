@@ -43,7 +43,6 @@ const FILE_SIZE_LENGTH: usize = 1024 * 1024 * 10; // 10mb
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::fmt()
         // NOTE: uncomment this line for pretty printed log output.
-        .with_thread_names(true)
         .with_ansi(false)
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .with_target(false)
@@ -62,13 +61,7 @@ async fn main() -> Result<()> {
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .output()
-        .map_err(|err| {
-            eyre!(
-                "Failed to run build command with args '{:?}': {}",
-                args,
-                err
-            )
-        })?;
+        .map_err(|err| eyre!("Failed to build cargo command with args '{args:?}': {err}"))?;
 
     println!("sn_node bins built successfully");
 
@@ -158,6 +151,8 @@ pub async fn run_split() -> Result<()> {
         all_data_put.push((address, hash));
     }
 
+    info!("Finished putting data, adding additional nodes");
+
     // ======================
     // Now we add more nodes
     // ======================
@@ -176,36 +171,13 @@ pub async fn run_split() -> Result<()> {
         .and_then(|launch| launch.run())
         .wrap_err("Error adding nodes to the testnet")?;
 
+    info!("Finished adding nodes to to network");
+
     let post_churn_interval_to_allow_replication = Duration::from_secs(30);
     sleep(post_churn_interval_to_allow_replication).await;
 
-    let client = Client::builder().build().await?;
-
     for (address, hash) in all_data_put {
-        println!("...reading bytes at address {:?} ...", address);
-        let mut bytes = client.read_bytes(address).await;
-
-        let mut attempts = 0;
-        while bytes.is_err() && attempts < 10 {
-            attempts += 1;
-            println!(
-                "another attempt {attempts} ...reading bytes at address {:?} ...",
-                address
-            );
-            // do some retries to ensure we're not just timing out by chance
-            sleep(Duration::from_millis(100)).await;
-            bytes = client.read_bytes(address).await;
-        }
-
-        let bytes = bytes?;
-        println!("Bytes read from {:?}:", address);
-
-        let mut hasher = Sha3::v256();
-        let mut output = [0; 32];
-        hasher.update(&bytes);
-        hasher.finalize(&mut output);
-
-        assert_eq!(output, hash);
+        read_data(address, hash).await?;
     }
 
     println!("All okay");
@@ -239,8 +211,8 @@ async fn upload_data() -> Result<(XorName, [u8; 32])> {
     while bytes.is_err() && attempts < 10 {
         attempts += 1;
         // do some retries to ensure we're not just timing out by chance
-        sleep(Duration::from_millis(100)).await;
         bytes = client.read_bytes(address).await;
+        sleep(Duration::from_millis(100)).await;
     }
 
     let _bytes = bytes?;
@@ -248,4 +220,33 @@ async fn upload_data() -> Result<(XorName, [u8; 32])> {
     println!("Bytes successfully read from {:?}:", address);
 
     Ok((address, output))
+}
+
+async fn read_data(address: XorName, hash: [u8; 32]) -> Result<()> {
+    println!("...reading bytes at address {:?} ...", address);
+    let client = Client::builder().build().await?;
+    let mut bytes = client.read_bytes(address).await;
+
+    let mut attempts = 0;
+    while bytes.is_err() && attempts < 10 {
+        attempts += 1;
+        println!(
+            "another attempt {attempts} ...reading bytes at address {:?} ...",
+            address
+        );
+        // do some retries to ensure we're not just timing out by chance
+        sleep(Duration::from_millis(100)).await;
+        bytes = client.read_bytes(address).await;
+    }
+
+    let bytes = bytes?;
+    println!("Bytes read from {:?}:", address);
+
+    let mut hasher = Sha3::v256();
+    let mut output = [0; 32];
+    hasher.update(&bytes);
+    hasher.finalize(&mut output);
+
+    assert_eq!(output, hash);
+    Ok(())
 }
