@@ -265,7 +265,7 @@ jobs:
         if: matrix.os != 'windows-latest'
 
       - name: Build all tests before running
-        run: cd sn_client && cargo test --no-run --release -p sn_client
+        run: cd sn_client && cargo test --no-run --release
         timeout-minutes: 50
 
       - name: Run client tests
@@ -437,7 +437,7 @@ jobs:
       #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
 
       - name: Build all tests before running
-        run: cd sn_client && cargo test --no-run --release -p sn_client
+        run: cd sn_client && cargo test --no-run --release
         timeout-minutes: 50
 
       - name: Run sn_client tests
@@ -588,7 +588,7 @@ jobs:
         if: matrix.os != 'windows-latest'
 
       - name: Build all tests before running
-        run: cd sn_api && cargo test --no-run --release -p sn_api
+        run: cd sn_api && cargo test --no-run --release
         timeout-minutes: 50
 
       - name: Run API tests
@@ -711,7 +711,7 @@ jobs:
         run: cargo run --package sn_cli --release -- keys create --for-cli
 
       - name: Build all tests before running
-        run: cd sn_cli && cargo test --no-run --release -p sn_cli
+        run: cd sn_cli && cargo test --no-run --release
         timeout-minutes: 50
 
       - name: Run CLI tests
