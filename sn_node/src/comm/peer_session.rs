@@ -8,6 +8,8 @@
 
 use super::Link;
 
+use crate::node::{Error, Result};
+
 use qp2p::RetryConfig;
 use qp2p::UsrMsgBytes;
 use sn_interface::messaging::MsgId;
@@ -74,7 +76,7 @@ impl PeerSession {
         msg_id: MsgId,
         bytes: UsrMsgBytes,
         is_msg_for_client: bool,
-    ) -> SendWatcher {
+    ) -> Result<SendWatcher> {
         let (watcher, reporter) = status_watching();
 
         let job = SendJob {
@@ -85,12 +87,13 @@ impl PeerSession {
             is_msg_for_client,
         };
 
-        if let Err(e) = self.channel.send(SessionCmd::Send(job)).await {
-            error!("Error while sending SendJob command {e:?}");
-        }
+        self.channel
+            .send(SessionCmd::Send(job))
+            .await
+            .map_err(|_| Error::PeerSessionChannel)?;
 
         trace!("Send job sent: {msg_id:?}");
-        watcher
+        Ok(watcher)
     }
 
     pub(crate) async fn disconnect(self) {
