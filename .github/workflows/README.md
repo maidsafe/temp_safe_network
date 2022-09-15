@@ -2,6 +2,7 @@
 
 A place to document any of our workflows or processes that run on Github Actions.
 
+
 ## Release Process
 
 After we changed our codebase to use a workspace with multiple crates, as opposed to a different repository for each crate, we had to change our automated release process.
