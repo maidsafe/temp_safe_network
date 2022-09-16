@@ -75,6 +75,8 @@ pub enum NodeQuery {
         origin: EndUser,
         /// The correlation id that recorded in Elders for this query
         correlation_id: MsgId,
+        /// The operation id that recorded in Elders for this query
+        operation_id: OperationId,
     },
 }
 
@@ -89,7 +91,7 @@ pub enum NodeQueryResponse {
     /// Response to [`GetChunk`]
     ///
     /// [`GetChunk`]: crate::messaging::data::DataQueryVariant::GetChunk
-    GetChunk(Result<Chunk>),
+    GetChunk((Result<Chunk>, OperationId)),
     //
     // ===== Register Data =====
     //
@@ -117,11 +119,6 @@ pub enum NodeQueryResponse {
     #[cfg(feature = "spentbook")]
     /// Response to [`crate::messaging::data::SpentbookQuery::SpentProofShares`].
     SpentProofShares((Result<Vec<SpentProofShare>>, OperationId)),
-    //
-    // ===== Other =====
-    //
-    /// Failed to create id generation
-    FailedToCreateOperationId,
 }
 
 impl NodeQueryResponse {
@@ -144,11 +141,10 @@ impl NodeQueryResponse {
             GetRegisterUserPermissions(res) => QueryResponse::GetRegisterUserPermissions(res),
             #[cfg(feature = "spentbook")]
             SpentProofShares(res) => QueryResponse::SpentProofShares(res),
-            FailedToCreateOperationId => QueryResponse::FailedToCreateOperationId,
         }
     }
 
-    pub fn operation_id(&self) -> Result<OperationId> {
+    pub fn operation_id(&self) -> OperationId {
         self.clone().convert().operation_id()
     }
 }

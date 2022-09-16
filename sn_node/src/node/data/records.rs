@@ -16,7 +16,7 @@ use sn_interface::messaging::Traceroute;
 use sn_interface::{
     data_copy_count,
     messaging::{
-        data::{DataQuery, MetadataExchange, StorageLevel},
+        data::{DataQuery, MetadataExchange, OperationId, StorageLevel},
         system::{NodeCmd, NodeQuery, SystemMsg},
         AuthorityProof, EndUser, MsgId, ServiceAuth,
     },
@@ -54,12 +54,12 @@ impl Node {
         &self,
         query: DataQuery,
         msg_id: MsgId,
+        operation_id: OperationId,
         auth: AuthorityProof<ServiceAuth>,
         source_client: Peer,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         let address = query.variant.address();
-        let operation_id = query.variant.operation_id()?;
         trace!(
             "{:?} preparing to query adults for data at {:?} with op_id: {:?}",
             LogMarker::DataQueryReceviedAtElder,
@@ -110,6 +110,7 @@ impl Node {
             auth: auth.into_inner(),
             origin: EndUser(source_client.name()),
             correlation_id: msg_id,
+            operation_id,
         });
 
         cmds.push(self.trace_system_msg(

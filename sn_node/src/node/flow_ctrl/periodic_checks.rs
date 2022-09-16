@@ -15,7 +15,7 @@ use ed25519_dalek::Signer;
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
-        data::{DataQuery, DataQueryVariant, ServiceMsg},
+        data::{DataQuery, DataQueryVariant, OperationId, ServiceMsg},
         system::{NodeCmd, SystemMsg},
         AuthorityProof, MsgId, ServiceAuth, WireMsg,
     },
@@ -171,6 +171,7 @@ impl FlowCtrl {
         });
 
         let msg_id = MsgId::new();
+        let op_id = OperationId::random();
         let our_info = node.info();
         let origin = our_info.peer();
 
@@ -179,6 +180,7 @@ impl FlowCtrl {
         // generate the cmds, and ensure we go through dysfunction tracking
         node.handle_valid_service_msg(
             msg_id,
+            op_id,
             msg,
             auth,
             origin,

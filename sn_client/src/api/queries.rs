@@ -98,7 +98,7 @@ impl Client {
 
             match res {
                 Ok(Ok(query_result)) => {
-                    if query_result.is_data_not_found() {
+                    if query_result.response.is_data_not_found() {
                         let _existed = data_not_found_count.insert(query.adult_index);
                         // if we've received DataNotFound from each adult_index,
                         // we can return that error
@@ -187,9 +187,9 @@ impl Client {
                 query,
                 auth,
                 serialised_query,
+                dst_section_info,
                 #[cfg(feature = "traceroute")]
                 self.public_key(),
-                dst_section_info,
             )
             .await
     }

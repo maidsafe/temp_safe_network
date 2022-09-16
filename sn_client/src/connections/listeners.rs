@@ -245,34 +245,29 @@ impl Session {
                     // responses corresponding to the same msg ID might arrive.
                     // Once we are satisfied with the response this is channel is discarded in
                     // ConnectionManager::send_query
-
-                    if let Ok(op_id) = response.operation_id() {
-                        if let Some(entry) = queries.get(&op_id) {
-                            let all_senders = entry.value();
-                            // Only valid response shall get broadcast to all
-                            for (ori_msg_id, sender) in all_senders {
-                                let res = if response.is_success() || ori_msg_id == &correlation_id
-                                {
-                                    sender.try_send(response.clone())
-                                } else {
-                                    continue;
-                                };
-                                if res.is_err() {
-                                    trace!("Error relaying query response internally on a channel for {:?} op_id {:?}: {:?}. (It has likely been removed)", msg_id, op_id, res)
-                                }
+                    let op_id = response.operation_id();
+                    if let Some(entry) = queries.get(&op_id) {
+                        let all_senders = entry.value();
+                        // Only valid response shall get broadcast to all
+                        for (ori_msg_id, sender) in all_senders {
+                            let res = if response.is_success() || ori_msg_id == &correlation_id {
+                                sender.try_send(response.clone())
+                            } else {
+                                continue;
+                            };
+                            if res.is_err() {
+                                trace!("Error relaying query response internally on a channel for {:?} op_id {:?}: {:?}. (It has likely been removed)", msg_id, op_id, res)
                             }
-                        } else {
-                            // TODO: The trace is only needed when we have an identified case of not finding a channel, but expecting one.
-                            // When expecting one, we can log "No channel found for operation", (and then probably at warn or error level).
-                            // But when we have received enough responses, we aren't really expecting a channel there, so there is no reason to log anything.
-                            // Right now, if we have already received enough responses for a query,
-                            // we drop the channels and drop any further responses for that query.
-                            // but we should not drop it immediately, but clean it up after a while
-                            // and then not log that "no channel was found" when we already had enough responses.
-                            //trace!("No channel found for operation {}", op_id);
                         }
                     } else {
-                        warn!("Ignoring query response without operation id");
+                        // TODO: The trace is only needed when we have an identified case of not finding a channel, but expecting one.
+                        // When expecting one, we can log "No channel found for operation", (and then probably at warn or error level).
+                        // But when we have received enough responses, we aren't really expecting a channel there, so there is no reason to log anything.
+                        // Right now, if we have already received enough responses for a query,
+                        // we drop the channels and drop any further responses for that query.
+                        // but we should not drop it immediately, but clean it up after a while
+                        // and then not log that "no channel was found" when we already had enough responses.
+                        //trace!("No channel found for operation {}", op_id);
                     }
                 }
                 ServiceMsg::CmdError {

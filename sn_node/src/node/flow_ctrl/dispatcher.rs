@@ -146,6 +146,7 @@ impl Dispatcher {
             }
             Cmd::HandleValidServiceMsg {
                 msg_id,
+                op_id,
                 msg,
                 origin,
                 auth,
@@ -156,6 +157,7 @@ impl Dispatcher {
                 match node
                     .handle_valid_service_msg(
                         msg_id,
+                        op_id,
                         msg,
                         auth,
                         origin,

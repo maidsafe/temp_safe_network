@@ -138,6 +138,7 @@ pub(crate) enum Cmd {
     },
     HandleValidServiceMsg {
         msg_id: MsgId,
+        op_id: OperationId,
         msg: ServiceMsg,
         origin: Peer,
         /// Requester's authority over this message

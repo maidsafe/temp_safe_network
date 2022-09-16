@@ -105,6 +105,7 @@ impl Session {
         let interval = Duration::from_millis(50);
         let expected_cmd_ack_wait_attempts =
             std::cmp::max(200, self.cmd_ack_wait.as_millis() / interval.as_millis());
+
         loop {
             match receiver.try_recv() {
                 Ok((src, None)) => {
@@ -135,6 +136,7 @@ impl Session {
                     // this is not an error..the channel is just empty atm
                 }
             }
+
             attempts += 1;
             if attempts >= expected_cmd_ack_wait_attempts {
                 warn!(
@@ -166,8 +168,8 @@ impl Session {
         query: DataQuery,
         auth: ServiceAuth,
         payload: Bytes,
-        #[cfg(feature = "traceroute")] client_pk: PublicKey,
         dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
+        #[cfg(feature = "traceroute")] client_pk: PublicKey,
     ) -> Result<QueryResult> {
         let endpoint = self.endpoint.clone();
 
@@ -197,23 +199,6 @@ impl Session {
             elders
         );
 
-        let (sender, mut receiver) = channel::<QueryResponse>(7);
-
-        if let Ok(op_id) = query.variant.operation_id() {
-            // Insert the response sender
-            trace!("Inserting channel for op_id {:?}", (msg_id, op_id));
-            if let Some(mut entry) = self.pending_queries.get_mut(&op_id) {
-                let senders_vec = entry.value_mut();
-                senders_vec.push((msg_id, sender))
-            } else {
-                let _nonexistant_entry = self.pending_queries.insert(op_id, vec![(msg_id, sender)]);
-            }
-
-            trace!("Inserted channel for {:?}", op_id);
-        } else {
-            warn!("No op_id found for query");
-        }
-
         let dst = Dst {
             name: dst,
             section_key: section_pk,
@@ -225,6 +210,23 @@ impl Session {
 
         #[cfg(feature = "traceroute")]
         wire_msg.append_trace(&mut Traceroute(vec![Entity::Client(client_pk)]));
+
+        let (sender, mut receiver) = channel::<QueryResponse>(7);
+
+        // Insert the response sender
+        let op_id = wire_msg.operation_id();
+        trace!(
+            "Inserting channel for msg_id {:?} and op_id {}",
+            msg_id,
+            op_id
+        );
+        if let Some(mut entry) = self.pending_queries.get_mut(&op_id) {
+            let senders_vec = entry.value_mut();
+            senders_vec.push((msg_id, sender));
+        } else {
+            let _nonexistant_entry = self.pending_queries.insert(op_id, vec![(msg_id, sender)]);
+        }
+        trace!("Inserted channel for {}", op_id);
 
         self.send_msg(elders.clone(), wire_msg, msg_id).await?;
 
@@ -240,17 +242,17 @@ impl Session {
         // have to review the approach.
         let mut discarded_responses: usize = 0;
 
-        let response = loop {
+        let outcome = loop {
             let mut error_response = None;
             match (receiver.recv().await, chunk_addr) {
-                (Some(QueryResponse::GetChunk(Ok(chunk))), Some(chunk_addr)) => {
+                (Some(QueryResponse::GetChunk((Ok(chunk), _))), Some(chunk_addr)) => {
                     // We are dealing with Chunk query responses, thus we validate its hash
                     // matches its xorname, if so, we don't need to await for more responses
                     debug!("Chunk QueryResponse received is: {:#?}", chunk);
 
                     if chunk_addr.name() == chunk.name() {
                         trace!("Valid Chunk received for {:?}", msg_id);
-                        break Some(QueryResponse::GetChunk(Ok(chunk)));
+                        break Some(QueryResponse::GetChunk((Ok(chunk), op_id)));
                     } else {
                         // the Chunk content doesn't match its XorName,
                         // this is suspicious and it could be a byzantine node
@@ -261,7 +263,7 @@ impl Session {
                 // Erring on the side of positivity. \
                 // Saving error, but not returning until we have more responses in
                 // (note, this will overwrite prior errors, so we'll just return whichever was last received)
-                (response @ Some(QueryResponse::GetChunk(Err(_))), Some(_))
+                (response @ Some(QueryResponse::GetChunk((Err(_), _))), Some(_))
                 | (response @ Some(QueryResponse::GetRegister((Err(_), _))), None)
                 | (response @ Some(QueryResponse::GetRegisterPolicy((Err(_), _))), None)
                 | (response @ Some(QueryResponse::GetRegisterOwner((Err(_), _))), None)
@@ -280,6 +282,7 @@ impl Session {
                     break None;
                 }
             }
+
             if discarded_responses == elders_len {
                 break error_response;
             }
@@ -287,38 +290,28 @@ impl Session {
 
         debug!(
             "Response obtained for query w/id {:?}: {:?}",
-            msg_id, response
+            msg_id, outcome
         );
 
-        if let Some(query) = &response {
-            if let Ok(query_op_id) = query.operation_id() {
-                // Remove the response sender
-                trace!("Removing channel for {:?}", (msg_id, &query_op_id));
-                if let Some(mut entry) = self.pending_queries.get_mut(&query_op_id) {
-                    let listeners_for_op = entry.value_mut();
-                    if let Some(index) = listeners_for_op
-                        .iter()
-                        .position(|(id, _sender)| *id == msg_id)
-                    {
-                        let _old_listener = listeners_for_op.swap_remove(index);
-                    }
-                } else {
-                    warn!("No listeners found for our op_id: {:?}", query_op_id)
+        if let Some(response) = outcome {
+            // Remove the response sender
+            let operation_id = response.operation_id();
+            trace!("Removing channel for {:?}", (msg_id, &operation_id));
+            if let Some(mut entry) = self.pending_queries.get_mut(&operation_id) {
+                let listeners_for_op = entry.value_mut();
+                if let Some(index) = listeners_for_op
+                    .iter()
+                    .position(|(id, _sender)| *id == msg_id)
+                {
+                    let _old_listener = listeners_for_op.swap_remove(index);
                 }
+            } else {
+                warn!("No listeners found for our op_id: {:?}", operation_id)
             }
-        }
 
-        match response {
-            Some(response) => {
-                let operation_id = response
-                    .operation_id()
-                    .map_err(|_| Error::UnknownOperationId(response.clone()))?;
-                Ok(QueryResult {
-                    response,
-                    operation_id,
-                })
-            }
-            None => Err(Error::NoResponse(elders)),
+            Ok(QueryResult { response })
+        } else {
+            Err(Error::NoResponse(elders))
         }
     }
 

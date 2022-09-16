@@ -34,14 +34,6 @@ type PendingCmdAcks = Arc<DashMap<MsgId, Sender<CmdResponse>>>;
 #[derive(Debug)]
 pub struct QueryResult {
     pub response: QueryResponse,
-    pub operation_id: OperationId,
-}
-
-impl QueryResult {
-    /// Returns true if the QueryResponse is DataNotFound
-    pub(crate) fn is_data_not_found(&self) -> bool {
-        self.response.is_data_not_found()
-    }
 }
 
 #[derive(Clone, Debug)]
