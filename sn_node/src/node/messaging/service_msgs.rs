@@ -21,8 +21,8 @@ use sn_interface::{
     data_copy_count,
     messaging::{
         data::{
-            CmdError, DataCmd, DataQueryVariant, EditRegister, OperationId, ServiceMsg,
-            SignedRegisterEdit, SpentbookCmd,
+            DataCmd, DataQueryVariant, EditRegister, OperationId, ServiceMsg, SignedRegisterEdit,
+            SpentbookCmd,
         },
         system::{NodeQueryResponse, SystemMsg},
         AuthorityProof, EndUser, MsgId, ServiceAuth,
@@ -64,7 +64,7 @@ impl Node {
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Cmd {
         let the_error_msg = ServiceMsg::CmdError {
-            error: CmdError::Data(error.into()),
+            error: error.into(),
             correlation_id,
         };
 

@@ -12,7 +12,7 @@ mod messaging;
 use crate::Result;
 use sn_interface::{
     messaging::{
-        data::{CmdError, OperationId, QueryResponse},
+        data::{Error as ErrorMsg, OperationId, QueryResponse},
         MsgId,
     },
     network_knowledge::SectionTree,
@@ -28,7 +28,7 @@ use tokio::sync::{mpsc::Sender, RwLock};
 type PendingQueryResponses = Arc<DashMap<OperationId, Vec<(MsgId, QueryResponseSender)>>>;
 type QueryResponseSender = Sender<QueryResponse>;
 
-type CmdResponse = (SocketAddr, Option<CmdError>);
+type CmdResponse = (SocketAddr, Option<ErrorMsg>);
 type PendingCmdAcks = Arc<DashMap<MsgId, Sender<CmdResponse>>>;
 
 #[derive(Debug)]
