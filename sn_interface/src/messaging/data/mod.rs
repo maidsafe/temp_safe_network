@@ -77,20 +77,6 @@ pub fn chunk_operation_id(address: &ChunkAddress) -> Result<OperationId> {
     Ok(OperationId(output))
 }
 
-/// A message indicating that an error occurred as a node was handling a client's message.
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct ServiceError {
-    /// Optional reason for the error.
-    ///
-    /// This can be used to handle the error.
-    pub reason: Option<Error>,
-    /// Message that triggered this error.
-    ///
-    /// This could be used to retry the message if the error could be handled.
-    pub source_message: Option<Bytes>,
-}
-
 /// Network service messages exchanged between clients
 /// and nodes in order for the clients to use the network services.
 /// NB: These are not used for node-to-node comms (see [`SystemMsg`] for those).
@@ -123,14 +109,23 @@ pub enum ServiceMsg {
     /// [`Cmd`]: Self::Cmd
     CmdError {
         /// The error.
-        error: CmdError,
+        error: Error,
         /// ID of causing [`Cmd`] message.
         ///
         /// [`Cmd`]: Self::Cmd
         correlation_id: MsgId,
     },
     /// A message indicating that an error occurred as a node was handling a client's message.
-    ServiceError(ServiceError),
+    ServiceError {
+        /// Optional reason for the error.
+        ///
+        /// This can be used to handle the error.
+        reason: Option<Error>,
+        /// Message that triggered this error.
+        ///
+        /// This could be used to retry the message if the error could be handled.
+        source_message: Option<Bytes>,
+    },
     /// CmdAck will be sent back to the client when the handling on the
     /// receiving Elder has been succeeded.
     CmdAck {
@@ -176,19 +171,11 @@ impl Display for ServiceMsg {
             Self::QueryResponse { response, .. } => {
                 write!(f, "ServiceMsg::QueryResponse({:?})", response)
             }
-            Self::ServiceError(error) => write!(f, "ServiceMsg::ServiceError({:?})", error),
+            Self::ServiceError { reason, .. } => {
+                write!(f, "ServiceMsg::ServiceError({:?})", reason)
+            }
         }
     }
-}
-
-/// An error response to a [`Cmd`].
-///
-/// [`Cmd`]: ServiceMsg::Cmd
-#[derive(Debug, Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum CmdError {
-    /// An error response to a [`DataCmd`].
-    // FIXME: `Cmd` is not an enum, so should this be?
-    Data(Error), // DataError enum for better differentiation?
 }
 
 /// The response to a query, containing the query result.

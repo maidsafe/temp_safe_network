@@ -8,9 +8,8 @@
 
 use super::wire_msg_header::WireMsgHeader;
 use crate::messaging::{
-    data::{ServiceError, ServiceMsg},
-    system::SystemMsg,
-    AuthKind, AuthorityProof, Dst, Error, MsgId, MsgType, NodeMsgAuthority, Result, ServiceAuth,
+    data::ServiceMsg, system::SystemMsg, AuthKind, AuthorityProof, Dst, Error, MsgId, MsgType,
+    NodeMsgAuthority, Result, ServiceAuth,
 };
 use bytes::Bytes;
 use custom_debug::Debug;
@@ -243,10 +242,10 @@ impl WireMsg {
                     Error::FailedToParse(format!("Data message payload as Msgpack: {}", err))
                 })?;
 
-                let auth = if let ServiceMsg::ServiceError(ServiceError {
+                let auth = if let ServiceMsg::ServiceError {
                     source_message: Some(payload),
                     ..
-                }) = &msg
+                } = &msg
                 {
                     AuthorityProof::verify(auth, payload)?
                 } else {

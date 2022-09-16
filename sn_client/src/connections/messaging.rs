@@ -12,7 +12,7 @@ use crate::{connections::CmdResponse, Error, Result};
 
 #[cfg(feature = "traceroute")]
 use sn_interface::{
-    messaging::{data::CmdError, Entity, Traceroute},
+    messaging::{Entity, Traceroute},
     types::PublicKey,
 };
 
@@ -125,8 +125,10 @@ impl Session {
                     if received_err >= expected_acks {
                         error!("Received majority of error response for cmd {:?}", msg_id);
                         let _ = self.pending_cmds.remove(&msg_id);
-                        let CmdError::Data(source) = error;
-                        return Err(Error::ErrorCmd { source, msg_id });
+                        return Err(Error::ErrorCmd {
+                            source: error,
+                            msg_id,
+                        });
                     }
                 }
                 Err(_err) => {

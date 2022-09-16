@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{CmdError, Error, QueryResponse, Result};
+use super::{Error, QueryResponse, Result};
 
 use crate::messaging::data::OperationId;
 use crate::types::{utils, SpentbookAddress};
@@ -77,12 +77,6 @@ impl SpentbookQuery {
 }
 
 impl SpentbookCmd {
-    /// Creates a Response containing an error, with the Response variant corresponding to the
-    /// Request variant.
-    pub fn error(&self, error: Error) -> CmdError {
-        CmdError::Data(error)
-    }
-
     /// Returns the name of the register.
     /// This is not a unique identifier.
     pub fn name(&self) -> XorName {

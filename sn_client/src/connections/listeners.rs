@@ -17,7 +17,7 @@ use qp2p::UsrMsgBytes;
 use sn_interface::{
     at_least_one_correct_elder,
     messaging::{
-        data::{CmdError, ServiceMsg},
+        data::{Error as ErrorMsg, ServiceMsg},
         system::{AntiEntropyKind, KeyedSig, NodeMsgAuthorityUtils, SectionAuth, SystemMsg},
         AuthKind, AuthorityProof, Dst, MsgId, MsgType, NodeMsgAuthority, ServiceAuth, WireMsg,
     },
@@ -195,7 +195,7 @@ impl Session {
         cmds: PendingCmdAcks,
         correlation_id: MsgId,
         src: SocketAddr,
-        error: Option<CmdError>,
+        error: Option<ErrorMsg>,
     ) {
         if let Some(sender) = cmds.get(&correlation_id) {
             trace!(

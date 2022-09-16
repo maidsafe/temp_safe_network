@@ -11,7 +11,7 @@ use eyre::Result;
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
-        data::{CmdError, Error as MessagingDataError, ServiceMsg},
+        data::{Error as MessagingDataError, ServiceMsg},
         serialisation::WireMsg,
         system::{JoinResponse, MembershipState, NodeCmd, RelocateDetails, SystemMsg},
         AuthorityProof, MsgId, MsgType, ServiceAuth,
@@ -186,9 +186,7 @@ impl Cmd {
         match self {
             Cmd::SendMsg { msg, .. } => match msg {
                 OutgoingMsg::Service(service_msg) => match service_msg {
-                    ServiceMsg::CmdError { error, .. } => match error {
-                        CmdError::Data(err) => Ok(err.clone()),
-                    },
+                    ServiceMsg::CmdError { error, .. } => Ok(error.clone()),
                     _ => Err(eyre!("A ServiceMsg::CmdError variant was expected")),
                 },
                 _ => Err(eyre!("A OutgoingMsg::Service variant was expected")),

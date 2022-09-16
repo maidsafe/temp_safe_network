@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{CmdError, Error, RegisterCmd, SpentbookCmd};
+use super::{RegisterCmd, SpentbookCmd};
 use crate::types::{Chunk, DataAddress};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
@@ -36,20 +36,6 @@ pub enum DataCmd {
 }
 
 impl DataCmd {
-    /// Creates a Response containing an error, with the Response variant corresponding to the
-    /// cmd variant.
-    pub fn error(&self, error: Error) -> CmdError {
-        use DataCmd::*;
-        match self {
-            #[cfg(feature = "chunks")]
-            StoreChunk(_) => CmdError::Data(error),
-            #[cfg(feature = "registers")]
-            Register(c) => c.error(error),
-            #[cfg(feature = "spentbook")]
-            Spentbook(c) => c.error(error),
-        }
-    }
-
     /// Returns the address of the corresponding variant.
     pub fn address(&self) -> DataAddress {
         match self {
