@@ -96,9 +96,8 @@ impl Client {
         let query = DataQueryVariant::GetChunk(ChunkAddress(*name));
         let res = self.send_query(query.clone()).await?;
 
-        let op_id = res.operation_id;
         let chunk: Chunk = match res.response {
-            QueryResponse::GetChunk(result) => {
+            QueryResponse::GetChunk((result, op_id)) => {
                 result.map_err(|err| Error::ErrorMsg { source: err, op_id })
             }
             response => return Err(Error::UnexpectedQueryResponse { query, response }),

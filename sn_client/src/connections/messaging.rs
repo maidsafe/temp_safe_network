@@ -213,9 +213,9 @@ impl Session {
         query: DataQuery,
         auth: ServiceAuth,
         payload: Bytes,
-        #[cfg(feature = "traceroute")] client_pk: PublicKey,
         dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
         force_new_link: bool,
+        #[cfg(feature = "traceroute")] client_pk: PublicKey,
     ) -> Result<QueryResult> {
         let endpoint = self.endpoint.clone();
 
@@ -245,11 +245,6 @@ impl Session {
             elders
         );
 
-        let operation_id = query
-            .variant
-            .operation_id()
-            .map_err(|_| Error::UnknownOperationId)?;
-
         let dst = Dst {
             name: dst,
             section_key: section_pk,
@@ -258,6 +253,7 @@ impl Session {
 
         #[allow(unused_mut)]
         let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
+        let operation_id = wire_msg.operation_id();
 
         #[cfg(feature = "traceroute")]
         wire_msg.append_trace(&mut Traceroute(vec![Entity::Client(client_pk)]));
@@ -333,7 +329,7 @@ impl Session {
                 let (peer_address, response) = refmulti.key().clone();
 
                 match response {
-                    QueryResponse::GetChunk(Ok(chunk)) => {
+                    QueryResponse::GetChunk((Ok(chunk), op_id)) => {
                         if let Some(chunk_addr) = chunk_addr {
                             // We are dealing with Chunk query responses, thus we validate its hash
                             // matches its xorname, if so, we don't need to await for more responses
@@ -341,7 +337,7 @@ impl Session {
 
                             if chunk_addr.name() == chunk.name() {
                                 trace!("Valid Chunk received for {:?}", msg_id);
-                                valid_response = Some(QueryResponse::GetChunk(Ok(chunk)));
+                                valid_response = Some(QueryResponse::GetChunk((Ok(chunk), op_id)));
 
                                 // return Ok(Some(QueryResponse::GetChunk(Ok(chunk))));
                             } else {
@@ -359,7 +355,7 @@ impl Session {
                     | QueryResponse::GetRegisterPolicy((Err(_), _))
                     | QueryResponse::GetRegisterOwner((Err(_), _))
                     | QueryResponse::GetRegisterUserPermissions((Err(_), _))
-                    | QueryResponse::GetChunk(Err(_)) => {
+                    | QueryResponse::GetChunk((Err(_), _)) => {
                         debug!("QueryResponse error received from {peer_address:?} (but may be overridden by a non-error response from another elder): {:#?}", &response);
                         error_response = Some(response);
                         discarded_responses += 1;
@@ -416,24 +412,20 @@ impl Session {
                     }
                 }
             }
+        } else {
+            warn!("No listeners found for our op_id: {:?}", operation_id)
         }
 
         // we've looped over all responses...
         // if any are valid, lets return it
         if let Some(response) = valid_response {
             debug!("valid response innnn!!! : {:?}", response);
-            return Ok(Some(QueryResult {
-                response,
-                operation_id,
-            }));
+            return Ok(Some(QueryResult { response }));
             // otherwise, if we've got an error in
             // we can return that too
         } else if let Some(response) = error_response {
             if discarded_responses > elders_len / 2 {
-                return Ok(Some(QueryResult {
-                    response,
-                    operation_id,
-                }));
+                return Ok(Some(QueryResult { response }));
             }
         }
 

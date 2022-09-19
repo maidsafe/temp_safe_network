@@ -8,21 +8,22 @@
 
 use super::wire_msg_header::WireMsgHeader;
 use crate::messaging::{
-    data::ServiceMsg, system::SystemMsg, AuthKind, AuthorityProof, Dst, Error, MsgId, MsgType,
-    NodeMsgAuthority, Result, ServiceAuth,
+    data::{OperationId, ServiceMsg},
+    system::SystemMsg,
+    AuthKind, AuthorityProof, Dst, Error, MsgId, MsgType, NodeMsgAuthority, Result, ServiceAuth,
 };
+
 use bytes::Bytes;
 use custom_debug::Debug;
+use qp2p::UsrMsgBytes;
 use serde::Serialize;
 
 #[cfg(feature = "traceroute")]
 use crate::types::PublicKey;
 #[cfg(feature = "traceroute")]
-use serde::Deserialize;
-
-#[cfg(feature = "traceroute")]
 use itertools::Itertools;
-use qp2p::UsrMsgBytes;
+#[cfg(feature = "traceroute")]
+use serde::Deserialize;
 #[cfg(feature = "traceroute")]
 use std::fmt::{Debug as StdDebug, Display, Formatter};
 
@@ -298,6 +299,11 @@ impl WireMsg {
     /// Return the message id of this message
     pub fn msg_id(&self) -> MsgId {
         self.header.msg_envelope.msg_id
+    }
+
+    /// Return the operation id of this message based on the payload bytes
+    pub fn operation_id(&self) -> OperationId {
+        OperationId::from(&self.payload)
     }
 
     /// Return the auth of this message

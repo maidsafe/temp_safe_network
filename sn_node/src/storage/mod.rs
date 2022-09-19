@@ -22,7 +22,9 @@ use registers::RegisterStorage;
 use sn_dbc::SpentProofShare;
 use sn_interface::{
     messaging::{
-        data::{DataQueryVariant, Error as MessagingError, RegisterQuery, StorageLevel},
+        data::{
+            DataQueryVariant, Error as MessagingError, OperationId, RegisterQuery, StorageLevel,
+        },
         system::NodeQueryResponse,
     },
     types::{
@@ -107,29 +109,23 @@ impl DataStorage {
         &self,
         query: &DataQueryVariant,
         requester: User,
+        op_id: OperationId,
     ) -> NodeQueryResponse {
         match query {
-            DataQueryVariant::GetChunk(addr) => self.chunks.get(addr).await,
-            DataQueryVariant::Register(read) => self.registers.read(read, requester).await,
+            DataQueryVariant::GetChunk(addr) => self.chunks.get(addr, op_id).await,
+            DataQueryVariant::Register(read) => self.registers.read(read, requester, op_id).await,
             DataQueryVariant::Spentbook(read) => {
                 // TODO: this is temporary till spentbook native data type is implemented,
                 // we read from the Register where we store the spentbook data
-                let spentbook_op_id = match read.operation_id() {
-                    Ok(id) => id,
-                    Err(_e) => {
-                        return NodeQueryResponse::FailedToCreateOperationId;
-                    }
-                };
-
                 let reg_addr = RegisterAddress::new(read.dst_name(), SPENTBOOK_TYPE_TAG);
 
                 match self
                     .registers
-                    .read(&RegisterQuery::Get(reg_addr), requester)
+                    .read(&RegisterQuery::Get(reg_addr), requester, op_id)
                     .await
                 {
                     NodeQueryResponse::GetRegister((Err(MessagingError::DataNotFound(_)), _)) => {
-                        NodeQueryResponse::SpentProofShares((Ok(Vec::new()), spentbook_op_id))
+                        NodeQueryResponse::SpentProofShares((Ok(Vec::new()), op_id))
                     }
                     NodeQueryResponse::GetRegister((result, _)) => {
                         let proof_shares_result = result.map(|reg| {
@@ -150,7 +146,7 @@ impl DataStorage {
                             proof_shares
                         });
 
-                        NodeQueryResponse::SpentProofShares((proof_shares_result, spentbook_op_id))
+                        NodeQueryResponse::SpentProofShares((proof_shares_result, op_id))
                     }
                     other => {
                         // TODO: this is temporary till spentbook native data type is implemented,
@@ -257,7 +253,7 @@ mod tests {
     use sn_interface::{
         init_logger,
         messaging::{
-            data::{CreateRegister, DataQueryVariant, SignedRegisterCreate},
+            data::{CreateRegister, DataQueryVariant, OperationId, SignedRegisterCreate},
             system::NodeQueryResponse,
         },
         types::{
@@ -314,10 +310,13 @@ mod tests {
         // Test client fetch
         let query = DataQueryVariant::GetChunk(*chunk.address());
         let user = User::Anyone;
+        let op_id = OperationId::random();
+        let query_response = storage.query(&query, user, op_id).await;
 
-        let query_response = storage.query(&query, user).await;
-
-        assert_eq!(query_response, NodeQueryResponse::GetChunk(Ok(chunk)));
+        assert_eq!(
+            query_response,
+            NodeQueryResponse::GetChunk((Ok(chunk), op_id))
+        );
 
         // Remove from storage
         storage.remove(&replicated_data.address()).await?;
@@ -543,21 +542,23 @@ mod tests {
                     let addr = ChunkAddress(key);
                     let query = DataQueryVariant::GetChunk(addr);
                     let user = User::Anyone;
-                    let stored_res = runtime.block_on(storage.query(&query, user));
+                    let op_id = OperationId::random();
+                    let stored_res = runtime.block_on(storage.query(&query, user, op_id));
                     let model_res = model.get(&key);
 
                     match model_res {
                         Some(m_res) => {
-                            if let NodeQueryResponse::GetChunk(Ok(s_chunk)) = stored_res {
+                            if let NodeQueryResponse::GetChunk((Ok(s_chunk), id)) = stored_res {
                                 if let ReplicatedData::Chunk(m_chunk) = m_res {
                                     assert_eq!(*m_chunk, s_chunk);
+                                    assert_eq!(id, op_id);
                                 }
                             } else {
                                 return Err(Error::ChunkNotFound(key));
                             }
                         }
                         None => {
-                            if let NodeQueryResponse::GetChunk(Ok(_)) = stored_res {
+                            if let NodeQueryResponse::GetChunk((Ok(_), _)) = stored_res {
                                 return Err(Error::DataExists(DataAddress::Bytes(addr)));
                             }
                         }

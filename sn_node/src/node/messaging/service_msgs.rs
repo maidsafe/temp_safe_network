@@ -99,9 +99,11 @@ impl Node {
     }
 
     /// Handle data query
+    #[allow(clippy::too_many_arguments)]
     pub(crate) async fn handle_data_query_at_adult(
         &self,
         correlation_id: MsgId,
+        op_id: OperationId,
         query: &DataQueryVariant,
         auth: ServiceAuth,
         user: EndUser,
@@ -110,7 +112,7 @@ impl Node {
     ) -> Cmd {
         let response = self
             .data_storage
-            .query(query, User::Key(auth.public_key))
+            .query(query, User::Key(auth.public_key), op_id)
             .await;
 
         trace!("data query response at adult is: {:?}", response);
@@ -137,9 +139,9 @@ impl Node {
         response: NodeQueryResponse,
         user: EndUser,
         sending_node_pk: PublicKey,
-        op_id: OperationId,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Option<Cmd> {
+        let op_id = response.operation_id();
         debug!(
             "Handling data read @ elders, received from {:?}, op id: {:?}",
             sending_node_pk, op_id
@@ -177,10 +179,8 @@ impl Node {
             return None;
         }
 
-        let query_response = response.convert();
-
         let msg = ServiceMsg::QueryResponse {
-            response: query_response,
+            response,
             correlation_id,
         };
 
@@ -200,6 +200,7 @@ impl Node {
     pub(crate) async fn handle_valid_service_msg(
         &self,
         msg_id: MsgId,
+        op_id: OperationId,
         msg: ServiceMsg,
         auth: AuthorityProof<ServiceAuth>,
         origin: Peer,
@@ -236,6 +237,7 @@ impl Node {
                     .read_data_from_adults(
                         query,
                         msg_id,
+                        op_id,
                         auth,
                         origin,
                         #[cfg(feature = "traceroute")]

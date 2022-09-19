@@ -117,7 +117,7 @@ async fn query_chunk(client: &Client, adult_index: usize, address: XorName) -> R
     };
     let query_response = send_query(client, query).await?;
     match query_response {
-        QueryResponse::GetChunk(result) => result.map_err(|e| e.into()),
+        QueryResponse::GetChunk((result, _)) => result.map_err(|e| e.into()),
         response => Err(Error::UnexpectedQueryResponse {
             query: variant,
             response,

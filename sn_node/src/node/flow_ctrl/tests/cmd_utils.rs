@@ -11,7 +11,7 @@ use eyre::Result;
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
-        data::{Error as MessagingDataError, ServiceMsg},
+        data::{Error as MessagingDataError, OperationId, ServiceMsg},
         serialisation::WireMsg,
         system::{JoinResponse, MembershipState, NodeCmd, RelocateDetails, SystemMsg},
         AuthorityProof, MsgId, MsgType, ServiceAuth,
@@ -120,6 +120,7 @@ pub(crate) fn wrap_service_msg_for_handling(msg: ServiceMsg, peer: Peer) -> Resu
     let auth_proof = AuthorityProof::verify(auth, &payload)?;
     Ok(HandleValidServiceMsg {
         msg_id: MsgId::new(),
+        op_id: OperationId::random(),
         msg,
         origin: peer,
         auth: auth_proof,

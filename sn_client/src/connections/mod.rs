@@ -36,7 +36,6 @@ type PendingCmdAcks = Arc<DashMap<MsgId, Arc<DashSet<CmdResponse>>>>;
 #[derive(Debug)]
 pub struct QueryResult {
     pub response: QueryResponse,
-    pub operation_id: OperationId,
 }
 
 impl QueryResult {

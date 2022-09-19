@@ -65,6 +65,7 @@ impl Node {
         let msg_id = wire_msg.msg_id();
         // payload needed for aggregation
         let wire_msg_payload = wire_msg.payload.clone();
+        let op_id = wire_msg.operation_id();
 
         let msg_type = match wire_msg.into_msg() {
             Ok(msg_type) => msg_type,
@@ -168,6 +169,7 @@ impl Node {
 
                 Ok(vec![Cmd::HandleValidServiceMsg {
                     msg_id,
+                    op_id,
                     msg,
                     origin,
                     auth,

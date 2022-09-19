@@ -28,13 +28,14 @@ pub use self::{
     spentbook::{SpentbookCmd, SpentbookQuery},
 };
 
-use crate::messaging::{data::Error as ErrorMsg, MsgId};
+use crate::messaging::MsgId;
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register, User},
-    utils, Chunk, ChunkAddress, DataAddress,
+    Chunk,
 };
 
 use bytes::Bytes;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sn_dbc::SpentProofShare;
 use std::{
@@ -66,15 +67,22 @@ impl Debug for OperationId {
     }
 }
 
-/// Return operation Id of a chunk
-pub fn chunk_operation_id(address: &ChunkAddress) -> Result<OperationId> {
-    let bytes = utils::serialise(address).map_err(|_| Error::NoOperationId)?;
-    let mut hasher = Sha3::v256();
-    let mut output = [0; 32];
-    hasher.update(&bytes);
-    hasher.finalize(&mut output);
+impl OperationId {
+    /// Creates an operation id by hashing the provided bytes
+    pub fn from(bytes: &Bytes) -> Self {
+        let mut hasher = Sha3::v256();
+        let mut output = [0; 32];
+        hasher.update(bytes);
+        hasher.finalize(&mut output);
 
-    Ok(OperationId(output))
+        Self(output)
+    }
+
+    /// Creates a random operation id
+    pub fn random() -> Self {
+        let mut rng = rand::thread_rng();
+        Self(rng.gen())
+    }
 }
 
 /// Network service messages exchanged between clients
@@ -189,7 +197,7 @@ pub enum QueryResponse {
     /// Response to [`GetChunk`]
     ///
     /// [`GetChunk`]: crate::messaging::data::DataQueryVariant::GetChunk
-    GetChunk(Result<Chunk>),
+    GetChunk((Result<Chunk>, OperationId)),
     //
     // ===== Register Data =====
     //
@@ -210,11 +218,6 @@ pub enum QueryResponse {
     //
     /// Response to [`SpentbookQuery::SpentProofShares`].
     SpentProofShares((Result<Vec<SpentProofShare>>, OperationId)),
-    //
-    // ===== Other =====
-    //
-    /// Failed to create id generation
-    FailedToCreateOperationId,
 }
 
 impl QueryResponse {
@@ -223,7 +226,7 @@ impl QueryResponse {
         use QueryResponse::*;
         matches!(
             self,
-            GetChunk(Ok(_))
+            GetChunk((Ok(_), _))
                 | GetRegister((Ok(_), _))
                 | GetRegisterEntry((Ok(_), _))
                 | GetRegisterOwner((Ok(_), _))
@@ -243,7 +246,7 @@ impl QueryResponse {
 
         matches!(
             self,
-            GetChunk(Err(Error::DataNotFound(_)))
+            GetChunk((Err(Error::DataNotFound(_)), _))
                 | GetRegister((Err(Error::DataNotFound(_)), _))
                 | GetRegisterEntry((Err(Error::DataNotFound(_)), _))
                 | GetRegisterEntry((Err(Error::NoSuchEntry), _))
@@ -260,40 +263,23 @@ impl QueryResponse {
 
     /// Retrieves the operation identifier for this response, use in tracking node liveness
     /// and responses at clients.
-    pub fn operation_id(&self) -> Result<OperationId> {
+    pub fn operation_id(&self) -> OperationId {
         use QueryResponse::*;
-
-        // TODO: Operation Id should eventually encompass _who_ the op is for.
         match self {
-            GetChunk(result) => match result {
-                Ok(chunk) => chunk_operation_id(chunk.address()),
-                Err(ErrorMsg::DataNotFound(DataAddress::Bytes(name))) => chunk_operation_id(name),
-                Err(ErrorMsg::DataNotFound(another_address)) => {
-                    error!(
-                        "{:?} address returned when we were expecting a ChunkAddress",
-                        another_address
-                    );
-                    Err(Error::NoOperationId)
-                }
-                Err(another_error) => {
-                    error!("Could not form operation id: {:?}", another_error);
-                    Err(Error::InvalidQueryResponseErrorForOperationId)
-                }
-            },
-            GetRegister((_, operation_id))
-            | GetRegisterEntry((_, operation_id))
-            | GetRegisterOwner((_, operation_id))
-            | ReadRegister((_, operation_id))
-            | GetRegisterPolicy((_, operation_id))
-            | GetRegisterUserPermissions((_, operation_id))
-            | SpentProofShares((_, operation_id)) => Ok(*operation_id),
-            FailedToCreateOperationId => Err(Error::NoOperationId),
+            GetChunk((_, op_id))
+            | GetRegister((_, op_id))
+            | GetRegisterEntry((_, op_id))
+            | GetRegisterOwner((_, op_id))
+            | ReadRegister((_, op_id))
+            | GetRegisterPolicy((_, op_id))
+            | GetRegisterUserPermissions((_, op_id))
+            | SpentProofShares((_, op_id)) => *op_id,
         }
     }
 }
 
-/// Error type for an attempted conversion from a [`QueryResponse`] variant to an expected wrapped
-/// value.
+/// Error type for an attempted conversion from a [`QueryResponse`] variant
+/// to an expected wrapped value.
 #[derive(Debug, Eq, PartialEq)]
 #[allow(clippy::large_enum_variant)]
 pub enum TryFromError {
@@ -326,8 +312,8 @@ impl TryFrom<QueryResponse> for Chunk {
     type Error = TryFromError;
     fn try_from(response: QueryResponse) -> std::result::Result<Self, Self::Error> {
         match response {
-            QueryResponse::GetChunk(Ok(data)) => Ok(data),
-            QueryResponse::GetChunk(Err(error)) => Err(TryFromError::Response(error)),
+            QueryResponse::GetChunk((Ok(data), _)) => Ok(data),
+            QueryResponse::GetChunk((Err(error), _)) => Err(TryFromError::Response(error)),
             _ => Err(TryFromError::WrongType),
         }
     }
@@ -391,15 +377,16 @@ mod tests {
 
         let i_data = Chunk::new(Bytes::from(vec![1, 3, 1, 4]));
         let e = Error::AccessDenied(key);
+        let op_id = OperationId::random();
         assert_eq!(
             i_data,
-            GetChunk(Ok(i_data.clone()))
+            GetChunk((Ok(i_data.clone()), op_id))
                 .try_into()
                 .map_err(|_| eyre!("Mismatched types".to_string()))?
         );
         assert_eq!(
             Err(TryFromError::Response(e.clone())),
-            Chunk::try_from(GetChunk(Err(e)))
+            Chunk::try_from(GetChunk((Err(e), op_id)))
         );
 
         Ok(())
