@@ -2685,6 +2685,27 @@ mod tests {
         let (version2, new_files_map) =
             version2_content.ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
+        // we know there a change, so we wait for an udpated version here
+        while version2 == version1 {
+            let (version2_content, new_new_processed_files) = safe
+            .files_container_add(
+                &other_file_xorurl,
+                &url_with_path.to_string(),
+                true, // force to overwrite it with new link
+                false,
+                false,
+            )
+            .await?;
+
+            let (new_version2, new_new_files_map) =
+                version2_content.ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
+            version2 = new_version2;
+            new_files_map = new_new_files_map;
+            new_processed_files = new_new_processed_files;
+        }
+
+
+
         assert_ne!(version2, version0);
         assert_ne!(version2, version1);
         assert_eq!(new_processed_files.len(), 1);
