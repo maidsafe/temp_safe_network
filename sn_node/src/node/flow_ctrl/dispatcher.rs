@@ -46,8 +46,7 @@ impl Dispatcher {
 
         match cmd {
             Cmd::CleanupPeerLinks => {
-                let members = { self.node.read().await.network_knowledge.section_members() };
-                self.comm.cleanup_peers(members).await;
+                self.comm.cleanup_peers().await;
                 Ok(vec![])
             }
             Cmd::SendMsg {
