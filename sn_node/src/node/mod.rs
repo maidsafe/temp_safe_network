@@ -27,7 +27,6 @@ mod node_starter;
 mod node_test_api;
 mod proposal;
 mod relocation;
-mod split_barrier;
 mod statemap;
 
 use self::{
@@ -79,7 +78,6 @@ mod core {
             handover::Handover,
             membership::{elder_candidates, try_split_dkg, Membership},
             messaging::Peers,
-            split_barrier::SplitBarrier,
             DataStorage, Elders, Error, Event, MembershipEvent, NodeElderChange, Prefix, Proposal,
             Result, XorName,
         },
@@ -93,11 +91,12 @@ mod core {
         messaging::{
             data::OperationId,
             signature_aggregator::SignatureAggregator,
-            system::{DkgSessionId, NodeState},
+            system::{DkgSessionId, NodeState, SectionAuth as SectionAuthed},
             AuthorityProof, SectionAuth, SectionAuthorityProvider,
         },
         network_knowledge::{
-            supermajority, NetworkKnowledge, NodeInfo, SectionKeyShare, SectionKeysProvider,
+            supermajority, NetworkKnowledge, NodeInfo,
+            SectionAuthorityProvider as SectionAuthProvider, SectionKeyShare, SectionKeysProvider,
         },
         types::{keys::ed25519::Digest256, log_markers::LogMarker, Cache, DataAddress, Peer},
     };
@@ -106,6 +105,7 @@ mod core {
     use ed25519_dalek::Keypair;
     use itertools::Itertools;
     use resource_proof::ResourceProof;
+    use sn_consensus::Generation;
     use std::{
         collections::{BTreeMap, BTreeSet, HashMap},
         net::SocketAddr,
@@ -174,9 +174,10 @@ mod core {
         pub(crate) message_aggregator: SignatureAggregator,
         pub(crate) proposal_aggregator: SignatureAggregator,
         // DKG/Split/Churn modules
-        pub(crate) split_barrier: SplitBarrier,
         pub(crate) dkg_sessions_info: HashMap<Digest256, DkgSessionInfo>,
         pub(crate) dkg_voter: DkgVoter,
+        pub(crate) pending_split_sections:
+            BTreeMap<Generation, BTreeSet<SectionAuthed<SectionAuthProvider>>>,
         pub(crate) relocate_state: Option<Box<JoiningAsRelocated>>,
         // ======================== Elder only ========================
         pub(crate) membership: Option<Membership>,
@@ -261,7 +262,7 @@ mod core {
                 root_storage_dir,
                 dkg_sessions_info: HashMap::default(),
                 proposal_aggregator: SignatureAggregator::default(),
-                split_barrier: SplitBarrier::new(),
+                pending_split_sections: Default::default(),
                 message_aggregator: SignatureAggregator::default(),
                 dkg_voter: DkgVoter::default(),
                 relocate_state: None,
@@ -522,9 +523,6 @@ mod core {
                 .key_share(&self.network_knowledge.section_key())?;
             let n_elders = self.network_knowledge.section_auth().elder_count();
 
-            // reset split barrier for
-            self.split_barrier = SplitBarrier::new();
-
             self.handover_voting = Some(Handover::from(
                 (key.index as u8, key.secret_key_share),
                 key.public_key_set,
@@ -573,6 +571,9 @@ mod core {
                 let _ = self.dkg_sessions_info.remove(&hash);
                 self.dkg_voter.remove(&hash);
             }
+
+            // clean up pending split sections
+            self.pending_split_sections = Default::default();
 
             if new.is_elder {
                 let sap = self.network_knowledge.section_auth();

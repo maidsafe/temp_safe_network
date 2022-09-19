@@ -71,14 +71,14 @@ impl Node {
             );
             return Ok(None);
         }
-        debug!("Updating section info for our prefix: {:?}", sap.prefix());
+        debug!("Handling section info with prefix: {:?}", sap.prefix());
 
         // check if at the given memberhip gen, the elders candidates are matching
         let membership_gen = sap.membership_gen();
-        let signed_section_auth = SectionAuth::new(sap, sig.clone());
+        let signed_sap = SectionAuth::new(sap, sig.clone());
         let dkg_sessions_info = self.best_elder_candidates_at_gen(membership_gen);
 
-        let elder_candidates = BTreeSet::from_iter(signed_section_auth.names());
+        let elder_candidates = BTreeSet::from_iter(signed_sap.names());
         if dkg_sessions_info
             .iter()
             .all(|session| !session.elder_names().eq(elder_candidates.iter().copied()))
@@ -90,27 +90,28 @@ impl Node {
         // handle regular elder handover (1 to 1)
         // trigger handover consensus among elders
         if equal_prefix {
-            debug!(
-                "Propose elder handover to: {:?}",
-                signed_section_auth.prefix()
-            );
-            return self
-                .propose_handover_consensus(SapCandidate::ElderHandover(signed_section_auth));
+            debug!("Propose elder handover to: {:?}", signed_sap.prefix());
+            return self.propose_handover_consensus(SapCandidate::ElderHandover(signed_sap));
         }
 
-        // manage pending split SAP candidates
-        // NB TODO temporary while we wait for Membership generations and possibly double DKG
-        let chosen_candidates = self
-            .split_barrier
-            .process(
-                &self.network_knowledge.prefix(),
-                signed_section_auth.clone(),
-                sig.clone(),
-            )
-            .await;
+        // add to pending split SAP candidates
+        // those are stored in a mapping from Generation to BTreeSet so the order in the set is deterministic
+        let section_candidates_for_gen = self
+            .pending_split_sections
+            .entry(membership_gen)
+            .and_modify(|curr| {
+                let _ = curr.insert(signed_sap.clone());
+            })
+            .or_insert_with(|| BTreeSet::from([signed_sap]));
 
+        // if we have reached 2 split SAP candidates for this generation
         // handle section split (1 to 2)
-        if let [(sap1, _sig1), (sap2, _sig2)] = chosen_candidates.as_slice() {
+        if let [sap1, sap2] = section_candidates_for_gen
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>()
+            .as_slice()
+        {
             debug!(
                 "Propose section split handover to: {:?} {:?}",
                 sap1.prefix(),
@@ -126,7 +127,7 @@ impl Node {
     #[instrument(skip(self), level = "trace")]
     pub(crate) async fn handle_new_elders_agreement(
         &mut self,
-        signed_section_auth: SectionAuth<SectionAuthorityProvider>,
+        signed_sap: SectionAuth<SectionAuthorityProvider>,
         key_sig: KeyedSig,
     ) -> Result<Vec<Cmd>> {
         trace!("{}", LogMarker::HandlingNewEldersAgreement);
@@ -134,21 +135,22 @@ impl Node {
         let mut section_chain = self.section_chain();
         let last_key = section_chain.last_key()?;
 
-        let prefix = signed_section_auth.prefix();
+        let prefix = signed_sap.prefix();
         trace!("{}: for {:?}", LogMarker::NewSignedSap, prefix);
-        info!("New SAP agreed for:{}", *signed_section_auth);
+
+        info!("New SAP agreed for:{}", *signed_sap);
 
         // Let's update our network knowledge, including our
         // section SAP and chain if the new SAP's prefix matches our name
         // We need to generate the proof chain to connect our current chain to new SAP.
         match section_chain.insert(
             &last_key,
-            signed_section_auth.section_key(),
+            signed_sap.section_key(),
             key_sig.signature,
         ) {
             Ok(()) => {
                 let section_tree_update =
-                    SectionTreeUpdate::new(signed_section_auth, section_chain);
+                    SectionTreeUpdate::new(signed_sap, section_chain);
                 match self.update_network_knowledge(section_tree_update, None) {
                     Ok(true) => {
                         info!("Updated our network knowledge for {:?}", prefix);
