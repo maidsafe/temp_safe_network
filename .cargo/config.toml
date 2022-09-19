@@ -8,4 +8,4 @@ rustflags = [
 [target.x86_64-pc-windows-gnu]
 rustflags = [
     "-C", "link-arg=-Wl,--stack,0x800000"
-]
+]~config alt +c+ alt config c++()
