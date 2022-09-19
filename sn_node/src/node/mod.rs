@@ -599,7 +599,7 @@ mod core {
             }
 
             if new.is_elder || old.is_elder {
-                if let Some(cmd) = self.send_ae_update_to_our_section() {
+                if let Some(cmd) = self.send_ae_update_to_our_section()? {
                     cmds.push(cmd);
                 }
             }
@@ -688,11 +688,11 @@ mod core {
         }
 
         #[allow(unused)]
-        pub(crate) fn section_key_by_name(&self, name: &XorName) -> bls::PublicKey {
+        pub(crate) fn section_key_by_name(&self, name: &XorName) -> Result<bls::PublicKey> {
             if self.network_knowledge.prefix().matches(name) {
-                self.network_knowledge.section_key()
+                Ok(self.network_knowledge.section_key())
             } else if let Ok(sap) = self.network_knowledge.section_by_name(name) {
-                sap.section_key()
+                Ok(sap.section_key())
             } else if self.network_knowledge.prefix().sibling().matches(name) {
                 // For sibling with unknown key, use the previous key in our chain under the assumption
                 // that it's the last key before the split and therefore the last key of theirs we know.
@@ -700,22 +700,16 @@ mod core {
                 // key since the split) then this key would be unknown to them and they would send
                 // us back their whole section chain. However, this situation should be rare.
 
-                // our_section_dag produces a DAG with only 1 leaf
-                let leaf_key = self
-                    .network_knowledge
-                    .our_section_dag()
-                    .leaf_keys()
-                    .into_iter()
-                    .collect::<Vec<_>>()[0];
+                let leaf_key = self.network_knowledge.our_section_dag().last_key()?;
                 match self.our_section_dag().get_parent_key(&leaf_key) {
-                    Ok(prev_pk) => prev_pk.unwrap_or(*self.our_section_dag().genesis_key()),
+                    Ok(prev_pk) => Ok(prev_pk.unwrap_or(*self.our_section_dag().genesis_key())),
                     Err(_) => {
                         error!("SectionsDAG fields went out of sync");
-                        leaf_key
+                        Ok(leaf_key)
                     }
                 }
             } else {
-                *self.network_knowledge.genesis_key()
+                Ok(*self.network_knowledge.genesis_key())
             }
         }
 

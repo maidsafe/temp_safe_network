@@ -33,7 +33,7 @@ use xor_name::{Prefix, XorName};
 
 impl Node {
     /// Send `AntiEntropy` update message to all nodes in our own section.
-    pub(crate) fn send_ae_update_to_our_section(&self) -> Option<Cmd> {
+    pub(crate) fn send_ae_update_to_our_section(&self) -> Result<Option<Cmd>> {
         let our_name = self.info().name();
         let recipients: BTreeSet<_> = self
             .network_knowledge
@@ -45,24 +45,19 @@ impl Node {
 
         if recipients.is_empty() {
             warn!("No peers of our section found in our network knowledge to send AE-Update");
-            return None;
+            return Ok(None);
         }
 
-        // our_section_dag produces a DAG with only 1 leaf
-        let leaf = self
-            .our_section_dag()
-            .leaf_keys()
-            .into_iter()
-            .collect::<Vec<_>>()[0];
+        let leaf = self.our_section_dag().last_key()?;
         // The previous PK which is likely what adults know
         match self.our_section_dag().get_parent_key(&leaf) {
             Ok(prev_pk) => {
                 let prev_pk = prev_pk.unwrap_or(*self.our_section_dag().genesis_key());
-                Some(self.send_ae_update_to_nodes(recipients, prev_pk))
+                Ok(Some(self.send_ae_update_to_nodes(recipients, prev_pk)))
             }
             Err(_) => {
                 error!("SectionsDAG fields went out of sync");
-                None
+                Ok(None)
             }
         }
     }
@@ -474,8 +469,8 @@ mod tests {
         local
             .run_until(async move {
                 let env = Env::new().await?;
-
-                let known_keys = vec![*env.node.network_knowledge().genesis_key()];
+                let known_key = *env.node.network_knowledge().genesis_key();
+                let known_keys = BTreeSet::from([known_key]);
 
                 // This proof_chain already contains other_pk
                 let proof_chain = env.partial_dag.clone();
@@ -499,7 +494,7 @@ mod tests {
                 ));
 
                 // Other messages shall get rejected.
-                let other_msg = SystemMsg::AntiEntropyProbe(known_keys[0]);
+                let other_msg = SystemMsg::AntiEntropyProbe(known_key);
                 assert!(!NetworkKnowledge::verify_node_msg_can_be_trusted(
                     &msg_authority,
                     &other_msg,

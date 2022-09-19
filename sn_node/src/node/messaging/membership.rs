@@ -202,7 +202,7 @@ impl Node {
         }
 
         cmds.extend(self.promote_and_demote_elders_except(&BTreeSet::default())?);
-        cmds.extend(self.send_ae_update_to_our_section());
+        cmds.extend(self.send_ae_update_to_our_section()?);
 
         self.liveness_retain_only(
             self.network_knowledge

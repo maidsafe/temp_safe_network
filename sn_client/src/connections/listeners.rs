@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Session;
+use std::collections::BTreeSet;
 
 use crate::{
     connections::{messaging::NUM_OF_ELDERS_SUBSET_FOR_QUERIES, PendingCmdAcks},
@@ -143,7 +144,7 @@ impl Session {
         sender: Peer,
     ) -> Result<(), Error> {
         // Check that the message can be trusted w.r.t. our known keys
-        let known_keys: Vec<_> = self
+        let known_keys: BTreeSet<_> = self
             .network
             .read()
             .await

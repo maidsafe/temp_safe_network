@@ -260,16 +260,14 @@ impl NetworkKnowledge {
                         // Remove any peer which doesn't belong to our new section's prefix
                         self.section_peers.retain(prefix);
                         // Prune list of archived members
-                        if self
+                        if let Err(e) = self
                             .section_peers
                             .prune_members_archive(&section_dag, &section_key)
-                            .is_err()
                         {
                             error!(
-                                "Error while pruning member archive with last_key: {section_key:?}"
+                                "Error while pruning member archive with last_key: {section_key:?}, err: {e:?}"
                             );
                         }
-
                         // Let's then update our current SAP and section chain
                         let our_prev_prefix = self.prefix();
                         self.signed_sap = signed_sap.clone();
@@ -300,7 +298,7 @@ impl NetworkKnowledge {
     pub fn verify_node_msg_can_be_trusted(
         msg_authority: &NodeMsgAuthority,
         msg: &SystemMsg,
-        known_keys: &[BlsPublicKey],
+        known_keys: &BTreeSet<BlsPublicKey>,
     ) -> bool {
         if !msg_authority.verify_src_section_key_is_known(known_keys) {
             // In case the incoming message itself is trying to update our knowledge,
@@ -350,9 +348,6 @@ impl NetworkKnowledge {
         if we_should_become_an_elder && !we_have_a_share_of_this_key {
             warn!("We should be an elder, but we're missing the keyshare!, ignoring update");
             return Ok(false);
-        };
-        if we_have_a_share_of_this_key && !we_should_become_an_elder {
-            warn!("We have the keyshare but we are not an elder");
         };
 
         // If the update is for a different prefix, we just update the section_tree; else we should
@@ -551,7 +546,7 @@ impl NetworkKnowledge {
         self.signed_sap.section_key()
     }
 
-    /// Return current section chain length
+    /// Return the number of keys in our section dag
     pub fn our_section_dag_len(&self) -> u64 {
         self.our_section_dag().keys().count() as u64
     }
@@ -561,7 +556,7 @@ impl NetworkKnowledge {
         self.our_section_dag().has_key(key)
     }
 
-    /// Return a vec of all known keys
+    /// Return the set of known keys
     pub fn known_keys(&self) -> BTreeSet<bls::PublicKey> {
         self.section_tree
             .get_sections_dag()

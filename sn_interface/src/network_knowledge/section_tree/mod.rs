@@ -196,10 +196,7 @@ impl SectionTree {
         }
 
         // Check the SAP's key is the last key of the proof chain
-        if partial_dag.leaf_keys().len() != 1 {
-            return Err(Error::MultipleBranchError);
-        }
-        if !partial_dag.leaf_keys().contains(&signed_sap.section_key()) {
+        if partial_dag.last_key()? != signed_sap.section_key() {
             return Err(Error::UntrustedPartialDAG(format!(
                 "Provided section key ({:?}, from prefix {:?}) is not the last key of the partial_dag",
                 signed_sap.section_key(),
@@ -275,10 +272,7 @@ impl SectionTree {
             // root/child key in our sections_dag. Checked in the above match statement.
             self.sections_dag.merge(partial_dag.clone())?;
             for (prefix, section_key) in &self.sections {
-                debug!(
-                    "Known prefix,section_key after update: {:?} = {:?}",
-                    prefix, section_key
-                );
+                debug!("Known prefix, section_key after update: {prefix:?} = {section_key:?}");
             }
             debug!("updated sections_dag: {:?}", self.sections_dag);
             Ok(true)

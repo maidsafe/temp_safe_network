@@ -59,7 +59,7 @@ pub enum Error {
     ArchivedNodeRejoined,
     #[error("The provided signature cannot be verified")]
     InvalidSignature,
-    #[error("Key not found in the SectionsDAG: {}", hex::encode(_0.to_bytes()))]
+    #[error("Key not found in the SectionsDAG: {0:?}")]
     KeyNotFound(bls::PublicKey),
     #[error("The 'to' or 'from' key is not present in the same branch")]
     InvalidBranch,

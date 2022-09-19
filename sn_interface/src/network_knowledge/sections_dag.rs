@@ -13,11 +13,7 @@ use crdts::{
     merkle_reg::{Hash, MerkleReg, Node, Sha3Hash},
     CmRDT,
 };
-use serde::{
-    de::Error as DeserializationError,
-    ser::{Error as SerializationError, SerializeMap},
-    Deserialize, Deserializer, Serialize, Serializer,
-};
+use serde::{de::Error as DeserializationError, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Debug, Formatter},
@@ -61,32 +57,49 @@ pub struct SectionsDAG {
     hashes: BTreeMap<bls::PublicKey, Hash>,
 }
 
+#[derive(Serialize, Deserialize)]
+struct Intermediate {
+    genesis_key: bls::PublicKey,
+    sections: Vec<(bls::PublicKey, SectionInfo)>,
+}
+
 impl Serialize for SectionsDAG {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         let mut sections: Vec<(bls::PublicKey, SectionInfo)> = Vec::new();
-        let mut need_to_visit: Vec<(bls::PublicKey, Node<SectionInfo>)> = Vec::new();
-        for key in self.dag_root.iter() {
-            need_to_visit.push((
-                *self.genesis_key(),
-                self.get_node(key).map_err(S::Error::custom)?,
-            ));
-        }
-        while let Some((parent_key, current_node)) = need_to_visit.pop() {
-            need_to_visit.extend(
-                self.child_nodes(current_node.hash())
-                    .into_iter()
-                    .map(|child_node| (current_node.value.key, child_node)),
-            );
-            sections.push((parent_key, current_node.value));
-        }
+        let mut already_visited: BTreeSet<bls::PublicKey> = BTreeSet::new();
 
-        let mut map = serializer.serialize_map(Some(2))?;
-        map.serialize_entry("genesis_key", &self.genesis_key)?;
-        map.serialize_entry("sections", &sections)?;
-        map.end()
+        for leaf in self.non_genesis_leaf_nodes() {
+            let mut node = leaf;
+            let mut ancestors: Vec<(bls::PublicKey, SectionInfo)> = Vec::new();
+            loop {
+                // skip to the next leaf since we have visited the current node and its ancestors
+                if already_visited.contains(&node.value.key) {
+                    break;
+                }
+                let parent = match self.parent_node(node.hash()) {
+                    Some(parent) => parent,
+                    None => {
+                        ancestors.push((self.genesis_key, node.value.clone()));
+                        break;
+                    }
+                };
+                ancestors.push((parent.value.key, node.value.clone()));
+                node = parent
+            }
+
+            ancestors.into_iter().rev().for_each(|section| {
+                already_visited.insert(section.1.key);
+                sections.push(section);
+            })
+        }
+        let inter = Intermediate {
+            genesis_key: self.genesis_key,
+            sections,
+        };
+        inter.serialize(serializer)
     }
 }
 
@@ -95,13 +108,7 @@ impl<'de> Deserialize<'de> for SectionsDAG {
     where
         D: Deserializer<'de>,
     {
-        #[derive(Deserialize)]
-        struct Intermediate {
-            genesis_key: bls::PublicKey,
-            sections: Vec<(bls::PublicKey, SectionInfo)>,
-        }
         let inter: Intermediate = Deserialize::deserialize(deserializer)?;
-
         let mut dag = SectionsDAG::new(inter.genesis_key);
         for (parent, info) in inter.sections {
             dag.insert(&parent, info.key, info.sig)
@@ -114,16 +121,18 @@ impl<'de> Deserialize<'de> for SectionsDAG {
 impl Debug for SectionsDAG {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         let keys: Vec<_> = self.keys().cloned().collect();
+        let key_positions: BTreeMap<&bls::PublicKey, usize> = keys
+            .iter()
+            .enumerate()
+            .map(|(idx, key)| (key, idx))
+            .collect();
         let mut parent_indices: Vec<usize> = Vec::new();
         for key in keys.iter() {
             match self.get_parent_key(key).map_err(|_| fmt::Error)? {
                 None => parent_indices.push(usize::MAX),
                 Some(parent_key) => {
-                    let idx = keys
-                        .iter()
-                        .position(|key| *key == parent_key)
-                        .ok_or(fmt::Error)?;
-                    parent_indices.push(idx)
+                    let idx = key_positions.get(&parent_key).ok_or(fmt::Error)?;
+                    parent_indices.push(*idx)
                 }
             }
         }
@@ -414,10 +423,26 @@ impl SectionsDAG {
         }
     }
 
+    /// Returns the last key if the DAG contains a single branch
+    /// Else returns `Error::MultipleBranchError`
+    pub fn last_key(&self) -> Result<bls::PublicKey> {
+        let last_key = self.leaf_keys().into_iter().collect::<Vec<_>>();
+        if last_key.len() != 1 {
+            return Err(Error::MultipleBranchError);
+        }
+        Ok(last_key[0])
+    }
+
     /// Returns the list of the leaf sections. A section is considered a leaf if it has not
     /// gone through any churn or split. Empty list if we only hold the genesis.
     fn non_genesis_leaf_sections(&self) -> Vec<SectionInfo> {
         self.dag.read().values().cloned().collect()
+    }
+
+    /// Returns the list of the leaf nodes. A section is considered a leaf if it has not
+    /// gone through any churn or split. Empty list if we only hold the genesis.
+    fn non_genesis_leaf_nodes(&self) -> Vec<Node<SectionInfo>> {
+        self.dag.read().nodes().cloned().collect()
     }
 
     /// Returns the parent node of the given hash; There can be only one parent;
@@ -1013,6 +1038,34 @@ pub(crate) mod tests {
                 }
                 assert_eq!(dag, main_dag);
         }
+    }
+
+    #[test]
+    fn verify_ser_de() -> Result<()> {
+        //  gen -> pk_a1 -> pk_a2
+        //     |
+        //     +-> pk_b1 -> pk_b2
+        //              |
+        //              +-> pk_c
+        let (sk_gen, pk_gen) = gen_keypair();
+        let (sk_a1, info_a1) = gen_signed_keypair(&sk_gen);
+        let (_, info_a2) = gen_signed_keypair(&sk_a1);
+        let (sk_b1, info_b1) = gen_signed_keypair(&sk_gen);
+        let (_, info_b2) = gen_signed_keypair(&sk_b1);
+        let (_, info_c) = gen_signed_keypair(&sk_b1);
+
+        let mut dag = SectionsDAG::new(pk_gen);
+        dag.insert(&pk_gen, info_a1.key, info_a1.sig)?;
+        dag.insert(&info_a1.key, info_a2.key, info_a2.sig)?;
+        dag.insert(&pk_gen, info_b1.key, info_b1.sig)?;
+        dag.insert(&info_b1.key, info_b2.key, info_b2.sig)?;
+        dag.insert(&info_b1.key, info_c.key, info_c.sig)?;
+
+        let dag_string = serde_json::to_string(&dag)?;
+        let dag_from_string = serde_json::from_str::<SectionsDAG>(dag_string.as_str())?;
+        assert_eq!(dag, dag_from_string);
+
+        Ok(())
     }
 
     // Test helpers

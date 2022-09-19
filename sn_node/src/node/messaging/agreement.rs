@@ -134,9 +134,8 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         trace!("{}", LogMarker::HandlingNewEldersAgreement);
         let snapshot = self.state_snapshot();
-        // our_section_dag produces a DAG with only 1 leaf
         let mut old_dag = self.our_section_dag();
-        let last_key = old_dag.leaf_keys().into_iter().collect::<Vec<_>>()[0];
+        let last_key = old_dag.last_key()?;
 
         let prefix = signed_section_auth.prefix();
         trace!("{}: for {:?}", LogMarker::NewSignedSap, prefix);

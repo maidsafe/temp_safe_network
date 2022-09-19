@@ -182,7 +182,7 @@ impl Node {
     /// based on our current knowledge of the network and sections chains.
     #[instrument(skip_all)]
     async fn verify_section_key(&self, msg_authority: &NodeMsgAuthority, msg: &SystemMsg) -> bool {
-        let known_keys: Vec<_> = self.network_knowledge.known_keys().into_iter().collect();
+        let known_keys = self.network_knowledge.known_keys();
         NetworkKnowledge::verify_node_msg_can_be_trusted(msg_authority, msg, &known_keys)
     }
 
