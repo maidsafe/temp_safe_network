@@ -145,17 +145,21 @@ impl MyNode {
             sender_name, op_id
         );
 
-        let query_peers = self.pending_data_queries.remove(&(op_id, sender_name));
-        // Clear expired queries from the cache.
-        self.pending_data_queries.remove_expired();
+        let node_id = XorName::from(sending_node_pk);
+
+        // dont remove here, leave the receipients to expire. That way any incoming reqeusts
+        // will still be forwarded on, and one NotFound reply from one adult may not bork
+        // the Operational success at another Adult (if they were queried again)
+        let query_peers = self.pending_data_queries.get(&(op_id, node_id));
 
         // First check for waiting peers. If no one is waiting, we drop the response
         let waiting_peers = if let Some(peers) = query_peers {
             if peers.is_empty() {
+                warn!("No waiting peers to send {op_id:?} to....");
                 // nothing to do
                 return None;
             }
-            peers
+            peers.clone()
         } else {
             warn!(
                 "Dropping chunk query response from Adult {}. We might have already forwarded this chunk to the requesting client or the client connection cache has expired: {}",
@@ -179,6 +183,9 @@ impl MyNode {
             response: query_response,
             correlation_id,
         };
+
+        // Clear expired queries from the cache.
+        self.pending_data_queries.remove_expired();
 
         Some(self.send_client_msg(
             msg,
