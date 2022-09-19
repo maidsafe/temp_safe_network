@@ -173,10 +173,8 @@ impl Node {
             return None;
         }
 
-        let query_response = response.convert();
-
         let msg = ServiceMsg::QueryResponse {
-            response: query_response,
+            response,
             correlation_id,
         };
 

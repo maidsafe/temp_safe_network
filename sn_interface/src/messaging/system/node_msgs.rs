@@ -7,17 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    data::{DataQueryVariant, MetadataExchange, OperationId, QueryResponse, Result, StorageLevel},
+    data::{DataQueryVariant, MetadataExchange, OperationId, QueryResponse, StorageLevel},
     EndUser, MsgId, ServiceAuth,
 };
-use crate::types::{
-    register::{Entry, EntryHash, Permissions, Policy, Register, User},
-    Chunk, DataAddress, PublicKey, ReplicatedData,
-};
+use crate::types::{DataAddress, PublicKey, ReplicatedData};
 
 use serde::{Deserialize, Serialize};
-use sn_dbc::SpentProofShare;
-use std::collections::BTreeSet;
 use xor_name::XorName;
 
 /// cmd message sent among nodes
@@ -80,71 +75,7 @@ pub enum NodeQuery {
     },
 }
 
-/// Responses to queries from Elders to Adults.
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum NodeQueryResponse {
-    //
-    // ===== Chunk =====
-    //
-    #[cfg(feature = "chunks")]
-    /// Response to [`GetChunk`]
-    ///
-    /// [`GetChunk`]: crate::messaging::data::DataQueryVariant::GetChunk
-    GetChunk((Result<Chunk>, OperationId)),
-    //
-    // ===== Register Data =====
-    //
-    #[cfg(feature = "registers")]
-    /// Response to [`crate::messaging::data::RegisterQuery::Get`].
-    GetRegister((Result<Register>, OperationId)),
-    #[cfg(feature = "registers")]
-    /// Response to [`crate::messaging::data::RegisterQuery::GetOwner`].
-    GetRegisterOwner((Result<User>, OperationId)),
-    #[cfg(feature = "registers")]
-    /// Response to [`crate::messaging::data::RegisterQuery::GetEntry`].
-    GetRegisterEntry((Result<Entry>, OperationId)),
-    #[cfg(feature = "registers")]
-    /// Response to [`crate::messaging::data::RegisterQuery::GetPolicy`].
-    GetRegisterPolicy((Result<Policy>, OperationId)),
-    #[cfg(feature = "registers")]
-    /// Response to [`crate::messaging::data::RegisterQuery::Read`].
-    ReadRegister((Result<BTreeSet<(EntryHash, Entry)>>, OperationId)),
-    #[cfg(feature = "registers")]
-    /// Response to [`crate::messaging::data::RegisterQuery::GetUserPermissions`].
-    GetRegisterUserPermissions((Result<Permissions>, OperationId)),
-    //
-    // ===== Spentbook Data =====
-    //
-    #[cfg(feature = "spentbook")]
-    /// Response to [`crate::messaging::data::SpentbookQuery::SpentProofShares`].
-    SpentProofShares((Result<Vec<SpentProofShare>>, OperationId)),
-}
-
-impl NodeQueryResponse {
-    pub fn convert(self) -> QueryResponse {
-        use NodeQueryResponse::*;
-        match self {
-            #[cfg(feature = "chunks")]
-            GetChunk(res) => QueryResponse::GetChunk(res),
-            #[cfg(feature = "registers")]
-            GetRegister(res) => QueryResponse::GetRegister(res),
-            #[cfg(feature = "registers")]
-            GetRegisterEntry(res) => QueryResponse::GetRegisterEntry(res),
-            #[cfg(feature = "registers")]
-            GetRegisterOwner(res) => QueryResponse::GetRegisterOwner(res),
-            #[cfg(feature = "registers")]
-            ReadRegister(res) => QueryResponse::ReadRegister(res),
-            #[cfg(feature = "registers")]
-            GetRegisterPolicy(res) => QueryResponse::GetRegisterPolicy(res),
-            #[cfg(feature = "registers")]
-            GetRegisterUserPermissions(res) => QueryResponse::GetRegisterUserPermissions(res),
-            #[cfg(feature = "spentbook")]
-            SpentProofShares(res) => QueryResponse::SpentProofShares(res),
-        }
-    }
-
-    pub fn operation_id(&self) -> OperationId {
-        self.clone().convert().operation_id()
-    }
-}
+/// Responses to queries sent from Elders to Adults.
+/// We define it as an alias to `QueryResponse` type, but we keep it as
+/// a separate system message type for more clarity in logs and messaging tracking/debugging.
+pub type NodeQueryResponse = QueryResponse;
