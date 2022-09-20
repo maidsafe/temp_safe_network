@@ -115,7 +115,7 @@ enum SessionStatus {
 
 struct PeerSessionWorker {
     queue: mpsc::Sender<SessionCmd>,
-    link: Link,
+    pub(crate) link: Link,
 }
 
 impl PeerSessionWorker {
@@ -132,9 +132,19 @@ impl PeerSessionWorker {
             );
 
             let status = match session_cmd {
-                SessionCmd::Send(job) => self.send(job).await,
+                SessionCmd::Send(job) => {
+                    match self.send(job).await {
+                        Ok(s) => s,
+                        Err(error) => {
+                            error!("session error {error:?}");
+                            // don't breakout here?
+                            // TODO: is this correct?
+                            continue;
+                        }
+                    }
+                }
                 SessionCmd::RemoveExpired => {
-                    if self.link.is_connected_after_cleanup() {
+                    if self.link.is_connected_after_cleanup().await {
                         SessionStatus::Ok
                     } else {
                         // close down the session
@@ -142,7 +152,7 @@ impl PeerSessionWorker {
                     }
                 }
                 SessionCmd::AddConnection(conn) => {
-                    self.link.add(conn);
+                    self.link.add(conn).await;
                     SessionStatus::Ok
                 }
                 SessionCmd::Terminate => SessionStatus::Terminating,
@@ -166,55 +176,75 @@ impl PeerSessionWorker {
         }
 
         // disconnect the link.
-        self.link.disconnect();
+        self.link.disconnect().await;
 
         info!("Finished peer session shutdown");
     }
 
-    async fn send(&mut self, mut job: SendJob) -> SessionStatus {
+    async fn send(&mut self, mut job: SendJob) -> Result<SessionStatus> {
         let id = job.msg_id;
         let should_establish_new_connection = !job.is_msg_for_client;
         trace!("Performing sendjob: {id:?} , should_establish_new_connection? {should_establish_new_connection}");
 
         if job.retries > MAX_SENDJOB_RETRIES {
             job.reporter.send(SendStatus::MaxRetriesReached);
-            return SessionStatus::Ok;
+            return Ok(SessionStatus::Ok);
         }
 
-        let send_resp = self
+        // we can't spawn this atm as it edits/updates the link
+        // if we can separate out those parts, we could hopefully get this all properly
+        // spawnable.
+        // But right now we have to wait to ensure the link has connection
+        // before spawning the send
+
+        // TODO: this link makes sense?
+        let conn = self
             .link
-            .send_with(
+            .get_or_connect(should_establish_new_connection)
+            .await
+            .map_err(|_| Error::PeerLinkDropped)?;
+        let queue = self.queue.clone();
+        let link_connections = self.link.connections.clone();
+        let link_queue = self.link.queue.clone();
+        let _handle = tokio::spawn(async move {
+            let send_resp = Link::send_with(
                 job.bytes.clone(),
                 0,
                 Some(&RetryConfig::default()),
                 should_establish_new_connection,
+                conn,
+                link_connections,
+                link_queue,
             )
             .await;
 
-        match send_resp {
-            Ok(_) => {
-                job.reporter.send(SendStatus::Sent);
-            }
-            Err(err) if err.is_local_close() => {
-                info!("Peer linked dropped");
-                job.reporter.send(SendStatus::PeerLinkDropped);
-                return SessionStatus::Terminating;
-            }
-            Err(err) => {
-                warn!("Transient error while attempting to send, re-enqueing job {id:?} {err:?}");
-                job.reporter
-                    .send(SendStatus::TransientError(format!("{err:?}")));
+            match send_resp {
+                Ok(_) => {
+                    job.reporter.send(SendStatus::Sent);
+                }
+                Err(err) if err.is_local_close() => {
+                    info!("Peer linked dropped");
+                    job.reporter.send(SendStatus::PeerLinkDropped);
+                    // return SessionStatus::Terminating;
+                }
+                Err(err) => {
+                    warn!(
+                        "Transient error while attempting to send, re-enqueing job {id:?} {err:?}"
+                    );
+                    job.reporter
+                        .send(SendStatus::TransientError(format!("{err:?}")));
 
-                job.retries += 1;
+                    job.retries += 1;
 
-                if let Err(e) = self.queue.send(SessionCmd::Send(job)).await {
-                    warn!("Failed to re-enqueue job {id:?} after transient error {e:?}");
-                    return SessionStatus::Terminating;
+                    if let Err(e) = queue.send(SessionCmd::Send(job)).await {
+                        warn!("Failed to re-enqueue job {id:?} after transient error {e:?}");
+                        // return SessionStatus::Terminating;
+                    }
                 }
             }
-        }
+        });
 
-        SessionStatus::Ok
+        Ok(SessionStatus::Ok)
     }
 }
 
