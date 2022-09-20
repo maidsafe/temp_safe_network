@@ -13,7 +13,7 @@ use sn_interface::{
     messaging::{
         data::{ClientMsg, Error as MessagingDataError},
         serialisation::WireMsg,
-        system::{JoinResponse, MembershipState, NodeCmd, NodeMsg, RelocateDetails},
+        system::{JoinResponse, MembershipState, NodeCmd, NodeMsg, OperationId, RelocateDetails},
         AuthorityProof, ClientAuth, MsgId, MsgType,
     },
     network_knowledge::{test_utils::*, NodeState, SectionAuthorityProvider},
