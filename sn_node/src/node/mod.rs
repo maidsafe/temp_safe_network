@@ -396,7 +396,7 @@ mod core {
             excluded_names: &BTreeSet<XorName>,
         ) -> Vec<DkgSessionId> {
             let sap = self.network_knowledge.authority_provider();
-            let chain_len = self.network_knowledge.chain_len();
+            let chain_len = self.network_knowledge.our_section_dag_len();
 
             // get current gen and members
             let current_gen;
@@ -481,7 +481,7 @@ mod core {
                 trace!("section_peers {:?}", members);
                 vec![]
             } else {
-                let chain_len = self.network_knowledge.chain_len();
+                let chain_len = self.network_knowledge.our_section_dag_len();
                 let session_id = DkgSessionId {
                     prefix: sap.prefix(),
                     elders: BTreeMap::from_iter(
@@ -558,11 +558,6 @@ mod core {
                 return Ok(vec![]);
             }
 
-            if new.section_key == old.section_key {
-                // there was no change
-                return Ok(vec![]);
-            }
-
             let mut cmds = vec![];
 
             if new.is_elder {
@@ -604,7 +599,7 @@ mod core {
             }
 
             if new.is_elder || old.is_elder {
-                if let Some(cmd) = self.send_ae_update_to_our_section() {
+                if let Some(cmd) = self.send_ae_update_to_our_section()? {
                     cmds.push(cmd);
                 }
             }
@@ -693,20 +688,28 @@ mod core {
         }
 
         #[allow(unused)]
-        pub(crate) fn section_key_by_name(&self, name: &XorName) -> bls::PublicKey {
+        pub(crate) fn section_key_by_name(&self, name: &XorName) -> Result<bls::PublicKey> {
             if self.network_knowledge.prefix().matches(name) {
-                self.network_knowledge.section_key()
+                Ok(self.network_knowledge.section_key())
             } else if let Ok(sap) = self.network_knowledge.section_by_name(name) {
-                sap.section_key()
+                Ok(sap.section_key())
             } else if self.network_knowledge.prefix().sibling().matches(name) {
                 // For sibling with unknown key, use the previous key in our chain under the assumption
                 // that it's the last key before the split and therefore the last key of theirs we know.
                 // In case this assumption is not correct (because we already progressed more than one
                 // key since the split) then this key would be unknown to them and they would send
                 // us back their whole section chain. However, this situation should be rare.
-                *self.network_knowledge.our_section_dag().prev_key()
+
+                let leaf_key = self.network_knowledge.our_section_dag().last_key()?;
+                match self.our_section_dag().get_parent_key(&leaf_key) {
+                    Ok(prev_pk) => Ok(prev_pk.unwrap_or(*self.our_section_dag().genesis_key())),
+                    Err(_) => {
+                        error!("SectionsDAG fields went out of sync");
+                        Ok(leaf_key)
+                    }
+                }
             } else {
-                *self.network_knowledge.genesis_key()
+                Ok(*self.network_knowledge.genesis_key())
             }
         }
 

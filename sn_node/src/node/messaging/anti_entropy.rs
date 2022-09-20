@@ -22,19 +22,18 @@ use sn_interface::{
         system::{KeyedSig, NodeCmd, SectionAuth, SystemMsg},
         MsgType, WireMsg,
     },
-    network_knowledge::SectionAuthorityProvider,
+    network_knowledge::{SectionAuthorityProvider, SectionsDAG},
     types::{log_markers::LogMarker, Peer, PublicKey},
 };
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
-use secured_linked_list::SecuredLinkedList;
 use std::{collections::BTreeSet, time::Duration};
 use xor_name::{Prefix, XorName};
 
 impl Node {
     /// Send `AntiEntropy` update message to all nodes in our own section.
-    pub(crate) fn send_ae_update_to_our_section(&self) -> Option<Cmd> {
+    pub(crate) fn send_ae_update_to_our_section(&self) -> Result<Option<Cmd>> {
         let our_name = self.info().name();
         let recipients: BTreeSet<_> = self
             .network_knowledge
@@ -46,12 +45,21 @@ impl Node {
 
         if recipients.is_empty() {
             warn!("No peers of our section found in our network knowledge to send AE-Update");
-            return None;
+            return Ok(None);
         }
 
+        let leaf = self.our_section_dag().last_key()?;
         // The previous PK which is likely what adults know
-        let previous_pk = *self.our_section_dag().prev_key();
-        Some(self.send_ae_update_to_nodes(recipients, previous_pk))
+        match self.our_section_dag().get_parent_key(&leaf) {
+            Ok(prev_pk) => {
+                let prev_pk = prev_pk.unwrap_or(*self.our_section_dag().genesis_key());
+                Ok(Some(self.send_ae_update_to_nodes(recipients, prev_pk)))
+            }
+            Err(_) => {
+                error!("SectionsDAG fields went out of sync");
+                Ok(None)
+            }
+        }
     }
 
     /// Send `AntiEntropy` update message to the specified nodes.
@@ -132,14 +140,14 @@ impl Node {
     ) -> SystemMsg {
         let signed_sap = self.network_knowledge.section_signed_authority_provider();
 
-        let proof_chain = dst_section_key
-            .and_then(|key| self.network_knowledge.get_proof_chain_to_current(&key).ok())
+        let partial_dag = dst_section_key
+            .and_then(|key| self.network_knowledge.get_partial_dag_to_current(&key).ok())
             .unwrap_or_else(|| self.network_knowledge.our_section_dag());
 
         SystemMsg::AntiEntropy {
             section_auth: signed_sap.value.to_msg(),
             section_signed: signed_sap.sig,
-            proof_chain,
+            partial_dag,
             kind,
         }
     }
@@ -149,7 +157,7 @@ impl Node {
         &mut self,
         section_auth: SectionAuthorityProvider,
         section_signed: KeyedSig,
-        proof_chain: SecuredLinkedList,
+        partial_dag: SectionsDAG,
         kind: AntiEntropyKind,
         sender: Peer,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
@@ -170,7 +178,7 @@ impl Node {
 
         let updated = self.network_knowledge.update_knowledge_if_valid(
             signed_sap.clone(),
-            &proof_chain,
+            &partial_dag,
             members,
             &our_name,
             &self.section_keys_provider,
@@ -320,14 +328,14 @@ impl Node {
                 our_prefix, dst_name
             );
             return match self.network_knowledge.closest_signed_sap(&dst_name) {
-                Some((signed_sap, section_dag)) => {
+                Some((signed_sap, partial_dag)) => {
                     info!("Found a better matching prefix {:?}", signed_sap.prefix());
                     let bounced_msg = wire_msg.serialize()?;
                     // Redirect to the closest section
                     let ae_msg = SystemMsg::AntiEntropy {
                         section_auth: signed_sap.value.to_msg(),
                         section_signed: signed_sap.sig.clone(),
-                        proof_chain: section_dag,
+                        partial_dag,
                         kind: AntiEntropyKind::Redirect { bounced_msg },
                     };
 
@@ -415,7 +423,7 @@ mod tests {
         },
         network_knowledge::{
             test_utils::{gen_addr, random_sap, section_signed},
-            NetworkKnowledge, NodeInfo, SectionKeyShare, SectionKeysProvider,
+            NetworkKnowledge, NodeInfo, SectionKeyShare, SectionKeysProvider, SectionsDAG,
         },
         types::keys::ed25519,
     };
@@ -423,7 +431,6 @@ mod tests {
     use assert_matches::assert_matches;
     use bls::SecretKey;
     use eyre::{Context, Result};
-    use secured_linked_list::SecuredLinkedList;
     use std::collections::BTreeSet;
     use xor_name::Prefix;
 
@@ -462,11 +469,11 @@ mod tests {
         local
             .run_until(async move {
                 let env = Env::new().await?;
-
-                let known_keys = vec![*env.node.network_knowledge().genesis_key()];
+                let known_key = *env.node.network_knowledge().genesis_key();
+                let known_keys = BTreeSet::from([known_key]);
 
                 // This proof_chain already contains other_pk
-                let proof_chain = env.proof_chain.clone();
+                let proof_chain = env.partial_dag.clone();
                 let (msg, msg_authority) = env.create_update_msg(proof_chain)?;
 
                 // AeUpdate message shall get pass through.
@@ -479,7 +486,7 @@ mod tests {
                 // AeUpdate message contains corrupted proof_chain shall get rejected.
                 let other_env = Env::new().await?;
                 let (corrupted_msg, _msg_authority) =
-                    env.create_update_msg(other_env.proof_chain)?;
+                    env.create_update_msg(other_env.partial_dag)?;
                 assert!(!NetworkKnowledge::verify_node_msg_can_be_trusted(
                     &msg_authority,
                     &corrupted_msg,
@@ -487,7 +494,7 @@ mod tests {
                 ));
 
                 // Other messages shall get rejected.
-                let other_msg = SystemMsg::AntiEntropyProbe(known_keys[0]);
+                let other_msg = SystemMsg::AntiEntropyProbe(known_key);
                 assert!(!NetworkKnowledge::verify_node_msg_can_be_trusted(
                     &msg_authority,
                     &other_msg,
@@ -540,7 +547,7 @@ mod tests {
                     .network_knowledge
                     .update_knowledge_if_valid(
                         env.other_sap.clone(),
-                        &env.proof_chain,
+                        &env.partial_dag,
                         None,
                         &env.node.info().name(),
                         &env.node.section_keys_provider
@@ -602,9 +609,9 @@ mod tests {
                 msg
             });
 
-            assert_matches!(&msg, SystemMsg::AntiEntropy { section_auth, proof_chain, kind: AntiEntropyKind::Retry{..}, .. } => {
+            assert_matches!(&msg, SystemMsg::AntiEntropy { section_auth, partial_dag, kind: AntiEntropyKind::Retry{..}, .. } => {
                 assert_eq!(section_auth, &env.node.network_knowledge().authority_provider().to_msg());
-                assert_eq!(proof_chain, &env.node.our_section_dag());
+                assert_eq!(partial_dag, &env.node.our_section_dag());
             });
             Ok(())
         }).await
@@ -644,9 +651,9 @@ mod tests {
                 msg
             });
 
-            assert_matches!(&msg, SystemMsg::AntiEntropy { section_auth, proof_chain, kind: AntiEntropyKind::Retry {..}, .. } => {
+            assert_matches!(&msg, SystemMsg::AntiEntropy { section_auth, partial_dag, kind: AntiEntropyKind::Retry {..}, .. } => {
                 assert_eq!(*section_auth, env.node.network_knowledge().authority_provider().to_msg());
-                assert_eq!(*proof_chain, env.node.our_section_dag());
+                assert_eq!(*partial_dag, env.node.our_section_dag());
             });
             Ok(())
         }).await
@@ -655,7 +662,7 @@ mod tests {
     struct Env {
         node: Node,
         other_sap: SectionAuth<SectionAuthorityProvider>,
-        proof_chain: SecuredLinkedList,
+        partial_dag: SectionsDAG,
     }
 
     impl Env {
@@ -670,10 +677,10 @@ mod tests {
             let sap_sk = secret_key_set.secret_key();
             let signed_sap = section_signed(sap_sk, section_auth)?;
 
-            let (chain, genesis_sk_set) = create_chain(sap_sk, signed_sap.section_key())
-                .context("failed to create section chain")?;
+            let (dag, genesis_sk_set) =
+                create_dag(signed_sap.section_key()).context("failed to create section chain")?;
             let genesis_pk = genesis_sk_set.public_keys().public_key();
-            assert_eq!(genesis_pk, *chain.root_key());
+            assert_eq!(genesis_pk, *dag.genesis_key());
 
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let (mut node, _) = Node::first_node(
@@ -697,7 +704,7 @@ mod tests {
             // get our Node to now be in prefix(0)
             let _ = node.network_knowledge.update_knowledge_if_valid(
                 signed_sap.clone(),
-                &chain,
+                &dag,
                 None,
                 &info.name(),
                 &node.section_keys_provider,
@@ -708,15 +715,15 @@ mod tests {
             let other_sap_sk = secret_key_set.secret_key();
             let other_sap = section_signed(other_sap_sk, other_sap)?;
             // generate a proof chain for this other SAP
-            let mut proof_chain = SecuredLinkedList::new(genesis_pk);
+            let mut partial_dag = SectionsDAG::new(genesis_pk);
             let signature = bincode::serialize(&other_sap_sk.public_key())
                 .map(|bytes| genesis_sk_set.secret_key().sign(&bytes))?;
-            proof_chain.insert(&genesis_pk, other_sap_sk.public_key(), signature)?;
+            partial_dag.insert(&genesis_pk, other_sap_sk.public_key(), signature)?;
 
             Ok(Self {
                 node,
                 other_sap,
-                proof_chain,
+                partial_dag,
             })
         }
 
@@ -749,12 +756,12 @@ mod tests {
 
         fn create_update_msg(
             &self,
-            proof_chain: SecuredLinkedList,
+            partial_dag: SectionsDAG,
         ) -> Result<(SystemMsg, NodeMsgAuthority)> {
             let payload_msg = SystemMsg::AntiEntropy {
                 section_auth: self.other_sap.value.to_msg(),
                 section_signed: self.other_sap.sig.clone(),
-                proof_chain,
+                partial_dag,
                 kind: AntiEntropyKind::Update {
                     members: BTreeSet::new(),
                 },
@@ -771,26 +778,26 @@ mod tests {
     }
 
     // Creates a section chain with three blocks
-    fn create_chain(
-        sap_sk: &SecretKey,
-        last_key: BlsPublicKey,
-    ) -> Result<(SecuredLinkedList, bls::SecretKeySet)> {
+    fn create_dag(last_key: BlsPublicKey) -> Result<(SectionsDAG, bls::SecretKeySet)> {
         // create chain with random genesis key
         let genesis_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
         let genesis_pk = genesis_sk_set.public_keys().public_key();
-        let mut chain = SecuredLinkedList::new(genesis_pk);
+        let mut dag = SectionsDAG::new(genesis_pk);
 
-        // insert second key which is the PK derived from SAP's SK
-        let sap_pk = sap_sk.public_key();
+        // insert random second section key
+        let second_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
+        let second_pk = second_sk_set.public_keys().public_key();
         let sig = genesis_sk_set
             .secret_key()
-            .sign(&bincode::serialize(&sap_pk)?);
-        chain.insert(&genesis_pk, sap_pk, sig)?;
+            .sign(&bincode::serialize(&second_pk)?);
+        dag.insert(&genesis_pk, second_pk, sig)?;
 
         // insert third key which is provided `last_key`
-        let last_sig = sap_sk.sign(&bincode::serialize(&last_key)?);
-        chain.insert(&sap_pk, last_key, last_sig)?;
+        let last_sig = second_sk_set
+            .secret_key()
+            .sign(&bincode::serialize(&last_key)?);
+        dag.insert(&second_pk, last_key, last_sig)?;
 
-        Ok((chain, genesis_sk_set))
+        Ok((dag, genesis_sk_set))
     }
 }

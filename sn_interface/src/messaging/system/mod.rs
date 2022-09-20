@@ -27,12 +27,11 @@ use super::{authority::SectionAuth as SectionAuthProof, AuthorityProof};
 use qp2p::UsrMsgBytes;
 
 use crate::messaging::{EndUser, MsgId, SectionAuthorityProvider};
-use crate::network_knowledge::SapCandidate;
+use crate::network_knowledge::{SapCandidate, SectionsDAG};
 
 use sn_consensus::{Generation, SignedVote};
 
 use bls_dkg::key_gen::message::Message as DkgMessage;
-use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::fmt::{Display, Formatter};
@@ -66,7 +65,7 @@ pub enum SystemMsg {
         /// section the bounced message shall be resent to.
         section_signed: KeyedSig,
         /// Our section chain truncated from the triggering msg's dst section_key (or genesis key for full proof)
-        proof_chain: SecuredLinkedList,
+        partial_dag: SectionsDAG,
         /// The kind of anti-entropy response.
         kind: AntiEntropyKind,
     },

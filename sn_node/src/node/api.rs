@@ -15,12 +15,13 @@ use crate::{
 };
 
 use sn_interface::{
-    network_knowledge::{NetworkKnowledge, NodeInfo, SectionAuthorityProvider, SectionKeyShare},
+    network_knowledge::{
+        NetworkKnowledge, NodeInfo, SectionAuthorityProvider, SectionKeyShare, SectionsDAG,
+    },
     types::log_markers::LogMarker,
 };
 
 use ed25519_dalek::Keypair;
-use secured_linked_list::SecuredLinkedList;
 use sn_dbc::{
     bls_ringct::{bls_bulletproofs::PedersenGens, group::Curve},
     rng, Dbc, Hash, IndexedSignatureShare, MlsagMaterial, Owner, OwnerOnce, RevealedCommitment,
@@ -80,7 +81,7 @@ impl Node {
         &self.network_knowledge
     }
 
-    pub(crate) fn our_section_dag(&self) -> SecuredLinkedList {
+    pub(crate) fn our_section_dag(&self) -> SectionsDAG {
         self.network_knowledge.our_section_dag()
     }
 

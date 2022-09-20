@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Session;
+use std::collections::BTreeSet;
 
 use crate::{
     connections::{messaging::NUM_OF_ELDERS_SUBSET_FOR_QUERIES, PendingCmdAcks},
@@ -21,15 +22,13 @@ use sn_interface::{
         system::{AntiEntropyKind, KeyedSig, NodeMsgAuthorityUtils, SectionAuth, SystemMsg},
         AuthKind, AuthorityProof, Dst, MsgId, MsgType, NodeMsgAuthority, ServiceAuth, WireMsg,
     },
-    network_knowledge::{NetworkKnowledge, SectionAuthorityProvider},
+    network_knowledge::{NetworkKnowledge, SectionAuthorityProvider, SectionsDAG},
     types::{log_markers::LogMarker, Peer},
 };
 
-use bls::PublicKey as BlsPublicKey;
 use itertools::Itertools;
 use qp2p::{Close, ConnectionError, ConnectionIncoming as IncomingMsgs, SendError};
 use rand::{rngs::OsRng, seq::SliceRandom};
-use secured_linked_list::SecuredLinkedList;
 use std::net::SocketAddr;
 use tracing::Instrument;
 
@@ -145,7 +144,7 @@ impl Session {
         sender: Peer,
     ) -> Result<(), Error> {
         // Check that the message can be trusted w.r.t. our known keys
-        let known_keys: Vec<BlsPublicKey> = self
+        let known_keys: BTreeSet<_> = self
             .network
             .read()
             .await
@@ -164,7 +163,7 @@ impl Session {
             SystemMsg::AntiEntropy {
                 section_auth,
                 section_signed,
-                proof_chain,
+                partial_dag,
                 kind:
                     AntiEntropyKind::Redirect { bounced_msg } | AntiEntropyKind::Retry { bounced_msg },
             } => {
@@ -173,7 +172,7 @@ impl Session {
                     .handle_ae_msg(
                         section_auth.into_state(),
                         section_signed,
-                        proof_chain,
+                        partial_dag,
                         bounced_msg,
                         sender,
                     )
@@ -307,20 +306,15 @@ impl Session {
         &mut self,
         target_sap: SectionAuthorityProvider,
         section_signed: KeyedSig,
-        provided_section_chain: SecuredLinkedList,
+        partial_dag: SectionsDAG,
         bounced_msg: UsrMsgBytes,
         src_peer: Peer,
     ) -> Result<(), Error> {
         debug!("Received Anti-Entropy from {src_peer}, with SAP: {target_sap:?}");
 
         // Try to update our network knowledge first
-        self.update_network_knowledge(
-            target_sap.clone(),
-            section_signed,
-            provided_section_chain,
-            src_peer,
-        )
-        .await;
+        self.update_network_knowledge(target_sap.clone(), section_signed, partial_dag, src_peer)
+            .await;
 
         if let Some((msg_id, elders, service_msg, dst, auth)) =
             Self::new_target_elders(bounced_msg.clone(), &target_sap).await?
@@ -358,7 +352,7 @@ impl Session {
         &mut self,
         sap: SectionAuthorityProvider,
         section_signed: KeyedSig,
-        proof_chain: SecuredLinkedList,
+        partial_dag: SectionsDAG,
         sender: Peer,
     ) {
         // Update our network PrefixMap based upon passed in knowledge
@@ -367,7 +361,7 @@ impl Session {
                 value: sap.clone(),
                 sig: section_signed,
             },
-            &proof_chain,
+            &partial_dag,
         );
 
         match result {

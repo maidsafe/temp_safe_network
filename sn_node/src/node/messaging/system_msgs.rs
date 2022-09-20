@@ -159,14 +159,14 @@ impl Node {
             SystemMsg::AntiEntropy {
                 section_auth,
                 section_signed,
-                proof_chain,
+                partial_dag,
                 kind,
             } => {
                 trace!("Handling msg: AE from {sender}: {msg_id:?}");
                 self.handle_anti_entropy_msg(
                     section_auth.into_state(),
                     section_signed,
-                    proof_chain,
+                    partial_dag,
                     kind,
                     sender,
                     #[cfg(feature = "traceroute")]
@@ -196,7 +196,7 @@ impl Node {
                 match *join_response {
                     JoinResponse::Approved {
                         section_auth,
-                        section_chain,
+                        sections_dag,
                         ..
                     } => {
                         info!(
@@ -223,7 +223,7 @@ impl Node {
 
                             let new_network_knowledge = NetworkKnowledge::new(
                                 genesis_key,
-                                section_chain,
+                                sections_dag,
                                 section_auth.into_authed_state(),
                                 Some(section_tree),
                             )?;

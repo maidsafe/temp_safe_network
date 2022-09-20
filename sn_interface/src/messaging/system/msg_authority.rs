@@ -9,6 +9,7 @@
 use crate::messaging::NodeMsgAuthority;
 use crate::types::keys::ed25519::{self};
 use bls::PublicKey as BlsPublicKey;
+use std::collections::BTreeSet;
 use xor_name::XorName;
 
 pub trait NodeMsgAuthorityUtils {
@@ -18,7 +19,7 @@ pub trait NodeMsgAuthorityUtils {
 
     // Verify if the section key of the NodeMsgAuthority can be trusted
     // based on a set of known keys.
-    fn verify_src_section_key_is_known(&self, known_keys: &[BlsPublicKey]) -> bool;
+    fn verify_src_section_key_is_known(&self, known_keys: &BTreeSet<BlsPublicKey>) -> bool;
 }
 
 impl NodeMsgAuthorityUtils for NodeMsgAuthority {
@@ -40,13 +41,13 @@ impl NodeMsgAuthorityUtils for NodeMsgAuthority {
 
     // Verify if it's a section/bls-share signed authority,
     // and if can be trusted based on a set of known keys.
-    fn verify_src_section_key_is_known(&self, known_keys: &[BlsPublicKey]) -> bool {
+    fn verify_src_section_key_is_known(&self, known_keys: &BTreeSet<BlsPublicKey>) -> bool {
         let section_pk = match &self {
             Self::Node(_) => return true,
             Self::BlsShare(bls_share_auth) => &bls_share_auth.section_pk,
             Self::Section(section_auth) => &section_auth.sig.public_key,
         };
 
-        known_keys.iter().any(|key| key == section_pk)
+        known_keys.contains(section_pk)
     }
 }

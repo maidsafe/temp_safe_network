@@ -17,8 +17,8 @@ use crate::types::Peer;
 use sn_consensus::Generation;
 use xor_name::{Prefix, XorName};
 
+use crate::network_knowledge::SectionsDAG;
 use bls::{PublicKey, PublicKeySet};
-use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeSet,
@@ -32,7 +32,7 @@ pub trait SectionAuthUtils<T: Serialize> {
     fn new(value: T, sig: KeyedSig) -> Self;
 
     ///
-    fn verify(&self, section_chain: &SecuredLinkedList) -> bool;
+    fn verify(&self, section_dag: &SectionsDAG) -> bool;
 
     ///
     fn self_verify(&self) -> bool;
@@ -43,8 +43,8 @@ impl<T: Serialize> SectionAuthUtils<T> for SectionAuth<T> {
         Self { value, sig }
     }
 
-    fn verify(&self, section_chain: &SecuredLinkedList) -> bool {
-        section_chain.has_key(&self.sig.public_key) && self.self_verify()
+    fn verify(&self, section_dag: &SectionsDAG) -> bool {
+        section_dag.has_key(&self.sig.public_key) && self.self_verify()
     }
 
     fn self_verify(&self) -> bool {
@@ -280,11 +280,18 @@ pub mod test_utils {
     use crate::types::SecretKeySet;
     use eyre::{eyre, Result};
     use itertools::Itertools;
+    use rand::RngCore;
     use serde::Serialize;
     use sn_consensus::{Ballot, Consensus, Decision, Proposition, Vote, VoteResponse};
     use std::collections::BTreeMap;
     use std::{cell::Cell, net::SocketAddr};
     use xor_name::Prefix;
+
+    // Parse `Prefix` from string
+    pub fn prefix(s: &str) -> Result<Prefix> {
+        s.parse()
+            .map_err(|err| eyre!("failed to parse Prefix '{}': {}", s, err))
+    }
 
     // Generate unique SocketAddr for testing purposes
     pub fn gen_addr() -> SocketAddr {
@@ -326,7 +333,8 @@ pub mod test_utils {
     ///
     /// An optional `sk_threshold_size` can be passed to specify the threshold when the secret key
     /// set is generated for the section key. Some tests require a low threshold.
-    pub fn random_sap(
+    pub fn random_sap_with_rng<R: RngCore>(
+        rng: &mut R,
         prefix: Prefix,
         elder_count: usize,
         adult_count: usize,
@@ -335,11 +343,26 @@ pub mod test_utils {
         let nodes = gen_sorted_nodes(&prefix, elder_count + adult_count, false);
         let elders = nodes.iter().map(NodeInfo::peer).take(elder_count);
         let members = nodes.iter().map(|i| NodeState::joined(i.peer(), None));
-        let secret_key_set = SecretKeySet::random(sk_threshold_size);
+        let secret_key_set = SecretKeySet::random_with_rng(rng, sk_threshold_size);
         let section_auth =
             SectionAuthorityProvider::new(elders, prefix, members, secret_key_set.public_keys(), 0);
 
         (section_auth, nodes, secret_key_set)
+    }
+
+    pub fn random_sap(
+        prefix: Prefix,
+        elder_count: usize,
+        adult_count: usize,
+        sk_threshold_size: Option<usize>,
+    ) -> (SectionAuthorityProvider, Vec<NodeInfo>, SecretKeySet) {
+        random_sap_with_rng(
+            &mut rand::thread_rng(),
+            prefix,
+            elder_count,
+            adult_count,
+            sk_threshold_size,
+        )
     }
 
     // Create signature for the given payload using the given secret key.

@@ -11,22 +11,23 @@ pub(crate) mod cmd_utils;
 pub(crate) mod dbc_utils;
 pub(crate) mod network_utils;
 
-use crate::comm::{Comm, MsgEvent};
-use crate::node::{
-    api::gen_genesis_dbc,
-    cfg::create_test_max_capacity_and_root_storage,
-    flow_ctrl::{dispatcher::Dispatcher, event_channel},
-    messages::WireMsgUtils,
-    messaging::{OutgoingMsg, Peers},
-    Cmd, Error, Event, MembershipEvent, Node, Proposal, Result as RoutingResult,
-    RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
+use crate::{
+    comm::{Comm, MsgEvent},
+    node::{
+        api::gen_genesis_dbc,
+        cfg::create_test_max_capacity_and_root_storage,
+        flow_ctrl::{dispatcher::Dispatcher, event_channel},
+        messages::WireMsgUtils,
+        messaging::{OutgoingMsg, Peers},
+        Cmd, Error, Event, MembershipEvent, Node, Proposal, Result as RoutingResult,
+        RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
+    },
+    storage::UsedSpace,
 };
-use crate::storage::UsedSpace;
 
 use cmd_utils::{handle_online_cmd, run_and_collect_cmds, wrap_service_msg_for_handling};
 use sn_consensus::Decision;
 use sn_dbc::{Hash, OwnerOnce, SpentProofShare, TransactionBuilder};
-use sn_interface::messaging::system::AntiEntropyKind;
 #[cfg(feature = "traceroute")]
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
@@ -34,16 +35,16 @@ use sn_interface::{
     messaging::{
         data::{DataCmd, Error as MessagingDataError, RegisterCmd, ServiceMsg, SpentbookCmd},
         system::{
-            JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState, NodeCmd,
-            NodeMsgAuthorityUtils, NodeState as NodeStateMsg, RelocateDetails, ResourceProof,
-            SectionAuth, SystemMsg,
+            AntiEntropyKind, JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig,
+            MembershipState, NodeCmd, NodeMsgAuthorityUtils, NodeState as NodeStateMsg,
+            RelocateDetails, ResourceProof, SectionAuth, SystemMsg,
         },
         Dst, MsgId, MsgType, SectionAuth as MsgKindSectionAuth, WireMsg,
     },
     network_knowledge::{
-        recommended_section_size, supermajority, test_utils::*, NetworkKnowledge, NodeInfo,
-        NodeState, SectionAuthorityProvider, SectionKeyShare, FIRST_SECTION_MAX_AGE,
-        FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
+        recommended_section_size, supermajority, test_utils::*, Error as NetworkKnowledgeError,
+        NetworkKnowledge, NodeInfo, NodeState, SectionAuthorityProvider, SectionKeyShare,
+        SectionsDAG, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
     },
     types::{keyed_signed, keys::ed25519, Peer, PublicKey, ReplicatedData, SecretKeySet},
 };
@@ -55,7 +56,6 @@ use eyre::{bail, eyre, Context, Result};
 use itertools::Itertools;
 use rand::{distributions::Alphanumeric, rngs::OsRng, Rng};
 use resource_proof::ResourceProof as ChallengeSolver;
-use secured_linked_list::SecuredLinkedList;
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
     iter,
@@ -313,7 +313,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     local
         .run_until(async move {
             let sk_set = SecretKeySet::random(None);
-            let chain = SecuredLinkedList::new(sk_set.secret_key().public_key());
+            let dag = SectionsDAG::new(sk_set.secret_key().public_key());
 
             // Creates nodes where everybody has age 6 except one has 5.
             let mut nodes: Vec<_> = gen_sorted_nodes(&Prefix::default(), elder_count(), true);
@@ -329,7 +329,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             );
             let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
 
-            let section = NetworkKnowledge::new(*chain.root_key(), chain, signed_sap, None)?;
+            let section = NetworkKnowledge::new(*dag.genesis_key(), dag, signed_sap, None)?;
             let mut expected_new_elders = BTreeSet::new();
 
             for peer in section_auth.elders() {
@@ -573,12 +573,11 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             let pk1 = sk_set1.secret_key().public_key();
             let pk1_signature = sk0.sign(bincode::serialize(&pk1)?);
 
-            let mut chain = SecuredLinkedList::new(pk0);
-            assert_eq!(chain.insert(&pk0, pk1, pk1_signature), Ok(()));
+            let mut dag = SectionsDAG::new(pk0);
+            assert!(dag.insert(&pk0, pk1, pk1_signature).is_ok());
 
             let signed_old_sap = section_signed(sk_set1.secret_key(), old_sap.clone())?;
-            let network_knowledge =
-                NetworkKnowledge::new(pk0, chain.clone(), signed_old_sap, None)?;
+            let network_knowledge = NetworkKnowledge::new(pk0, dag.clone(), signed_old_sap, None)?;
 
             // Create our node
             let (event_sender, mut event_receiver) =
@@ -603,7 +602,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             let sk2 = sk_set2.secret_key();
             let pk2 = sk2.public_key();
             let pk2_signature = sk_set1.secret_key().sign(bincode::serialize(&pk2)?);
-            chain.insert(&pk1, pk2, pk2_signature)?;
+            dag.insert(&pk1, pk2, pk2_signature)?;
 
             let old_node = nodes.remove(0);
             let src_section_pk = pk2;
@@ -636,7 +635,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
                 SystemMsg::AntiEntropy {
                     section_auth: new_sap.to_msg(),
                     section_signed: signed_new_sap.sig,
-                    proof_chain: chain,
+                    partial_dag: dag,
                     kind: AntiEntropyKind::Update {
                         members: BTreeSet::default(),
                     },
@@ -697,7 +696,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
             let node_msg = SystemMsg::AntiEntropy {
                 section_auth: signed_sap.value.clone().to_msg(),
                 section_signed: signed_sap.sig,
-                proof_chain: SecuredLinkedList::new(bogus_section_pk),
+                partial_dag: SectionsDAG::new(bogus_section_pk),
                 kind: AntiEntropyKind::Update {
                     members: BTreeSet::default(),
                 },
@@ -715,14 +714,19 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
                 bogus_section_pk,
             )?;
 
-            let _cmds = run_and_collect_cmds(
-                Cmd::ValidateMsg {
-                    origin: sender.peer(),
-                    wire_msg,
-                },
-                &dispatcher,
-            )
-            .await?;
+            assert!(matches!(
+                run_and_collect_cmds(
+                    Cmd::ValidateMsg {
+                        origin: sender.peer(),
+                        wire_msg,
+                    },
+                    &dispatcher,
+                )
+                .await,
+                Err(Error::NetworkKnowledge(
+                    NetworkKnowledgeError::UntrustedPartialDAG(_)
+                ))
+            ));
 
             assert_eq!(
                 dispatcher
@@ -1002,12 +1006,14 @@ async fn handle_elders_update() -> Result<()> {
                 _ => continue,
             };
 
-            let proof_chain = match msg {
-                SystemMsg::AntiEntropy { proof_chain, kind: AntiEntropyKind::Update { .. }, .. } => proof_chain,
+            let partial_dag = match msg {
+                SystemMsg::AntiEntropy { partial_dag, kind: AntiEntropyKind::Update { .. }, .. } => partial_dag,
                 _ => continue,
             };
 
-            assert_eq!(proof_chain.last_key(), &pk1);
+            let is_pk1_last_key = partial_dag.leaf_keys().contains(&pk1)
+                && partial_dag.leaf_keys().len() == 1;
+            assert!(is_pk1_last_key);
 
 
             // Merging the section contained in the message with the original section succeeds.

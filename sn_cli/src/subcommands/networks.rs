@@ -139,7 +139,7 @@ pub async fn networks_commander(
                 println!("Section key: {:?}", section_key);
                 println!(
                     "Section keys chain: {:?}",
-                    sections_dag.get_proof_chain(genesis_key, &section_key)?
+                    sections_dag.partial_dag(genesis_key, &section_key)?
                 );
                 println!();
 

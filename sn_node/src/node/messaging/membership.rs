@@ -202,7 +202,7 @@ impl Node {
         }
 
         cmds.extend(self.promote_and_demote_elders_except(&BTreeSet::default())?);
-        cmds.extend(self.send_ae_update_to_our_section());
+        cmds.extend(self.send_ae_update_to_our_section()?);
 
         self.liveness_retain_only(
             self.network_knowledge
@@ -270,7 +270,7 @@ impl Node {
                 .network_knowledge
                 .section_signed_authority_provider()
                 .into_authed_msg(),
-            section_chain: self.network_knowledge.our_section_dag(),
+            sections_dag: self.network_knowledge.our_section_dag(),
             decision,
         }));
 

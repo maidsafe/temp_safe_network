@@ -113,12 +113,12 @@ impl Node {
         }
 
         if !section_key_matches || is_age_invalid {
-            let proof_chain = self.network_knowledge.our_section_dag();
+            let partial_dag = self.network_knowledge.our_section_dag();
             let signed_sap = self.network_knowledge.section_signed_authority_provider();
             let msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
                 section_auth: signed_sap.value.to_msg(),
                 section_signed: signed_sap.sig,
-                proof_chain,
+                partial_dag,
                 expected_age,
             }));
             trace!("Sending {:?} to {}", msg, peer);

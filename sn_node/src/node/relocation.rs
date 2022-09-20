@@ -124,7 +124,9 @@ mod tests {
 
     use sn_interface::{
         elder_count,
-        network_knowledge::{test_utils::section_signed, SectionAuthorityProvider, MIN_ADULT_AGE},
+        network_knowledge::{
+            test_utils::section_signed, SectionAuthorityProvider, SectionsDAG, MIN_ADULT_AGE,
+        },
         types::{Peer, SecretKeySet},
     };
 
@@ -132,7 +134,6 @@ mod tests {
     use itertools::Itertools;
     use proptest::{collection::SizeRange, prelude::*};
     use rand::{rngs::SmallRng, Rng, SeedableRng};
-    use secured_linked_list::SecuredLinkedList;
     use std::net::SocketAddr;
     use xor_name::{Prefix, XOR_NAME_LEN};
 
@@ -182,12 +183,8 @@ mod tests {
         );
         let section_auth = section_signed(sk, section_auth)?;
 
-        let network_knowledge = NetworkKnowledge::new(
-            genesis_pk,
-            SecuredLinkedList::new(genesis_pk),
-            section_auth,
-            None,
-        )?;
+        let network_knowledge =
+            NetworkKnowledge::new(genesis_pk, SectionsDAG::new(genesis_pk), section_auth, None)?;
 
         for peer in &peers {
             let info = NodeState::joined(*peer, None);

@@ -12,14 +12,13 @@ use crate::storage::UsedSpace;
 use bls::Signature;
 use ed25519_dalek::Keypair;
 use eyre::{bail, eyre, Context, Result};
-use secured_linked_list::SecuredLinkedList;
 use sn_consensus::Decision;
 use sn_interface::{
     elder_count,
     messaging::system::NodeState as NodeStateMsg,
     network_knowledge::{
         test_utils::*, NetworkKnowledge, NodeInfo, NodeState, SectionAuthorityProvider,
-        SectionKeyShare, MIN_ADULT_AGE,
+        SectionKeyShare, SectionsDAG, MIN_ADULT_AGE,
     },
     types::{keys::ed25519, Peer, SecretKeySet},
 };
@@ -221,11 +220,10 @@ pub(crate) fn create_section(
     sk_set: &SecretKeySet,
     section_auth: &SectionAuthorityProvider,
 ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
-    let section_chain = SecuredLinkedList::new(sk_set.public_keys().public_key());
+    let dag = SectionsDAG::new(sk_set.public_keys().public_key());
     let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
 
-    let section =
-        NetworkKnowledge::new(*section_chain.root_key(), section_chain, signed_sap, None)?;
+    let section = NetworkKnowledge::new(*dag.genesis_key(), dag, signed_sap, None)?;
 
     for ns in section_auth.members() {
         let auth_ns = section_signed(sk_set.secret_key(), ns.clone())?;
@@ -244,11 +242,15 @@ pub(crate) fn create_section_with_elders(
     sk_set: &SecretKeySet,
     section_auth: &SectionAuthorityProvider,
 ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
-    let section_chain = SecuredLinkedList::new(sk_set.public_keys().public_key());
+    let section_chain = SectionsDAG::new(sk_set.public_keys().public_key());
     let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
 
-    let section =
-        NetworkKnowledge::new(*section_chain.root_key(), section_chain, signed_sap, None)?;
+    let section = NetworkKnowledge::new(
+        *section_chain.genesis_key(),
+        section_chain,
+        signed_sap,
+        None,
+    )?;
 
     for peer in section_auth.elders() {
         let node_state = NodeState::joined(*peer, None);

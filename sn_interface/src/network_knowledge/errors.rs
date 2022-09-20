@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use secured_linked_list::error::Error as SecuredLinkedListError;
 use thiserror::Error;
 
 /// The type returned by the `sn_routing` message handling methods.
@@ -30,8 +29,6 @@ pub enum Error {
     Deserialisation(String),
     #[error("Section authority provider cannot be trusted: {0}")]
     UntrustedSectionAuthProvider(String),
-    #[error("Proof chain cannot be trusted: {0}")]
-    UntrustedProofChain(String),
     #[error("Invalid genesis key of provided in section tree: {}", hex::encode(_0.to_bytes()))]
     InvalidGenesisKey(bls::PublicKey),
     #[error("The node is not in a state to handle the action.")]
@@ -42,8 +39,6 @@ pub enum Error {
     InvalidRelocationDetails,
     #[error("The secret key share is missing for public key {0:?}")]
     MissingSecretKeyShare(bls::PublicKey),
-    #[error("Invalid section chain: {0}")]
-    InvalidSectionChain(#[from] SecuredLinkedListError),
     #[error("Invalid payload")]
     InvalidPayload,
     #[error("The section is currently set to not allow taking any new node")]
@@ -64,8 +59,12 @@ pub enum Error {
     ArchivedNodeRejoined,
     #[error("The provided signature cannot be verified")]
     InvalidSignature,
-    #[error("Key not found in the SectionsDAG: {}", hex::encode(_0.to_bytes()))]
+    #[error("Key not found in the SectionsDAG: {0:?}")]
     KeyNotFound(bls::PublicKey),
     #[error("The 'to' or 'from' key is not present in the same branch")]
     InvalidBranch,
+    #[error("Partial DAG cannot be trusted: {0}")]
+    UntrustedPartialDAG(String),
+    #[error("The Partial DAG should contain a single branch")]
+    MultipleBranchError,
 }
