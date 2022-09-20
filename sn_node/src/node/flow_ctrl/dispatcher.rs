@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::comm::Comm;
+use crate::comm::Outbox;
 use crate::log_sleep;
 use crate::node::{
     messaging::{OutgoingMsg, Peers},
@@ -29,12 +29,13 @@ use tokio::{sync::watch, sync::RwLock};
 // Cmd Dispatcher.
 pub(crate) struct Dispatcher {
     node: Arc<RwLock<Node>>,
-    comm: Comm,
+    // comm: Comm,
     dkg_timeout: Arc<DkgTimeout>,
+    outbox: Outbox
 }
 
 impl Dispatcher {
-    pub(crate) fn new(node: Arc<RwLock<Node>>, comm: Comm) -> Self {
+    pub(crate) fn new(node: Arc<RwLock<Node>>, outbox: Outbox) -> Self {
         let (cancel_timer_tx, cancel_timer_rx) = watch::channel(false);
         let dkg_timeout = Arc::new(DkgTimeout {
             cancel_timer_tx,
@@ -44,7 +45,8 @@ impl Dispatcher {
         Self {
             node,
             dkg_timeout,
-            comm,
+            // comm,
+            outbox
         }
     }
 
@@ -58,7 +60,7 @@ impl Dispatcher {
 
         match cmd {
             Cmd::CleanupPeerLinks => {
-                self.comm.cleanup_peers().await;
+                // self.comm.cleanup_peers().await;
                 Ok(vec![])
             }
             Cmd::SendMsg {
@@ -85,8 +87,8 @@ impl Dispatcher {
                 };
 
                 let tasks = peer_msgs.into_iter().map(|(peer, msg)| {
-                    self.comm
-                        .send_out_bytes(peer, msg_id, msg, is_msg_for_client)
+                    self.outbox
+                        .send((peer, msg_id, msg, is_msg_for_client))
                 });
                 let results = futures::future::join_all(tasks).await;
 
@@ -95,14 +97,17 @@ impl Dispatcher {
                 let cmds = results
                     .into_iter()
                     .filter_map(|result| match result {
-                        Err(Error::FailedSend(peer)) => {
-                            if is_msg_for_client {
-                                warn!("Service msg send failed to: {peer}, for {msg_id:?}");
-                                None
-                            } else {
-                                Some(Cmd::HandleFailedSendToNode { peer, msg_id })
-                            }
-                        }
+                        // TODO: Handlefailed send.
+                        // Have a cmd produced by comms on failed send.
+
+                        // Err(Error::FailedSend(peer)) => {
+                        //     if is_msg_for_client {
+                        //         warn!("Service msg send failed to: {peer}, for {msg_id:?}");
+                        //         None
+                        //     } else {
+                        //         Some(Cmd::HandleFailedSendToNode { peer, msg_id })
+                        //     }
+                        // }
                         _ => None,
                     })
                     .collect();
@@ -203,7 +208,6 @@ impl Dispatcher {
                         msg_authority,
                         msg,
                         origin,
-                        &self.comm,
                         #[cfg(feature = "traceroute")]
                         traceroute.clone(),
                     )
