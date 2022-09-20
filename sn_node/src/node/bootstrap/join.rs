@@ -122,7 +122,6 @@ impl<'a> Joiner<'a> {
             "Bootstrap run, network contacts as we have it: {:?}",
             self.network_contacts
         );
-        let genesis_key = *self.network_contacts.genesis_key();
 
         let (target_section_key, recipients) = if let Ok(sap) = self
             .network_contacts
@@ -130,16 +129,12 @@ impl<'a> Joiner<'a> {
         {
             (sap.section_key(), sap.elders_vec())
         } else {
+            let genesis_key = *self.network_contacts.genesis_key();
             (genesis_key, vec![bootstrap_peer])
         };
         tokio::time::timeout(
             join_timeout,
-            self.join(
-                genesis_key,
-                target_section_key,
-                recipients,
-                join_timeout / 10,
-            ),
+            self.join(target_section_key, recipients, join_timeout / 10),
         )
         .await
         .map_err(|_| Error::JoinTimeout)?
@@ -148,7 +143,6 @@ impl<'a> Joiner<'a> {
     #[tracing::instrument(skip(self))]
     async fn join(
         mut self,
-        network_genesis_key: BlsPublicKey,
         target_section_key: BlsPublicKey,
         recipients: Vec<Peer>,
         response_timeout: Duration,
@@ -930,7 +924,7 @@ mod tests {
                 )
             })
             .collect();
-        let join_task = state.join(section_key, section_key, elders, join_timeout);
+        let join_task = state.join(section_key, elders, join_timeout);
 
         let test_task = async {
             let (wire_msg, _) = send_rx
