@@ -28,15 +28,21 @@
     clippy::unwrap_used
 )]
 
-use sn_node::node::{start_node, Config, Error as NodeError, Event, MembershipEvent};
-
 use clap::{CommandFactory, Parser};
 use clap_complete::{generate, Shell};
 use color_eyre::{Section, SectionExt};
 use eyre::{eyre, Context, ErrReport, Result};
 use self_update::{cargo_crate_version, Status};
+use sn_interface::network_knowledge::SectionTree;
+use sn_node::comm::{Comm, Inbox, Outbox, OutgoingMsg};
+use sn_node::node::{start_node, Config, Error as NodeError, Event, MembershipEvent};
+use std::net::{Ipv4Addr, SocketAddr};
+use std::sync::Arc;
 use std::{io::Write, process::exit};
-use tokio::time::{sleep, Duration};
+use tokio::{
+    sync::{mpsc, RwLock},
+    time::{sleep, Duration},
+};
 use tracing::{self, error, info, trace, warn};
 
 const JOIN_TIMEOUT_SEC: u64 = 100;
@@ -44,40 +50,110 @@ const BOOTSTRAP_RETRY_TIME_SEC: u64 = 5;
 
 mod log;
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     color_eyre::install()?;
 
     // Create a new runtime for a node
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .thread_name("sn_node")
-        // 16mb here for windows stack size, which was being exceeded previously
-        .thread_stack_size(16 * 1024 * 1024)
-        .build()?;
+    // let rt = tokio::runtime::new();
+    // .enable_all()
+    // .thread_name("sn_node")
+    // // 16mb here for windows stack size, which was being exceeded previously
+    // .thread_stack_size(16 * 1024 * 1024)
+    // .build()?;
 
-    rt.block_on(async {
-        let mut config = Config::new().await?;
-        let _guard = log::init_node_logging(&config)?;
-        trace!("Initial node config: {config:?}");
+    // We need this to pass into join flow
+    // TODO: refactor this to be created by comms and just return Cmds
+    // This will need join flow to parse cmds...
+    let (sender_for_msgs_received_in_comms, msg_receiver_channel) = mpsc::channel(100);
 
-        loop {
-            info!("Node runtime started");
-            create_runtime_and_node(&config).await?;
+    // rt.block_on(async {
+    let mut config = Config::new().await?;
 
-            // pull config again in case it has been updated meanwhile
-            config = Config::new().await?;
-        }
-    })
+    let _guard = log::init_node_logging(&config)?;
+    trace!("Initial node config: {config:?}");
+
+    let local_addr = config
+        .local_addr
+        .unwrap_or_else(|| SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0)));
+
+    let (mut comm, intitial_contact_address) = if config.is_first() {
+        let comm = Comm::first_node(
+            local_addr,
+            config.network_config().clone(),
+            sender_for_msgs_received_in_comms,
+        )
+        .await?;
+
+        (comm, None)
+    } else {
+        // get initial contacts
+        let path = config.network_contacts_file().ok_or_else(|| {
+            NodeError::Configuration("Could not obtain network contacts file path".to_string())
+        })?;
+        let network_contacts = SectionTree::from_disk(&path).await?;
+        let section_elders = {
+            let sap = network_contacts
+                .closest(&xor_name::rand::random(), None)
+                .ok_or_else(|| {
+                    NodeError::Configuration("Could not obtain closest SAP".to_string())
+                })?;
+            sap.elders_vec()
+        };
+        let bootstrap_nodes: Vec<SocketAddr> =
+            section_elders.iter().map(|node| node.addr()).collect();
+
+        let (comm, intitial_contact_address) = Comm::make_initial_contact(
+            local_addr,
+            bootstrap_nodes.as_slice(),
+            config.network_config().clone(),
+            sender_for_msgs_received_in_comms,
+        )
+        .await?;
+
+        (comm, Some(intitial_contact_address))
+    };
+
+    let send_msg_channel = comm.send_msg_channel();
+    let addr = comm.socket_addr();
+
+    // SO here we have comm...
+    // we need that in a thread with its own event loop
+    // and we spawn a freash thread just for that
+    // with a sender available outside...
+    let _handle = tokio::spawn(async move {
+        info!("hey1");
+        let r = comm.run_comm_loop().await;
+        info!("hey2: {r:?}");
+    });
+
+    info!("Node runtime started");
+    create_runtime_and_node(
+        &config,
+        send_msg_channel.clone(),
+        msg_receiver_channel,
+        addr,
+        intitial_contact_address,
+    )
+    .await?;
+
+    Ok(())
 }
 
 /// Create a tokio runtime per `run_node` instance.
-async fn create_runtime_and_node(config: &Config) -> Result<()> {
+async fn create_runtime_and_node(
+    config: &Config,
+    outbox: Outbox,
+    inbox: Inbox,
+    addr: SocketAddr,
+    intitial_contact_address: Option<SocketAddr>,
+) -> Result<()> {
     let local = tokio::task::LocalSet::new();
 
     local
         .run_until(async move {
             // loops ready to catch any ChurnJoinMiss
-            match run_node(config).await {
+            match run_node(config, outbox, inbox, addr, intitial_contact_address).await {
                 Ok(_) => {
                     info!("Node has finished running, no runtime errors were reported");
                 }
@@ -91,7 +167,13 @@ async fn create_runtime_and_node(config: &Config) -> Result<()> {
     Ok(())
 }
 
-async fn run_node(config: &Config) -> Result<()> {
+async fn run_node(
+    config: &Config,
+    outbox: Outbox,
+    inbox: Inbox,
+    addr: SocketAddr,
+    intitial_contact_address: Option<SocketAddr>,
+) -> Result<()> {
     if let Some(c) = &config.completions() {
         let shell = c.parse().map_err(|err: String| eyre!(err))?;
         let buf = gen_completions_for_shell(shell, Config::command()).map_err(|err| eyre!(err))?;
@@ -130,8 +212,18 @@ async fn run_node(config: &Config) -> Result<()> {
     let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
     let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME_SEC);
 
+    let inbox = Arc::new(RwLock::new(inbox));
     let (_node, mut event_stream) = loop {
-        match start_node(config, join_timeout).await {
+        match start_node(
+            config,
+            join_timeout,
+            outbox.clone(),
+            inbox.clone(),
+            addr,
+            intitial_contact_address,
+        )
+        .await
+        {
             Ok(result) => break result,
             Err(NodeError::CannotConnectEndpoint(qp2p::EndpointError::Upnp(error))) => {
                 return Err(error).suggestion(
@@ -149,6 +241,7 @@ async fn run_node(config: &Config) -> Result<()> {
             Err(NodeError::TryJoinLater) => {
                 println!("{}", log);
                 info!("{}", log);
+                // return Err(NodeError::TryJoinLater.into())
             }
             Err(NodeError::NodeNotReachable(addr)) => {
                 let err_msg = format!(
@@ -167,6 +260,7 @@ async fn run_node(config: &Config) -> Result<()> {
                 let message = format!("(PID: {our_pid}): Encountered a timeout while trying to join the network. Retrying after {BOOTSTRAP_RETRY_TIME_SEC} seconds.");
                 println!("{}", &message);
                 error!("{}", &message);
+                // return Err(NodeError::JoinTimeout.into())
             }
             Err(e) => {
                 let log_path = if let Some(path) = config.log_dir() {
@@ -185,7 +279,6 @@ async fn run_node(config: &Config) -> Result<()> {
         }
         sleep(bootstrap_retry_duration).await;
     };
-
     // Simulate failed node starts, and ensure that
     #[cfg(feature = "chaos")]
     {

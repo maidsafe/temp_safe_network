@@ -29,21 +29,28 @@ use dashmap::DashMap;
 use qp2p::{Endpoint, IncomingConnections};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
-    sync::mpsc::{self, Receiver, Sender},
+    sync::mpsc::{self, error::TryRecvError, Receiver, Sender},
     task,
 };
 
 // Communication component of the node to interact with other nodes.
-#[derive(Clone)]
-pub(crate) struct Comm {
+pub struct Comm {
     our_endpoint: Endpoint,
     msg_listener: MsgListener,
     sessions: Arc<DashMap<Peer, PeerSession>>,
+    outgoing_msg_channel: Sender<OutgoingMsg>,
+    inbox: Receiver<OutgoingMsg>,
+    conn_receiver: Receiver<ListenerEvent>,
 }
+
+/// peer, msg_id, bytes, is_msg_for_client
+pub type OutgoingMsg = (Peer, MsgId, UsrMsgBytes, bool);
+pub type Outbox = Sender<OutgoingMsg>;
+pub type Inbox = Receiver<MsgEvent>;
 
 impl Comm {
     #[tracing::instrument(skip_all)]
-    pub(crate) async fn first_node(
+    pub async fn first_node(
         local_addr: SocketAddr,
         config: qp2p::Config,
         incoming_msg_pipe: Sender<MsgEvent>,
@@ -59,7 +66,7 @@ impl Comm {
     }
 
     #[tracing::instrument(skip_all)]
-    pub(crate) async fn bootstrap(
+    pub async fn make_initial_contact(
         local_addr: SocketAddr,
         bootstrap_nodes: &[SocketAddr],
         config: qp2p::Config,
@@ -79,14 +86,14 @@ impl Comm {
         );
 
         let (connection, incoming_msgs) = bootstrap_node.ok_or(Error::BootstrapFailed)?;
-        let remote_address = connection.remote_address();
+        let intitial_contact_address = connection.remote_address();
 
         msg_listener.listen(connection, incoming_msgs);
 
-        Ok((comm, remote_address))
+        Ok((comm, intitial_contact_address))
     }
 
-    pub(crate) fn socket_addr(&self) -> SocketAddr {
+    pub fn socket_addr(&self) -> SocketAddr {
         self.our_endpoint.public_addr()
     }
 
@@ -117,6 +124,59 @@ impl Comm {
     #[cfg(test)]
     pub(crate) async fn is_reachable(&self, _peer: &SocketAddr) -> Result<(), Error> {
         Ok(())
+    }
+
+    /// Get the channel to send msgs
+    pub fn send_msg_channel(&self) -> Outbox {
+        self.outgoing_msg_channel.clone()
+    }
+
+    /// Get the channel to send msgs. Parse inbound connections etc.
+    pub async fn run_comm_loop(&mut self) -> Result<()> {
+        loop {
+            debug!("comm loop");
+            let mut did_something = false;
+            match self.inbox.try_recv() {
+                Ok((peer, msg_id, bytes, is_msg_for_client)) => {
+                    debug!("msg to go out... to {peer:?}{msg_id:?}");
+                    // self.add_incoming(&peer, connection).await;
+                    if let Err(error) = self
+                        .send_out_bytes(peer, msg_id, bytes, is_msg_for_client)
+                        .await
+                    {
+                        error!("Errrrrrrrrrrrrrrr sending {error:?}");
+                    }
+                    did_something = true;
+                }
+                Err(TryRecvError::Empty) => {
+                    // do nothing else
+                }
+                Err(TryRecvError::Disconnected) => {
+                    error!("Senders to `inbox` have disconnected.");
+                    return Err(Error::MsgChannelDropped);
+                }
+            }
+
+            // HANDLE ANY CONNECTIONS THAT CAME IN
+            match self.conn_receiver.try_recv() {
+                Ok(ListenerEvent::Connected { peer, connection }) => {
+                    debug!("adding con from {peer:?}");
+                    self.add_incoming(&peer, connection).await;
+                    did_something = true;
+                }
+                Err(TryRecvError::Empty) => {
+                    // do nothing else
+                }
+                Err(TryRecvError::Disconnected) => {
+                    error!("Senders to `conn_receiver` have disconnected.");
+                    return Err(Error::MsgChannelDropped);
+                }
+            }
+
+            if !did_something{
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        }
     }
 
     /// Tests whether the peer is reachable.
@@ -249,7 +309,7 @@ impl Comm {
                     // transient connection issue. We don't treat this as a failed recipient, but we sleep a little longer here.
                     // Retries are managed by the peer session, where it will open a new connection.
                     debug!("Transient error when sending to peer {}: {}", peer, error);
-                    log_sleep!(Duration::from_millis(200));
+                    // log_sleep!(Duration::from_millis(200));
                     continue; // moves on to awaiting a new change
                 }
                 SendStatus::MaxRetriesReached => {
@@ -348,6 +408,7 @@ fn setup_comms(
 #[tracing::instrument(skip_all)]
 fn setup(our_endpoint: Endpoint, receive_msg: Sender<MsgEvent>) -> (Comm, MsgListener) {
     let (add_connection, conn_receiver) = mpsc::channel(100);
+    let (outgoing_msg_channel, mut inbox) = mpsc::channel(100);
 
     let msg_listener = MsgListener::new(add_connection, receive_msg);
 
@@ -355,9 +416,13 @@ fn setup(our_endpoint: Endpoint, receive_msg: Sender<MsgEvent>) -> (Comm, MsgLis
         our_endpoint,
         msg_listener: msg_listener.clone(),
         sessions: Arc::new(DashMap::new()),
+        inbox,
+        outgoing_msg_channel,
+        conn_receiver,
     };
 
-    let _ = task::spawn_local(receive_conns(comm.clone(), conn_receiver));
+    // TODO get event loop and get this in
+    // let _ = task::spawn_local(receive_conns(comm.clone(), conn_receiver));
 
     (comm, msg_listener)
 }
@@ -374,7 +439,7 @@ fn listen_for_incoming_msgs(
     msg_listener: MsgListener,
     mut incoming_connections: IncomingConnections,
 ) {
-    let _ = task::spawn_local(async move {
+    let _ = task::spawn(async move {
         while let Some((connection, incoming_msgs)) = incoming_connections.next().await {
             trace!(
                 "incoming_connection from {:?} with connection_id {:?}",
@@ -384,6 +449,8 @@ fn listen_for_incoming_msgs(
 
             msg_listener.listen(connection, incoming_msgs);
         }
+
+        trace!("WHYYYYYYYY");
     });
 }
 
@@ -396,7 +463,7 @@ impl Drop for Comm {
 }
 
 #[derive(Debug)]
-pub(crate) enum MsgEvent {
+pub enum MsgEvent {
     Received { sender: Peer, wire_msg: WireMsg },
 }
 
@@ -616,7 +683,7 @@ mod tests {
 
         let (tx, rx) = mpsc::channel(1);
 
-        let _handle = tokio::task::spawn_local(async move {
+        let _handle = tokio::task::spawn(async move {
             while let Some((_, mut incoming_messages)) = incoming_connections.next().await {
                 while let Ok(Some(msg)) = incoming_messages.next().await {
                     let _ = tx.send(msg).await;
@@ -633,7 +700,7 @@ mod tests {
 
         // Keep the socket alive to keep the address bound, but don't read/write to it so any
         // attempt to connect to it will fail.
-        let _handle = tokio::task::spawn_local(async move {
+        let _handle = tokio::task::spawn(async move {
             debug!("get invalid peer");
             future::pending::<()>().await;
             let _ = socket;

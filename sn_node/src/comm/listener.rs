@@ -45,7 +45,7 @@ impl MsgListener {
     #[tracing::instrument(skip_all)]
     pub(crate) fn listen(&self, conn: qp2p::Connection, incoming_msgs: ConnectionIncoming) {
         let clone = self.clone();
-        let _ = task::spawn_local(clone.listen_internal(conn, incoming_msgs).in_current_span());
+        let _ = task::spawn(clone.listen_internal(conn, incoming_msgs).in_current_span());
     }
 
     #[tracing::instrument(skip_all)]
@@ -54,9 +54,11 @@ impl MsgListener {
         let remote_address = conn.remote_address();
         let mut first = true;
 
+        debug!("------->>>> LISTEN INTERNAL");
         while let Some(result) = incoming_msgs.next().await.transpose() {
             match result {
                 Ok(msg_bytes) => {
+                    debug!("SOME MSSGGGGGGGGGGGGG");
                     let wire_msg = match WireMsg::from(msg_bytes) {
                         Ok(wire_msg) => wire_msg,
                         Err(error) => {

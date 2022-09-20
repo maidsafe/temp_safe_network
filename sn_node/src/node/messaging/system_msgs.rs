@@ -113,7 +113,6 @@ impl Node {
         msg_authority: NodeMsgAuthority,
         msg: SystemMsg,
         sender: Peer,
-        comm: &Comm,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         trace!("{:?}", LogMarker::SystemMsgToBeHandled);
@@ -269,7 +268,7 @@ impl Node {
                 .collect()),
             SystemMsg::JoinRequest(join_request) => {
                 trace!("Handling msg {:?}: JoinRequest from {}", msg_id, sender);
-                self.handle_join_request(sender, join_request, comm)
+                self.handle_join_request(sender, join_request)
                     .await
                     .map(|c| c.into_iter().collect())
             }
@@ -281,7 +280,7 @@ impl Node {
                     return Ok(vec![]);
                 }
                 Ok(self
-                    .handle_join_as_relocated_request(sender, *join_request, comm)
+                    .handle_join_as_relocated_request(sender, *join_request)
                     .await
                     .into_iter()
                     .collect())

@@ -1,4 +1,4 @@
-use crate::comm::Comm;
+use crate::comm::{Comm, Outbox};
 use crate::node::{
     cfg::create_test_max_capacity_and_root_storage,
     flow_ctrl::{
@@ -207,7 +207,7 @@ impl TestNodeBuilder {
         )
         .await?;
         let node = Arc::new(RwLock::new(node));
-        let dispatcher = Dispatcher::new(node, comm);
+        let dispatcher = Dispatcher::new(node, comm.send_msg_channel());
         Ok((dispatcher, section, peer, sk_set))
     }
 }

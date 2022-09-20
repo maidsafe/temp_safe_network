@@ -18,7 +18,7 @@ mod periodic_checks;
 
 use event_channel::EventSender;
 
-use crate::comm::MsgEvent;
+use crate::comm::{Inbox, MsgEvent};
 
 use crate::node::{flow_ctrl::cmds::Cmd, Error, Node, Result};
 
@@ -40,7 +40,7 @@ use tokio::{
 pub(crate) struct FlowCtrl {
     node: Arc<RwLock<Node>>,
     cmd_ctrl: CmdCtrl,
-    incoming_msg_events: mpsc::Receiver<MsgEvent>,
+    inbox: Arc<RwLock<Inbox>>,
     incoming_cmds_from_apis: mpsc::Receiver<(Cmd, Option<usize>)>,
     cmd_sender_channel: mpsc::Sender<(Cmd, Option<usize>)>,
     outgoing_node_event_sender: EventSender,
@@ -49,7 +49,7 @@ pub(crate) struct FlowCtrl {
 impl FlowCtrl {
     pub(crate) fn new(
         cmd_ctrl: CmdCtrl,
-        incoming_msg_events: mpsc::Receiver<MsgEvent>,
+        inbox: Arc<RwLock<Inbox>>,
         outgoing_node_event_sender: EventSender,
     ) -> (Self, mpsc::Sender<(Cmd, Option<usize>)>) {
         let node = cmd_ctrl.node();
@@ -59,7 +59,7 @@ impl FlowCtrl {
             Self {
                 cmd_ctrl,
                 node,
-                incoming_msg_events,
+                inbox,
                 incoming_cmds_from_apis,
                 cmd_sender_channel: cmd_sender_channel.clone(),
                 outgoing_node_event_sender,
@@ -100,8 +100,12 @@ impl FlowCtrl {
 
     /// Pull and queue up all pending msgs from the MsgSender
     async fn enqueue_new_incoming_msgs(&mut self) -> Result<()> {
+        // this is the only place this lock should be used now
+        let mut inbox = self.inbox.write().await;
+        // queue cmds to queue.. cos we mutably borrow and need to drop the inbox lock first
+        let mut cmds_to_fire_off = vec![];
         loop {
-            match self.incoming_msg_events.try_recv() {
+            match inbox.try_recv() {
                 Ok(msg) => {
                     let cmd = match self.handle_new_msg_event(msg).await {
                         Ok(cmd) => cmd,
@@ -110,20 +114,27 @@ impl FlowCtrl {
                             continue;
                         }
                     };
-
-                    // dont use sender here incase channel gets full
-                    self.fire_and_forget(cmd, None).await;
+                    cmds_to_fire_off.push((cmd, None));
                 }
                 Err(TryRecvError::Empty) => {
                     // do nothing else
-                    return Ok(());
+                    break;
                 }
                 Err(TryRecvError::Disconnected) => {
-                    error!("Senders to `incoming_cmds_from_apis` have disconnected.");
+                    error!("Senders to `incoming_msg_events` have disconnected.");
                     return Err(Error::MsgChannelDropped);
                 }
             }
         }
+
+        drop(inbox);
+
+        for (cmd, id) in cmds_to_fire_off {
+            // dont use sender here incase channel gets full
+            self.fire_and_forget(cmd, id).await;
+        }
+
+        Ok(())
     }
 
     /// This is a never ending loop as long as the node is live.

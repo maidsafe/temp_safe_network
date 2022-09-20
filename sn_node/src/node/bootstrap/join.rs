@@ -8,7 +8,7 @@
 
 use super::UsedRecipientSaps;
 
-use crate::comm::{Comm, MsgEvent};
+use crate::comm::{Comm, Inbox, MsgEvent, Outbox};
 use crate::log_sleep;
 use crate::node::{messages::WireMsgUtils, Error, Result};
 
@@ -29,8 +29,9 @@ use bls::PublicKey as BlsPublicKey;
 use futures::future;
 use resource_proof::ResourceProof as ChallengeSolver;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tokio::{
-    sync::mpsc,
+    sync::{mpsc, RwLock},
     time::{Duration, Instant},
 };
 use tracing::Instrument;
@@ -43,32 +44,33 @@ use xor_name::Prefix;
 /// for example by using a timeout.
 pub(crate) async fn join_network(
     node: NodeInfo,
-    comm: &Comm,
-    incoming_msgs: &mut mpsc::Receiver<MsgEvent>,
+    // comm: &Comm,
+    outbox: Outbox,
+    inbox: Arc<RwLock<Inbox>>,
     bootstrap_addr: SocketAddr,
     network_contacts: SectionTree,
     join_timeout: Duration,
 ) -> Result<(NodeInfo, NetworkKnowledge)> {
-    let (outgoing_msgs_sender, outgoing_msgs_receiver) = mpsc::channel(1);
+    let (outgoing_msgs_sender, outgoing_msgs_receiver) = mpsc::channel(10);
 
     let span = trace_span!("bootstrap");
-    let joiner = Joiner::new(node, outgoing_msgs_sender, incoming_msgs, network_contacts);
+    let joiner = Joiner::new(node, outgoing_msgs_sender, inbox, network_contacts);
 
-    debug!("=========> attempting bootstrap to {bootstrap_addr}");
+    debug!("=========> attempting join network @ {bootstrap_addr}");
     future::join(
         joiner.try_join(bootstrap_addr, join_timeout),
-        send_messages(outgoing_msgs_receiver, comm),
+        send_messages(outgoing_msgs_receiver, outbox),
     )
     .instrument(span)
     .await
     .0
 }
 
-struct Joiner<'a> {
+struct Joiner {
     // Sender for outgoing messages.
     outgoing_msgs: mpsc::Sender<(WireMsg, Vec<Peer>)>,
     // Receiver for incoming messages.
-    incoming_msgs: &'a mut mpsc::Receiver<MsgEvent>,
+    inbox: Arc<RwLock<Inbox>>,
     node: NodeInfo,
     prefix: Prefix,
     network_contacts: SectionTree,
@@ -76,11 +78,11 @@ struct Joiner<'a> {
     aggregated: bool,
 }
 
-impl<'a> Joiner<'a> {
+impl Joiner {
     fn new(
         node: NodeInfo,
         outgoing_msgs: mpsc::Sender<(WireMsg, Vec<Peer>)>,
-        incoming_msgs: &'a mut mpsc::Receiver<MsgEvent>,
+        inbox: Arc<RwLock<Inbox>>,
         network_contacts: SectionTree,
     ) -> Self {
         let mut backoff = ExponentialBackoff {
@@ -95,7 +97,7 @@ impl<'a> Joiner<'a> {
 
         Self {
             outgoing_msgs,
-            incoming_msgs,
+            inbox,
             node,
             prefix: Prefix::default(),
             network_contacts,
@@ -439,8 +441,9 @@ impl<'a> Joiner<'a> {
     ) -> Result<(JoinResponse, Peer)> {
         let mut timer = Instant::now();
 
+        let mut inbox = self.inbox.write().await;
         // Awaits at most the time left of join_timeout.
-        while let Some(event) = tokio::time::timeout(response_timeout, self.incoming_msgs.recv())
+        while let Some(event) = tokio::time::timeout(response_timeout, inbox.recv())
             .await
             .map_err(|_| Error::JoinTimeout)?
         {
@@ -489,7 +492,8 @@ impl<'a> Joiner<'a> {
 // Keep reading messages from `rx` and send them using `comm`.
 async fn send_messages(
     mut outgoing_msgs: mpsc::Receiver<(WireMsg, Vec<Peer>)>,
-    comm: &Comm,
+    // comm: &Comm,
+    outbox: Outbox,
 ) -> Result<()> {
     while let Some((msg, peers)) = outgoing_msgs.recv().await {
         for peer in peers {
@@ -497,13 +501,13 @@ async fn send_messages(
             let msg_id = msg.msg_id();
 
             let bytes = msg.serialize()?;
-            match comm.send_out_bytes(peer, msg_id, bytes, false).await {
+            match outbox.send((peer, msg_id, bytes, false)).await {
                 Ok(()) => trace!("Msg {msg_id:?} sent on {dst:?}"),
-                Err(Error::FailedSend(peer)) => {
-                    error!("Failed to send message {msg_id:?} to {peer:?}")
-                }
+                // Err(Error::FailedSend(peer)) => {
+                //     error!("Failed to send message {msg_id:?} to {peer:?}")
+                // }
                 Err(error) => {
-                    warn!("Error in comms when sending msg {msg_id:?} to peer {peer:?}: {error}")
+                    warn!("Error sending msg via Outbox: {msg_id:?} to peer {peer:?}: {error}")
                 }
             }
         }
