@@ -48,7 +48,7 @@ fn main() -> Result<()> {
     color_eyre::install()?;
 
     // Create a new runtime for a node
-    let rt = tokio::runtime::Builder::new_current_thread()
+    let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .thread_name("sn_node")
         // 16mb here for windows stack size, which was being exceeded previously
