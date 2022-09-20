@@ -8,7 +8,6 @@
 
 use super::{Error, QueryResponse};
 
-use crate::messaging::data::OperationId;
 use crate::types::SpentbookAddress;
 
 use serde::{Deserialize, Serialize};
@@ -41,9 +40,9 @@ pub enum SpentbookCmd {
 impl SpentbookQuery {
     /// Creates a Response containing an error, with the Response variant corresponding to the
     /// Request variant.
-    pub fn error(&self, error: Error, op_id: OperationId) -> QueryResponse {
+    pub fn error(&self, error: Error) -> QueryResponse {
         match self {
-            Self::SpentProofShares(_) => QueryResponse::SpentProofShares((Err(error), op_id)),
+            Self::SpentProofShares(_) => QueryResponse::SpentProofShares(Err(error)),
         }
     }
 

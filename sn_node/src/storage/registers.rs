@@ -14,8 +14,8 @@ use super::{
 use sn_interface::{
     messaging::{
         data::{
-            CreateRegister, EditRegister, OperationId, RegisterCmd, RegisterQuery,
-            SignedRegisterCreate, SignedRegisterEdit,
+            CreateRegister, EditRegister, RegisterCmd, RegisterQuery, SignedRegisterCreate,
+            SignedRegisterEdit,
         },
         system::NodeQueryResponse,
         SectionAuth, ServiceAuth, VerifyAuthority,
@@ -121,27 +121,17 @@ impl RegisterStorage {
 
     /// --- Reading ---
 
-    pub(super) async fn read(
-        &self,
-        read: &RegisterQuery,
-        requester: User,
-        op_id: OperationId,
-    ) -> NodeQueryResponse {
-        trace!(
-            "Reading register with op id {}: {:?}",
-            op_id,
-            read.dst_address()
-        );
+    pub(super) async fn read(&self, read: &RegisterQuery, requester: User) -> NodeQueryResponse {
+        trace!("Reading register: {:?}", read.dst_address());
         use RegisterQuery::*;
         match read {
-            Get(address) => self.get(*address, requester, op_id).await,
-            Read(address) => self.read_register(*address, requester, op_id).await,
-            GetOwner(address) => self.get_owner(*address, requester, op_id).await,
-            GetEntry { address, hash } => self.get_entry(*address, *hash, requester, op_id).await,
-            GetPolicy(address) => self.get_policy(*address, requester, op_id).await,
+            Get(address) => self.get(*address, requester).await,
+            Read(address) => self.read_register(*address, requester).await,
+            GetOwner(address) => self.get_owner(*address, requester).await,
+            GetEntry { address, hash } => self.get_entry(*address, *hash, requester).await,
+            GetPolicy(address) => self.get_policy(*address, requester).await,
             GetUserPermissions { address, user } => {
-                self.get_user_permissions(*address, *user, requester, op_id)
-                    .await
+                self.get_user_permissions(*address, *user, requester).await
             }
         }
     }
@@ -166,12 +156,7 @@ impl RegisterStorage {
     }
 
     /// Get entire Register.
-    async fn get(
-        &self,
-        address: RegisterAddress,
-        requester: User,
-        op_id: OperationId,
-    ) -> NodeQueryResponse {
+    async fn get(&self, address: RegisterAddress, requester: User) -> NodeQueryResponse {
         let result = match self.get_register(&address, Action::Read, requester).await {
             Ok(register) => Ok(register),
             Err(error) => {
@@ -180,35 +165,25 @@ impl RegisterStorage {
             }
         };
 
-        NodeQueryResponse::GetRegister((result, op_id))
+        NodeQueryResponse::GetRegister(result)
     }
 
-    async fn read_register(
-        &self,
-        address: RegisterAddress,
-        requester: User,
-        op_id: OperationId,
-    ) -> NodeQueryResponse {
+    async fn read_register(&self, address: RegisterAddress, requester: User) -> NodeQueryResponse {
         let result = match self.get_register(&address, Action::Read, requester).await {
             Ok(register) => Ok(register.read()),
             Err(error) => Err(error),
         };
 
-        NodeQueryResponse::ReadRegister((result.map_err(|error| error.into()), op_id))
+        NodeQueryResponse::ReadRegister(result.map_err(|error| error.into()))
     }
 
-    async fn get_owner(
-        &self,
-        address: RegisterAddress,
-        requester: User,
-        op_id: OperationId,
-    ) -> NodeQueryResponse {
+    async fn get_owner(&self, address: RegisterAddress, requester: User) -> NodeQueryResponse {
         let result = match self.get_register(&address, Action::Read, requester).await {
             Ok(res) => Ok(res.owner()),
             Err(error) => Err(error.into()),
         };
 
-        NodeQueryResponse::GetRegisterOwner((result, op_id))
+        NodeQueryResponse::GetRegisterOwner(result)
     }
 
     async fn get_entry(
@@ -216,7 +191,6 @@ impl RegisterStorage {
         address: RegisterAddress,
         hash: EntryHash,
         requester: User,
-        op_id: OperationId,
     ) -> NodeQueryResponse {
         let result = match self
             .get_register(&address, Action::Read, requester)
@@ -227,7 +201,7 @@ impl RegisterStorage {
             Err(error) => Err(error.into()),
         };
 
-        NodeQueryResponse::GetRegisterEntry((result, op_id))
+        NodeQueryResponse::GetRegisterEntry(result)
     }
 
     async fn get_user_permissions(
@@ -235,7 +209,6 @@ impl RegisterStorage {
         address: RegisterAddress,
         user: User,
         requester: User,
-        op_id: OperationId,
     ) -> NodeQueryResponse {
         let result = match self
             .get_register(&address, Action::Read, requester)
@@ -246,15 +219,10 @@ impl RegisterStorage {
             Err(error) => Err(error.into()),
         };
 
-        NodeQueryResponse::GetRegisterUserPermissions((result, op_id))
+        NodeQueryResponse::GetRegisterUserPermissions(result)
     }
 
-    async fn get_policy(
-        &self,
-        address: RegisterAddress,
-        requester_pk: User,
-        op_id: OperationId,
-    ) -> NodeQueryResponse {
+    async fn get_policy(&self, address: RegisterAddress, requester_pk: User) -> NodeQueryResponse {
         let result = match self
             .get_register(&address, Action::Read, requester_pk)
             .await
@@ -264,7 +232,7 @@ impl RegisterStorage {
             Err(error) => Err(error.into()),
         };
 
-        NodeQueryResponse::GetRegisterPolicy((result, op_id))
+        NodeQueryResponse::GetRegisterPolicy(result)
     }
 
     // ========================================================================
@@ -452,7 +420,7 @@ mod test {
     use super::{create_reg_w_policy, Error, RegisterStorage, UsedSpace};
     use sn_interface::{
         messaging::{
-            data::{EditRegister, OperationId, RegisterCmd, RegisterQuery, SignedRegisterEdit},
+            data::{EditRegister, RegisterCmd, RegisterQuery, SignedRegisterEdit},
             system::NodeQueryResponse,
             ServiceAuth,
         },
@@ -698,12 +666,8 @@ mod test {
 
         // get register
         let address = cmd.dst_address();
-        let op_id = OperationId::random();
-        match store
-            .read(&RegisterQuery::Get(address), authority, op_id)
-            .await
-        {
-            NodeQueryResponse::GetRegister((Ok(reg), _)) => {
+        match store.read(&RegisterQuery::Get(address), authority).await {
+            NodeQueryResponse::GetRegister(Ok(reg)) => {
                 assert_eq!(reg.address(), &address, "Should have same address!");
                 assert_eq!(reg.owner(), authority, "Should have same owner!");
             }
@@ -780,12 +744,10 @@ mod test {
         }
 
         // should be able to read the same value from this new store also
-        let res = new_store
-            .read(&RegisterQuery::Get(addr), authority, OperationId::random())
-            .await;
+        let res = new_store.read(&RegisterQuery::Get(addr), authority).await;
 
         match res {
-            NodeQueryResponse::GetRegister((Ok(reg), _)) => {
+            NodeQueryResponse::GetRegister(Ok(reg)) => {
                 assert_eq!(reg.address(), &addr, "Should have same address!");
                 assert_eq!(reg.owner(), authority, "Should have same owner!");
             }
@@ -808,16 +770,14 @@ mod test {
 
         // try get permissions of random user
         let address = cmd_create.dst_address();
-        let op_id = OperationId::random();
         let res = store
-            .read(&RegisterQuery::GetEntry { address, hash }, authority, op_id)
+            .read(&RegisterQuery::GetEntry { address, hash }, authority)
             .await;
         match res {
-            NodeQueryResponse::GetRegisterEntry((Err(e), id)) => {
-                assert_eq!(id, op_id);
+            NodeQueryResponse::GetRegisterEntry(Err(e)) => {
                 assert_eq!(e, sn_interface::messaging::data::Error::NoSuchEntry)
             }
-            NodeQueryResponse::GetRegisterEntry((Ok(entry), _)) => {
+            NodeQueryResponse::GetRegisterEntry(Ok(entry)) => {
                 panic!("Should not exist any entry for random hash! {:?}", entry)
             }
             e => panic!("Could not read! {:?}", e),
@@ -839,20 +799,17 @@ mod test {
 
         // try get permissions of random user
         let address = cmd_create.dst_address();
-        let op_id = OperationId::random();
         let res = store
             .read(
                 &RegisterQuery::GetUserPermissions { address, user },
                 authority,
-                op_id,
             )
             .await;
         match res {
-            NodeQueryResponse::GetRegisterUserPermissions((Err(e), id)) => {
-                assert_eq!(id, op_id);
+            NodeQueryResponse::GetRegisterUserPermissions(Err(e)) => {
                 assert_eq!(e, sn_interface::messaging::data::Error::NoSuchEntry)
             }
-            NodeQueryResponse::GetRegisterUserPermissions((Ok(perms), _)) => panic!(
+            NodeQueryResponse::GetRegisterUserPermissions(Ok(perms)) => panic!(
                 "Should not exist any permissions for random user! {:?}",
                 perms
             ),

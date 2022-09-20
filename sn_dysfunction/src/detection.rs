@@ -286,7 +286,7 @@ mod tests {
     use itertools::Itertools;
 
     use crate::{detection::IssueType, tests::init_test_logger, DysfunctionDetection};
-    use sn_interface::messaging::data::OperationId;
+    use sn_interface::messaging::system::OperationId;
 
     use eyre::bail;
     use proptest::prelude::*;

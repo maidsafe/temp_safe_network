@@ -6,9 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{
-    register::RegisterQuery, spentbook::SpentbookQuery, Error, OperationId, QueryResponse,
-};
+use super::{register::RegisterQuery, spentbook::SpentbookQuery, Error, QueryResponse};
 use crate::types::{ChunkAddress, DataAddress, SpentbookAddress};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
@@ -52,15 +50,15 @@ pub enum DataQueryVariant {
 impl DataQueryVariant {
     /// Creates a Response containing an error, with the Response variant corresponding to the
     /// Request variant.
-    pub fn error(&self, error: Error, op_id: OperationId) -> QueryResponse {
+    pub fn error(&self, error: Error) -> QueryResponse {
         use DataQueryVariant::*;
         match self {
             #[cfg(feature = "chunks")]
-            GetChunk(_) => QueryResponse::GetChunk((Err(error), op_id)),
+            GetChunk(_) => QueryResponse::GetChunk(Err(error)),
             #[cfg(feature = "registers")]
-            Register(q) => q.error(error, op_id),
+            Register(q) => q.error(error),
             #[cfg(feature = "spentbook")]
-            Spentbook(q) => q.error(error, op_id),
+            Spentbook(q) => q.error(error),
         }
     }
 

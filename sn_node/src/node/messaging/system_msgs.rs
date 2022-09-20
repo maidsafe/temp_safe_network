@@ -491,7 +491,6 @@ impl Node {
             SystemMsg::NodeQuery(NodeQuery::Data {
                 query,
                 auth,
-                origin,
                 correlation_id,
                 operation_id,
             }) => {
@@ -508,7 +507,6 @@ impl Node {
                         operation_id,
                         &query,
                         auth,
-                        origin,
                         sender,
                         #[cfg(feature = "traceroute")]
                         traceroute,
@@ -519,11 +517,11 @@ impl Node {
             SystemMsg::NodeQueryResponse {
                 response,
                 correlation_id,
-                user,
+                operation_id,
             } => {
                 debug!(
                     "{:?}: op_id {}, correlation_id: {correlation_id:?}, sender: {sender} origin msg_id: {msg_id:?}",
-                    LogMarker::ChunkQueryResponseReceviedFromAdult, response.operation_id()
+                    LogMarker::ChunkQueryResponseReceviedFromAdult, operation_id
                 );
 
                 match msg_authority {
@@ -531,9 +529,9 @@ impl Node {
                         let sending_nodes_pk = PublicKey::from(auth.into_inner().node_ed_pk);
                         Ok(self
                             .handle_data_query_response_at_elder(
+                                operation_id,
                                 correlation_id,
                                 response,
-                                user,
                                 sending_nodes_pk,
                                 #[cfg(feature = "traceroute")]
                                 traceroute,

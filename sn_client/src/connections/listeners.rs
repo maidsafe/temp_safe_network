@@ -245,18 +245,13 @@ impl Session {
                     // responses corresponding to the same msg ID might arrive.
                     // Once we are satisfied with the response this is channel is discarded in
                     // ConnectionManager::send_query
-                    let op_id = response.operation_id();
-                    if let Some(entry) = queries.get(&op_id) {
-                        let all_senders = entry.value();
+                    if let Some(entry) = queries.get(&correlation_id) {
+                        let sender = entry.value();
                         // Only valid response shall get broadcast to all
-                        for (ori_msg_id, sender) in all_senders {
-                            let res = if response.is_success() || ori_msg_id == &correlation_id {
-                                sender.try_send(response.clone())
-                            } else {
-                                continue;
-                            };
+                        if response.is_success() {
+                            let res = sender.try_send(response);
                             if res.is_err() {
-                                trace!("Error relaying query response internally on a channel for {:?} op_id {:?}: {:?}. (It has likely been removed)", msg_id, op_id, res)
+                                trace!("Error relaying query response internally on a channel for {:?}: {:?}. (It has likely been removed)", msg_id, res)
                             }
                         }
                     } else {
@@ -280,7 +275,7 @@ impl Session {
                 }
                 ServiceMsg::CmdAck { correlation_id } => {
                     debug!(
-                        "CmdAck was received for Message{:?} w/ID: {:?} from {:?}",
+                        "CmdAck was received with id {:?} regarding {:?} from {:?}",
                         msg_id,
                         correlation_id,
                         src_peer.addr()

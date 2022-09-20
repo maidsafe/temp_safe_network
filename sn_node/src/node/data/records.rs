@@ -16,9 +16,9 @@ use sn_interface::messaging::Traceroute;
 use sn_interface::{
     data_copy_count,
     messaging::{
-        data::{DataQuery, MetadataExchange, OperationId, StorageLevel},
-        system::{NodeCmd, NodeQuery, SystemMsg},
-        AuthorityProof, EndUser, MsgId, ServiceAuth,
+        data::{DataQuery, MetadataExchange, StorageLevel},
+        system::{NodeCmd, NodeQuery, OperationId, SystemMsg},
+        AuthorityProof, MsgId, ServiceAuth,
     },
     types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData},
 };
@@ -108,7 +108,6 @@ impl Node {
         let msg = SystemMsg::NodeQuery(NodeQuery::Data {
             query: query.variant,
             auth: auth.into_inner(),
-            origin: EndUser(source_client.name()),
             correlation_id: msg_id,
             operation_id,
         });
