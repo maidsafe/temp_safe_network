@@ -10,14 +10,16 @@ mod agreement;
 mod join;
 mod join_as_relocated;
 mod node_msgs;
+mod op_id;
 mod section_sig;
 
-use crate::messaging::{AuthorityProof, EndUser, MsgId};
+use crate::messaging::AuthorityProof;
 use crate::network_knowledge::{NodeState, SapCandidate, SectionTreeUpdate};
 pub use agreement::{DkgSessionId, Proposal, SectionSigned};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use node_msgs::{NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse};
+pub use op_id::OperationId;
 pub use section_sig::{SectionSig, SectionSigShare};
 
 use bls::PublicKey as BlsPublicKey;
@@ -125,10 +127,8 @@ pub enum NodeMsg {
     NodeQueryResponse {
         /// QueryResponse.
         response: NodeQueryResponse,
-        /// ID of causing query.
-        correlation_id: MsgId,
-        /// TEMP: Add user here as part of return flow. Remove this as we have chunk routing etc
-        user: EndUser,
+        /// ID of the requested operation.
+        operation_id: OperationId,
     },
 }
 
