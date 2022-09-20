@@ -44,30 +44,31 @@ const BOOTSTRAP_RETRY_TIME_SEC: u64 = 5;
 
 mod log;
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     color_eyre::install()?;
 
     // Create a new runtime for a node
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .thread_name("sn_node")
-        // 16mb here for windows stack size, which was being exceeded previously
-        .thread_stack_size(16 * 1024 * 1024)
-        .build()?;
+    // let rt = tokio::runtime::new();
+    // .enable_all()
+    // .thread_name("sn_node")
+    // // 16mb here for windows stack size, which was being exceeded previously
+    // .thread_stack_size(16 * 1024 * 1024)
+    // .build()?;
 
-    rt.block_on(async {
-        let mut config = Config::new().await?;
-        let _guard = log::init_node_logging(&config)?;
-        trace!("Initial node config: {config:?}");
+    // rt.block_on(async {
+    let mut config = Config::new().await?;
+    let _guard = log::init_node_logging(&config)?;
+    trace!("Initial node config: {config:?}");
 
-        loop {
-            info!("Node runtime started");
-            create_runtime_and_node(&config).await?;
+    loop {
+        info!("Node runtime started");
+        create_runtime_and_node(&config).await?;
 
-            // pull config again in case it has been updated meanwhile
-            config = Config::new().await?;
-        }
-    })
+        // pull config again in case it has been updated meanwhile
+        config = Config::new().await?;
+    }
+    // })
 }
 
 /// Create a tokio runtime per `run_node` instance.
