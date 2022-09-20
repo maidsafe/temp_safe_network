@@ -211,30 +211,21 @@ impl Session {
                     // Once we are satisfied with the response this is channel is discarded in
                     // ConnectionManager::send_query
 
-                    if let Ok(op_id) = response.operation_id() {
-                        debug!("OpId of {msg_id:?} is {op_id:?}");
-                        if let Some(entry) = queries.get_mut(&op_id) {
-                            debug!("op id: {op_id:?} exists in pending queries...");
-                            let received = entry.value();
+                    if let Some(entry) = queries.get_mut(&correlation_id) {
+                        debug!("correlation_id: {correlation_id:?} exists in pending queries...");
+                        let received = entry.value();
 
-                            debug!("inserting response : {response:?}");
-                            // we can acutally have many responses per peer if they're different
-                            // this could be a fail, and then an Ok aftewards from a different adult.
-                            let _prior = received.insert((src_peer.addr(), response));
+                        debug!("inserting response : {response:?}");
+                        // we can acutally have many responses per peer if they're different
+                        // this could be a fail, and then an Ok aftewards from a different adult.
+                        let _prior = received.insert((src_peer.addr(), response));
 
-                            debug!("received now looks like: {:?}", received);
-                        } else {
-                            debug!("op id: {op_id:?} does not exist in pending queries...");
-                            let received = DashSet::new();
-                            let _prior = received.insert((src_peer.addr(), response));
-                            let _prev = queries.insert(op_id, Arc::new(received));
-                            debug!("op_id added :{op_id:?}")
-                        }
+                        debug!("received now looks like: {:?}", received);
                     } else {
-                        warn!(
-                            "Ignoring query response without operation id: {:?} {:?}",
-                            msg_id, response
-                        );
+                        debug!("correlation_id: {correlation_id:?} does not exist in pending queries...");
+                        let received = DashSet::new();
+                        let _prior = received.insert((src_peer.addr(), response));
+                        let _prev = queries.insert(correlation_id, Arc::new(received));
                     }
                 }
                 ClientMsg::CmdError {

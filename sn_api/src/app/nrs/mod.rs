@@ -424,7 +424,7 @@ mod tests {
 
         assert_eq!(url.public_name(), site_name);
         assert!(url.content_version().is_some());
-        let nrs_map = retry_loop_for_pattern!(safe.nrs_get_subnames_map(&site_name, None), Ok(nrs_map) if nrs_map.map.len() > 0)?;
+        let nrs_map = retry_loop_for_pattern!(safe.nrs_get_subnames_map(&site_name, None), Ok(nrs_map) if !nrs_map.map.is_empty())?;
         assert_eq!(nrs_map.map.len(), 1);
         assert_eq!(
             *nrs_map.map.get(&site_name).ok_or_else(|| anyhow!(format!(
@@ -622,7 +622,7 @@ mod tests {
         assert!(topname_registered);
 
         // we're retrying until an adult returns with the data we've just put.
-        let nrs_map = retry_loop_for_pattern!(safe.nrs_get_subnames_map(&site_name, None), Ok(nrs_map) if nrs_map.map.len() > 0)?;
+        let nrs_map = retry_loop_for_pattern!(safe.nrs_get_subnames_map(&site_name, None), Ok(nrs_map) if !nrs_map.map.is_empty())?;
 
         assert_eq!(nrs_map.map.len(), 1, "nrs map has len 1");
         assert_eq!(
@@ -665,7 +665,7 @@ mod tests {
         assert_eq!(url.public_name(), &format!("another.{site_name}"));
         assert!(url.content_version().is_some());
 
-        let nrs_map = retry_loop_for_pattern!(safe.nrs_get_subnames_map(&site_name, None), Ok(nrs_map) if nrs_map.map.len()> 0)?;
+        let nrs_map = retry_loop_for_pattern!(safe.nrs_get_subnames_map(&site_name, None), Ok(nrs_map) if !nrs_map.map.is_empty())?;
         assert_eq!(nrs_map.map.len(), 1);
         assert_eq!(
             *nrs_map
@@ -690,7 +690,7 @@ mod tests {
         safe.nrs_associate(&site_name, &files_container.url).await?;
 
         // we're retrying until an adult returns with the data we've just put.
-        let nrs_map = retry_loop_for_pattern!(safe.nrs_get_subnames_map(&site_name, None), Ok(nrs_map) if nrs_map.map.len() > 0)?;
+        let nrs_map = retry_loop_for_pattern!(safe.nrs_get_subnames_map(&site_name, None), Ok(nrs_map) if !nrs_map.map.is_empty())?;
         assert_eq!(nrs_map.map.len(), 1);
 
         let url = safe.nrs_remove(&site_name).await?;
@@ -698,7 +698,7 @@ mod tests {
         assert_eq!(url.public_name(), site_name);
         assert!(url.content_version().is_some());
         // we're retrying until an adult returns with the data we've just put.
-        let nrs_map = retry_loop_for_pattern!(safe.nrs_get_subnames_map(&site_name, None), Ok(nrs_map) if nrs_map.map.len() < 1)?;
+        let nrs_map = retry_loop_for_pattern!(safe.nrs_get_subnames_map(&site_name, None), Ok(nrs_map) if nrs_map.map.is_empty())?;
         assert_eq!(nrs_map.map.len(), 0);
         Ok(())
     }
