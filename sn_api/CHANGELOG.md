@@ -5,9 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.74.0 (2022-09-19)
+
 ## v0.73.0 (2022-09-09)
 
+### Chore
+
+ - <csr-id-448694176dd3b40a12bd8ecc16d9bb66fd171a37/> sn_interface-0.14.0/sn_dysfunction-0.13.0/sn_client-0.75.0/sn_node-0.70.0/sn_api-0.73.0/sn_cli-0.66.0
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 1 day passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.14.0/sn_dysfunction-0.13.0/sn_client-0.75.0/sn_node-0.70.0/sn_api-0.73.0/sn_cli-0.66.0 ([`4486941`](https://github.com/maidsafe/safe_network/commit/448694176dd3b40a12bd8ecc16d9bb66fd171a37))
+</details>
+
 ## v0.72.0 (2022-09-07)
+
+<csr-id-fe659c5685289fe0071b54298dcac394e83c0dce/>
 
 ### Chore
 
@@ -17,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-d671f4ee4c76b42187d266aee99351114acf6cd7/> report any error occurred when handling a service msg back to the client
    - Removing several unused sn_node::Error types.
-   - Adapting sn_api wallet and sn_node spentbook unit tests for new error msgs/cmds.
+- Adapting sn_api wallet and sn_node spentbook unit tests for new error msgs/cmds.
 
 ### Commit Statistics
 
@@ -45,6 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-dd89cac97da96ffe26ae78c4b7b62aa952ec53fc/>
 <csr-id-921438659ccaf65b2ea8cc00efb61d8146ef71ef/>
 <csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/>
+<csr-id-1b9e0a6564e9564201ef3a3e04adb0bfbef6ac14/>
 
 ### Chore
 

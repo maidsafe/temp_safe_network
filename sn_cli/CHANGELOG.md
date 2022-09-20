@@ -4,9 +4,37 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## v0.67.0 (2022-09-19)
+
 ## v0.66.0 (2022-09-09)
 
+### Chore
+
+ - <csr-id-448694176dd3b40a12bd8ecc16d9bb66fd171a37/> sn_interface-0.14.0/sn_dysfunction-0.13.0/sn_client-0.75.0/sn_node-0.70.0/sn_api-0.73.0/sn_cli-0.66.0
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 1 day passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.14.0/sn_dysfunction-0.13.0/sn_client-0.75.0/sn_node-0.70.0/sn_api-0.73.0/sn_cli-0.66.0 ([`4486941`](https://github.com/maidsafe/safe_network/commit/448694176dd3b40a12bd8ecc16d9bb66fd171a37))
+</details>
+
 ## v0.65.0 (2022-09-07)
+
+<csr-id-fe659c5685289fe0071b54298dcac394e83c0dce/>
+<csr-id-638bcdfea4cbc713d8a4faecec7ed8538317fa29/>
 
 ### Chore
 
@@ -51,6 +79,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <csr-id-f5d436fba99e0e9c258c7ab3c3a256be3be58f84/>
 <csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/>
 <csr-id-39dd5a043c75492e416bb9371015a1365b06fa01/>
+<csr-id-1b9e0a6564e9564201ef3a3e04adb0bfbef6ac14/>
 
 ### Chore
 
