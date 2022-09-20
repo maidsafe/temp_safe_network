@@ -271,7 +271,8 @@ impl Comm {
                 self.our_endpoint.clone(),
                 self.msg_listener.clone(),
                 conn,
-            );
+            )
+            .await;
             let session = PeerSession::new(link);
             let _ = self.sessions.insert(*peer, session);
         }
@@ -337,7 +338,7 @@ fn setup(our_endpoint: Endpoint, receive_msg: Sender<MsgEvent>) -> (Comm, MsgLis
         sessions: Arc::new(DashMap::new()),
     };
 
-    let _ = task::spawn_local(receive_conns(comm.clone(), conn_receiver));
+    let _ = task::spawn(receive_conns(comm.clone(), conn_receiver));
 
     (comm, msg_listener)
 }
@@ -354,7 +355,7 @@ fn listen_for_incoming_msgs(
     msg_listener: MsgListener,
     mut incoming_connections: IncomingConnections,
 ) {
-    let _ = task::spawn_local(async move {
+    let _ = task::spawn(async move {
         while let Some((connection, incoming_msgs)) = incoming_connections.next().await {
             trace!(
                 "incoming_connection from {:?} with connection_id {:?}",
@@ -596,7 +597,7 @@ mod tests {
 
         let (tx, rx) = mpsc::channel(1);
 
-        let _handle = tokio::task::spawn_local(async move {
+        let _handle = tokio::task::spawn(async move {
             while let Some((_, mut incoming_messages)) = incoming_connections.next().await {
                 while let Ok(Some(msg)) = incoming_messages.next().await {
                     let _ = tx.send(msg).await;
@@ -613,7 +614,7 @@ mod tests {
 
         // Keep the socket alive to keep the address bound, but don't read/write to it so any
         // attempt to connect to it will fail.
-        let _handle = tokio::task::spawn_local(async move {
+        let _handle = tokio::task::spawn(async move {
             debug!("get invalid peer");
             future::pending::<()>().await;
             let _ = socket;

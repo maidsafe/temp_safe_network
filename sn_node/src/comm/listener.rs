@@ -45,7 +45,7 @@ impl MsgListener {
     #[tracing::instrument(skip_all)]
     pub(crate) fn listen(&self, conn: qp2p::Connection, incoming_msgs: ConnectionIncoming) {
         let clone = self.clone();
-        let _ = task::spawn_local(clone.listen_internal(conn, incoming_msgs).in_current_span());
+        let _ = task::spawn(clone.listen_internal(conn, incoming_msgs).in_current_span());
     }
 
     #[tracing::instrument(skip_all)]
