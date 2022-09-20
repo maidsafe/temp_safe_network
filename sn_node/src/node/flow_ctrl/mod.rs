@@ -135,6 +135,7 @@ impl FlowCtrl {
         let mut last_adult_health_check = Instant::now();
         let mut last_elder_health_check = Instant::now();
         let mut last_vote_check = Instant::now();
+        let mut last_dkg_msg_check = Instant::now();
         let mut last_data_batch_check = Instant::now();
         let mut last_link_cleanup = Instant::now();
         let mut last_dysfunction_check = Instant::now();
@@ -194,6 +195,7 @@ impl FlowCtrl {
                 &mut last_adult_health_check,
                 &mut last_elder_health_check,
                 &mut last_vote_check,
+                &mut last_dkg_msg_check,
                 &mut last_dysfunction_check,
             )
             .await;

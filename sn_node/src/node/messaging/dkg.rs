@@ -7,6 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
+    core::DkgSessionInfo,
+    dkg::{check_key, DkgPubKeys},
     flow_ctrl::cmds::Cmd,
     messaging::{OutgoingMsg, Peers},
     Error, Node, Proposal, Result,
@@ -17,28 +19,69 @@ use bytes::Bytes;
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
-        system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SigShare, SystemMsg},
-        AuthorityProof, BlsShareAuth, NodeMsgAuthority, WireMsg,
+        system::{DkgSessionId, SigShare, SystemMsg},
+        AuthorityProof, BlsShareAuth, NodeMsgAuthority, SectionAuth, WireMsg,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
-    types::{log_markers::LogMarker, Peer},
+    types::{self, log_markers::LogMarker, Peer},
 };
 
-use bls_dkg::key_gen::message::Message as DkgMessage;
+use bls::{PublicKey as BlsPublicKey, PublicKeySet, SecretKeyShare};
+use ed25519::Signature;
+use sn_sdkg::{DkgSignedVote, VoteResponse};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
+/// Helper to get our DKG peers (excluding us)
+fn dkg_peers(our_index: usize, session_id: &DkgSessionId) -> BTreeSet<Peer> {
+    session_id
+        .elder_peers()
+        .enumerate()
+        .filter_map(|(index, peer)| (index != our_index).then(|| peer))
+        .collect()
+}
+
+fn acknowledge_dkg_oucome(
+    session_id: &DkgSessionId,
+    participant_index: usize,
+    pub_key_set: PublicKeySet,
+    sec_key_share: SecretKeyShare,
+) -> Cmd {
+    let section_auth = SectionAuthorityProvider::from_dkg_session(session_id, pub_key_set.clone());
+    let outcome = SectionKeyShare {
+        public_key_set: pub_key_set,
+        index: participant_index,
+        secret_key_share: sec_key_share,
+    };
+
+    Cmd::HandleDkgOutcome {
+        section_auth,
+        outcome,
+    }
+}
+
 impl Node {
     /// Send a `DkgStart` message to the provided set of candidates
+    /// Before a DKG session kicks off, the `DkgStart { ... }` message is individually signed
+    /// by the current _set of elders_ and sent to the _new elder candidates_ to be accumulated.
+    /// This is to prevent nodes from spamming `DkgStart` messages which might lead to unnecessary
+    /// DKG sessions.
+    /// Whenever there is a change in Elders in the network Distributed Key Generation
+    /// is used to generate a new set of BLS key shares for individual Elders along with the
+    /// SectionKey which will represent the section.
+    /// DKG is triggered by the following events:
+    /// - A change in the Elders
+    /// - Section Split
     pub(crate) fn send_dkg_start(&self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
         // Send DKG start to all candidates
         let recipients = Vec::from_iter(session_id.elder_peers());
 
         trace!(
-            "{} for {:?} with {:?} to {:?}",
+            "{} s{} {:?} with {:?} to {:?}",
             LogMarker::SendDkgStart,
+            session_id.sum(),
+            session_id.prefix,
             session_id.elders,
-            session_id,
             recipients
         );
 
@@ -107,176 +150,571 @@ impl Node {
         Ok((auth, payload))
     }
 
-    pub(crate) fn handle_dkg_start(&mut self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
-        let current_generation = self.network_knowledge.our_section_dag_len();
-        if session_id.section_chain_len < current_generation {
-            trace!("Skipping DkgStart for older generation: {:?}", &session_id);
-            return Ok(vec![]);
-        }
-        let section_auth = self.network_knowledge().authority_provider();
-
-        let mut peers = vec![];
-        for session_peer in session_id.elder_peers() {
-            // Reuse known peers from network_knowledge, in order to preserve connections
-            let peer = if let Some(elder) = section_auth
-                .get_elder(&session_peer.name())
-                .filter(|elder| elder.addr() == session_peer.addr())
-            {
-                *elder
-            } else if let Some(peer) = self
-                .network_knowledge()
-                .find_member_by_addr(&session_peer.addr())
-            {
-                peer
-            } else {
-                session_peer
-            };
-
-            peers.push(peer);
-        }
-
-        trace!("Received DkgStart for {:?}", session_id);
-        self.dkg_sessions.retain(|_, existing_session_info| {
-            existing_session_info.session_id.section_chain_len >= session_id.section_chain_len
-        });
-        let cmds = self.dkg_voter.start(
-            &self.info(),
-            session_id,
-            self.network_knowledge().section_key(),
-        )?;
-        Ok(cmds)
+    fn broadcast_dkg_votes(
+        &self,
+        session_id: &DkgSessionId,
+        pub_keys: DkgPubKeys,
+        participant_index: usize,
+        votes: Vec<DkgSignedVote>,
+    ) -> Cmd {
+        let recipients = dkg_peers(participant_index, session_id);
+        trace!(
+            "{} s{}: {:?}",
+            LogMarker::DkgBroadcastVote,
+            session_id.sum(),
+            votes
+        );
+        let node_msg = SystemMsg::DkgVotes {
+            session_id: session_id.clone(),
+            pub_keys,
+            votes,
+        };
+        self.send_system_msg(node_msg, Peers::Multiple(recipients))
     }
 
-    pub(crate) fn handle_dkg_msg(
-        &self,
-        session_id: DkgSessionId,
-        message: DkgMessage,
+    fn request_dkg_ae(&self, session_id: &DkgSessionId, sender: Peer) -> Cmd {
+        let node_msg = SystemMsg::DkgAE(session_id.clone());
+        self.send_system_msg(node_msg, Peers::Single(sender))
+    }
+
+    pub(crate) fn handle_dkg_start(&mut self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
+        // make sure we are in this dkg session
+        let our_name = types::keys::ed25519::name(&self.keypair.public);
+        let our_id = if let Some(index) = session_id.elder_index(our_name) {
+            index
+        } else {
+            error!(
+                "DKG failed to start s{}: {our_name} is not a participant",
+                session_id.sum()
+            );
+            return Ok(vec![]);
+        };
+
+        // ignore DkgStart from old chains
+        let current_chain_len = self.network_knowledge.our_section_dag_len();
+        if session_id.section_chain_len < current_chain_len {
+            trace!("Skipping DkgStart for older chain: s{}", session_id.sum());
+            return Ok(vec![]);
+        }
+
+        // gen key
+        let (ephemeral_pub_key, sig) =
+            match self
+                .dkg_voter
+                .gen_ephemeral_key(session_id.hash(), our_name, &self.keypair)
+            {
+                Ok(k) => k,
+                Err(Error::DkgEphemeralKeyAlreadyGenerated) => {
+                    trace!(
+                        "Skipping already acknowledged DkgStart s{}",
+                        session_id.sum()
+                    );
+                    return Ok(vec![]);
+                }
+                Err(e) => return Err(e),
+            };
+
+        // assert people can check key
+        assert!(check_key(&session_id, our_name, ephemeral_pub_key, sig).is_ok());
+
+        // get original auth (as proof for those who missed the original DkgStart msg)
+        let section_auth = self
+            .dkg_sessions_info
+            .get(&session_id.hash())
+            .ok_or(Error::InvalidState)?
+            .authority
+            .clone();
+
+        // broadcast signed pub key
+        trace!(
+            "{} s{} from {our_id:?}",
+            LogMarker::DkgBroadcastEphemeralPubKey,
+            session_id.sum(),
+        );
+        let peers = dkg_peers(our_id, &session_id);
+        let node_msg = SystemMsg::DkgEphemeralPubKey {
+            session_id,
+            section_auth,
+            pub_key: ephemeral_pub_key,
+            sig,
+        };
+
+        let cmd = self.send_system_msg(node_msg, Peers::Multiple(peers));
+        Ok(vec![cmd])
+    }
+
+    fn handle_missed_dkg_start(
+        &mut self,
+        session_id: &DkgSessionId,
+        section_auth: AuthorityProof<SectionAuth>,
+        pub_key: BlsPublicKey,
+        sig: Signature,
         sender: Peer,
     ) -> Result<Vec<Cmd>> {
         trace!(
-            "{} {:?} from {}",
-            LogMarker::DkgMessageHandling,
-            message,
-            sender
+            "Detected missed dkg start for s{:?} after msg from {sender:?}",
+            session_id.sum()
         );
 
-        if session_id.prefix.bit_count() < self.network_knowledge.prefix().bit_count() {
-            return Err(Error::InvalidDkgPrefix);
-        }
-
-        self.dkg_voter.process_msg(
-            sender,
-            &self.info(),
-            &session_id,
-            message,
-            self.network_knowledge().section_key(),
-        )
-    }
-
-    pub(crate) fn handle_dkg_not_ready(
-        &self,
-        sender: Peer,
-        message: DkgMessage,
-        session_id: DkgSessionId,
-    ) -> Cmd {
-        let msg = SystemMsg::DkgRetry {
-            message_history: self.dkg_voter.get_cached_msgs(&session_id),
-            message,
-            session_id,
-        };
-        self.send_system_msg(msg, Peers::Single(sender))
-    }
-
-    pub(crate) fn handle_dkg_retry(
-        &self,
-        session_id: &DkgSessionId,
-        message_history: Vec<DkgMessage>,
-        message: DkgMessage,
-        sender: Peer,
-    ) -> Result<Vec<Cmd>> {
-        let section_key = self.network_knowledge().section_key();
-        let current_generation = self.network_knowledge.our_section_dag_len();
-        if session_id.section_chain_len < current_generation {
-            trace!(
-                "Ignoring DkgRetry for expired DKG session: {:?}",
-                &session_id
+        // reconstruct the original DKG start message and verify the section signature
+        let payload = WireMsg::serialize_msg_payload(&SystemMsg::DkgStart(session_id.clone()))?;
+        let auth = section_auth.clone().into_inner();
+        if self.network_knowledge.section_key() != auth.sig.public_key {
+            warn!(
+                "Invalid section key in dkg auth proof in s{:?}: {sender:?}",
+                session_id.sum()
             );
             return Ok(vec![]);
         }
-        let mut cmds = self.dkg_voter.handle_dkg_history(
-            &self.info(),
-            session_id,
-            message_history,
-            sender.name(),
-            section_key,
-        )?;
+        if let Err(err) = AuthorityProof::verify(auth, payload) {
+            error!(
+                "Invalid signature in dkg auth proof in s{:?}: {err:?}",
+                session_id.sum()
+            );
+            return Ok(vec![]);
+        }
 
-        cmds.extend(self.dkg_voter.process_msg(
-            sender,
-            &self.info(),
+        // acknowledge Dkg Session
+        info!(
+            "Handling missed dkg start for s{:?} after msg from {sender:?}",
+            session_id.sum()
+        );
+        self.log_dkg_session(&sender.name());
+        let session_info = DkgSessionInfo {
+            session_id: session_id.clone(),
+            authority: section_auth.clone(),
+        };
+        let _existing = self
+            .dkg_sessions_info
+            .insert(session_id.hash(), session_info);
+
+        // catch back up
+        let mut cmds = vec![];
+        cmds.extend(self.handle_dkg_start(session_id.clone())?);
+        cmds.extend(self.handle_dkg_ephemeral_pubkey(
             session_id,
-            message,
-            section_key,
+            section_auth,
+            pub_key,
+            sig,
+            sender,
         )?);
         Ok(cmds)
     }
 
-    pub(crate) fn handle_dkg_failure_observation(
-        &self,
-        session_id: DkgSessionId,
-        failed_participants: &BTreeSet<XorName>,
-        signed: DkgFailureSig,
-    ) -> Result<Vec<Cmd>> {
-        match self
-            .dkg_voter
-            .process_failure(&session_id, failed_participants, signed)
-        {
-            None => Ok(vec![]),
-            Some(cmd) => Ok(vec![cmd]),
-        }
-    }
-
-    pub(crate) fn handle_dkg_failure_agreement(
+    pub(crate) fn handle_dkg_ephemeral_pubkey(
         &mut self,
-        sender: &XorName,
-        failure_set: &DkgFailureSigSet,
+        session_id: &DkgSessionId,
+        section_auth: AuthorityProof<SectionAuth>,
+        pub_key: BlsPublicKey,
+        sig: Signature,
+        sender: Peer,
     ) -> Result<Vec<Cmd>> {
-        if !self.network_knowledge.is_section_member(sender) {
-            return Err(Error::InvalidDkgParticipant);
-        }
-
-        let generation = self.network_knowledge.our_section_dag_len();
-
-        let dkg_session = if let Some(dkg_session) = self
-            .promote_and_demote_elders(&BTreeSet::new())
-            .into_iter()
-            .find(|session_id| failure_set.verify(session_id))
-        {
-            dkg_session
+        // make sure we are in this dkg session
+        let name = types::keys::ed25519::name(&self.keypair.public);
+        let our_id = if let Some(index) = session_id.elder_index(name) {
+            index
         } else {
-            trace!("Ignore DKG failure agreement with invalid signeds or outdated participants",);
+            error!(
+                "DKG ephemeral key ignored for s{}: {name} is not a participant",
+                session_id.sum()
+            );
             return Ok(vec![]);
         };
 
-        let mut cmds = vec![];
+        // try to start DKG if we've got all the keys
+        let outcome =
+            match self
+                .dkg_voter
+                .try_init_dkg(session_id, our_id, pub_key, sig, sender.name())
+            {
+                Ok(o) => o,
+                Err(Error::NoDkgKeysForSession(_)) => {
+                    return self.handle_missed_dkg_start(
+                        session_id,
+                        section_auth,
+                        pub_key,
+                        sig,
+                        sender,
+                    );
+                }
+                Err(e) => {
+                    error!(
+                        "Failed to init DKG s{} id:{our_id:?}: {:?}",
+                        session_id.sum(),
+                        e
+                    );
+                    return Ok(vec![]);
+                }
+            };
+        let (vote, pub_keys) = if let Some(start) = outcome {
+            start
+        } else {
+            // we don't have all the keys yet
+            return Ok(vec![]);
+        };
 
-        if !failure_set.failed_participants.is_empty() {
-            // The DKG failure is regarding failed_participants, i.e. potential unresponsive node.
-            trace!(
-                "Received DKG failure agreement, propose offline for failed participants: {:?} , DKG generation({}), candidates: {:?}",
-                failure_set.failed_participants,
-                generation, dkg_session
+        // send first vote
+        trace!(
+            "{} s{} from id:{our_id:?}",
+            LogMarker::DkgBroadcastFirstVote,
+            session_id.sum()
+        );
+        let peers = dkg_peers(our_id, session_id);
+        let node_msg = SystemMsg::DkgVotes {
+            session_id: session_id.clone(),
+            pub_keys,
+            votes: vec![vote],
+        };
+        let cmd = self.send_system_msg(node_msg, Peers::Multiple(peers));
+        Ok(vec![cmd])
+    }
+
+    fn handle_vote_response(
+        &mut self,
+        session_id: &DkgSessionId,
+        pub_keys: DkgPubKeys,
+        sender: Peer,
+        our_id: usize,
+        vote_response: VoteResponse,
+    ) -> (Vec<Cmd>, Vec<Cmd>) {
+        let mut cmds = vec![];
+        let mut ae_cmds = vec![];
+        match vote_response {
+            VoteResponse::WaitingForMoreVotes | VoteResponse::IgnoringKnownVote => {}
+            VoteResponse::RequestAntiEntropy => {
+                ae_cmds.push(self.request_dkg_ae(session_id, sender))
+            }
+            VoteResponse::BroadcastVote(vote) => {
+                cmds.push(self.broadcast_dkg_votes(session_id, pub_keys, our_id, vec![*vote]))
+            }
+            VoteResponse::DkgComplete(new_pubs, new_sec) => {
+                trace!(
+                    "{} s{:?} {:?}: {} elders: {:?}",
+                    LogMarker::DkgComplete,
+                    session_id.sum(),
+                    session_id.prefix,
+                    session_id.elders.len(),
+                    new_pubs.public_key(),
+                );
+                cmds.push(acknowledge_dkg_oucome(
+                    session_id, our_id, new_pubs, new_sec,
+                ))
+            }
+        }
+        (cmds, ae_cmds)
+    }
+
+    pub(crate) fn handle_dkg_votes(
+        &mut self,
+        session_id: &DkgSessionId,
+        msg_keys: DkgPubKeys,
+        votes: Vec<DkgSignedVote>,
+        sender: Peer,
+    ) -> Result<Vec<Cmd>> {
+        // make sure we are in this dkg session
+        let name = types::keys::ed25519::name(&self.keypair.public);
+        let our_id = if let Some(index) = session_id.elder_index(name) {
+            index
+        } else {
+            error!(
+                "DKG failed to handle vote in s{}: {name} is not a participant",
+                session_id.sum()
             );
-            cmds.extend(self.cast_offline_proposals(&failure_set.failed_participants)?);
+            return Ok(vec![]);
+        };
+
+        // make sure the keys are valid
+        let (pub_keys, just_completed) = self.dkg_voter.check_keys(session_id, msg_keys)?;
+
+        // if we just completed our keyset thanks to the incoming keys, bcast 1st vote
+        let mut cmds = Vec::new();
+        if just_completed {
+            let (first_vote, _) = self.dkg_voter.initialize_dkg_state(session_id, our_id)?;
+            cmds.push(self.broadcast_dkg_votes(
+                session_id,
+                pub_keys.clone(),
+                our_id,
+                vec![first_vote],
+            ));
         }
 
+        // handle vote
+        let mut cmds: Vec<Cmd> = Vec::new();
+        let mut ae_cmds: Vec<Cmd> = Vec::new();
+        let mut is_old_gossip = true;
+        let their_votes_len = votes.len();
+        for v in votes {
+            match self.dkg_voter.handle_dkg_vote(session_id, v.clone()) {
+                Ok(vote_response) => {
+                    debug!(
+                        "Dkg s{}: {:?} after: {v:?}",
+                        session_id.sum(),
+                        vote_response,
+                    );
+                    if !matches!(vote_response, VoteResponse::IgnoringKnownVote) {
+                        self.dkg_voter.learned_something_from_message();
+                        is_old_gossip = false;
+                    }
+                    let (cmd, ae_cmd) = self.handle_vote_response(
+                        session_id,
+                        pub_keys.clone(),
+                        sender,
+                        our_id,
+                        vote_response,
+                    );
+                    cmds.extend(cmd);
+                    ae_cmds.extend(ae_cmd);
+                }
+                Err(err) => {
+                    error!(
+                        "Error processing DKG vote s{} id:{our_id:?} {v:?} from {sender:?}: {err:?}",
+                        session_id.sum()
+                    );
+                }
+            }
+        }
+
+        // ae is not necessary if we have votes or termination cmds
+        if cmds.is_empty() {
+            cmds.append(&mut ae_cmds);
+        }
+
+        // if their un-interesting gossip is missing votes, send them ours
+        if is_old_gossip && their_votes_len != 1 {
+            let mut manual_ae = match self.gossip_missing_votes(session_id, sender, their_votes_len)
+            {
+                Ok(g) => g,
+                Err(err) => {
+                    error!(
+                        "Error gossiping s{} id:{our_id:?} from {sender:?}: {err:?}",
+                        session_id.sum()
+                    );
+                    vec![]
+                }
+            };
+            cmds.append(&mut manual_ae);
+        }
+
+        Ok(cmds)
+    }
+
+    /// Gossips all our votes if they have less votes than us
+    /// Assumes we know all their votes so the length difference is enough to know that they
+    /// are missing votes
+    fn gossip_missing_votes(
+        &self,
+        session_id: &DkgSessionId,
+        sender: Peer,
+        their_votes_len: usize,
+    ) -> Result<Vec<Cmd>> {
+        let our_votes = self.dkg_voter.get_all_votes(session_id)?;
+        if their_votes_len < our_votes.len() {
+            let pub_keys = self.dkg_voter.get_dkg_keys(session_id)?;
+            trace!(
+                "{} s{}: gossip including missing votes to {sender:?}",
+                LogMarker::DkgBroadcastVote,
+                session_id.sum()
+            );
+            let node_msg = SystemMsg::DkgVotes {
+                session_id: session_id.clone(),
+                pub_keys,
+                votes: our_votes,
+            };
+            let cmd = self.send_system_msg(node_msg, Peers::Single(sender));
+            Ok(vec![cmd])
+        } else {
+            Ok(vec![])
+        }
+    }
+
+    pub(crate) fn handle_dkg_anti_entropy(
+        &self,
+        session_id: DkgSessionId,
+        sender: Peer,
+    ) -> Result<Vec<Cmd>> {
+        let pub_keys = self.dkg_voter.get_dkg_keys(&session_id)?;
+        let votes = self.dkg_voter.get_all_votes(&session_id)?;
         trace!(
-            "Received DKG failure agreement, we will restart with candidates: {:?} except failed participants: {:?}",
-            dkg_session, failure_set.failed_participants
+            "{} s{}: AE to {sender:?}",
+            LogMarker::DkgBroadcastVote,
+            session_id.sum()
+        );
+        let node_msg = SystemMsg::DkgVotes {
+            session_id,
+            pub_keys,
+            votes,
+        };
+        let cmd = self.send_system_msg(node_msg, Peers::Single(sender));
+        Ok(vec![cmd])
+    }
+
+    // broadcasts our current known votes
+    fn gossip_votes(
+        &self,
+        session_id: DkgSessionId,
+        votes: Vec<DkgSignedVote>,
+        our_id: usize,
+    ) -> Vec<Cmd> {
+        let pub_keys = match self.dkg_voter.get_dkg_keys(&session_id) {
+            Ok(k) => k,
+            Err(_) => {
+                warn!(
+                    "Unexpectedly missing dkg keys when gossiping s{}",
+                    session_id.sum()
+                );
+                return vec![];
+            }
+        };
+        trace!(
+            "{} s{}: gossiping votes",
+            LogMarker::DkgBroadcastVote,
+            session_id.sum()
+        );
+        let cmd = self.broadcast_dkg_votes(&session_id, pub_keys, our_id, votes);
+        vec![cmd]
+    }
+
+    // broadcasts our ephemeral key
+    fn gossip_our_key(
+        &self,
+        session_id: DkgSessionId,
+        our_name: XorName,
+        our_id: usize,
+    ) -> Vec<Cmd> {
+        // get the keys
+        let dkg_keys = match self.dkg_voter.get_dkg_keys(&session_id) {
+            Ok(k) => k,
+            Err(_) => {
+                warn!(
+                    "Unexpectedly missing dkg pub keys when gossiping s{}",
+                    session_id.sum()
+                );
+                return vec![];
+            }
+        };
+        let (pub_key, sig) = match dkg_keys.get(&our_name) {
+            Some(res) => res,
+            None => {
+                warn!(
+                    "Unexpectedly missing our dkg key when gossiping s{}",
+                    session_id.sum()
+                );
+                return vec![];
+            }
+        };
+
+        // get original auth (as proof for those who missed the original DkgStart msg)
+        let section_info = match self.dkg_sessions_info.get(&session_id.hash()) {
+            Some(auth) => auth,
+            None => {
+                warn!(
+                    "Unexpectedly missing dkg section info when gossiping s{}",
+                    session_id.sum()
+                );
+                return vec![];
+            }
+        };
+        let section_auth = section_info.authority.clone();
+
+        trace!(
+            "{} s{}: gossiping ephemeral key",
+            LogMarker::DkgBroadcastVote,
+            session_id.sum()
         );
 
-        cmds.extend(self.promote_and_demote_elders_except(&failure_set.failed_participants)?);
-        Ok(cmds)
+        // broadcast our key
+        let peers = dkg_peers(our_id, &session_id);
+        let node_msg = SystemMsg::DkgEphemeralPubKey {
+            session_id,
+            section_auth,
+            pub_key: *pub_key,
+            sig: *sig,
+        };
+        let cmd = self.send_system_msg(node_msg, Peers::Multiple(peers));
+        vec![cmd]
+    }
+
+    pub(crate) fn had_sap_change_since(&self, session_id: &DkgSessionId) -> bool {
+        self.network_knowledge.our_section_dag_len() != session_id.section_chain_len
+    }
+
+    pub(crate) fn gossip_handover_trigger(&self, session_id: &DkgSessionId) -> Vec<Cmd> {
+        match self.dkg_voter.outcome(session_id) {
+            Ok(Some((our_id, new_pubs, new_sec))) => {
+                trace!(
+                    "Gossiping DKG outcome for s{} as we didn't notice SAP change",
+                    session_id.sum()
+                );
+                let cmd = acknowledge_dkg_oucome(session_id, our_id.into(), new_pubs, new_sec);
+                vec![cmd]
+            }
+            Ok(None) => {
+                error!(
+                    "Missing DKG outcome for s{}, when trying to gossip outcome",
+                    session_id.sum()
+                );
+                vec![]
+            }
+            Err(e) => {
+                error!(
+                    "Failed to get DKG outcome for s{}, when trying to gossip outcome: {}",
+                    session_id.sum(),
+                    e
+                );
+                vec![]
+            }
+        }
+    }
+
+    /// For all the ongoing DKG sessions, sends out all the current known votes to all DKG
+    /// participants if we don't have any votes yet, sends out our ephemeral key
+    pub(crate) fn dkg_gossip_msgs(&self) -> Vec<Cmd> {
+        let mut cmds = vec![];
+        for (_hash, session_info) in self.dkg_sessions_info.iter() {
+            // get our id
+            let name = types::keys::ed25519::name(&self.keypair.public);
+            let our_id = if let Some(index) = session_info.session_id.elder_index(name) {
+                index
+            } else {
+                error!(
+                    "DKG failed gossip in s{}: {name} is not a participant",
+                    session_info.session_id.sum()
+                );
+                continue;
+            };
+
+            // skip if we already reached termination
+            match self.dkg_voter.reached_termination(&session_info.session_id) {
+                Ok(true) => {
+                    trace!(
+                        "Skipping DKG gossip for s{} as we have reached termination",
+                        session_info.session_id.sum()
+                    );
+
+                    if !self.had_sap_change_since(&session_info.session_id) {
+                        cmds.extend(self.gossip_handover_trigger(&session_info.session_id));
+                    }
+
+                    continue;
+                }
+                Ok(false) => {}
+                Err(err) => {
+                    error!(
+                        "DKG failed gossip in s{}: {:?}",
+                        session_info.session_id.sum(),
+                        err
+                    );
+                }
+            }
+
+            // gossip votes else gossip our key
+            if let Ok(votes) = self.dkg_voter.get_all_votes(&session_info.session_id) {
+                cmds.extend(self.gossip_votes(session_info.session_id.clone(), votes, our_id));
+            } else {
+                cmds.extend(self.gossip_our_key(session_info.session_id.clone(), name, our_id));
+            }
+        }
+        cmds
     }
 
     pub(crate) async fn handle_dkg_outcome(
@@ -312,14 +750,5 @@ impl Node {
             let recipients: Vec<_> = self.network_knowledge.authority_provider().elders_vec();
             self.send_proposal_with(recipients, proposal, &key_share)
         }
-    }
-
-    pub(crate) fn handle_dkg_failure(&mut self, failure_set: DkgFailureSigSet) -> Cmd {
-        // track those failed participants
-        for name in &failure_set.failed_participants {
-            trace!("Logging {name} as having Dkg issue in dysfunction");
-            self.log_dkg_issue(*name);
-        }
-        self.send_msg_to_our_elders(SystemMsg::DkgFailureAgreement(failure_set))
     }
 }

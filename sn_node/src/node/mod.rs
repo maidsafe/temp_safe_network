@@ -27,14 +27,13 @@ mod node_starter;
 mod node_test_api;
 mod proposal;
 mod relocation;
-mod split_barrier;
 mod statemap;
 
 use self::{
     bootstrap::join_network,
     core::{
-        DkgSessionInfo, Node, StateSnapshot, DATA_QUERY_LIMIT, GENESIS_DBC_AMOUNT,
-        MAX_WAITING_PEERS_PER_QUERY, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
+        Node, StateSnapshot, DATA_QUERY_LIMIT, GENESIS_DBC_AMOUNT, MAX_WAITING_PEERS_PER_QUERY,
+        RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
     },
     data::MIN_LEVEL_WHEN_FULL,
     flow_ctrl::{
@@ -79,7 +78,6 @@ mod core {
             handover::Handover,
             membership::{elder_candidates, try_split_dkg, Membership},
             messaging::Peers,
-            split_barrier::SplitBarrier,
             DataStorage, Elders, Error, Event, MembershipEvent, NodeElderChange, Prefix, Proposal,
             Result, XorName,
         },
@@ -88,15 +86,17 @@ mod core {
     use sn_dysfunction::{DysfunctionDetection, IssueType};
     #[cfg(feature = "traceroute")]
     use sn_interface::messaging::Entity;
+
     use sn_interface::{
         messaging::{
             data::OperationId,
             signature_aggregator::SignatureAggregator,
-            system::{DkgSessionId, NodeState},
+            system::{DkgSessionId, NodeState, SectionAuth as SectionAuthed},
             AuthorityProof, SectionAuth, SectionAuthorityProvider,
         },
         network_knowledge::{
-            supermajority, NetworkKnowledge, NodeInfo, SectionKeyShare, SectionKeysProvider,
+            supermajority, NetworkKnowledge, NodeInfo,
+            SectionAuthorityProvider as SectionAuthProvider, SectionKeyShare, SectionKeysProvider,
         },
         types::{keys::ed25519::Digest256, log_markers::LogMarker, Cache, DataAddress, Peer},
     };
@@ -105,6 +105,7 @@ mod core {
     use ed25519_dalek::Keypair;
     use itertools::Itertools;
     use resource_proof::ResourceProof;
+    use sn_consensus::Generation;
     use std::{
         collections::{BTreeMap, BTreeSet, HashMap},
         net::SocketAddr,
@@ -173,9 +174,10 @@ mod core {
         pub(crate) message_aggregator: SignatureAggregator,
         pub(crate) proposal_aggregator: SignatureAggregator,
         // DKG/Split/Churn modules
-        pub(crate) split_barrier: SplitBarrier,
-        pub(crate) dkg_sessions: HashMap<Digest256, DkgSessionInfo>,
+        pub(crate) dkg_sessions_info: HashMap<Digest256, DkgSessionInfo>,
         pub(crate) dkg_voter: DkgVoter,
+        pub(crate) pending_split_sections:
+            BTreeMap<Generation, BTreeSet<SectionAuthed<SectionAuthProvider>>>,
         pub(crate) relocate_state: Option<Box<JoiningAsRelocated>>,
         // ======================== Elder only ========================
         pub(crate) membership: Option<Membership>,
@@ -260,9 +262,9 @@ mod core {
                 network_knowledge,
                 section_keys_provider,
                 root_storage_dir,
-                dkg_sessions: HashMap::default(),
+                dkg_sessions_info: HashMap::default(),
                 proposal_aggregator: SignatureAggregator::default(),
-                split_barrier: SplitBarrier::new(),
+                pending_split_sections: Default::default(),
                 message_aggregator: SignatureAggregator::default(),
                 dkg_voter: DkgVoter::default(),
                 relocate_state: None,
@@ -388,36 +390,31 @@ mod core {
             }
         }
 
-        /// Generate a new section info(s) based on the current set of members,
-        /// excluding any member matching a name in the provided `excluded_names` set.
+        /// Generates section infos for the best elder candidate among the members at the given generation
         /// Returns a set of candidate `DkgSessionId`'s.
-        pub(crate) fn promote_and_demote_elders(
+        pub(crate) fn best_elder_candidates_at_gen(
             &mut self,
-            excluded_names: &BTreeSet<XorName>,
+            membership_gen: u64,
         ) -> Vec<DkgSessionId> {
             let sap = self.network_knowledge.authority_provider();
             let chain_len = self.network_knowledge.our_section_dag_len();
 
-            // get current gen and members
-            let current_gen;
+            // get members for membership gen
             let members: BTreeMap<XorName, NodeState> = if let Some(m) = self.membership.as_ref() {
-                current_gen = m.generation();
-                m.current_section_members()
+                m.section_members(membership_gen)
+                    .unwrap_or_default()
                     .iter()
-                    .filter(|(name, _node_state)| !excluded_names.contains(*name))
                     .map(|(n, s)| (*n, s.clone()))
                     .collect()
             } else {
-                error!(
-                "attempted to promote and demote elders when we don't have a membership instance"
-            );
+                error!("Attempted to find best elder candidates when we don't have a membership instance");
                 return vec![];
             };
 
             // Try splitting
             trace!("{}", LogMarker::SplitAttempt);
             if let Some((zero_dkg_id, one_dkg_id)) =
-                try_split_dkg(&members, &sap, chain_len, current_gen)
+                try_split_dkg(&members, &sap, chain_len, membership_gen)
             {
                 debug!(
                     "Upon section split attempt, section size: zero {:?}, one {:?}",
@@ -445,18 +442,12 @@ mod core {
             // Candidates for elders out of all the nodes in the section, even out of the
             // relocating nodes if there would not be enough instead.
             let sap = self.network_knowledge.authority_provider();
-            let elder_candidates = elder_candidates(
-                members
-                    .values()
-                    .cloned()
-                    .filter(|node| !excluded_names.contains(&node.name)),
-                &sap,
-            );
+            let elder_candidates = elder_candidates(members.values().cloned(), &sap);
             let current_elders = BTreeSet::from_iter(sap.elders().copied());
 
             info!(
                 "ELDER CANDIDATES (current gen:{}) {}: {:?}",
-                current_gen,
+                membership_gen,
                 elder_candidates.len(),
                 elder_candidates
             );
@@ -477,7 +468,6 @@ mod core {
                 warn!("Ignore attempt to shrink the elders");
                 trace!("current_names  {:?}", current_elders);
                 trace!("expected_names {:?}", elder_candidates);
-                trace!("excluded_names {:?}", excluded_names);
                 trace!("section_peers {:?}", members);
                 vec![]
             } else {
@@ -491,7 +481,7 @@ mod core {
                     ),
                     section_chain_len: chain_len,
                     bootstrap_members: BTreeSet::from_iter(members.into_values()),
-                    membership_gen: current_gen,
+                    membership_gen,
                 };
                 // track init of DKG
                 for candidate in session_id.elders.keys() {
@@ -499,6 +489,18 @@ mod core {
                 }
 
                 vec![session_id]
+            }
+        }
+
+        /// Generates section infos for the current best elder candidate among the current members
+        /// Returns a set of candidate `DkgSessionId`'s.
+        pub(crate) fn best_elder_candidates(&mut self) -> Vec<DkgSessionId> {
+            match self.membership.as_ref() {
+                Some(m) => self.best_elder_candidates_at_gen(m.generation()),
+                None => {
+                    error!("Attempted to find best elder candidates when we don't have a membership instance");
+                    vec![]
+                }
             }
         }
 
@@ -522,9 +524,6 @@ mod core {
                 .section_keys_provider
                 .key_share(&self.network_knowledge.section_key())?;
             let n_elders = self.network_knowledge.authority_provider().elder_count();
-
-            // reset split barrier for
-            self.split_barrier = SplitBarrier::new();
 
             self.handover_voting = Some(Handover::from(
                 (key.index as u8, key.secret_key_share),
@@ -560,6 +559,28 @@ mod core {
 
             let mut cmds = vec![];
 
+            // clean up DKG sessions 2 generations older than current
+            // `session_id.section_chain_len < old_chain_len`
+            // we voluntarily keep the previous DKG rounds
+            // `session_id.section_chain_len == old_chain_len`
+            // so lagging elder candidates can still get responses to their gossip.
+            // At generation+2, they are not going to be elders anymore so we can safely discard it
+            let old_chain_len = self.network_knowledge.our_section_dag_len();
+            let mut old_hashes = vec![];
+            for (hash, session_info) in self.dkg_sessions_info.iter() {
+                if session_info.session_id.section_chain_len < old_chain_len {
+                    old_hashes.push(*hash);
+                    debug!("Removing old DKG s{}", session_info.session_id.sum());
+                }
+            }
+            for hash in old_hashes {
+                let _ = self.dkg_sessions_info.remove(&hash);
+                self.dkg_voter.remove(&hash);
+            }
+
+            // clean up pending split sections
+            self.pending_split_sections = Default::default();
+
             if new.is_elder {
                 let sap = self.network_knowledge.authority_provider();
                 info!(
@@ -584,7 +605,7 @@ mod core {
                     // The section-key has changed, we are now able to function as an elder.
                     self.initialize_elder_state()?;
 
-                    cmds.extend(self.promote_and_demote_elders_except(&BTreeSet::new())?);
+                    cmds.extend(self.trigger_dkg()?);
 
                     // Whenever there is an elders change, casting a round of joins_allowed
                     // proposals to sync this particular state.

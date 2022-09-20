@@ -6,12 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{dkg::SigShare, flow_ctrl::cmds::Cmd, messaging::Peers, Node, Proposal, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Node, Proposal, Result};
 
 use sn_interface::{
     messaging::{
         signature_aggregator::{Error as AggregatorError, SignatureAggregator},
-        system::SystemMsg,
+        system::{SigShare, SystemMsg},
         MsgId,
     },
     network_knowledge::{NetworkKnowledge, SectionKeyShare},

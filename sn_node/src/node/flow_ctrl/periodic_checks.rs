@@ -28,6 +28,7 @@ use tokio::{sync::RwLock, time::Instant};
 
 const PROBE_INTERVAL: Duration = Duration::from_secs(30);
 const MISSING_VOTE_INTERVAL: Duration = Duration::from_secs(5);
+const MISSING_DKG_MSG_INTERVAL: Duration = Duration::from_secs(30);
 const SECTION_PROBE_INTERVAL: Duration = Duration::from_secs(300);
 const LINK_CLEANUP_INTERVAL: Duration = Duration::from_secs(120);
 const DATA_BATCH_INTERVAL: Duration = Duration::from_millis(50);
@@ -101,6 +102,7 @@ impl FlowCtrl {
         last_adult_health_check: &mut Instant,
         last_elder_health_check: &mut Instant,
         last_vote_check: &mut Instant,
+        last_dkg_msg_check: &mut Instant,
         last_dysfunction_check: &mut Instant,
     ) {
         let now = Instant::now();
@@ -140,6 +142,12 @@ impl FlowCtrl {
             if let Some(cmd) = Self::check_for_missed_votes(self.node.clone()).await {
                 cmds.push(cmd);
             };
+        }
+
+        if last_dkg_msg_check.elapsed() > MISSING_DKG_MSG_INTERVAL {
+            *last_dkg_msg_check = now;
+            let dkg_cmds = Self::check_for_missed_dkg_messages(self.node.clone()).await;
+            cmds.extend(dkg_cmds);
         }
 
         if last_dysfunction_check.elapsed() > DYSFUNCTION_CHECK_INTERVAL {
@@ -268,6 +276,27 @@ impl FlowCtrl {
             }
         }
         None
+    }
+
+    /// Checks the interval since last dkg vote received
+    async fn check_for_missed_dkg_messages(node: Arc<RwLock<Node>>) -> Vec<Cmd> {
+        info!("Checking for DKG missed messages");
+        let node = node.read().await;
+        let dkg_voter = &node.dkg_voter;
+
+        let last_received_dkg_message = dkg_voter.last_received_dkg_message();
+
+        if let Some(time) = last_received_dkg_message {
+            if time.elapsed() >= MISSING_DKG_MSG_INTERVAL {
+                debug!("Dkg voting appears stalled...");
+                let cmds = node.dkg_gossip_msgs();
+                if !cmds.is_empty() {
+                    trace!("Dkg msg resending cmd");
+                    return cmds;
+                }
+            }
+        }
+        vec![]
     }
 
     /// Periodically loop over any pending data batches and queue up `send_msg` for those

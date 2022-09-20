@@ -9,10 +9,10 @@
 use crate::{
     comm::Comm,
     node::{
+        core::DkgSessionInfo,
         flow_ctrl::cmds::Cmd,
         messaging::{OutgoingMsg, Peers},
-        DkgSessionInfo, Error, Event, MembershipEvent, Node, Proposal as CoreProposal, Result,
-        MIN_LEVEL_WHEN_FULL,
+        Error, Event, MembershipEvent, Node, Proposal as CoreProposal, Result, MIN_LEVEL_WHEN_FULL,
     },
     storage::Error as StorageError,
 };
@@ -31,12 +31,11 @@ use sn_interface::{
             JoinResponse,
             NodeCmd,
             NodeEvent,
-            NodeMsgAuthorityUtils,
             NodeQuery,
             Proposal as ProposalMsg,
             SystemMsg,
         },
-        AuthorityProof, MsgId, NodeMsgAuthority, SectionAuth, WireMsg,
+        MsgId, NodeMsgAuthority, SectionAuth,
     },
     network_knowledge::NetworkKnowledge,
     types::{log_markers::LogMarker, Keypair, Peer, PublicKey},
@@ -129,7 +128,6 @@ impl Node {
             }
         }
 
-        let src_name = msg_authority.name();
         match msg {
             SystemMsg::Relocate(node_state) => {
                 trace!("Handling msg: Relocate from {}: {:?}", sender, msg_id);
@@ -259,10 +257,6 @@ impl Node {
                     }
                 }
             }
-            SystemMsg::DkgFailureAgreement(sig_set) => {
-                trace!("Handling msg: Dkg-FailureAgreement from {}", sender);
-                self.handle_dkg_failure_agreement(&src_name, &sig_set)
-            }
             SystemMsg::HandoverVotes(votes) => self.handle_handover_msg(sender, votes).await,
             SystemMsg::HandoverAE(gen) => Ok(self
                 .handle_handover_anti_entropy(sender, gen)
@@ -330,54 +324,58 @@ impl Node {
                 )
             }
             SystemMsg::DkgStart(session_id) => {
-                trace!("Handling msg: Dkg-Start {:?} from {}", session_id, sender);
+                trace!(
+                    "Handling msg: DkgStart s{} {:?}: {} elders from {}",
+                    session_id.sum(),
+                    session_id.prefix,
+                    session_id.elders.len(),
+                    sender
+                );
                 self.log_dkg_session(&sender.name());
-                let our_name = self.info().name();
-                if !session_id.contains_elder(our_name) {
-                    return Ok(vec![]);
-                }
                 if let NodeMsgAuthority::Section(authority) = msg_authority {
-                    let _existing = self.dkg_sessions.insert(
-                        session_id.hash(),
-                        DkgSessionInfo {
-                            session_id: session_id.clone(),
-                            authority,
-                        },
-                    );
+                    let session_info = DkgSessionInfo {
+                        session_id: session_id.clone(),
+                        authority,
+                    };
+                    let _existing = self
+                        .dkg_sessions_info
+                        .insert(session_id.hash(), session_info);
                 }
                 self.handle_dkg_start(session_id)
             }
-            SystemMsg::DkgMessage {
+            SystemMsg::DkgEphemeralPubKey {
                 session_id,
-                message,
+                section_auth,
+                pub_key,
+                sig,
             } => {
                 trace!(
-                    "Handling msg: Dkg-Msg ({:?} - {:?}) from {}",
-                    session_id,
-                    message,
+                    "{} s{} from {}",
+                    LogMarker::DkgHandleEphemeralPubKey,
+                    session_id.sum(),
                     sender
                 );
-                // We could receive a DkgStart BEFORE starts tracking it in dysfunction
-                self.log_dkg_session(&sender.name());
-                self.handle_dkg_msg(session_id, message, sender)
+                self.handle_dkg_ephemeral_pubkey(&session_id, section_auth, pub_key, sig, sender)
             }
-            SystemMsg::DkgFailureObservation {
+            SystemMsg::DkgVotes {
                 session_id,
-                sig,
-                failed_participants,
+                pub_keys,
+                votes,
             } => {
-                trace!("Handling msg: Dkg-FailureObservation from {}", sender);
-                self.handle_dkg_failure_observation(session_id, &failed_participants, sig)
+                trace!(
+                    "{} s{} from {}: {:?}",
+                    LogMarker::DkgVotesHandling,
+                    session_id.sum(),
+                    sender,
+                    votes
+                );
+                self.log_dkg_session(&sender.name());
+                self.handle_dkg_votes(&session_id, pub_keys, votes, sender)
             }
-            SystemMsg::DkgNotReady {
-                message,
-                session_id,
-            } => Ok(vec![self.handle_dkg_not_ready(sender, message, session_id)]),
-            SystemMsg::DkgRetry {
-                message_history,
-                message,
-                session_id,
-            } => self.handle_dkg_retry(&session_id, message_history, message, sender),
+            SystemMsg::DkgAE(session_id) => {
+                trace!("Handling msg: DkgAE s{} from {}", session_id.sum(), sender);
+                self.handle_dkg_anti_entropy(session_id, sender)
+            }
             SystemMsg::NodeCmd(NodeCmd::RecordStorageLevel { node_id, level, .. }) => {
                 let changed = self.set_storage_level(&node_id, level);
                 if changed && level.value() == MIN_LEVEL_WHEN_FULL {
@@ -558,75 +556,6 @@ impl Node {
                     }
                     _ => Err(Error::InvalidQueryResponseAuthority),
                 }
-            }
-            SystemMsg::DkgSessionUnknown {
-                session_id,
-                message,
-            } => {
-                if let Some(session_info) = self.dkg_sessions.get(&session_id.hash()).cloned() {
-                    let message_cache = self.dkg_voter.get_cached_msgs(&session_info.session_id);
-                    trace!(
-                        "Sending DkgSessionInfo {{ {:?}, ... }} to {}",
-                        &session_info.session_id,
-                        &sender
-                    );
-
-                    let msg = SystemMsg::DkgSessionInfo {
-                        session_id,
-                        section_auth: session_info.authority,
-                        message_cache,
-                        message,
-                    };
-
-                    Ok(vec![Cmd::send_traced_msg(
-                        OutgoingMsg::System(msg),
-                        Peers::Single(sender),
-                        #[cfg(feature = "traceroute")]
-                        traceroute,
-                    )])
-                } else {
-                    warn!("Unknown DkgSessionInfo: {:?} requested", &session_id);
-                    Ok(vec![])
-                }
-            }
-            SystemMsg::DkgSessionInfo {
-                session_id,
-                message_cache,
-                section_auth,
-                message,
-            } => {
-                let mut cmds = vec![];
-                // Reconstruct the original DKG start message and verify the section signature
-                let payload =
-                    WireMsg::serialize_msg_payload(&SystemMsg::DkgStart(session_id.clone()))?;
-                let auth = section_auth.clone().into_inner();
-                if self.network_knowledge.section_key() == auth.sig.public_key {
-                    if let Err(err) = AuthorityProof::verify(auth, payload) {
-                        error!("Error verifying signature for DkgSessionInfo: {:?}", err);
-                        return Ok(cmds);
-                    } else {
-                        trace!("DkgSessionInfo signature verified");
-                    }
-                } else {
-                    warn!(
-                        "Cannot verify DkgSessionInfo: {:?}. Unknown key: {:?}!",
-                        &session_id, auth.sig.public_key
-                    );
-                    let chain = self.network_knowledge().our_section_dag();
-                    warn!("Chain: {:?}", chain);
-                    return Ok(cmds);
-                };
-                let _existing = self.dkg_sessions.insert(
-                    session_id.hash(),
-                    DkgSessionInfo {
-                        session_id: session_id.clone(),
-                        authority: section_auth,
-                    },
-                );
-                trace!("DkgSessionInfo handling {:?}", session_id);
-                cmds.extend(self.handle_dkg_start(session_id.clone())?);
-                cmds.extend(self.handle_dkg_retry(&session_id, message_cache, message, sender)?);
-                Ok(cmds)
             }
         }
     }

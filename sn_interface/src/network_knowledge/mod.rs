@@ -94,6 +94,12 @@ pub const fn supermajority(group_size: usize) -> usize {
     1 + group_size * 2 / 3
 }
 
+/// `Threshold` of a given group
+#[inline]
+pub const fn threshold(group_size: usize) -> usize {
+    supermajority(group_size) - 1
+}
+
 pub fn partition_by_prefix(
     prefix: &Prefix,
     nodes: impl IntoIterator<Item = XorName>,

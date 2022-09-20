@@ -201,7 +201,7 @@ impl Node {
             cmds.extend(self.relocate_peers(churn_id, excluded_from_relocation)?);
         }
 
-        cmds.extend(self.promote_and_demote_elders_except(&BTreeSet::default())?);
+        cmds.extend(self.trigger_dkg()?);
         cmds.extend(self.send_ae_update_to_our_section()?);
 
         self.liveness_retain_only(

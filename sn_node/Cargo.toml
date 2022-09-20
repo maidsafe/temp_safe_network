@@ -37,7 +37,6 @@ backoff = { version = "~0.4.0", features = [ "tokio" ] }
 base64 = "~0.13.0"
 bincode = "1.3.1"
 bls = { package = "blsttc", version = "7.0.0" }
-bls_dkg = "~0.10.5"
 bytes = { version = "1.0.1", features = ["serde"] }
 chrono = "0.4.19"
 color-eyre = "~0.6.0"
@@ -72,6 +71,8 @@ sn_consensus = "3.1.2"
 sn_dbc = { version = "8.0.0", features = ["serdes"] }
 sn_dysfunction = { path = "../sn_dysfunction", version = "^0.14.0" }
 sn_interface = { path = "../sn_interface", version = "^0.15.0" }
+sn_sdkg = { git = "https://github.com/maidsafe/sn_sdkg", rev = "5c21993" }
+# sn_sdkg = { path = "../../sn_sdkg" }
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_bytes = "~0.11.5"
 serde_json = "1.0.53"
