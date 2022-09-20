@@ -8,15 +8,16 @@
 
 use super::MsgListener;
 
-use qp2p::UsrMsgBytes;
-use sn_interface::types::{log_markers::LogMarker, Peer};
-
+use dashmap::DashMap;
 use priority_queue::DoublePriorityQueue;
+use qp2p::{Connection, UsrMsgBytes};
 use qp2p::{Endpoint, RetryConfig};
+use sn_interface::types::{log_markers::LogMarker, Peer};
 use std::{
-    collections::BTreeMap,
+    sync::Arc,
     time::{Duration, Instant},
 };
+use tokio::sync::RwLock;
 
 type Priority = u64;
 type ConnId = String;
@@ -44,34 +45,37 @@ const UNUSED_TTL: Duration = Duration::from_secs(120);
 pub(crate) struct Link {
     peer: Peer,
     endpoint: Endpoint,
-    connections: BTreeMap<ConnId, ExpiringConn>,
-    queue: DoublePriorityQueue<ConnId, Priority>,
+    pub(crate) connections: LinkConnections,
+    pub(crate) queue: LinkQueue,
     access_counter: u64,
     listener: MsgListener,
     expiration_check: Instant,
 }
+
+pub(crate) type LinkConnections = Arc<DashMap<ConnId, ExpiringConn>>;
+pub(crate) type LinkQueue = Arc<RwLock<DoublePriorityQueue<ConnId, Priority>>>;
 
 impl Link {
     pub(crate) fn new(peer: Peer, endpoint: Endpoint, listener: MsgListener) -> Self {
         Self {
             peer,
             endpoint,
-            connections: BTreeMap::new(),
-            queue: DoublePriorityQueue::new(),
+            connections: Arc::new(DashMap::new()),
+            queue: Arc::new(RwLock::new(DoublePriorityQueue::new())),
             access_counter: 0,
             listener,
             expiration_check: expiration(),
         }
     }
 
-    pub(crate) fn new_with(
+    pub(crate) async fn new_with(
         peer: Peer,
         endpoint: Endpoint,
         listener: MsgListener,
-        conn: qp2p::Connection,
+        conn: Connection,
     ) -> Self {
         let mut instance = Self::new(peer, endpoint, listener);
-        instance.insert(conn);
+        instance.insert(conn).await;
         instance
     }
 
@@ -79,17 +83,18 @@ impl Link {
         &self.peer
     }
 
-    pub(crate) fn add(&mut self, conn: qp2p::Connection) {
-        self.insert(conn);
+    pub(crate) async fn add(&mut self, conn: Connection) {
+        self.insert(conn).await;
     }
 
     /// Disposes of the link and all underlying resources.
     /// Also any clones of this link that are held, will be cleaned up.
-    /// This is due to the fact that we do never leak the `qp2p::Connection` outside of this struct,
+    /// This is due to the fact that we do never leak the `Connection` outside of this struct,
     /// since that struct is cloneable and uses Arc internally.
-    pub(crate) fn disconnect(&mut self) {
-        self.queue.clear();
-        for item in self.connections.values() {
+    pub(crate) async fn disconnect(&mut self) {
+        self.queue.write().await.clear();
+        for refmulti in self.connections.iter() {
+            let item = refmulti.value();
             item.conn
                 .close(Some("We disconnected from peer.".to_string()));
         }
@@ -101,18 +106,20 @@ impl Link {
     /// See [`send`](Self::send) if you want to send with the default configuration.
     #[instrument(skip_all)]
     pub(crate) async fn send_with(
-        &mut self,
+        // &mut self,
         bytes: UsrMsgBytes,
         priority: i32,
         retry_config: Option<&RetryConfig>,
-        should_establish_new_connection: bool,
+        _should_establish_new_connection: bool,
+        conn: Connection,
+        connections: LinkConnections,
+        queue: LinkQueue,
     ) -> Result<(), SendToOneError> {
-        let conn = self.get_or_connect(should_establish_new_connection).await?;
-        trace!(
-            "We have {} open connections to node {:?}.",
-            self.queue.len(),
-            self.peer
-        );
+        // trace!(
+        //     "We have {} open connections to node {:?}.",
+        //     self.queue.len(),
+        //     self.peer
+        // );
 
         match conn.send_with(bytes, priority, retry_config).await {
             Ok(()) => Ok(()),
@@ -122,8 +129,8 @@ impl Link {
                 let id = &conn.id();
                 // We could write just `self.queue.remove(id)`, but the library warns for `unused_results`.
                 {
-                    let _ = self.connections.remove(id);
-                    let _ = self.queue.remove(id);
+                    let _ = connections.remove(id);
+                    let _ = queue.write().await.remove(id);
                 }
                 conn.close(Some(format!("{:?}", error)));
                 Err(SendToOneError::Send(error))
@@ -131,12 +138,17 @@ impl Link {
         }
     }
 
-    async fn get_or_connect(
+    pub(crate) async fn get_or_connect(
         &mut self,
         should_establish_new_connection: bool,
-    ) -> Result<qp2p::Connection, SendToOneError> {
+    ) -> Result<Connection, SendToOneError> {
         // get the most recently used connection
-        match self.queue.peek_max().map(|(id, _prio)| id.clone()) {
+        let q = self.queue.read().await;
+        let conn = q.peek_max().map(|(id, _prio)| id.clone());
+        // drop the initial immutable borrow
+        // so we can create conn if required
+        drop(q);
+        match conn {
             None => {
                 if should_establish_new_connection {
                     self.create_connection().await
@@ -148,29 +160,47 @@ impl Link {
         }
     }
 
-    /// Is this Link currently connected?
-    #[allow(unused)]
-    pub(crate) fn is_connected(&self) -> bool {
-        // get the most recently used connection
+    // /// Is this Link currently connected?
+    // #[allow(unused)]
+    // pub(crate) async fn is_connected(&self) -> bool {
+    //     // get the most recently used connection
 
-        self.queue
-            .peek_max()
-            .and_then(|(id, _)| self.connections.get(id))
-            .map(|conn| !conn.expired())
-            .unwrap_or(false)
-    }
+    //     self.queue
+    //     .read().await
+    //         .peek_max()
+    //         .and_then(|(id, _)| self.connections.get(id))
+    //         .map(|conn| !conn.expired())
+    //         .unwrap_or(false)
+    // }
 
-    async fn read_conn(&mut self, id: ConnId) -> Result<qp2p::Connection, SendToOneError> {
-        match self.connections.get(&id).cloned() {
-            Some(item) => {
-                self.touch(item.conn.id());
-                Ok(item.conn)
-            }
-            None => self.create_connection().await,
+    async fn read_conn(&mut self, id: ConnId) -> Result<Connection, SendToOneError> {
+        let conn = self.connections.get_mut(&id);
+
+        let mut existing_conn = None;
+        // let mut should_create_conn = false;
+        if let Some(ref entry) = conn {
+            let item = entry.value();
+            // let id = item.conn.id();
+            let connec = item.conn.clone();
+
+            existing_conn = Some(connec);
+            // drop(item);
+            // drop(entry);
         }
+
+        drop(conn);
+
+        if let Some(conn) = existing_conn {
+            self.touch(id).await;
+            return Ok(conn);
+        }
+
+        // if should_create_conn {
+        self.create_connection().await
+        // }
     }
 
-    async fn create_connection(&mut self) -> Result<qp2p::Connection, SendToOneError> {
+    async fn create_connection(&mut self) -> Result<Connection, SendToOneError> {
         let (conn, incoming_msgs) = self
             .endpoint
             .connect_to(&self.peer.addr())
@@ -184,41 +214,45 @@ impl Link {
             conn.id()
         );
 
-        self.insert(conn.clone());
+        self.insert(conn.clone()).await;
 
         self.listener.listen(conn.clone(), incoming_msgs);
 
         Ok(conn)
     }
 
-    fn insert(&mut self, conn: qp2p::Connection) {
+    async fn insert(&mut self, conn: Connection) {
         let id = conn.id();
 
         let _ = self.connections.insert(id.clone(), ExpiringConn::new(conn));
 
-        let prio = self.priority();
-        let _ = self.queue.push(id, prio);
+        let prio = self.priority().await;
+        let _ = self.queue.write().await.push(id, prio);
     }
 
-    fn touch(&mut self, id: ConnId) {
-        let prio = self.priority();
-        let _ = self.queue.change_priority(&id, prio);
+    async fn touch(&mut self, id: ConnId) {
+        let prio = self.priority().await;
+        let _ = self.queue.write().await.change_priority(&id, prio);
 
-        if let Some(conn) = self.connections.get_mut(&id) {
+        if let Some(mut conn) = self.connections.get_mut(&id) {
             conn.touch()
         }
     }
 
-    fn priority(&mut self) -> Priority {
+    async fn priority(&mut self) -> Priority {
         if self.access_counter == u64::MAX {
             // after u64::MAX connections to this peer (very unlikely), we need to update the prios
-            let sorted_queue = self.queue.clone().into_sorted_iter();
+            let sorted_queue = self.queue.read().await.clone().into_sorted_iter();
             // update all prios, starting from zero prio again
             for (new_prio, (id, _old_prio)) in sorted_queue.enumerate() {
-                let _ = self.queue.change_priority(&id, new_prio as u64);
+                let _ = self
+                    .queue
+                    .write()
+                    .await
+                    .change_priority(&id, new_prio as u64);
             }
 
-            self.access_counter = self.queue.len() as u64;
+            self.access_counter = self.queue.read().await.len() as u64;
         }
 
         self.access_counter = self.access_counter.saturating_add(1);
@@ -227,7 +261,7 @@ impl Link {
     }
 
     /// Remove expired connections.
-    pub(crate) fn remove_expired(&mut self) {
+    pub(crate) async fn remove_expired(&mut self) {
         if Instant::now() < self.expiration_check {
             return;
         }
@@ -236,9 +270,11 @@ impl Link {
 
         let mut expired_ids = vec![];
 
+        let read_queue = self.queue.read().await.clone();
+
         // the iter is sorted from lowest to highest
-        for (id, _old_prio) in self.queue.clone().into_sorted_iter() {
-            if 1 + expired_ids.len() >= self.queue.len() {
+        for (id, _old_prio) in read_queue.into_sorted_iter() {
+            if 1 + expired_ids.len() >= self.queue.read().await.len() {
                 break;
             }
 
@@ -250,29 +286,30 @@ impl Link {
         }
 
         for id in expired_ids {
-            let _ = self.queue.remove(&id);
+            let _ = self.queue.write().await.remove(&id);
 
-            if let Some(item) = self.connections.remove(&id) {
+            if let Some((_, item)) = self.connections.remove(&id) {
                 trace!("Connection expired: {}", item.conn.id());
                 item.conn.close(Some("Connection expired.".to_string()));
             }
         }
 
-        self.drop_excess();
+        self.drop_excess().await;
     }
 
     /// Are we still connected here  after cleanup
     /// retruens true if a connection remains
-    pub(crate) fn is_connected_after_cleanup(&mut self) -> bool {
-        self.remove_expired();
+    pub(crate) async fn is_connected_after_cleanup(&mut self) -> bool {
+        self.remove_expired().await;
         !self.connections.is_empty()
     }
     /// Remove connections that exceed capacity, oldest first.
-    fn drop_excess(&mut self) {
-        if self.queue.len() >= CAPACITY {
+    async fn drop_excess(&mut self) {
+        let mut queue = self.queue.write().await;
+        if queue.len() >= CAPACITY {
             // remove the least recently used connections
-            if let Some((evicted_id, _)) = self.queue.pop_min() {
-                if let Some(item) = self.connections.remove(&evicted_id) {
+            if let Some((evicted_id, _)) = queue.pop_min() {
+                if let Some((evicted_id, item)) = self.connections.remove(&evicted_id) {
                     trace!("Connection evicted: {}", evicted_id);
                     item.conn.close(Some("Connection evicted.".to_string()));
                 }
@@ -308,13 +345,13 @@ impl SendToOneError {
 }
 
 #[derive(Clone, Debug)]
-struct ExpiringConn {
-    conn: qp2p::Connection,
+pub(crate) struct ExpiringConn {
+    conn: Connection,
     expiry: Instant,
 }
 
 impl ExpiringConn {
-    fn new(conn: qp2p::Connection) -> Self {
+    fn new(conn: Connection) -> Self {
         ExpiringConn {
             conn,
             expiry: expiration(),
