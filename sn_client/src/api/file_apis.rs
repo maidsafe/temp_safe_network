@@ -82,6 +82,7 @@ impl Client {
 
     #[instrument(skip(self), level = "trace")]
     pub(crate) async fn get_chunk(&self, name: &XorName) -> Result<Chunk> {
+        /* TODO: re-enable chunks cache
         // first check it's not already in our Chunks' cache
         if let Some(chunk) = self
             .chunks_cache
@@ -92,6 +93,7 @@ impl Client {
             trace!("Chunk retrieved from local cache: {:?}", name);
             return Ok(chunk.clone());
         }
+        */
 
         let query = DataQueryVariant::GetChunk(ChunkAddress(*name));
         let res = self.send_query(query.clone()).await?;

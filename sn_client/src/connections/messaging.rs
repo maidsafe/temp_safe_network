@@ -285,6 +285,7 @@ impl Session {
         let mut response_checks = 0;
 
         loop {
+            response_checks += 1;
             debug!("looping send responses, attempt: #{response_checks} for {msg_id:?}");
             if let Some(response) = self
                 .check_query_responses(msg_id, elders.clone(), chunk_addr)
@@ -295,12 +296,11 @@ impl Session {
             }
 
             //stop mad looping
-            tokio::time::sleep(Duration::from_millis(50)).await;
+            tokio::time::sleep(Duration::from_millis(10000)).await;
 
-            if response_checks > 40 {
+            if response_checks > 2 {
                 return Err(Error::NoResponse(elders));
             }
-            response_checks += 1;
         }
     }
 
@@ -409,7 +409,7 @@ impl Session {
                 }
             }
         } else {
-            warn!("No listeners found for our msg_id: {:?}", msg_id)
+            warn!("No responses found for our msg_id: {:?}", msg_id)
         }
 
         // we've looped over all responses...
