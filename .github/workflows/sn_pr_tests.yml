@@ -283,7 +283,7 @@ jobs:
           junit-path: junit.xml
           package: sn_client
           release: true
-          test-threads: 10
+          test-threads: 1
         timeout-minutes: 25
 
       - name: Run AE tests
@@ -295,7 +295,7 @@ jobs:
           package: sn_client
           release: true
           filters: ae_checks
-          test-threads: 2
+          test-threads: 1
         timeout-minutes: 15
         env:
           SN_AE_WAIT: 10
@@ -453,7 +453,7 @@ jobs:
           junit-path: junit.xml
           package: sn_client
           release: true
-          test-threads: 10
+          test-threads: 1
         timeout-minutes: 25
 
       - name: Run AE tests
@@ -465,7 +465,7 @@ jobs:
           package: sn_client
           release: true
           filters: ae_checks
-          test-threads: 2
+          test-threads: 1
         timeout-minutes: 15
         env:
           SN_AE_WAIT: 10
