@@ -142,8 +142,6 @@ impl Node {
 
         info!("New SAP agreed for:{}", *signed_section_auth);
 
-        let our_name = self.info().name();
-
         // Let's update our network knowledge, including our
         // section SAP and chain if the new SAP's prefix matches our name
         // We need to generate the proof chain to connect our current chain to new SAP.
@@ -157,17 +155,10 @@ impl Node {
                 err
             ),
             Ok(()) => {
-                match self.network_knowledge.update_knowledge_if_valid(
-                    signed_section_auth.clone(),
-                    &old_dag,
-                    None,
-                    &our_name,
-                    &self.section_keys_provider,
-                ) {
-                    Err(err) => error!(
-                        "Error updating our network knowledge for {:?}: {:?}",
-                        prefix, err
-                    ),
+                match self.update_network_knowledge(signed_section_auth.clone(), &old_dag, None) {
+                    Err(err) => {
+                        error!("Error updating our network knowledge for {prefix:?}: {err:?}")
+                    }
                     Ok(true) => {
                         info!("Updated our network knowledge for {:?}", prefix);
                         info!("Writing updated knowledge to disk");

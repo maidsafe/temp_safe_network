@@ -14,7 +14,7 @@ use crate::node::{
 };
 
 use qp2p::UsrMsgBytes;
-use sn_interface::messaging::system::AntiEntropyKind;
+use sn_interface::messaging::system::{AntiEntropyKind, NodeState};
 #[cfg(feature = "traceroute")]
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
@@ -152,6 +152,26 @@ impl Node {
         }
     }
 
+    // Update's Network Knowledge
+    // returns
+    //   Ok(true) if the update had new valid information
+    //   Ok(false) if the update was valid but did not contain new information
+    //   Err(_) if the update was invalid
+    pub(crate) fn update_network_knowledge(
+        &mut self,
+        sap: SectionAuth<SectionAuthorityProvider>,
+        partial_dag: &SectionsDAG,
+        members: Option<BTreeSet<SectionAuth<NodeState>>>,
+    ) -> Result<bool> {
+        Ok(self.network_knowledge.update_knowledge_if_valid(
+            sap,
+            partial_dag,
+            members,
+            &self.info().name(),
+            &self.section_keys_provider,
+        )?)
+    }
+
     #[instrument(skip_all)]
     pub(crate) async fn handle_anti_entropy_msg(
         &mut self,
@@ -164,7 +184,6 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         let snapshot = self.state_snapshot();
 
-        let our_name = self.info().name();
         let signed_sap = SectionAuth {
             value: section_auth.clone(),
             sig: section_signed.clone(),
@@ -176,13 +195,7 @@ impl Node {
             None
         };
 
-        let updated = self.network_knowledge.update_knowledge_if_valid(
-            signed_sap.clone(),
-            &partial_dag,
-            members,
-            &our_name,
-            &self.section_keys_provider,
-        )?;
+        let updated = self.update_network_knowledge(signed_sap.clone(), &partial_dag, members)?;
 
         // always run this, only changes will trigger events
         let mut cmds = self.update_on_elder_change(&snapshot).await?;
@@ -544,13 +557,10 @@ mod tests {
             // now let's insert the other SAP to make it aware of the other prefix
             assert!(
                 env.node
-                    .network_knowledge
-                    .update_knowledge_if_valid(
+                    .update_network_knowledge(
                         env.other_sap.clone(),
                         &env.partial_dag,
                         None,
-                        &env.node.info().name(),
-                        &env.node.section_keys_provider
                     )?
             );
 
@@ -702,13 +712,7 @@ mod tests {
             node.section_keys_provider = SectionKeysProvider::new(Some(section_key_share));
 
             // get our Node to now be in prefix(0)
-            let _ = node.network_knowledge.update_knowledge_if_valid(
-                signed_sap.clone(),
-                &dag,
-                None,
-                &info.name(),
-                &node.section_keys_provider,
-            );
+            let _ = node.update_network_knowledge(signed_sap.clone(), &dag, None);
 
             // generate other SAP for prefix1
             let (other_sap, _, secret_key_set) = random_sap(prefix1, elder_count(), 0, None);
