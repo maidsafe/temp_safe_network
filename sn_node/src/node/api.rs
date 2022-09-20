@@ -81,8 +81,8 @@ impl Node {
         &self.network_knowledge
     }
 
-    pub(crate) fn our_section_dag(&self) -> SectionsDAG {
-        self.network_knowledge.our_section_dag()
+    pub(crate) fn section_chain(&self) -> SectionsDAG {
+        self.network_knowledge.section_chain()
     }
 
     /// Is this node an elder?
@@ -102,7 +102,7 @@ impl Node {
     /// Returns the SAP of the section matching the name.
     pub(crate) fn matching_section(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
         self.network_knowledge
-            .section_by_name(name)
+            .section_auth_by_name(name)
             .map_err(Error::from)
     }
 

@@ -34,7 +34,7 @@ impl Node {
         // triggering a chain of further `Offline` proposals.
         let elders: Vec<_> = self
             .network_knowledge
-            .authority_provider()
+            .section_auth()
             .elders()
             .filter(|peer| !names.contains(&peer.name()))
             .cloned()

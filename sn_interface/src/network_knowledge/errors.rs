@@ -27,9 +27,19 @@ pub enum Error {
     /// Failed to deserialise a section tree.
     #[error("Failed to deserialise section tree: {0}")]
     Deserialisation(String),
+    #[error("The provided signature cannot be verified while inserting into the SectionsDAG")]
+    InvalidSignature,
+    #[error("Key not found in the SectionsDAG: {0:?}")]
+    KeyNotFound(bls::PublicKey),
+    #[error("The 'to' or 'from' key is not present in the same branch of the SectionsDAG")]
+    InvalidBranch,
+    #[error("The SectionsDAG should contain a single branch")]
+    MultipleBranchError,
+    #[error("Proof chain cannot be trusted: {0}")]
+    UntrustedProofChain(String),
     #[error("Section authority provider cannot be trusted: {0}")]
     UntrustedSectionAuthProvider(String),
-    #[error("Invalid genesis key of provided in section tree: {}", hex::encode(_0.to_bytes()))]
+    #[error("The genesis key of the provided SectionTree is invalid: {0:?}")]
     InvalidGenesisKey(bls::PublicKey),
     #[error("The node is not in a state to handle the action.")]
     InvalidState,
@@ -57,14 +67,4 @@ pub enum Error {
     Consensus(#[from] sn_consensus::Error),
     #[error("An archived node attempted to rejoin the section")]
     ArchivedNodeRejoined,
-    #[error("The provided signature cannot be verified")]
-    InvalidSignature,
-    #[error("Key not found in the SectionsDAG: {0:?}")]
-    KeyNotFound(bls::PublicKey),
-    #[error("The 'to' or 'from' key is not present in the same branch")]
-    InvalidBranch,
-    #[error("Partial DAG cannot be trusted: {0}")]
-    UntrustedPartialDAG(String),
-    #[error("The Partial DAG should contain a single branch")]
-    MultipleBranchError,
 }

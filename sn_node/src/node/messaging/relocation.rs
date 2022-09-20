@@ -36,7 +36,7 @@ impl Node {
         }
 
         // Do not carry out relocation when there is not enough elder nodes.
-        if self.network_knowledge.authority_provider().elder_count() < elder_count() {
+        if self.network_knowledge.section_auth().elder_count() < elder_count() {
             return Ok(vec![]);
         }
 
@@ -106,12 +106,12 @@ impl Node {
 
         // Create a new instance of JoiningAsRelocated to start the relocation
         // flow. This same instance will handle responses till relocation is complete.
-        let bootstrap_addrs = if let Ok(sap) = self.network_knowledge.section_by_name(&dst_xorname)
-        {
-            sap.addresses()
-        } else {
-            self.network_knowledge.authority_provider().addresses()
-        };
+        let bootstrap_addrs =
+            if let Ok(sap) = self.network_knowledge.section_auth_by_name(&dst_xorname) {
+                sap.addresses()
+            } else {
+                self.network_knowledge.section_auth().addresses()
+            };
         let (joining_as_relocated, cmd) = JoiningAsRelocated::start(
             node,
             relocate_proof,

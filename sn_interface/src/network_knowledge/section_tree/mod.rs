@@ -19,7 +19,7 @@ mod stats;
 
 use self::stats::NetworkStats;
 
-use crate::messaging::system::SectionAuth;
+use crate::messaging::{system::SectionAuth, SectionTreeUpdate, SectionsDAG as SectionsDAGMsg};
 use crate::network_knowledge::{
     Error, Result, SectionAuthUtils, SectionAuthorityProvider, SectionsDAG,
 };
@@ -35,7 +35,6 @@ use std::{
 };
 use tempfile::NamedTempFile;
 use tokio::{fs, io::AsyncReadExt};
-
 use xor_name::{Prefix, XorName};
 
 /// Container for storing information about other sections in the network.
@@ -162,14 +161,12 @@ impl SectionTree {
         self.sections.get(prefix)
     }
 
-    /// Update our knowledge on the remote section's SAP and our sections DAG
-    /// if it's verifiable with the provided proof chain.
+    /// Update our `SectionTree` if the provided update can be verified
     /// Returns true if an update was made
-    pub fn update(
-        &mut self,
-        signed_sap: SectionAuth<SectionAuthorityProvider>,
-        partial_dag: &SectionsDAG,
-    ) -> Result<bool> {
+    pub fn update(&mut self, section_tree_update: SectionTreeUpdate) -> Result<bool> {
+        let signed_sap = section_tree_update.signed_sap();
+        let proof_chain = section_tree_update.proof_chain()?;
+
         // Check if SAP signature is valid
         if !signed_sap.self_verify() {
             return Err(Error::UntrustedSectionAuthProvider(format!(
@@ -181,31 +178,30 @@ impl SectionTree {
         // Check if SAP's section key matches SAP signature's key
         if signed_sap.sig.public_key != signed_sap.section_key() {
             return Err(Error::UntrustedSectionAuthProvider(format!(
-                "Section key doesn't match signature's key: {:?}",
+                "Section key does not match signature's key: {:?}",
                 signed_sap.value
             )));
         }
 
         // Make sure the proof chain can be trusted,
         // i.e. check each key is signed by its parent/predecessor key.
-        if !partial_dag.self_verify() {
-            return Err(Error::UntrustedPartialDAG(format!(
-                "Invalid partial_dag: {:?}",
-                partial_dag
+        if !proof_chain.self_verify() {
+            return Err(Error::UntrustedProofChain(format!(
+                "Proof chain failed self verification: {:?}",
+                proof_chain
             )));
         }
 
-        // Check the SAP's key is the last key of the proof chain
-        if partial_dag.last_key()? != signed_sap.section_key() {
-            return Err(Error::UntrustedPartialDAG(format!(
-                "Provided section key ({:?}, from prefix {:?}) is not the last key of the partial_dag",
+        // SAP's key should be the last key of the proof chain
+        if proof_chain.last_key()? != signed_sap.section_key() {
+            return Err(Error::UntrustedProofChain(format!(
+                "Provided section key ({:?}, from prefix {:?}) is not the last key of the proof chain",
                 signed_sap.section_key(),
                 signed_sap.prefix(),
             )));
         }
 
         let incoming_prefix = &signed_sap.prefix();
-
         // Lets warn if we're in a SAP that's shrinking for some reason.
         // So we check the incoming elder count vs what we know of for
         // the incoming prefix. If elder_count() is smaller at _all_ we
@@ -217,7 +213,8 @@ impl SectionTree {
                     let proposed_sap_elder_count = signed_sap.elder_count();
 
                     if proposed_sap_elder_count < current_sap_elder_count {
-                        warn!("Proposed SAP elder count is LESS than current... proposed: {proposed_sap_elder_count:?}, current: {current_sap_elder_count:?} (proposed is: {signed_sap:?})");
+                        warn!("Proposed SAP elder count is LESS than current...\
+                        proposed: {proposed_sap_elder_count:?}, current: {current_sap_elder_count:?} (proposed is: {:?})", signed_sap);
                     }
                 }
                 Err(e) => {
@@ -235,7 +232,7 @@ impl SectionTree {
             Some(sap) => {
                 // We are then aware of the prefix, let's just verify the new SAP can
                 // be trusted based on the SAP we aware of and the proof chain provided.
-                if !partial_dag.has_key(&sap.section_key()) {
+                if !proof_chain.has_key(&sap.section_key()) {
                     // This case may happen when both the sender and receiver is about to using
                     // a new SAP. The AE-Update was sent before sender switching to use new SAP,
                     // hence it only contains proof_chain covering the old SAP.
@@ -244,18 +241,18 @@ impl SectionTree {
                     // As an outdated node will got updated via AE triggered by other messages,
                     // there is no need to bounce back here (assuming the sender is outdated) to
                     // avoid potential looping.
-                    return Err(Error::UntrustedPartialDAG(format!(
-                        "Provided partial_dag doesn't cover the SAP's key we currently know: {:?}, {:?}",
-                        partial_dag,
+                    return Err(Error::UntrustedProofChain(format!(
+                        "Provided proof_chain doesn't cover the SAP's key we currently know: {:?}, {:?}",
+                        section_tree_update.proof_chain,
                         sap.value
                     )));
                 }
             }
             None => {
                 // We are not aware of the prefix, let's then verify it can be
-                // trusted based on our own section chain and the provided proof chain.
-                if !partial_dag.check_trust(self.sections_dag.keys()) {
-                    return Err(Error::UntrustedPartialDAG(format!(
+                // trusted based on our own sections_dag and the provided proof chain.
+                if !proof_chain.check_trust(self.sections_dag.keys()) {
+                    return Err(Error::UntrustedProofChain(format!(
                         "None of the keys were found on our section chain: {:?}",
                         signed_sap.value
                     )));
@@ -267,10 +264,10 @@ impl SectionTree {
         // Note: we don't expect the same SAP to be found in our records
         // for the prefix since we've already checked that above.
         if self.insert(signed_sap) {
-            // update our sections_dag with the proof_chain. Cannot be an error, since in cases where we
-            // have outdated SAP (aware of prefix)/ not aware of the prefix, we have the proof_chains's
-            // root/child key in our sections_dag. Checked in the above match statement.
-            self.sections_dag.merge(partial_dag.clone())?;
+            // update our sections_dag with the proof chain. Cannot be an error, since in cases
+            // where we have outdated SAP (aware of prefix)/ not aware of the prefix, we have the
+            // proof chain's genesis key in our sections_dag.
+            self.sections_dag.merge(proof_chain)?;
             for (prefix, section_key) in &self.sections {
                 debug!("Known prefix, section_key after update: {prefix:?} = {section_key:?}");
             }
@@ -435,12 +432,37 @@ impl PartialEq for SectionTree {
 
 impl Eq for SectionTree {}
 
+impl SectionTreeUpdate {
+    pub fn new(
+        signed_sap: SectionAuth<SectionAuthorityProvider>,
+        proof_chain: SectionsDAG,
+    ) -> Self {
+        let proof_chain: SectionsDAGMsg = proof_chain.into();
+        Self {
+            section_auth: signed_sap.to_msg(),
+            section_signed: signed_sap.sig,
+            proof_chain,
+        }
+    }
+
+    pub fn proof_chain(&self) -> Result<SectionsDAG> {
+        self.proof_chain.clone().try_into()
+    }
+
+    pub fn signed_sap(&self) -> SectionAuth<SectionAuthorityProvider> {
+        SectionAuth {
+            value: self.section_auth.clone().into_state(),
+            sig: self.section_signed.clone(),
+        }
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
     use crate::network_knowledge::sections_dag::tests::assert_lists;
     use crate::network_knowledge::{
-        sections_dag::tests::arb_sections_dag_and_partial_dags,
+        sections_dag::tests::arb_sections_dag_and_proof_chains,
         test_utils::{prefix, random_sap, section_signed},
     };
     use eyre::{Context, Result};
@@ -448,73 +470,73 @@ pub(crate) mod tests {
 
     #[test]
     fn insert_existing_prefix() -> Result<()> {
-        let (mut map, _, _) = new_network_section_tree();
+        let (mut tree, _, _) = new_network_section_tree();
         let p0 = prefix("0")?;
         let sap0 = gen_section_auth(p0)?;
         let new_sap0 = gen_section_auth(p0)?;
         assert_ne!(sap0, new_sap0);
 
-        assert!(map.insert(sap0));
-        assert!(map.insert(new_sap0.clone()));
-        assert_eq!(map.get(&p0), Some(new_sap0.value));
+        assert!(tree.insert(sap0));
+        assert!(tree.insert(new_sap0.clone()));
+        assert_eq!(tree.get(&p0), Some(new_sap0.value));
 
         Ok(())
     }
 
     #[test]
     fn insert_direct_descendants_of_existing_prefix() -> Result<()> {
-        let (mut map, _, _) = new_network_section_tree();
+        let (mut tree, _, _) = new_network_section_tree();
         let p0 = prefix("0")?;
         let p00 = prefix("00")?;
         let p01 = prefix("01")?;
 
         let sap0 = gen_section_auth(p0)?;
-        assert!(map.insert(sap0));
+        assert!(tree.insert(sap0));
 
         // Insert the first sibling. Parent get pruned in the map.
         let sap00 = gen_section_auth(p00)?;
-        assert!(map.insert(sap00.clone()));
+        assert!(tree.insert(sap00.clone()));
 
-        assert_eq!(map.get(&p00), Some(sap00.value.clone()));
-        assert_eq!(map.get(&p01), None);
-        assert_eq!(map.get(&p0), None);
+        assert_eq!(tree.get(&p00), Some(sap00.value.clone()));
+        assert_eq!(tree.get(&p01), None);
+        assert_eq!(tree.get(&p0), None);
 
         // Insert the other sibling.
         let sap3 = gen_section_auth(p01)?;
-        assert!(map.insert(sap3.clone()));
+        assert!(tree.insert(sap3.clone()));
 
-        assert_eq!(map.get(&p00), Some(sap00.value));
-        assert_eq!(map.get(&p01), Some(sap3.value));
-        assert_eq!(map.get(&p0), None);
+        assert_eq!(tree.get(&p00), Some(sap00.value));
+        assert_eq!(tree.get(&p01), Some(sap3.value));
+        assert_eq!(tree.get(&p0), None);
 
         Ok(())
     }
 
     #[test]
     fn return_opposite_prefix_if_none_matching() -> Result<()> {
-        let (mut map, _, _) = new_network_section_tree();
+        let (mut tree, _, _) = new_network_section_tree();
         let p0 = prefix("0")?;
         let p1 = prefix("1")?;
 
         let sap0 = gen_section_auth(p0)?;
 
-        let _changed = map.insert(sap0.clone());
+        let _changed = tree.insert(sap0.clone());
 
         assert_eq!(
-            map.section_by_name(&p1.substituted_in(xor_name::rand::random()))?,
+            tree.section_by_name(&p1.substituted_in(xor_name::rand::random()))?,
             sap0.value
         );
 
         // There are no matching prefixes, so return an opposite prefix.
         assert_eq!(
-            map.closest(&p1.substituted_in(xor_name::rand::random()), None)
+            tree.closest(&p1.substituted_in(xor_name::rand::random()), None)
                 .ok_or(Error::NoMatchingSection)?,
             &sap0
         );
 
-        let _changed = map.insert(sap0.clone());
+        let _changed = tree.insert(sap0.clone());
         assert_eq!(
-            map.closest(&p1.substituted_in(xor_name::rand::random()), None)
+            tree.closest(&p1.substituted_in(xor_name::rand::random()), None)
                 .ok_or(Error::NoMatchingSection)?,
             &sap0
         );
@@ -524,7 +546,7 @@ pub(crate) mod tests {
 
     #[test]
     fn insert_indirect_descendants_of_existing_prefix() -> Result<()> {
-        let (mut map, _, _) = new_network_section_tree();
+        let (mut tree, _, _) = new_network_section_tree();
         let p0 = prefix("0")?;
         let p000 = prefix("000")?;
         let p001 = prefix("001")?;
@@ -536,52 +558,52 @@ pub(crate) mod tests {
         let sap000 = gen_section_auth(p000)?;
         let sap001 = gen_section_auth(p001)?;
 
-        assert!(map.insert(sap0));
+        assert!(tree.insert(sap0));
 
-        assert!(map.insert(sap000.clone()));
-        assert_eq!(map.get(&p000), Some(sap000.value.clone()));
-        assert_eq!(map.get(&p001), None);
-        assert_eq!(map.get(&p00), None);
-        assert_eq!(map.get(&p01), None);
-        assert_eq!(map.get(&p0), None);
+        assert!(tree.insert(sap000.clone()));
+        assert_eq!(tree.get(&p000), Some(sap000.value.clone()));
+        assert_eq!(tree.get(&p001), None);
+        assert_eq!(tree.get(&p00), None);
+        assert_eq!(tree.get(&p01), None);
+        assert_eq!(tree.get(&p0), None);
 
-        assert!(map.insert(sap001.clone()));
-        assert_eq!(map.get(&p000), Some(sap000.value.clone()));
-        assert_eq!(map.get(&p001), Some(sap001.value.clone()));
-        assert_eq!(map.get(&p00), None);
-        assert_eq!(map.get(&p01), None);
-        assert_eq!(map.get(&p0), None);
+        assert!(tree.insert(sap001.clone()));
+        assert_eq!(tree.get(&p000), Some(sap000.value.clone()));
+        assert_eq!(tree.get(&p001), Some(sap001.value.clone()));
+        assert_eq!(tree.get(&p00), None);
+        assert_eq!(tree.get(&p01), None);
+        assert_eq!(tree.get(&p0), None);
 
-        assert!(map.insert(sap01.clone()));
-        assert_eq!(map.get(&p000), Some(sap000.value));
-        assert_eq!(map.get(&p001), Some(sap001.value));
-        assert_eq!(map.get(&p00), None);
-        assert_eq!(map.get(&p01), Some(sap01.value));
-        assert_eq!(map.get(&p0), None);
+        assert!(tree.insert(sap01.clone()));
+        assert_eq!(tree.get(&p000), Some(sap000.value));
+        assert_eq!(tree.get(&p001), Some(sap001.value));
+        assert_eq!(tree.get(&p00), None);
+        assert_eq!(tree.get(&p01), Some(sap01.value));
+        assert_eq!(tree.get(&p0), None);
 
         Ok(())
     }
 
     #[test]
     fn insert_ancestor_of_existing_prefix() -> Result<()> {
-        let (mut map, _, _) = new_network_section_tree();
+        let (mut tree, _, _) = new_network_section_tree();
         let p0 = prefix("0")?;
         let p00 = prefix("00")?;
 
         let sap0 = gen_section_auth(p0)?;
         let sap00 = gen_section_auth(p00)?;
-        let _changed = map.insert(sap00.clone());
+        let _changed = tree.insert(sap00.clone());
 
-        assert!(!map.insert(sap0));
-        assert_eq!(map.get(&p0), None);
-        assert_eq!(map.get(&p00), Some(sap00.value));
+        assert!(!tree.insert(sap0));
+        assert_eq!(tree.get(&p0), None);
+        assert_eq!(tree.get(&p00), Some(sap00.value));
 
         Ok(())
     }
 
     #[test]
     fn get_matching() -> Result<()> {
-        let (mut map, _, _) = new_network_section_tree();
+        let (mut tree, _, _) = new_network_section_tree();
         let p = prefix("")?;
         let p0 = prefix("0")?;
         let p1 = prefix("1")?;
@@ -592,36 +614,36 @@ pub(crate) mod tests {
         let sap1 = gen_section_auth(p1)?;
         let sap10 = gen_section_auth(p10)?;
 
-        let _changed = map.insert(sap.clone());
+        let _changed = tree.insert(sap.clone());
 
         assert_eq!(
-            map.section_by_name(&p0.substituted_in(xor_name::rand::random()))?,
+            tree.section_by_name(&p0.substituted_in(xor_name::rand::random()))?,
             sap.value
         );
 
-        let _changed = map.insert(sap0.clone());
+        let _changed = tree.insert(sap0.clone());
 
         assert_eq!(
-            map.section_by_name(&p1.substituted_in(xor_name::rand::random()))?,
+            tree.section_by_name(&p1.substituted_in(xor_name::rand::random()))?,
             sap0.value
         );
 
-        let _changed = map.insert(sap1);
-        let _changed = map.insert(sap10.clone());
+        let _changed = tree.insert(sap1);
+        let _changed = tree.insert(sap10.clone());
 
         assert_eq!(
-            map.section_by_name(&p0.substituted_in(xor_name::rand::random()))?,
+            tree.section_by_name(&p0.substituted_in(xor_name::rand::random()))?,
             sap0.value
         );
 
         // sap1 get pruned once sap10 inserted.
         assert_eq!(
-            map.section_by_name(&prefix("11")?.substituted_in(xor_name::rand::random()))?,
+            tree.section_by_name(&prefix("11")?.substituted_in(xor_name::rand::random()))?,
             sap10.value
         );
 
         assert_eq!(
-            map.section_by_name(&p10.substituted_in(xor_name::rand::random()))?,
+            tree.section_by_name(&p10.substituted_in(xor_name::rand::random()))?,
             sap10.value
         );
 
@@ -630,7 +652,7 @@ pub(crate) mod tests {
 
     #[test]
     fn get_matching_prefix() -> Result<()> {
-        let (mut map, _, _) = new_network_section_tree();
+        let (mut tree, _, _) = new_network_section_tree();
         let p0 = prefix("0")?;
         let p1 = prefix("1")?;
         let p10 = prefix("10")?;
@@ -639,18 +661,18 @@ pub(crate) mod tests {
         let sap1 = gen_section_auth(p1)?;
         let sap10 = gen_section_auth(p10)?;
 
-        let _changed = map.insert(sap0.clone());
-        let _changed = map.insert(sap1);
-        let _changed = map.insert(sap10.clone());
+        let _changed = tree.insert(sap0.clone());
+        let _changed = tree.insert(sap1);
+        let _changed = tree.insert(sap10.clone());
 
-        assert_eq!(map.section_by_prefix(&p0)?, sap0.value);
+        assert_eq!(tree.section_by_prefix(&p0)?, sap0.value);
 
         // sap1 get pruned once sap10 inserted.
-        assert_eq!(map.section_by_prefix(&prefix("11")?)?, sap10.value);
+        assert_eq!(tree.section_by_prefix(&prefix("11")?)?, sap10.value);
 
-        assert_eq!(map.section_by_prefix(&p10)?, sap10.value);
+        assert_eq!(tree.section_by_prefix(&p10)?, sap10.value);
 
-        assert_eq!(map.section_by_prefix(&prefix("101")?)?, sap10.value);
+        assert_eq!(tree.section_by_prefix(&prefix("101")?)?, sap10.value);
 
         Ok(())
     }
@@ -658,7 +680,7 @@ pub(crate) mod tests {
     #[test]
     fn closest() -> Result<()> {
         // Create map containing sections (00), (01) and (10)
-        let (mut map, genesis_sk, genesis_pk) = new_network_section_tree();
+        let (mut tree, genesis_sk, genesis_pk) = new_network_section_tree();
         let dag = SectionsDAG::new(genesis_pk);
         let p01 = prefix("01")?;
         let p10 = prefix("10")?;
@@ -669,46 +691,51 @@ pub(crate) mod tests {
         let pk01 = section_auth_01.section_key();
         let sig01 = bincode::serialize(&pk01).map(|bytes| genesis_sk.sign(&bytes))?;
         dag_01.insert(&genesis_pk, pk01, sig01)?;
-        assert!(map.update(section_auth_01, &dag_01)?);
+        let tree_update = SectionTreeUpdate::new(section_auth_01, dag_01);
+        assert!(tree.update(tree_update)?);
 
         let mut dag_10 = dag;
         let section_auth_10 = gen_section_auth(p10)?;
         let pk10 = section_auth_10.section_key();
         let sig10 = bincode::serialize(&pk10).map(|bytes| genesis_sk.sign(&bytes))?;
         dag_10.insert(&genesis_pk, pk10, sig10)?;
-        assert!(map.update(section_auth_10, &dag_10)?);
+        let tree_update = SectionTreeUpdate::new(section_auth_10, dag_10);
+        assert!(tree.update(tree_update)?);
 
         let n01 = p01.substituted_in(xor_name::rand::random());
         let n10 = p10.substituted_in(xor_name::rand::random());
         let n11 = p11.substituted_in(xor_name::rand::random());
 
-        assert_eq!(map.closest(&n01, None).map(|sap| sap.prefix()), Some(p01));
-        assert_eq!(map.closest(&n10, None).map(|sap| sap.prefix()), Some(p10));
-        assert_eq!(map.closest(&n11, None).map(|sap| sap.prefix()), Some(p10));
+        assert_eq!(tree.closest(&n01, None).map(|sap| sap.prefix()), Some(p01));
+        assert_eq!(tree.closest(&n10, None).map(|sap| sap.prefix()), Some(p10));
+        assert_eq!(tree.closest(&n11, None).map(|sap| sap.prefix()), Some(p10));
 
         Ok(())
     }
 
+    // roland: todo add more tests to update fn
     #[test]
-    fn partial_dag_should_contain_a_single_branch_during_update() -> Result<()> {
-        let (mut map, genesis_sk, genesis_pk) = new_network_section_tree();
+    fn proof_chain_should_contain_a_single_branch_during_update() -> Result<()> {
+        let (mut tree, genesis_sk, genesis_pk) = new_network_section_tree();
 
         let section_auth_0 = gen_section_auth(prefix("0")?)?;
         let pk0 = section_auth_0.section_key();
         let sig0 = bincode::serialize(&pk0).map(|bytes| genesis_sk.sign(&bytes))?;
-        let mut partial_dag = map.get_sections_dag().clone();
-        partial_dag.insert(&genesis_pk, pk0, sig0)?;
-        assert!(map.update(section_auth_0, &partial_dag)?);
+        let mut proof_chain = tree.get_sections_dag().clone();
+        proof_chain.insert(&genesis_pk, pk0, sig0)?;
+        let tree_update = SectionTreeUpdate::new(section_auth_0, proof_chain);
+        assert!(tree.update(tree_update)?);
 
         let section_auth_1 = gen_section_auth(prefix("1")?)?;
         let pk1 = section_auth_1.section_key();
         let sig1 = bincode::serialize(&pk1).map(|bytes| genesis_sk.sign(&bytes))?;
-        // instead of constructing a partial_dag from gen -> 1; we also include the branch '0'
+        // instead of constructing a proof_chain from gen -> 1; we also include the branch '0'
         // which will result in an error while updating the SectionTree
-        let mut partial_dag = map.get_sections_dag().clone();
-        partial_dag.insert(&genesis_pk, pk1, sig1)?;
+        let mut proof_chain = tree.get_sections_dag().clone();
+        proof_chain.insert(&genesis_pk, pk1, sig1)?;
+        let tree_update = SectionTreeUpdate::new(section_auth_1, proof_chain);
         assert!(matches!(
-            map.update(section_auth_1, &partial_dag),
+            tree.update(tree_update),
             Err(Error::MultipleBranchError)
         ));
 
@@ -721,10 +748,11 @@ pub(crate) mod tests {
         })]
         #[test]
         #[allow(clippy::unwrap_used)]
-        fn proptest_section_tree_fields_should_stay_in_sync((main_dag, list_of_partial_dags) in arb_sections_dag_and_partial_dags(100, true)) {
+        fn proptest_section_tree_fields_should_stay_in_sync((main_dag, list_of_proof_chains) in arb_sections_dag_and_proof_chains(100, true)) {
                 let mut section_tree = SectionTree::new(*main_dag.genesis_key());
-                for (partial_dag, sap) in &list_of_partial_dags {
-                    let _ = section_tree.update(sap.clone(), partial_dag)?;
+                for (proof_chain, sap) in &list_of_proof_chains {
+                    let tree_update = SectionTreeUpdate::new(sap.clone(), proof_chain.clone());
+                    assert!(section_tree.update(tree_update)?);
                     // The `sections` are supposed to hold the SAP of the `sections_dag`'s leaves. Verify it
                     assert_lists(section_tree.sections.values().map(|sap|sap.section_key()), section_tree.sections_dag.leaf_keys()).unwrap();
                 }

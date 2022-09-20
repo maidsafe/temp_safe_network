@@ -19,10 +19,11 @@ use sn_interface::{
     at_least_one_correct_elder,
     messaging::{
         data::{Error as ErrorMsg, ServiceMsg},
-        system::{AntiEntropyKind, KeyedSig, NodeMsgAuthorityUtils, SectionAuth, SystemMsg},
-        AuthKind, AuthorityProof, Dst, MsgId, MsgType, NodeMsgAuthority, ServiceAuth, WireMsg,
+        system::{AntiEntropyKind, NodeMsgAuthorityUtils, SystemMsg},
+        AuthKind, AuthorityProof, Dst, MsgId, MsgType, NodeMsgAuthority, SectionTreeUpdate,
+        ServiceAuth, WireMsg,
     },
-    network_knowledge::{NetworkKnowledge, SectionAuthorityProvider, SectionsDAG},
+    network_knowledge::{NetworkKnowledge, SectionAuthorityProvider},
     types::{log_markers::LogMarker, Peer},
 };
 
@@ -161,21 +162,13 @@ impl Session {
 
         match msg {
             SystemMsg::AntiEntropy {
-                section_auth,
-                section_signed,
-                partial_dag,
+                section_tree_update,
                 kind:
                     AntiEntropyKind::Redirect { bounced_msg } | AntiEntropyKind::Retry { bounced_msg },
             } => {
                 debug!("AE-Redirect/Retry msg received");
                 let result = self
-                    .handle_ae_msg(
-                        section_auth.into_state(),
-                        section_signed,
-                        partial_dag,
-                        bounced_msg,
-                        sender,
-                    )
+                    .handle_ae_msg(section_tree_update, bounced_msg, sender)
                     .await;
                 if result.is_err() {
                     error!("Failed to handle AE msg from {sender:?}, {result:?}");
@@ -304,16 +297,15 @@ impl Session {
     #[instrument(skip_all, level = "debug")]
     async fn handle_ae_msg(
         &mut self,
-        target_sap: SectionAuthorityProvider,
-        section_signed: KeyedSig,
-        partial_dag: SectionsDAG,
+        section_tree_update: SectionTreeUpdate,
         bounced_msg: UsrMsgBytes,
         src_peer: Peer,
     ) -> Result<(), Error> {
+        let target_sap = section_tree_update.signed_sap().value;
         debug!("Received Anti-Entropy from {src_peer}, with SAP: {target_sap:?}");
 
         // Try to update our network knowledge first
-        self.update_network_knowledge(target_sap.clone(), section_signed, partial_dag, src_peer)
+        self.update_network_knowledge(section_tree_update, src_peer)
             .await;
 
         if let Some((msg_id, elders, service_msg, dst, auth)) =
@@ -350,21 +342,12 @@ impl Session {
     /// new SAP based on currently known remote section SAP or genesis key.
     async fn update_network_knowledge(
         &mut self,
-        sap: SectionAuthorityProvider,
-        section_signed: KeyedSig,
-        partial_dag: SectionsDAG,
+        section_tree_update: SectionTreeUpdate,
         sender: Peer,
     ) {
+        let sap = section_tree_update.signed_sap().value;
         // Update our network PrefixMap based upon passed in knowledge
-        let result = self.network.write().await.update(
-            SectionAuth {
-                value: sap.clone(),
-                sig: section_signed,
-            },
-            &partial_dag,
-        );
-
-        match result {
+        match self.network.write().await.update(section_tree_update) {
             Ok(true) => {
                 debug!(
                     "Anti-Entropy: updated remote section SAP updated for {:?}",

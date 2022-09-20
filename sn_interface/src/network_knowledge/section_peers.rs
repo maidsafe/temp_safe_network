@@ -126,10 +126,10 @@ impl SectionPeers {
     // than ELDER_CHURN_EVENTS_TO_PRUNE_ARCHIVE section keys ago from `last_key`
     pub(super) fn prune_members_archive(
         &self,
-        section_dag: &SectionsDAG,
+        proof_chain: &SectionsDAG,
         last_key: &bls::PublicKey,
     ) -> Result<()> {
-        let mut last_section_keys = section_dag.get_ancestors(last_key)?;
+        let mut last_section_keys = proof_chain.get_ancestors(last_key)?;
         last_section_keys.truncate(ELDER_CHURN_EVENTS_TO_PRUNE_ARCHIVE - 1);
         last_section_keys.push(*last_key);
         self.archive

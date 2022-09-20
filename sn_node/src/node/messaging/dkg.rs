@@ -108,12 +108,12 @@ impl Node {
     }
 
     pub(crate) fn handle_dkg_start(&mut self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
-        let current_generation = self.network_knowledge.our_section_dag_len();
+        let current_generation = self.network_knowledge.section_chain_len();
         if session_id.section_chain_len < current_generation {
             trace!("Skipping DkgStart for older generation: {:?}", &session_id);
             return Ok(vec![]);
         }
-        let section_auth = self.network_knowledge().authority_provider();
+        let section_auth = self.network_knowledge().section_auth();
 
         let mut peers = vec![];
         for session_peer in session_id.elder_peers() {
@@ -195,7 +195,7 @@ impl Node {
         sender: Peer,
     ) -> Result<Vec<Cmd>> {
         let section_key = self.network_knowledge().section_key();
-        let current_generation = self.network_knowledge.our_section_dag_len();
+        let current_generation = self.network_knowledge.section_chain_len();
         if session_id.section_chain_len < current_generation {
             trace!(
                 "Ignoring DkgRetry for expired DKG session: {:?}",
@@ -245,7 +245,7 @@ impl Node {
             return Err(Error::InvalidDkgParticipant);
         }
 
-        let generation = self.network_knowledge.our_section_dag_len();
+        let generation = self.network_knowledge.section_chain_len();
 
         let dkg_session = if let Some(dkg_session) = self
             .promote_and_demote_elders(&BTreeSet::new())
@@ -309,7 +309,7 @@ impl Node {
             // This proposal is sent to the current set of elders to be aggregated
             // and section signed.
             let proposal = Proposal::SectionInfo(sap);
-            let recipients: Vec<_> = self.network_knowledge.authority_provider().elders_vec();
+            let recipients: Vec<_> = self.network_knowledge.section_auth().elders_vec();
             self.send_proposal_with(recipients, proposal, &key_share)
         }
     }

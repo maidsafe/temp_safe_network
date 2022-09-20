@@ -26,8 +26,8 @@ pub use signed::{KeyedSig, SigShare};
 use super::{authority::SectionAuth as SectionAuthProof, AuthorityProof};
 use qp2p::UsrMsgBytes;
 
-use crate::messaging::{EndUser, MsgId, SectionAuthorityProvider};
-use crate::network_knowledge::{SapCandidate, SectionsDAG};
+use crate::messaging::{EndUser, MsgId, SectionTreeUpdate};
+use crate::network_knowledge::SapCandidate;
 
 use sn_consensus::{Generation, SignedVote};
 
@@ -59,13 +59,10 @@ pub enum AntiEntropyKind {
 /// Message sent over the among nodes
 pub enum SystemMsg {
     AntiEntropy {
-        /// Current `SectionAuthorityProvider` of our section.
-        section_auth: SectionAuthorityProvider,
-        /// Section signature over the `SectionAuthorityProvider` of our
-        /// section the bounced message shall be resent to.
-        section_signed: KeyedSig,
-        /// Our section chain truncated from the triggering msg's dst section_key (or genesis key for full proof)
-        partial_dag: SectionsDAG,
+        /// The update to our NetworkKnowledge containing our current section's `SectionAuthorityProvider`
+        /// and our section chain truncated from the triggering msg's dst section_key or genesis key
+        /// if the the dst section_key is not a direct ancestor to our section_key
+        section_tree_update: SectionTreeUpdate,
         /// The kind of anti-entropy response.
         kind: AntiEntropyKind,
     },

@@ -15,7 +15,7 @@ use eyre::{bail, eyre, Context, Result};
 use sn_consensus::Decision;
 use sn_interface::{
     elder_count,
-    messaging::system::NodeState as NodeStateMsg,
+    messaging::{system::NodeState as NodeStateMsg, SectionTreeUpdate},
     network_knowledge::{
         test_utils::*, NetworkKnowledge, NodeInfo, NodeState, SectionAuthorityProvider,
         SectionKeyShare, SectionsDAG, MIN_ADULT_AGE,
@@ -220,10 +220,13 @@ pub(crate) fn create_section(
     sk_set: &SecretKeySet,
     section_auth: &SectionAuthorityProvider,
 ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
-    let dag = SectionsDAG::new(sk_set.public_keys().public_key());
-    let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
-
-    let section = NetworkKnowledge::new(*dag.genesis_key(), dag, signed_sap, None)?;
+    let section_tree_update = {
+        let section_chain = SectionsDAG::new(sk_set.public_keys().public_key());
+        let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
+        SectionTreeUpdate::new(signed_sap, section_chain)
+    };
+    let section =
+        NetworkKnowledge::new(sk_set.public_keys().public_key(), section_tree_update, None)?;
 
     for ns in section_auth.members() {
         let auth_ns = section_signed(sk_set.secret_key(), ns.clone())?;
@@ -242,15 +245,14 @@ pub(crate) fn create_section_with_elders(
     sk_set: &SecretKeySet,
     section_auth: &SectionAuthorityProvider,
 ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
-    let section_chain = SectionsDAG::new(sk_set.public_keys().public_key());
-    let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
+    let section_tree_update = {
+        let section_chain = SectionsDAG::new(sk_set.public_keys().public_key());
+        let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
+        SectionTreeUpdate::new(signed_sap, section_chain)
+    };
 
-    let section = NetworkKnowledge::new(
-        *section_chain.genesis_key(),
-        section_chain,
-        signed_sap,
-        None,
-    )?;
+    let section =
+        NetworkKnowledge::new(sk_set.public_keys().public_key(), section_tree_update, None)?;
 
     for peer in section_auth.elders() {
         let node_state = NodeState::joined(*peer, None);

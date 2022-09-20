@@ -8,7 +8,10 @@
 
 use crate::node::{flow_ctrl::cmds::Cmd, Node, Proposal, Result};
 use sn_interface::{
-    messaging::system::{KeyedSig, SectionAuth},
+    messaging::{
+        system::{KeyedSig, SectionAuth},
+        SectionTreeUpdate,
+    },
     network_knowledge::{NodeState, SapCandidate, SectionAuthUtils, SectionAuthorityProvider},
     types::log_markers::LogMarker,
 };
@@ -134,39 +137,41 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         trace!("{}", LogMarker::HandlingNewEldersAgreement);
         let snapshot = self.state_snapshot();
-        let mut old_dag = self.our_section_dag();
-        let last_key = old_dag.last_key()?;
+        let mut section_chain = self.section_chain();
+        let last_key = section_chain.last_key()?;
 
         let prefix = signed_section_auth.prefix();
         trace!("{}: for {:?}", LogMarker::NewSignedSap, prefix);
-
         info!("New SAP agreed for:{}", *signed_section_auth);
 
         // Let's update our network knowledge, including our
         // section SAP and chain if the new SAP's prefix matches our name
         // We need to generate the proof chain to connect our current chain to new SAP.
-        match old_dag.insert(
+        match section_chain.insert(
             &last_key,
             signed_section_auth.section_key(),
             key_sig.signature,
         ) {
-            Err(err) => error!(
-                "Failed to generate proof chain for a newly received SAP: {:?}",
-                err
-            ),
             Ok(()) => {
-                match self.update_network_knowledge(signed_section_auth.clone(), &old_dag, None) {
-                    Err(err) => {
-                        error!("Error updating our network knowledge for {prefix:?}: {err:?}")
-                    }
+                let section_tree_update =
+                    SectionTreeUpdate::new(signed_section_auth, section_chain);
+                match self.update_network_knowledge(section_tree_update, None) {
                     Ok(true) => {
                         info!("Updated our network knowledge for {:?}", prefix);
                         info!("Writing updated knowledge to disk");
                         self.write_section_tree().await
                     }
+                    Err(err) => {
+                        error!("Error updating our network knowledge for {prefix:?}: {err:?}")
+                    }
+
                     _ => {}
                 }
             }
+            Err(err) => error!(
+                "Failed to generate proof chain for a newly received SAP: {:?}",
+                err
+            ),
         }
 
         info!(

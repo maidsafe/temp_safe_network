@@ -21,7 +21,7 @@ use sn_interface::{
 impl Node {
     /// Send proposal to all our elders.
     pub(crate) fn propose(&mut self, proposal: Proposal) -> Result<Vec<Cmd>> {
-        let elders = self.network_knowledge.authority_provider().elders_vec();
+        let elders = self.network_knowledge.section_auth().elders_vec();
         self.send_proposal(elders, proposal)
     }
 

@@ -16,7 +16,7 @@ use sn_interface::{
     messaging::{
         system::{
             JoinRejectionReason, JoinRequest, JoinResponse, MembershipState, ResourceProof,
-            SectionAuth, SystemMsg,
+            SystemMsg,
         },
         AuthKind, Dst, MsgType, NodeAuth, WireMsg,
     },
@@ -193,13 +193,14 @@ impl<'a> Joiner<'a> {
                     self.send(msg, &[sender], section_key, false).await?;
                 }
                 JoinResponse::Approved {
-                    section_auth,
                     genesis_key,
-                    sections_dag,
+                    section_tree_update,
                     decision,
                 } => {
                     info!("{}", LogMarker::ReceivedJoinApproval);
-                    if let Err(e) = decision.validate(&section_auth.public_key_set) {
+                    if let Err(e) =
+                        decision.validate(&section_tree_update.section_auth.public_key_set)
+                    {
                         error!("Dropping invalid join decision: {e:?}");
                         continue;
                     }
@@ -217,28 +218,23 @@ impl<'a> Joiner<'a> {
 
                     trace!(
                         "=========>> This node has been approved to join the network at {:?}!",
-                        section_auth.prefix,
+                        section_tree_update.section_auth.prefix,
                     );
 
-                    // Building our network knowledge instance will validate SAP and section chain.
-                    let section_auth = section_auth.into_authed_state();
-
+                    // Building our network knowledge instance will validate the section_tree_update
                     let network_knowledge = NetworkKnowledge::new(
                         genesis_key,
-                        sections_dag,
-                        section_auth,
+                        section_tree_update,
                         Some(self.network_contacts),
                     )?;
 
                     return Ok((self.node, network_knowledge));
                 }
                 JoinResponse::Retry {
-                    section_auth,
-                    section_signed,
-                    partial_dag,
+                    section_tree_update,
                     expected_age,
                 } => {
-                    let section_auth = section_auth.into_state();
+                    let section_auth = section_tree_update.signed_sap();
 
                     trace!(
                         "Joining node {:?} - {:?}/{:?} received a Retry from {} with SAP {:?}, expected_age: {}, our age: {}",
@@ -261,13 +257,8 @@ impl<'a> Joiner<'a> {
                         continue;
                     }
 
-                    let signed_sap = SectionAuth {
-                        value: section_auth.clone(),
-                        sig: section_signed,
-                    };
-
                     // make sure we received a valid and trusted new SAP
-                    let is_new_sap = match self.network_contacts.update(signed_sap, &partial_dag) {
+                    let is_new_sap = match self.network_contacts.update(section_tree_update) {
                         Ok(updated) => updated,
                         Err(err) => {
                             debug!(
@@ -519,7 +510,7 @@ mod tests {
 
     use sn_interface::{
         elder_count, init_logger,
-        messaging::SectionAuthorityProvider as SectionAuthorityProviderMsg,
+        messaging::{SectionAuthorityProvider as SectionAuthorityProviderMsg, SectionTreeUpdate},
         network_knowledge::{test_utils::*, NodeState, SectionsDAG},
         types::PublicKey,
     };
@@ -595,15 +586,16 @@ mod tests {
             );
 
             // Send JoinResponse::Retry with section auth provider info
-            let partial_dag = SectionsDAG::new(original_section_key);
             let signed_sap = section_signed(sk, section_auth.clone())?;
+            let section_tree_update = {
+                let proof_chain = SectionsDAG::new(original_section_key);
+                SectionTreeUpdate::new(signed_sap, proof_chain)
+            };
 
             send_response(
                 &recv_tx,
                 JoinResponse::Retry {
-                    section_auth: section_auth.to_msg(),
-                    section_signed: signed_sap.sig,
-                    partial_dag,
+                    section_tree_update,
                     expected_age: MIN_ADULT_AGE,
                 },
                 &bootstrap_node,
@@ -625,19 +617,22 @@ mod tests {
             });
 
             // Send JoinResponse::Approved
-            let section_auth = section_signed(sk, section_auth.clone())?;
+            let signed_sap = section_signed(sk, section_auth.clone())?;
             let decision = section_decision(&sk_set, NodeState::joined(peer, None).to_msg())?;
-            let sections_dag = SectionsDAG::new(original_section_key);
+            let section_pk = signed_sap.section_key();
+            let section_tree_update = {
+                let proof_chain = SectionsDAG::new(original_section_key);
+                SectionTreeUpdate::new(signed_sap, proof_chain)
+            };
             send_response(
                 &recv_tx,
                 JoinResponse::Approved {
                     genesis_key: original_section_key,
-                    section_auth: section_auth.clone().into_authed_msg(),
-                    sections_dag,
+                    section_tree_update,
                     decision,
                 },
                 &bootstrap_node,
-                section_auth.section_key(),
+                section_pk,
             )?;
 
             Ok(())
@@ -646,7 +641,7 @@ mod tests {
         // Drive both tasks to completion concurrently (but on the same thread).
         let ((node, section), _) = future::try_join(bootstrap, others).await?;
 
-        assert_eq!(section.authority_provider(), section_auth);
+        assert_eq!(section.section_auth(), section_auth);
         assert_eq!(section.section_key(), original_section_key);
         assert_eq!(node.age(), node_age);
 
@@ -939,16 +934,19 @@ mod tests {
                 SystemMsg::JoinRequest(JoinRequest::Initiate { .. })
             );
 
-            let partial_dag = SectionsDAG::new(section_key);
+            let proof_chain = SectionsDAG::new(section_key);
             let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
 
             // Send `Retry` with bad prefix
+            let bad_section_tree_update = {
+                let mut bad_signed_sap = signed_sap.clone();
+                bad_signed_sap.value = random_sap(bad_prefix, elder_count(), 0, None).0;
+                SectionTreeUpdate::new(bad_signed_sap, proof_chain.clone())
+            };
             send_response(
                 &recv_tx,
                 JoinResponse::Retry {
-                    section_auth: random_sap(bad_prefix, elder_count(), 0, None).0.to_msg(),
-                    section_signed: signed_sap.sig.clone(),
-                    partial_dag: partial_dag.clone(),
+                    section_tree_update: bad_section_tree_update,
                     expected_age: MIN_ADULT_AGE,
                 },
                 &bootstrap_node,
@@ -960,9 +958,7 @@ mod tests {
             send_response(
                 &recv_tx,
                 JoinResponse::Retry {
-                    section_auth: section_auth.to_msg(),
-                    section_signed: signed_sap.sig,
-                    partial_dag,
+                    section_tree_update: SectionTreeUpdate::new(signed_sap, proof_chain),
                     expected_age: MIN_ADULT_AGE,
                 },
                 &bootstrap_node,
