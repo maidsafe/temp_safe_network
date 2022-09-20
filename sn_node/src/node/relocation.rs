@@ -124,6 +124,7 @@ mod tests {
 
     use sn_interface::{
         elder_count,
+        messaging::SectionTreeUpdate,
         network_knowledge::{
             test_utils::section_signed, SectionAuthorityProvider, SectionsDAG, MIN_ADULT_AGE,
         },
@@ -181,10 +182,12 @@ mod tests {
             sk_set.public_keys(),
             0,
         );
-        let section_auth = section_signed(sk, section_auth)?;
+        let section_tree_update = {
+            let signed_sap = section_signed(sk, section_auth)?;
+            SectionTreeUpdate::new(signed_sap, SectionsDAG::new(genesis_pk))
+        };
 
-        let network_knowledge =
-            NetworkKnowledge::new(genesis_pk, SectionsDAG::new(genesis_pk), section_auth, None)?;
+        let network_knowledge = NetworkKnowledge::new(genesis_pk, section_tree_update, None)?;
 
         for peer in &peers {
             let info = NodeState::joined(*peer, None);

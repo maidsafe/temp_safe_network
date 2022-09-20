@@ -11,9 +11,12 @@ use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Error, Node, Result};
 
 use sn_interface::{
     elder_count,
-    messaging::system::{
-        JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest,
-        JoinResponse, MembershipState, NodeState, SystemMsg,
+    messaging::{
+        system::{
+            JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest,
+            JoinResponse, MembershipState, NodeState, SystemMsg,
+        },
+        SectionTreeUpdate,
     },
     network_knowledge::{SectionAuthUtils, FIRST_SECTION_MAX_AGE, MIN_ADULT_AGE},
     types::{log_markers::LogMarker, Peer},
@@ -113,12 +116,10 @@ impl Node {
         }
 
         if !section_key_matches || is_age_invalid {
-            let partial_dag = self.network_knowledge.our_section_dag();
-            let signed_sap = self.network_knowledge.section_signed_authority_provider();
+            let signed_sap = self.network_knowledge.signed_sap();
+            let proof_chain = self.network_knowledge.section_chain();
             let msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
-                section_auth: signed_sap.value.to_msg(),
-                section_signed: signed_sap.sig,
-                partial_dag,
+                section_tree_update: SectionTreeUpdate::new(signed_sap, proof_chain),
                 expected_age,
             }));
             trace!("Sending {:?} to {}", msg, peer);
@@ -204,7 +205,7 @@ impl Node {
             );
 
             let msg = SystemMsg::JoinAsRelocatedResponse(Box::new(JoinAsRelocatedResponse::Retry(
-                self.network_knowledge.authority_provider().to_msg(),
+                self.network_knowledge.section_auth().to_msg(),
             )));
 
             trace!("{} b", LogMarker::SendJoinAsRelocatedResponse);

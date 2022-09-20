@@ -14,8 +14,9 @@ use crate::node::{
 use bls::Signature;
 use sn_consensus::{Decision, Generation, SignedVote, VoteResponse};
 use sn_interface::{
-    messaging::system::{
-        JoinResponse, KeyedSig, MembershipState, NodeState, SectionAuth, SystemMsg,
+    messaging::{
+        system::{JoinResponse, KeyedSig, MembershipState, NodeState, SectionAuth, SystemMsg},
+        SectionTreeUpdate,
     },
     types::{log_markers::LogMarker, Peer},
 };
@@ -266,11 +267,10 @@ impl Node {
 
         let msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Approved {
             genesis_key: *self.network_knowledge.genesis_key(),
-            section_auth: self
-                .network_knowledge
-                .section_signed_authority_provider()
-                .into_authed_msg(),
-            sections_dag: self.network_knowledge.our_section_dag(),
+            section_tree_update: SectionTreeUpdate::new(
+                self.network_knowledge.signed_sap(),
+                self.network_knowledge.section_chain(),
+            ),
             decision,
         }));
 

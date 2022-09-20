@@ -37,8 +37,8 @@ mod msg_type;
 mod auth_kind;
 // Msg dst
 mod dst;
-// SectionAuthorityProvider
-mod sap;
+// Network Knowledge
+mod network_knowledge;
 
 #[cfg(feature = "traceroute")]
 pub use self::serialisation::{Entity, Traceroute};
@@ -52,7 +52,7 @@ pub use self::{
     errors::{Error, Result},
     msg_id::{MsgId, MESSAGE_ID_LEN},
     msg_type::MsgType,
-    sap::SectionAuthorityProvider,
+    network_knowledge::{SectionAuthorityProvider, SectionInfo, SectionTreeUpdate, SectionsDAG},
     serialisation::{NodeMsgAuthority, WireMsg},
 };
 

@@ -39,7 +39,7 @@ use sn_interface::{
             MembershipState, NodeCmd, NodeMsgAuthorityUtils, NodeState as NodeStateMsg,
             RelocateDetails, ResourceProof, SectionAuth, SystemMsg,
         },
-        Dst, MsgId, MsgType, SectionAuth as MsgKindSectionAuth, WireMsg,
+        Dst, MsgId, MsgType, SectionAuth as MsgKindSectionAuth, SectionTreeUpdate, WireMsg,
     },
     network_knowledge::{
         recommended_section_size, supermajority, test_utils::*, Error as NetworkKnowledgeError,
@@ -285,13 +285,8 @@ async fn handle_agreement_on_online() -> Result<()> {
                     .await?;
 
             let new_peer = network_utils::create_peer(MIN_ADULT_AGE);
-            let status = handle_online_cmd(
-                &new_peer,
-                &sk_set,
-                &dispatcher,
-                &section.authority_provider(),
-            )
-            .await?;
+            let status =
+                handle_online_cmd(&new_peer, &sk_set, &dispatcher, &section.section_auth()).await?;
             assert!(status.node_approval_sent);
 
             assert_matches!(
@@ -313,7 +308,8 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     local
         .run_until(async move {
             let sk_set = SecretKeySet::random(None);
-            let dag = SectionsDAG::new(sk_set.secret_key().public_key());
+            let pk = sk_set.secret_key().public_key();
+            let section_chain = SectionsDAG::new(pk);
 
             // Creates nodes where everybody has age 6 except one has 5.
             let mut nodes: Vec<_> = gen_sorted_nodes(&Prefix::default(), elder_count(), true);
@@ -327,9 +323,12 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                 sk_set.public_keys(),
                 0,
             );
-            let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
+            let section_tree_update = {
+                let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
+                SectionTreeUpdate::new(signed_sap, section_chain)
+            };
 
-            let section = NetworkKnowledge::new(*dag.genesis_key(), dag, signed_sap, None)?;
+            let section = NetworkKnowledge::new(pk, section_tree_update, None)?;
             let mut expected_new_elders = BTreeSet::new();
 
             for peer in section_auth.elders() {
@@ -573,11 +572,13 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             let pk1 = sk_set1.secret_key().public_key();
             let pk1_signature = sk0.sign(bincode::serialize(&pk1)?);
 
-            let mut dag = SectionsDAG::new(pk0);
-            assert!(dag.insert(&pk0, pk1, pk1_signature).is_ok());
-
-            let signed_old_sap = section_signed(sk_set1.secret_key(), old_sap.clone())?;
-            let network_knowledge = NetworkKnowledge::new(pk0, dag.clone(), signed_old_sap, None)?;
+            let mut section_chain = SectionsDAG::new(pk0);
+            assert!(section_chain.insert(&pk0, pk1, pk1_signature).is_ok());
+            let section_tree_update = {
+                let signed_old_sap = section_signed(sk_set1.secret_key(), old_sap.clone())?;
+                SectionTreeUpdate::new(signed_old_sap, section_chain.clone())
+            };
+            let network_knowledge = NetworkKnowledge::new(pk0, section_tree_update, None)?;
 
             // Create our node
             let (event_sender, mut event_receiver) =
@@ -602,7 +603,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             let sk2 = sk_set2.secret_key();
             let pk2 = sk2.public_key();
             let pk2_signature = sk_set1.secret_key().sign(bincode::serialize(&pk2)?);
-            dag.insert(&pk1, pk2, pk2_signature)?;
+            section_chain.insert(&pk1, pk2, pk2_signature)?;
 
             let old_node = nodes.remove(0);
             let src_section_pk = pk2;
@@ -623,7 +624,10 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
                 0,
             );
             let new_section_elders: BTreeSet<_> = new_sap.names();
-            let signed_new_sap = section_signed(sk2, new_sap.clone())?;
+            let section_tree_update = {
+                let signed_new_sap = section_signed(sk2, new_sap.clone())?;
+                SectionTreeUpdate::new(signed_new_sap, section_chain)
+            };
 
             // Create the `Sync` message containing the new `Section`.
             let wire_msg = WireMsg::single_src(
@@ -633,9 +637,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
                     section_key: pk1,
                 },
                 SystemMsg::AntiEntropy {
-                    section_auth: new_sap.to_msg(),
-                    section_signed: signed_new_sap.sig,
-                    partial_dag: dag,
+                    section_tree_update,
                     kind: AntiEntropyKind::Update {
                         members: BTreeSet::default(),
                     },
@@ -691,12 +693,17 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
             let pk = sk_set.secret_key().public_key();
 
             // a valid AE msg but with a non-verifiable SAP...
-            let bogus_section_pk = bls::SecretKey::random().public_key();
             let signed_sap = section.signed_sap();
-            let node_msg = SystemMsg::AntiEntropy {
-                section_auth: signed_sap.value.clone().to_msg(),
+            let bogus_section_pk = bls::SecretKey::random().public_key();
+            // skip verification by not using `new()`
+            let bogus_section_tree_update = SectionTreeUpdate {
+                section_auth: signed_sap.to_msg(),
                 section_signed: signed_sap.sig,
-                partial_dag: SectionsDAG::new(bogus_section_pk),
+                proof_chain: SectionsDAG::new(bogus_section_pk).into(),
+            };
+
+            let node_msg = SystemMsg::AntiEntropy {
+                section_tree_update: bogus_section_tree_update,
                 kind: AntiEntropyKind::Update {
                     members: BTreeSet::default(),
                 },
@@ -724,7 +731,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
                 )
                 .await,
                 Err(Error::NetworkKnowledge(
-                    NetworkKnowledgeError::UntrustedPartialDAG(_)
+                    NetworkKnowledgeError::UntrustedProofChain(_)
                 ))
             ));
 
@@ -1006,16 +1013,17 @@ async fn handle_elders_update() -> Result<()> {
                 _ => continue,
             };
 
-            let partial_dag = match msg {
-                SystemMsg::AntiEntropy { partial_dag, kind: AntiEntropyKind::Update { .. }, .. } => partial_dag,
+            let proof_chain = match msg {
+                SystemMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Update { .. }, .. } => section_tree_update.proof_chain()?,
                 _ => continue,
             };
 
-            let is_pk1_last_key = partial_dag.leaf_keys().contains(&pk1)
-                && partial_dag.leaf_keys().len() == 1;
+            let is_pk1_last_key = proof_chain.leaf_keys().contains(&pk1)
+                && proof_chain.leaf_keys().len() == 1;
             assert!(is_pk1_last_key);
 
 
+            // roland TODO look at this
             // Merging the section contained in the message with the original section succeeds.
             // TODO: how to do this here?
             // assert_matches!(section0.clone().merge(proof_chain.clone()), Ok(()));
@@ -1411,7 +1419,7 @@ async fn spentbook_spend_spent_proofs_do_not_relate_to_input_dbcs_should_return_
             // `new_dbc2`, we use the spent proofs/transactions from `genesis_dbc`. This should
             // not be permitted. The correct way would be to pass the spent proofs/transactions
             // from `new_dbc`, which was our input to `new_dbc2`.
-            let sap = section.authority_provider();
+            let sap = section.section_auth();
             let keys_provider = dispatcher.node().read().await.section_keys_provider.clone();
             let genesis_dbc = gen_genesis_dbc(&sk_set)?;
             let new_dbc = dbc_utils::reissue_dbc(
@@ -1479,7 +1487,7 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
                     .await?;
 
             // These conditions will produce a failure on `tx.verify` in the message handler.
-            let sap = section.authority_provider();
+            let sap = section.section_auth();
             let keys_provider = dispatcher.node().read().await.section_keys_provider.clone();
             let genesis_dbc = gen_genesis_dbc(&sk_set)?;
             let new_dbc = dbc_utils::reissue_dbc(
@@ -1546,7 +1554,7 @@ async fn spentbook_spend_with_random_key_image_should_return_spentbook_error() -
                     .build()
                     .await?;
 
-            let sap = section.authority_provider();
+            let sap = section.section_auth();
             let keys_provider = dispatcher.node().read().await.section_keys_provider.clone();
             let genesis_dbc = gen_genesis_dbc(&sk_set)?;
             let new_dbc = dbc_utils::reissue_dbc(

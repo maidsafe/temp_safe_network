@@ -61,7 +61,7 @@ impl NodeTestApi {
 
     /// Returns the Section Signed Chain
     pub async fn section_chain(&self) -> SectionsDAG {
-        self.node.read().await.our_section_dag()
+        self.node.read().await.section_chain()
     }
 
     /// Returns the Section Chain's genesis key

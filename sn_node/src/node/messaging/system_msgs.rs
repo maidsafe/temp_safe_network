@@ -46,7 +46,7 @@ use xor_name::XorName;
 impl Node {
     /// Send a (`SystemMsg`) message to all Elders in our section
     pub(crate) fn send_msg_to_our_elders(&self, msg: SystemMsg) -> Cmd {
-        let sap = self.network_knowledge.authority_provider();
+        let sap = self.network_knowledge.section_auth();
         let recipients = sap.elders_set();
         self.send_system_msg(msg, Peers::Multiple(recipients))
     }
@@ -157,16 +157,12 @@ impl Node {
                 Ok(vec![])
             }
             SystemMsg::AntiEntropy {
-                section_auth,
-                section_signed,
-                partial_dag,
+                section_tree_update,
                 kind,
             } => {
                 trace!("Handling msg: AE from {sender}: {msg_id:?}");
                 self.handle_anti_entropy_msg(
-                    section_auth.into_state(),
-                    section_signed,
-                    partial_dag,
+                    section_tree_update,
                     kind,
                     sender,
                     #[cfg(feature = "traceroute")]
@@ -195,8 +191,7 @@ impl Node {
             SystemMsg::JoinResponse(join_response) => {
                 match *join_response {
                     JoinResponse::Approved {
-                        section_auth,
-                        sections_dag,
+                        section_tree_update,
                         ..
                     } => {
                         info!(
@@ -219,12 +214,11 @@ impl Node {
                             let genesis_key = *self.network_knowledge.genesis_key();
                             let section_tree = self.network_knowledge.section_tree().clone();
 
-                            let recipients = section_auth.value.elders.clone();
+                            let recipients = section_tree_update.section_auth.elders.clone();
 
                             let new_network_knowledge = NetworkKnowledge::new(
                                 genesis_key,
-                                sections_dag,
-                                section_auth.into_authed_state(),
+                                section_tree_update,
                                 Some(section_tree),
                             )?;
 
@@ -612,7 +606,7 @@ impl Node {
                         "Cannot verify DkgSessionInfo: {:?}. Unknown key: {:?}!",
                         &session_id, auth.sig.public_key
                     );
-                    let chain = self.network_knowledge().our_section_dag();
+                    let chain = self.network_knowledge().section_chain();
                     warn!("Chain: {:?}", chain);
                     return Ok(cmds);
                 };

@@ -203,9 +203,7 @@ mod core {
             root_storage_dir: PathBuf,
         ) -> Result<Self> {
             let membership = if let Some(key) = section_key_share.clone() {
-                let n_elders = network_knowledge
-                    .section_signed_authority_provider()
-                    .elder_count();
+                let n_elders = network_knowledge.signed_sap().elder_count();
 
                 // TODO: the bootstrap members should come from handover
                 let bootstrap_members = BTreeSet::from_iter(
@@ -314,7 +312,7 @@ mod core {
                 dst = xor_name::rand::random();
             }
 
-            let matching_section = self.network_knowledge.section_by_name(&dst)?;
+            let matching_section = self.network_knowledge.section_auth_by_name(&dst)?;
             let recipients = matching_section.elders_set();
 
             let probe = self.network_knowledge.anti_entropy_probe();
@@ -328,7 +326,7 @@ mod core {
         /// targetting our section elders.
         /// Even if we're up to date, we expect a response.
         pub(crate) fn generate_section_probe_msg(&self) -> Cmd {
-            let our_section = self.network_knowledge.authority_provider();
+            let our_section = self.network_knowledge.section_auth();
             let recipients = our_section.elders_set();
 
             info!(
@@ -378,7 +376,7 @@ mod core {
                 is_elder: self.is_elder(),
                 section_key: self.network_knowledge.section_key(),
                 prefix: self.network_knowledge.prefix(),
-                elders: self.network_knowledge().authority_provider().names(),
+                elders: self.network_knowledge().section_auth().names(),
                 members: self
                     .network_knowledge()
                     .members()
@@ -395,8 +393,8 @@ mod core {
             &mut self,
             excluded_names: &BTreeSet<XorName>,
         ) -> Vec<DkgSessionId> {
-            let sap = self.network_knowledge.authority_provider();
-            let chain_len = self.network_knowledge.our_section_dag_len();
+            let sap = self.network_knowledge.section_auth();
+            let chain_len = self.network_knowledge.section_chain_len();
 
             // get current gen and members
             let current_gen;
@@ -444,7 +442,7 @@ mod core {
 
             // Candidates for elders out of all the nodes in the section, even out of the
             // relocating nodes if there would not be enough instead.
-            let sap = self.network_knowledge.authority_provider();
+            let sap = self.network_knowledge.section_auth();
             let elder_candidates = elder_candidates(
                 members
                     .values()
@@ -481,7 +479,7 @@ mod core {
                 trace!("section_peers {:?}", members);
                 vec![]
             } else {
-                let chain_len = self.network_knowledge.our_section_dag_len();
+                let chain_len = self.network_knowledge.section_chain_len();
                 let session_id = DkgSessionId {
                     prefix: sap.prefix(),
                     elders: BTreeMap::from_iter(
@@ -521,7 +519,7 @@ mod core {
             let key = self
                 .section_keys_provider
                 .key_share(&self.network_knowledge.section_key())?;
-            let n_elders = self.network_knowledge.authority_provider().elder_count();
+            let n_elders = self.network_knowledge.section_auth().elder_count();
 
             // reset split barrier for
             self.split_barrier = SplitBarrier::new();
@@ -536,11 +534,7 @@ mod core {
         }
 
         fn initialize_elder_state(&mut self) -> Result<()> {
-            let sap = self
-                .network_knowledge
-                .section_signed_authority_provider()
-                .value
-                .to_msg();
+            let sap = self.network_knowledge.signed_sap().value.to_msg();
             self.initialize_membership(sap)?;
             self.initialize_handover()?;
             Ok(())
@@ -561,7 +555,7 @@ mod core {
             let mut cmds = vec![];
 
             if new.is_elder {
-                let sap = self.network_knowledge.authority_provider();
+                let sap = self.network_knowledge.section_auth();
                 info!(
                     "Section updated: prefix: ({:b}), key: {:?}, elders: {}",
                     new.prefix,
@@ -604,7 +598,7 @@ mod core {
                 }
             }
 
-            let current: BTreeSet<_> = self.network_knowledge.authority_provider().names();
+            let current: BTreeSet<_> = self.network_knowledge.section_auth().names();
             let added = current.difference(&old.elders).copied().collect();
             let removed = old.elders.difference(&current).copied().collect();
             let remaining = old.elders.intersection(&current).copied().collect();
@@ -670,7 +664,7 @@ mod core {
                 cmds.push(
                     self.send_metadata_updates(
                         self.network_knowledge
-                            .authority_provider()
+                            .section_auth()
                             .elders()
                             .filter(|peer| !old.elders.contains(&peer.name()))
                             .cloned()
@@ -691,7 +685,7 @@ mod core {
         pub(crate) fn section_key_by_name(&self, name: &XorName) -> Result<bls::PublicKey> {
             if self.network_knowledge.prefix().matches(name) {
                 Ok(self.network_knowledge.section_key())
-            } else if let Ok(sap) = self.network_knowledge.section_by_name(name) {
+            } else if let Ok(sap) = self.network_knowledge.section_auth_by_name(name) {
                 Ok(sap.section_key())
             } else if self.network_knowledge.prefix().sibling().matches(name) {
                 // For sibling with unknown key, use the previous key in our chain under the assumption
@@ -700,9 +694,10 @@ mod core {
                 // key since the split) then this key would be unknown to them and they would send
                 // us back their whole section chain. However, this situation should be rare.
 
-                let leaf_key = self.network_knowledge.our_section_dag().last_key()?;
-                match self.our_section_dag().get_parent_key(&leaf_key) {
-                    Ok(prev_pk) => Ok(prev_pk.unwrap_or(*self.our_section_dag().genesis_key())),
+                // section_chain produces a proof chain with only 1 leaf
+                let leaf_key = self.network_knowledge.section_chain().last_key()?;
+                match self.section_chain().get_parent_key(&leaf_key) {
+                    Ok(prev_pk) => Ok(prev_pk.unwrap_or(*self.section_chain().genesis_key())),
                     Err(_) => {
                         error!("SectionsDAG fields went out of sync");
                         Ok(leaf_key)
@@ -718,7 +713,7 @@ mod core {
                 "{}",
                 self.network_knowledge
                     .section_tree()
-                    .network_stats(&self.network_knowledge.authority_provider())
+                    .network_stats(&self.network_knowledge.section_auth())
             );
         }
 
@@ -726,7 +721,7 @@ mod core {
             if let Some(m) = self.membership.as_ref() {
                 let adults = self.network_knowledge.adults().len();
 
-                let elders = self.network_knowledge.authority_provider().elder_count();
+                let elders = self.network_knowledge.section_auth().elder_count();
 
                 let membership_adults = m.current_section_members().len() - elders;
                 let prefix = self.network_knowledge.prefix();

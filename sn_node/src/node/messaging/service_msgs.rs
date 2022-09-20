@@ -431,7 +431,7 @@ impl Node {
         let spent_proof_share = Self::build_spent_proof_share(
             key_image,
             tx,
-            &self.network_knowledge.authority_provider(),
+            &self.network_knowledge.section_auth(),
             &self.section_keys_provider,
             public_commitments,
         )?;

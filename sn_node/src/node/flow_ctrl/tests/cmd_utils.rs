@@ -59,11 +59,14 @@ pub(crate) async fn handle_online_cmd(
         match msg {
             SystemMsg::JoinResponse(response) => {
                 if let JoinResponse::Approved {
-                    section_auth: signed_sap,
+                    section_tree_update,
                     ..
                 } = *response
                 {
-                    assert_eq!(signed_sap.value, section_auth.clone().to_msg());
+                    assert_eq!(
+                        section_tree_update.section_auth,
+                        section_auth.clone().to_msg()
+                    );
                     assert_matches!(recipients, Peers::Multiple(peers) => {
                         assert_eq!(peers, BTreeSet::from([*peer]));
                     });

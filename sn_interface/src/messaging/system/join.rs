@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{agreement::SectionAuth, KeyedSig, NodeState};
-use crate::{messaging::SectionAuthorityProvider, network_knowledge::SectionsDAG};
+use super::NodeState;
+use crate::messaging::{SectionAuthorityProvider, SectionTreeUpdate};
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::Signature;
 use serde::{Deserialize, Serialize};
@@ -63,12 +63,9 @@ pub enum JoinResponse {
     },
     /// Up to date section information for a joining peer to retry its join request with
     Retry {
-        /// Current `SectionAuthorityProvider` of the section.
-        section_auth: SectionAuthorityProvider,
-        /// Section signature over the `SectionAuthorityProvider`.
-        section_signed: KeyedSig,
-        /// Section chain truncated from the section key found in the join request.
-        partial_dag: SectionsDAG,
+        /// The update to our NetworkKnowledge containing the current `SectionAuthorityProvider` of
+        /// the section and the section chain truncated from the section key found in the join request.
+        section_tree_update: SectionTreeUpdate,
         /// The age of the node as expected by the section.
         expected_age: u8,
     },
@@ -79,12 +76,12 @@ pub enum JoinResponse {
     /// Message sent to joining peer containing the necessary
     /// info to become a member of the section.
     Approved {
-        /// Network genesis key (needed to validate) section_chain
+        // roland TODO is this needed since section tree update contains section chain for Approved
+        /// Network genesis key (needed to validate) section chain
         genesis_key: BlsPublicKey,
-        /// SectionAuthorityProvider Signed by (current section)
-        section_auth: SectionAuth<SectionAuthorityProvider>,
-        /// Full verifiable section chain
-        sections_dag: SectionsDAG,
+        /// The update to our NetworkKnowledge containing the `SectionAuthorityProvider` signed by
+        /// the current section and a fully verifiable section chain
+        section_tree_update: SectionTreeUpdate,
         /// Current node's state
         decision: Decision<NodeState>,
     },

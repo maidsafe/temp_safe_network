@@ -85,7 +85,7 @@ impl RelocateDetails {
         let genesis_key = *network_knowledge.genesis_key();
 
         let dst_section_key = network_knowledge
-            .section_by_name(&dst)
+            .section_auth_by_name(&dst)
             .map_or_else(|_| genesis_key, |section_auth| section_auth.section_key());
 
         Self {

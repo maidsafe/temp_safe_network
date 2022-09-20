@@ -9,8 +9,10 @@
 #![allow(dead_code)]
 
 use super::errors::{Error, Result};
+use crate::messaging::{SectionInfo, SectionsDAG as SectionsDAGMsg};
+
 use crdts::{
-    merkle_reg::{Hash, MerkleReg, Node, Sha3Hash},
+    merkle_reg::{Hash, MerkleReg, Node},
     CmRDT,
 };
 use serde::{de::Error as DeserializationError, Deserialize, Deserializer, Serialize, Serializer};
@@ -19,34 +21,6 @@ use std::{
     fmt::{self, Debug, Formatter},
     iter, mem,
 };
-use tiny_keccak::{Hasher, Sha3};
-
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
-pub(crate) struct SectionInfo {
-    key: bls::PublicKey,
-    sig: bls::Signature,
-}
-
-impl Debug for SectionInfo {
-    fn fmt(&self, formatter: &mut Formatter) -> std::fmt::Result {
-        let bytes: Vec<u8> = self
-            .key
-            .to_bytes()
-            .into_iter()
-            .chain(self.sig.to_bytes().into_iter())
-            .collect();
-        let hex = hex::encode(bytes);
-        let hex: String = hex.chars().into_iter().take(10).collect();
-        write!(formatter, "SectionInfo({})", hex)
-    }
-}
-
-impl Sha3Hash for SectionInfo {
-    fn hash(&self, hasher: &mut Sha3) {
-        hasher.update(&self.key.to_bytes());
-        hasher.update(&self.sig.to_bytes());
-    }
-}
 
 /// A Merkle DAG of BLS keys where every key is signed by its parent key, except the genesis one.
 #[derive(Clone, PartialEq, Eq)]
@@ -57,49 +31,13 @@ pub struct SectionsDAG {
     hashes: BTreeMap<bls::PublicKey, Hash>,
 }
 
-#[derive(Serialize, Deserialize)]
-struct Intermediate {
-    genesis_key: bls::PublicKey,
-    sections: Vec<(bls::PublicKey, SectionInfo)>,
-}
-
 impl Serialize for SectionsDAG {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        let mut sections: Vec<(bls::PublicKey, SectionInfo)> = Vec::new();
-        let mut already_visited: BTreeSet<bls::PublicKey> = BTreeSet::new();
-
-        for leaf in self.non_genesis_leaf_nodes() {
-            let mut node = leaf;
-            let mut ancestors: Vec<(bls::PublicKey, SectionInfo)> = Vec::new();
-            loop {
-                // skip to the next leaf since we have visited the current node and its ancestors
-                if already_visited.contains(&node.value.key) {
-                    break;
-                }
-                let parent = match self.parent_node(node.hash()) {
-                    Some(parent) => parent,
-                    None => {
-                        ancestors.push((self.genesis_key, node.value.clone()));
-                        break;
-                    }
-                };
-                ancestors.push((parent.value.key, node.value.clone()));
-                node = parent
-            }
-
-            ancestors.into_iter().rev().for_each(|section| {
-                already_visited.insert(section.1.key);
-                sections.push(section);
-            })
-        }
-        let inter = Intermediate {
-            genesis_key: self.genesis_key,
-            sections,
-        };
-        inter.serialize(serializer)
+        let msg: SectionsDAGMsg = self.clone().into();
+        msg.serialize(serializer)
     }
 }
 
@@ -108,13 +46,8 @@ impl<'de> Deserialize<'de> for SectionsDAG {
     where
         D: Deserializer<'de>,
     {
-        let inter: Intermediate = Deserialize::deserialize(deserializer)?;
-        let mut dag = SectionsDAG::new(inter.genesis_key);
-        for (parent, info) in inter.sections {
-            dag.insert(&parent, info.key, info.sig)
-                .map_err(D::Error::custom)?;
-        }
-        Ok(dag)
+        let msg: SectionsDAGMsg = Deserialize::deserialize(deserializer)?;
+        msg.try_into().map_err(D::Error::custom)
     }
 }
 
@@ -143,6 +76,54 @@ impl Debug for SectionsDAG {
                 .zip(parent_indices.into_iter())
                 .collect::<Vec<_>>()
         )
+    }
+}
+
+impl From<SectionsDAG> for SectionsDAGMsg {
+    fn from(item: SectionsDAG) -> Self {
+        let mut sections: Vec<(bls::PublicKey, SectionInfo)> = Vec::new();
+        let mut already_visited: BTreeSet<bls::PublicKey> = BTreeSet::new();
+
+        for leaf in item.non_genesis_leaf_nodes() {
+            let mut node = leaf;
+            let mut ancestors: Vec<(bls::PublicKey, SectionInfo)> = Vec::new();
+            loop {
+                // skip to the next leaf since we have visited the current node and its ancestors
+                if already_visited.contains(&node.value.key) {
+                    break;
+                }
+                let parent = match item.parent_node(node.hash()) {
+                    Some(parent) => parent,
+                    None => {
+                        ancestors.push((item.genesis_key, node.value.clone()));
+                        break;
+                    }
+                };
+                ancestors.push((parent.value.key, node.value.clone()));
+                node = parent
+            }
+
+            ancestors.into_iter().rev().for_each(|section| {
+                already_visited.insert(section.1.key);
+                sections.push(section);
+            })
+        }
+        SectionsDAGMsg {
+            genesis_key: item.genesis_key,
+            sections,
+        }
+    }
+}
+
+impl TryFrom<SectionsDAGMsg> for SectionsDAG {
+    type Error = Error;
+
+    fn try_from(value: SectionsDAGMsg) -> Result<Self, Self::Error> {
+        let mut dag = SectionsDAG::new(value.genesis_key);
+        for (parent, info) in value.sections {
+            dag.insert(&parent, info.key, info.sig)?;
+        }
+        Ok(dag)
     }
 }
 
@@ -1031,7 +1012,7 @@ pub(crate) mod tests {
         })]
         #[test]
         #[allow(clippy::unwrap_used)]
-        fn proptest_merge_sections_dag((main_dag, list_of_partial_dags) in arb_sections_dag_and_partial_dags(100, false)) {
+        fn proptest_merge_sections_dag((main_dag, list_of_partial_dags) in arb_sections_dag_and_proof_chains(100, false)) {
                 let mut dag = SectionsDAG::new(main_dag.genesis_key);
                 for (partial_dag, _last_key_sap) in list_of_partial_dags {
                     dag.merge(partial_dag).unwrap();
@@ -1119,7 +1100,7 @@ pub(crate) mod tests {
     // new_information_only: if false, the partial_dags can end with keys which has been previously
     // inserted, providing no new information. Useful in `SectionTree` proptest.
     #[allow(clippy::unwrap_used)]
-    pub(crate) fn arb_sections_dag_and_partial_dags(
+    pub(crate) fn arb_sections_dag_and_proof_chains(
         max_sections: usize,
         new_information_only: bool,
     ) -> impl Strategy<

@@ -7,20 +7,23 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use bls::PublicKeySet;
+use crdts::merkle_reg::Sha3Hash;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use sn_consensus::Generation;
 use std::{
     borrow::Borrow,
     collections::BTreeMap,
-    fmt::{self, Display, Formatter},
+    fmt::{self, Debug, Display, Formatter},
     net::SocketAddr,
 };
+use tiny_keccak::{Hasher, Sha3};
+
 use xor_name::{Prefix, XorName};
 
-use super::system::NodeState;
+use crate::messaging::system::{KeyedSig, NodeState};
 
-// TODO: we need to maintain a list of nodes who have previosly been members of this section (archived nodes)
+// TODO: we need to maintain a list of nodes who have previously been members of this section (archived nodes)
 //       currently, only the final members of the section are preserved on the SAP.
 
 /// Details of section authority.
@@ -58,4 +61,50 @@ impl Display for SectionAuthorityProvider {
             self.prefix,
         )
     }
+}
+
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
+pub struct SectionInfo {
+    pub key: bls::PublicKey,
+    pub sig: bls::Signature,
+}
+
+impl Debug for SectionInfo {
+    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
+        let bytes: Vec<u8> = self
+            .key
+            .to_bytes()
+            .into_iter()
+            .chain(self.sig.to_bytes().into_iter())
+            .collect();
+        let hex = hex::encode(bytes);
+        let hex: String = hex.chars().into_iter().take(10).collect();
+        write!(formatter, "SectionInfo({})", hex)
+    }
+}
+
+impl Sha3Hash for SectionInfo {
+    fn hash(&self, hasher: &mut Sha3) {
+        hasher.update(&self.key.to_bytes());
+        hasher.update(&self.sig.to_bytes());
+    }
+}
+
+// roland TODO, partialeq valid? even if section's order differ a bit, the resultant SectionsDAG
+// will be equal, but this SectionsDAGMsg is not equal.
+/// A Merkle DAG of BLS keys where every key is signed by its parent key, except the genesis one.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SectionsDAG {
+    pub genesis_key: bls::PublicKey,
+    // List of (parent_key, SectionInfo)
+    pub sections: Vec<(bls::PublicKey, SectionInfo)>,
+}
+
+/// The update to our `NetworkKnowledge` containing the section's `SectionAuthorityProvider` signed
+/// by the section and the proof chain to validate the it.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SectionTreeUpdate {
+    pub section_auth: SectionAuthorityProvider,
+    pub section_signed: KeyedSig,
+    pub proof_chain: SectionsDAG,
 }

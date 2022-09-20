@@ -194,7 +194,7 @@ async fn bootstrap_node(
             prefix: network_knowledge.prefix(),
             key: network_knowledge.section_key(),
             remaining: BTreeSet::new(),
-            added: network_knowledge.authority_provider().names(),
+            added: network_knowledge.section_auth().names(),
             removed: BTreeSet::new(),
         };
 
