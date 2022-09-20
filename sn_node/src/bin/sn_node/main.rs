@@ -59,23 +59,23 @@ async fn main() -> Result<()> {
     // rt.block_on(async {
     let mut config = Config::new().await?;
 
-    let comm = if config.is_first() {
-        Comm::first_node(
-        local_addr,
-        config.network_config().clone(),
-        connection_event_tx,
-        )
-        .await?
-    }
-    else {
-        Comm::bootstrap(
-            local_addr,
-            bootstrap_nodes.as_slice(),
-            config.network_config().clone(),
-            connection_event_tx,
-        )
-        .await?
-    }
+    // let comm = if config.is_first() {
+    //     Comm::first_node(
+    //     local_addr,
+    //     config.network_config().clone(),
+    //     connection_event_tx,
+    //     )
+    //     .await?
+    // }
+    // else {
+    //     Comm::bootstrap(
+    //         local_addr,
+    //         bootstrap_nodes.as_slice(),
+    //         config.network_config().clone(),
+    //         connection_event_tx,
+    //     )
+    //     .await?
+    // }
 
 
     let _guard = log::init_node_logging(&config)?;
