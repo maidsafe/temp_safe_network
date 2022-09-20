@@ -491,19 +491,17 @@ impl Node {
             SystemMsg::NodeQuery(NodeQuery::Data {
                 query,
                 auth,
-                correlation_id,
                 operation_id,
             }) => {
                 // A request from EndUser - via elders - for locally stored data
                 debug!(
-                    "Handle NodeQuery with msg_id {:?}, correlation_id {:?}, operation_id {}",
-                    msg_id, correlation_id, operation_id
+                    "Handle NodeQuery with msg_id {:?}, operation_id {}",
+                    msg_id, operation_id
                 );
                 // There is no point in verifying a sig from a sender A or B here.
                 // Send back response to the sending elder
                 Ok(vec![
                     self.handle_data_query_at_adult(
-                        correlation_id,
                         operation_id,
                         &query,
                         auth,
@@ -516,12 +514,12 @@ impl Node {
             }
             SystemMsg::NodeQueryResponse {
                 response,
-                correlation_id,
                 operation_id,
             } => {
                 debug!(
-                    "{:?}: op_id {}, correlation_id: {correlation_id:?}, sender: {sender} origin msg_id: {msg_id:?}",
-                    LogMarker::ChunkQueryResponseReceviedFromAdult, operation_id
+                    "{:?}: op_id {}, sender: {sender} origin msg_id: {msg_id:?}",
+                    LogMarker::ChunkQueryResponseReceviedFromAdult,
+                    operation_id
                 );
 
                 match msg_authority {
@@ -530,15 +528,12 @@ impl Node {
                         Ok(self
                             .handle_data_query_response_at_elder(
                                 operation_id,
-                                correlation_id,
                                 response,
                                 sending_nodes_pk,
                                 #[cfg(feature = "traceroute")]
                                 traceroute,
                             )
-                            .await
-                            .into_iter()
-                            .collect())
+                            .await)
                     }
                     _ => Err(Error::InvalidQueryResponseAuthority),
                 }

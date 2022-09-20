@@ -82,6 +82,7 @@ impl Node {
         };
 
         let mut cmds = vec![Cmd::AddToPendingQueries {
+            msg_id,
             origin: source_client,
             operation_id,
             target_adult: target.name(),
@@ -94,7 +95,14 @@ impl Node {
         {
             if peers.len() > MAX_WAITING_PEERS_PER_QUERY {
                 warn!("Dropping query from {source_client:?}, there are more than {MAX_WAITING_PEERS_PER_QUERY} waiting already");
-                return Ok(vec![]);
+                let cmd = self.cmd_error_response(
+                    Error::CannotHandleQuery(query),
+                    source_client,
+                    msg_id,
+                    #[cfg(feature = "traceroute")]
+                    traceroute,
+                );
+                return Ok(vec![cmd]);
             }
         }
 
@@ -108,7 +116,6 @@ impl Node {
         let msg = SystemMsg::NodeQuery(NodeQuery::Data {
             query: query.variant,
             auth: auth.into_inner(),
-            correlation_id: msg_id,
             operation_id,
         });
 

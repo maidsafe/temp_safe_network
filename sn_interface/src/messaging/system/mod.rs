@@ -28,7 +28,7 @@ pub use signed::{KeyedSig, SigShare};
 use super::{authority::SectionAuth as SectionAuthProof, AuthorityProof};
 use qp2p::UsrMsgBytes;
 
-use crate::messaging::{MsgId, SectionAuthorityProvider};
+use crate::messaging::SectionAuthorityProvider;
 use crate::network_knowledge::SapCandidate;
 
 use sn_consensus::{Generation, SignedVote};
@@ -171,8 +171,6 @@ pub enum SystemMsg {
     NodeQueryResponse {
         /// QueryResponse.
         response: NodeQueryResponse,
-        /// ID of causing query.
-        correlation_id: MsgId,
         /// ID of the requested operation.
         operation_id: OperationId,
     },

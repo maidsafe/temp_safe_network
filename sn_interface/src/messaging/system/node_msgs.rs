@@ -9,7 +9,7 @@
 use super::OperationId;
 use crate::messaging::{
     data::{DataQueryVariant, MetadataExchange, QueryResponse, StorageLevel},
-    MsgId, ServiceAuth,
+    ServiceAuth,
 };
 use crate::types::{DataAddress, PublicKey, ReplicatedData};
 
@@ -67,8 +67,6 @@ pub enum NodeQuery {
         query: DataQueryVariant,
         /// Client signature
         auth: ServiceAuth,
-        /// The correlation id that recorded in Elders for this query
-        correlation_id: MsgId,
         /// The operation id that recorded in Elders for this query
         operation_id: OperationId,
     },
