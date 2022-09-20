@@ -6,13 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{Error, QueryResponse, Result};
+use super::{Error, QueryResponse};
 
-use crate::messaging::data::OperationId;
 use crate::messaging::system::SectionAuth;
 use crate::network_knowledge::{SectionAuthorityProvider, SectionsDAG};
-use crate::types::{utils, SpentbookAddress};
-use tiny_keccak::{Hasher, Sha3};
+use crate::types::SpentbookAddress;
 
 use serde::{Deserialize, Serialize};
 use sn_dbc::{KeyImage, RingCtTransaction, SpentProof};
@@ -50,12 +48,9 @@ pub enum SpentbookCmd {
 impl SpentbookQuery {
     /// Creates a Response containing an error, with the Response variant corresponding to the
     /// Request variant.
-    pub fn error(&self, error: Error) -> Result<QueryResponse> {
-        match *self {
-            Self::SpentProofShares(_) => Ok(QueryResponse::SpentProofShares((
-                Err(error),
-                self.operation_id()?,
-            ))),
+    pub fn error(&self, error: Error) -> QueryResponse {
+        match self {
+            Self::SpentProofShares(_) => QueryResponse::SpentProofShares(Err(error)),
         }
     }
 
@@ -69,18 +64,6 @@ impl SpentbookQuery {
     /// Returns the xorname of the data for request.
     pub fn dst_name(&self) -> XorName {
         *self.dst_address().name()
-    }
-
-    /// Retrieves the operation identifier for this request, use in tracking node liveness
-    /// and responses at clients.
-    /// Must be the same as the query response
-    pub fn operation_id(&self) -> Result<OperationId> {
-        let bytes = utils::serialise(&self).map_err(|_| Error::NoOperationId)?;
-        let mut hasher = Sha3::v256();
-        let mut output = [0; 32];
-        hasher.update(&bytes);
-        hasher.finalize(&mut output);
-        Ok(OperationId(output))
     }
 }
 
