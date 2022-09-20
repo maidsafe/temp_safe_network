@@ -85,12 +85,12 @@ impl Node {
         #[cfg(feature = "traceroute")]
         traceroute.0.push(self.identity());
 
-        let new_msg_id = MsgId::new();
+        let msg_id = MsgId::new();
 
-        debug!("SendMSg formed for {:?}", new_msg_id);
+        debug!("SendMSg formed for {:?}", msg_id);
         Cmd::SendMsg {
             msg: OutgoingMsg::Service(msg),
-            msg_id: MsgId::new(),
+            msg_id,
             recipients,
             #[cfg(feature = "traceroute")]
             traceroute,
@@ -143,10 +143,7 @@ impl Node {
 
         let node_id = XorName::from(sending_node_pk);
 
-        // dont remove here, leave the receipients to expire. That way any incoming reqeusts
-        // will still be forwarded on, and one NotFound reply from one adult may not bork
-        // the Operational success at another Adult (if they were queried again)
-        let query_peers = self.pending_data_queries.get(&(op_id, node_id));
+        let query_peers = self.pending_data_queries.remove(&(op_id, node_id));
 
         // First check for waiting peers. If no one is waiting, we drop the response
         let waiting_peers = if let Some(peers) = query_peers {
@@ -155,7 +152,7 @@ impl Node {
                 // nothing to do
                 return vec![];
             }
-            peers.clone()
+            peers
         } else {
             warn!(
                 "Dropping chunk query response from Adult {}. We might have already forwarded this chunk to the requesting client or the client connection cache has expired: {}",
