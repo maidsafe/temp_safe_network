@@ -127,6 +127,7 @@ pub(crate) enum Cmd {
     /// Adds peer to set of recipients of an already pending query,
     /// or adds a pending query if it didn't already exist.
     AddToPendingQueries {
+        msg_id: MsgId,
         operation_id: OperationId,
         origin: Peer,
         target_adult: XorName,
