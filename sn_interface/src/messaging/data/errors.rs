@@ -47,16 +47,7 @@ pub enum Error {
     /// Invalid Operation such as a POST on ImmutableData
     #[error("Invalid operation: {0}")]
     InvalidOperation(String),
-    /// There was an error forming the OperationId
-    #[error("Operation id could not be derived.")]
-    NoOperationId,
-    /// Error is not valid for operation id generation. This should not absolve a pending (and thus far unfulfilled) operation
-    #[error("Could not generate operation id for chunk retrieval. Error was not 'DataNotFound'.")]
-    InvalidQueryResponseErrorForOperationId,
-    /// A DBC spend request could not be processed because the processing section was unaware of
-    /// the section that signed one of the input spent proofs.
-    #[error(
-        "Spent proof is signed by section key {0:?} that is unknown to the current section {1:?}"
-    )]
+    /// Failed to verify a spent proof since it's signed by unknown section key
+    #[error("Spent proof was signed with unknown section key: {0:?}")]
     SpentProofUnknownSectionKey(bls::PublicKey, bls::PublicKey),
 }
