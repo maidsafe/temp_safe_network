@@ -35,7 +35,6 @@ use crate::types::{
 };
 
 use bytes::Bytes;
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sn_dbc::SpentProofShare;
 use std::{
@@ -43,47 +42,7 @@ use std::{
     convert::TryFrom,
     fmt::{self, Debug, Display, Formatter},
 };
-use tiny_keccak::{Hasher, Sha3};
 use xor_name::XorName;
-
-/// Derivable Id of an operation. Query/Response should return the same id for simple tracking purposes.
-/// TODO: make uniquer per requester for some operations
-#[derive(Deserialize, Serialize, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub struct OperationId(pub [u8; 32]);
-
-impl Display for OperationId {
-    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
-        write!(
-            fmt,
-            "OpId-{:02x}{:02x}{:02x}..",
-            self.0[0], self.0[1], self.0[2]
-        )
-    }
-}
-
-impl Debug for OperationId {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self)
-    }
-}
-
-impl OperationId {
-    /// Creates an operation id by hashing the provided bytes
-    pub fn from(bytes: &Bytes) -> Self {
-        let mut hasher = Sha3::v256();
-        let mut output = [0; 32];
-        hasher.update(bytes);
-        hasher.finalize(&mut output);
-
-        Self(output)
-    }
-
-    /// Creates a random operation id
-    pub fn random() -> Self {
-        let mut rng = rand::thread_rng();
-        Self(rng.gen())
-    }
-}
 
 /// Network service messages exchanged between clients
 /// and nodes in order for the clients to use the network services.
@@ -197,27 +156,27 @@ pub enum QueryResponse {
     /// Response to [`GetChunk`]
     ///
     /// [`GetChunk`]: crate::messaging::data::DataQueryVariant::GetChunk
-    GetChunk((Result<Chunk>, OperationId)),
+    GetChunk(Result<Chunk>),
     //
     // ===== Register Data =====
     //
     /// Response to [`RegisterQuery::Get`].
-    GetRegister((Result<Register>, OperationId)),
+    GetRegister(Result<Register>),
     /// Response to [`RegisterQuery::GetEntry`].
-    GetRegisterEntry((Result<Entry>, OperationId)),
+    GetRegisterEntry(Result<Entry>),
     /// Response to [`RegisterQuery::GetOwner`].
-    GetRegisterOwner((Result<User>, OperationId)),
+    GetRegisterOwner(Result<User>),
     /// Response to [`RegisterQuery::Read`].
-    ReadRegister((Result<BTreeSet<(EntryHash, Entry)>>, OperationId)),
+    ReadRegister(Result<BTreeSet<(EntryHash, Entry)>>),
     /// Response to [`RegisterQuery::GetPolicy`].
-    GetRegisterPolicy((Result<Policy>, OperationId)),
+    GetRegisterPolicy(Result<Policy>),
     /// Response to [`RegisterQuery::GetUserPermissions`].
-    GetRegisterUserPermissions((Result<Permissions>, OperationId)),
+    GetRegisterUserPermissions(Result<Permissions>),
     //
     // ===== Spentbook Data =====
     //
     /// Response to [`SpentbookQuery::SpentProofShares`].
-    SpentProofShares((Result<Vec<SpentProofShare>>, OperationId)),
+    SpentProofShares(Result<Vec<SpentProofShare>>),
 }
 
 impl QueryResponse {
@@ -226,55 +185,39 @@ impl QueryResponse {
         use QueryResponse::*;
         matches!(
             self,
-            GetChunk((Ok(_), _))
-                | GetRegister((Ok(_), _))
-                | GetRegisterEntry((Ok(_), _))
-                | GetRegisterOwner((Ok(_), _))
-                | ReadRegister((Ok(_), _))
-                | GetRegisterPolicy((Ok(_), _))
-                | GetRegisterUserPermissions((Ok(_), _))
-                | SpentProofShares((Ok(_), _))
+            GetChunk(Ok(_))
+                | GetRegister(Ok(_))
+                | GetRegisterEntry(Ok(_))
+                | GetRegisterOwner(Ok(_))
+                | ReadRegister(Ok(_))
+                | GetRegisterPolicy(Ok(_))
+                | GetRegisterUserPermissions(Ok(_))
+                | SpentProofShares(Ok(_))
         )
     }
 
     /// Returns true if the result returned is DataNotFound
     pub fn is_data_not_found(&self) -> bool {
         use QueryResponse::*;
-        if let SpentProofShares((Ok(vec), _)) = self {
+        if let SpentProofShares(Ok(vec)) = self {
             return vec.len() < 5;
         }
 
         matches!(
             self,
-            GetChunk((Err(Error::DataNotFound(_)), _))
-                | GetRegister((Err(Error::DataNotFound(_)), _))
-                | GetRegisterEntry((Err(Error::DataNotFound(_)), _))
-                | GetRegisterEntry((Err(Error::NoSuchEntry), _))
-                | GetRegisterOwner((Err(Error::DataNotFound(_)), _))
-                | GetRegisterOwner((Err(Error::NoSuchEntry), _))
-                | ReadRegister((Err(Error::DataNotFound(_)), _))
-                | GetRegisterPolicy((Err(Error::DataNotFound(_)), _))
-                | GetRegisterPolicy((Err(Error::NoSuchEntry), _))
-                | GetRegisterUserPermissions((Err(Error::DataNotFound(_)), _))
-                | GetRegisterUserPermissions((Err(Error::NoSuchEntry), _))
-                | SpentProofShares((Err(Error::DataNotFound(_)), _))
+            GetChunk(Err(Error::DataNotFound(_)))
+                | GetRegister(Err(Error::DataNotFound(_)))
+                | GetRegisterEntry(Err(Error::DataNotFound(_)))
+                | GetRegisterEntry(Err(Error::NoSuchEntry))
+                | GetRegisterOwner(Err(Error::DataNotFound(_)))
+                | GetRegisterOwner(Err(Error::NoSuchEntry))
+                | ReadRegister(Err(Error::DataNotFound(_)))
+                | GetRegisterPolicy(Err(Error::DataNotFound(_)))
+                | GetRegisterPolicy(Err(Error::NoSuchEntry))
+                | GetRegisterUserPermissions(Err(Error::DataNotFound(_)))
+                | GetRegisterUserPermissions(Err(Error::NoSuchEntry))
+                | SpentProofShares(Err(Error::DataNotFound(_)))
         )
-    }
-
-    /// Retrieves the operation identifier for this response, use in tracking node liveness
-    /// and responses at clients.
-    pub fn operation_id(&self) -> OperationId {
-        use QueryResponse::*;
-        match self {
-            GetChunk((_, op_id))
-            | GetRegister((_, op_id))
-            | GetRegisterEntry((_, op_id))
-            | GetRegisterOwner((_, op_id))
-            | ReadRegister((_, op_id))
-            | GetRegisterPolicy((_, op_id))
-            | GetRegisterUserPermissions((_, op_id))
-            | SpentProofShares((_, op_id)) => *op_id,
-        }
     }
 }
 
@@ -296,8 +239,8 @@ macro_rules! try_from {
             fn try_from(response: QueryResponse) -> std::result::Result<Self, Self::Error> {
                 match response {
                     $(
-                        QueryResponse::$variant((Ok(data), _op_id)) => Ok(data),
-                        QueryResponse::$variant((Err(error), _op_id)) => Err(TryFromError::Response(error)),
+                        QueryResponse::$variant(Ok(data)) => Ok(data),
+                        QueryResponse::$variant(Err(error)) => Err(TryFromError::Response(error)),
                     )*
                     _ => Err(TryFromError::WrongType),
                 }
@@ -312,8 +255,8 @@ impl TryFrom<QueryResponse> for Chunk {
     type Error = TryFromError;
     fn try_from(response: QueryResponse) -> std::result::Result<Self, Self::Error> {
         match response {
-            QueryResponse::GetChunk((Ok(data), _)) => Ok(data),
-            QueryResponse::GetChunk((Err(error), _)) => Err(TryFromError::Response(error)),
+            QueryResponse::GetChunk(Ok(data)) => Ok(data),
+            QueryResponse::GetChunk(Err(error)) => Err(TryFromError::Response(error)),
             _ => Err(TryFromError::WrongType),
         }
     }
@@ -353,14 +296,9 @@ mod tests {
     #[test]
     fn debug_format_functional() -> Result<()> {
         if let Some(key) = gen_keys().first() {
-            let errored_response = QueryResponse::GetRegister((
-                Err(Error::AccessDenied(User::Key(*key))),
-                OperationId([
-                    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5,
-                    6, 7, 8, 9, 1, 2,
-                ]), // some op id
-            ));
-            assert!(format!("{:?}", errored_response).contains("GetRegister((Err(AccessDenied("));
+            let errored_response =
+                QueryResponse::GetRegister(Err(Error::AccessDenied(User::Key(*key))));
+            assert!(format!("{:?}", errored_response).contains("GetRegister(Err(AccessDenied("));
             Ok(())
         } else {
             Err(eyre!("Could not generate public key"))
@@ -377,16 +315,15 @@ mod tests {
 
         let i_data = Chunk::new(Bytes::from(vec![1, 3, 1, 4]));
         let e = Error::AccessDenied(key);
-        let op_id = OperationId::random();
         assert_eq!(
             i_data,
-            GetChunk((Ok(i_data.clone()), op_id))
+            GetChunk(Ok(i_data.clone()))
                 .try_into()
                 .map_err(|_| eyre!("Mismatched types".to_string()))?
         );
         assert_eq!(
             Err(TryFromError::Response(e.clone())),
-            Chunk::try_from(GetChunk((Err(e), op_id)))
+            Chunk::try_from(GetChunk(Err(e)))
         );
 
         Ok(())

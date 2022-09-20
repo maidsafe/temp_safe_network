@@ -238,16 +238,14 @@ impl Session {
                     correlation_id,
                 } => {
                     trace!(
-                    "ServiceMsg with id {:?} is QueryResponse regarding {:?} with response {:?}",
-                    msg_id,
-                    correlation_id,
-                    response,
-                );
+                        "ServiceMsg with id {:?} is QueryResponse regarding {:?} with response {:?}",
+                        msg_id,
+                        correlation_id,
+                        response,
+                    );
 
-                    let op_id = response.operation_id();
-                    debug!("OpId of {msg_id:?} is {op_id:?}");
-                    if let Some(entry) = queries.get_mut(&op_id) {
-                        debug!("op id: {op_id:?} exists in pending queries...");
+                    if let Some(entry) = queries.get_mut(&correlation_id) {
+                        debug!("correlation_id: {correlation_id:?} exists in pending queries...");
                         let received = entry.value();
 
                         debug!("inserting response : {response:?}");
@@ -257,10 +255,10 @@ impl Session {
 
                         debug!("received now looks like: {:?}", received);
                     } else {
-                        debug!("op id: {op_id:?} does not exist in pending queries...");
+                        debug!("correlation_id: {correlation_id:?} does not exist in pending queries...");
                         let received = DashSet::new();
                         let _prior = received.insert((src_peer.addr(), response));
-                        let _prev = queries.insert(op_id, Arc::new(received));
+                        let _prev = queries.insert(correlation_id, Arc::new(received));
                     }
                 }
                 ServiceMsg::CmdError {
@@ -272,7 +270,7 @@ impl Session {
                 }
                 ServiceMsg::CmdAck { correlation_id } => {
                     debug!(
-                        "CmdAck was received for Message{:?} w/ID: {:?} from {:?}",
+                        "CmdAck was received with id {:?} regarding {:?} from {:?}",
                         msg_id,
                         correlation_id,
                         src_peer.addr()

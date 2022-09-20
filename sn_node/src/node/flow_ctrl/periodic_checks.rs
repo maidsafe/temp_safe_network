@@ -15,8 +15,8 @@ use ed25519_dalek::Signer;
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
-        data::{DataQuery, DataQueryVariant, OperationId, ServiceMsg},
-        system::{NodeCmd, SystemMsg},
+        data::{DataQuery, DataQueryVariant, ServiceMsg},
+        system::{NodeCmd, OperationId, SystemMsg},
         AuthorityProof, MsgId, ServiceAuth, WireMsg,
     },
     types::log_markers::LogMarker,

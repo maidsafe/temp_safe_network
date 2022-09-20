@@ -97,8 +97,8 @@ impl Client {
         let res = self.send_query(query.clone()).await?;
 
         let chunk: Chunk = match res.response {
-            QueryResponse::GetChunk((result, op_id)) => {
-                result.map_err(|err| Error::ErrorMsg { source: err, op_id })
+            QueryResponse::GetChunk(result) => {
+                result.map_err(|err| Error::ErrorMsg { source: err })
             }
             response => return Err(Error::UnexpectedQueryResponse { query, response }),
         }?;

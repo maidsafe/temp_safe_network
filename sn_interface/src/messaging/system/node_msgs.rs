@@ -6,9 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::OperationId;
 use crate::messaging::{
-    data::{DataQueryVariant, MetadataExchange, OperationId, QueryResponse, StorageLevel},
-    EndUser, MsgId, ServiceAuth,
+    data::{DataQueryVariant, MetadataExchange, QueryResponse, StorageLevel},
+    MsgId, ServiceAuth,
 };
 use crate::types::{DataAddress, PublicKey, ReplicatedData};
 
@@ -66,8 +67,6 @@ pub enum NodeQuery {
         query: DataQueryVariant,
         /// Client signature
         auth: ServiceAuth,
-        /// The user that has initiated this query
-        origin: EndUser,
         /// The correlation id that recorded in Elders for this query
         correlation_id: MsgId,
         /// The operation id that recorded in Elders for this query

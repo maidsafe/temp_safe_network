@@ -90,9 +90,8 @@ mod core {
     use sn_interface::messaging::Entity;
     use sn_interface::{
         messaging::{
-            data::OperationId,
             signature_aggregator::SignatureAggregator,
-            system::{DkgSessionId, NodeState},
+            system::{DkgSessionId, NodeState, OperationId},
             AuthorityProof, SectionAuth, SectionAuthorityProvider,
         },
         network_knowledge::{

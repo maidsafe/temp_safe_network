@@ -8,8 +8,8 @@
 
 use super::wire_msg_header::WireMsgHeader;
 use crate::messaging::{
-    data::{OperationId, ServiceMsg},
-    system::SystemMsg,
+    data::ServiceMsg,
+    system::{OperationId, SystemMsg},
     AuthKind, AuthorityProof, Dst, Error, MsgId, MsgType, NodeMsgAuthority, Result, ServiceAuth,
 };
 

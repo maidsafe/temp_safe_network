@@ -8,7 +8,7 @@
 
 use super::{Error, QueryResponse};
 
-use crate::messaging::{data::OperationId, SectionAuth, ServiceAuth};
+use crate::messaging::{SectionAuth, ServiceAuth};
 #[allow(unused_imports)] // needed by rustdocs links
 use crate::types::register::Register;
 use crate::types::{
@@ -163,16 +163,16 @@ impl SignedRegisterEdit {
 impl RegisterQuery {
     /// Creates a Response containing an error, with the Response variant corresponding to the
     /// Request variant.
-    pub fn error(&self, error: Error, op_id: OperationId) -> QueryResponse {
+    pub fn error(&self, error: Error) -> QueryResponse {
         match self {
-            Self::Get(_) => QueryResponse::GetRegister((Err(error), op_id)),
-            Self::Read(_) => QueryResponse::ReadRegister((Err(error), op_id)),
-            Self::GetPolicy(_) => QueryResponse::GetRegisterPolicy((Err(error), op_id)),
+            Self::Get(_) => QueryResponse::GetRegister(Err(error)),
+            Self::Read(_) => QueryResponse::ReadRegister(Err(error)),
+            Self::GetPolicy(_) => QueryResponse::GetRegisterPolicy(Err(error)),
             Self::GetUserPermissions { .. } => {
-                QueryResponse::GetRegisterUserPermissions((Err(error), op_id))
+                QueryResponse::GetRegisterUserPermissions(Err(error))
             }
-            Self::GetEntry { .. } => QueryResponse::GetRegisterEntry((Err(error), op_id)),
-            Self::GetOwner(_) => QueryResponse::GetRegisterOwner((Err(error), op_id)),
+            Self::GetEntry { .. } => QueryResponse::GetRegisterEntry(Err(error)),
+            Self::GetOwner(_) => QueryResponse::GetRegisterOwner(Err(error)),
         }
     }
 

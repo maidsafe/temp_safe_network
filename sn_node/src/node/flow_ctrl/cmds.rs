@@ -17,8 +17,8 @@ use sn_dysfunction::IssueType;
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
-        data::{OperationId, ServiceMsg},
-        system::{DkgFailureSigSet, KeyedSig, NodeState, SectionAuth, SystemMsg},
+        data::ServiceMsg,
+        system::{DkgFailureSigSet, KeyedSig, NodeState, OperationId, SectionAuth, SystemMsg},
         AuthorityProof, MsgId, NodeMsgAuthority, ServiceAuth, WireMsg,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare},

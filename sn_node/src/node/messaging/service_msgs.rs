@@ -21,11 +21,10 @@ use sn_interface::{
     data_copy_count,
     messaging::{
         data::{
-            DataCmd, DataQueryVariant, EditRegister, OperationId, ServiceMsg, SignedRegisterEdit,
-            SpentbookCmd,
+            DataCmd, DataQueryVariant, EditRegister, ServiceMsg, SignedRegisterEdit, SpentbookCmd,
         },
-        system::{NodeQueryResponse, SystemMsg},
-        AuthorityProof, EndUser, MsgId, ServiceAuth,
+        system::{NodeQueryResponse, OperationId, SystemMsg},
+        AuthorityProof, MsgId, ServiceAuth,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeysProvider},
     types::{
@@ -103,23 +102,22 @@ impl Node {
     pub(crate) async fn handle_data_query_at_adult(
         &self,
         correlation_id: MsgId,
-        op_id: OperationId,
+        operation_id: OperationId,
         query: &DataQueryVariant,
         auth: ServiceAuth,
-        user: EndUser,
         requesting_elder: Peer,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Cmd {
         let response = self
             .data_storage
-            .query(query, User::Key(auth.public_key), op_id)
+            .query(query, User::Key(auth.public_key))
             .await;
 
         trace!("data query response at adult is: {:?}", response);
         let msg = SystemMsg::NodeQueryResponse {
             response,
             correlation_id,
-            user,
+            operation_id,
         };
 
         self.trace_system_msg(
@@ -135,13 +133,12 @@ impl Node {
     /// Forms a response to send to the requester
     pub(crate) async fn handle_data_query_response_at_elder(
         &mut self,
+        op_id: OperationId,
         correlation_id: MsgId,
         response: NodeQueryResponse,
-        user: EndUser,
         sending_node_pk: PublicKey,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Option<Cmd> {
-        let op_id = response.operation_id();
         debug!(
             "Handling data read @ elders, received from {:?}, op id: {:?}",
             sending_node_pk, op_id
@@ -165,7 +162,7 @@ impl Node {
         } else {
             warn!(
                 "Dropping chunk query response from Adult {}. We might have already forwarded this chunk to the requesting client or the client connection cache has expired: {}",
-                sending_node_pk, user.0
+                sending_node_pk, op_id
             );
             return None;
         };

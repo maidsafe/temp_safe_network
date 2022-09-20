@@ -18,7 +18,7 @@ use sn_interface::{
 
 use sn_interface::{
     messaging::{
-        data::{DataQuery, DataQueryVariant, OperationId, QueryResponse},
+        data::{DataQuery, DataQueryVariant, QueryResponse},
         AuthKind, Dst, MsgId, ServiceAuth, WireMsg,
     },
     network_knowledge::supermajority,
@@ -253,7 +253,6 @@ impl Session {
 
         #[allow(unused_mut)]
         let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
-        let operation_id = wire_msg.operation_id();
 
         #[cfg(feature = "traceroute")]
         wire_msg.append_trace(&mut Traceroute(vec![Entity::Client(client_pk)]));
@@ -286,11 +285,9 @@ impl Session {
         let mut response_checks = 0;
 
         loop {
-            debug!(
-                "looping send responses, attempt: #{response_checks} for {msg_id:?} op_id: {operation_id:?}"
-            );
+            debug!("looping send responses, attempt: #{response_checks} for {msg_id:?}");
             if let Some(response) = self
-                .check_query_responses(msg_id, operation_id, elders.clone(), chunk_addr)
+                .check_query_responses(msg_id, elders.clone(), chunk_addr)
                 .await?
             {
                 debug!("returning okkkkkkkkkkkkk");
@@ -310,7 +307,6 @@ impl Session {
     async fn check_query_responses(
         &self,
         msg_id: MsgId,
-        operation_id: OperationId,
         elders: Vec<Peer>,
         chunk_addr: Option<ChunkAddress>,
     ) -> Result<Option<QueryResult>> {
@@ -319,7 +315,7 @@ impl Session {
         let mut valid_response = None;
         let elders_len = elders.len();
 
-        if let Some(entry) = self.pending_queries.get(&operation_id) {
+        if let Some(entry) = self.pending_queries.get(&msg_id) {
             let responses = entry.value();
 
             // lets see if we have a positive response...
@@ -329,7 +325,7 @@ impl Session {
                 let (peer_address, response) = refmulti.key().clone();
 
                 match response {
-                    QueryResponse::GetChunk((Ok(chunk), op_id)) => {
+                    QueryResponse::GetChunk(Ok(chunk)) => {
                         if let Some(chunk_addr) = chunk_addr {
                             // We are dealing with Chunk query responses, thus we validate its hash
                             // matches its xorname, if so, we don't need to await for more responses
@@ -337,7 +333,7 @@ impl Session {
 
                             if chunk_addr.name() == chunk.name() {
                                 trace!("Valid Chunk received for {:?}", msg_id);
-                                valid_response = Some(QueryResponse::GetChunk((Ok(chunk), op_id)));
+                                valid_response = Some(QueryResponse::GetChunk(Ok(chunk)));
 
                                 // return Ok(Some(QueryResponse::GetChunk(Ok(chunk))));
                             } else {
@@ -350,21 +346,21 @@ impl Session {
                             }
                         }
                     }
-                    QueryResponse::GetRegister((Err(_), _))
-                    | QueryResponse::ReadRegister((Err(_), _))
-                    | QueryResponse::GetRegisterPolicy((Err(_), _))
-                    | QueryResponse::GetRegisterOwner((Err(_), _))
-                    | QueryResponse::GetRegisterUserPermissions((Err(_), _))
-                    | QueryResponse::GetChunk((Err(_), _)) => {
+                    QueryResponse::GetRegister(Err(_))
+                    | QueryResponse::ReadRegister(Err(_))
+                    | QueryResponse::GetRegisterPolicy(Err(_))
+                    | QueryResponse::GetRegisterOwner(Err(_))
+                    | QueryResponse::GetRegisterUserPermissions(Err(_))
+                    | QueryResponse::GetChunk(Err(_)) => {
                         debug!("QueryResponse error received from {peer_address:?} (but may be overridden by a non-error response from another elder): {:#?}", &response);
                         error_response = Some(response);
                         discarded_responses += 1;
                     }
 
-                    QueryResponse::GetRegister((Ok(ref register), _)) => {
+                    QueryResponse::GetRegister(Ok(ref register)) => {
                         debug!("okay got register from {peer_address:?}");
                         // TODO: properly merge all registers
-                        if let Some(QueryResponse::GetRegister((Ok(prior_response), _))) =
+                        if let Some(QueryResponse::GetRegister(Ok(prior_response))) =
                             &valid_response
                         {
                             if register.size() > prior_response.size() {
@@ -376,10 +372,10 @@ impl Session {
                             valid_response = Some(response);
                         }
                     }
-                    QueryResponse::ReadRegister((Ok(ref register_set), _)) => {
+                    QueryResponse::ReadRegister(Ok(ref register_set)) => {
                         debug!("okay _read_ register from {peer_address:?}");
                         // TODO: properly merge all registers
-                        if let Some(QueryResponse::ReadRegister((Ok(prior_response), _))) =
+                        if let Some(QueryResponse::ReadRegister(Ok(prior_response))) =
                             &valid_response
                         {
                             if register_set.len() > prior_response.len() {
@@ -391,10 +387,10 @@ impl Session {
                             valid_response = Some(response);
                         }
                     }
-                    QueryResponse::SpentProofShares((Ok(ref spentproof_set), _)) => {
+                    QueryResponse::SpentProofShares(Ok(ref spentproof_set)) => {
                         debug!("okay _read_ spentproofs from {peer_address:?}");
                         // TODO: properly merge all registers
-                        if let Some(QueryResponse::SpentProofShares((Ok(prior_response), _))) =
+                        if let Some(QueryResponse::SpentProofShares(Ok(prior_response))) =
                             &valid_response
                         {
                             if spentproof_set.len() > prior_response.len() {
@@ -413,7 +409,7 @@ impl Session {
                 }
             }
         } else {
-            warn!("No listeners found for our op_id: {:?}", operation_id)
+            warn!("No listeners found for our msg_id: {:?}", msg_id)
         }
 
         // we've looped over all responses...
