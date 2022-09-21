@@ -42,6 +42,8 @@ use tokio::{
 };
 use xor_name::Prefix;
 
+use super::flow_ctrl::event_channel::EventSender;
+
 // Filename for storing the content of the genesis DBC.
 // The Genesis DBC is generated and owned by the genesis PK of the network's section chain,
 // i.e. the very first section key in the chain.
@@ -118,7 +120,7 @@ async fn new_node<'a>(
 
     let used_space = UsedSpace::new(config.max_capacity());
 
-    let (node, cmd_channel, network_events) =
+    let (node, network_events) =
         bootstrap_node(config, used_space, root_dir, join_timeout, outbox, inbox, addr, intitial_contact_address).await?;
 
     {
@@ -145,6 +147,8 @@ async fn new_node<'a>(
         );
     }
 
+    let cmd_channel = run_node_processes(node, inbox, outbox, event_sender);
+
     run_system_logger(LogCtx::new(node.clone()), config.resource_logs).await;
 
     Ok((node, cmd_channel, network_events))
@@ -160,7 +164,7 @@ async fn bootstrap_node<'a>(
     inbox: &'a mut Inbox,
     addr: SocketAddr,
     intitial_contact_address: Option<SocketAddr>,
-) -> Result<(Arc<RwLock<Node>>, CmdChannel, EventReceiver)> {
+) -> Result<(Arc<RwLock<Node>>, EventReceiver)> {
     // let (connection_event_tx, mut connection_event_rx) = mpsc::channel(100);
 
     // let local_addr = config
@@ -250,6 +254,7 @@ async fn bootstrap_node<'a>(
             let bootstrap_nodes: Vec<SocketAddr> =
                 section_elders.iter().map(|node| node.addr()).collect();
 
+
             // let (comm, bootstrap_addr) = Comm::bootstrap(
             //     local_addr,
             //     bootstrap_nodes.as_slice(),
@@ -298,6 +303,21 @@ async fn bootstrap_node<'a>(
     };
 
     let node = Arc::new(RwLock::new(node));
+
+    // let cmd_ctrl = CmdCtrl::new(Dispatcher::new(node.clone(), outbox));
+    // let (msg_and_period_ctrl, cmd_channel) =
+    //     FlowCtrl::new(cmd_ctrl, inbox, event_sender);
+
+    // let _ = tokio::task::spawn_local(async move {
+    //     msg_and_period_ctrl
+    //         .process_messages_and_periodic_checks()
+    //         .await
+    // });
+
+    Ok((node, event_receiver))
+}
+
+pub fn run_node_processes<'a>(node: Arc<RwLock<Node>>, inbox: &'a mut Inbox, outbox: Outbox, event_sender: EventSender) -> CmdChannel {
     let cmd_ctrl = CmdCtrl::new(Dispatcher::new(node.clone(), outbox));
     let (msg_and_period_ctrl, cmd_channel) =
         FlowCtrl::new(cmd_ctrl, inbox, event_sender);
@@ -308,5 +328,5 @@ async fn bootstrap_node<'a>(
             .await
     });
 
-    Ok((node, cmd_channel, event_receiver))
+    cmd_channel
 }
