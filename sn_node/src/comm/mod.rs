@@ -40,6 +40,7 @@ pub struct Comm {
     sessions: Arc<DashMap<Peer, PeerSession>>,
     outgoing_msg_channel: Sender<OutgoingMsg>,
     inbox: Receiver<OutgoingMsg>,
+    conn_receiver : Receiver<ListenerEvent>,
 }
 
 /// peer, msg_id, bytes, is_msg_for_client
@@ -133,8 +134,8 @@ impl Comm {
     /// Get the channel to send msgs. Parse inbound connections etc.
     pub async fn run_comm_loop(&mut self) -> Result<()> {
         loop {
-            match self.inbox.try_recv() {
-                Ok((peer, msg_id, bytes, is_msg_for_client)) => {
+            match self.inbox.recv().await {
+                Some((peer, msg_id, bytes, is_msg_for_client)) => {
                     // tokio::spawn(async move{
                     if let Err(err) = self
                         .send_out_bytes(peer, msg_id, bytes, is_msg_for_client)
@@ -145,12 +146,22 @@ impl Comm {
 
                     // });
                 }
+                None => {
+                    error!("Senders to `inbox` have disconnected.");
+                    return Err(Error::MsgChannelDropped);
+                }
+            }
+
+            // HANDLE ANY CONNECTIONS THAT CAME IN
+            match self.conn_receiver.try_recv() {
+                Ok(ListenerEvent::Connected { peer, connection }) => {
+                    self.add_incoming(&peer, connection).await;
+                }
                 Err(TryRecvError::Empty) => {
                     // do nothing else
-                    return Ok(());
                 }
                 Err(TryRecvError::Disconnected) => {
-                    error!("Senders to `incoming_cmds_from_apis` have disconnected.");
+                    error!("Senders to `conn_receiver` have disconnected.");
                     return Err(Error::MsgChannelDropped);
                 }
             }
@@ -396,6 +407,7 @@ fn setup(our_endpoint: Endpoint, receive_msg: Sender<MsgEvent>) -> (Comm, MsgLis
         sessions: Arc::new(DashMap::new()),
         inbox,
         outgoing_msg_channel,
+        conn_receiver,
     };
 
     // TODO get event loop and get this in
@@ -416,7 +428,7 @@ fn listen_for_incoming_msgs(
     msg_listener: MsgListener,
     mut incoming_connections: IncomingConnections,
 ) {
-    let _ = task::spawn_local(async move {
+    let _ = task::spawn(async move {
         while let Some((connection, incoming_msgs)) = incoming_connections.next().await {
             trace!(
                 "incoming_connection from {:?} with connection_id {:?}",
@@ -426,6 +438,8 @@ fn listen_for_incoming_msgs(
 
             msg_listener.listen(connection, incoming_msgs);
         }
+
+        trace!("WHYYYYYYYY");
     });
 }
 
@@ -471,7 +485,7 @@ mod tests {
         // Run the local task set.
         local
             .run_until(async move {
-                let (tx, _rx) = channel(1);
+                let (tx, _rx) = mpsc::channel(1);
                 let comm = Comm::first_node(local_addr(), Config::default(), tx).await?;
 
                 let (peer0, mut rx0) = new_peer().await?;
@@ -506,7 +520,7 @@ mod tests {
         // Run the local task set.
         local
             .run_until(async move {
-                let (tx, _rx) = channel(1);
+                let (tx, _rx) = mpsc::channel(1);
                 let comm = Comm::first_node(
                     local_addr(),
                     Config {
@@ -538,7 +552,7 @@ mod tests {
         // Run the local task set.
         local
             .run_until(async move {
-                let (tx, _rx) = channel(1);
+                let (tx, _rx) = mpsc::channel(1);
                 let send_comm = Comm::first_node(local_addr(), Config::default(), tx).await?;
 
                 let (recv_endpoint, mut incoming_connections, _) =
@@ -595,7 +609,7 @@ mod tests {
         // Run the local task set.
         local
             .run_until(async move {
-                let (tx, mut rx0) = channel(1);
+                let (tx, mut rx0) = mpsc::channel(1);
                 let comm0 = Comm::first_node(local_addr(), Config::default(), tx.clone()).await?;
                 let addr0 = comm0.socket_addr();
 
@@ -656,7 +670,7 @@ mod tests {
             Endpoint::new_peer(local_addr(), &[], Config::default()).await?;
         let addr = endpoint.public_addr();
 
-        let (tx, rx) = channel(1);
+        let (tx, rx) = mpsc::channel(1);
 
         let _handle = tokio::task::spawn_local(async move {
             while let Some((_, mut incoming_messages)) = incoming_connections.next().await {

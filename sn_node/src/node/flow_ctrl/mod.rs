@@ -119,7 +119,7 @@ impl FlowCtrl {
                     return Ok(());
                 }
                 Err(TryRecvError::Disconnected) => {
-                    error!("Senders to `incoming_cmds_from_apis` have disconnected.");
+                    error!("Senders to `incoming_msg_events` have disconnected.");
                     return Err(Error::MsgChannelDropped);
                 }
             }

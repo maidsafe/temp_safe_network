@@ -64,10 +64,14 @@ async fn main() -> Result<()> {
     // We need this to pass into join flow
     // TODO: refactor this to be created by comms and just return Cmds
     // This will need join flow to parse cmds...
-    let (sender_for_msgs_received_in_comms, mut msg_receiver_channel) = mpsc::channel(100);
+    let (sender_for_msgs_received_in_comms, msg_receiver_channel) = mpsc::channel(100);
 
     // rt.block_on(async {
     let mut config = Config::new().await?;
+
+    let _guard = log::init_node_logging(&config)?;
+    trace!("Initial node config: {config:?}");
+
     let local_addr = config
         .local_addr
         .unwrap_or_else(|| SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0)));
@@ -110,30 +114,22 @@ async fn main() -> Result<()> {
     };
 
     let send_msg_channel = comm.send_msg_channel();
+    let addr = comm.socket_addr();
 
     // SO here we have comm...
     // we need that in a thread with its own event loop
     // and we spawn a freash thread just for that
     // with a sender available outside...
     let _handle = tokio::spawn(async move {
-        comm.run_comm_loop().await
+        info!("hey1");
+        let r = comm.run_comm_loop().await;
+        info!("hey2: {r:?}");
     });
 
-    let _guard = log::init_node_logging(&config)?;
-    trace!("Initial node config: {config:?}");
+    info!("Node runtime started");
+    create_runtime_and_node(&config, send_msg_channel.clone(), msg_receiver_channel, addr, intitial_contact_address).await?;
 
-    let addr = comm.socket_addr();
-
-    // TODO: refactor the above and keep it in the loop for full cleanup.
-
-    loop {
-        info!("Node runtime started");
-        create_runtime_and_node(&config, send_msg_channel.clone(), msg_receiver_channel, addr, intitial_contact_address).await?;
-
-        // pull config again in case it has been updated meanwhile
-        config = Config::new().await?;
-    }
-    // })
+    Ok(())
 }
 
 /// Create a tokio runtime per `run_node` instance.
@@ -215,7 +211,7 @@ async fn run_node(config: &Config, outbox: Outbox, inbox: Inbox, addr: SocketAdd
             Err(NodeError::TryJoinLater) => {
                 println!("{}", log);
                 info!("{}", log);
-                return Err(NodeError::TryJoinLater)
+                return Err(NodeError::TryJoinLater.into())
             }
             Err(NodeError::NodeNotReachable(addr)) => {
                 let err_msg = format!(
@@ -234,7 +230,7 @@ async fn run_node(config: &Config, outbox: Outbox, inbox: Inbox, addr: SocketAdd
                 let message = format!("(PID: {our_pid}): Encountered a timeout while trying to join the network. Retrying after {BOOTSTRAP_RETRY_TIME_SEC} seconds.");
                 println!("{}", &message);
                 error!("{}", &message);
-                return Err(NodeError::JoinTimeout)
+                return Err(NodeError::JoinTimeout.into())
 
             }
             Err(e) => {
