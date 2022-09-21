@@ -146,8 +146,8 @@ impl SectionTree {
     }
 
     /// Returns all known sections SAP.
-    pub fn all(&self) -> Vec<&SectionAuthorityProvider> {
-        self.sections.iter().map(|(_, sap)| &sap.value).collect()
+    pub fn all(&self) -> impl Iterator<Item = &SectionAuthorityProvider> {
+        self.sections.iter().map(|(_, sap)| &sap.value)
     }
 
     /// Get `SectionAuthorityProvider` of a known section with the given prefix.
@@ -187,8 +187,7 @@ impl SectionTree {
         // i.e. check each key is signed by its parent/predecessor key.
         if !proof_chain.self_verify() {
             return Err(Error::UntrustedProofChain(format!(
-                "Proof chain failed self verification: {:?}",
-                proof_chain
+                "Proof chain failed self verification: {proof_chain:?}",
             )));
         }
 
@@ -214,7 +213,7 @@ impl SectionTree {
 
                     if proposed_sap_elder_count < current_sap_elder_count {
                         warn!("Proposed SAP elder count is LESS than current...\
-                        proposed: {proposed_sap_elder_count:?}, current: {current_sap_elder_count:?} (proposed is: {:?})", signed_sap);
+                        proposed: {proposed_sap_elder_count:?}, current: {current_sap_elder_count:?} (proposed is: {signed_sap:?})");
                     }
                 }
                 Err(e) => {
@@ -242,8 +241,7 @@ impl SectionTree {
                     // there is no need to bounce back here (assuming the sender is outdated) to
                     // avoid potential looping.
                     return Err(Error::UntrustedProofChain(format!(
-                        "Provided proof_chain doesn't cover the SAP's key we currently know: {:?}, {:?}",
-                        section_tree_update.proof_chain,
+                        "Provided proof_chain doesn't cover the SAP's key we currently know: {proof_chain:?}, {:?}",
                         sap.value
                     )));
                 }
@@ -713,7 +711,6 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    // roland: todo add more tests to update fn
     #[test]
     fn proof_chain_should_contain_a_single_branch_during_update() -> Result<()> {
         let (mut tree, genesis_sk, genesis_pk) = new_network_section_tree();

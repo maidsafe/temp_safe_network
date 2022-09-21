@@ -211,16 +211,11 @@ impl Node {
                                 previous_name, new_name
                             );
 
-                            let genesis_key = *self.network_knowledge.genesis_key();
-                            let section_tree = self.network_knowledge.section_tree().clone();
-
                             let recipients = section_tree_update.section_auth.elders.clone();
 
-                            let new_network_knowledge = NetworkKnowledge::new(
-                                genesis_key,
-                                section_tree_update,
-                                Some(section_tree),
-                            )?;
+                            let section_tree = self.network_knowledge.section_tree().clone();
+                            let new_network_knowledge =
+                                NetworkKnowledge::new(section_tree, section_tree_update)?;
 
                             // TODO: confirm whether carry out the switch immediately here
                             //       or still using the cmd pattern.

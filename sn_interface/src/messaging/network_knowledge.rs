@@ -90,8 +90,6 @@ impl Sha3Hash for SectionInfo {
     }
 }
 
-// roland TODO, partialeq valid? even if section's order differ a bit, the resultant SectionsDAG
-// will be equal, but this SectionsDAGMsg is not equal.
 /// A Merkle DAG of BLS keys where every key is signed by its parent key, except the genesis one.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SectionsDAG {

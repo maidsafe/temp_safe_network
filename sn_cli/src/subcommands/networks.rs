@@ -132,7 +132,7 @@ pub async fn networks_commander(
             println!();
 
             let sections_dag = network_contacts.get_sections_dag();
-            for sap in &network_contacts.all() {
+            for sap in network_contacts.all() {
                 let section_key = sap.section_key();
                 println!("Prefix '{}'", sap.prefix());
                 println!("----------------------------------");

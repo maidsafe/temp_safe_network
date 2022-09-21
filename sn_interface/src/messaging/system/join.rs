@@ -63,8 +63,8 @@ pub enum JoinResponse {
     },
     /// Up to date section information for a joining peer to retry its join request with
     Retry {
-        /// The update to our NetworkKnowledge containing the current `SectionAuthorityProvider` of
-        /// the section and the section chain truncated from the section key found in the join request.
+        /// The update to our NetworkKnowledge containing the current `SectionAuthorityProvider`
+        /// and the section chain truncated from the section key found in the join request.
         section_tree_update: SectionTreeUpdate,
         /// The age of the node as expected by the section.
         expected_age: u8,
@@ -76,11 +76,8 @@ pub enum JoinResponse {
     /// Message sent to joining peer containing the necessary
     /// info to become a member of the section.
     Approved {
-        // roland TODO is this needed since section tree update contains section chain for Approved
-        /// Network genesis key (needed to validate) section chain
-        genesis_key: BlsPublicKey,
-        /// The update to our NetworkKnowledge containing the `SectionAuthorityProvider` signed by
-        /// the current section and a fully verifiable section chain
+        /// The update to our NetworkKnowledge containing the current `SectionAuthorityProvider`
+        /// and a fully verifiable section chain
         section_tree_update: SectionTreeUpdate,
         /// Current node's state
         decision: Decision<NodeState>,

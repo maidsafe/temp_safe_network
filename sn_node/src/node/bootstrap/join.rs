@@ -193,7 +193,6 @@ impl<'a> Joiner<'a> {
                     self.send(msg, &[sender], section_key, false).await?;
                 }
                 JoinResponse::Approved {
-                    genesis_key,
                     section_tree_update,
                     decision,
                 } => {
@@ -222,11 +221,9 @@ impl<'a> Joiner<'a> {
                     );
 
                     // Building our network knowledge instance will validate the section_tree_update
-                    let network_knowledge = NetworkKnowledge::new(
-                        genesis_key,
-                        section_tree_update,
-                        Some(self.network_contacts),
-                    )?;
+
+                    let network_knowledge =
+                        NetworkKnowledge::new(self.network_contacts, section_tree_update)?;
 
                     return Ok((self.node, network_knowledge));
                 }
@@ -627,7 +624,6 @@ mod tests {
             send_response(
                 &recv_tx,
                 JoinResponse::Approved {
-                    genesis_key: original_section_key,
                     section_tree_update,
                     decision,
                 },
