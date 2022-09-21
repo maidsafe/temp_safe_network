@@ -69,7 +69,7 @@ struct Joiner<'a> {
     // Sender for outgoing messages.
     outgoing_msgs: mpsc::Sender<(WireMsg, Vec<Peer>)>,
     // Receiver for incoming messages.
-    incoming_msgs: &'a mut mpsc::Receiver<MsgEvent>,
+    incoming_msgs: &'a mut Inbox,
     node: NodeInfo,
     prefix: Prefix,
     network_contacts: SectionTree,

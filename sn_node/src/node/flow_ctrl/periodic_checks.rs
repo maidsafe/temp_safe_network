@@ -37,7 +37,7 @@ const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 const ADULT_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(2);
 const ELDER_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(3);
 
-impl FlowCtrl {
+impl <'a> FlowCtrl<'a> {
     /// Periodic tasks run for elders and adults alike
     pub(super) async fn enqueue_cmds_for_standard_periodic_checks(
         &mut self,

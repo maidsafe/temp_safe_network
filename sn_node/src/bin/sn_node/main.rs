@@ -192,8 +192,10 @@ async fn run_node(config: &Config, outbox: Outbox, inbox: Inbox, addr: SocketAdd
     let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
     let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME_SEC);
 
-    let (_node, mut event_stream) =
-        match start_node(config, join_timeout, outbox, inbox, addr, intitial_contact_address).await {
+    let (_node, mut event_stream) = loop {
+
+
+        match start_node(config, join_timeout, outbox, &mut inbox, addr, intitial_contact_address).await {
             Ok(result) => result,
             Err(NodeError::CannotConnectEndpoint(qp2p::EndpointError::Upnp(error))) => {
                 return Err(error).suggestion(
@@ -211,7 +213,7 @@ async fn run_node(config: &Config, outbox: Outbox, inbox: Inbox, addr: SocketAdd
             Err(NodeError::TryJoinLater) => {
                 println!("{}", log);
                 info!("{}", log);
-                return Err(NodeError::TryJoinLater.into())
+                // return Err(NodeError::TryJoinLater.into())
             }
             Err(NodeError::NodeNotReachable(addr)) => {
                 let err_msg = format!(
@@ -230,7 +232,7 @@ async fn run_node(config: &Config, outbox: Outbox, inbox: Inbox, addr: SocketAdd
                 let message = format!("(PID: {our_pid}): Encountered a timeout while trying to join the network. Retrying after {BOOTSTRAP_RETRY_TIME_SEC} seconds.");
                 println!("{}", &message);
                 error!("{}", &message);
-                return Err(NodeError::JoinTimeout.into())
+                // return Err(NodeError::JoinTimeout.into())
 
             }
             Err(e) => {
@@ -247,9 +249,9 @@ async fn run_node(config: &Config, outbox: Outbox, inbox: Inbox, addr: SocketAdd
                     address to be used using --first", log_path)
                 );
             }
-        };
-        // sleep(bootstrap_retry_duration).await;
-
+        }
+        sleep(bootstrap_retry_duration).await;
+    };
 
     // Simulate failed node starts, and ensure that
     #[cfg(feature = "chaos")]

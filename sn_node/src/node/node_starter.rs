@@ -56,11 +56,11 @@ static EVENT_CHANNEL_SIZE: usize = 20;
 pub(crate) type CmdChannel = mpsc::Sender<(Cmd, Option<usize>)>;
 
 /// Test only
-pub async fn new_test_api(
+pub async fn new_test_api<'a>(
     config: &Config,
     join_timeout: Duration,
     outbox: Outbox,
-    inbox: Inbox,
+    inbox: &'a mut Inbox,
     addr: SocketAddr,
     intitial_contact_address: Option<SocketAddr>,
 ) -> Result<(super::NodeTestApi, EventReceiver)> {
@@ -80,11 +80,11 @@ pub struct NodeRef {
 }
 
 /// Start a new node.
-pub async fn start_node(
+pub async fn start_node<'a>(
     config: &Config,
     join_timeout: Duration,
     outbox: Outbox,
-    inbox: Inbox,
+    inbox: &'a mut Inbox,
     addr: SocketAddr,
     intitial_contact_address: Option<SocketAddr>,
 ) -> Result<(NodeRef, EventReceiver)> {
@@ -94,11 +94,11 @@ pub async fn start_node(
 }
 
 // Private helper to create a new node using the given config and bootstraps it to the network.
-async fn new_node(
+async fn new_node<'a>(
     config: &Config,
     join_timeout: Duration,
     outbox: Outbox,
-    inbox: Inbox,
+    inbox: &'a mut Inbox,
     addr: SocketAddr,
     intitial_contact_address: Option<SocketAddr>,
 ) -> Result<(Arc<RwLock<Node>>, CmdChannel, EventReceiver)> {
@@ -151,13 +151,13 @@ async fn new_node(
 }
 
 // Private helper to create a new node using the given config and bootstraps it to the network.
-async fn bootstrap_node(
+async fn bootstrap_node<'a>(
     config: &Config,
     used_space: UsedSpace,
     root_storage_dir: &Path,
     join_timeout: Duration,
     outbox: Outbox,
-    mut inbox: Inbox,
+    inbox: &'a mut Inbox,
     addr: SocketAddr,
     intitial_contact_address: Option<SocketAddr>,
 ) -> Result<(Arc<RwLock<Node>>, CmdChannel, EventReceiver)> {
@@ -270,7 +270,7 @@ async fn bootstrap_node(
             let (info, network_knowledge) = join_network(
                 joining_node,
                 outbox.clone(),
-                &mut inbox,
+                inbox,
                 contact_address,
                 network_contacts,
                 join_timeout,

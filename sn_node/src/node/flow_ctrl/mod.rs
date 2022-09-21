@@ -18,7 +18,7 @@ mod periodic_checks;
 
 use event_channel::EventSender;
 
-use crate::comm::MsgEvent;
+use crate::comm::{MsgEvent, Inbox};
 
 use crate::node::{flow_ctrl::cmds::Cmd, Error, Node, Result};
 
@@ -37,19 +37,19 @@ use tokio::{
 
 /// Listens for incoming msgs and forms Cmds for each,
 /// Periodically triggers other Cmd Processes (eg health checks, dysfunction etc)
-pub(crate) struct FlowCtrl {
+pub(crate) struct FlowCtrl<'a> {
     node: Arc<RwLock<Node>>,
     cmd_ctrl: CmdCtrl,
-    incoming_msg_events: mpsc::Receiver<MsgEvent>,
+    inbox: &'a mut Inbox,
     incoming_cmds_from_apis: mpsc::Receiver<(Cmd, Option<usize>)>,
     cmd_sender_channel: mpsc::Sender<(Cmd, Option<usize>)>,
     outgoing_node_event_sender: EventSender,
 }
 
-impl FlowCtrl {
+impl <'a> FlowCtrl<'a> {
     pub(crate) fn new(
         cmd_ctrl: CmdCtrl,
-        incoming_msg_events: mpsc::Receiver<MsgEvent>,
+        inbox: &'a mut Inbox,
         outgoing_node_event_sender: EventSender,
     ) -> (Self, mpsc::Sender<(Cmd, Option<usize>)>) {
         let node = cmd_ctrl.node();
@@ -59,7 +59,7 @@ impl FlowCtrl {
             Self {
                 cmd_ctrl,
                 node,
-                incoming_msg_events,
+                inbox,
                 incoming_cmds_from_apis,
                 cmd_sender_channel: cmd_sender_channel.clone(),
                 outgoing_node_event_sender,
@@ -101,7 +101,7 @@ impl FlowCtrl {
     /// Pull and queue up all pending msgs from the MsgSender
     async fn enqueue_new_incoming_msgs(&mut self) -> Result<()> {
         loop {
-            match self.incoming_msg_events.try_recv() {
+            match self.inbox.try_recv() {
                 Ok(msg) => {
                     let cmd = match self.handle_new_msg_event(msg).await {
                         Ok(cmd) => cmd,
