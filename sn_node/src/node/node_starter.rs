@@ -120,8 +120,8 @@ async fn new_node<'a>(
 
     let used_space = UsedSpace::new(config.max_capacity());
 
-    let (node, network_events) =
-        bootstrap_node(config, used_space, root_dir, join_timeout, outbox, inbox, addr, intitial_contact_address).await?;
+    let (node, network_events, event_sender) =
+        bootstrap_node(config, used_space, root_dir, join_timeout, outbox.clone(), inbox, addr, intitial_contact_address).await?;
 
     {
         let read_only_node = node.read().await;
@@ -147,7 +147,7 @@ async fn new_node<'a>(
         );
     }
 
-    let cmd_channel = run_node_processes(node, inbox, outbox, event_sender);
+    let cmd_channel = run_node_processes(node.clone(), inbox, outbox, event_sender);
 
     run_system_logger(LogCtx::new(node.clone()), config.resource_logs).await;
 
@@ -164,7 +164,7 @@ async fn bootstrap_node<'a>(
     inbox: &'a mut Inbox,
     addr: SocketAddr,
     intitial_contact_address: Option<SocketAddr>,
-) -> Result<(Arc<RwLock<Node>>, EventReceiver)> {
+) -> Result<(Arc<RwLock<Node>>, EventReceiver, EventSender)> {
     // let (connection_event_tx, mut connection_event_rx) = mpsc::channel(100);
 
     // let local_addr = config
@@ -314,7 +314,7 @@ async fn bootstrap_node<'a>(
     //         .await
     // });
 
-    Ok((node, event_receiver))
+    Ok((node, event_receiver, event_sender.clone()))
 }
 
 pub fn run_node_processes<'a>(node: Arc<RwLock<Node>>, inbox: &'a mut Inbox, outbox: Outbox, event_sender: EventSender) -> CmdChannel {
