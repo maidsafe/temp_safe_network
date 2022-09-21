@@ -255,8 +255,8 @@ async fn bootstrap_node(
             "{} Joining as a new node (PID: {}) our socket: {}, bootstrapper was: {}, network's genesis key: {:?}",
             node_name,
             std::process::id(),
-            comm.socket_addr(),
             addr,
+            bootstrap_addr,
             network_contacts.genesis_key()
         );
 
@@ -265,7 +265,7 @@ async fn bootstrap_node(
             joining_node,
             outbox,
             &mut inbox,
-            addr,
+            bootstrap_addr,
             network_contacts,
             join_timeout,
         )

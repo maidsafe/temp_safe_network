@@ -60,7 +60,7 @@ impl Dispatcher {
 
         match cmd {
             Cmd::CleanupPeerLinks => {
-                self.comm.cleanup_peers().await;
+                // self.comm.cleanup_peers().await;
                 Ok(vec![])
             }
             Cmd::SendMsg {
@@ -87,8 +87,8 @@ impl Dispatcher {
                 };
 
                 let tasks = peer_msgs.into_iter().map(|(peer, msg)| {
-                    self.comm
-                        .send_out_bytes(peer, msg_id, msg, is_msg_for_client)
+                    self.outbox
+                        .send((peer, msg_id, msg, is_msg_for_client))
                 });
                 let results = futures::future::join_all(tasks).await;
 
@@ -97,14 +97,17 @@ impl Dispatcher {
                 let cmds = results
                     .into_iter()
                     .filter_map(|result| match result {
-                        Err(Error::FailedSend(peer)) => {
-                            if is_msg_for_client {
-                                warn!("Service msg send failed to: {peer}, for {msg_id:?}");
-                                None
-                            } else {
-                                Some(Cmd::HandleFailedSendToNode { peer, msg_id })
-                            }
-                        }
+                        // TODO: Handlefailed send.
+                        // Have a cmd produced by comms on failed send.
+
+                        // Err(Error::FailedSend(peer)) => {
+                        //     if is_msg_for_client {
+                        //         warn!("Service msg send failed to: {peer}, for {msg_id:?}");
+                        //         None
+                        //     } else {
+                        //         Some(Cmd::HandleFailedSendToNode { peer, msg_id })
+                        //     }
+                        // }
                         _ => None,
                     })
                     .collect();
@@ -205,7 +208,6 @@ impl Dispatcher {
                         msg_authority,
                         msg,
                         origin,
-                        &self.comm,
                         #[cfg(feature = "traceroute")]
                         traceroute.clone(),
                     )

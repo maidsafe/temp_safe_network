@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::comm::Comm;
 use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Error, Node, Result};
 
 use sn_interface::{
@@ -27,7 +26,6 @@ impl Node {
         &mut self,
         peer: Peer,
         join_request: JoinRequest,
-        comm: &Comm,
     ) -> Result<Option<Cmd>> {
         debug!("Received {:?} from {}", join_request, peer);
 
@@ -125,18 +123,22 @@ impl Node {
             return Ok(Some(self.send_system_msg(msg, Peers::Single(peer))));
         }
 
+
+        // TODO **********************
+        // Reenable reachability
+
         // Do reachability check only for the initial join request
-        if comm.is_reachable(&peer.addr()).await.is_err() {
-            let msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Rejected(
-                JoinRejectionReason::NodeNotReachable(peer.addr()),
-            )));
-            trace!("{}", LogMarker::SendJoinRejected);
-            trace!("Sending {:?} to {}", msg, peer);
-            Ok(Some(self.send_system_msg(msg, Peers::Single(peer))))
-        } else {
+        // if comm.is_reachable(&peer.addr()).await.is_err() {
+        //     let msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Rejected(
+        //         JoinRejectionReason::NodeNotReachable(peer.addr()),
+        //     )));
+        //     trace!("{}", LogMarker::SendJoinRejected);
+        //     trace!("Sending {:?} to {}", msg, peer);
+        //     Ok(Some(self.send_system_msg(msg, Peers::Single(peer))))
+        // } else {
             // It's reachable, let's then send the proof challenge
             self.send_resource_proof_challenge(peer).map(Some)
-        }
+        // }
     }
 
     pub(crate) fn verify_joining_node_age(&self, peer: &Peer) -> Result<(bool, u8)> {
@@ -191,7 +193,7 @@ impl Node {
         &mut self,
         peer: Peer,
         join_request: JoinAsRelocatedRequest,
-        comm: &Comm,
+        // comm: &Comm,
     ) -> Option<Cmd> {
         debug!("Received JoinAsRelocatedRequest {join_request:?} from {peer}",);
 
@@ -242,15 +244,15 @@ impl Node {
         }
 
         // Finally do reachability check
-        if comm.is_reachable(&peer.addr()).await.is_err() {
-            let msg = SystemMsg::JoinAsRelocatedResponse(Box::new(
-                JoinAsRelocatedResponse::NodeNotReachable(peer.addr()),
-            ));
-            trace!("{}", LogMarker::SendJoinAsRelocatedResponse);
+        // if comm.is_reachable(&peer.addr()).await.is_err() {
+        //     let msg = SystemMsg::JoinAsRelocatedResponse(Box::new(
+        //         JoinAsRelocatedResponse::NodeNotReachable(peer.addr()),
+        //     ));
+        //     trace!("{}", LogMarker::SendJoinAsRelocatedResponse);
 
-            trace!("Sending {:?} to {}", msg, peer);
-            return Some(self.send_system_msg(msg, Peers::Single(peer)));
-        };
+        //     trace!("Sending {:?} to {}", msg, peer);
+        //     return Some(self.send_system_msg(msg, Peers::Single(peer)));
+        // };
 
         self.propose_membership_change(join_request.relocate_proof.value)
     }

@@ -385,8 +385,8 @@ fn setup_comms(
 
 #[tracing::instrument(skip_all)]
 fn setup(our_endpoint: Endpoint, receive_msg: Sender<MsgEvent>) -> (Comm, MsgListener) {
-    let (add_connection, conn_receiver) = channel(100);
-    let (outgoing_msg_channel, mut inbox) = channel(100);
+    let (add_connection, conn_receiver) = mpsc::channel(100);
+    let (outgoing_msg_channel, mut inbox) = mpsc::channel(100);
 
     let msg_listener = MsgListener::new(add_connection, receive_msg);
 
