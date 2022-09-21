@@ -114,39 +114,39 @@ impl<'a> Joiner<'a> {
         bootstrap_addr: SocketAddr,
         join_timeout: Duration,
     ) -> Result<(NodeInfo, NetworkKnowledge)> {
-        // Use our XorName as we do not know their name or section key yet.
-        let bootstrap_peer = Peer::new(self.node.name(), bootstrap_addr);
-
         trace!(
             "Bootstrap run, network contacts as we have it: {:?}",
             self.network_contacts
         );
 
-        let (target_section_key, recipients) = if let Ok(sap) = self
-            .network_contacts
-            .section_by_name(&bootstrap_peer.name())
-        {
+        tokio::time::timeout(join_timeout, self.join(bootstrap_addr, join_timeout / 10))
+            .await
+            .map_err(|_| Error::JoinTimeout)?
+    }
+
+    fn join_target(&self, bootstrap_addr: SocketAddr) -> (BlsPublicKey, Vec<Peer>) {
+        let our_name = self.node.name();
+
+        if let Ok(sap) = self.network_contacts.section_by_name(&our_name) {
             (sap.section_key(), sap.elders_vec())
         } else {
+            // Use our XorName as we do not know their name or section key yet.
+            let bootstrap_peer = Peer::new(our_name, bootstrap_addr);
             let genesis_key = *self.network_contacts.genesis_key();
             (genesis_key, vec![bootstrap_peer])
-        };
-        tokio::time::timeout(
-            join_timeout,
-            self.join(target_section_key, recipients, join_timeout / 10),
-        )
-        .await
-        .map_err(|_| Error::JoinTimeout)?
+        }
     }
 
     #[tracing::instrument(skip(self))]
     async fn join(
         mut self,
-        target_section_key: BlsPublicKey,
-        recipients: Vec<Peer>,
+        bootstrap_addr: SocketAddr,
         response_timeout: Duration,
     ) -> Result<(NodeInfo, NetworkKnowledge)> {
+        let (target_section_key, recipients) = self.join_target(bootstrap_addr);
+
         debug!("Initiating join with {recipients:?}");
+
         // We first use genesis key as the target section key, we'll be getting
         // a response with the latest section key for us to retry with.
         // Once we are approved to join, we will make sure the SAP we receive can
@@ -898,23 +898,14 @@ mod tests {
         let (section_auth, _, sk_set) = random_sap(good_prefix, elder_count(), 0, None);
         let section_key = sk_set.public_keys().public_key();
 
-        let state = Joiner::new(node, send_tx, &mut recv_rx, SectionTree::new(section_key));
+        let tree = SectionTree::new(section_key);
+        let state = Joiner::new(node, send_tx, &mut recv_rx, tree);
 
-        let elders = (0..elder_count())
-            .map(|_| {
-                Peer::new(
-                    good_prefix.substituted_in(xor_name::rand::random()),
-                    gen_addr(),
-                )
-            })
-            .collect();
-        let join_task = state.join(section_key, elders, join_timeout);
+        let random_elder_addr = gen_addr();
+        let join_task = state.join(random_elder_addr, join_timeout);
 
         let test_task = async {
-            let (wire_msg, _) = send_rx
-                .recv()
-                .await
-                .ok_or_else(|| eyre!("NodeMsg was not received"))?;
+            let (wire_msg, _) = send_rx.recv().await.expect("NodeMsg was not received");
 
             let node_msg =
                 assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node{ msg, .. }) => msg);
