@@ -420,7 +420,7 @@ impl Node {
         sender: Peer,
         bounced_msg: UsrMsgBytes,
     ) -> Result<Cmd> {
-        trace!("{:?} in ae_redirect ", LogMarker::AeSendRedirect);
+        trace!("{} in ae_redirect ", LogMarker::AeSendRedirect);
 
         let ae_msg = self.generate_ae_msg(None, AntiEntropyKind::Redirect { bounced_msg });
 

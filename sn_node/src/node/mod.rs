@@ -694,7 +694,7 @@ mod core {
                 // key since the split) then this key would be unknown to them and they would send
                 // us back their whole section chain. However, this situation should be rare.
 
-                // section_chain produces a proof chain with only 1 leaf
+                // section_chain contains a single leaf key
                 let leaf_key = self.network_knowledge.section_chain().last_key()?;
                 match self.section_chain().get_parent_key(&leaf_key) {
                     Ok(prev_pk) => Ok(prev_pk.unwrap_or(*self.section_chain().genesis_key())),

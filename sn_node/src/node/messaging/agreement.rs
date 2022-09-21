@@ -168,10 +168,7 @@ impl Node {
                     _ => {}
                 }
             }
-            Err(err) => error!(
-                "Failed to generate proof chain for a newly received SAP: {:?}",
-                err
-            ),
+            Err(err) => error!("Failed to generate proof chain for a newly received SAP: {err:?}"),
         }
 
         info!(

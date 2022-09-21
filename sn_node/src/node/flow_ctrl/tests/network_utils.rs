@@ -13,6 +13,7 @@ use bls::Signature;
 use ed25519_dalek::Keypair;
 use eyre::{bail, eyre, Context, Result};
 use sn_consensus::Decision;
+use sn_interface::network_knowledge::SectionTree;
 use sn_interface::{
     elder_count,
     messaging::{system::NodeState as NodeStateMsg, SectionTreeUpdate},
@@ -220,13 +221,13 @@ pub(crate) fn create_section(
     sk_set: &SecretKeySet,
     section_auth: &SectionAuthorityProvider,
 ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
+    let genesis_key = sk_set.public_keys().public_key();
     let section_tree_update = {
-        let section_chain = SectionsDAG::new(sk_set.public_keys().public_key());
+        let section_chain = SectionsDAG::new(genesis_key);
         let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
         SectionTreeUpdate::new(signed_sap, section_chain)
     };
-    let section =
-        NetworkKnowledge::new(sk_set.public_keys().public_key(), section_tree_update, None)?;
+    let section = NetworkKnowledge::new(SectionTree::new(genesis_key), section_tree_update)?;
 
     for ns in section_auth.members() {
         let auth_ns = section_signed(sk_set.secret_key(), ns.clone())?;
@@ -245,14 +246,14 @@ pub(crate) fn create_section_with_elders(
     sk_set: &SecretKeySet,
     section_auth: &SectionAuthorityProvider,
 ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
+    let genesis_key = sk_set.public_keys().public_key();
     let section_tree_update = {
-        let section_chain = SectionsDAG::new(sk_set.public_keys().public_key());
+        let section_chain = SectionsDAG::new(genesis_key);
         let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
         SectionTreeUpdate::new(signed_sap, section_chain)
     };
 
-    let section =
-        NetworkKnowledge::new(sk_set.public_keys().public_key(), section_tree_update, None)?;
+    let section = NetworkKnowledge::new(SectionTree::new(genesis_key), section_tree_update)?;
 
     for peer in section_auth.elders() {
         let node_state = NodeState::joined(*peer, None);

@@ -266,7 +266,6 @@ impl Node {
         info!("Section {prefix:?} has approved new peers {peers:?}.");
 
         let msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Approved {
-            genesis_key: *self.network_knowledge.genesis_key(),
             section_tree_update: SectionTreeUpdate::new(
                 self.network_knowledge.signed_sap(),
                 self.network_knowledge.section_chain(),

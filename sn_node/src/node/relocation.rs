@@ -135,6 +135,7 @@ mod tests {
     use itertools::Itertools;
     use proptest::{collection::SizeRange, prelude::*};
     use rand::{rngs::SmallRng, Rng, SeedableRng};
+    use sn_interface::network_knowledge::SectionTree;
     use std::net::SocketAddr;
     use xor_name::{Prefix, XOR_NAME_LEN};
 
@@ -187,7 +188,8 @@ mod tests {
             SectionTreeUpdate::new(signed_sap, SectionsDAG::new(genesis_pk))
         };
 
-        let network_knowledge = NetworkKnowledge::new(genesis_pk, section_tree_update, None)?;
+        let network_knowledge =
+            NetworkKnowledge::new(SectionTree::new(genesis_pk), section_tree_update)?;
 
         for peer in &peers {
             let info = NodeState::joined(*peer, None);

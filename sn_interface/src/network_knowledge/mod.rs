@@ -149,44 +149,21 @@ pub struct NetworkKnowledge {
 }
 
 impl NetworkKnowledge {
-    /// Creates a minimal `NetworkKnowledge` initially containing only info about our elders
-    /// (`SAP`).
-    ///
-    /// Returns error if the `signed_sap` is not verifiable with the `chain`.
+    /// Creates a minimal `NetworkKnowledge` with the provided SectionTree and SAP
     pub fn new(
-        genesis_key: bls::PublicKey,
+        section_tree: SectionTree,
         section_tree_update: SectionTreeUpdate,
-        passed_section_tree: Option<SectionTree>,
     ) -> Result<Self, Error> {
-        // Let's check the proof_chain's genesis key matches ours.
-        if genesis_key != section_tree_update.proof_chain.genesis_key {
-            return Err(Error::UntrustedProofChain(format!(
-                "Genesis key doesn't match first key in proof chain: {:?}",
-                section_tree_update.proof_chain.genesis_key
-            )));
-        }
+        let mut section_tree = section_tree;
+        let signed_sap = section_tree_update.signed_sap();
 
-        // Check if the genesis key in the provided section_tree matches ours.
-        // If no section tree was provided, start afresh.
-        let mut section_tree = match passed_section_tree {
-            Some(section_tree) => {
-                if *section_tree.genesis_key() != genesis_key {
-                    return Err(Error::InvalidGenesisKey(*section_tree.genesis_key()));
-                } else {
-                    section_tree
-                }
-            }
-            None => SectionTree::new(genesis_key),
-        };
-
-        // At this point we know the `SectionTree` corresponds to the correct genesis key,
-        // let's make sure the section tree contains also our own prefix and SAP,
+        // Update fails if the proof chain's genesis key is not part of the SectionTree's dag.
         if let Err(err) = section_tree.update(section_tree_update.clone()) {
             debug!("Failed to update SectionTree with {section_tree_update:?} upon creating new NetworkKnowledge instance: {err:?}");
         }
 
         Ok(Self {
-            signed_sap: section_tree_update.signed_sap(),
+            signed_sap,
             section_peers: SectionPeers::default(),
             section_tree,
         })
@@ -201,13 +178,13 @@ impl NetworkKnowledge {
         let secret_key_index = 0u8;
         let secret_key_share = genesis_sk_set.secret_key_share(secret_key_index as u64);
         let genesis_key = public_key_set.public_key();
+
         let section_tree_update = {
             let section_auth =
                 create_first_section_authority_provider(&public_key_set, &secret_key_share, peer)?;
-            let section_chain = SectionsDAG::new(genesis_key);
-            SectionTreeUpdate::new(section_auth, section_chain)
+            SectionTreeUpdate::new(section_auth, SectionsDAG::new(genesis_key))
         };
-        let network_knowledge = Self::new(genesis_key, section_tree_update, None)?;
+        let network_knowledge = Self::new(SectionTree::new(genesis_key), section_tree_update)?;
 
         for peer in network_knowledge.signed_sap.elders() {
             let node_state = NodeState::joined(*peer, None);

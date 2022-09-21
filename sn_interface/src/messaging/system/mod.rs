@@ -59,8 +59,8 @@ pub enum AntiEntropyKind {
 /// Message sent over the among nodes
 pub enum SystemMsg {
     AntiEntropy {
-        /// The update to our NetworkKnowledge containing our current section's `SectionAuthorityProvider`
-        /// and our section chain truncated from the triggering msg's dst section_key or genesis key
+        /// The update to our NetworkKnowledge containing the current `SectionAuthorityProvider`
+        /// and the section chain truncated from the triggering msg's dst section_key or genesis_key
         /// if the the dst section_key is not a direct ancestor to our section_key
         section_tree_update: SectionTreeUpdate,
         /// The kind of anti-entropy response.

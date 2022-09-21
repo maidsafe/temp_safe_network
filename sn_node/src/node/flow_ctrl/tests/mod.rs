@@ -44,7 +44,7 @@ use sn_interface::{
     network_knowledge::{
         recommended_section_size, supermajority, test_utils::*, Error as NetworkKnowledgeError,
         NetworkKnowledge, NodeInfo, NodeState, SectionAuthorityProvider, SectionKeyShare,
-        SectionsDAG, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
+        SectionTree, SectionsDAG, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
     },
     types::{keyed_signed, keys::ed25519, Peer, PublicKey, ReplicatedData, SecretKeySet},
 };
@@ -328,7 +328,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                 SectionTreeUpdate::new(signed_sap, section_chain)
             };
 
-            let section = NetworkKnowledge::new(pk, section_tree_update, None)?;
+            let section = NetworkKnowledge::new(SectionTree::new(pk), section_tree_update)?;
             let mut expected_new_elders = BTreeSet::new();
 
             for peer in section_auth.elders() {
@@ -578,7 +578,8 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
                 let signed_old_sap = section_signed(sk_set1.secret_key(), old_sap.clone())?;
                 SectionTreeUpdate::new(signed_old_sap, section_chain.clone())
             };
-            let network_knowledge = NetworkKnowledge::new(pk0, section_tree_update, None)?;
+            let network_knowledge =
+                NetworkKnowledge::new(SectionTree::new(pk0), section_tree_update)?;
 
             // Create our node
             let (event_sender, mut event_receiver) =
@@ -695,12 +696,8 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
             // a valid AE msg but with a non-verifiable SAP...
             let signed_sap = section.signed_sap();
             let bogus_section_pk = bls::SecretKey::random().public_key();
-            // skip verification by not using `new()`
-            let bogus_section_tree_update = SectionTreeUpdate {
-                section_auth: signed_sap.to_msg(),
-                section_signed: signed_sap.sig,
-                proof_chain: SectionsDAG::new(bogus_section_pk).into(),
-            };
+            let bogus_section_tree_update =
+                SectionTreeUpdate::new(signed_sap.clone(), SectionsDAG::new(bogus_section_pk));
 
             let node_msg = SystemMsg::AntiEntropy {
                 section_tree_update: bogus_section_tree_update,
@@ -751,7 +748,8 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
                     .await
                     .network_knowledge()
                     .section_tree()
-                    .all(),
+                    .all()
+                    .collect::<Vec<_>>(),
                 vec![&signed_sap.value]
             );
             Result::<()>::Ok(())
@@ -992,7 +990,7 @@ async fn handle_elders_update() -> Result<()> {
         )
         .await?;
 
-        // Simulate DKG round finished succesfully by adding
+        // Simulate DKG round finished successfully by adding
         // the new section key share to our cache
         node.section_keys_provider
             .insert(network_utils::create_section_key_share(&sk_set1, 0));
@@ -1013,20 +1011,14 @@ async fn handle_elders_update() -> Result<()> {
                 _ => continue,
             };
 
-            let proof_chain = match msg {
-                SystemMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Update { .. }, .. } => section_tree_update.proof_chain()?,
+            let section_tree_update = match msg {
+                SystemMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Update { .. }, .. } => section_tree_update,
                 _ => continue,
             };
 
-            let is_pk1_last_key = proof_chain.leaf_keys().contains(&pk1)
-                && proof_chain.leaf_keys().len() == 1;
-            assert!(is_pk1_last_key);
-
-
-            // roland TODO look at this
+            assert_eq!(section_tree_update.proof_chain()?.last_key()?, pk1);
             // Merging the section contained in the message with the original section succeeds.
-            // TODO: how to do this here?
-            // assert_matches!(section0.clone().merge(proof_chain.clone()), Ok(()));
+            assert!(section0.clone().update_knowledge_if_valid(section_tree_update, None, &info.name()).is_ok());
 
             update_actual_recipients.extend(recipients);
         }
