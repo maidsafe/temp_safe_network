@@ -44,7 +44,7 @@ impl PeerSession {
         let (sender, receiver) = mpsc::channel(1000);
 
         let _ =
-            tokio::task::spawn_local(PeerSessionWorker::new(link, sender.clone()).run(receiver));
+            tokio::task::spawn(PeerSessionWorker::new(link, sender.clone()).run(receiver));
 
         PeerSession { channel: sender }
     }

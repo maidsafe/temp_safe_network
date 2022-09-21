@@ -134,19 +134,19 @@ impl Comm {
     /// Get the channel to send msgs. Parse inbound connections etc.
     pub async fn run_comm_loop(&mut self) -> Result<()> {
         loop {
-            match self.inbox.recv().await {
-                Some((peer, msg_id, bytes, is_msg_for_client)) => {
-                    // tokio::spawn(async move{
-                    if let Err(err) = self
+            match self.inbox.try_recv() {
+                Ok((peer, msg_id, bytes, is_msg_for_client)) => {
+                    // self.add_incoming(&peer, connection).await;
+                    if let Err(error) =self
                         .send_out_bytes(peer, msg_id, bytes, is_msg_for_client)
-                        .await
-                    {
-                        error!("Error during send to {peer:?}, {msg_id:?}: {err:?}");
-                    }
-
-                    // });
+                        .await {
+                            error!("Errrrrrrrrrrrrrrr sending");
+                        }
                 }
-                None => {
+                Err(TryRecvError::Empty) => {
+                    // do nothing else
+                }
+                Err(TryRecvError::Disconnected) => {
                     error!("Senders to `inbox` have disconnected.");
                     return Err(Error::MsgChannelDropped);
                 }
@@ -672,7 +672,7 @@ mod tests {
 
         let (tx, rx) = mpsc::channel(1);
 
-        let _handle = tokio::task::spawn_local(async move {
+        let _handle = tokio::task::spawn(async move {
             while let Some((_, mut incoming_messages)) = incoming_connections.next().await {
                 while let Ok(Some(msg)) = incoming_messages.next().await {
                     let _ = tx.send(msg).await;
@@ -689,7 +689,7 @@ mod tests {
 
         // Keep the socket alive to keep the address bound, but don't read/write to it so any
         // attempt to connect to it will fail.
-        let _handle = tokio::task::spawn_local(async move {
+        let _handle = tokio::task::spawn(async move {
             debug!("get invalid peer");
             future::pending::<()>().await;
             let _ = socket;
