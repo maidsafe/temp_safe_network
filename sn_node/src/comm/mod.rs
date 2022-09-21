@@ -134,15 +134,19 @@ impl Comm {
     /// Get the channel to send msgs. Parse inbound connections etc.
     pub async fn run_comm_loop(&mut self) -> Result<()> {
         loop {
+            debug!("comm loop");
+            let mut did_something = false;
             match self.inbox.try_recv() {
                 Ok((peer, msg_id, bytes, is_msg_for_client)) => {
+                    debug!("msg to go out... to {peer:?}{msg_id:?}");
                     // self.add_incoming(&peer, connection).await;
                     if let Err(error) = self
                         .send_out_bytes(peer, msg_id, bytes, is_msg_for_client)
                         .await
                     {
-                        error!("Errrrrrrrrrrrrrrr sending");
+                        error!("Errrrrrrrrrrrrrrr sending {error:?}");
                     }
+                    did_something = true;
                 }
                 Err(TryRecvError::Empty) => {
                     // do nothing else
@@ -156,7 +160,9 @@ impl Comm {
             // HANDLE ANY CONNECTIONS THAT CAME IN
             match self.conn_receiver.try_recv() {
                 Ok(ListenerEvent::Connected { peer, connection }) => {
+                    debug!("adding con from {peer:?}");
                     self.add_incoming(&peer, connection).await;
+                    did_something = true;
                 }
                 Err(TryRecvError::Empty) => {
                     // do nothing else
@@ -165,6 +171,10 @@ impl Comm {
                     error!("Senders to `conn_receiver` have disconnected.");
                     return Err(Error::MsgChannelDropped);
                 }
+            }
+
+            if !did_something{
+                tokio::time::sleep(Duration::from_millis(50)).await;
             }
         }
     }

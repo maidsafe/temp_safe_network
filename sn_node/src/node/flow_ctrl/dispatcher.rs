@@ -86,32 +86,42 @@ impl Dispatcher {
                     )?
                 };
 
-                let tasks = peer_msgs
-                    .into_iter()
-                    .map(|(peer, msg)| self.outbox.send((peer, msg_id, msg, is_msg_for_client)));
-                let results = futures::future::join_all(tasks).await;
+                // let tasks = peer_msgs
+                //     .into_iter()
+                //     .map(|(peer, msg)|
+                for (peer, msg) in peer_msgs {
+                    if let Err(err) = self.outbox
+                        .send((peer, msg_id, msg, is_msg_for_client))
+                        .await{
+                            error!("error sending msg in outbox: {peer:?} {msg_id:?}")
+                        }
+
+                    debug!("sent on channel to {peer:?}, for {msg_id:?}");
+                }
+                // );
+                // let results = futures::future::join_all(tasks).await;
 
                 // Any failed sends are tracked via Cmd::HandlePeerFailedSend, which will log dysfunction for any peers
                 // in the section (otherwise ignoring failed send to out of section nodes or clients)
-                let cmds = results
-                    .into_iter()
-                    .filter_map(|result| match result {
-                        // TODO: Handlefailed send.
-                        // Have a cmd produced by comms on failed send.
+                // let cmds = results
+                //     .into_iter()
+                //     .filter_map(|result| match result {
+                //         // TODO: Handlefailed send.
+                //         // Have a cmd produced by comms on failed send.
 
-                        // Err(Error::FailedSend(peer)) => {
-                        //     if is_msg_for_client {
-                        //         warn!("Service msg send failed to: {peer}, for {msg_id:?}");
-                        //         None
-                        //     } else {
-                        //         Some(Cmd::HandleFailedSendToNode { peer, msg_id })
-                        //     }
-                        // }
-                        _ => None,
-                    })
-                    .collect();
+                //         // Err(Error::FailedSend(peer)) => {
+                //         //     if is_msg_for_client {
+                //         //         warn!("Service msg send failed to: {peer}, for {msg_id:?}");
+                //         //         None
+                //         //     } else {
+                //         //         Some(Cmd::HandleFailedSendToNode { peer, msg_id })
+                //         //     }
+                //         // }
+                //         _ => None,
+                //     })
+                //     .collect();
 
-                Ok(cmds)
+                Ok(vec![])
             }
             Cmd::TrackNodeIssueInDysfunction { name, issue } => {
                 let mut node = self.node.write().await;
