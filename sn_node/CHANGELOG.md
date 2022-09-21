@@ -5,7 +5,214 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.71.1 (2022-09-21)
+
+### Chore
+
+ - <csr-id-03da7f67fff1fa5bb06d60a66dfdb531506dec4c/> optimizations and code cleanup
+ - <csr-id-859fc30fa70ce41ceb910e0352c71dda5c5501ce/> enable `SectionTree` proptest
+
+### New Features
+
+ - <csr-id-864c023e26697a609a9ad230c04e7aef7416650c/> custom Serializer, Deserializer for `SectionsDAG`
+ - <csr-id-0cd47ad56e0d93e3e99feb0dfcea8094f871ff6f/> replace `SecuredLinkedList` with `SectionsDAG`
+
+### Bug Fixes
+
+ - <csr-id-4884c511d302522aa408ebf9350a7ff6cefeecb7/> ignore update if we don't have KeyShare
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 5 commits contributed to the release.
+ - 1 day passed between releases.
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - optimizations and code cleanup ([`03da7f6`](https://github.com/maidsafe/safe_network/commit/03da7f67fff1fa5bb06d60a66dfdb531506dec4c))
+    - ignore update if we don't have KeyShare ([`4884c51`](https://github.com/maidsafe/safe_network/commit/4884c511d302522aa408ebf9350a7ff6cefeecb7))
+    - custom Serializer, Deserializer for `SectionsDAG` ([`864c023`](https://github.com/maidsafe/safe_network/commit/864c023e26697a609a9ad230c04e7aef7416650c))
+    - enable `SectionTree` proptest ([`859fc30`](https://github.com/maidsafe/safe_network/commit/859fc30fa70ce41ceb910e0352c71dda5c5501ce))
+    - replace `SecuredLinkedList` with `SectionsDAG` ([`0cd47ad`](https://github.com/maidsafe/safe_network/commit/0cd47ad56e0d93e3e99feb0dfcea8094f871ff6f))
+</details>
+
+## v0.71.0 (2022-09-19)
+
+### Chore
+
+ - <csr-id-a8a9fb90791b29496e8559090dca4161e04054da/> sn_interface-0.15.0/sn_dysfunction-0.14.0/sn_client-0.76.0/sn_node-0.71.0/sn_api-0.74.0/sn_cli-0.67.0
+ - <csr-id-a0bc2562df4f427752ec0f3ab85d9befe2d20050/> cleanup unused deps
+ - <csr-id-84cedf30fff0cc298f9f658d2c58499990967fe4/> remove unused back-pressure code
+
+### Bug Fixes
+
+ - <csr-id-f1b7d17651fa105d2864059ce52a429f8b329af0/> pass id of parent to cmd
+
+### Refactor (BREAKING)
+
+ - <csr-id-2d1221999b959bf4d0879cf42050d5e1e3119445/> flattening up ServiceMsg::ServiceError and ServiceMsg::CmdError types
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 5 commits contributed to the release over the course of 4 calendar days.
+ - 9 days passed between releases.
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.15.0/sn_dysfunction-0.14.0/sn_client-0.76.0/sn_node-0.71.0/sn_api-0.74.0/sn_cli-0.67.0 ([`a8a9fb9`](https://github.com/maidsafe/safe_network/commit/a8a9fb90791b29496e8559090dca4161e04054da))
+    - flattening up ServiceMsg::ServiceError and ServiceMsg::CmdError types ([`2d12219`](https://github.com/maidsafe/safe_network/commit/2d1221999b959bf4d0879cf42050d5e1e3119445))
+    - cleanup unused deps ([`a0bc256`](https://github.com/maidsafe/safe_network/commit/a0bc2562df4f427752ec0f3ab85d9befe2d20050))
+    - remove unused back-pressure code ([`84cedf3`](https://github.com/maidsafe/safe_network/commit/84cedf30fff0cc298f9f658d2c58499990967fe4))
+    - pass id of parent to cmd ([`f1b7d17`](https://github.com/maidsafe/safe_network/commit/f1b7d17651fa105d2864059ce52a429f8b329af0))
+</details>
+
+## v0.70.0 (2022-09-09)
+
+### Chore
+
+ - <csr-id-448694176dd3b40a12bd8ecc16d9bb66fd171a37/> sn_interface-0.14.0/sn_dysfunction-0.13.0/sn_client-0.75.0/sn_node-0.70.0/sn_api-0.73.0/sn_cli-0.66.0
+
+### New Features
+
+ - <csr-id-7c8b022a53adbfb3abdd31a56f47bedc53031d1d/> set statemap as default in sn_node; docs in README
+ - <csr-id-1601027ae1d88ef282a00cccdf2b01490c3e5224/> remove unnecessary double init for handover
+ - <csr-id-ece2514375980140cf2adc5c263cd3878d6e1dc6/> don't HandlePeerFailedSend for ServiceMsgs
+
+### Bug Fixes
+
+ - <csr-id-829f9fbfefc001e73d1aa6a00c4c6ac5de4c87d3/> add missing back-pressure feature gate to code
+
+### Refactor
+
+ - <csr-id-5e70a7afff0d0969143d75f92ce82a02bc40a7b8/> avoiding unnecessary operation id generation upon query response at elder
+
+### Chore (BREAKING)
+
+ - <csr-id-927931c9eb833df3e589d72affc4839ba57b5cc2/> removing unused SystemMsg::NodeMsgError msg type
+
+### New Features (BREAKING)
+
+ - <csr-id-7bedb7bb7614a8af05f5892a28ff4732e87d4796/> return an error to the client when it cannot accept a query
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 8 commits contributed to the release over the course of 1 calendar day.
+ - 1 day passed between releases.
+ - 8 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.14.0/sn_dysfunction-0.13.0/sn_client-0.75.0/sn_node-0.70.0/sn_api-0.73.0/sn_cli-0.66.0 ([`4486941`](https://github.com/maidsafe/safe_network/commit/448694176dd3b40a12bd8ecc16d9bb66fd171a37))
+    - add missing back-pressure feature gate to code ([`829f9fb`](https://github.com/maidsafe/safe_network/commit/829f9fbfefc001e73d1aa6a00c4c6ac5de4c87d3))
+    - avoiding unnecessary operation id generation upon query response at elder ([`5e70a7a`](https://github.com/maidsafe/safe_network/commit/5e70a7afff0d0969143d75f92ce82a02bc40a7b8))
+    - removing unused SystemMsg::NodeMsgError msg type ([`927931c`](https://github.com/maidsafe/safe_network/commit/927931c9eb833df3e589d72affc4839ba57b5cc2))
+    - return an error to the client when it cannot accept a query ([`7bedb7b`](https://github.com/maidsafe/safe_network/commit/7bedb7bb7614a8af05f5892a28ff4732e87d4796))
+    - set statemap as default in sn_node; docs in README ([`7c8b022`](https://github.com/maidsafe/safe_network/commit/7c8b022a53adbfb3abdd31a56f47bedc53031d1d))
+    - remove unnecessary double init for handover ([`1601027`](https://github.com/maidsafe/safe_network/commit/1601027ae1d88ef282a00cccdf2b01490c3e5224))
+    - don't HandlePeerFailedSend for ServiceMsgs ([`ece2514`](https://github.com/maidsafe/safe_network/commit/ece2514375980140cf2adc5c263cd3878d6e1dc6))
+</details>
+
+## v0.69.0 (2022-09-07)
+
+### Chore
+
+ - <csr-id-fe659c5685289fe0071b54298dcac394e83c0dce/> sn_interface-0.13.0/sn_dysfunction-0.12.0/sn_client-0.74.0/sn_node-0.69.0/sn_api-0.72.0/sn_cli-0.65.0
+ - <csr-id-84bfdaaf5b0df86912fef806dcb04f353e828b69/> pass by reference instead of by value
+
+### Bug Fixes
+
+ - <csr-id-4dcbd154698c5f7302502490724150e8eefe32af/> avoid using timeout to handle ContentNotFound
+   Instead of waiting for another adult to respond, return the error.
+   
+   The requeueing is ineffective since the node will not respond again and
+   the operation will linger in the cache until it expires.
+
+### Refactor
+
+ - <csr-id-638bcdfea4cbc713d8a4faecec7ed8538317fa29/> minor refactor to Capacity functions impl, plus removing unused fns
+
+### New Features (BREAKING)
+
+ - <csr-id-d671f4ee4c76b42187d266aee99351114acf6cd7/> report any error occurred when handling a service msg back to the client
+   - Removing several unused sn_node::Error types.
+   - Adapting sn_api wallet and sn_node spentbook unit tests for new error msgs/cmds.
+
+### Refactor (BREAKING)
+
+ - <csr-id-0c49daf5dbfad2593ccf13cb114841045688ffed/> removing unused Error types
+   - Minor refactor to how we convert sn_node modules Error types to sn_interface::Error types.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release.
+ - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.13.0/sn_dysfunction-0.12.0/sn_client-0.74.0/sn_node-0.69.0/sn_api-0.72.0/sn_cli-0.65.0 ([`fe659c5`](https://github.com/maidsafe/safe_network/commit/fe659c5685289fe0071b54298dcac394e83c0dce))
+    - minor refactor to Capacity functions impl, plus removing unused fns ([`638bcdf`](https://github.com/maidsafe/safe_network/commit/638bcdfea4cbc713d8a4faecec7ed8538317fa29))
+    - avoid using timeout to handle ContentNotFound ([`4dcbd15`](https://github.com/maidsafe/safe_network/commit/4dcbd154698c5f7302502490724150e8eefe32af))
+    - pass by reference instead of by value ([`84bfdaa`](https://github.com/maidsafe/safe_network/commit/84bfdaaf5b0df86912fef806dcb04f353e828b69))
+    - removing unused Error types ([`0c49daf`](https://github.com/maidsafe/safe_network/commit/0c49daf5dbfad2593ccf13cb114841045688ffed))
+    - report any error occurred when handling a service msg back to the client ([`d671f4e`](https://github.com/maidsafe/safe_network/commit/d671f4ee4c76b42187d266aee99351114acf6cd7))
+</details>
+
 ## v0.68.0 (2022-09-06)
+
+<csr-id-d28fdf3ddd0a39f7bbc6426e1e71d990319b0ec7/>
+<csr-id-bcbca889993268429636b003c5ae50ed6cbda527/>
+<csr-id-dd89cac97da96ffe26ae78c4b7b62aa952ec53fc/>
+<csr-id-921438659ccaf65b2ea8cc00efb61d8146ef71ef/>
+<csr-id-933f4282fce2e28a1956fd1b50cc8061a68e1515/>
+<csr-id-b040ea14e53247094838de6f1fa9af2830b051fa/>
+<csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/>
+<csr-id-906625895228de811515e7b71d5f55d067964d24/>
+<csr-id-7d8956a8d7ac2bf0961b90b19c48e89dda6cfb21/>
+<csr-id-39dd5a043c75492e416bb9371015a1365b06fa01/>
+<csr-id-183d7f83985a36deeb5933ae9b1880df21da2866/>
+<csr-id-070f7d8902c3bbc2a88b3be1a8f44de3c2726df6/>
+<csr-id-4a9d4c4bdc8f81d11ea78f888368f64d76754d8e/>
+<csr-id-63958a8629c9fbca8e6604edb17d9b61ca92a4ee/>
+<csr-id-9f9a95614991197b240b3c1a363eb4e5946d3fae/>
+<csr-id-62bc8d6d24b7c82bd3a27ceb43cd53d8077ff6b2/>
+<csr-id-277d925aa3ed5ff01eab8c1d2488f653cfe6effc/>
+<csr-id-a6685348578fe546576bd13405e6485d984b3487/>
+<csr-id-ed9f627d0e2c42ab1b7386888cced751ae28f98a/>
+<csr-id-5b73b33b683991be9e9f6440c3d8d568edab3ad6/>
+<csr-id-b7530feb40987f433ff12c5176cfdbc375359dc6/>
 
 ### Chore
 
@@ -28,6 +235,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    interfaces.
  - <csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/> switch on clippy::unwrap_used as a warning
 
+
+### Chore
+
+ - <csr-id-1b9e0a6564e9564201ef3a3e04adb0bfbef6ac14/> sn_interface-0.12.0/sn_dysfunction-0.11.0/sn_client-0.73.0/sn_node-0.68.0/sn_api-0.71.0/sn_cli-0.64.0
 
 ### New Features
 
@@ -112,9 +323,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 35 commits contributed to the release over the course of 7 calendar days.
+ - 36 commits contributed to the release over the course of 8 calendar days.
  - 8 days passed between releases.
- - 32 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 33 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -124,6 +335,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.12.0/sn_dysfunction-0.11.0/sn_client-0.73.0/sn_node-0.68.0/sn_api-0.71.0/sn_cli-0.64.0 ([`1b9e0a6`](https://github.com/maidsafe/safe_network/commit/1b9e0a6564e9564201ef3a3e04adb0bfbef6ac14))
     - update qp2p to use UsrMsgBytes and avoid reserializing bytes ([`f5361d9`](https://github.com/maidsafe/safe_network/commit/f5361d91f8215585651229eb6dc2535f2ecb631c))
     - Merge #1545 ([`b62c056`](https://github.com/maidsafe/safe_network/commit/b62c056b0b28f67a40d9e036b2d64b36fd5380bd))
     - always resend query to adults ([`7c207e4`](https://github.com/maidsafe/safe_network/commit/7c207e407533c09108ae6668d51b398caf896f0f))

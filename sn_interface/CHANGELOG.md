@@ -6,7 +6,205 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## v0.15.1 (2022-09-21)
+
+### Chore
+
+ - <csr-id-03da7f67fff1fa5bb06d60a66dfdb531506dec4c/> optimizations and code cleanup
+ - <csr-id-71d992ba1405a48a8593f8f5aa3288296bd59af6/> show parent idx while debugging
+ - <csr-id-859fc30fa70ce41ceb910e0352c71dda5c5501ce/> enable `SectionTree` proptest
+ - <csr-id-e01a964b7aee8fde125dd56b3cfa78498c4cbb41/> provide custom rng to generate random_sap, SecretKeySet
+
+### New Features
+
+ - <csr-id-864c023e26697a609a9ad230c04e7aef7416650c/> custom Serializer, Deserializer for `SectionsDAG`
+ - <csr-id-0cd47ad56e0d93e3e99feb0dfcea8094f871ff6f/> replace `SecuredLinkedList` with `SectionsDAG`
+
+### Bug Fixes
+
+ - <csr-id-4884c511d302522aa408ebf9350a7ff6cefeecb7/> ignore update if we don't have KeyShare
+
+### Test
+
+ - <csr-id-301aeeb687561106f8e2fd6bab1133159d22a6f1/> verify entry_hash generation
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 8 commits contributed to the release over the course of 1 calendar day.
+ - 1 day passed between releases.
+ - 8 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - optimizations and code cleanup ([`03da7f6`](https://github.com/maidsafe/safe_network/commit/03da7f67fff1fa5bb06d60a66dfdb531506dec4c))
+    - ignore update if we don't have KeyShare ([`4884c51`](https://github.com/maidsafe/safe_network/commit/4884c511d302522aa408ebf9350a7ff6cefeecb7))
+    - show parent idx while debugging ([`71d992b`](https://github.com/maidsafe/safe_network/commit/71d992ba1405a48a8593f8f5aa3288296bd59af6))
+    - custom Serializer, Deserializer for `SectionsDAG` ([`864c023`](https://github.com/maidsafe/safe_network/commit/864c023e26697a609a9ad230c04e7aef7416650c))
+    - enable `SectionTree` proptest ([`859fc30`](https://github.com/maidsafe/safe_network/commit/859fc30fa70ce41ceb910e0352c71dda5c5501ce))
+    - provide custom rng to generate random_sap, SecretKeySet ([`e01a964`](https://github.com/maidsafe/safe_network/commit/e01a964b7aee8fde125dd56b3cfa78498c4cbb41))
+    - replace `SecuredLinkedList` with `SectionsDAG` ([`0cd47ad`](https://github.com/maidsafe/safe_network/commit/0cd47ad56e0d93e3e99feb0dfcea8094f871ff6f))
+    - verify entry_hash generation ([`301aeeb`](https://github.com/maidsafe/safe_network/commit/301aeeb687561106f8e2fd6bab1133159d22a6f1))
+</details>
+
+## v0.15.0 (2022-09-19)
+
+### Chore
+
+ - <csr-id-a8a9fb90791b29496e8559090dca4161e04054da/> sn_interface-0.15.0/sn_dysfunction-0.14.0/sn_client-0.76.0/sn_node-0.71.0/sn_api-0.74.0/sn_cli-0.67.0
+ - <csr-id-a0bc2562df4f427752ec0f3ab85d9befe2d20050/> cleanup unused deps
+ - <csr-id-84cedf30fff0cc298f9f658d2c58499990967fe4/> remove unused back-pressure code
+
+### New Features
+
+ - <csr-id-32577f2e5c158db2420bbf173e84aef7f4175fd7/> add API to retrieve a single-branch partial DAG containing a given key.
+   - Adding `single_branch_dag_for_key` API to get a partial `SectionsDAG` with a single branch
+   which contains the given `key`, from the genesis to the last key of any of its children branches.
+   - The new API also returns the last key of the (single) branch the returned DAG contains.
+
+### Test
+
+ - <csr-id-3e59963094f93528404af34efa9cf9900640702f/> RegisterCrdt generates entry hash properly
+
+### Refactor (BREAKING)
+
+ - <csr-id-2d1221999b959bf4d0879cf42050d5e1e3119445/> flattening up ServiceMsg::ServiceError and ServiceMsg::CmdError types
+ - <csr-id-d5cc996e5ca0a34bfad3ed16760a44a93d3264a2/> operation id to be generated merely by bincode serialisation without any encoding
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 7 commits contributed to the release over the course of 6 calendar days.
+ - 9 days passed between releases.
+ - 7 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.15.0/sn_dysfunction-0.14.0/sn_client-0.76.0/sn_node-0.71.0/sn_api-0.74.0/sn_cli-0.67.0 ([`a8a9fb9`](https://github.com/maidsafe/safe_network/commit/a8a9fb90791b29496e8559090dca4161e04054da))
+    - flattening up ServiceMsg::ServiceError and ServiceMsg::CmdError types ([`2d12219`](https://github.com/maidsafe/safe_network/commit/2d1221999b959bf4d0879cf42050d5e1e3119445))
+    - cleanup unused deps ([`a0bc256`](https://github.com/maidsafe/safe_network/commit/a0bc2562df4f427752ec0f3ab85d9befe2d20050))
+    - remove unused back-pressure code ([`84cedf3`](https://github.com/maidsafe/safe_network/commit/84cedf30fff0cc298f9f658d2c58499990967fe4))
+    - RegisterCrdt generates entry hash properly ([`3e59963`](https://github.com/maidsafe/safe_network/commit/3e59963094f93528404af34efa9cf9900640702f))
+    - operation id to be generated merely by bincode serialisation without any encoding ([`d5cc996`](https://github.com/maidsafe/safe_network/commit/d5cc996e5ca0a34bfad3ed16760a44a93d3264a2))
+    - add API to retrieve a single-branch partial DAG containing a given key. ([`32577f2`](https://github.com/maidsafe/safe_network/commit/32577f2e5c158db2420bbf173e84aef7f4175fd7))
+</details>
+
+## v0.14.0 (2022-09-09)
+
+### Chore
+
+ - <csr-id-448694176dd3b40a12bd8ecc16d9bb66fd171a37/> sn_interface-0.14.0/sn_dysfunction-0.13.0/sn_client-0.75.0/sn_node-0.70.0/sn_api-0.73.0/sn_cli-0.66.0
+ - <csr-id-7d4a15a7855429d604c0216f67e46620fea80e6f/> loop upload verification to avoid early NoDataFound
+   The underlying API now returns NoDataFound once it ahs queried all adults... So we loop atop this to ensure we don't hit this too early as not all chunks may have been uploaded yet
+
+### Chore (BREAKING)
+
+ - <csr-id-927931c9eb833df3e589d72affc4839ba57b5cc2/> removing unused SystemMsg::NodeMsgError msg type
+
+### New Features (BREAKING)
+
+ - <csr-id-7bedb7bb7614a8af05f5892a28ff4732e87d4796/> return an error to the client when it cannot accept a query
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release over the course of 1 calendar day.
+ - 1 day passed between releases.
+ - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.14.0/sn_dysfunction-0.13.0/sn_client-0.75.0/sn_node-0.70.0/sn_api-0.73.0/sn_cli-0.66.0 ([`4486941`](https://github.com/maidsafe/safe_network/commit/448694176dd3b40a12bd8ecc16d9bb66fd171a37))
+    - removing unused SystemMsg::NodeMsgError msg type ([`927931c`](https://github.com/maidsafe/safe_network/commit/927931c9eb833df3e589d72affc4839ba57b5cc2))
+    - return an error to the client when it cannot accept a query ([`7bedb7b`](https://github.com/maidsafe/safe_network/commit/7bedb7bb7614a8af05f5892a28ff4732e87d4796))
+    - Merge #1559 ([`e762528`](https://github.com/maidsafe/safe_network/commit/e762528eabf076148b5c6767e61b16901681bffe))
+    - Merge branch 'main' into Chore-ClientRetriesOnDataNotFound ([`bbca976`](https://github.com/maidsafe/safe_network/commit/bbca97680840e1069c88278fe14ddee153b97dbb))
+    - loop upload verification to avoid early NoDataFound ([`7d4a15a`](https://github.com/maidsafe/safe_network/commit/7d4a15a7855429d604c0216f67e46620fea80e6f))
+</details>
+
+## v0.13.0 (2022-09-07)
+
+### Chore
+
+ - <csr-id-fe659c5685289fe0071b54298dcac394e83c0dce/> sn_interface-0.13.0/sn_dysfunction-0.12.0/sn_client-0.74.0/sn_node-0.69.0/sn_api-0.72.0/sn_cli-0.65.0
+ - <csr-id-b1329158b3c2427a7c1939060ba1fe3ef9e72bf9/> retry DataNotFound errors for data_copy_count * 2
+   We do this twice in case of connection issues during prev run
+ - <csr-id-84bfdaaf5b0df86912fef806dcb04f353e828b69/> pass by reference instead of by value
+
+### Refactor
+
+ - <csr-id-638bcdfea4cbc713d8a4faecec7ed8538317fa29/> minor refactor to Capacity functions impl, plus removing unused fns
+
+### New Features (BREAKING)
+
+ - <csr-id-d671f4ee4c76b42187d266aee99351114acf6cd7/> report any error occurred when handling a service msg back to the client
+   - Removing several unused sn_node::Error types.
+   - Adapting sn_api wallet and sn_node spentbook unit tests for new error msgs/cmds.
+
+### Refactor (BREAKING)
+
+ - <csr-id-0c49daf5dbfad2593ccf13cb114841045688ffed/> removing unused Error types
+   - Minor refactor to how we convert sn_node modules Error types to sn_interface::Error types.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release.
+ - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.13.0/sn_dysfunction-0.12.0/sn_client-0.74.0/sn_node-0.69.0/sn_api-0.72.0/sn_cli-0.65.0 ([`fe659c5`](https://github.com/maidsafe/safe_network/commit/fe659c5685289fe0071b54298dcac394e83c0dce))
+    - retry DataNotFound errors for data_copy_count * 2 ([`b132915`](https://github.com/maidsafe/safe_network/commit/b1329158b3c2427a7c1939060ba1fe3ef9e72bf9))
+    - minor refactor to Capacity functions impl, plus removing unused fns ([`638bcdf`](https://github.com/maidsafe/safe_network/commit/638bcdfea4cbc713d8a4faecec7ed8538317fa29))
+    - pass by reference instead of by value ([`84bfdaa`](https://github.com/maidsafe/safe_network/commit/84bfdaaf5b0df86912fef806dcb04f353e828b69))
+    - removing unused Error types ([`0c49daf`](https://github.com/maidsafe/safe_network/commit/0c49daf5dbfad2593ccf13cb114841045688ffed))
+    - report any error occurred when handling a service msg back to the client ([`d671f4e`](https://github.com/maidsafe/safe_network/commit/d671f4ee4c76b42187d266aee99351114acf6cd7))
+</details>
+
 ## v0.12.0 (2022-09-06)
+
+<csr-id-d28fdf3ddd0a39f7bbc6426e1e71d990319b0ec7/>
+<csr-id-997517764347857f71674567364b7dbb852d8b10/>
+<csr-id-921438659ccaf65b2ea8cc00efb61d8146ef71ef/>
+<csr-id-f5d436fba99e0e9c258c7ab3c3a256be3be58f84/>
+<csr-id-b040ea14e53247094838de6f1fa9af2830b051fa/>
+<csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/>
+<csr-id-183d7f83985a36deeb5933ae9b1880df21da2866/>
+<csr-id-63958a8629c9fbca8e6604edb17d9b61ca92a4ee/>
+<csr-id-62bc8d6d24b7c82bd3a27ceb43cd53d8077ff6b2/>
+<csr-id-a6685348578fe546576bd13405e6485d984b3487/>
+<csr-id-ed9f627d0e2c42ab1b7386888cced751ae28f98a/>
+<csr-id-5b73b33b683991be9e9f6440c3d8d568edab3ad6/>
+<csr-id-b7530feb40987f433ff12c5176cfdbc375359dc6/>
 
 ### Chore
 
@@ -21,6 +219,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    interfaces.
  - <csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/> switch on clippy::unwrap_used as a warning
 
+
+### Chore
+
+ - <csr-id-1b9e0a6564e9564201ef3a3e04adb0bfbef6ac14/> sn_interface-0.12.0/sn_dysfunction-0.11.0/sn_client-0.73.0/sn_node-0.68.0/sn_api-0.71.0/sn_cli-0.64.0
 
 ### New Features
 
@@ -66,9 +268,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 19 commits contributed to the release over the course of 7 calendar days.
+ - 20 commits contributed to the release over the course of 8 calendar days.
  - 8 days passed between releases.
- - 18 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 19 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -78,6 +280,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.12.0/sn_dysfunction-0.11.0/sn_client-0.73.0/sn_node-0.68.0/sn_api-0.71.0/sn_cli-0.64.0 ([`1b9e0a6`](https://github.com/maidsafe/safe_network/commit/1b9e0a6564e9564201ef3a3e04adb0bfbef6ac14))
     - update qp2p to use UsrMsgBytes and avoid reserializing bytes ([`f5361d9`](https://github.com/maidsafe/safe_network/commit/f5361d91f8215585651229eb6dc2535f2ecb631c))
     - Merge #1545 ([`b62c056`](https://github.com/maidsafe/safe_network/commit/b62c056b0b28f67a40d9e036b2d64b36fd5380bd))
     - update qp2p for unique ids ([`6bdc822`](https://github.com/maidsafe/safe_network/commit/6bdc82295dfdcaa617c7c1e36d2b72f085e50042))

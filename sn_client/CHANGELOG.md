@@ -1113,7 +1113,136 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
+## v0.76.1 (2022-09-21)
+
+### Chore
+
+ - <csr-id-03da7f67fff1fa5bb06d60a66dfdb531506dec4c/> optimizations and code cleanup
+
+### New Features
+
+ - <csr-id-0cd47ad56e0d93e3e99feb0dfcea8094f871ff6f/> replace `SecuredLinkedList` with `SectionsDAG`
+
+### Test
+
+ - <csr-id-18bea3c1e56268b28826643e1ff8936dfa6d4896/> verify client generate entry_hash
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release over the course of 1 calendar day.
+ - 1 day passed between releases.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - optimizations and code cleanup ([`03da7f6`](https://github.com/maidsafe/safe_network/commit/03da7f67fff1fa5bb06d60a66dfdb531506dec4c))
+    - replace `SecuredLinkedList` with `SectionsDAG` ([`0cd47ad`](https://github.com/maidsafe/safe_network/commit/0cd47ad56e0d93e3e99feb0dfcea8094f871ff6f))
+    - verify client generate entry_hash ([`18bea3c`](https://github.com/maidsafe/safe_network/commit/18bea3c1e56268b28826643e1ff8936dfa6d4896))
+</details>
+
+## v0.76.0 (2022-09-19)
+
+### Chore
+
+ - <csr-id-a8a9fb90791b29496e8559090dca4161e04054da/> sn_interface-0.15.0/sn_dysfunction-0.14.0/sn_client-0.76.0/sn_node-0.71.0/sn_api-0.74.0/sn_cli-0.67.0
+ - <csr-id-a0bc2562df4f427752ec0f3ab85d9befe2d20050/> cleanup unused deps
+
+### Refactor (BREAKING)
+
+ - <csr-id-2d1221999b959bf4d0879cf42050d5e1e3119445/> flattening up ServiceMsg::ServiceError and ServiceMsg::CmdError types
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release over the course of 2 calendar days.
+ - 9 days passed between releases.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.15.0/sn_dysfunction-0.14.0/sn_client-0.76.0/sn_node-0.71.0/sn_api-0.74.0/sn_cli-0.67.0 ([`a8a9fb9`](https://github.com/maidsafe/safe_network/commit/a8a9fb90791b29496e8559090dca4161e04054da))
+    - flattening up ServiceMsg::ServiceError and ServiceMsg::CmdError types ([`2d12219`](https://github.com/maidsafe/safe_network/commit/2d1221999b959bf4d0879cf42050d5e1e3119445))
+    - cleanup unused deps ([`a0bc256`](https://github.com/maidsafe/safe_network/commit/a0bc2562df4f427752ec0f3ab85d9befe2d20050))
+</details>
+
+## v0.75.0 (2022-09-09)
+
+### Chore
+
+ - <csr-id-448694176dd3b40a12bd8ecc16d9bb66fd171a37/> sn_interface-0.14.0/sn_dysfunction-0.13.0/sn_client-0.75.0/sn_node-0.70.0/sn_api-0.73.0/sn_cli-0.66.0
+ - <csr-id-7d4a15a7855429d604c0216f67e46620fea80e6f/> loop upload verification to avoid early NoDataFound
+   The underlying API now returns NoDataFound once it ahs queried all adults... So we loop atop this to ensure we don't hit this too early as not all chunks may have been uploaded yet
+ - <csr-id-278f29ea80352211c7c0606945f7dfc4908ea9ca/> remove send_msg_in_bg as it hides errors from us
+
+### Bug Fixes
+
+ - <csr-id-7513fbf431f369e3f6eab9e32d23988ec0cec056/> enable statemap feature in churn test
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release over the course of 1 calendar day.
+ - 1 day passed between releases.
+ - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.14.0/sn_dysfunction-0.13.0/sn_client-0.75.0/sn_node-0.70.0/sn_api-0.73.0/sn_cli-0.66.0 ([`4486941`](https://github.com/maidsafe/safe_network/commit/448694176dd3b40a12bd8ecc16d9bb66fd171a37))
+    - enable statemap feature in churn test ([`7513fbf`](https://github.com/maidsafe/safe_network/commit/7513fbf431f369e3f6eab9e32d23988ec0cec056))
+    - Merge #1559 ([`e762528`](https://github.com/maidsafe/safe_network/commit/e762528eabf076148b5c6767e61b16901681bffe))
+    - Merge branch 'main' into Chore-ClientRetriesOnDataNotFound ([`bbca976`](https://github.com/maidsafe/safe_network/commit/bbca97680840e1069c88278fe14ddee153b97dbb))
+    - loop upload verification to avoid early NoDataFound ([`7d4a15a`](https://github.com/maidsafe/safe_network/commit/7d4a15a7855429d604c0216f67e46620fea80e6f))
+    - remove send_msg_in_bg as it hides errors from us ([`278f29e`](https://github.com/maidsafe/safe_network/commit/278f29ea80352211c7c0606945f7dfc4908ea9ca))
+</details>
+
 ## v0.74.0 (2022-09-07)
+
+### Chore
+
+ - <csr-id-fe659c5685289fe0071b54298dcac394e83c0dce/> sn_interface-0.13.0/sn_dysfunction-0.12.0/sn_client-0.74.0/sn_node-0.69.0/sn_api-0.72.0/sn_cli-0.65.0
+ - <csr-id-b1329158b3c2427a7c1939060ba1fe3ef9e72bf9/> retry DataNotFound errors for data_copy_count * 2
+   We do this twice in case of connection issues during prev run
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.13.0/sn_dysfunction-0.12.0/sn_client-0.74.0/sn_node-0.69.0/sn_api-0.72.0/sn_cli-0.65.0 ([`fe659c5`](https://github.com/maidsafe/safe_network/commit/fe659c5685289fe0071b54298dcac394e83c0dce))
+    - retry DataNotFound errors for data_copy_count * 2 ([`b132915`](https://github.com/maidsafe/safe_network/commit/b1329158b3c2427a7c1939060ba1fe3ef9e72bf9))
+</details>
 
 ## v0.73.0 (2022-09-06)
 
@@ -1126,6 +1255,7 @@ needed, as they keypair itself contains the Arcs we need.
 <csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/>
 <csr-id-a4e84ef4608a13ecc2f14dd87f5c23d185185513/>
 <csr-id-d251dbeb2e44707623c3bbb1215784b1bd4fae06/>
+<csr-id-1b9e0a6564e9564201ef3a3e04adb0bfbef6ac14/>
 
 ### Chore
 
