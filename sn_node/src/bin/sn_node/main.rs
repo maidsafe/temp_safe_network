@@ -196,7 +196,7 @@ async fn run_node(config: &Config, outbox: Outbox, inbox: Inbox, addr: SocketAdd
     let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
     let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME_SEC);
 
-    let (_node, mut event_stream) = loop {
+    let (_node, mut event_stream) =
         match start_node(config, join_timeout, outbox, inbox, addr, intitial_contact_address).await {
             Ok(result) => break result,
             Err(NodeError::CannotConnectEndpoint(qp2p::EndpointError::Upnp(error))) => {
@@ -249,8 +249,8 @@ async fn run_node(config: &Config, outbox: Outbox, inbox: Inbox, addr: SocketAdd
                 );
             }
         }
-        sleep(bootstrap_retry_duration).await;
-    };
+        // sleep(bootstrap_retry_duration).await;
+
 
     // Simulate failed node starts, and ensure that
     #[cfg(feature = "chaos")]
