@@ -163,12 +163,31 @@ impl Node {
         partial_dag: &SectionsDAG,
         members: Option<BTreeSet<SectionAuth<NodeState>>>,
     ) -> Result<bool> {
+        let our_name = self.info().name();
+
+        let we_have_a_share_of_this_key = self
+            .section_keys_provider
+            .key_share(&sap.section_key())
+            .is_ok();
+
+        // check we should be _becoming_ an elder
+        let we_should_become_an_elder = sap.value.contains_elder(&our_name);
+
+        trace!("we_have_a_share_of_this_key: {we_have_a_share_of_this_key}, we_should_become_an_elder: {we_should_become_an_elder}");
+
+        // This prevent us from updating our NetworkKnowledge based on an AE message where
+        // we don't have the key share for the new SAP, making this node unable to sign section
+        // messages and possibly being kicked out of the group of Elders.
+        if we_should_become_an_elder && !we_have_a_share_of_this_key {
+            warn!("We should be an elder, but we're missing the keyshare!, ignoring update to wait until we have our keyshare");
+            return Ok(false);
+        };
+
         Ok(self.network_knowledge.update_knowledge_if_valid(
             sap,
             partial_dag,
             members,
-            &self.info().name(),
-            &self.section_keys_provider,
+            &our_name,
         )?)
     }
 
