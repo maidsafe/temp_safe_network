@@ -21,7 +21,7 @@ use sn_interface::{
         system::{DkgFailureSigSet, KeyedSig, NodeState, SectionAuth, SystemMsg},
         AuthorityProof, MsgId, NodeMsgAuthority, ServiceAuth, WireMsg,
     },
-    network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
+    network_knowledge::{SectionAuthorityProvider, SectionKeyShare, SectionsDAG},
     types::{DataAddress, Peer},
 };
 
@@ -145,6 +145,17 @@ pub(crate) enum Cmd {
         #[cfg(feature = "traceroute")]
         traceroute: Traceroute,
     },
+    UpdateNetworkAndHandleValidServiceMsg {
+        proof_chain: SectionsDAG,
+        signed_sap: SectionAuth<SectionAuthorityProvider>,
+        msg_id: MsgId,
+        msg: ServiceMsg,
+        origin: Peer,
+        /// Requester's authority over this message
+        auth: AuthorityProof<ServiceAuth>,
+        #[cfg(feature = "traceroute")]
+        traceroute: Traceroute,
+    },
     /// Handle a timeout previously scheduled with `ScheduleDkgTimeout`.
     HandleDkgTimeout(u64),
     /// Handle peer that's been detected as lost.
@@ -243,6 +254,7 @@ impl Cmd {
             // See [`MsgType`] for the priority constants and the range of possible values.
             HandleValidSystemMsg { msg, .. } => msg.priority(),
             HandleValidServiceMsg { msg, .. } => msg.priority(),
+            UpdateNetworkAndHandleValidServiceMsg { msg, .. } => msg.priority(),
 
             ValidateMsg { .. } => -9, // before it's validated, we cannot give it high prio, as it would be a spam vector
         }
@@ -257,6 +269,7 @@ impl Cmd {
             Cmd::ValidateMsg { .. } => State::Validation,
             Cmd::HandleValidSystemMsg { msg, .. } => msg.statemap_states(),
             Cmd::HandleValidServiceMsg { .. } => State::ServiceMsg,
+            Cmd::UpdateNetworkAndHandleValidServiceMsg { .. } => State::ServiceMsg,
             Cmd::TrackNodeIssueInDysfunction { .. } => State::Dysfunction,
             Cmd::AddToPendingQueries { .. } => State::Dysfunction,
             Cmd::HandleAgreement { .. } => State::Agreement,
@@ -298,6 +311,9 @@ impl fmt::Display for Cmd {
             }
             Cmd::HandleValidServiceMsg { msg_id, msg, .. } => {
                 write!(f, "HandleValidServiceMsg {:?}: {:?}", msg_id, msg)
+            }
+            Cmd::UpdateNetworkAndHandleValidServiceMsg { msg_id, msg, .. } => {
+                write!(f, "UpdateAndHandleValidServiceMsg {:?}: {:?}", msg_id, msg)
             }
             Cmd::HandleFailedSendToNode { peer, msg_id } => {
                 write!(f, "HandlePeerFailedSend({:?}, {:?})", peer.name(), msg_id)

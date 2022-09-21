@@ -583,7 +583,7 @@ mod tests {
             );
 
             // Send JoinResponse::Retry with section auth provider info
-            let signed_sap = section_signed(sk, section_auth.clone())?;
+            let signed_sap = section_signed(&sk, section_auth.clone())?;
             let section_tree_update = {
                 let proof_chain = SectionsDAG::new(original_section_key);
                 SectionTreeUpdate::new(signed_sap, proof_chain)
@@ -614,7 +614,7 @@ mod tests {
             });
 
             // Send JoinResponse::Approved
-            let signed_sap = section_signed(sk, section_auth.clone())?;
+            let signed_sap = section_signed(&sk, section_auth.clone())?;
             let decision = section_decision(&sk_set, NodeState::joined(peer, None).to_msg())?;
             let section_pk = signed_sap.section_key();
             let section_tree_update = {
@@ -931,7 +931,7 @@ mod tests {
             );
 
             let proof_chain = SectionsDAG::new(section_key);
-            let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
+            let signed_sap = section_signed(&sk_set.secret_key(), section_auth.clone())?;
 
             // Send `Retry` with bad prefix
             let bad_section_tree_update = {

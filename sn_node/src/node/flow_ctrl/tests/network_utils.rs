@@ -13,13 +13,12 @@ use bls::Signature;
 use ed25519_dalek::Keypair;
 use eyre::{bail, eyre, Context, Result};
 use sn_consensus::Decision;
-use sn_interface::network_knowledge::SectionTree;
 use sn_interface::{
     elder_count,
     messaging::{system::NodeState as NodeStateMsg, SectionTreeUpdate},
     network_knowledge::{
         test_utils::*, NetworkKnowledge, NodeInfo, NodeState, SectionAuthorityProvider,
-        SectionKeyShare, SectionsDAG, MIN_ADULT_AGE,
+        SectionKeyShare, SectionTree, SectionsDAG, MIN_ADULT_AGE,
     },
     types::{keys::ed25519, Peer, SecretKeySet},
 };
@@ -42,9 +41,11 @@ pub(crate) struct TestNodeBuilder {
     pub(crate) node_event_sender: EventSender,
     pub(crate) section: Option<NetworkKnowledge>,
     pub(crate) first_node: Option<NodeInfo>,
-    pub(crate) sk_set: Option<SecretKeySet>,
+    pub(crate) genesis_sk_set: Option<bls::SecretKeySet>,
     pub(crate) sap: Option<SectionAuthorityProvider>,
     pub(crate) custom_peer: Option<Peer>,
+    pub(crate) other_section_keys: Option<Vec<bls::SecretKey>>,
+    pub(crate) parent_section_tree: Option<SectionTree>,
 }
 
 impl TestNodeBuilder {
@@ -69,10 +70,37 @@ impl TestNodeBuilder {
             node_event_sender: event_sender,
             section: None,
             first_node: None,
-            sk_set: None,
+            genesis_sk_set: None,
             sap: None,
             custom_peer: None,
+            other_section_keys: None,
+            parent_section_tree: None,
         }
+    }
+
+    /// Provide a the genesis key set for the section to be created with.
+    pub(crate) fn genesis_sk_set(mut self, sk_set: bls::SecretKeySet) -> TestNodeBuilder {
+        self.genesis_sk_set = Some(sk_set);
+        self
+    }
+
+    /// Provide other keys for the section chain.
+    ///
+    /// This list should *not* include the genesis key.
+    pub(crate) fn other_section_keys(mut self, other_keys: Vec<bls::SecretKey>) -> TestNodeBuilder {
+        self.other_section_keys = Some(other_keys);
+        self
+    }
+
+    /// Provide the parent section tree.
+    ///
+    /// Use this when creating section that's supposed to be related to another one.
+    pub(crate) fn parent_section_tree(
+        mut self,
+        parent_section_tree: SectionTree,
+    ) -> TestNodeBuilder {
+        self.parent_section_tree = Some(parent_section_tree);
+        self
     }
 
     /// Set the number of adults for the section.
@@ -130,11 +158,11 @@ impl TestNodeBuilder {
     pub(crate) fn section(
         mut self,
         section: NetworkKnowledge,
-        sk_set: SecretKeySet,
+        sk_set: bls::SecretKeySet,
         first_node: NodeInfo,
     ) -> TestNodeBuilder {
         self.section = Some(section);
-        self.sk_set = Some(sk_set);
+        self.genesis_sk_set = Some(sk_set);
         self.first_node = Some(first_node);
         self
     }
@@ -145,6 +173,46 @@ impl TestNodeBuilder {
     pub(crate) fn custom_peer(mut self, peer: Peer) -> TestNodeBuilder {
         self.custom_peer = Some(peer);
         self
+    }
+
+    /// Build a mock network section using the values provided.
+    ///
+    /// This is to avoid creating another node and dispatcher when they are not needed. It's
+    /// simpler to have two separate functions rather than `build` returning options and so on.
+    ///
+    /// Note that this function is *not* compatible with the use of a custom section.
+    pub(crate) async fn build_section(
+        self,
+    ) -> Result<(NetworkKnowledge, bls::SecretKeySet, SectionKeyShare)> {
+        let section_key_set = if let Some(ref section_keys) = self.other_section_keys {
+            let last_key = section_keys
+                .last()
+                .ok_or_else(|| eyre!("The section keys list must be populated"))?;
+            bls::SecretKeySet::from_bytes(last_key.to_bytes().to_vec())?
+        } else if let Some(ref genesis_sk_set) = self.genesis_sk_set {
+            genesis_sk_set.clone()
+        } else {
+            bls::SecretKeySet::random(self.section_sk_threshold, &mut rand::thread_rng())
+        };
+
+        let (sap, _) = random_sap_with_key(
+            self.prefix,
+            self.elder_count,
+            self.adult_count,
+            &section_key_set,
+        );
+        let genesis_key_set = if let Some(ref genesis_sk_set) = self.genesis_sk_set {
+            genesis_sk_set.clone()
+        } else {
+            bls::SecretKeySet::random(self.section_sk_threshold, &mut rand::thread_rng())
+        };
+        let (section, section_key_share) = create_section(
+            &genesis_key_set,
+            &sap,
+            self.other_section_keys,
+            self.parent_section_tree,
+        )?;
+        Ok((section, section_key_set, section_key_share))
     }
 
     /// Build a `Node` with mock network section using the values provided.
@@ -158,40 +226,54 @@ impl TestNodeBuilder {
     /// which can be provided via the section (NetworkKnowledge).
     ///
     /// A node will be created with a mock section and it will be wrapped inside the dispatcher.
-    pub(crate) async fn build(self) -> Result<(Dispatcher, NetworkKnowledge, Peer, SecretKeySet)> {
+    pub(crate) async fn build(
+        self,
+    ) -> Result<(Dispatcher, NetworkKnowledge, Peer, bls::SecretKeySet)> {
         std::env::set_var("SN_DATA_COPY_COUNT", self.data_copy_count.to_string());
-        let (section, section_key_share, keypair, peer, sk_set) =
-            if let Some(custom_section) = self.section {
-                let first_node = self.first_node.ok_or_else(|| {
-                    eyre!("The first node must be provided when providing a custom section")
-                })?;
-                let sk_set = self.sk_set.ok_or_else(|| {
-                    eyre!("The secret key set must be supplied when providing a custom section")
-                })?;
-                let section_key_share = create_section_key_share(&sk_set, 0);
-                (
-                    custom_section,
-                    section_key_share,
-                    first_node.keypair.clone(),
-                    first_node.peer(),
-                    sk_set,
-                )
+        let (section, section_key_share, keypair, peer, sk_set) = if let Some(custom_section) =
+            self.section
+        {
+            let first_node = self.first_node.ok_or_else(|| {
+                eyre!("The first node must be provided when providing a custom section")
+            })?;
+            let sk_set = self.genesis_sk_set.ok_or_else(|| {
+                eyre!("The secret key set must be supplied when providing a custom section")
+            })?;
+            let section_key_share = create_section_key_share(&sk_set, 0);
+            (
+                custom_section,
+                section_key_share,
+                first_node.keypair.clone(),
+                first_node.peer(),
+                sk_set,
+            )
+        } else {
+            let (sap, mut nodes, sk_set) = if let Some(sk_set) = self.genesis_sk_set {
+                let (sap, nodes) =
+                    random_sap_with_key(self.prefix, self.elder_count, self.adult_count, &sk_set);
+                (sap, nodes, sk_set)
             } else {
-                let (sap, mut nodes, sk_set) = random_sap(
+                random_sap(
                     self.prefix,
                     self.elder_count,
                     self.adult_count,
                     Some(self.section_sk_threshold),
-                );
-                let (section, section_key_share) = create_section(&sk_set, &sap)?;
-                let node = nodes.remove(0);
-                let keypair = node.keypair.clone();
-                (section, section_key_share, keypair, node.peer(), sk_set)
+                )
             };
+            let (section, section_key_share) = create_section(
+                &sk_set,
+                &sap,
+                self.other_section_keys,
+                self.parent_section_tree,
+            )?;
+            let node = nodes.remove(0);
+            let keypair = node.keypair.clone();
+            (section, section_key_share, keypair, node.peer(), sk_set)
+        };
 
         if let Some(custom_peer) = self.custom_peer {
             let node_state = NodeState::joined(custom_peer, None);
-            let node_state = section_signed(sk_set.secret_key(), node_state)?;
+            let node_state = section_signed(&sk_set.secret_key(), node_state)?;
             let _updated = section.update_member(node_state);
         }
 
@@ -213,29 +295,31 @@ impl TestNodeBuilder {
     }
 }
 
+pub(crate) fn create_section_with_key(
+    prefix: Prefix,
+    sk_set: &SecretKeySet,
+) -> Result<(NetworkKnowledge, SectionAuthorityProvider)> {
+    let (sap, _) = random_sap_with_key(prefix, elder_count(), 0, sk_set);
+    let (section, _) = create_section(sk_set, &sap, None, None)?;
+    Ok((section, sap))
+}
+
 /// Creates a section where all elders and adults are marked as joined members.
 ///
 /// Can be used for tests requiring adults to be members of the section, e.g., when you expect
 /// replication to occur after handling a message.
 pub(crate) fn create_section(
-    sk_set: &SecretKeySet,
-    section_auth: &SectionAuthorityProvider,
+    genesis_sk_set: &bls::SecretKeySet,
+    sap: &SectionAuthorityProvider,
+    other_keys: Option<Vec<bls::SecretKey>>,
+    parent_section_tree: Option<SectionTree>,
 ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
-    let genesis_key = sk_set.public_keys().public_key();
-    let section_tree_update = {
-        let section_chain = SectionsDAG::new(genesis_key);
-        let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
-        SectionTreeUpdate::new(signed_sap, section_chain)
-    };
-    let section = NetworkKnowledge::new(SectionTree::new(genesis_key), section_tree_update)?;
-
-    for ns in section_auth.members() {
-        let auth_ns = section_signed(sk_set.secret_key(), ns.clone())?;
+    let (section, section_key_share) =
+        do_create_section(sap, genesis_sk_set, other_keys, parent_section_tree)?;
+    for ns in sap.members() {
+        let auth_ns = section_signed(&genesis_sk_set.secret_key(), ns.clone())?;
         let _updated = section.update_member(auth_ns);
     }
-
-    let section_key_share = create_section_key_share(sk_set, 0);
-
     Ok((section, section_key_share))
 }
 
@@ -244,25 +328,14 @@ pub(crate) fn create_section(
 /// Some tests require the condition where only the elders were marked as joined members.
 pub(crate) fn create_section_with_elders(
     sk_set: &SecretKeySet,
-    section_auth: &SectionAuthorityProvider,
+    sap: &SectionAuthorityProvider,
 ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
-    let genesis_key = sk_set.public_keys().public_key();
-    let section_tree_update = {
-        let section_chain = SectionsDAG::new(genesis_key);
-        let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
-        SectionTreeUpdate::new(signed_sap, section_chain)
-    };
-
-    let section = NetworkKnowledge::new(SectionTree::new(genesis_key), section_tree_update)?;
-
-    for peer in section_auth.elders() {
+    let (section, section_key_share) = do_create_section(sap, sk_set, None, None)?;
+    for peer in sap.elders() {
         let node_state = NodeState::joined(*peer, None);
         let node_state = section_signed(sk_set.secret_key(), node_state)?;
         let _updated = section.update_member(node_state);
     }
-
-    let section_key_share = create_section_key_share(sk_set, 0);
-
     Ok((section, section_key_share))
 }
 
@@ -277,7 +350,8 @@ pub(crate) fn create_section_key_share(
     }
 }
 
-pub(crate) fn create_section_auth() -> (SectionAuthorityProvider, Vec<NodeInfo>, SecretKeySet) {
+pub(crate) fn create_section_auth() -> (SectionAuthorityProvider, Vec<NodeInfo>, bls::SecretKeySet)
+{
     let (section_auth, elders, secret_key_set) =
         random_sap(Prefix::default(), elder_count(), 0, None);
     (section_auth, elders, secret_key_set)
@@ -327,4 +401,55 @@ pub(crate) fn create_relocation_trigger(
             return Ok(decision);
         }
     }
+}
+
+///
+/// Private helpers
+///
+
+fn do_create_section(
+    section_auth: &SectionAuthorityProvider,
+    genesis_ks: &bls::SecretKeySet,
+    other_section_keys: Option<Vec<bls::SecretKey>>,
+    parent_section_tree: Option<SectionTree>,
+) -> Result<(NetworkKnowledge, SectionKeyShare)> {
+    let (section_chain, last_sk, share_index) = if let Some(other_section_keys) = other_section_keys
+    {
+        let section_chain = make_section_chain(&genesis_ks.secret_key(), &other_section_keys)?;
+        let last_key = other_section_keys
+            .last()
+            .ok_or_else(|| eyre!("The section keys list must be populated"))?;
+        let share_index = other_section_keys.len() - 1;
+        (section_chain, last_key.clone(), share_index)
+    } else {
+        let section_chain = SectionsDAG::new(genesis_ks.public_keys().public_key());
+        (section_chain, genesis_ks.secret_key(), 0)
+    };
+
+    let signed_sap = section_signed(&last_sk, section_auth.clone())?;
+    let section_tree_update = SectionTreeUpdate::new(signed_sap, section_chain);
+    let section_tree = if let Some(parent_section_tree) = parent_section_tree {
+        parent_section_tree
+    } else {
+        SectionTree::new(genesis_ks.public_keys().public_key())
+    };
+    let section = NetworkKnowledge::new(section_tree, section_tree_update)?;
+
+    let sks = bls::SecretKeySet::from_bytes(last_sk.to_bytes().to_vec())?;
+    let section_key_share = create_section_key_share(&sks, share_index);
+    Ok((section, section_key_share))
+}
+
+fn make_section_chain(
+    genesis_key: &bls::SecretKey,
+    other_keys: &Vec<bls::SecretKey>,
+) -> Result<SectionsDAG> {
+    let mut section_chain = SectionsDAG::new(genesis_key.public_key());
+    let mut parent = genesis_key.clone();
+    for key in other_keys {
+        let sig = parent.sign(key.public_key().to_bytes());
+        section_chain.insert(&parent.public_key(), key.public_key(), sig)?;
+        parent = key.clone();
+    }
+    Ok(section_chain)
 }

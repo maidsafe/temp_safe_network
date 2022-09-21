@@ -25,6 +25,15 @@ impl Client {
     //---------------------
 
     /// Spend a DBC's key image.
+    ///
+    /// It's possible that the section processing the spend request will not be aware of the
+    /// section keys used to sign the spent proofs. If this is the case, the network will return a
+    /// particular error and we will retry. There are several retries because there could be
+    /// several keys the section is not aware of, but it only returns back the first one it
+    /// encounters.
+    ///
+    /// When the request is resubmitted, it gets sent along with a proof chain and a signed SAP
+    /// that the section can use to update itself.
     #[instrument(skip(self), level = "debug")]
     pub async fn spend_dbc(
         &self,
@@ -35,9 +44,10 @@ impl Client {
     ) -> Result<(), Error> {
         let cmd = SpentbookCmd::Spend {
             key_image,
-            tx,
-            spent_proofs,
-            spent_transactions,
+            tx: tx.clone(),
+            spent_proofs: spent_proofs.clone(),
+            spent_transactions: spent_transactions.clone(),
+            network_knowledge: None,
         };
         self.send_cmd(DataCmd::Spentbook(cmd)).await
     }

@@ -277,7 +277,6 @@ pub mod test_utils {
     use super::*;
     use crate::messaging::system::{KeyedSig, SectionAuth};
     use crate::network_knowledge::{Error, NodeInfo, MIN_ADULT_AGE};
-    use crate::types::SecretKeySet;
     use eyre::{eyre, Result};
     use itertools::Itertools;
     use rand::RngCore;
@@ -339,15 +338,15 @@ pub mod test_utils {
         elder_count: usize,
         adult_count: usize,
         sk_threshold_size: Option<usize>,
-    ) -> (SectionAuthorityProvider, Vec<NodeInfo>, SecretKeySet) {
+    ) -> (SectionAuthorityProvider, Vec<NodeInfo>, bls::SecretKeySet) {
         let nodes = gen_sorted_nodes(&prefix, elder_count + adult_count, false);
         let elders = nodes.iter().map(NodeInfo::peer).take(elder_count);
         let members = nodes.iter().map(|i| NodeState::joined(i.peer(), None));
-        let secret_key_set = SecretKeySet::random_with_rng(rng, sk_threshold_size);
+        let poly = bls::poly::Poly::random(sk_threshold_size.unwrap_or(0), rng);
+        let sks = bls::SecretKeySet::from(poly);
         let section_auth =
-            SectionAuthorityProvider::new(elders, prefix, members, secret_key_set.public_keys(), 0);
-
-        (section_auth, nodes, secret_key_set)
+            SectionAuthorityProvider::new(elders, prefix, members, sks.public_keys(), 0);
+        (section_auth, nodes, sks)
     }
 
     pub fn random_sap(
@@ -355,7 +354,7 @@ pub mod test_utils {
         elder_count: usize,
         adult_count: usize,
         sk_threshold_size: Option<usize>,
-    ) -> (SectionAuthorityProvider, Vec<NodeInfo>, SecretKeySet) {
+    ) -> (SectionAuthorityProvider, Vec<NodeInfo>, bls::SecretKeySet) {
         random_sap_with_rng(
             &mut rand::thread_rng(),
             prefix,
@@ -363,6 +362,24 @@ pub mod test_utils {
             adult_count,
             sk_threshold_size,
         )
+    }
+
+    /// Generate a random `SectionAuthorityProvider` for testing.
+    ///
+    /// The same as `random_sap`, but instead the secret key is provided. This can be useful for
+    /// creating a section to share the same genesis key as another one.
+    pub fn random_sap_with_key(
+        prefix: Prefix,
+        elder_count: usize,
+        adult_count: usize,
+        sk_set: &bls::SecretKeySet,
+    ) -> (SectionAuthorityProvider, Vec<NodeInfo>) {
+        let nodes = gen_sorted_nodes(&prefix, elder_count + adult_count, false);
+        let elders = nodes.iter().map(NodeInfo::peer).take(elder_count);
+        let members = nodes.iter().map(|i| NodeState::joined(i.peer(), None));
+        let section_auth =
+            SectionAuthorityProvider::new(elders, prefix, members, sk_set.public_keys(), 0);
+        (section_auth, nodes)
     }
 
     // Create signature for the given payload using the given secret key.

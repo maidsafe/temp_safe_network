@@ -16,7 +16,7 @@ use crate::node::{
 #[cfg(feature = "traceroute")]
 use sn_interface::{messaging::Entity, messaging::Traceroute};
 use sn_interface::{
-    messaging::{AuthKind, Dst, MsgId, WireMsg},
+    messaging::{AuthKind, Dst, MsgId, SectionTreeUpdate, WireMsg},
     types::Peer,
 };
 
@@ -177,6 +177,35 @@ impl Dispatcher {
                         Ok(vec![cmd])
                     }
                 }
+            }
+            Cmd::UpdateNetworkAndHandleValidServiceMsg {
+                proof_chain,
+                signed_sap,
+                msg_id,
+                msg,
+                origin,
+                auth,
+                #[cfg(feature = "traceroute")]
+                traceroute,
+            } => {
+                debug!("Updating network knowledge before handling message");
+                let mut node = self.node.write().await;
+                let name = node.name();
+                let updated = node.network_knowledge.update_knowledge_if_valid(
+                    SectionTreeUpdate::new(signed_sap, proof_chain),
+                    None,
+                    &name,
+                )?;
+                debug!("Network knowledge was updated: {updated}");
+                node.handle_valid_service_msg(
+                    msg_id,
+                    msg,
+                    auth,
+                    origin,
+                    #[cfg(feature = "traceroute")]
+                    traceroute,
+                )
+                .await
             }
             Cmd::HandleValidSystemMsg {
                 origin,
