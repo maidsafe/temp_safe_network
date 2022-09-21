@@ -554,17 +554,21 @@ mod core {
             let mut cmds = vec![];
 
             // clean up DKG sessions 2 generations older than current
-            // `session_id.section_chain_len < old_chain_len`
+            // `session_id.section_chain_len + 2 < current_chain_len`
             // we voluntarily keep the previous DKG rounds
-            // `session_id.section_chain_len == old_chain_len`
             // so lagging elder candidates can still get responses to their gossip.
             // At generation+2, they are not going to be elders anymore so we can safely discard it
-            let old_chain_len = self.network_knowledge.chain_len();
+            let current_chain_len = self.network_knowledge.chain_len();
             let mut old_hashes = vec![];
             for (hash, session_info) in self.dkg_sessions_info.iter() {
-                if session_info.session_id.section_chain_len < old_chain_len {
+                if session_info.session_id.section_chain_len + 2 < current_chain_len {
                     old_hashes.push(*hash);
-                    debug!("Removing old DKG s{}", session_info.session_id.sum());
+                    debug!(
+                        "Removing old DKG s{} of chain len {} when we are at {}",
+                        session_info.session_id.sum(),
+                        session_info.session_id.section_chain_len,
+                        current_chain_len
+                    );
                 }
             }
             for hash in old_hashes {
