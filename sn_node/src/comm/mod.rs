@@ -166,34 +166,11 @@ impl Comm {
     #[tracing::instrument(skip(self, bytes))]
     pub(crate) async fn send(&self, peer: Peer, msg_id: MsgId, bytes: UsrMsgBytes) -> Result<()> {
         let watcher = self.send_to_one(peer, msg_id, bytes).await;
-
-        match watcher {
-            Ok(watcher) => {
-                if Self::is_sent(watcher, msg_id, peer).await {
-                    trace!("Msg {msg_id:?} sent to {peer:?}");
-                    Ok(())
-                } else {
-                    Err(Error::FailedSend(peer))
-                }
-            }
-            Err(error) => {
-                // there is only one type of error returned: [`Error::InvalidState`]
-                // which should not happen (be reachable) if we only access PeerSession from Comm
-                // The error means we accessed a peer that we disconnected from.
-                // So, this would potentially be a bug!
-                warn!(
-                    "Accessed a disconnected peer: {}. This is potentially a bug!",
-                    peer
-                );
-                error!(
-                    "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed as we have disconnected from the peer. (Error is: {})",
-                    msg_id,
-                    peer.addr(),
-                    peer.name(),
-                    error,
-                );
-                Err(Error::FailedSend(peer))
-            }
+        if Self::is_sent(watcher, msg_id, peer).await {
+            trace!("Msg {msg_id:?} sent to {peer:?}");
+            Ok(())
+        } else {
+            Err(Error::FailedSend(peer))
         }
     }
 
@@ -234,10 +211,12 @@ impl Comm {
                     return false;
                 }
                 SendStatus::TransientError(error) => {
-                    // An individual connection can for example have been lost when we tried to send. This
+                    // An individual connection could have been lost when we tried to send. This
                     // could indicate the connection timed out whilst it was held, or some other
-                    // transient connection issue. We don't treat this as a failed recipient, but we sleep a little longer here.
-                    // Retries are managed by the peer session, where it will open a new connection.
+                    // transient connection issue. We don't treat this as a failed send, but we
+                    // do sleep a little longer here.
+                    // Retries are managed by the peer session, where it will open a new
+                    // connection.
                     debug!("Transient error when sending to peer {}: {}", peer, error);
                     log_sleep!(Duration::from_millis(200));
                     continue; // moves on to awaiting a new change
@@ -289,12 +268,7 @@ impl Comm {
 
     // Helper to send a message to a single recipient.
     #[instrument(skip(self, bytes))]
-    async fn send_to_one(
-        &self,
-        recipient: Peer,
-        msg_id: MsgId,
-        bytes: UsrMsgBytes,
-    ) -> Result<SendWatcher> {
+    async fn send_to_one(&self, recipient: Peer, msg_id: MsgId, bytes: UsrMsgBytes) -> SendWatcher {
         let bytes_len = {
             let (h, d, p) = bytes.clone();
             h.len() + d.len() + p.len()

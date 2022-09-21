@@ -48,7 +48,7 @@ pub(crate) async fn join_network(
     network_contacts: SectionTree,
     join_timeout: Duration,
 ) -> Result<(NodeInfo, NetworkKnowledge)> {
-    let (outgoing_msgs_sender, outgoing_msgs_receiver) = mpsc::channel(1);
+    let (outgoing_msgs_sender, outgoing_msgs_receiver) = mpsc::channel(100);
 
     let span = trace_span!("bootstrap");
     let joiner = Joiner::new(node, outgoing_msgs_sender, incoming_msgs, network_contacts);
@@ -486,9 +486,6 @@ async fn send_messages(
             let bytes = msg.serialize()?;
             match comm.send(peer, msg_id, bytes).await {
                 Ok(()) => trace!("Msg {msg_id:?} sent on {dst:?}"),
-                Err(Error::FailedSend(peer)) => {
-                    error!("Failed to send message {msg_id:?} to {peer:?}")
-                }
                 Err(error) => {
                     warn!("Error in comms when sending msg {msg_id:?} to peer {peer:?}: {error}")
                 }
