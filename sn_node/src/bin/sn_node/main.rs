@@ -34,7 +34,7 @@ use color_eyre::{Section, SectionExt};
 use eyre::{eyre, Context, ErrReport, Result};
 use self_update::{cargo_crate_version, Status};
 use sn_interface::network_knowledge::SectionTree;
-use sn_node::comm::{Comm, OutgoingMsg, OutBox};
+use sn_node::comm::{Comm, OutgoingMsg, Outbox, Inbox};
 use sn_node::node::{start_node, Config, Error as NodeError, Event, MembershipEvent};
 use std::net::{Ipv4Addr, SocketAddr};
 use std::{io::Write, process::exit};
@@ -60,7 +60,11 @@ async fn main() -> Result<()> {
     // // 16mb here for windows stack size, which was being exceeded previously
     // .thread_stack_size(16 * 1024 * 1024)
     // .build()?;
-    let (connection_event_tx, mut msg_receiver_channel) = mpsc::channel(100);
+
+    // We need this to pass into join flow
+    // TODO: refactor this to be created by comms and just return Cmds
+    // This will need join flow to parse cmds...
+    let (sender_for_msgs_received_in_comms, mut msg_receiver_channel) = mpsc::channel(100);
 
     // rt.block_on(async {
     let mut config = Config::new().await?;
@@ -72,7 +76,7 @@ async fn main() -> Result<()> {
         Comm::first_node(
             local_addr,
             config.network_config().clone(),
-            connection_event_tx,
+            sender_for_msgs_received_in_comms,
         )
         .await?
     } else {
@@ -96,7 +100,7 @@ async fn main() -> Result<()> {
             local_addr,
             bootstrap_nodes.as_slice(),
             config.network_config().clone(),
-            connection_event_tx,
+            sender_for_msgs_received_in_comms,
         )
         .await?;
 
@@ -122,7 +126,7 @@ async fn main() -> Result<()> {
 
     loop {
         info!("Node runtime started");
-        create_runtime_and_node(&config, send_msg_channel.clone(), addr).await?;
+        create_runtime_and_node(&config, send_msg_channel.clone(), msg_receiver_channel, addr).await?;
 
         // pull config again in case it has been updated meanwhile
         config = Config::new().await?;
@@ -131,13 +135,13 @@ async fn main() -> Result<()> {
 }
 
 /// Create a tokio runtime per `run_node` instance.
-async fn create_runtime_and_node(config: &Config, outbox: OutBox, addr: SocketAddr) -> Result<()> {
+async fn create_runtime_and_node(config: &Config, outbox: Outbox, inbox: Inbox, addr: SocketAddr) -> Result<()> {
     let local = tokio::task::LocalSet::new();
 
     local
         .run_until(async move {
             // loops ready to catch any ChurnJoinMiss
-            match run_node(config, outbox, addr).await {
+            match run_node(config, outbox, inbox, addr).await {
                 Ok(_) => {
                     info!("Node has finished running, no runtime errors were reported");
                 }
@@ -151,7 +155,7 @@ async fn create_runtime_and_node(config: &Config, outbox: OutBox, addr: SocketAd
     Ok(())
 }
 
-async fn run_node(config: &Config, outbox: OutBox, addr: SocketAddr) -> Result<()> {
+async fn run_node(config: &Config, outbox: Outbox, inbox: Inbox, addr: SocketAddr) -> Result<()> {
     if let Some(c) = &config.completions() {
         let shell = c.parse().map_err(|err: String| eyre!(err))?;
         let buf = gen_completions_for_shell(shell, Config::command()).map_err(|err| eyre!(err))?;
@@ -191,7 +195,7 @@ async fn run_node(config: &Config, outbox: OutBox, addr: SocketAddr) -> Result<(
     let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME_SEC);
 
     let (_node, mut event_stream) = loop {
-        match start_node(config, join_timeout, outbox, addr).await {
+        match start_node(config, join_timeout, outbox, inbox, addr).await {
             Ok(result) => break result,
             Err(NodeError::CannotConnectEndpoint(qp2p::EndpointError::Upnp(error))) => {
                 return Err(error).suggestion(

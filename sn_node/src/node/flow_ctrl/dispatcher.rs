@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::comm::Comm;
+use crate::comm::Outbox;
 use crate::log_sleep;
 use crate::node::{
     messaging::{OutgoingMsg, Peers},
@@ -29,13 +29,13 @@ use tokio::{sync::watch, sync::RwLock};
 // Cmd Dispatcher.
 pub(crate) struct Dispatcher {
     node: Arc<RwLock<Node>>,
-    comm: Comm,
+    // comm: Comm,
     dkg_timeout: Arc<DkgTimeout>,
-    outbox: OutBox
+    outbox: Outbox
 }
 
 impl Dispatcher {
-    pub(crate) fn new(node: Arc<RwLock<Node>>, outbox: OutBox) -> Self {
+    pub(crate) fn new(node: Arc<RwLock<Node>>, outbox: Outbox) -> Self {
         let (cancel_timer_tx, cancel_timer_rx) = watch::channel(false);
         let dkg_timeout = Arc::new(DkgTimeout {
             cancel_timer_tx,
@@ -45,7 +45,7 @@ impl Dispatcher {
         Self {
             node,
             dkg_timeout,
-            comm,
+            // comm,
             outbox
         }
     }

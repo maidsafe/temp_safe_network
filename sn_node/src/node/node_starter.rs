@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::comm::{Comm, OutgoingMsg, OutBox};
+use crate::comm::{Comm, OutgoingMsg, Outbox, Inbox};
 use crate::node::{
     cfg::keypair_storage::{get_reward_pk, store_network_keypair, store_new_reward_keypair},
     flow_ctrl::{
@@ -59,10 +59,11 @@ pub(crate) type CmdChannel = mpsc::Sender<(Cmd, Option<usize>)>;
 pub async fn new_test_api(
     config: &Config,
     join_timeout: Duration,
-    outbox: OutBox,
+    outbox: Outbox,
+    inbox: Inbox,
     addr: SocketAddr
 ) -> Result<(super::NodeTestApi, EventReceiver)> {
-    let (node, cmd_channel, event_receiver) = new_node(config, join_timeout, outbox, addr).await?;
+    let (node, cmd_channel, event_receiver) = new_node(config, join_timeout, outbox, inbox, addr).await?;
     Ok((super::NodeTestApi::new(node, cmd_channel), event_receiver))
 }
 
@@ -81,10 +82,11 @@ pub struct NodeRef {
 pub async fn start_node(
     config: &Config,
     join_timeout: Duration,
-    outbox: OutBox,
+    outbox: Outbox,
+    inbox: Inbox,
     addr: SocketAddr
 ) -> Result<(NodeRef, EventReceiver)> {
-    let (node, cmd_channel, event_receiver) = new_node(config, join_timeout, outbox, addr).await?;
+    let (node, cmd_channel, event_receiver) = new_node(config, join_timeout, outbox, inbox, addr).await?;
 
     Ok((NodeRef { node, cmd_channel }, event_receiver))
 }
@@ -93,7 +95,8 @@ pub async fn start_node(
 async fn new_node(
     config: &Config,
     join_timeout: Duration,
-    outbox: OutBox,
+    outbox: Outbox,
+    inbox: Inbox,
     addr: SocketAddr
 ) -> Result<(Arc<RwLock<Node>>, CmdChannel, EventReceiver)> {
     let root_dir_buf = config.root_dir()?;
@@ -113,7 +116,7 @@ async fn new_node(
     let used_space = UsedSpace::new(config.max_capacity());
 
     let (node, cmd_channel, network_events) =
-        bootstrap_node(config, used_space, root_dir, join_timeout, outbox, addr).await?;
+        bootstrap_node(config, used_space, root_dir, join_timeout, outbox, inbox, addr).await?;
 
     {
         let read_only_node = node.read().await;
@@ -150,7 +153,8 @@ async fn bootstrap_node(
     used_space: UsedSpace,
     root_storage_dir: &Path,
     join_timeout: Duration,
-    outbox: OutBox,
+    outbox: Outbox,
+    inbox: Inbox,
     addr: SocketAddr
 ) -> Result<(Arc<RwLock<Node>>, CmdChannel, EventReceiver)> {
     // let (connection_event_tx, mut connection_event_rx) = mpsc::channel(100);
@@ -227,18 +231,18 @@ async fn bootstrap_node(
         let node_name = ed25519::name(&keypair.public);
         info!("{} Bootstrapping as a new node.", node_name);
 
-        // let path = config.network_contacts_file().ok_or_else(|| {
-        //     Error::Configuration("Could not obtain network contacts file path".to_string())
-        // })?;
-        // let network_contacts = SectionTree::from_disk(&path).await?;
-        // let section_elders = {
-        //     let sap = network_contacts
-        //         .closest(&xor_name::rand::random(), None)
-        //         .ok_or_else(|| Error::Configuration("Could not obtain closest SAP".to_string()))?;
-        //     sap.elders_vec()
-        // };
-        // let bootstrap_nodes: Vec<SocketAddr> =
-        //     section_elders.iter().map(|node| node.addr()).collect();
+        let path = config.network_contacts_file().ok_or_else(|| {
+            Error::Configuration("Could not obtain network contacts file path".to_string())
+        })?;
+        let network_contacts = SectionTree::from_disk(&path).await?;
+        let section_elders = {
+            let sap = network_contacts
+                .closest(&xor_name::rand::random(), None)
+                .ok_or_else(|| Error::Configuration("Could not obtain closest SAP".to_string()))?;
+            sap.elders_vec()
+        };
+        let bootstrap_nodes: Vec<SocketAddr> =
+            section_elders.iter().map(|node| node.addr()).collect();
 
         // let (comm, bootstrap_addr) = Comm::bootstrap(
         //     local_addr,
@@ -252,16 +256,16 @@ async fn bootstrap_node(
             node_name,
             std::process::id(),
             comm.socket_addr(),
-            bootstrap_addr,
+            addr,
             network_contacts.genesis_key()
         );
 
-        let joining_node = NodeInfo::new(keypair, comm.socket_addr());
+        let joining_node = NodeInfo::new(keypair, addr);
         let (info, network_knowledge) = join_network(
             joining_node,
-            &comm,
-            &mut connection_event_rx,
-            bootstrap_addr,
+            outbox,
+            &mut inbox,
+            addr,
             network_contacts,
             join_timeout,
         )
@@ -287,7 +291,7 @@ async fn bootstrap_node(
     let node = Arc::new(RwLock::new(node));
     let cmd_ctrl = CmdCtrl::new(Dispatcher::new(node.clone(), outbox));
     let (msg_and_period_ctrl, cmd_channel) =
-        FlowCtrl::new(cmd_ctrl, connection_event_rx, event_sender);
+        FlowCtrl::new(cmd_ctrl, inbox, event_sender);
 
     let _ = tokio::task::spawn_local(async move {
         msg_and_period_ctrl

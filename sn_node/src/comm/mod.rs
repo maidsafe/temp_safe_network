@@ -38,13 +38,14 @@ pub struct Comm {
     our_endpoint: Endpoint,
     msg_listener: MsgListener,
     sessions: Arc<DashMap<Peer, PeerSession>>,
-    outgoing_msg_channel: mpsc::Sender<OutgoingMsg>,
-    inbox: mpsc::Receiver<OutgoingMsg>,
+    outgoing_msg_channel: Sender<OutgoingMsg>,
+    inbox: Receiver<OutgoingMsg>,
 }
 
 /// peer, msg_id, bytes, is_msg_for_client
 pub type OutgoingMsg = (Peer, MsgId, UsrMsgBytes, bool);
-pub type OutBox = mpsc::Sender<OutgoingMsg>;
+pub type Outbox = Sender<OutgoingMsg>;
+pub type Inbox = Receiver<MsgEvent>;
 
 impl Comm {
     #[tracing::instrument(skip_all)]
@@ -125,7 +126,7 @@ impl Comm {
     }
 
     /// Get the channel to send msgs
-    pub fn send_msg_channel(&self) -> OutBox {
+    pub fn send_msg_channel(&self) -> Outbox {
         self.outgoing_msg_channel.clone()
     }
 
@@ -384,8 +385,8 @@ fn setup_comms(
 
 #[tracing::instrument(skip_all)]
 fn setup(our_endpoint: Endpoint, receive_msg: Sender<MsgEvent>) -> (Comm, MsgListener) {
-    let (add_connection, conn_receiver) = mpsc::channel(100);
-    let (outgoing_msg_channel, mut inbox) = mpsc::channel(100);
+    let (add_connection, conn_receiver) = channel(100);
+    let (outgoing_msg_channel, mut inbox) = channel(100);
 
     let msg_listener = MsgListener::new(add_connection, receive_msg);
 
@@ -470,7 +471,7 @@ mod tests {
         // Run the local task set.
         local
             .run_until(async move {
-                let (tx, _rx) = mpsc::channel(1);
+                let (tx, _rx) = channel(1);
                 let comm = Comm::first_node(local_addr(), Config::default(), tx).await?;
 
                 let (peer0, mut rx0) = new_peer().await?;
@@ -505,7 +506,7 @@ mod tests {
         // Run the local task set.
         local
             .run_until(async move {
-                let (tx, _rx) = mpsc::channel(1);
+                let (tx, _rx) = channel(1);
                 let comm = Comm::first_node(
                     local_addr(),
                     Config {
@@ -537,7 +538,7 @@ mod tests {
         // Run the local task set.
         local
             .run_until(async move {
-                let (tx, _rx) = mpsc::channel(1);
+                let (tx, _rx) = channel(1);
                 let send_comm = Comm::first_node(local_addr(), Config::default(), tx).await?;
 
                 let (recv_endpoint, mut incoming_connections, _) =
@@ -594,7 +595,7 @@ mod tests {
         // Run the local task set.
         local
             .run_until(async move {
-                let (tx, mut rx0) = mpsc::channel(1);
+                let (tx, mut rx0) = channel(1);
                 let comm0 = Comm::first_node(local_addr(), Config::default(), tx.clone()).await?;
                 let addr0 = comm0.socket_addr();
 
@@ -655,7 +656,7 @@ mod tests {
             Endpoint::new_peer(local_addr(), &[], Config::default()).await?;
         let addr = endpoint.public_addr();
 
-        let (tx, rx) = mpsc::channel(1);
+        let (tx, rx) = channel(1);
 
         let _handle = tokio::task::spawn_local(async move {
             while let Some((_, mut incoming_messages)) = incoming_connections.next().await {
