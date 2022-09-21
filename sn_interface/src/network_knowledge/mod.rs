@@ -325,77 +325,46 @@ impl NetworkKnowledge {
     /// with the provided proof chain.
     pub fn update_knowledge_if_valid(
         &mut self,
-        signed_sap: SectionAuth<SectionAuthorityProvider>,
+        sap: SectionAuth<SectionAuthorityProvider>,
         partial_dag: &SectionsDAG,
         updated_members: Option<SectionPeersMsg>,
         our_name: &XorName,
-        section_keys_provider: &SectionKeysProvider,
     ) -> Result<bool> {
         let mut there_was_an_update = false;
-        let provided_sap = signed_sap.value.clone();
-
-        // Do we have the key share needed to perform elder duties?
-        let we_have_a_share_of_this_key = section_keys_provider
-            .key_share(&signed_sap.section_key())
-            .is_ok();
-        // check we should be _becoming_ an elder
-        let we_should_become_an_elder = provided_sap.contains_elder(our_name);
-        trace!("we_have_a_share_of_this_key: {we_have_a_share_of_this_key}, we_should_become_an_elder: {we_should_become_an_elder}");
-
-        // This prevent us from updating our NetworkKnowledge based on an AE message where
-        // we don't have the key share for the new SAP, making this node unable to sign section
-        // messages and possibly being kicked out of the group of Elders.
-        if we_should_become_an_elder && !we_have_a_share_of_this_key {
-            warn!("We should be an elder, but we're missing the keyshare!, ignoring update");
-            return Ok(false);
-        };
+        let sap_prefix = sap.prefix();
 
         // If the update is for a different prefix, we just update the section_tree; else we should
         // update the section_tree and signed_sap together. Or else they might go out of sync and
         // querying section_tree using signed_sap will result in undesirable effect
-        match self.section_tree.update(signed_sap.clone(), partial_dag) {
+        match self.section_tree.update(sap.clone(), partial_dag) {
             Ok(true) => {
                 there_was_an_update = true;
-                info!(
-                    "Updated network section tree with SAP for {:?}",
-                    provided_sap.prefix()
-                );
+                info!("Updated network section tree with SAP for {:?}", sap_prefix);
                 // update the signed_sap only if the prefix matches
-                if provided_sap.prefix().matches(our_name) {
+                if sap_prefix.matches(our_name) {
                     let our_prev_prefix = self.prefix();
                     // Remove any peer which doesn't belong to our new section's prefix
-                    self.section_peers.retain(&provided_sap.prefix());
-                    info!(
-                        "Updated our section's SAP ({:?} to {:?}) with new one: {:?}",
-                        our_prev_prefix,
-                        provided_sap.prefix(),
-                        provided_sap
-                    );
+                    self.section_peers.retain(&sap_prefix);
+                    info!("Updated our section's SAP ({our_prev_prefix:?} to {sap_prefix:?}) with new one: {:?}", sap.value);
 
                     let section_dag = self
                         .section_tree
                         .get_sections_dag()
-                        .partial_dag(self.genesis_key(), &provided_sap.section_key())?;
+                        .partial_dag(self.genesis_key(), &sap.section_key())?;
 
                     // Prune list of archived members
                     self.section_peers
-                        .prune_members_archive(&section_dag, &provided_sap.section_key())?;
+                        .prune_members_archive(&section_dag, &sap.section_key())?;
 
                     // Switch to new SAP
-                    self.signed_sap = signed_sap;
+                    self.signed_sap = sap;
                 }
             }
             Ok(false) => {
-                debug!(
-                    "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
-                    provided_sap.prefix(), provided_sap
-                );
+                debug!("Anti-Entropy: discarded SAP for {sap_prefix:?} since it's the same as the one in our records: {:?}", sap.value);
             }
             Err(err) => {
-                debug!(
-                    "Anti-Entropy: discarded SAP for {:?} since we failed to update section tree with: {:?}",
-                    provided_sap.prefix(), err
-                );
+                debug!("Anti-Entropy: discarded SAP for {sap_prefix:?} since we failed to update section tree with: {err:?}");
                 return Err(err);
             }
         }
