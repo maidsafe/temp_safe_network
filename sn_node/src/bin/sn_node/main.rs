@@ -72,13 +72,15 @@ async fn main() -> Result<()> {
         .local_addr
         .unwrap_or_else(|| SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0)));
 
-    let mut comm = if config.is_first() {
-        Comm::first_node(
+    let (mut comm, intitial_contact_address) = if config.is_first() {
+        let comm = Comm::first_node(
             local_addr,
             config.network_config().clone(),
             sender_for_msgs_received_in_comms,
         )
-        .await?
+        .await?;
+
+        (comm, None)
     } else {
         // get initial contacts
         let path = config.network_contacts_file().ok_or_else(|| {
@@ -96,7 +98,7 @@ async fn main() -> Result<()> {
         let bootstrap_nodes: Vec<SocketAddr> =
             section_elders.iter().map(|node| node.addr()).collect();
 
-        let (comm, socket) = Comm::bootstrap(
+        let (comm, intitial_contact_address) = Comm::make_initial_contact(
             local_addr,
             bootstrap_nodes.as_slice(),
             config.network_config().clone(),
@@ -104,7 +106,7 @@ async fn main() -> Result<()> {
         )
         .await?;
 
-        comm
+        (comm, Some(intitial_contact_address))
     };
 
     let send_msg_channel = comm.send_msg_channel();
@@ -126,7 +128,7 @@ async fn main() -> Result<()> {
 
     loop {
         info!("Node runtime started");
-        create_runtime_and_node(&config, send_msg_channel.clone(), msg_receiver_channel, addr).await?;
+        create_runtime_and_node(&config, send_msg_channel.clone(), msg_receiver_channel, addr, intitial_contact_address).await?;
 
         // pull config again in case it has been updated meanwhile
         config = Config::new().await?;
@@ -135,13 +137,13 @@ async fn main() -> Result<()> {
 }
 
 /// Create a tokio runtime per `run_node` instance.
-async fn create_runtime_and_node(config: &Config, outbox: Outbox, inbox: Inbox, addr: SocketAddr) -> Result<()> {
+async fn create_runtime_and_node(config: &Config, outbox: Outbox, inbox: Inbox, addr: SocketAddr,     intitial_contact_address: Option<SocketAddr>) -> Result<()> {
     let local = tokio::task::LocalSet::new();
 
     local
         .run_until(async move {
             // loops ready to catch any ChurnJoinMiss
-            match run_node(config, outbox, inbox, addr).await {
+            match run_node(config, outbox, inbox, addr, intitial_contact_address).await {
                 Ok(_) => {
                     info!("Node has finished running, no runtime errors were reported");
                 }
@@ -155,7 +157,7 @@ async fn create_runtime_and_node(config: &Config, outbox: Outbox, inbox: Inbox, 
     Ok(())
 }
 
-async fn run_node(config: &Config, outbox: Outbox, inbox: Inbox, addr: SocketAddr) -> Result<()> {
+async fn run_node(config: &Config, outbox: Outbox, inbox: Inbox, addr: SocketAddr,     intitial_contact_address: Option<SocketAddr>,) -> Result<()> {
     if let Some(c) = &config.completions() {
         let shell = c.parse().map_err(|err: String| eyre!(err))?;
         let buf = gen_completions_for_shell(shell, Config::command()).map_err(|err| eyre!(err))?;
@@ -195,7 +197,7 @@ async fn run_node(config: &Config, outbox: Outbox, inbox: Inbox, addr: SocketAdd
     let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME_SEC);
 
     let (_node, mut event_stream) = loop {
-        match start_node(config, join_timeout, outbox, inbox, addr).await {
+        match start_node(config, join_timeout, outbox, inbox, addr, intitial_contact_address).await {
             Ok(result) => break result,
             Err(NodeError::CannotConnectEndpoint(qp2p::EndpointError::Upnp(error))) => {
                 return Err(error).suggestion(

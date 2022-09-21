@@ -55,7 +55,7 @@ pub(crate) async fn join_network(
     let span = trace_span!("bootstrap");
     let joiner = Joiner::new(node, outgoing_msgs_sender, inbox, network_contacts);
 
-    debug!("=========> attempting bootstrap to {bootstrap_addr}");
+    debug!("=========> attempting join network @ {bootstrap_addr}");
     future::join(
         joiner.try_join(bootstrap_addr, join_timeout),
         send_messages(outgoing_msgs_receiver, outbox),

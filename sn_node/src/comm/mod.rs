@@ -65,7 +65,7 @@ impl Comm {
     }
 
     #[tracing::instrument(skip_all)]
-    pub async fn bootstrap(
+    pub async fn make_initial_contact(
         local_addr: SocketAddr,
         bootstrap_nodes: &[SocketAddr],
         config: qp2p::Config,
@@ -85,11 +85,11 @@ impl Comm {
         );
 
         let (connection, incoming_msgs) = bootstrap_node.ok_or(Error::BootstrapFailed)?;
-        let remote_address = connection.remote_address();
+        let intitial_contact_address = connection.remote_address();
 
         msg_listener.listen(connection, incoming_msgs);
 
-        Ok((comm, remote_address))
+        Ok((comm, intitial_contact_address))
     }
 
     pub fn socket_addr(&self) -> SocketAddr {
