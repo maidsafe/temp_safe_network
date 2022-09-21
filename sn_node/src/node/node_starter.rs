@@ -317,7 +317,7 @@ async fn bootstrap_node<'a>(
     Ok((node, event_receiver, event_sender.clone()))
 }
 
-pub fn run_node_processes<'a>(node: Arc<RwLock<Node>>, inbox: &'a mut Inbox, outbox: Outbox, event_sender: EventSender) -> CmdChannel {
+pub fn run_node_processes(node: Arc<RwLock<Node>>, inbox: &mut Inbox, outbox: Outbox, event_sender: EventSender) -> CmdChannel {
     let cmd_ctrl = CmdCtrl::new(Dispatcher::new(node.clone(), outbox));
     let (msg_and_period_ctrl, cmd_channel) =
         FlowCtrl::new(cmd_ctrl, inbox, event_sender);
