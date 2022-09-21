@@ -123,7 +123,6 @@ impl Node {
             return Ok(Some(self.send_system_msg(msg, Peers::Single(peer))));
         }
 
-
         // TODO **********************
         // Reenable reachability
 
@@ -136,8 +135,8 @@ impl Node {
         //     trace!("Sending {:?} to {}", msg, peer);
         //     Ok(Some(self.send_system_msg(msg, Peers::Single(peer))))
         // } else {
-            // It's reachable, let's then send the proof challenge
-            self.send_resource_proof_challenge(peer).map(Some)
+        // It's reachable, let's then send the proof challenge
+        self.send_resource_proof_challenge(peer).map(Some)
         // }
     }
 

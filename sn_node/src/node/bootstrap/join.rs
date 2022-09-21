@@ -8,7 +8,7 @@
 
 use super::UsedRecipientSaps;
 
-use crate::comm::{Comm, MsgEvent, Inbox, Outbox};
+use crate::comm::{Comm, Inbox, MsgEvent, Outbox};
 use crate::log_sleep;
 use crate::node::{messages::WireMsgUtils, Error, Result};
 
@@ -29,8 +29,9 @@ use bls::PublicKey as BlsPublicKey;
 use futures::future;
 use resource_proof::ResourceProof as ChallengeSolver;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tokio::{
-    sync::mpsc,
+    sync::{mpsc, RwLock},
     time::{Duration, Instant},
 };
 use tracing::Instrument;
@@ -45,7 +46,7 @@ pub(crate) async fn join_network(
     node: NodeInfo,
     // comm: &Comm,
     outbox: Outbox,
-    inbox: &mut Inbox,
+    inbox: Arc<RwLock<Inbox>>,
     bootstrap_addr: SocketAddr,
     network_contacts: SectionTree,
     join_timeout: Duration,
@@ -65,11 +66,11 @@ pub(crate) async fn join_network(
     .0
 }
 
-struct Joiner<'a> {
+struct Joiner {
     // Sender for outgoing messages.
     outgoing_msgs: mpsc::Sender<(WireMsg, Vec<Peer>)>,
     // Receiver for incoming messages.
-    incoming_msgs: &'a mut mpsc::Receiver<MsgEvent>,
+    inbox: Arc<RwLock<Inbox>>,
     node: NodeInfo,
     prefix: Prefix,
     network_contacts: SectionTree,
@@ -77,11 +78,11 @@ struct Joiner<'a> {
     aggregated: bool,
 }
 
-impl<'a> Joiner<'a> {
+impl Joiner {
     fn new(
         node: NodeInfo,
         outgoing_msgs: mpsc::Sender<(WireMsg, Vec<Peer>)>,
-        inbox: &'a mut Inbox,
+        inbox: Arc<RwLock<Inbox>>,
         network_contacts: SectionTree,
     ) -> Self {
         let mut backoff = ExponentialBackoff {
@@ -96,7 +97,7 @@ impl<'a> Joiner<'a> {
 
         Self {
             outgoing_msgs,
-            incoming_msgs: inbox,
+            inbox,
             node,
             prefix: Prefix::default(),
             network_contacts,
@@ -440,8 +441,9 @@ impl<'a> Joiner<'a> {
     ) -> Result<(JoinResponse, Peer)> {
         let mut timer = Instant::now();
 
+        let mut inbox = self.inbox.write().await;
         // Awaits at most the time left of join_timeout.
-        while let Some(event) = tokio::time::timeout(response_timeout, self.incoming_msgs.recv())
+        while let Some(event) = tokio::time::timeout(response_timeout, inbox.recv())
             .await
             .map_err(|_| Error::JoinTimeout)?
         {
@@ -491,7 +493,7 @@ impl<'a> Joiner<'a> {
 async fn send_messages(
     mut outgoing_msgs: mpsc::Receiver<(WireMsg, Vec<Peer>)>,
     // comm: &Comm,
-    outbox: Outbox
+    outbox: Outbox,
 ) -> Result<()> {
     while let Some((msg, peers)) = outgoing_msgs.recv().await {
         for peer in peers {

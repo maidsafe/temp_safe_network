@@ -43,8 +43,7 @@ impl PeerSession {
     pub(crate) fn new(link: Link) -> PeerSession {
         let (sender, receiver) = mpsc::channel(1000);
 
-        let _ =
-            tokio::task::spawn(PeerSessionWorker::new(link, sender.clone()).run(receiver));
+        let _ = tokio::task::spawn(PeerSessionWorker::new(link, sender.clone()).run(receiver));
 
         PeerSession { channel: sender }
     }

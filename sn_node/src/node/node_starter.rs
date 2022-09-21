@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::comm::{Comm, OutgoingMsg, Outbox, Inbox};
+use crate::comm::{Comm, Inbox, Outbox, OutgoingMsg};
 use crate::node::{
     cfg::keypair_storage::{get_reward_pk, store_network_keypair, store_new_reward_keypair},
     flow_ctrl::{
@@ -60,11 +60,19 @@ pub async fn new_test_api(
     config: &Config,
     join_timeout: Duration,
     outbox: Outbox,
-    inbox: Inbox,
+    inbox: Arc<RwLock<Inbox>>,
     addr: SocketAddr,
     intitial_contact_address: Option<SocketAddr>,
 ) -> Result<(super::NodeTestApi, EventReceiver)> {
-    let (node, cmd_channel, event_receiver) = new_node(config, join_timeout, outbox, inbox, addr, intitial_contact_address).await?;
+    let (node, cmd_channel, event_receiver) = new_node(
+        config,
+        join_timeout,
+        outbox,
+        inbox,
+        addr,
+        intitial_contact_address,
+    )
+    .await?;
     Ok((super::NodeTestApi::new(node, cmd_channel), event_receiver))
 }
 
@@ -84,11 +92,19 @@ pub async fn start_node(
     config: &Config,
     join_timeout: Duration,
     outbox: Outbox,
-    inbox: Inbox,
+    inbox: Arc<RwLock<Inbox>>,
     addr: SocketAddr,
     intitial_contact_address: Option<SocketAddr>,
 ) -> Result<(NodeRef, EventReceiver)> {
-    let (node, cmd_channel, event_receiver) = new_node(config, join_timeout, outbox, inbox, addr, intitial_contact_address).await?;
+    let (node, cmd_channel, event_receiver) = new_node(
+        config,
+        join_timeout,
+        outbox,
+        inbox,
+        addr,
+        intitial_contact_address,
+    )
+    .await?;
 
     Ok((NodeRef { node, cmd_channel }, event_receiver))
 }
@@ -98,7 +114,7 @@ async fn new_node(
     config: &Config,
     join_timeout: Duration,
     outbox: Outbox,
-    inbox: Inbox,
+    inbox: Arc<RwLock<Inbox>>,
     addr: SocketAddr,
     intitial_contact_address: Option<SocketAddr>,
 ) -> Result<(Arc<RwLock<Node>>, CmdChannel, EventReceiver)> {
@@ -118,8 +134,17 @@ async fn new_node(
 
     let used_space = UsedSpace::new(config.max_capacity());
 
-    let (node, cmd_channel, network_events) =
-        bootstrap_node(config, used_space, root_dir, join_timeout, outbox, inbox, addr, intitial_contact_address).await?;
+    let (node, cmd_channel, network_events) = bootstrap_node(
+        config,
+        used_space,
+        root_dir,
+        join_timeout,
+        outbox,
+        inbox,
+        addr,
+        intitial_contact_address,
+    )
+    .await?;
 
     {
         let read_only_node = node.read().await;
@@ -157,7 +182,7 @@ async fn bootstrap_node(
     root_storage_dir: &Path,
     join_timeout: Duration,
     outbox: Outbox,
-    mut inbox: Inbox,
+    mut inbox: Arc<RwLock<Inbox>>,
     addr: SocketAddr,
     intitial_contact_address: Option<SocketAddr>,
 ) -> Result<(Arc<RwLock<Node>>, CmdChannel, EventReceiver)> {
@@ -231,8 +256,7 @@ async fn bootstrap_node(
 
         node
     } else {
-        if let Some(contact_address) = intitial_contact_address{
-
+        if let Some(contact_address) = intitial_contact_address {
             let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE);
             let node_name = ed25519::name(&keypair.public);
             info!("{} Bootstrapping as a new node.", node_name);
@@ -244,7 +268,9 @@ async fn bootstrap_node(
             let section_elders = {
                 let sap = network_contacts
                     .closest(&xor_name::rand::random(), None)
-                    .ok_or_else(|| Error::Configuration("Could not obtain closest SAP".to_string()))?;
+                    .ok_or_else(|| {
+                        Error::Configuration("Could not obtain closest SAP".to_string())
+                    })?;
                 sap.elders_vec()
             };
             let bootstrap_nodes: Vec<SocketAddr> =
@@ -270,7 +296,7 @@ async fn bootstrap_node(
             let (info, network_knowledge) = join_network(
                 joining_node,
                 outbox.clone(),
-                &mut inbox,
+                inbox.clone(),
                 contact_address,
                 network_contacts,
                 join_timeout,
@@ -292,15 +318,14 @@ async fn bootstrap_node(
             info!("Our AGE: {}", node.info().age());
 
             node
-        } else{
-            return Err(Error::NoInitialContactForJoiningNode)
+        } else {
+            return Err(Error::NoInitialContactForJoiningNode);
         }
     };
 
     let node = Arc::new(RwLock::new(node));
     let cmd_ctrl = CmdCtrl::new(Dispatcher::new(node.clone(), outbox));
-    let (msg_and_period_ctrl, cmd_channel) =
-        FlowCtrl::new(cmd_ctrl, inbox, event_sender);
+    let (msg_and_period_ctrl, cmd_channel) = FlowCtrl::new(cmd_ctrl, inbox, event_sender);
 
     let _ = tokio::task::spawn_local(async move {
         msg_and_period_ctrl

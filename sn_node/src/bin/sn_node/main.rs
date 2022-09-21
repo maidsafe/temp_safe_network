@@ -34,12 +34,13 @@ use color_eyre::{Section, SectionExt};
 use eyre::{eyre, Context, ErrReport, Result};
 use self_update::{cargo_crate_version, Status};
 use sn_interface::network_knowledge::SectionTree;
-use sn_node::comm::{Comm, OutgoingMsg, Outbox, Inbox};
+use sn_node::comm::{Comm, Inbox, Outbox, OutgoingMsg};
 use sn_node::node::{start_node, Config, Error as NodeError, Event, MembershipEvent};
 use std::net::{Ipv4Addr, SocketAddr};
+use std::sync::Arc;
 use std::{io::Write, process::exit};
 use tokio::{
-    sync::mpsc,
+    sync::{mpsc, RwLock},
     time::{sleep, Duration},
 };
 use tracing::{self, error, info, trace, warn};
@@ -127,13 +128,26 @@ async fn main() -> Result<()> {
     });
 
     info!("Node runtime started");
-    create_runtime_and_node(&config, send_msg_channel.clone(), msg_receiver_channel, addr, intitial_contact_address).await?;
+    create_runtime_and_node(
+        &config,
+        send_msg_channel.clone(),
+        msg_receiver_channel,
+        addr,
+        intitial_contact_address,
+    )
+    .await?;
 
     Ok(())
 }
 
 /// Create a tokio runtime per `run_node` instance.
-async fn create_runtime_and_node(config: &Config, outbox: Outbox, inbox: Inbox, addr: SocketAddr,     intitial_contact_address: Option<SocketAddr>) -> Result<()> {
+async fn create_runtime_and_node(
+    config: &Config,
+    outbox: Outbox,
+    inbox: Inbox,
+    addr: SocketAddr,
+    intitial_contact_address: Option<SocketAddr>,
+) -> Result<()> {
     let local = tokio::task::LocalSet::new();
 
     local
@@ -153,7 +167,13 @@ async fn create_runtime_and_node(config: &Config, outbox: Outbox, inbox: Inbox, 
     Ok(())
 }
 
-async fn run_node(config: &Config, outbox: Outbox, inbox: Inbox, addr: SocketAddr,     intitial_contact_address: Option<SocketAddr>,) -> Result<()> {
+async fn run_node(
+    config: &Config,
+    outbox: Outbox,
+    inbox: Inbox,
+    addr: SocketAddr,
+    intitial_contact_address: Option<SocketAddr>,
+) -> Result<()> {
     if let Some(c) = &config.completions() {
         let shell = c.parse().map_err(|err: String| eyre!(err))?;
         let buf = gen_completions_for_shell(shell, Config::command()).map_err(|err| eyre!(err))?;
@@ -192,9 +212,19 @@ async fn run_node(config: &Config, outbox: Outbox, inbox: Inbox, addr: SocketAdd
     let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
     let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME_SEC);
 
-    let (_node, mut event_stream) =
-        match start_node(config, join_timeout, outbox, inbox, addr, intitial_contact_address).await {
-            Ok(result) => result,
+    let inbox = Arc::new(RwLock::new(inbox));
+    let (_node, mut event_stream) = loop {
+        match start_node(
+            config,
+            join_timeout,
+            outbox.clone(),
+            inbox.clone(),
+            addr,
+            intitial_contact_address,
+        )
+        .await
+        {
+            Ok(result) => break result,
             Err(NodeError::CannotConnectEndpoint(qp2p::EndpointError::Upnp(error))) => {
                 return Err(error).suggestion(
                     "You can disable port forwarding by supplying --skip-auto-port-forwarding. Without port\n\
@@ -211,7 +241,7 @@ async fn run_node(config: &Config, outbox: Outbox, inbox: Inbox, addr: SocketAdd
             Err(NodeError::TryJoinLater) => {
                 println!("{}", log);
                 info!("{}", log);
-                return Err(NodeError::TryJoinLater.into())
+                // return Err(NodeError::TryJoinLater.into())
             }
             Err(NodeError::NodeNotReachable(addr)) => {
                 let err_msg = format!(
@@ -230,8 +260,7 @@ async fn run_node(config: &Config, outbox: Outbox, inbox: Inbox, addr: SocketAdd
                 let message = format!("(PID: {our_pid}): Encountered a timeout while trying to join the network. Retrying after {BOOTSTRAP_RETRY_TIME_SEC} seconds.");
                 println!("{}", &message);
                 error!("{}", &message);
-                return Err(NodeError::JoinTimeout.into())
-
+                // return Err(NodeError::JoinTimeout.into())
             }
             Err(e) => {
                 let log_path = if let Some(path) = config.log_dir() {
@@ -247,10 +276,9 @@ async fn run_node(config: &Config, outbox: Outbox, inbox: Inbox, addr: SocketAdd
                     address to be used using --first", log_path)
                 );
             }
-        };
-        // sleep(bootstrap_retry_duration).await;
-
-
+        }
+        sleep(bootstrap_retry_duration).await;
+    };
     // Simulate failed node starts, and ensure that
     #[cfg(feature = "chaos")]
     {

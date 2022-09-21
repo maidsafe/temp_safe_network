@@ -40,7 +40,7 @@ pub struct Comm {
     sessions: Arc<DashMap<Peer, PeerSession>>,
     outgoing_msg_channel: Sender<OutgoingMsg>,
     inbox: Receiver<OutgoingMsg>,
-    conn_receiver : Receiver<ListenerEvent>,
+    conn_receiver: Receiver<ListenerEvent>,
 }
 
 /// peer, msg_id, bytes, is_msg_for_client
@@ -137,11 +137,12 @@ impl Comm {
             match self.inbox.try_recv() {
                 Ok((peer, msg_id, bytes, is_msg_for_client)) => {
                     // self.add_incoming(&peer, connection).await;
-                    if let Err(error) =self
+                    if let Err(error) = self
                         .send_out_bytes(peer, msg_id, bytes, is_msg_for_client)
-                        .await {
-                            error!("Errrrrrrrrrrrrrrr sending");
-                        }
+                        .await
+                    {
+                        error!("Errrrrrrrrrrrrrrr sending");
+                    }
                 }
                 Err(TryRecvError::Empty) => {
                     // do nothing else

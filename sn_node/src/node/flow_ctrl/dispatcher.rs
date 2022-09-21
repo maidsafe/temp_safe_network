@@ -31,7 +31,7 @@ pub(crate) struct Dispatcher {
     node: Arc<RwLock<Node>>,
     // comm: Comm,
     dkg_timeout: Arc<DkgTimeout>,
-    outbox: Outbox
+    outbox: Outbox,
 }
 
 impl Dispatcher {
@@ -46,7 +46,7 @@ impl Dispatcher {
             node,
             dkg_timeout,
             // comm,
-            outbox
+            outbox,
         }
     }
 
@@ -86,10 +86,9 @@ impl Dispatcher {
                     )?
                 };
 
-                let tasks = peer_msgs.into_iter().map(|(peer, msg)| {
-                    self.outbox
-                        .send((peer, msg_id, msg, is_msg_for_client))
-                });
+                let tasks = peer_msgs
+                    .into_iter()
+                    .map(|(peer, msg)| self.outbox.send((peer, msg_id, msg, is_msg_for_client)));
                 let results = futures::future::join_all(tasks).await;
 
                 // Any failed sends are tracked via Cmd::HandlePeerFailedSend, which will log dysfunction for any peers
