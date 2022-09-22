@@ -16,7 +16,7 @@ mod section_tree;
 mod sections_dag;
 
 #[cfg(any(test, feature = "test-utils"))]
-pub use self::section_authority_provider::test_utils;
+pub mod test_utils;
 
 pub use self::{
     errors::{Error, Result},

@@ -1419,7 +1419,7 @@ async fn spentbook_spend_spent_proofs_do_not_relate_to_input_dbcs_should_return_
             let sap = section.section_auth();
             let keys_provider = dispatcher.node().read().await.section_keys_provider.clone();
             let genesis_dbc = gen_genesis_dbc(&sk_set)?;
-            let new_dbc = dbc_utils::reissue_dbc(
+            let new_dbc = reissue_dbc(
                 &genesis_dbc,
                 10,
                 &bls::SecretKey::random(),
@@ -1427,7 +1427,7 @@ async fn spentbook_spend_spent_proofs_do_not_relate_to_input_dbcs_should_return_
                 &keys_provider,
             )?;
             let new_dbc2_sk = bls::SecretKey::random();
-            let new_dbc2 = dbc_utils::reissue_dbc(&new_dbc, 5, &new_dbc2_sk, &sap, &keys_provider)?;
+            let new_dbc2 = reissue_dbc(&new_dbc, 5, &new_dbc2_sk, &sap, &keys_provider)?;
 
             let result = run_and_collect_cmds(
                 wrap_service_msg_for_handling(
@@ -1487,7 +1487,7 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
             let sap = section.section_auth();
             let keys_provider = dispatcher.node().read().await.section_keys_provider.clone();
             let genesis_dbc = gen_genesis_dbc(&sk_set)?;
-            let new_dbc = dbc_utils::reissue_dbc(
+            let new_dbc = reissue_dbc(
                 &genesis_dbc,
                 10,
                 &bls::SecretKey::random(),
@@ -1555,7 +1555,7 @@ async fn spentbook_spend_with_random_key_image_should_return_spentbook_error() -
             let sap = section.section_auth();
             let keys_provider = dispatcher.node().read().await.section_keys_provider.clone();
             let genesis_dbc = gen_genesis_dbc(&sk_set)?;
-            let new_dbc = dbc_utils::reissue_dbc(
+            let new_dbc = reissue_dbc(
                 &genesis_dbc,
                 10,
                 &bls::SecretKey::random(),
@@ -1563,7 +1563,7 @@ async fn spentbook_spend_with_random_key_image_should_return_spentbook_error() -
                 &keys_provider,
             )?;
             let new_dbc2_sk = bls::SecretKey::random();
-            let new_dbc2 = dbc_utils::reissue_dbc(&new_dbc, 5, &new_dbc2_sk, &sap, &keys_provider)?;
+            let new_dbc2 = reissue_dbc(&new_dbc, 5, &new_dbc2_sk, &sap, &keys_provider)?;
 
             let pk = bls::SecretKey::random().public_key();
             let result = run_and_collect_cmds(
@@ -1663,10 +1663,8 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
             let skp = SectionKeysProvider::new(Some(other_section_key_share.clone()));
             let sap = other_section.signed_sap();
             let genesis_dbc = gen_genesis_dbc(&genesis_sk_set)?;
-            let new_dbc =
-                dbc_utils::reissue_dbc(&genesis_dbc, 10, &bls::SecretKey::random(), &sap, &skp)?;
-            let new_dbc2 =
-                dbc_utils::reissue_dbc(&new_dbc, 5, &bls::SecretKey::random(), &sap, &skp)?;
+            let new_dbc = reissue_dbc(&genesis_dbc, 10, &bls::SecretKey::random(), &sap, &skp)?;
+            let new_dbc2 = reissue_dbc(&new_dbc, 5, &bls::SecretKey::random(), &sap, &skp)?;
             let new_dbc2_spent_proof =
                 new_dbc2.spent_proofs.iter().next().ok_or_else(|| {
                     eyre!("This DBC should have been reissued with a spent proof")
@@ -1682,7 +1680,7 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
             // used.
             let proof_chain = other_section.section_chain();
             let (key_image, tx) =
-                dbc_utils::get_input_dbc_spend_info(&new_dbc2, 2, &bls::SecretKey::random())?;
+                get_input_dbc_spend_info(&new_dbc2, 2, &bls::SecretKey::random())?;
             let cmds = run_and_collect_cmds(
                 wrap_service_msg_for_handling(
                     ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
