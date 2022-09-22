@@ -5,6 +5,7 @@ use sn_dbc::{
     KeyImage, Owner, OwnerOnce, PublicKey, RingCtTransaction, Signature, SpentProof,
     SpentProofContent, SpentProofShare, Token, TransactionBuilder,
 };
+use sn_interface::network_knowledge::section_keys::build_spent_proof_share;
 use sn_interface::{
     messaging::data::{DataCmd, RegisterCmd, ServiceMsg, SpentbookCmd},
     network_knowledge::{SectionAuthorityProvider, SectionKeysProvider},
@@ -127,7 +128,7 @@ pub(crate) fn reissue_dbc(
             .into_iter()
             .flat_map(|(k, v)| if k == key_image { v } else { vec![] })
             .collect();
-        let spent_proof_share = crate::node::Node::build_spent_proof_share(
+        let spent_proof_share = build_spent_proof_share(
             &key_image,
             &tx,
             sap,

@@ -12,11 +12,12 @@ use crate::node::{flow_ctrl::cmds::Cmd, Error, Node, Result};
 use bytes::Bytes;
 
 use sn_dbc::{
-    get_public_commitments_from_transaction, Commitment, Hash, IndexedSignatureShare, KeyImage,
-    RingCtTransaction, SpentProof, SpentProofContent, SpentProofShare,
+    get_public_commitments_from_transaction, Commitment, KeyImage, RingCtTransaction, SpentProof,
+    SpentProofShare,
 };
 #[cfg(feature = "traceroute")]
 use sn_interface::messaging::Traceroute;
+use sn_interface::network_knowledge::section_keys::build_spent_proof_share;
 use sn_interface::{
     data_copy_count,
     messaging::{
@@ -27,7 +28,6 @@ use sn_interface::{
         system::{NodeQueryResponse, SystemMsg},
         AuthorityProof, EndUser, MsgId, ServiceAuth,
     },
-    network_knowledge::{SectionAuthorityProvider, SectionKeysProvider},
     types::{
         log_markers::LogMarker,
         register::{Permissions, Policy, Register, User},
@@ -305,30 +305,6 @@ impl Node {
         Ok(cmds)
     }
 
-    /// Builds the spent proof share based on the given inputs.
-    ///
-    /// This is in its own function because we share this code between the message handler and a
-    /// test utility.
-    pub(crate) fn build_spent_proof_share(
-        key_image: &bls::PublicKey,
-        tx: &RingCtTransaction,
-        sap: &SectionAuthorityProvider,
-        skp: &SectionKeysProvider,
-        public_commitments: Vec<Commitment>,
-    ) -> Result<SpentProofShare> {
-        let content = SpentProofContent {
-            key_image: *key_image,
-            transaction_hash: Hash::from(tx.hash()),
-            public_commitments,
-        };
-        let (index, sig_share) = skp.sign_with(content.hash().as_ref(), &sap.section_key())?;
-        Ok(SpentProofShare {
-            content,
-            spentbook_pks: sap.public_key_set(),
-            spentbook_sig_share: IndexedSignatureShare::new(index as u64, sig_share),
-        })
-    }
-
     /// Generate a spent proof share from the information provided by the client.
     fn gen_spent_proof_share(
         &self,
@@ -400,7 +376,7 @@ impl Node {
             debug!("Dropping spend request: {msg}");
             return Err(Error::SpentbookError(msg));
         }
-        let spent_proof_share = Self::build_spent_proof_share(
+        let spent_proof_share = build_spent_proof_share(
             key_image,
             tx,
             &self.network_knowledge.section_auth(),
