@@ -6,9 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::network_knowledge::{Error, Result};
+use crate::network_knowledge::{Error, Result, SectionAuthorityProvider};
 use crate::types::log_markers::LogMarker;
 
+use sn_dbc::{
+    Commitment, Hash, IndexedSignatureShare, RingCtTransaction, SpentProofContent, SpentProofShare,
+};
 use uluru::LRUCache;
 
 const KEY_CACHE_SIZE: usize = 50;
@@ -93,4 +96,30 @@ impl SectionKeysProvider {
             LogMarker::NewKeyShareStored,
         );
     }
+}
+
+/// Builds a spent proof share based on the given inputs.
+///
+/// This code is shared between `sn_node` and `sn_client`. The node needs it both for validating a
+/// spend request and for test setup, and the client needs it for test setup. This is not a perfect
+/// location for it, but since it makes use of the section key provider I thought it could sit
+/// alongside it.
+pub fn build_spent_proof_share(
+    key_image: &bls::PublicKey,
+    tx: &RingCtTransaction,
+    sap: &SectionAuthorityProvider,
+    skp: &SectionKeysProvider,
+    public_commitments: Vec<Commitment>,
+) -> Result<SpentProofShare> {
+    let content = SpentProofContent {
+        key_image: *key_image,
+        transaction_hash: Hash::from(tx.hash()),
+        public_commitments,
+    };
+    let (index, sig_share) = skp.sign_with(content.hash().as_ref(), &sap.section_key())?;
+    Ok(SpentProofShare {
+        content,
+        spentbook_pks: sap.public_key_set(),
+        spentbook_sig_share: IndexedSignatureShare::new(index as u64, sig_share),
+    })
 }
