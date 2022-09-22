@@ -1,9 +1,9 @@
 use crate::node::{api::gen_genesis_dbc, flow_ctrl::dispatcher::Dispatcher};
 use eyre::{eyre, Result};
 use sn_dbc::{
-    Commitment, Dbc, Hash, IndexedSignatureShare, KeyImage, Owner, OwnerOnce, PublicKey,
-    RingCtTransaction, Signature, SpentProof, SpentProofContent, SpentProofShare, Token,
-    TransactionBuilder,
+    get_public_commitments_from_transaction, Commitment, Dbc, Hash, IndexedSignatureShare,
+    KeyImage, Owner, OwnerOnce, PublicKey, RingCtTransaction, Signature, SpentProof,
+    SpentProofContent, SpentProofShare, Token, TransactionBuilder,
 };
 use sn_interface::{
     messaging::data::{DataCmd, RegisterCmd, ServiceMsg, SpentbookCmd},
@@ -118,7 +118,7 @@ pub(crate) fn reissue_dbc(
         )
         .build(rng)?;
     for (key_image, tx) in dbc_builder.inputs() {
-        let public_commitments = crate::node::Node::get_public_commitments_from_transaction(
+        let public_commitments = get_public_commitments_from_transaction(
             &tx,
             &input.spent_proofs,
             &input.spent_transactions,

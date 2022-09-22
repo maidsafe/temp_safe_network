@@ -12,8 +12,8 @@ use crate::node::{flow_ctrl::cmds::Cmd, Error, Node, Result};
 use bytes::Bytes;
 
 use sn_dbc::{
-    Commitment, Hash, IndexedSignatureShare, KeyImage, RingCtTransaction, SpentProof,
-    SpentProofContent, SpentProofShare,
+    get_public_commitments_from_transaction, Commitment, Hash, IndexedSignatureShare, KeyImage,
+    RingCtTransaction, SpentProof, SpentProofContent, SpentProofShare,
 };
 #[cfg(feature = "traceroute")]
 use sn_interface::messaging::Traceroute;
@@ -305,63 +305,6 @@ impl Node {
         Ok(cmds)
     }
 
-    /// Get the public commitments for the transaction for this key image spend.
-    ///
-    /// They will be assigned to the spent proof share that is generated.
-    ///
-    /// In the process of doing so, we verify the correct set of spent proofs and transactions have
-    /// been sent by the client.
-    ///
-    /// This is in its own function because we share this code between the message handler and a
-    /// test utility. It may be moved inside on of the `sn_dbc` APIs.
-    pub(crate) fn get_public_commitments_from_transaction(
-        tx: &RingCtTransaction,
-        spent_proofs: &BTreeSet<SpentProof>,
-        spent_transactions: &BTreeSet<RingCtTransaction>,
-    ) -> Result<Vec<(KeyImage, Vec<Commitment>)>> {
-        let mut public_commitments_info = Vec::<(KeyImage, Vec<Commitment>)>::new();
-        for mlsag in &tx.mlsags {
-            // For each public key in ring, look up the matching Commitment
-            // using the SpentProofs and spent TX set provided by the client.
-            let commitments: Vec<Commitment> = mlsag
-                .public_keys()
-                .iter()
-                .flat_map(|input_pk| {
-                    spent_proofs.iter().flat_map(move |proof| {
-                        // Make sure the spent proof corresponds to any of the spent TX provided,
-                        // and the TX output PK matches the ring PK
-                        spent_transactions.iter().filter_map(|spent_tx| {
-                            let tx_hash = Hash::from(spent_tx.hash());
-                            if tx_hash == proof.transaction_hash() {
-                                spent_tx
-                                    .outputs
-                                    .iter()
-                                    .find(|output| output.public_key() == &input_pk.clone())
-                                    .map(|output| output.commitment())
-                            } else {
-                                None
-                            }
-                        })
-                    })
-                })
-                .collect();
-
-            if commitments.len() != mlsag.public_keys().len() {
-                let error_msg = format!(
-                    "The number of spent proofs ({}) does not match the number \
-                    of input public keys ({})",
-                    commitments.len(),
-                    mlsag.public_keys().len()
-                );
-                debug!("Dropping spend request: {}", error_msg);
-                return Err(Error::SpentbookError(error_msg));
-            }
-
-            public_commitments_info.push((mlsag.key_image.into(), commitments));
-        }
-        Ok(public_commitments_info)
-    }
-
     /// Builds the spent proof share based on the given inputs.
     ///
     /// This is in its own function because we share this code between the message handler and a
@@ -427,7 +370,7 @@ impl Node {
         }
 
         let public_commitments_info =
-            Self::get_public_commitments_from_transaction(tx, spent_proofs, spent_transactions)?;
+            get_public_commitments_from_transaction(tx, spent_proofs, spent_transactions)?;
 
         // Do not sign invalid TX.
         let tx_public_commitments: Vec<Vec<Commitment>> = public_commitments_info

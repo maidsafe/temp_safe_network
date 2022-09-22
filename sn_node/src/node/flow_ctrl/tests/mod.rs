@@ -1456,9 +1456,8 @@ async fn spentbook_spend_spent_proofs_do_not_relate_to_input_dbcs_should_return_
             assert_eq!(
                 cmd_err,
                 MessagingDataError::InvalidOperation(
-                    "Failed to perform operation: SpentbookError(\"The number of \
-                            spent proofs (0) does not match the number of input \
-                            public keys (1)\")"
+                    "Failed to perform operation: DbcError(CommitmentsInputLenMismatch \
+                    { current: 0, expected: 1 })"
                         .to_string()
                 ),
                 "A different error was expected for this case: {:?}",
