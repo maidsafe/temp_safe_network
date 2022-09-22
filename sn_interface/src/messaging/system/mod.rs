@@ -15,8 +15,8 @@ mod node_state;
 mod signed;
 
 use super::authority::SectionAuth as SectionAuthProof;
-use crate::messaging::{AuthorityProof, EndUser, MsgId, SectionAuthorityProvider, SectionTreeUpdate};
-use crate::network_knowledge::{SapCandidate, SectionsDAG};
+use crate::messaging::{AuthorityProof, EndUser, MsgId, SectionTreeUpdate};
+use crate::network_knowledge::SapCandidate;
 pub use agreement::{DkgSessionId, Proposal, SectionAuth};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProof};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};

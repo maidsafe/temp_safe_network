@@ -558,7 +558,7 @@ mod core {
             // we voluntarily keep the previous DKG rounds
             // so lagging elder candidates can still get responses to their gossip.
             // At generation+2, they are not going to be elders anymore so we can safely discard it
-            let current_chain_len = self.network_knowledge.chain_len();
+            let current_chain_len = self.network_knowledge.section_chain_len();
             let mut old_hashes = vec![];
             for (hash, session_info) in self.dkg_sessions_info.iter() {
                 if session_info.session_id.section_chain_len + 2 < current_chain_len {

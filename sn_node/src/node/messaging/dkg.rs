@@ -191,7 +191,7 @@ impl Node {
         };
 
         // ignore DkgStart from old chains
-        let current_chain_len = self.network_knowledge.chain_len();
+        let current_chain_len = self.network_knowledge.section_chain_len();
         if session_id.section_chain_len < current_chain_len {
             trace!("Skipping DkgStart for older chain: s{}", session_id.sum());
             return Ok(vec![]);
@@ -635,7 +635,7 @@ impl Node {
     }
 
     pub(crate) fn had_sap_change_since(&self, session_id: &DkgSessionId) -> bool {
-        self.network_knowledge.chain_len() != session_id.section_chain_len
+        self.network_knowledge.section_chain_len() != session_id.section_chain_len
     }
 
     pub(crate) fn gossip_handover_trigger(&self, session_id: &DkgSessionId) -> Vec<Cmd> {
