@@ -15,7 +15,7 @@ use sn_interface::{
     data_copy_count,
     messaging::{
         data::{DataQuery, DataQueryVariant, ServiceMsg},
-        ServiceAuth, WireMsg,
+        MsgId, ServiceAuth, WireMsg,
     },
     types::{Peer, PublicKey, Signature},
 };
@@ -79,6 +79,8 @@ impl Client {
             ..Default::default()
         };
 
+        let msg_id = MsgId::new();
+
         // this seems needed for custom settings to take effect
         backoff.reset();
 
@@ -99,6 +101,7 @@ impl Client {
                     query.clone(),
                     client_pk,
                     serialised_query.clone(),
+                    msg_id,
                     signature.clone(),
                     Some((section_pk, elders.clone())),
                     force_new_link,
@@ -153,6 +156,7 @@ impl Client {
         query: DataQuery,
         client_pk: PublicKey,
         serialised_query: Bytes,
+        msg_id: MsgId,
         signature: Signature,
     ) -> Result<QueryResult, Error> {
         debug!("Sending Query: {:?}", query);
@@ -160,6 +164,7 @@ impl Client {
             query,
             client_pk,
             serialised_query,
+            msg_id,
             signature,
             None,
             false,
@@ -169,11 +174,13 @@ impl Client {
 
     // Private helper to send a signed query, with the option to define the destination section.
     // If no destination section is provided, it will be derived from the query content.
+    #[allow(clippy::too_many_arguments)]
     async fn send_signed_query_to_section(
         &self,
         query: DataQuery,
         client_pk: PublicKey,
         serialised_query: Bytes,
+        msg_id: MsgId,
         signature: Signature,
         dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
         force_new_link: bool,
@@ -188,6 +195,7 @@ impl Client {
                 query,
                 auth,
                 serialised_query,
+                msg_id,
                 dst_section_info,
                 force_new_link,
                 #[cfg(feature = "traceroute")]
