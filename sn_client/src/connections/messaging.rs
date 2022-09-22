@@ -213,6 +213,7 @@ impl Session {
         query: DataQuery,
         auth: ServiceAuth,
         payload: Bytes,
+        msg_id: MsgId,
         dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
         force_new_link: bool,
         #[cfg(feature = "traceroute")] client_pk: PublicKey,
@@ -234,7 +235,7 @@ impl Session {
         };
 
         let elders_len = elders.len();
-        let msg_id = MsgId::new();
+        // let msg_id = MsgId::new();
 
         debug!(
             "Sending query message {:?}, msg_id: {:?}, from {}, to the {} Elders closest to data name: {:?}",

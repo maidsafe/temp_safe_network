@@ -134,12 +134,13 @@ impl Comm {
     /// Get the channel to send msgs. Parse inbound connections etc.
     pub async fn run_comm_loop(&mut self) -> Result<()> {
         loop {
-            debug!("comm loop");
+            // debug!("comm loop");
             let mut did_something = false;
             match self.inbox.try_recv() {
                 Ok((peer, msg_id, bytes, is_msg_for_client)) => {
                     debug!("msg to go out... to {peer:?}{msg_id:?}");
                     // self.add_incoming(&peer, connection).await;
+
                     if let Err(error) = self
                         .send_out_bytes(peer, msg_id, bytes, is_msg_for_client)
                         .await
@@ -173,7 +174,7 @@ impl Comm {
                 }
             }
 
-            if !did_something{
+            if !did_something {
                 tokio::time::sleep(Duration::from_millis(50)).await;
             }
         }
