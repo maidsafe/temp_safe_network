@@ -181,6 +181,9 @@ pub enum Error {
     /// Cannot handle more queries at this point
     #[error("Cannot handle more queries at this point: {0:?}")]
     CannotHandleQuery(DataQuery),
+    /// No Semaphore could be aqcuired
+    #[error("Semaphore was closed unexpectedly")]
+    SemaphoreAqcuire,
 }
 
 impl From<qp2p::ClientEndpointError> for Error {

@@ -17,6 +17,7 @@ pub(crate) use self::cmd_ctrl::CmdCtrl;
 mod periodic_checks;
 
 use event_channel::EventSender;
+use tokio::sync::Semaphore;
 
 use crate::comm::MsgEvent;
 
@@ -69,16 +70,21 @@ impl FlowCtrl {
     }
 
     /// Process the next pending cmds
-    async fn process_next_cmd(&mut self) {
+    ///
+    /// The semaphore will make the process task wait if there too many concurrent cmds processed
+    async fn process_next_cmd(&mut self, semaphore: Arc<Semaphore>) -> Result<()> {
         if let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {
             self.cmd_ctrl
                 .process_cmd_job(
                     next_cmd_job,
                     self.cmd_sender_channel.clone(),
                     self.outgoing_node_event_sender.clone(),
+                    semaphore,
                 )
                 .await
         }
+
+        Ok(())
     }
 
     /// Pull and queue up all pending cmds from the CmdChannel
@@ -139,6 +145,9 @@ impl FlowCtrl {
         let mut last_link_cleanup = Instant::now();
         let mut last_dysfunction_check = Instant::now();
 
+        // This Semaphore limits the amount of tasks spawned to process cmds.
+        let semaphore = Arc::new(Semaphore::new(14));
+
         // the internal process loop
         loop {
             // if we want to throttle cmd throughput, we do that here.
@@ -159,7 +168,10 @@ impl FlowCtrl {
 
             // we go through all pending cmds in this loop
             while self.cmd_ctrl.has_items_queued() {
-                self.process_next_cmd().await;
+                if let Err(err) = self.process_next_cmd(semaphore.clone()).await {
+                    error!("{err:?}");
+                    break;
+                }
 
                 if let Err(error) = self.enqeue_new_cmds_from_channel().await {
                     error!("{error:?}");

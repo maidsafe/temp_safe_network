@@ -889,7 +889,7 @@ async fn msg_to_self() -> Result<()> {
         // don't use the cmd collection fn, as it skips Cmd::SendMsg
         let cmds = dispatcher
             .process_cmd(
-                Cmd::send_msg(OutgoingMsg::System(node_msg.clone()), Peers::Single(info.peer()))
+                Cmd::send_msg(OutgoingMsg::System(node_msg.clone()), Peers::Single(info.peer())), std::sync::Arc::new(tokio::sync::Semaphore::new(100))
             )
             .await?;
 

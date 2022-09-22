@@ -24,6 +24,7 @@ use qp2p::UsrMsgBytes;
 
 use bytes::Bytes;
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
+use tokio::sync::{Semaphore, TryAcquireError};
 use tokio::{sync::watch, sync::RwLock};
 
 // Cmd Dispatcher.
@@ -53,7 +54,19 @@ impl Dispatcher {
     }
 
     /// Handles a single cmd.
-    pub(crate) async fn process_cmd(&self, cmd: Cmd) -> Result<Vec<Cmd>> {
+    pub(crate) async fn process_cmd(
+        &self,
+        cmd: Cmd,
+        semaphore: Arc<Semaphore>,
+    ) -> Result<Vec<Cmd>> {
+        let _permit = match Arc::clone(&semaphore).try_acquire_owned() {
+            Ok(p) => p,
+            Err(TryAcquireError::NoPermits) => semaphore
+                .acquire_owned()
+                .await
+                .map_err(|_| Error::SemaphoreAqcuire)?,
+            Err(TryAcquireError::Closed) => return Err(Error::SemaphoreAqcuire),
+        };
         trace!("doing actual processing cmd: {cmd:?}");
 
         match cmd {

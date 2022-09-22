@@ -19,7 +19,7 @@ use crate::node::{
 use priority_queue::PriorityQueue;
 use std::time::SystemTime;
 use std::{sync::Arc, time::Duration};
-use tokio::sync::RwLock;
+use tokio::sync::{RwLock, Semaphore};
 
 type Priority = i32;
 
@@ -118,6 +118,7 @@ impl CmdCtrl {
         job: CmdJob,
         cmd_process_api: tokio::sync::mpsc::Sender<(Cmd, Option<usize>)>,
         node_event_sender: EventSender,
+        semaphore: Arc<Semaphore>,
     ) {
         #[cfg(feature = "test-utils")]
         {
@@ -152,7 +153,7 @@ impl CmdCtrl {
                 .await
                 .statemap_log_state(cmd.statemap_state());
 
-            match dispatcher.process_cmd(cmd).await {
+            match dispatcher.process_cmd(cmd, semaphore).await {
                 Ok(cmds) => {
                     for cmd in cmds {
                         match cmd_process_api.send((cmd, Some(id))).await {

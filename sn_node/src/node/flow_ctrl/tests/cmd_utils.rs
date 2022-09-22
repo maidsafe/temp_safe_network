@@ -97,14 +97,20 @@ pub(crate) async fn run_and_collect_cmds(
 ) -> crate::node::error::Result<Vec<Cmd>> {
     let mut all_cmds = vec![];
 
-    let mut cmds = dispatcher.process_cmd(cmd).await?;
+    let mut cmds = dispatcher
+        .process_cmd(cmd, std::sync::Arc::new(tokio::sync::Semaphore::new(100)))
+        .await?;
 
     while !cmds.is_empty() {
         all_cmds.extend(cmds.clone());
         let mut new_cmds = vec![];
         for cmd in cmds {
             if !matches!(cmd, Cmd::SendMsg { .. }) {
-                new_cmds.extend(dispatcher.process_cmd(cmd).await?);
+                new_cmds.extend(
+                    dispatcher
+                        .process_cmd(cmd, std::sync::Arc::new(tokio::sync::Semaphore::new(100)))
+                        .await?,
+                );
             }
         }
         cmds = new_cmds;
