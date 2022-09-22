@@ -223,7 +223,7 @@ fn get_media_type(path: &Path, meta: &fs::Metadata) -> String {
     } else if meta.file_type().is_symlink() {
         return MIMETYPE_FILESYSTEM_SYMLINK.to_string();
     }
-    let mime_type = mime_guess::from_path(&path);
+    let mime_type = mime_guess::from_path(path);
     let media_type = mime_type.first_raw().unwrap_or("Raw");
     media_type.to_string()
 }

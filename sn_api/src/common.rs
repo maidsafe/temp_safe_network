@@ -50,7 +50,7 @@ where
     );
 
     let qjsonrpc_client =
-        ClientEndpoint::new(&cert_path, Some(SN_AUTHD_CONNECTION_IDLE_TIMEOUT), false).map_err(
+        ClientEndpoint::new(cert_path, Some(SN_AUTHD_CONNECTION_IDLE_TIMEOUT), false).map_err(
             |err| Error::AuthdClientError(format!("Failed to create client endpoint: {}", err)),
         )?;
 

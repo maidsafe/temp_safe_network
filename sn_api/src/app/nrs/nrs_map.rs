@@ -108,6 +108,7 @@ mod tests {
     use super::*;
     use crate::SafeUrl;
     use anyhow::{anyhow, Result};
+    use assert_matches::assert_matches;
 
     #[test]
     fn get_should_return_link_for_subname() -> Result<()> {
@@ -197,11 +198,9 @@ mod tests {
             SafeUrl::from_url("safe://a.b.example")?,
         );
 
-        let result = nrs_map.get("a.b.c.example");
-        assert!(result.is_err());
-        assert_eq!(
-            format!("{}", result.unwrap_err()),
-            "ContentError: Link not found in NRS Map Container for public name: \"a.b.c.example\"",
+        assert_matches!(
+            nrs_map.get("a.b.c.example"), Err(Error::ContentError(err))
+            if err.as_str() == "Link not found in NRS Map Container for public name: \"a.b.c.example\""
         );
 
         Ok(())

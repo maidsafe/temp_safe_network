@@ -54,7 +54,7 @@ fn node_install_should_install_a_specific_version() -> Result<()> {
         .arg("node")
         .arg("install")
         .arg("--version")
-        .arg(&version)
+        .arg(version)
         .assert()
         .success()
         .stdout(predicate::str::is_match(format!(
@@ -80,7 +80,7 @@ fn node_install_should_install_to_a_specific_location() -> Result<()> {
         .arg("--node-path")
         .arg(&node_dir_path.path().display().to_string())
         .arg("--version")
-        .arg(&version)
+        .arg(version)
         .assert()
         .success()
         .stdout(predicate::str::is_match(format!(

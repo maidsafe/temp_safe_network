@@ -273,7 +273,7 @@ mod tests {
 
         loop {
             let data: u64 = rng.gen();
-            let signature = sk.sign(&data.to_be_bytes());
+            let signature = sk.sign(data.to_be_bytes());
 
             if trailing_zeros(&signature.to_bytes()) == trailing_zeros_count {
                 return signature;

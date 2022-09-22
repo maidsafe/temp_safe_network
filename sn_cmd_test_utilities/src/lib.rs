@@ -287,7 +287,7 @@ pub mod util {
             if p.path().is_file() {
                 digests.push_str(&digest_file(&p.path().display().to_string())?);
             } else if p.path_is_symlink() {
-                let target_path = fs::read_link(&p.path()).wrap_err(format!(
+                let target_path = fs::read_link(p.path()).wrap_err(format!(
                     "Failed to follow link from file at: {}",
                     p.path().display()
                 ))?;
@@ -309,7 +309,7 @@ pub mod util {
 
     // returns sha3_256 digest/hash of a file as a string.
     pub fn digest_file(path: &str) -> Result<String> {
-        let data = fs::read_to_string(&path)
+        let data = fs::read_to_string(path)
             .wrap_err(format!("Failed to read string from file at: {}", path))?;
         Ok(str_to_sha3_256(&data))
     }

@@ -38,7 +38,7 @@ impl Safe {
                     .to_string(),
             ))
         } else {
-            Ok(encode(&derived_xorname))
+            Ok(encode(derived_xorname))
         }
     }
 

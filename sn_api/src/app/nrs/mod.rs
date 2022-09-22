@@ -369,6 +369,7 @@ mod tests {
         Error, SafeUrl,
     };
     use anyhow::{anyhow, Result};
+    use assert_matches::assert_matches;
     use std::matches;
 
     const TEST_DATA_FILE: &str = "./testdata/test.md";
@@ -389,15 +390,10 @@ mod tests {
         let safe = new_safe_instance().await?;
 
         let invalid_top_name = "atffdgasd/d";
-        let result = safe.nrs_create(invalid_top_name).await;
-        assert!(result.is_err());
-        assert_eq!(
-            format!("{}", result.unwrap_err()),
-            format!(
-                "InvalidInput: The NRS top name \"{}\" is invalid because it contains url parts. \
-                Please remove any path, version or subnames.",
-                invalid_top_name
-            ),
+        assert_matches!(
+            safe.nrs_create(invalid_top_name).await, Err(Error::InvalidInput(err))
+            if err ==  format!("The NRS top name \"{}\" is invalid because it contains url parts. \
+            Please remove any path, version or subnames.", invalid_top_name)
         );
         Ok(())
     }
@@ -409,11 +405,9 @@ mod tests {
 
         safe.nrs_create(&site_name).await?;
         let _ = safe.nrs_get_subnames_map(&site_name, None).await?;
-        let result = safe.nrs_create(&site_name).await;
-        assert!(result.is_err());
-        assert_eq!(
-            format!("{}", result.unwrap_err()),
-            format!("NrsNameAlreadyExists: {}", site_name),
+        assert_matches!(
+            safe.nrs_create(&site_name).await, Err(Error::NrsNameAlreadyExists(err))
+            if err == site_name
         );
         Ok(())
     }
@@ -527,12 +521,10 @@ mod tests {
         let public_name = &format!("test.{site_name}");
 
         safe.nrs_create(&site_name).await?;
-        let result = safe.nrs_associate(public_name, &url).await;
-        assert!(result.is_err());
-        assert_eq!(
-            format!("{}", result.unwrap_err()),
-            "UnversionedContentError: FilesContainer content is versionable. NRS requires the \
-            supplied link to specify a version hash."
+        assert_matches!(
+            safe.nrs_associate(public_name, &url).await, Err(Error::UnversionedContentError(err))
+            if err.as_str() == "FilesContainer content is versionable. NRS requires the supplied \
+            link to specify a version hash."
         );
 
         Ok(())
@@ -546,13 +538,10 @@ mod tests {
         let public_name = &format!("test.{site_name}");
         let mut nrs_container_url = safe.nrs_create(&site_name).await?;
         nrs_container_url.set_content_version(None);
-
-        let result = safe.nrs_associate(public_name, &nrs_container_url).await;
-        assert!(result.is_err());
-        assert_eq!(
-            format!("{}", result.unwrap_err()),
-            "UnversionedContentError: NrsMapContainer content is versionable. NRS requires the \
-            supplied link to specify a version hash."
+        assert_matches!(
+            safe.nrs_associate(public_name, &nrs_container_url).await, Err(Error::UnversionedContentError(err))
+            if err.as_str() == "NrsMapContainer content is versionable. NRS requires the supplied \
+            link to specify a version hash."
         );
 
         Ok(())
@@ -572,11 +561,10 @@ mod tests {
         let result = safe
             .nrs_associate(&format!("test.{site_name}"), &register_url)
             .await;
-        assert!(result.is_err());
-        assert_eq!(
-            format!("{}", result.unwrap_err()),
-            "UnversionedContentError: Register content is versionable. NRS requires the \
-            supplied link to specify a version hash."
+        assert_matches!(
+            result, Err(Error::UnversionedContentError(err))
+            if err.as_str() == "Register content is versionable. NRS requires the supplied link to \
+            specify a version hash."
         );
 
         Ok(())
@@ -594,14 +582,10 @@ mod tests {
         let result = safe
             .nrs_associate(public_name, &files_container["/testdata/test.md"])
             .await;
-        assert!(result.is_err());
-        assert_eq!(
-            format!("{}", result.unwrap_err()),
-            format!(
-                "InvalidInput: The NRS public name \"{}\" is invalid because it contains url \
-                parts. Please remove any path or version.",
-                public_name
-            )
+        assert_matches!(
+            result, Err(Error::InvalidInput(err))
+            if err == format!("The NRS public name \"{}\" is invalid because it contains url parts. \
+            Please remove any path or version.", public_name)
         );
         Ok(())
     }
