@@ -677,7 +677,7 @@ fn create_dir_all(dir_path: &Path) -> Result<()> {
             dir_path.display()
         );
     }
-    fs::create_dir_all(&dir_path)
+    fs::create_dir_all(dir_path)
         .with_context(|| format!("Couldn't create path: \"{}\"", dir_path.display(),))
 }
 

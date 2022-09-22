@@ -294,7 +294,7 @@ pub async fn files_commander(
             force,
         } => {
             // Validate that location and target are not both "", ie stdin.
-            let target_url = target.unwrap_or_else(|| "".to_string());
+            let target_url = target.unwrap_or_default();
             if target_url.is_empty() && location.is_empty() {
                 bail!("Cannot read both <location> and <target> from stdin");
             }

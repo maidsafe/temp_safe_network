@@ -149,7 +149,7 @@ async fn gen_new_file_item(
         file_item.insert(PREDICATE_LINK.to_string(), xorurl);
     } else if file_meta.is_symlink() {
         // get metadata, with any symlinks resolved.
-        let result = fs::metadata(&file_path);
+        let result = fs::metadata(file_path);
         let symlink_target_type = match result {
             Ok(meta) => {
                 if meta.is_dir() {
@@ -164,7 +164,7 @@ async fn gen_new_file_item(
         let target_path = match link {
             Some(target) => target.to_string(),
             None => {
-                let target_path = fs::read_link(&file_path).map_err(|e| {
+                let target_path = fs::read_link(file_path).map_err(|e| {
                     Error::FileSystemError(format!(
                         "Unable to read link: {}.  {:#?}",
                         file_path.display(),
