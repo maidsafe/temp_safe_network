@@ -10,8 +10,6 @@ readme = "README.md"
 repository = "https://github.com/maidsafe/safe_network"
 version = "0.71.0"
 
-
-
 [[bench]]
 name = "data_storage"
 harness = false
@@ -69,7 +67,7 @@ resource_proof = "1.0.39"
 rmp-serde = "1.0.0"
 self_encryption = "~0.27.5"
 sn_consensus = "3.1.2"
-sn_dbc = { version = "8.0.0", features = ["serdes"] }
+sn_dbc = { git = "https://github.com/jacderida/sn_dbc", rev = "e84f699", features = ["serdes"] }
 sn_dysfunction = { path = "../sn_dysfunction", version = "^0.14.0" }
 sn_interface = { path = "../sn_interface", version = "^0.15.0" }
 serde = { version = "1.0.111", features = ["derive", "rc"] }
