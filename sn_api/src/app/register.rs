@@ -55,7 +55,7 @@ impl Safe {
         let owner = User::Key(client.public_key());
 
         // Store the Register on the network
-        let (_, op_batch) = client
+        let (address, op_batch) = client
             .create_register(xorname, tag, policy(owner))
             .await
             .map_err(|e| {
@@ -65,7 +65,9 @@ impl Safe {
                 ))
             })?;
 
-        client.publish_register_ops(op_batch).await?;
+        client
+            .publish_register_ops(op_batch, vec![(address, None)])
+            .await?;
 
         Ok(xorurl)
     }
@@ -212,7 +214,9 @@ impl Safe {
             }
         };
 
-        client.publish_register_ops(op_batch).await?;
+        client
+            .publish_register_ops(op_batch, vec![(address, Some(entry_hash))])
+            .await?;
 
         Ok(entry_hash)
     }

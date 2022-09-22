@@ -123,7 +123,9 @@ impl Safe {
                 .write_to_local_register(reg_address, entry, Default::default())
                 .await?;
 
-            client.publish_register_ops(reg_op).await?;
+            client
+                .publish_register_ops(reg_op, vec![(reg_address, Some(entry_hash))])
+                .await?;
 
             // We return versioned xorurl
             reg_url.set_content_version(Some(VersionHash::from(&entry_hash)));

@@ -106,7 +106,9 @@ impl Safe {
             .write_to_local_register(address, data, replace)
             .await?;
 
-        client.publish_register_ops(op_batch).await?;
+        client
+            .publish_register_ops(op_batch, vec![(address, Some(entry_hash))])
+            .await?;
 
         Ok(entry_hash)
     }
@@ -143,7 +145,9 @@ impl Safe {
             .write_to_local_register(address, MULTIMAP_REMOVED_MARK.to_vec(), to_remove)
             .await?;
 
-        client.publish_register_ops(op_batch).await?;
+        client
+            .publish_register_ops(op_batch, vec![(address, Some(entry_hash))])
+            .await?;
 
         Ok(entry_hash)
     }

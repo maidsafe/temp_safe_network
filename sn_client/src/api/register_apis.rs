@@ -40,10 +40,25 @@ impl Client {
     /// Publish all register mutation operations in a WAL to the network
     /// Incrementing the WAL index as successful writes are sent out. Stops at the first error.
     /// Starts publishing from the index when called again with the same WAL.
+    ///
+    /// Carry out verification when target address or entry_hash is provided.
     #[instrument(skip(self), level = "debug")]
-    pub async fn publish_register_ops(&self, wal: RegisterWriteAheadLog) -> Result<(), Error> {
+    pub async fn publish_register_ops(
+        &self,
+        wal: RegisterWriteAheadLog,
+        targets: Vec<(Address, Option<EntryHash>)>,
+    ) -> Result<(), Error> {
         for cmd in &wal {
             self.send_cmd(cmd.clone()).await?;
+        }
+
+        // Looping to wait for the network update will be carried out within the send_query
+        for (address, hash_option) in targets {
+            if let Some(entry_hash) = hash_option {
+                let _ = self.get_register_entry(address, entry_hash).await?;
+            } else {
+                let _ = self.get_register(address).await?;
+            }
         }
         Ok(())
     }
@@ -307,7 +322,7 @@ mod tests {
         batch.append(&mut batch2);
 
         // publish that batch to the network
-        client.publish_register_ops(batch).await?;
+        client.publish_register_ops(batch, vec![]).await?;
         tokio::time::sleep(one_sec).await;
 
         // check they're both there
@@ -349,7 +364,7 @@ mod tests {
 
         // store a Register
         let (_address, batch) = client.create_register(name, tag, policy(owner)).await?;
-        client.publish_register_ops(batch).await?;
+        client.publish_register_ops(batch, vec![]).await?;
 
         // small delay to ensure logs have written
         tokio::time::sleep(delay).await;
@@ -373,7 +388,7 @@ mod tests {
         let owner = User::Key(client.public_key());
 
         let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
-        client.publish_register_ops(batch).await?;
+        client.publish_register_ops(batch, vec![]).await?;
 
         let mut total = 0;
         let value_1 = random_register_entry();
@@ -384,7 +399,7 @@ mod tests {
             let (_value1_hash, batch) = client
                 .write_to_local_register(address, value_1.clone(), BTreeSet::new())
                 .await?;
-            client.publish_register_ops(batch).await?;
+            client.publish_register_ops(batch, vec![]).await?;
 
             let elapsed = now.elapsed().as_millis();
             total += elapsed;
@@ -410,7 +425,7 @@ mod tests {
 
         // store a Register
         let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
-        client.publish_register_ops(batch).await?;
+        client.publish_register_ops(batch, vec![]).await?;
 
         let delay = tokio::time::Duration::from_secs(1);
         tokio::time::sleep(delay).await;
@@ -424,7 +439,7 @@ mod tests {
 
         // store a second Register
         let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
-        client.publish_register_ops(batch).await?;
+        client.publish_register_ops(batch, vec![]).await?;
 
         tokio::time::sleep(delay).await;
         let register = client.get_register(address).await?;
@@ -452,7 +467,7 @@ mod tests {
             .create_register(name, tag, none_policy(owner)) // trying to set write perms to false for the owner (will not be reflected as long as the user is the owner, as an owner will have full authority)
             .await?;
         client
-            .publish_register_ops(batch)
+            .publish_register_ops(batch, vec![])
             .await
             .context("publish ops failed")?;
 
@@ -497,7 +512,7 @@ mod tests {
         let owner = User::Key(client.public_key());
 
         let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
-        client.publish_register_ops(batch).await?;
+        client.publish_register_ops(batch, vec![]).await?;
 
         let value_1 = random_register_entry();
 
@@ -552,14 +567,14 @@ mod tests {
         let owner = User::Key(client.public_key());
 
         let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
-        client.publish_register_ops(batch).await?;
+        client.publish_register_ops(batch, vec![]).await?;
 
         let value_1 = random_register_entry();
 
         let (value1_hash, batch) = client
             .write_to_local_register(address, value_1.clone(), BTreeSet::new())
             .await?;
-        client.publish_register_ops(batch).await?;
+        client.publish_register_ops(batch, vec![]).await?;
 
         // now check last entry
         let hashes = retry_loop_for_pattern!(client.read_register(address), Ok(hashes) if !hashes.is_empty())?;
@@ -581,7 +596,7 @@ mod tests {
         // we get an op to publish
         assert!(batch.len() == 1);
 
-        client.publish_register_ops(batch).await?;
+        client.publish_register_ops(batch, vec![]).await?;
 
         // and then lets check all entries are returned
         // NB: these will not be ordered according to insertion order, but according to the hashes of the values.
@@ -640,7 +655,7 @@ mod tests {
         let owner = User::Key(client.public_key());
 
         let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
-        client.publish_register_ops(batch).await?;
+        client.publish_register_ops(batch, vec![]).await?;
 
         // Assert that the data is stored.
         let current_owner = client.get_register_owner(address).await?;
@@ -662,7 +677,7 @@ mod tests {
 
         // store a Register
         let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
-        client.publish_register_ops(batch).await?;
+        client.publish_register_ops(batch, vec![]).await?;
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
         let _register = client.get_register(address).await?;
