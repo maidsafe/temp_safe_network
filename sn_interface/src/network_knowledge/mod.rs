@@ -160,6 +160,7 @@ impl NetworkKnowledge {
         // Update fails if the proof chain's genesis key is not part of the SectionTree's dag.
         if let Err(err) = section_tree.update(section_tree_update.clone()) {
             debug!("Failed to update SectionTree with {section_tree_update:?} upon creating new NetworkKnowledge instance: {err:?}");
+            return Err(err);
         }
 
         Ok(Self {
