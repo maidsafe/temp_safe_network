@@ -166,12 +166,10 @@ impl SectionTree {
         &self,
         section_key: &bls::PublicKey,
     ) -> Option<&SectionAuth<SectionAuthorityProvider>> {
-        for (_, signed_sap) in self.sections.iter() {
-            if signed_sap.public_key_set().public_key() == *section_key {
-                return Some(signed_sap);
-            }
-        }
-        None
+        self.sections
+            .iter()
+            .map(|(_, signed_sap)| signed_sap)
+            .find(|sap| sap.public_key_set().public_key() == *section_key)
     }
 
     /// Update our `SectionTree` if the provided update can be verified

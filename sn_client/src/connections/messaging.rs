@@ -189,10 +189,10 @@ impl Session {
         let msg_id = MsgId::new();
 
         debug!(
-            "Sending query message {:?}, msg_id: {:?}, from {}, to the {} Elders closest to data name: {:?}",
-            query,
+            "Sending query message {:?}, from {}, {:?} to the {} Elders closest to data name: {:?}",
             msg_id,
             endpoint.public_addr(),
+            query,
             elders_len,
             elders
         );

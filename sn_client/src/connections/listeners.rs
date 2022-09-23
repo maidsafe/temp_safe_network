@@ -228,7 +228,7 @@ impl Session {
                     correlation_id,
                 } => {
                     trace!(
-                        "ServiceMsg with id {:?} is QueryResponse regarding {:?} with response {:?}",
+                        "ServiceMsg with id {:?} is QueryResponse regarding correlation_id {:?} with response {:?}",
                         msg_id,
                         correlation_id,
                         response,
@@ -270,14 +270,13 @@ impl Session {
                 ServiceMsg::CmdError {
                     error,
                     correlation_id,
-                    ..
                 } => {
                     warn!("CmdError was received for {correlation_id:?}: {:?}", error);
                     Self::send_cmd_response(cmds, correlation_id, src_peer.addr(), Some(error));
                 }
                 ServiceMsg::CmdAck { correlation_id } => {
                     debug!(
-                        "CmdAck was received for Message{:?} w/ID: {:?} from {:?}",
+                        "CmdAck was received with id {:?} regarding correlation_id {:?} from {:?}",
                         msg_id,
                         correlation_id,
                         src_peer.addr()

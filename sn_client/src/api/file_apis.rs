@@ -328,11 +328,12 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
+    use super::LargeFile;
     use crate::{
-        api::file_apis::LargeFile,
-        utils::test_utils::{create_test_client, create_test_client_with, init_logger},
+        utils::test_utils::{create_test_client, init_logger},
         Client,
     };
+    use self_encryption::MIN_ENCRYPTABLE_BYTES;
     use sn_interface::types::{log_markers::LogMarker, utils::random_bytes};
 
     use bytes::Bytes;
@@ -343,12 +344,10 @@ mod tests {
     use tracing::{instrument::Instrumented, Instrument};
     use xor_name::XorName;
 
-    const LARGE_FILE_SIZE_MIN: usize = self_encryption::MIN_ENCRYPTABLE_BYTES;
-
     #[test]
     fn deterministic_chunking() -> Result<()> {
         init_logger();
-        let file = random_bytes(LARGE_FILE_SIZE_MIN);
+        let file = random_bytes(MIN_ENCRYPTABLE_BYTES);
 
         use crate::api::data::encrypt_large;
         let (first_address, mut first_chunks) = encrypt_large(file.clone())?;
@@ -373,7 +372,7 @@ mod tests {
 
         let client = create_test_client().await?;
 
-        let file = LargeFile::new(random_bytes(LARGE_FILE_SIZE_MIN))?;
+        let file = LargeFile::new(random_bytes(MIN_ENCRYPTABLE_BYTES))?;
 
         // Store file (also verifies that the file is stored)
         let (address, read_data) = client.upload_and_verify(file.bytes()).await?;
@@ -399,8 +398,8 @@ mod tests {
         let _outer_span = tracing::info_span!("seek_with_unknown_length").entered();
         let client = create_test_client().await?;
 
-        // create content which is stored as LargeFile, i.e. its size is larger than LARGE_FILE_SIZE_MIN
-        let size = 2 * LARGE_FILE_SIZE_MIN;
+        // create content which is stored as LargeFile, i.e. its size is larger than MIN_ENCRYPTABLE_BYTES
+        let size = 2 * MIN_ENCRYPTABLE_BYTES;
         let file = LargeFile::new(random_bytes(size))?;
 
         let (address, _) = client.upload_and_verify(file.bytes()).await?;
@@ -421,7 +420,7 @@ mod tests {
         let client = create_test_client().await?;
 
         for i in 1..5 {
-            let size = i * LARGE_FILE_SIZE_MIN;
+            let size = i * MIN_ENCRYPTABLE_BYTES;
             let _outer_span = tracing::info_span!("size:", size).entered();
             for divisor in 2..5 {
                 let _outer_span = tracing::info_span!("divisor", divisor).entered();
@@ -521,7 +520,8 @@ mod tests {
             res??;
         }
 
-        // TODO: we need to use the node log analysis to check the mem usage across nodes does not exceed X
+        // TODO: we need to use the node log analysis to check the mem usage
+        // across nodes does not exceed X
         Ok(())
     }
 
@@ -578,7 +578,7 @@ mod tests {
         let delay = tokio::time::Duration::from_secs(network_assert_delay);
         debug!("Running network asserts with delay of {:?}", delay);
 
-        let bytes = random_bytes(LARGE_FILE_SIZE_MIN / 3);
+        let bytes = random_bytes(MIN_ENCRYPTABLE_BYTES / 3);
         let client = create_test_client().await?;
 
         let mut the_logs = crate::testnet_grep::NetworkLogState::new()?;
@@ -604,7 +604,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_1kb() -> Result<()> {
         init_logger();
-        let size = LARGE_FILE_SIZE_MIN / 3;
+        let size = MIN_ENCRYPTABLE_BYTES / 3;
         let _outer_span = tracing::info_span!("store_and_read_1kb", size).entered();
         let client = create_test_client().await?;
         store_and_read(&client, size).await
@@ -622,7 +622,7 @@ mod tests {
     async fn ae_checks_file_test() -> Result<()> {
         init_logger();
         let _outer_span = tracing::info_span!("ae_checks_file_test").entered();
-        let client = create_test_client_with(None, None, None).await?;
+        let client = create_test_client().await?;
         store_and_read(&client, 10 * 1024 * 1024).await
     }
 
@@ -672,7 +672,7 @@ mod tests {
             .map(|i| (i, client.clone()))
             .map(|(i, client)| {
                 tokio::spawn(async move {
-                    let file = LargeFile::new(random_bytes(LARGE_FILE_SIZE_MIN))?;
+                    let file = LargeFile::new(random_bytes(MIN_ENCRYPTABLE_BYTES))?;
                     let _ = client.upload_large(file).await?;
                     println!("Iter: {}", i);
                     let res: Result<()> = Ok(());
@@ -704,7 +704,7 @@ mod tests {
         let client = create_test_client().await?;
 
         for i in 0..1000_usize {
-            let file = LargeFile::new(random_bytes(LARGE_FILE_SIZE_MIN))?;
+            let file = LargeFile::new(random_bytes(MIN_ENCRYPTABLE_BYTES))?;
             let now = Instant::now();
             let _ = client.upload_large(file).await?;
             let elapsed = now.elapsed();

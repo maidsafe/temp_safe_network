@@ -37,11 +37,15 @@ pub enum Error {
     #[error("Initial network contact probe failed. Attempted contacts: {0:?}")]
     NetworkContact(Vec<Peer>),
     /// Client has not gone through qp2p bootstrap process yet
-    #[error("Client has not yet acquired enough/any network knowledge for destination xorname {0}, so anything sent is guaranteed to have a lengthy AE process")]
+    #[error(
+        "Client has not yet acquired enough/any network knowledge for destination \
+        xorname {0}, so anything sent is guaranteed to have a lengthy AE process"
+    )]
     NoNetworkKnowledge(XorName),
     /// Could not connect to sufficient elder to retrieve reliable responses.
     #[error(
-        "Problem connecting to sufficient elders. A supermajority of responses is unobtainable. {connections} were connected to, {required} needed."
+        "Problem connecting to sufficient elders. A supermajority of responses is unobtainable. \
+        {connections} were connected to, {required} needed."
     )]
     InsufficientElderConnections {
         /// Number of existing connections to Elders
@@ -51,7 +55,8 @@ pub enum Error {
     },
     /// Did not know of sufficient elders in the desired section to get supermajority of responses.
     #[error(
-        "Problem finding sufficient elders. A supermajority of responses is unobtainable. {connections} were known in this section, {required} needed. Section pk: {section_pk:?}"
+        "Problem finding sufficient elders. A supermajority of responses is unobtainable. \
+        {connections} were known in this section, {required} needed. Section pk: {section_pk:?}"
     )]
     InsufficientElderKnowledge {
         /// Number of existing connections to Elders
@@ -65,7 +70,10 @@ pub enum Error {
     #[error("Cannot store empty file.")]
     EmptyFileProvided,
     /// Not enough bytes for self-encryption.
-    #[error("Not enough bytes ({size}) for self-encryption, at least {minimum} bytes needed. Try storing it as a SmallFile.")]
+    #[error(
+        "Not enough bytes ({size}) for self-encryption, at least {minimum} bytes needed. \
+        Try storing it as a SmallFile."
+    )]
     TooSmallForSelfEncryption {
         /// Number of bytes
         size: usize,
@@ -73,11 +81,15 @@ pub enum Error {
         minimum: usize,
     },
     /// Encryption oversized the SmallFile, so it cannot be stored as a SmallFile and be encrypted
-    #[error("You might need to pad the `SmallFile` contents and then store it as a `LargeFile`, as the encryption has made it slightly too big ({0} bytes)")]
+    #[error(
+        "You might need to pad the `SmallFile` contents and then store it as a `LargeFile`, \
+        as the encryption has made it slightly too big ({0} bytes)"
+    )]
     SmallFilePaddingNeeded(usize),
     /// The provided bytes is too large to store as a `SmallFile`.
     #[error(
-        "The provided bytes ({size}) is too large to store as a `SmallFile` which maximum can be {maximum}. Store as a LargeFile instead."
+        "The provided bytes ({size}) is too large to store as a `SmallFile` which maximum can be \
+        {maximum}. Store as a LargeFile instead."
     )]
     TooLargeAsSmallFile {
         /// Number of bytes
@@ -92,7 +104,10 @@ pub enum Error {
     #[error("Failed to obtain any response from: {0:?}")]
     NoResponse(Vec<Peer>),
     /// Failed to obtain a response from Elders even after retrying.
-    #[error("Failed to obtain any response, even after {attempts} attempts, for query: {query:?}. Error in last attempt: {last_error}")]
+    #[error(
+        "Failed to obtain any response, even after {attempts} attempts, for query: {query:?}. \
+        Error in last attempt: {last_error}"
+    )]
     NoResponseAfterRetrying {
         /// Number of attempts made
         attempts: usize,
