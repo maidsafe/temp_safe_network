@@ -267,7 +267,7 @@ fn section_auth() -> sn_interface::messaging::SectionAuth {
 mod tests {
     use crate::{
         retry_loop_for_pattern,
-        utils::test_utils::{create_test_client, create_test_client_with, init_logger},
+        utils::test_utils::{create_test_client, init_logger},
         Error,
     };
 
@@ -291,7 +291,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_register_batching() -> Result<()> {
         init_logger();
-        let _outer_span = tracing::info_span!("test__register_basics").entered();
+        let _outer_span = tracing::info_span!("test__register_batching").entered();
 
         let client = create_test_client().await?;
         let one_sec = tokio::time::Duration::from_secs(1);
@@ -652,7 +652,7 @@ mod tests {
     async fn ae_checks_register_test() -> Result<()> {
         init_logger();
         let _outer_span = tracing::info_span!("ae_checks_register_test").entered();
-        let client = create_test_client_with(None, None, None).await?;
+        let client = create_test_client().await?;
 
         let name = xor_name::rand::random();
         let tag = 15000;

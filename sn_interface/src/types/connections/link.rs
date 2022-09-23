@@ -185,6 +185,7 @@ impl Link {
                 if let Some(id) = res {
                     self.read_conn(id, listen).await
                 } else {
+                    debug!("creating conn with {:?}", self.peer);
                     self.create_connection(listen).await
                 }
             }
