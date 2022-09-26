@@ -202,4 +202,7 @@ pub enum Error {
     /// Occurs if a DBC spend command eventually fails after a number of retry attempts.
     #[error("The DBC spend request failed after several retry attempts")]
     DbcSpendRetryAttemptsExceeded,
+    /// Occurs if a section key is not found when searching the sections DAG.
+    #[error("Section key {0:?} was not found in the sections DAG")]
+    SectionsDagKeyNotFound(PublicKey),
 }

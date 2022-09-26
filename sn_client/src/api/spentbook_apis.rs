@@ -12,7 +12,10 @@ use crate::Error;
 
 use sn_dbc::{KeyImage, RingCtTransaction, SpentProof, SpentProofShare};
 use sn_interface::{
-    messaging::data::{DataCmd, DataQueryVariant, QueryResponse, SpentbookCmd, SpentbookQuery},
+    messaging::data::{
+        DataCmd, DataQueryVariant, Error as NetworkDataError, QueryResponse, SpentbookCmd,
+        SpentbookQuery,
+    },
     types::SpentbookAddress,
 };
 
@@ -42,14 +45,63 @@ impl Client {
         spent_proofs: BTreeSet<SpentProof>,
         spent_transactions: BTreeSet<RingCtTransaction>,
     ) -> Result<(), Error> {
-        let cmd = SpentbookCmd::Spend {
+        let mut cmd = SpentbookCmd::Spend {
             key_image,
             tx: tx.clone(),
             spent_proofs: spent_proofs.clone(),
             spent_transactions: spent_transactions.clone(),
             network_knowledge: None,
         };
-        self.send_cmd(DataCmd::Spentbook(cmd)).await
+        let mut attempts = 1;
+        debug!("Attempting DBC spend request.");
+        debug!(
+            "Will reattempt if spent proof was signed with a section key that is unknown to the \
+            processing section."
+        );
+        loop {
+            let result = self.send_cmd(DataCmd::Spentbook(cmd)).await;
+            match result {
+                Ok(()) => {
+                    return Ok(());
+                }
+                Err(err) => match err {
+                    Error::ErrorCmd {
+                        source: NetworkDataError::SpentProofUnknownSectionKey(unknown_section_key),
+                        ..
+                    } => {
+                        debug!("Encountered unknown section key during spend request.");
+                        debug!(
+                            "Will obtain updated network knowledge and retry. \
+                            Attempts made: {attempts}"
+                        );
+                        attempts += 1;
+                        if attempts > 5 {
+                            error!("DBC spend request failed after 5 retry attempts");
+                            return Err(Error::DbcSpendRetryAttemptsExceeded);
+                        }
+                        let network = self.session.network.read().await;
+                        let (proof_chain, _) = network
+                            .get_sections_dag()
+                            .single_branch_dag_for_key(&unknown_section_key)
+                            .map_err(|_| Error::SectionsDagKeyNotFound(unknown_section_key))?;
+                        let signed_sap = network
+                            .get_signed_by_key(&unknown_section_key)
+                            .ok_or(Error::SignedSapNotFound(unknown_section_key))?;
+                        cmd = SpentbookCmd::Spend {
+                            key_image,
+                            tx: tx.clone(),
+                            spent_proofs: spent_proofs.clone(),
+                            spent_transactions: spent_transactions.clone(),
+                            network_knowledge: Some((proof_chain, signed_sap.clone())),
+                        };
+                        continue;
+                    }
+                    _ => {
+                        return Err(err);
+                    }
+                },
+            }
+        }
     }
 
     //----------------------
@@ -82,12 +134,50 @@ mod tests {
     use crate::utils::test_utils::{
         create_test_client_with, init_logger, read_genesis_dbc_from_first_node,
     };
+    use crate::Client;
     use eyre::{bail, Result};
-    use sn_dbc::{rng, Hash, OwnerOnce, TransactionBuilder};
+    use sn_dbc::{rng, Hash, OwnerOnce, RingCtTransaction, TransactionBuilder};
     use tokio::time::Duration;
 
-    const MAX_ATTEMPTS: u8 = 3;
+    const MAX_ATTEMPTS: u8 = 5;
     const SLEEP_DURATION: Duration = Duration::from_secs(3);
+
+    async fn verify_spent_proof_share(
+        key_image: &bls::PublicKey,
+        tx: &RingCtTransaction,
+        client: &Client,
+    ) -> Result<()> {
+        // The query could be too close to the spend which make adult only accumulated
+        // part of shares. To avoid assertion faiure, more attempts are needed.
+        let mut attempts = 0;
+        loop {
+            attempts += 1;
+
+            // Get spent proof shares for the key_image.
+            let spent_proof_shares = client.spent_proof_shares(*key_image).await?;
+
+            // Note this test could have been run more than once thus the genesis DBC
+            // could have been spent a few times already, so we filter
+            // the SpentProofShares that belong to the TX we just spent in this run.
+            // TODO: once we have our Spentbook which prevents double spents
+            // we shouldnt't need this filtering.
+            let num_of_spent_proof_shares = spent_proof_shares
+                .iter()
+                .filter(|proof| proof.content.transaction_hash == Hash::from(tx.hash()))
+                .count();
+
+            if (5..=7).contains(&num_of_spent_proof_shares) {
+                break Ok(());
+            } else if attempts == MAX_ATTEMPTS {
+                bail!(
+                    "Failed to obtained enough spent proof shares after {} attempts, {} retrieved in last attempt",
+                    MAX_ATTEMPTS, num_of_spent_proof_shares
+                );
+            }
+
+            tokio::time::sleep(SLEEP_DURATION).await;
+        }
+    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_spentbook_spend_dbc() -> Result<()> {
@@ -124,35 +214,6 @@ mod tests {
             )
             .await?;
 
-        // The query could be too close to the spend which make adult only accumulated
-        // part of shares. To avoid assertion faiure, more attempts are needed.
-        let mut attempts = 0;
-        loop {
-            attempts += 1;
-
-            // Get spent proof shares for the key_image.
-            let spent_proof_shares = client.spent_proof_shares(*key_image).await?;
-
-            // Note this test could have been run more than once thus the genesis DBC
-            // could have been spent a few times already, so we filter
-            // the SpentProofShares that belong to the TX we just spent in this run.
-            // TODO: once we have our Spentbook which prevents double spents
-            // we shouldnt't need this filtering.
-            let num_of_spent_proof_shares = spent_proof_shares
-                .iter()
-                .filter(|proof| proof.content.transaction_hash == Hash::from(tx.hash()))
-                .count();
-
-            if (5..=7).contains(&num_of_spent_proof_shares) {
-                break Ok(());
-            } else if attempts == MAX_ATTEMPTS {
-                bail!(
-                    "Failed to obtained enough spent proof shares after {} attempts, {} retrieved in last attempt",
-                    MAX_ATTEMPTS, num_of_spent_proof_shares
-                );
-            }
-
-            tokio::time::sleep(SLEEP_DURATION).await;
-        }
+        verify_spent_proof_share(key_image, tx, &client).await
     }
 }
