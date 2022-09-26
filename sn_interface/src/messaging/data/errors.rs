@@ -55,8 +55,6 @@ pub enum Error {
     InvalidQueryResponseErrorForOperationId,
     /// A DBC spend request could not be processed because the processing section was unaware of
     /// the section that signed one of the input spent proofs.
-    #[error(
-        "Spent proof is signed by section key {0:?} that is unknown to the current section {1:?}"
-    )]
-    SpentProofUnknownSectionKey(bls::PublicKey, bls::PublicKey),
+    #[error("Spent proof is signed by section key {0:?} that is unknown to the current section")]
+    SpentProofUnknownSectionKey(bls::PublicKey),
 }

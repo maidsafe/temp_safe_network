@@ -338,10 +338,7 @@ impl Node {
                     key {:?}",
                     pk
                 );
-                return Err(Error::SpentProofUnknownSectionKey(
-                    *pk,
-                    self.network_knowledge.section_key(),
-                ));
+                return Err(Error::SpentProofUnknownSectionKey(*pk));
             }
         }
 
@@ -430,6 +427,7 @@ impl Node {
             },
         };
 
+        debug!("Successfully generated spent proof share for spend request");
         Ok(RegisterCmd::Edit(signed_edit))
     }
 }

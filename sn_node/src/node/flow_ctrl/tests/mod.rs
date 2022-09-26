@@ -1345,7 +1345,7 @@ async fn spentbook_spend_spent_proof_with_key_not_in_section_chain_should_return
         .run_until(async move {
             init_logger();
             let replication_count = 5;
-            let (dispatcher, _, peer, section_sk_set) =
+            let (dispatcher, _, peer, _) =
                 network_utils::TestNodeBuilder::new(Prefix::default().pushed(true), elder_count())
                     .adult_count(6)
                     .section_sk_threshold(0)
@@ -1382,10 +1382,9 @@ async fn spentbook_spend_spent_proof_with_key_not_in_section_chain_should_return
             assert_eq!(cmds.len(), 1);
             let cmd_err = cmds[0].get_error()?;
             let section_key = sk_set.public_keys().public_key();
-            let current_section_key = section_sk_set.public_keys().public_key();
             assert_eq!(
                 cmd_err,
-                MessagingDataError::SpentProofUnknownSectionKey(section_key, current_section_key),
+                MessagingDataError::SpentProofUnknownSectionKey(section_key),
                 "A different error was expected for this case: {:?}",
                 cmd_err
             );

@@ -159,7 +159,7 @@ run-baby-fleming-clean-build:
 	cargo clean
 	cargo build --bin sn_node
 	cp target/debug/sn_node ~/.safe/node
-	RUST_LOG=sn_node=debug cargo run node run-baby-fleming
+	RUST_LOG=sn_node=trace,sn_interface=trace cargo run node run-baby-fleming
 
 .ONESHELL:
 run-baby-fleming:
@@ -168,7 +168,7 @@ run-baby-fleming:
 	mkdir -p ~/.safe/node
 	cargo build --bin sn_node
 	cp target/debug/sn_node ~/.safe/node
-	RUST_LOG=sn_node=debug cargo run node run-baby-fleming
+	RUST_LOG=sn_node=trace,sn_interface=trace cargo run node run-baby-fleming
 
 ci-unit-tests:
 	cargo test --no-run --release --package sn_interface --package sn_dysfunction --package sn_node
