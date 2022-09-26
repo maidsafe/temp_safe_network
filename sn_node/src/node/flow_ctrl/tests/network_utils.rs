@@ -376,7 +376,7 @@ pub(crate) fn gen_info(age: u8, prefix: Option<Prefix>) -> NodeInfo {
 
 pub(crate) async fn create_comm() -> Result<Comm> {
     let (tx, _rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
-    Ok(Comm::first_node((Ipv4Addr::LOCALHOST, 0).into(), Default::default(), tx).await?)
+    Ok(Comm::new((Ipv4Addr::LOCALHOST, 0).into(), Default::default(), tx).await?)
 }
 
 /// Create a `Proposal::Online` whose agreement handling triggers relocation of a node with the

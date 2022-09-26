@@ -863,7 +863,7 @@ async fn msg_to_self() -> Result<()> {
         let info = network_utils::gen_info(MIN_ADULT_AGE, None);
         let (event_sender, _) = event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE);
         let (comm_tx, mut comm_rx) = mpsc::channel(network_utils::TEST_EVENT_CHANNEL_SIZE);
-        let comm = Comm::first_node(
+        let comm = Comm::new(
             (Ipv4Addr::LOCALHOST, 0).into(),
             Default::default(),
             comm_tx,

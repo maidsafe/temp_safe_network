@@ -44,7 +44,7 @@ pub(crate) struct Comm {
 
 impl Comm {
     #[tracing::instrument(skip_all)]
-    pub(crate) async fn first_node(
+    pub(crate) async fn new(
         local_addr: SocketAddr,
         config: qp2p::Config,
         incoming_msg_pipe: Sender<MsgEvent>,
@@ -55,28 +55,6 @@ impl Comm {
             Endpoint::new_peer(local_addr, Default::default(), config).await?;
 
         let (comm, _) = setup_comms(our_endpoint, incoming_connections, incoming_msg_pipe);
-
-        Ok(comm)
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub(crate) async fn bootstrap(
-        local_addr: SocketAddr,
-        config: qp2p::Config,
-        // monitoring: RateLimits,
-        incoming_msg_pipe: Sender<MsgEvent>,
-    ) -> Result<Self> {
-        debug!("Starting bootstrap process.");
-        // Bootstrap to the network returning the connection to a node.
-        let (our_endpoint, incoming_connections, _bootstrap_addr) =
-            Endpoint::new_peer(local_addr, &[], config).await?;
-
-        let (comm, _msg_listener) = setup_comms(
-            our_endpoint,
-            incoming_connections,
-            // monitoring,
-            incoming_msg_pipe,
-        );
 
         Ok(comm)
     }
@@ -378,7 +356,7 @@ mod tests {
         local
             .run_until(async move {
                 let (tx, _rx) = mpsc::channel(1);
-                let comm = Comm::first_node(local_addr(), Config::default(), tx).await?;
+                let comm = Comm::new(local_addr(), Config::default(), tx).await?;
 
                 let (peer0, mut rx0) = new_peer().await?;
                 let (peer1, mut rx1) = new_peer().await?;
@@ -413,7 +391,7 @@ mod tests {
         local
             .run_until(async move {
                 let (tx, _rx) = mpsc::channel(1);
-                let comm = Comm::first_node(
+                let comm = Comm::new(
                     local_addr(),
                     Config {
                         // This makes this test faster.
@@ -445,7 +423,7 @@ mod tests {
         local
             .run_until(async move {
                 let (tx, _rx) = mpsc::channel(1);
-                let send_comm = Comm::first_node(local_addr(), Config::default(), tx).await?;
+                let send_comm = Comm::new(local_addr(), Config::default(), tx).await?;
 
                 let (recv_endpoint, mut incoming_connections, _) =
                     Endpoint::new_peer(local_addr(), &[], Config::default()).await?;
@@ -502,10 +480,10 @@ mod tests {
         local
             .run_until(async move {
                 let (tx, mut rx0) = mpsc::channel(1);
-                let comm0 = Comm::first_node(local_addr(), Config::default(), tx.clone()).await?;
+                let comm0 = Comm::new(local_addr(), Config::default(), tx.clone()).await?;
                 let addr0 = comm0.socket_addr();
 
-                let comm1 = Comm::first_node(local_addr(), Config::default(), tx).await?;
+                let comm1 = Comm::new(local_addr(), Config::default(), tx).await?;
 
                 let peer = Peer::new(xor_name::rand::random(), addr0);
                 let msg = new_test_msg(dst(peer))?;
