@@ -561,7 +561,7 @@ mod core {
             let current_chain_len = self.network_knowledge.section_chain_len();
             let mut old_hashes = vec![];
             for (hash, session_info) in self.dkg_sessions_info.iter() {
-                if session_info.session_id.section_chain_len + 2 < current_chain_len {
+                if session_info.session_id.section_chain_len + 5 < current_chain_len {
                     old_hashes.push(*hash);
                     debug!(
                         "Removing old DKG s{} of chain len {} when we are at {}",
