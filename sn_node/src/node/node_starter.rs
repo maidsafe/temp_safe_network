@@ -164,7 +164,7 @@ async fn bootstrap_node(
             std::process::id()
         );
 
-        let comm = Comm::first_node(
+        let comm = Comm::new(
             local_addr,
             config.network_config().clone(),
             connection_event_tx,
@@ -223,7 +223,7 @@ async fn bootstrap_node(
             Error::Configuration("Could not obtain network contacts file path".to_string())
         })?;
         let network_contacts = SectionTree::from_disk(&path).await?;
-        let comm = Comm::bootstrap(
+        let comm = Comm::new(
             local_addr,
             config.network_config().clone(),
             connection_event_tx,
