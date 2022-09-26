@@ -16,7 +16,6 @@ use self::{
     peer_session::{PeerSession, SendStatus, SendWatcher},
 };
 
-use crate::log_sleep;
 use crate::node::{Error, Result};
 use qp2p::UsrMsgBytes;
 
@@ -128,55 +127,62 @@ impl Comm {
             .send_to_one(peer, msg_id, bytes, is_msg_for_client)
             .await;
 
-        match watcher {
-            Ok(Some(watcher)) => {
-                let send_was_successful = match Self::is_sent(watcher, msg_id, peer).await {
-                    Ok(result) => result,
-                    Err(error) => match error {
-                        Error::PeerLinkDropped => {
-                            // remove the peer link
-                            let perhaps_session = self.sessions.remove(&peer);
-                            if let Some((_peer, session)) = perhaps_session {
-                                session.disconnect().await;
-                            }
-                            return Err(Error::PeerLinkDropped);
-                        }
-                        _ => return Err(error),
-                    },
-                };
+        let sessions = self.sessions.clone();
 
-                if send_was_successful {
-                    trace!("Msg {msg_id:?} sent to {peer:?}");
+        // TODO: we could cache the handles above and check them as part of loop...
+        let _handle = tokio::spawn(async move {
+            match watcher {
+                Ok(Some(watcher)) => {
+                    let send_was_successful = match Self::is_sent(watcher, msg_id, peer).await {
+                        Ok(result) => result,
+                        Err(error) => match error {
+                            Error::PeerLinkDropped => {
+                                // remove the peer link
+                                let perhaps_session = sessions.remove(&peer);
+                                if let Some((_peer, session)) = perhaps_session {
+                                    session.disconnect().await;
+                                }
+                                return Err(Error::PeerLinkDropped);
+                            }
+                            _ => return Err(error),
+                        },
+                    };
+
+                    if send_was_successful {
+                        trace!("Msg {msg_id:?} sent to {peer:?}");
+                        Ok(())
+                    } else {
+                        Err(Error::FailedSend(peer))
+                    }
+                }
+                Ok(None) => {
                     Ok(())
-                } else {
+                    // no watcher......
+                }
+                Err(error) => {
+                    // there is only one type of error returned: [`Error::InvalidState`]
+                    // which should not happen (be reachable) if we only access PeerSession from Comm
+                    // The error means we accessed a peer that we disconnected from.
+                    // So, this would potentially be a bug!
+                    warn!(
+                        "Accessed a disconnected peer: {}. This is potentially a bug!",
+                        peer
+                    );
+
+                    let _peer = sessions.remove(&peer);
+                    error!(
+                            "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed as we have disconnected from the peer. (Error is: {})",
+                            msg_id,
+                            peer.addr(),
+                            peer.name(),
+                            error,
+                        );
                     Err(Error::FailedSend(peer))
                 }
             }
-            Ok(None) => {
-                Ok(())
-                // no watcher......
-            }
-            Err(error) => {
-                // there is only one type of error returned: [`Error::InvalidState`]
-                // which should not happen (be reachable) if we only access PeerSession from Comm
-                // The error means we accessed a peer that we disconnected from.
-                // So, this would potentially be a bug!
-                warn!(
-                    "Accessed a disconnected peer: {}. This is potentially a bug!",
-                    peer
-                );
+        });
 
-                let _peer = self.sessions.remove(&peer);
-                error!(
-                        "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed as we have disconnected from the peer. (Error is: {})",
-                        msg_id,
-                        peer.addr(),
-                        peer.name(),
-                        error,
-                    );
-                Err(Error::FailedSend(peer))
-            }
-        }
+        Ok(())
     }
 
     async fn is_sent(mut watcher: SendWatcher, msg_id: MsgId, peer: Peer) -> Result<bool> {
@@ -223,7 +229,7 @@ impl Comm {
                     // Retries are managed by the peer session, where it will open a new
                     // connection.
                     debug!("Transient error when sending to peer {}: {}", peer, error);
-                    log_sleep!(Duration::from_millis(200));
+                    tokio::time::sleep(Duration::from_millis(50)).await;
                     continue; // moves on to awaiting a new change
                 }
                 SendStatus::MaxRetriesReached => {
