@@ -223,28 +223,18 @@ async fn bootstrap_node(
             Error::Configuration("Could not obtain network contacts file path".to_string())
         })?;
         let network_contacts = SectionTree::from_disk(&path).await?;
-        let section_elders = {
-            let sap = network_contacts
-                .closest(&xor_name::rand::random(), None)
-                .ok_or_else(|| Error::Configuration("Could not obtain closest SAP".to_string()))?;
-            sap.elders_vec()
-        };
-        let bootstrap_nodes: Vec<SocketAddr> =
-            section_elders.iter().map(|node| node.addr()).collect();
-
-        let (comm, bootstrap_addr) = Comm::bootstrap(
+        let comm = Comm::bootstrap(
             local_addr,
-            bootstrap_nodes.as_slice(),
             config.network_config().clone(),
             connection_event_tx,
         )
         .await?;
+
         info!(
-            "{} Joining as a new node (PID: {}) our socket: {}, bootstrapper was: {}, network's genesis key: {:?}",
+            "{} Joining as a new node (PID: {}) our socket: {}, network's genesis key: {:?}",
             node_name,
             std::process::id(),
             comm.socket_addr(),
-            bootstrap_addr,
             network_contacts.genesis_key()
         );
 
@@ -253,7 +243,6 @@ async fn bootstrap_node(
             joining_node,
             &comm,
             &mut connection_event_rx,
-            bootstrap_addr,
             network_contacts,
             join_timeout,
         )
