@@ -62,29 +62,23 @@ impl Comm {
     #[tracing::instrument(skip_all)]
     pub(crate) async fn bootstrap(
         local_addr: SocketAddr,
-        bootstrap_nodes: &[SocketAddr],
         config: qp2p::Config,
         // monitoring: RateLimits,
         incoming_msg_pipe: Sender<MsgEvent>,
-    ) -> Result<(Self, SocketAddr)> {
-        debug!("Starting bootstrap process with bootstrap nodes: {bootstrap_nodes:?}");
+    ) -> Result<Self> {
+        debug!("Starting bootstrap process.");
         // Bootstrap to the network returning the connection to a node.
-        let (our_endpoint, incoming_connections, bootstrap_node) =
-            Endpoint::new_peer(local_addr, bootstrap_nodes, config).await?;
+        let (our_endpoint, incoming_connections, _bootstrap_addr) =
+            Endpoint::new_peer(local_addr, &[], config).await?;
 
-        let (comm, msg_listener) = setup_comms(
+        let (comm, _msg_listener) = setup_comms(
             our_endpoint,
             incoming_connections,
             // monitoring,
             incoming_msg_pipe,
         );
 
-        let (connection, incoming_msgs) = bootstrap_node.ok_or(Error::BootstrapFailed)?;
-        let remote_address = connection.remote_address();
-
-        msg_listener.listen(connection, incoming_msgs);
-
-        Ok((comm, remote_address))
+        Ok(comm)
     }
 
     pub(crate) fn socket_addr(&self) -> SocketAddr {
