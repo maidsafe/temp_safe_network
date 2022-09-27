@@ -84,7 +84,7 @@ pub fn chunk_operation_id(address: &ChunkAddress) -> Result<OperationId> {
 /// [`SystemMsg`]: crate::messaging::system::SystemMsg
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum ServiceMsg {
+pub enum ClientMsg {
     /// Messages that lead to mutation.
     ///
     /// There will be no response to these messages on success, only if something went wrong. Due to
@@ -136,7 +136,7 @@ pub enum ServiceMsg {
     },
 }
 
-impl ServiceMsg {
+impl ClientMsg {
     /// Returns the destination address for cmds and Queries only.
     pub fn dst_address(&self) -> Option<XorName> {
         match self {
@@ -159,7 +159,7 @@ impl ServiceMsg {
     }
 }
 
-impl Display for ServiceMsg {
+impl Display for ClientMsg {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::Cmd(cmd) => write!(f, "ServiceMsg::Cmd({:?})", cmd),
@@ -399,19 +399,19 @@ mod tests {
 
     #[test]
     fn wire_msg_payload() -> Result<()> {
+        use crate::messaging::data::ClientMsg;
         use crate::messaging::data::DataCmd;
-        use crate::messaging::data::ServiceMsg;
         use crate::messaging::WireMsg;
 
         let chunks = (0..10).map(|_| Chunk::new(random_bytes(3072)));
 
         for chunk in chunks {
             let (original_msg, serialised_cmd) = {
-                let msg = ServiceMsg::Cmd(DataCmd::StoreChunk(chunk));
+                let msg = ClientMsg::Cmd(DataCmd::StoreChunk(chunk));
                 let bytes = WireMsg::serialize_msg_payload(&msg)?;
                 (msg, bytes)
             };
-            let deserialized_msg: ServiceMsg =
+            let deserialized_msg: ClientMsg =
                 rmp_serde::from_slice(&serialised_cmd).map_err(|err| {
                     crate::messaging::Error::FailedToParse(format!(
                         "Data message payload as Msgpack: {}",

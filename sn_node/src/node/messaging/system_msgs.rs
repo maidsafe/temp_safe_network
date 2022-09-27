@@ -29,11 +29,11 @@ use sn_interface::{
         system::{
             // SectionAuth is gonna cause issue
             JoinResponse,
+            Node2NodeMsg,
             NodeCmd,
             NodeEvent,
             NodeQuery,
             Proposal as ProposalMsg,
-            SystemMsg,
         },
         MsgId, NodeMsgAuthority, SectionAuth,
     },
@@ -44,14 +44,14 @@ use xor_name::XorName;
 
 impl Node {
     /// Send a (`SystemMsg`) message to all Elders in our section
-    pub(crate) fn send_msg_to_our_elders(&self, msg: SystemMsg) -> Cmd {
+    pub(crate) fn send_msg_to_our_elders(&self, msg: Node2NodeMsg) -> Cmd {
         let sap = self.network_knowledge.section_auth();
         let recipients = sap.elders_set();
         self.send_system_msg(msg, Peers::Multiple(recipients))
     }
 
     /// Send a (`SystemMsg`) message to a node
-    pub(crate) fn send_system_msg(&self, msg: SystemMsg, recipients: Peers) -> Cmd {
+    pub(crate) fn send_system_msg(&self, msg: Node2NodeMsg, recipients: Peers) -> Cmd {
         self.trace_system_msg(
             msg,
             recipients,
@@ -63,13 +63,13 @@ impl Node {
     /// Send a (`SystemMsg`) message to a node
     pub(crate) fn trace_system_msg(
         &self,
-        msg: SystemMsg,
+        msg: Node2NodeMsg,
         recipients: Peers,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Cmd {
         trace!("{}: {:?}", LogMarker::SendToNodes, msg);
         Cmd::send_traced_msg(
-            OutgoingMsg::System(msg),
+            OutgoingMsg::Node2Node(msg),
             recipients,
             #[cfg(feature = "traceroute")]
             traceroute,
@@ -111,7 +111,7 @@ impl Node {
         &mut self,
         msg_id: MsgId,
         msg_authority: NodeMsgAuthority,
-        msg: SystemMsg,
+        msg: Node2NodeMsg,
         sender: Peer,
         comm: &Comm,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
@@ -129,7 +129,7 @@ impl Node {
         }
 
         match msg {
-            SystemMsg::Relocate(node_state) => {
+            Node2NodeMsg::Relocate(node_state) => {
                 trace!("Handling msg: Relocate from {}: {:?}", sender, msg_id);
                 Ok(self
                     .handle_relocate(node_state)
@@ -137,7 +137,7 @@ impl Node {
                     .into_iter()
                     .collect())
             }
-            SystemMsg::JoinAsRelocatedResponse(join_response) => {
+            Node2NodeMsg::JoinAsRelocatedResponse(join_response) => {
                 trace!("Handling msg: JoinAsRelocatedResponse from {}", sender);
                 if let Some(ref mut joining_as_relocated) = self.relocate_state {
                     if let Some(cmd) =
@@ -154,7 +154,7 @@ impl Node {
 
                 Ok(vec![])
             }
-            SystemMsg::AntiEntropy {
+            Node2NodeMsg::AntiEntropy {
                 section_tree_update,
                 kind,
             } => {
@@ -171,7 +171,7 @@ impl Node {
             // Respond to a probe msg
             // We always respond to probe msgs if we're an elder as health checks use this to see if a node is alive
             // and repsonsive, as well as being a method of keeping nodes up to date.
-            SystemMsg::AntiEntropyProbe(section_key) => {
+            Node2NodeMsg::AntiEntropyProbe(section_key) => {
                 let mut cmds = vec![];
                 if !self.is_elder() {
                     // early return here as we do not get health checks as adults,
@@ -186,7 +186,7 @@ impl Node {
                 Ok(cmds)
             }
             // The AcceptedOnlineShare for relocation will be received here.
-            SystemMsg::JoinResponse(join_response) => {
+            Node2NodeMsg::JoinResponse(join_response) => {
                 match *join_response {
                     JoinResponse::Approved {
                         section_tree_update,
@@ -246,18 +246,18 @@ impl Node {
                     }
                 }
             }
-            SystemMsg::HandoverVotes(votes) => self.handle_handover_msg(sender, votes).await,
-            SystemMsg::HandoverAE(gen) => Ok(self
+            Node2NodeMsg::HandoverVotes(votes) => self.handle_handover_msg(sender, votes).await,
+            Node2NodeMsg::HandoverAE(gen) => Ok(self
                 .handle_handover_anti_entropy(sender, gen)
                 .into_iter()
                 .collect()),
-            SystemMsg::JoinRequest(join_request) => {
+            Node2NodeMsg::JoinRequest(join_request) => {
                 trace!("Handling msg {:?}: JoinRequest from {}", msg_id, sender);
                 self.handle_join_request(sender, join_request, comm)
                     .await
                     .map(|c| c.into_iter().collect())
             }
-            SystemMsg::JoinAsRelocatedRequest(join_request) => {
+            Node2NodeMsg::JoinAsRelocatedRequest(join_request) => {
                 trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
                 if self.is_not_elder()
                     && join_request.section_key == self.network_knowledge.section_key()
@@ -270,16 +270,16 @@ impl Node {
                     .into_iter()
                     .collect())
             }
-            SystemMsg::MembershipVotes(votes) => {
+            Node2NodeMsg::MembershipVotes(votes) => {
                 let mut cmds = vec![];
                 cmds.extend(self.handle_membership_votes(sender, votes)?);
                 Ok(cmds)
             }
-            SystemMsg::MembershipAE(gen) => Ok(self
+            Node2NodeMsg::MembershipAE(gen) => Ok(self
                 .handle_membership_anti_entropy(sender, gen)
                 .into_iter()
                 .collect()),
-            SystemMsg::Propose {
+            Node2NodeMsg::Propose {
                 proposal,
                 sig_share,
             } => {
@@ -312,7 +312,7 @@ impl Node {
                     &mut self.proposal_aggregator,
                 )
             }
-            SystemMsg::DkgStart(session_id) => {
+            Node2NodeMsg::DkgStart(session_id) => {
                 trace!(
                     "Handling msg: DkgStart s{} {:?}: {} elders from {}",
                     session_id.sh(),
@@ -332,7 +332,7 @@ impl Node {
                 }
                 self.handle_dkg_start(session_id)
             }
-            SystemMsg::DkgEphemeralPubKey {
+            Node2NodeMsg::DkgEphemeralPubKey {
                 session_id,
                 section_auth,
                 pub_key,
@@ -346,7 +346,7 @@ impl Node {
                 );
                 self.handle_dkg_ephemeral_pubkey(&session_id, section_auth, pub_key, sig, sender)
             }
-            SystemMsg::DkgVotes {
+            Node2NodeMsg::DkgVotes {
                 session_id,
                 pub_keys,
                 votes,
@@ -361,11 +361,11 @@ impl Node {
                 self.log_dkg_session(&sender.name());
                 self.handle_dkg_votes(&session_id, pub_keys, votes, sender)
             }
-            SystemMsg::DkgAE(session_id) => {
+            Node2NodeMsg::DkgAE(session_id) => {
                 trace!("Handling msg: DkgAE s{} from {}", session_id.sh(), sender);
                 self.handle_dkg_anti_entropy(session_id, sender)
             }
-            SystemMsg::NodeCmd(NodeCmd::RecordStorageLevel { node_id, level, .. }) => {
+            Node2NodeMsg::NodeCmd(NodeCmd::RecordStorageLevel { node_id, level, .. }) => {
                 let changed = self.set_storage_level(&node_id, level);
                 if changed && level.value() == MIN_LEVEL_WHEN_FULL {
                     // ..then we accept a new node in place of the full node
@@ -373,12 +373,12 @@ impl Node {
                 }
                 Ok(vec![])
             }
-            SystemMsg::NodeCmd(NodeCmd::ReceiveMetadata { metadata }) => {
+            Node2NodeMsg::NodeCmd(NodeCmd::ReceiveMetadata { metadata }) => {
                 info!("Processing received MetadataExchange packet: {:?}", msg_id);
                 self.set_adult_levels(metadata);
                 Ok(vec![])
             }
-            SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData {
+            Node2NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
                 node_id,
                 data,
                 full,
@@ -410,7 +410,7 @@ impl Node {
                     traceroute,
                 )])
             }
-            SystemMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)) => {
+            Node2NodeMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)) => {
                 info!("ReplicateData MsgId: {:?}", msg_id);
 
                 if self.is_elder() {
@@ -447,7 +447,7 @@ impl Node {
                             // storage full
                             error!("Not enough space to store more data");
                             let node_id = PublicKey::from(self.keypair.public);
-                            let msg = SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData {
+                            let msg = Node2NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
                                 node_id,
                                 data,
                                 full: true,
@@ -464,7 +464,7 @@ impl Node {
 
                 Ok(cmds)
             }
-            SystemMsg::NodeCmd(NodeCmd::SendAnyMissingRelevantData(known_data_addresses)) => {
+            Node2NodeMsg::NodeCmd(NodeCmd::SendAnyMissingRelevantData(known_data_addresses)) => {
                 info!(
                     "{:?} MsgId: {:?}",
                     LogMarker::RequestForAnyMissingData,
@@ -476,7 +476,7 @@ impl Node {
                     .into_iter()
                     .collect())
             }
-            SystemMsg::NodeQuery(NodeQuery::Data {
+            Node2NodeMsg::NodeQuery(NodeQuery::Data {
                 query,
                 auth,
                 origin,
@@ -502,7 +502,7 @@ impl Node {
                     .await,
                 ])
             }
-            SystemMsg::NodeQueryResponse {
+            Node2NodeMsg::NodeQueryResponse {
                 response,
                 correlation_id,
                 user,
@@ -561,7 +561,7 @@ impl Node {
             let node_xorname = XorName::from(node_id);
 
             // we ask the section to record the new level reached
-            let msg = SystemMsg::NodeCmd(NodeCmd::RecordStorageLevel {
+            let msg = Node2NodeMsg::NodeCmd(NodeCmd::RecordStorageLevel {
                 section: node_xorname,
                 node_id,
                 level,
@@ -570,7 +570,7 @@ impl Node {
             let dst = Peers::Multiple(self.network_knowledge.elders());
 
             cmds.push(Cmd::send_traced_msg(
-                OutgoingMsg::System(msg),
+                OutgoingMsg::Node2Node(msg),
                 dst,
                 #[cfg(feature = "traceroute")]
                 traceroute,

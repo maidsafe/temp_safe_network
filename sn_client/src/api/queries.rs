@@ -14,8 +14,8 @@ use crate::{connections::QueryResult, errors::Error};
 use sn_interface::{
     data_copy_count,
     messaging::{
-        data::{DataQuery, DataQueryVariant, ServiceMsg},
-        ServiceAuth, WireMsg,
+        data::{ClientMsg, DataQuery, DataQueryVariant},
+        ClientAuth, WireMsg,
     },
     types::{Peer, PublicKey, Signature},
 };
@@ -72,7 +72,7 @@ impl Client {
 
         let mut data_not_found_count = BTreeSet::default();
         loop {
-            let msg = ServiceMsg::Query(query.clone());
+            let msg = ClientMsg::Query(query.clone());
             let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
             let signature = self.keypair.sign(&serialised_query);
 
@@ -177,7 +177,7 @@ impl Client {
         signature: Signature,
         dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
     ) -> Result<QueryResult, Error> {
-        let auth = ServiceAuth {
+        let auth = ClientAuth {
             public_key: client_pk,
             signature,
         };

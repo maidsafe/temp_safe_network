@@ -18,7 +18,7 @@ use sn_interface::{
             SignedRegisterCreate, SignedRegisterEdit,
         },
         system::NodeQueryResponse,
-        SectionAuth, ServiceAuth, VerifyAuthority,
+        ClientAuth, SectionAuth, VerifyAuthority,
     },
     types::{
         register::{Action, EntryHash, Permissions, Policy, Register, User},
@@ -420,7 +420,7 @@ fn create_reg_w_policy(
     let op = CreateRegister { name, tag, policy };
     let signature = node_keypair.sign(&serialize(&op)?);
 
-    let auth = ServiceAuth {
+    let auth = ClientAuth {
         public_key: node_keypair.public_key(),
         signature,
     };
@@ -455,7 +455,7 @@ mod test {
         messaging::{
             data::{EditRegister, RegisterCmd, RegisterQuery, SignedRegisterEdit},
             system::NodeQueryResponse,
-            ServiceAuth,
+            ClientAuth,
         },
         types::{
             register::{EntryHash, Policy, Register, User},
@@ -892,7 +892,7 @@ mod test {
 
         Ok(RegisterCmd::Edit(SignedRegisterEdit {
             op,
-            auth: ServiceAuth {
+            auth: ClientAuth {
                 public_key: keypair.public_key(),
                 signature,
             },

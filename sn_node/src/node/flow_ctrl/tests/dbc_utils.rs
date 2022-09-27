@@ -7,7 +7,7 @@ use sn_dbc::{
 };
 use sn_interface::network_knowledge::section_keys::build_spent_proof_share;
 use sn_interface::{
-    messaging::data::{DataCmd, RegisterCmd, ServiceMsg, SpentbookCmd},
+    messaging::data::{ClientMsg, DataCmd, RegisterCmd, SpentbookCmd},
     network_knowledge::{SectionAuthorityProvider, SectionKeysProvider},
     types::{Peer, ReplicatedData},
 };

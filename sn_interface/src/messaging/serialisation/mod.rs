@@ -12,7 +12,7 @@ mod wire_msg_header;
 pub use self::wire_msg::WireMsg;
 #[cfg(feature = "traceroute")]
 pub use self::wire_msg::{Entity, Traceroute};
-use super::{AuthorityProof, BlsShareAuth, NodeAuth, SectionAuth};
+use super::{AuthorityProof, NodeAuth, SectionAuth, SectionAuthPart};
 
 use crate::types::PublicKey;
 
@@ -25,7 +25,7 @@ pub enum NodeMsgAuthority {
     /// Authority of a single peer.
     Node(AuthorityProof<NodeAuth>),
     /// Authority of a single peer that uses it's BLS Keyshare to sign the message.
-    BlsShare(AuthorityProof<BlsShareAuth>),
+    BlsShare(AuthorityProof<SectionAuthPart>),
     /// Authority of a whole section.
     Section(AuthorityProof<SectionAuth>),
 }

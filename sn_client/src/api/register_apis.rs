@@ -70,7 +70,7 @@ impl Client {
         let cmd = DataCmd::Register(RegisterCmd::Create {
             cmd: SignedRegisterCreate {
                 op,
-                auth: sn_interface::messaging::ServiceAuth {
+                auth: sn_interface::messaging::ClientAuth {
                     public_key: self.keypair.public_key(),
                     signature,
                 },
@@ -112,7 +112,7 @@ impl Client {
 
         let edit = SignedRegisterEdit {
             op,
-            auth: sn_interface::messaging::ServiceAuth {
+            auth: sn_interface::messaging::ClientAuth {
                 public_key,
                 signature,
             },

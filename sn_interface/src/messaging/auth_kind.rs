@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{BlsShareAuth, NodeAuth, ServiceAuth};
+use super::{ClientAuth, NodeAuth, SectionAuthPart};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
@@ -23,7 +23,7 @@ pub enum AuthKind {
     /// A data message, with the requesting peer's authority.
     ///
     /// Authority is needed to access private data, such as reading or writing a private file.
-    Service(ServiceAuth),
+    Client(ClientAuth),
 
     /// A message from a Node with its own independent authority.
     ///
@@ -35,17 +35,17 @@ pub enum AuthKind {
     ///
     /// Section share authority is needed for messages related to section administration, such as
     /// DKG and relocation.
-    NodeBlsShare(BlsShareAuth),
+    SectionPart(SectionAuthPart),
 }
 
 impl AuthKind {
     /// The src location of the msg.
     pub fn src_name(&self) -> XorName {
         match self {
-            Self::NodeBlsShare(auth) => auth.src_name,
+            Self::SectionPart(auth) => auth.src_name,
             Self::Node(auth) => crate::types::PublicKey::Ed25519(auth.node_ed_pk).into(),
             #[cfg(any(feature = "chunks", feature = "registers"))]
-            Self::Service(auth) => auth.public_key.into(),
+            Self::Client(auth) => auth.public_key.into(),
         }
     }
 }

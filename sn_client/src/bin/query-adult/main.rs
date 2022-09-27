@@ -7,7 +7,7 @@ use sn_client::{Client, Error};
 use sn_interface::{
     data_copy_count,
     messaging::{
-        data::{DataQuery, DataQueryVariant, QueryResponse, ServiceMsg},
+        data::{ClientMsg, DataQuery, DataQueryVariant, QueryResponse},
         WireMsg,
     },
     types::{Chunk, ChunkAddress},
@@ -128,7 +128,7 @@ async fn query_chunk(client: &Client, adult_index: usize, address: XorName) -> R
 
 async fn send_query(client: &Client, query: DataQuery) -> Result<QueryResponse> {
     let client_pk = client.public_key();
-    let msg = ServiceMsg::Query(query.clone());
+    let msg = ClientMsg::Query(query.clone());
     let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
     let signature = client.keypair().sign(&serialised_query);
 

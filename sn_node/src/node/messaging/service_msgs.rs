@@ -22,11 +22,11 @@ use sn_interface::{
     data_copy_count,
     messaging::{
         data::{
-            DataCmd, DataQueryVariant, EditRegister, OperationId, ServiceMsg, SignedRegisterEdit,
+            ClientMsg, DataCmd, DataQueryVariant, EditRegister, OperationId, SignedRegisterEdit,
             SpentbookCmd,
         },
-        system::{NodeQueryResponse, SystemMsg},
-        AuthorityProof, EndUser, MsgId, ServiceAuth,
+        system::{Node2NodeMsg, NodeQueryResponse},
+        AuthorityProof, ClientAuth, EndUser, MsgId,
     },
     types::{
         log_markers::LogMarker,
@@ -46,7 +46,7 @@ impl Node {
         correlation_id: MsgId,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Cmd {
-        let the_ack_msg = ServiceMsg::CmdAck { correlation_id };
+        let the_ack_msg = ClientMsg::CmdAck { correlation_id };
         self.send_service_msg(
             the_ack_msg,
             Peers::Single(target),
@@ -63,7 +63,7 @@ impl Node {
         correlation_id: MsgId,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Cmd {
-        let the_error_msg = ServiceMsg::CmdError {
+        let the_error_msg = ClientMsg::CmdError {
             error: error.into(),
             correlation_id,
         };
@@ -79,7 +79,7 @@ impl Node {
     /// Forms a cmd to send a cmd response error/ack to the client
     fn send_service_msg(
         &self,
-        msg: ServiceMsg,
+        msg: ClientMsg,
         recipients: Peers,
         #[cfg(feature = "traceroute")] mut traceroute: Traceroute,
     ) -> Cmd {
@@ -87,7 +87,7 @@ impl Node {
         traceroute.0.push(self.identity());
 
         Cmd::SendMsg {
-            msg: OutgoingMsg::Service(msg),
+            msg: OutgoingMsg::Client(msg),
             msg_id: MsgId::new(),
             recipients,
             #[cfg(feature = "traceroute")]
@@ -100,7 +100,7 @@ impl Node {
         &self,
         correlation_id: MsgId,
         query: &DataQueryVariant,
-        auth: ServiceAuth,
+        auth: ClientAuth,
         user: EndUser,
         requesting_elder: Peer,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
@@ -111,7 +111,7 @@ impl Node {
             .await;
 
         trace!("data query response at adult is: {:?}", response);
-        let msg = SystemMsg::NodeQueryResponse {
+        let msg = Node2NodeMsg::NodeQueryResponse {
             response,
             correlation_id,
             user,
@@ -173,7 +173,7 @@ impl Node {
 
         let query_response = response.convert();
 
-        let msg = ServiceMsg::QueryResponse {
+        let msg = ClientMsg::QueryResponse {
             response: query_response,
             correlation_id,
         };
@@ -191,8 +191,8 @@ impl Node {
     pub(crate) async fn handle_valid_service_msg(
         &self,
         msg_id: MsgId,
-        msg: ServiceMsg,
-        auth: AuthorityProof<ServiceAuth>,
+        msg: ClientMsg,
+        auth: AuthorityProof<ClientAuth>,
         origin: Peer,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
@@ -205,8 +205,8 @@ impl Node {
         // extract the data from the request
         let data = match msg {
             // These reads/writes are for adult nodes...
-            ServiceMsg::Cmd(DataCmd::Register(cmd)) => ReplicatedData::RegisterWrite(cmd),
-            ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+            ClientMsg::Cmd(DataCmd::Register(cmd)) => ReplicatedData::RegisterWrite(cmd),
+            ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                 key_image,
                 tx,
                 spent_proofs,
@@ -221,7 +221,7 @@ impl Node {
                     );
                     // To avoid a loop, recompose the message without the updated proof_chain.
                     let updated_service_msg =
-                        ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                        ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                             key_image,
                             tx,
                             spent_proofs,
@@ -249,8 +249,8 @@ impl Node {
                 let reg_cmd = self.gen_register_cmd(&key_image, &spent_proof_share)?;
                 ReplicatedData::SpentbookWrite(reg_cmd)
             }
-            ServiceMsg::Cmd(DataCmd::StoreChunk(chunk)) => ReplicatedData::Chunk(chunk),
-            ServiceMsg::Query(query) => {
+            ClientMsg::Cmd(DataCmd::StoreChunk(chunk)) => ReplicatedData::Chunk(chunk),
+            ClientMsg::Query(query) => {
                 return self
                     .read_data_from_adults(
                         query,
@@ -421,7 +421,7 @@ impl Node {
         let signature = own_keypair.sign(&bincode::serialize(&op)?);
         let signed_edit = SignedRegisterEdit {
             op,
-            auth: ServiceAuth {
+            auth: ClientAuth {
                 public_key: own_keypair.public_key(),
                 signature,
             },

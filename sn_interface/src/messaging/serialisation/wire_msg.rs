@@ -8,8 +8,8 @@
 
 use super::wire_msg_header::WireMsgHeader;
 use crate::messaging::{
-    data::ServiceMsg, system::SystemMsg, AuthKind, AuthorityProof, Dst, Error, MsgId, MsgType,
-    NodeMsgAuthority, Result, ServiceAuth,
+    data::ClientMsg, system::Node2NodeMsg, AuthKind, AuthorityProof, ClientAuth, Dst, Error, MsgId,
+    MsgType, NodeMsgAuthority, Result,
 };
 use bytes::Bytes;
 use custom_debug::Debug;
@@ -237,12 +237,12 @@ impl WireMsg {
     pub fn into_msg(&self) -> Result<MsgType> {
         match self.header.msg_envelope.auth.clone() {
             #[cfg(any(feature = "chunks", feature = "registers"))]
-            AuthKind::Service(auth) => {
-                let msg: ServiceMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
+            AuthKind::Client(auth) => {
+                let msg: ClientMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Data message payload as Msgpack: {}", err))
                 })?;
 
-                let auth = if let ServiceMsg::ServiceError {
+                let auth = if let ClientMsg::ServiceError {
                     source_message: Some(payload),
                     ..
                 } = &msg
@@ -260,7 +260,7 @@ impl WireMsg {
                 })
             }
             AuthKind::Node(node_signed) => {
-                let msg: SystemMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
+                let msg: Node2NodeMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Node signed message payload as Msgpack: {}", err))
                 })?;
 
@@ -274,8 +274,8 @@ impl WireMsg {
                     msg,
                 })
             }
-            AuthKind::NodeBlsShare(bls_share_signed) => {
-                let msg: SystemMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
+            AuthKind::SectionPart(bls_share_signed) => {
+                let msg: Node2NodeMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!(
                         "Node message payload (BLS share signed) as Msgpack: {}",
                         err
@@ -315,7 +315,7 @@ impl WireMsg {
     pub fn src_section_pk(&self) -> Option<bls::PublicKey> {
         match &self.header.msg_envelope.auth {
             AuthKind::Node(node_signed) => Some(node_signed.section_pk),
-            AuthKind::NodeBlsShare(bls_share_signed) => Some(bls_share_signed.section_pk),
+            AuthKind::SectionPart(bls_share_signed) => Some(bls_share_signed.section_pk),
             _ => None,
         }
     }
@@ -332,7 +332,7 @@ impl WireMsg {
     }
 
     /// Convenience function which validates the signature on a `ServiceMsg`.
-    pub fn verify_sig(auth: ServiceAuth, msg: ServiceMsg) -> Result<AuthorityProof<ServiceAuth>> {
+    pub fn verify_sig(auth: ClientAuth, msg: ClientMsg) -> Result<AuthorityProof<ClientAuth>> {
         Self::serialize_msg_payload(&msg).and_then(|payload| AuthorityProof::verify(auth, &payload))
     }
 
@@ -367,9 +367,9 @@ mod tests {
     use super::*;
     use crate::{
         messaging::{
-            data::{DataQuery, DataQueryVariant, ServiceMsg, StorageLevel},
-            system::{NodeCmd, SystemMsg},
-            AuthorityProof, MsgId, NodeAuth, ServiceAuth,
+            data::{ClientMsg, DataQuery, DataQueryVariant, StorageLevel},
+            system::{Node2NodeMsg, NodeCmd},
+            AuthorityProof, ClientAuth, MsgId, NodeAuth,
         },
         types::{ChunkAddress, Keypair},
     };
@@ -391,7 +391,7 @@ mod tests {
         let msg_id = MsgId::new();
         let pk = crate::types::PublicKey::Bls(dst.section_key);
 
-        let msg = SystemMsg::NodeCmd(NodeCmd::RecordStorageLevel {
+        let msg = Node2NodeMsg::NodeCmd(NodeCmd::RecordStorageLevel {
             node_id: pk,
             section: pk.into(),
             level: StorageLevel::zero(),
@@ -438,19 +438,19 @@ mod tests {
 
         let msg_id = MsgId::new();
 
-        let client_msg = ServiceMsg::Query(DataQuery {
+        let client_msg = ClientMsg::Query(DataQuery {
             adult_index: 0,
             variant: DataQueryVariant::GetChunk(ChunkAddress(xor_name::rand::random())),
         });
 
         let payload = WireMsg::serialize_msg_payload(&client_msg)?;
-        let auth = ServiceAuth {
+        let auth = ClientAuth {
             public_key: src_client_keypair.public_key(),
             signature: src_client_keypair.sign(&payload),
         };
         let auth_proof = AuthorityProof::verify(auth.clone(), &payload)?;
 
-        let auth = AuthKind::Service(auth);
+        let auth = AuthKind::Client(auth);
 
         let wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
         let serialized = wire_msg.serialize()?;

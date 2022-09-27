@@ -386,8 +386,8 @@ mod tests {
 
     use sn_interface::{
         messaging::{
-            data::{DataQuery, DataQueryVariant, ServiceMsg},
-            AuthKind, Dst, MsgId, ServiceAuth,
+            data::{ClientMsg, DataQuery, DataQueryVariant},
+            AuthKind, ClientAuth, Dst, MsgId,
         },
         types::{ChunkAddress, Keypair, Peer},
     };
@@ -571,10 +571,10 @@ mod tests {
             adult_index: 0,
             variant: query,
         };
-        let query = ServiceMsg::Query(query);
+        let query = ClientMsg::Query(query);
         let payload = WireMsg::serialize_msg_payload(&query)?;
 
-        let auth = ServiceAuth {
+        let auth = ClientAuth {
             public_key: src_keypair.public_key(),
             signature: src_keypair.sign(&payload),
         };
@@ -582,7 +582,7 @@ mod tests {
         Ok(WireMsg::new_msg(
             MsgId::new(),
             payload,
-            AuthKind::Service(auth),
+            AuthKind::Client(auth),
             dst,
         ))
     }

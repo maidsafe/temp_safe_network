@@ -19,7 +19,7 @@ use sn_interface::{
 use sn_interface::{
     messaging::{
         data::{DataQuery, DataQueryVariant, QueryResponse},
-        AuthKind, Dst, MsgId, ServiceAuth, WireMsg,
+        AuthKind, ClientAuth, Dst, MsgId, WireMsg,
     },
     network_knowledge::supermajority,
     types::{Peer, SendToOneError},
@@ -56,7 +56,7 @@ impl Session {
     pub(crate) async fn send_cmd(
         &self,
         dst_address: XorName,
-        auth: ServiceAuth,
+        auth: ClientAuth,
         payload: Bytes,
         #[cfg(feature = "traceroute")] client_pk: PublicKey,
     ) -> Result<()> {
@@ -79,7 +79,7 @@ impl Session {
             section_key: section_pk,
         };
 
-        let auth = AuthKind::Service(auth);
+        let auth = AuthKind::Client(auth);
 
         #[allow(unused_mut)]
         let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
@@ -164,7 +164,7 @@ impl Session {
     pub(crate) async fn send_query(
         &self,
         query: DataQuery,
-        auth: ServiceAuth,
+        auth: ClientAuth,
         payload: Bytes,
         #[cfg(feature = "traceroute")] client_pk: PublicKey,
         dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
@@ -218,7 +218,7 @@ impl Session {
             name: dst,
             section_key: section_pk,
         };
-        let auth = AuthKind::Service(auth);
+        let auth = AuthKind::Client(auth);
 
         #[allow(unused_mut)]
         let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
@@ -328,7 +328,7 @@ impl Session {
         nodes: Vec<Peer>,
         section_pk: bls::PublicKey,
         dst_address: XorName,
-        auth: ServiceAuth,
+        auth: ClientAuth,
         payload: Bytes,
     ) -> Result<(), Error> {
         let endpoint = self.endpoint.clone();
@@ -346,7 +346,7 @@ impl Session {
             name: dst_address,
             section_key: section_pk,
         };
-        let auth = AuthKind::Service(auth);
+        let auth = AuthKind::Client(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
 
         let initial_contacts = nodes

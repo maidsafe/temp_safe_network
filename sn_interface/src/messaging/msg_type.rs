@@ -9,7 +9,7 @@
 use crate::messaging::Dst;
 
 use super::{
-    data::ServiceMsg, system::SystemMsg, AuthorityProof, MsgId, NodeMsgAuthority, ServiceAuth,
+    data::ClientMsg, system::Node2NodeMsg, AuthorityProof, ClientAuth, MsgId, NodeMsgAuthority,
 };
 use std::fmt::{Display, Formatter};
 
@@ -44,11 +44,11 @@ pub enum MsgType {
         /// Message ID
         msg_id: MsgId,
         /// Requester's authority over this message
-        auth: AuthorityProof<ServiceAuth>,
+        auth: AuthorityProof<ClientAuth>,
         /// Message dst
         dst: Dst,
         /// the message
-        msg: ServiceMsg,
+        msg: ClientMsg,
     },
     /// System message for node<->node comms.
     System {
@@ -59,7 +59,7 @@ pub enum MsgType {
         /// Message dst
         dst: Dst,
         /// the message
-        msg: SystemMsg,
+        msg: Node2NodeMsg,
     },
 }
 

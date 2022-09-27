@@ -18,10 +18,10 @@ use qp2p::UsrMsgBytes;
 use sn_interface::{
     at_least_one_correct_elder,
     messaging::{
-        data::{Error as ErrorMsg, ServiceMsg},
-        system::{AntiEntropyKind, NodeMsgAuthorityUtils, SystemMsg},
-        AuthKind, AuthorityProof, Dst, MsgId, MsgType, NodeMsgAuthority, SectionTreeUpdate,
-        ServiceAuth, WireMsg,
+        data::{ClientMsg, Error as ErrorMsg},
+        system::{AntiEntropyKind, Node2NodeMsg, NodeMsgAuthorityUtils},
+        AuthKind, AuthorityProof, ClientAuth, Dst, MsgId, MsgType, NodeMsgAuthority,
+        SectionTreeUpdate, WireMsg,
     },
     network_knowledge::{NetworkKnowledge, SectionAuthorityProvider},
     types::{log_markers::LogMarker, Peer},
@@ -140,7 +140,7 @@ impl Session {
 
     async fn handle_system_msg(
         &mut self,
-        msg: SystemMsg,
+        msg: Node2NodeMsg,
         msg_authority: NodeMsgAuthority,
         sender: Peer,
     ) -> Result<(), Error> {
@@ -161,7 +161,7 @@ impl Session {
         }
 
         match msg {
-            SystemMsg::AntiEntropy {
+            Node2NodeMsg::AntiEntropy {
                 section_tree_update,
                 kind:
                     AntiEntropyKind::Redirect { bounced_msg } | AntiEntropyKind::Retry { bounced_msg },
@@ -210,7 +210,7 @@ impl Session {
     fn handle_client_msg(
         session: Self,
         msg_id: MsgId,
-        msg: ServiceMsg,
+        msg: ClientMsg,
         src_peer: Peer,
     ) -> Result<(), Error> {
         debug!(
@@ -223,7 +223,7 @@ impl Session {
 
         let _handle = tokio::spawn(async move {
             match msg {
-                ServiceMsg::QueryResponse {
+                ClientMsg::QueryResponse {
                     response,
                     correlation_id,
                 } => {
@@ -267,14 +267,14 @@ impl Session {
                         warn!("Ignoring query response without operation id");
                     }
                 }
-                ServiceMsg::CmdError {
+                ClientMsg::CmdError {
                     error,
                     correlation_id,
                 } => {
                     warn!("CmdError was received for {correlation_id:?}: {:?}", error);
                     Self::send_cmd_response(cmds, correlation_id, src_peer.addr(), Some(error));
                 }
-                ServiceMsg::CmdAck { correlation_id } => {
+                ClientMsg::CmdAck { correlation_id } => {
                     debug!(
                         "CmdAck was received with id {:?} regarding correlation_id {:?} from {:?}",
                         msg_id,
@@ -324,7 +324,7 @@ impl Session {
             if let Some(elder) = target_elder {
                 let payload = WireMsg::serialize_msg_payload(&service_msg)?;
                 let wire_msg =
-                    WireMsg::new_msg(msg_id, payload, AuthKind::Service(auth.into_inner()), dst);
+                    WireMsg::new_msg(msg_id, payload, AuthKind::Client(auth.into_inner()), dst);
 
                 debug!("Resending original message on AE-Redirect with updated details. Expecting an AE-Retry next");
 
@@ -379,16 +379,7 @@ impl Session {
     async fn new_target_elders(
         bounced_msg: UsrMsgBytes,
         received_auth: &SectionAuthorityProvider,
-    ) -> Result<
-        Option<(
-            MsgId,
-            Vec<Peer>,
-            ServiceMsg,
-            Dst,
-            AuthorityProof<ServiceAuth>,
-        )>,
-        Error,
-    > {
+    ) -> Result<Option<(MsgId, Vec<Peer>, ClientMsg, Dst, AuthorityProof<ClientAuth>)>, Error> {
         let (msg_id, service_msg, dst, auth) = match WireMsg::deserialize(bounced_msg)? {
             MsgType::Service {
                 msg_id,
@@ -412,10 +403,8 @@ impl Session {
         );
 
         let (target_count, dst_address_of_bounced_msg) = match service_msg.clone() {
-            ServiceMsg::Cmd(cmd) => (at_least_one_correct_elder(), cmd.dst_name()),
-            ServiceMsg::Query(query) => {
-                (NUM_OF_ELDERS_SUBSET_FOR_QUERIES, query.variant.dst_name())
-            }
+            ClientMsg::Cmd(cmd) => (at_least_one_correct_elder(), cmd.dst_name()),
+            ClientMsg::Query(query) => (NUM_OF_ELDERS_SUBSET_FOR_QUERIES, query.variant.dst_name()),
             _ => {
                 warn!(
                     "Invalid bounced msg {:?} received in AE response: {:?}. Msg is of invalid type",

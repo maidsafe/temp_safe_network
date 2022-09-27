@@ -11,8 +11,8 @@ use crate::Error;
 
 use sn_interface::{
     messaging::{
-        data::{DataCmd, ServiceMsg},
-        ServiceAuth, WireMsg,
+        data::{ClientMsg, DataCmd},
+        ClientAuth, WireMsg,
     },
     types::{PublicKey, Signature},
 };
@@ -50,7 +50,7 @@ impl Client {
         let debug_cmd = format!("{:?}", cmd);
 
         let serialised_cmd = {
-            let msg = ServiceMsg::Cmd(cmd);
+            let msg = ClientMsg::Cmd(cmd);
             WireMsg::serialize_msg_payload(&msg)?
         };
         let signature = self.sign(&serialised_cmd);
@@ -116,7 +116,7 @@ impl Client {
         serialised_cmd: Bytes,
         signature: Signature,
     ) -> Result<(), Error> {
-        let auth = ServiceAuth {
+        let auth = ClientAuth {
             public_key: client_pk,
             signature,
         };

@@ -12,7 +12,7 @@ use crate::node::{
 };
 
 use sn_interface::{
-    messaging::system::{JoinResponse, ResourceProof, SystemMsg},
+    messaging::system::{JoinResponse, Node2NodeMsg, ResourceProof},
     types::{keys::ed25519, log_markers::LogMarker, Peer},
 };
 
@@ -49,7 +49,7 @@ impl Node {
         let nonce: [u8; 32] = rand::random();
         let serialized =
             bincode::serialize(&(peer.name(), &nonce)).map_err(|_| Error::InvalidMessage)?;
-        let response = SystemMsg::JoinResponse(Box::new(JoinResponse::ResourceChallenge {
+        let response = Node2NodeMsg::JoinResponse(Box::new(JoinResponse::ResourceChallenge {
             data_size: RESOURCE_PROOF_DATA_SIZE,
             difficulty: RESOURCE_PROOF_DIFFICULTY,
             nonce,

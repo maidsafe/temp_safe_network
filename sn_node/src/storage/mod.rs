@@ -418,7 +418,7 @@ mod tests {
         let cmd = RegisterCmd::Create {
             cmd: SignedRegisterCreate {
                 op,
-                auth: sn_interface::messaging::ServiceAuth {
+                auth: sn_interface::messaging::ClientAuth {
                     public_key: keypair.public_key(),
                     signature,
                 },

@@ -15,8 +15,8 @@ use crate::node::{messages::WireMsgUtils, Error, Result};
 use sn_interface::{
     messaging::{
         system::{
-            JoinRejectionReason, JoinRequest, JoinResponse, MembershipState, ResourceProof,
-            SystemMsg,
+            JoinRejectionReason, JoinRequest, JoinResponse, MembershipState, Node2NodeMsg,
+            ResourceProof,
         },
         AuthKind, Dst, MsgType, NodeAuth, WireMsg,
     },
@@ -406,7 +406,7 @@ impl<'a> Joiner<'a> {
                 name: self.node.name(), // we want to target a section where our name fits
                 section_key,
             },
-            SystemMsg::JoinRequest(msg),
+            Node2NodeMsg::JoinRequest(msg),
             section_key,
         )?;
 
@@ -443,14 +443,14 @@ impl<'a> Joiner<'a> {
                 MsgEvent::Received {
                     sender, wire_msg, ..
                 } => match wire_msg.auth() {
-                    AuthKind::Service(_) => continue,
-                    AuthKind::NodeBlsShare(_) => {
+                    AuthKind::Client(_) => continue,
+                    AuthKind::SectionPart(_) => {
                         trace!("Bootstrap message discarded: sender: {sender:?} wire_msg: {wire_msg:?}");
                         continue;
                     }
                     AuthKind::Node(NodeAuth { .. }) => match wire_msg.into_msg() {
                         Ok(MsgType::System {
-                            msg: SystemMsg::JoinResponse(resp),
+                            msg: Node2NodeMsg::JoinResponse(resp),
                             ..
                         }) => (*resp, sender),
                         Ok(MsgType::Service { msg_id, .. } | MsgType::System { msg_id, .. }) => {
@@ -579,7 +579,7 @@ mod tests {
 
             assert_matches!(
                 node_msg,
-                SystemMsg::JoinRequest(JoinRequest::Initiate { .. })
+                Node2NodeMsg::JoinRequest(JoinRequest::Initiate { .. })
             );
 
             // Send JoinResponse::Retry with section auth provider info
@@ -609,7 +609,7 @@ mod tests {
 
             assert_eq!(dst.section_key, original_section_key);
             itertools::assert_equal(recipients, section_auth.elders());
-            assert_matches!(node_msg, SystemMsg::JoinRequest(JoinRequest::Initiate { section_key }) => {
+            assert_matches!(node_msg, Node2NodeMsg::JoinRequest(JoinRequest::Initiate { section_key }) => {
                 assert_eq!(section_key, original_section_key);
             });
 
@@ -677,7 +677,7 @@ mod tests {
             );
 
             assert_matches!(wire_msg.into_msg(), Ok(MsgType::System { msg, .. }) =>
-                    assert_matches!(msg, SystemMsg::JoinRequest{..}));
+                    assert_matches!(msg, Node2NodeMsg::JoinRequest{..}));
 
             // Send JoinResponse::Redirect
             let new_bootstrap_addrs: BTreeMap<_, _> = (0..elder_count())
@@ -723,7 +723,7 @@ mod tests {
                     (msg, dst));
 
             assert_eq!(dst.section_key, new_pk_set.public_key());
-            assert_matches!(node_msg, SystemMsg::JoinRequest(JoinRequest::Initiate { section_key }) => {
+            assert_matches!(node_msg, Node2NodeMsg::JoinRequest(JoinRequest::Initiate { section_key }) => {
                 assert_eq!(section_key, new_pk_set.public_key());
             });
 
@@ -766,7 +766,7 @@ mod tests {
                 .ok_or_else(|| eyre!("JoinRequest was not received"))?;
 
             assert_matches!(wire_msg.into_msg(), Ok(MsgType::System { msg, .. }) =>
-            assert_matches!(msg, SystemMsg::JoinRequest{..}));
+            assert_matches!(msg, Node2NodeMsg::JoinRequest{..}));
 
             let (new_section_auth, _, new_sk_set) =
                 random_sap(Prefix::default(), elder_count(), 0, None);
@@ -810,7 +810,7 @@ mod tests {
                 .ok_or_else(|| eyre!("JoinRequest was not received"))?;
 
             assert_matches!(wire_msg.into_msg(), Ok(MsgType::System { msg, .. }) =>
-            assert_matches!(msg, SystemMsg::JoinRequest{..}));
+            assert_matches!(msg, Node2NodeMsg::JoinRequest{..}));
 
             Ok(())
         };
@@ -850,7 +850,7 @@ mod tests {
                 .ok_or_else(|| eyre!("JoinRequest was not received"))?;
 
             assert_matches!(wire_msg.into_msg(), Ok(MsgType::System { msg, .. }) =>
-                                assert_matches!(msg, SystemMsg::JoinRequest{..}));
+                                assert_matches!(msg, Node2NodeMsg::JoinRequest{..}));
 
             send_response(
                 &recv_tx,
@@ -927,7 +927,7 @@ mod tests {
                 assert_matches!(wire_msg.into_msg(), Ok(MsgType::System{ msg, .. }) => msg);
             assert_matches!(
                 node_msg,
-                SystemMsg::JoinRequest(JoinRequest::Initiate { .. })
+                Node2NodeMsg::JoinRequest(JoinRequest::Initiate { .. })
             );
 
             let proof_chain = SectionsDAG::new(section_key);
@@ -970,7 +970,7 @@ mod tests {
                 assert_matches!(wire_msg.into_msg(), Ok(MsgType::System{ msg, .. }) => msg);
             assert_matches!(
                 node_msg,
-                SystemMsg::JoinRequest(JoinRequest::Initiate { .. })
+                Node2NodeMsg::JoinRequest(JoinRequest::Initiate { .. })
             );
 
             Ok(())
@@ -999,7 +999,7 @@ mod tests {
                 name: XorName::from(PublicKey::Bls(section_pk)),
                 section_key: section_pk,
             },
-            SystemMsg::JoinResponse(Box::new(response)),
+            Node2NodeMsg::JoinResponse(Box::new(response)),
             section_pk,
         )?;
 
