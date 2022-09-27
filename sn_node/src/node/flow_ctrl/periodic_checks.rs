@@ -16,7 +16,7 @@ use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         data::{ClientMsg, DataQuery, DataQueryVariant},
-        system::{Node2NodeMsg, NodeCmd},
+        system::{NodeCmd, NodeMsg},
         AuthorityProof, ClientAuth, MsgId, WireMsg,
     },
     types::log_markers::LogMarker,
@@ -345,7 +345,7 @@ impl FlowCtrl {
                     data_recipients,
                 );
 
-                let msg = Node2NodeMsg::NodeCmd(NodeCmd::ReplicateData(vec![data_to_send]));
+                let msg = NodeMsg::NodeCmd(NodeCmd::ReplicateData(vec![data_to_send]));
                 let node = node.read().await;
                 return Ok(Some(
                     node.send_system_msg(msg, Peers::Multiple(data_recipients)),

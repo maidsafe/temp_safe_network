@@ -8,7 +8,7 @@
 
 use super::wire_msg_header::WireMsgHeader;
 use crate::messaging::{
-    data::ClientMsg, system::Node2NodeMsg, AuthKind, AuthorityProof, ClientAuth, Dst, Error, MsgId,
+    data::ClientMsg, system::NodeMsg, AuthKind, AuthorityProof, ClientAuth, Dst, Error, MsgId,
     MsgType, NodeMsgAuthority, Result,
 };
 use bytes::Bytes;
@@ -260,7 +260,7 @@ impl WireMsg {
                 })
             }
             AuthKind::Node(node_signed) => {
-                let msg: Node2NodeMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
+                let msg: NodeMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Node signed message payload as Msgpack: {}", err))
                 })?;
 
@@ -274,8 +274,8 @@ impl WireMsg {
                     msg,
                 })
             }
-            AuthKind::SectionPart(bls_share_signed) => {
-                let msg: Node2NodeMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
+            AuthKind::SectionShare(bls_share_signed) => {
+                let msg: NodeMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!(
                         "Node message payload (BLS share signed) as Msgpack: {}",
                         err
@@ -315,7 +315,7 @@ impl WireMsg {
     pub fn src_section_pk(&self) -> Option<bls::PublicKey> {
         match &self.header.msg_envelope.auth {
             AuthKind::Node(node_signed) => Some(node_signed.section_pk),
-            AuthKind::SectionPart(bls_share_signed) => Some(bls_share_signed.section_pk),
+            AuthKind::SectionShare(bls_share_signed) => Some(bls_share_signed.section_pk),
             _ => None,
         }
     }
@@ -368,7 +368,7 @@ mod tests {
     use crate::{
         messaging::{
             data::{ClientMsg, DataQuery, DataQueryVariant, StorageLevel},
-            system::{Node2NodeMsg, NodeCmd},
+            system::{NodeCmd, NodeMsg},
             AuthorityProof, ClientAuth, MsgId, NodeAuth,
         },
         types::{ChunkAddress, Keypair},
@@ -391,7 +391,7 @@ mod tests {
         let msg_id = MsgId::new();
         let pk = crate::types::PublicKey::Bls(dst.section_key);
 
-        let msg = Node2NodeMsg::NodeCmd(NodeCmd::RecordStorageLevel {
+        let msg = NodeMsg::NodeCmd(NodeCmd::RecordStorageLevel {
             node_id: pk,
             section: pk.into(),
             level: StorageLevel::zero(),

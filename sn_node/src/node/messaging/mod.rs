@@ -24,8 +24,7 @@ use crate::node::{flow_ctrl::cmds::Cmd, Error, Node, Result, DATA_QUERY_LIMIT};
 
 use sn_interface::{
     messaging::{
-        data::ClientMsg, system::Node2NodeMsg, Dst, MsgType, NodeMsgAuthority, SectionAuthPart,
-        WireMsg,
+        data::ClientMsg, system::NodeMsg, Dst, MsgType, NodeMsgAuthority, SectionAuthShare, WireMsg,
     },
     network_knowledge::NetworkKnowledge,
     types::Peer,
@@ -37,9 +36,9 @@ use std::collections::BTreeSet;
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum OutgoingMsg {
-    Node2Node(Node2NodeMsg),
+    Node(NodeMsg),
     Client(ClientMsg),
-    Consensus((SectionAuthPart, Bytes)),
+    SectionAuth((SectionAuthShare, Bytes)),
 }
 
 #[derive(Debug, Clone)]
@@ -182,11 +181,7 @@ impl Node {
     /// Verifies that the section key in the msg authority is trusted
     /// based on our current knowledge of the network and sections chains.
     #[instrument(skip_all)]
-    async fn verify_section_key(
-        &self,
-        msg_authority: &NodeMsgAuthority,
-        msg: &Node2NodeMsg,
-    ) -> bool {
+    async fn verify_section_key(&self, msg_authority: &NodeMsgAuthority, msg: &NodeMsg) -> bool {
         let known_keys = self.network_knowledge.known_keys();
         NetworkKnowledge::verify_node_msg_can_be_trusted(msg_authority, msg, &known_keys)
     }
@@ -197,7 +192,7 @@ impl Node {
     async fn apply_ae(
         &self,
         origin: &Peer,
-        msg: &Node2NodeMsg,
+        msg: &NodeMsg,
         wire_msg: &WireMsg,
         dst: &Dst,
     ) -> Result<Vec<Cmd>> {
@@ -213,9 +208,9 @@ impl Node {
         // TODO: consider changing the join and "join as relocated" flows to
         // make use of AntiEntropy retry/redirect responses.
         match msg {
-            Node2NodeMsg::AntiEntropy { .. }
-            | Node2NodeMsg::JoinRequest(_)
-            | Node2NodeMsg::JoinAsRelocatedRequest(_) => {
+            NodeMsg::AntiEntropy { .. }
+            | NodeMsg::JoinRequest(_)
+            | NodeMsg::JoinAsRelocatedRequest(_) => {
                 trace!(
                     "Entropy check skipped for {:?}, handling message directly",
                     wire_msg.msg_id()

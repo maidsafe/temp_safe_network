@@ -123,7 +123,7 @@ pub(crate) enum Cmd {
     },
     HandleValidSystemMsg {
         msg_id: MsgId,
-        msg: Node2NodeMsg,
+        msg: NodeMsg,
         origin: Peer,
         msg_authority: NodeMsgAuthority,
         #[debug(skip)]
@@ -218,7 +218,7 @@ impl Cmd {
         use Cmd::*;
         match self {
             SendMsg { msg, .. } => match msg {
-                OutgoingMsg::Node2Node(_) => 20,
+                OutgoingMsg::Node(_) => 20,
                 _ => 19,
             },
 

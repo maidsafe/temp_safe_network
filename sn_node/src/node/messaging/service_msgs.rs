@@ -25,7 +25,7 @@ use sn_interface::{
             ClientMsg, DataCmd, DataQueryVariant, EditRegister, OperationId, SignedRegisterEdit,
             SpentbookCmd,
         },
-        system::{Node2NodeMsg, NodeQueryResponse},
+        system::{NodeMsg, NodeQueryResponse},
         AuthorityProof, ClientAuth, EndUser, MsgId,
     },
     types::{
@@ -111,7 +111,7 @@ impl Node {
             .await;
 
         trace!("data query response at adult is: {:?}", response);
-        let msg = Node2NodeMsg::NodeQueryResponse {
+        let msg = NodeMsg::NodeQueryResponse {
             response,
             correlation_id,
             user,

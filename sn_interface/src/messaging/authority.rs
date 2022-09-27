@@ -62,7 +62,7 @@ impl NodeAuth {
 
 /// Authority of a single peer that uses it's BLS Keyshare to sign the message.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
-pub struct SectionAuthPart {
+pub struct SectionAuthShare {
     /// Section key of the source.
     pub section_pk: BlsPublicKey,
     /// Name in the source section.
@@ -84,7 +84,7 @@ impl SectionAuth {
     /// Try to construct verified section authority by aggregating a new share.
     pub fn try_authorize(
         aggregator: &mut SignatureAggregator,
-        share: SectionAuthPart,
+        share: SectionAuthShare,
         payload: impl AsRef<[u8]>,
     ) -> Result<AuthorityProof<Self>, AggregatorError> {
         let sig = aggregator.add(payload.as_ref(), share.sig_share.clone())?;
@@ -168,7 +168,7 @@ impl VerifyAuthority for NodeAuth {
 }
 impl sealed::Sealed for NodeAuth {}
 
-impl VerifyAuthority for SectionAuthPart {
+impl VerifyAuthority for SectionAuthShare {
     fn verify_authority(self, payload: impl AsRef<[u8]>) -> Result<Self> {
         // Signed chain is required for accumulation at destination.
         if self.sig_share.public_key_set.public_key() != self.section_pk {
@@ -182,7 +182,7 @@ impl VerifyAuthority for SectionAuthPart {
         Ok(self)
     }
 }
-impl sealed::Sealed for SectionAuthPart {}
+impl sealed::Sealed for SectionAuthShare {}
 
 impl VerifyAuthority for SectionAuth {
     fn verify_authority(self, payload: impl AsRef<[u8]>) -> Result<Self> {

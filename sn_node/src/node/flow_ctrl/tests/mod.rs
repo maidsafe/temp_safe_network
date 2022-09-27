@@ -36,8 +36,8 @@ use sn_interface::{
         data::{ClientMsg, DataCmd, Error as MessagingDataError, RegisterCmd, SpentbookCmd},
         system::{
             AntiEntropyKind, JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig,
-            MembershipState, Node2NodeMsg, NodeCmd, NodeMsgAuthorityUtils,
-            NodeState as NodeStateMsg, RelocateDetails, ResourceProof, SectionAuth,
+            MembershipState, NodeCmd, NodeMsg, NodeMsgAuthorityUtils, NodeState as NodeStateMsg,
+            RelocateDetails, ResourceProof, SectionAuth,
         },
         Dst, MsgId, MsgType, SectionAuth as MsgKindSectionAuth, SectionTreeUpdate, WireMsg,
     },
@@ -96,7 +96,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
                     name: XorName::from(PublicKey::Bls(section_key)),
                     section_key,
                 },
-                Node2NodeMsg::JoinRequest(JoinRequest::Initiate { section_key }),
+                NodeMsg::JoinRequest(JoinRequest::Initiate { section_key }),
                 section_key,
             )?;
 
@@ -112,7 +112,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
             assert!(all_cmds.into_iter().any(|cmd| {
                 match cmd {
                     Cmd::SendMsg {
-                        msg: OutgoingMsg::Node2Node(Node2NodeMsg::JoinResponse(response)),
+                        msg: OutgoingMsg::Node2Node(NodeMsg::JoinResponse(response)),
                         ..
                     } => matches!(*response, JoinResponse::ResourceChallenge { .. }),
                     _ => false,
@@ -162,7 +162,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
                     name: XorName::from(PublicKey::Bls(section_key)),
                     section_key,
                 },
-                Node2NodeMsg::JoinRequest(JoinRequest::SubmitResourceProof {
+                NodeMsg::JoinRequest(JoinRequest::SubmitResourceProof {
                     section_key,
                     proof: Box::new(resource_proof.clone()),
                 }),
@@ -242,7 +242,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
                     name: XorName::from(PublicKey::Bls(section_key)),
                     section_key,
                 },
-                Node2NodeMsg::JoinAsRelocatedRequest(Box::new(JoinAsRelocatedRequest {
+                NodeMsg::JoinAsRelocatedRequest(Box::new(JoinAsRelocatedRequest {
                     section_key,
                     relocate_proof,
                     signature_over_new_name,
@@ -383,14 +383,14 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                 let (payload, recipients) = match cmd {
                     Cmd::SendMsg {
                         recipients,
-                        msg: OutgoingMsg::Consensus((_, payload)),
+                        msg: OutgoingMsg::SectionAuth((_, payload)),
                         ..
                     } => (payload, recipients),
                     _ => continue,
                 };
 
                 let actual_elder_candidates = match rmp_serde::from_slice(&payload) {
-                    Ok(Node2NodeMsg::DkgStart(session)) => session.elders,
+                    Ok(NodeMsg::DkgStart(session)) => session.elders,
                     _ => continue,
                 };
                 itertools::assert_equal(
@@ -638,7 +638,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
                     name: XorName::from(PublicKey::Bls(pk1)),
                     section_key: pk1,
                 },
-                Node2NodeMsg::AntiEntropy {
+                NodeMsg::AntiEntropy {
                     section_tree_update,
                     kind: AntiEntropyKind::Update {
                         members: BTreeSet::default(),
@@ -700,7 +700,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
             let bogus_section_tree_update =
                 SectionTreeUpdate::new(signed_sap.clone(), SectionsDAG::new(bogus_section_pk));
 
-            let node_msg = Node2NodeMsg::AntiEntropy {
+            let node_msg = NodeMsg::AntiEntropy {
                 section_tree_update: bogus_section_tree_update,
                 kind: AntiEntropyKind::Update {
                     members: BTreeSet::default(),
@@ -831,13 +831,13 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
             for cmd in cmds {
                 let msg = match cmd {
                     Cmd::SendMsg {
-                        msg: OutgoingMsg::Node2Node(msg),
+                        msg: OutgoingMsg::Node(msg),
                         ..
                     } => msg,
                     _ => continue,
                 };
 
-                if let Node2NodeMsg::Propose {
+                if let NodeMsg::Propose {
                     proposal: sn_interface::messaging::system::Proposal::VoteNodeOffline(node_state),
                     ..
                 } = msg
@@ -884,12 +884,12 @@ async fn msg_to_self() -> Result<()> {
         let info = node.info();
         let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
-        let node_msg = Node2NodeMsg::NodeCmd(NodeCmd::ReplicateData(vec![]));
+        let node_msg = NodeMsg::NodeCmd(NodeCmd::ReplicateData(vec![]));
 
         // don't use the cmd collection fn, as it skips Cmd::SendMsg
         let cmds = dispatcher
             .process_cmd(
-                Cmd::send_msg(OutgoingMsg::Node2Node(node_msg.clone()), Peers::Single(info.peer()))
+                Cmd::send_msg(OutgoingMsg::Node(node_msg.clone()), Peers::Single(info.peer()))
             )
             .await?;
 
@@ -1005,7 +1005,7 @@ async fn handle_elders_update() -> Result<()> {
         for cmd in cmds {
             let (msg, recipients) = match cmd {
                 Cmd::SendMsg {
-                    msg: OutgoingMsg::Node2Node(msg),
+                    msg: OutgoingMsg::Node(msg),
                     recipients: Peers::Multiple(recipients),
                     ..
                 } => (msg, recipients),
@@ -1013,7 +1013,7 @@ async fn handle_elders_update() -> Result<()> {
             };
 
             let section_tree_update = match msg {
-                Node2NodeMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Update { .. }, .. } => section_tree_update,
+                NodeMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Update { .. }, .. } => section_tree_update,
                 _ => continue,
             };
 
@@ -1186,7 +1186,7 @@ async fn handle_demote_during_split() -> Result<()> {
             for cmd in cmds {
                 let (msg, recipients) = match cmd {
                     Cmd::SendMsg {
-                        msg: OutgoingMsg::Node2Node(msg),
+                        msg: OutgoingMsg::Node(msg),
                         recipients: Peers::Multiple(recipients),
                         ..
                     } => (msg, recipients),
@@ -1195,7 +1195,7 @@ async fn handle_demote_during_split() -> Result<()> {
 
                 if matches!(
                     msg,
-                    Node2NodeMsg::AntiEntropy {
+                    NodeMsg::AntiEntropy {
                         kind: AntiEntropyKind::Update { .. },
                         ..
                     }
