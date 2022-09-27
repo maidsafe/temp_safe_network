@@ -13,7 +13,7 @@ use eyre::Result;
 
 use sn_client::{Client, Error};
 use sn_interface::{
-    messaging::{data::ServiceMsg, AuthKind, Dst, MsgId, ServiceAuth, WireMsg},
+    messaging::{data::ClientMsg, ClientAuth, Dst, MsgId, WireMsg},
     types::register::{Policy, User},
 };
 use tokio::runtime::Runtime;
@@ -71,19 +71,17 @@ fn criterion_benchmark(c: &mut Criterion) {
         let msg_id = MsgId::new();
 
         let payload = {
-            let msg = ServiceMsg::Cmd(batch[0].clone());
+            let msg = ClientMsg::Cmd(batch[0].clone());
             match WireMsg::serialize_msg_payload(&msg) {
                 Ok(payload) => payload,
                 Err(error) => panic!("failed to serialise msg payload: {error:?}"),
             }
         };
 
-        let auth = ServiceAuth {
+        let auth = ClientAuth {
             public_key: client_pk,
             signature: client.sign(&payload),
         };
-
-        let auth = AuthKind::Service(auth);
 
         // wire_msg parts
         (auth, payload, msg_id)

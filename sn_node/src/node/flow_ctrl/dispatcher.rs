@@ -56,7 +56,7 @@ impl Dispatcher {
                 traceroute,
             } => {
                 // ServiceMsgs are only used for the communication between Client and Elders
-                let is_msg_for_client = matches!(msg, OutgoingMsg::Service(_));
+                let is_msg_for_client = matches!(msg, OutgoingMsg::Client(_));
 
                 trace!("Sending msg: {msg_id:?}");
                 let peer_msgs = {

@@ -33,11 +33,11 @@ use sn_interface::messaging::Traceroute;
 use sn_interface::{
     elder_count, init_logger,
     messaging::{
-        data::{DataCmd, Error as MessagingDataError, RegisterCmd, ServiceMsg, SpentbookCmd},
+        data::{ClientMsg, DataCmd, Error as MessagingDataError, RegisterCmd, SpentbookCmd},
         system::{
             AntiEntropyKind, JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig,
-            MembershipState, NodeCmd, NodeMsgAuthorityUtils, NodeState as NodeStateMsg,
-            RelocateDetails, ResourceProof, SectionAuth, SystemMsg,
+            MembershipState, Node2NodeMsg, NodeCmd, NodeMsgAuthorityUtils,
+            NodeState as NodeStateMsg, RelocateDetails, ResourceProof, SectionAuth,
         },
         Dst, MsgId, MsgType, SectionAuth as MsgKindSectionAuth, SectionTreeUpdate, WireMsg,
     },
@@ -96,7 +96,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
                     name: XorName::from(PublicKey::Bls(section_key)),
                     section_key,
                 },
-                SystemMsg::JoinRequest(JoinRequest::Initiate { section_key }),
+                Node2NodeMsg::JoinRequest(JoinRequest::Initiate { section_key }),
                 section_key,
             )?;
 
@@ -112,7 +112,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
             assert!(all_cmds.into_iter().any(|cmd| {
                 match cmd {
                     Cmd::SendMsg {
-                        msg: OutgoingMsg::System(SystemMsg::JoinResponse(response)),
+                        msg: OutgoingMsg::Node2Node(Node2NodeMsg::JoinResponse(response)),
                         ..
                     } => matches!(*response, JoinResponse::ResourceChallenge { .. }),
                     _ => false,
@@ -162,7 +162,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
                     name: XorName::from(PublicKey::Bls(section_key)),
                     section_key,
                 },
-                SystemMsg::JoinRequest(JoinRequest::SubmitResourceProof {
+                Node2NodeMsg::JoinRequest(JoinRequest::SubmitResourceProof {
                     section_key,
                     proof: Box::new(resource_proof.clone()),
                 }),
@@ -242,7 +242,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
                     name: XorName::from(PublicKey::Bls(section_key)),
                     section_key,
                 },
-                SystemMsg::JoinAsRelocatedRequest(Box::new(JoinAsRelocatedRequest {
+                Node2NodeMsg::JoinAsRelocatedRequest(Box::new(JoinAsRelocatedRequest {
                     section_key,
                     relocate_proof,
                     signature_over_new_name,
@@ -383,14 +383,14 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                 let (payload, recipients) = match cmd {
                     Cmd::SendMsg {
                         recipients,
-                        msg: OutgoingMsg::DstAggregated((_, payload)),
+                        msg: OutgoingMsg::Consensus((_, payload)),
                         ..
                     } => (payload, recipients),
                     _ => continue,
                 };
 
                 let actual_elder_candidates = match rmp_serde::from_slice(&payload) {
-                    Ok(SystemMsg::DkgStart(session)) => session.elders,
+                    Ok(Node2NodeMsg::DkgStart(session)) => session.elders,
                     _ => continue,
                 };
                 itertools::assert_equal(
@@ -638,7 +638,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
                     name: XorName::from(PublicKey::Bls(pk1)),
                     section_key: pk1,
                 },
-                SystemMsg::AntiEntropy {
+                Node2NodeMsg::AntiEntropy {
                     section_tree_update,
                     kind: AntiEntropyKind::Update {
                         members: BTreeSet::default(),
@@ -700,7 +700,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
             let bogus_section_tree_update =
                 SectionTreeUpdate::new(signed_sap.clone(), SectionsDAG::new(bogus_section_pk));
 
-            let node_msg = SystemMsg::AntiEntropy {
+            let node_msg = Node2NodeMsg::AntiEntropy {
                 section_tree_update: bogus_section_tree_update,
                 kind: AntiEntropyKind::Update {
                     members: BTreeSet::default(),
@@ -831,13 +831,13 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
             for cmd in cmds {
                 let msg = match cmd {
                     Cmd::SendMsg {
-                        msg: OutgoingMsg::System(msg),
+                        msg: OutgoingMsg::Node2Node(msg),
                         ..
                     } => msg,
                     _ => continue,
                 };
 
-                if let SystemMsg::Propose {
+                if let Node2NodeMsg::Propose {
                     proposal: sn_interface::messaging::system::Proposal::VoteNodeOffline(node_state),
                     ..
                 } = msg
@@ -884,12 +884,12 @@ async fn msg_to_self() -> Result<()> {
         let info = node.info();
         let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
-        let node_msg = SystemMsg::NodeCmd(NodeCmd::ReplicateData(vec![]));
+        let node_msg = Node2NodeMsg::NodeCmd(NodeCmd::ReplicateData(vec![]));
 
         // don't use the cmd collection fn, as it skips Cmd::SendMsg
         let cmds = dispatcher
             .process_cmd(
-                Cmd::send_msg(OutgoingMsg::System(node_msg.clone()), Peers::Single(info.peer()))
+                Cmd::send_msg(OutgoingMsg::Node2Node(node_msg.clone()), Peers::Single(info.peer()))
             )
             .await?;
 
@@ -1005,7 +1005,7 @@ async fn handle_elders_update() -> Result<()> {
         for cmd in cmds {
             let (msg, recipients) = match cmd {
                 Cmd::SendMsg {
-                    msg: OutgoingMsg::System(msg),
+                    msg: OutgoingMsg::Node2Node(msg),
                     recipients: Peers::Multiple(recipients),
                     ..
                 } => (msg, recipients),
@@ -1013,7 +1013,7 @@ async fn handle_elders_update() -> Result<()> {
             };
 
             let section_tree_update = match msg {
-                SystemMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Update { .. }, .. } => section_tree_update,
+                Node2NodeMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Update { .. }, .. } => section_tree_update,
                 _ => continue,
             };
 
@@ -1186,7 +1186,7 @@ async fn handle_demote_during_split() -> Result<()> {
             for cmd in cmds {
                 let (msg, recipients) = match cmd {
                     Cmd::SendMsg {
-                        msg: OutgoingMsg::System(msg),
+                        msg: OutgoingMsg::Node2Node(msg),
                         recipients: Peers::Multiple(recipients),
                         ..
                     } => (msg, recipients),
@@ -1195,7 +1195,7 @@ async fn handle_demote_during_split() -> Result<()> {
 
                 if matches!(
                     msg,
-                    SystemMsg::AntiEntropy {
+                    Node2NodeMsg::AntiEntropy {
                         kind: AntiEntropyKind::Update { .. },
                         ..
                     }
@@ -1233,7 +1233,7 @@ async fn spentbook_spend_service_message_should_replicate_to_adults_and_send_ack
 
             let cmds = run_and_collect_cmds(
                 wrap_service_msg_for_handling(
-                    ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                    ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                         key_image,
                         tx: tx.clone(),
                         spent_proofs,
@@ -1265,7 +1265,7 @@ async fn spentbook_spend_service_message_should_replicate_to_adults_and_send_ack
             );
 
             let service_msg = cmds[1].clone().get_service_msg()?;
-            assert_matches!(service_msg, ServiceMsg::CmdAck { .. });
+            assert_matches!(service_msg, ClientMsg::CmdAck { .. });
 
             Result::<()>::Ok(())
         })
@@ -1300,7 +1300,7 @@ async fn spentbook_spend_spent_proof_with_invalid_pk_should_return_spentbook_err
 
             let result = run_and_collect_cmds(
                 wrap_service_msg_for_handling(
-                    ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                    ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                         key_image,
                         tx,
                         spent_proofs,
@@ -1359,7 +1359,7 @@ async fn spentbook_spend_spent_proof_with_key_not_in_section_chain_should_return
 
             let result = run_and_collect_cmds(
                 wrap_service_msg_for_handling(
-                    ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                    ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                         key_image,
                         tx,
                         spent_proofs,
@@ -1430,7 +1430,7 @@ async fn spentbook_spend_spent_proofs_do_not_relate_to_input_dbcs_should_return_
 
             let result = run_and_collect_cmds(
                 wrap_service_msg_for_handling(
-                    ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                    ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                         key_image: new_dbc2_sk.public_key(),
                         tx: new_dbc2.transaction.clone(),
                         spent_proofs: genesis_dbc.spent_proofs.clone(),
@@ -1499,7 +1499,7 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
 
             let result = run_and_collect_cmds(
                 wrap_service_msg_for_handling(
-                    ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                    ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                         key_image: new_dbc2_sk.public_key(),
                         tx: new_dbc2.transaction.clone(),
                         spent_proofs: new_dbc.spent_proofs.clone(),
@@ -1567,7 +1567,7 @@ async fn spentbook_spend_with_random_key_image_should_return_spentbook_error() -
             let pk = bls::SecretKey::random().public_key();
             let result = run_and_collect_cmds(
                 wrap_service_msg_for_handling(
-                    ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                    ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                         key_image: pk,
                         tx: new_dbc2.transaction.clone(),
                         spent_proofs: new_dbc.spent_proofs.clone(),
@@ -1682,7 +1682,7 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
                 get_input_dbc_spend_info(&new_dbc2, 2, &bls::SecretKey::random())?;
             let cmds = run_and_collect_cmds(
                 wrap_service_msg_for_handling(
-                    ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                    ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                         key_image,
                         tx,
                         spent_proofs: new_dbc2.spent_proofs,

@@ -9,7 +9,7 @@
 use crate::node::{CmdChannel, Error, Node, Peer, Result};
 
 use sn_interface::{
-    messaging::system::SystemMsg,
+    messaging::system::Node2NodeMsg,
     network_knowledge::{SectionAuthorityProvider, SectionsDAG},
 };
 
@@ -95,8 +95,8 @@ impl NodeTestApi {
     }
 
     /// Send a system msg.
-    pub async fn send(&self, msg: SystemMsg, recipients: BTreeSet<Peer>) -> Result<()> {
-        let cmd = Cmd::send_msg(OutgoingMsg::System(msg), Peers::Multiple(recipients));
+    pub async fn send(&self, msg: Node2NodeMsg, recipients: BTreeSet<Peer>) -> Result<()> {
+        let cmd = Cmd::send_msg(OutgoingMsg::Node2Node(msg), Peers::Multiple(recipients));
         self.send_cmd(cmd).await
     }
 

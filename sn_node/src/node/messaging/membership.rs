@@ -15,7 +15,7 @@ use bls::Signature;
 use sn_consensus::{Decision, Generation, SignedVote, VoteResponse};
 use sn_interface::{
     messaging::{
-        system::{JoinResponse, KeyedSig, MembershipState, NodeState, SectionAuth, SystemMsg},
+        system::{JoinResponse, KeyedSig, MembershipState, Node2NodeMsg, NodeState, SectionAuth},
         SectionTreeUpdate,
     },
     types::{log_markers::LogMarker, Peer},
@@ -39,7 +39,7 @@ impl Node {
                     return None;
                 }
             };
-            Some(self.send_msg_to_our_elders(SystemMsg::MembershipVotes(vec![membership_vote])))
+            Some(self.send_msg_to_our_elders(Node2NodeMsg::MembershipVotes(vec![membership_vote])))
         } else {
             error!("Membership - Failed to propose membership change, no membership instance");
             None
@@ -55,7 +55,7 @@ impl Node {
         if let Some(membership) = membership {
             trace!("{}", LogMarker::GossippingMembershipVotes);
             if let Ok(ae_votes) = membership.anti_entropy(membership.generation()) {
-                let cmd = self.send_msg_to_our_elders(SystemMsg::MembershipVotes(ae_votes));
+                let cmd = self.send_msg_to_our_elders(Node2NodeMsg::MembershipVotes(ae_votes));
                 return Some(cmd);
             }
         }
@@ -88,7 +88,7 @@ impl Node {
                         // We hit an error while processing this vote, perhaps we are missing information.
                         // We'll send a membership AE request to see if they can help us catch up.
                         debug!("{:?}", LogMarker::MembershipSendingAeUpdateRequest);
-                        let msg = SystemMsg::MembershipAE(membership.generation());
+                        let msg = Node2NodeMsg::MembershipAE(membership.generation());
                         cmds.push(self.send_system_msg(msg, Peers::Single(peer)));
                         // return the vec w/ the AE cmd there so as not to loop and generate AE for
                         // any subsequent commands
@@ -102,7 +102,7 @@ impl Node {
 
                 match vote_response {
                     VoteResponse::Broadcast(response_vote) => {
-                        vote_broadcast = Some(SystemMsg::MembershipVotes(vec![response_vote]));
+                        vote_broadcast = Some(Node2NodeMsg::MembershipVotes(vec![response_vote]));
                     }
                     VoteResponse::WaitingForMoreVotes => {
                         // do nothing
@@ -141,7 +141,7 @@ impl Node {
         if let Some(membership) = self.membership.as_ref() {
             match membership.anti_entropy(gen) {
                 Ok(catchup_votes) => Some(self.send_system_msg(
-                    SystemMsg::MembershipVotes(catchup_votes),
+                    Node2NodeMsg::MembershipVotes(catchup_votes),
                     Peers::Single(peer),
                 )),
                 Err(e) => {
@@ -265,7 +265,7 @@ impl Node {
         let prefix = self.network_knowledge.prefix();
         info!("Section {prefix:?} has approved new peers {peers:?}.");
 
-        let msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Approved {
+        let msg = Node2NodeMsg::JoinResponse(Box::new(JoinResponse::Approved {
             section_tree_update: SectionTreeUpdate::new(
                 self.network_knowledge.signed_sap(),
                 self.network_knowledge.section_chain(),
@@ -306,7 +306,7 @@ impl Node {
         // containing the relocation details.
         if node_state.is_relocated() {
             let peer = *node_state.peer();
-            let msg = SystemMsg::Relocate(node_state.into_authed_msg());
+            let msg = Node2NodeMsg::Relocate(node_state.into_authed_msg());
             Some(self.send_system_msg(msg, Peers::Single(peer)))
         } else {
             None

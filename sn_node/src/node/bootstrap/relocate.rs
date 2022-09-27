@@ -16,7 +16,7 @@ use crate::node::{
 
 use sn_interface::{
     messaging::system::{
-        JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeState, SectionAuth, SystemMsg,
+        JoinAsRelocatedRequest, JoinAsRelocatedResponse, Node2NodeMsg, NodeState, SectionAuth,
     },
     network_knowledge::{NodeInfo, SectionAuthorityProvider},
     types::{keys::ed25519, Peer, PublicKey},
@@ -216,8 +216,8 @@ impl JoiningAsRelocated {
 
         info!("Sending {:?} to {:?}", join_request, recipients);
 
-        let msg = SystemMsg::JoinAsRelocatedRequest(Box::new(join_request));
-        let cmd = Cmd::send_msg(OutgoingMsg::System(msg), Peers::Multiple(recipients));
+        let msg = Node2NodeMsg::JoinAsRelocatedRequest(Box::new(join_request));
+        let cmd = Cmd::send_msg(OutgoingMsg::Node2Node(msg), Peers::Multiple(recipients));
 
         Ok(cmd)
     }
@@ -254,7 +254,7 @@ mod tests {
     use sn_interface::{
         elder_count,
         messaging::{
-            system::{JoinAsRelocatedResponse, NodeState, SystemMsg},
+            system::{JoinAsRelocatedResponse, Node2NodeMsg, NodeState},
             SectionAuthorityProvider,
         },
         network_knowledge::{
@@ -301,7 +301,7 @@ mod tests {
                 }
                 if !matches!(
                     msg,
-                    OutgoingMsg::System(SystemMsg::JoinAsRelocatedRequest(_))
+                    OutgoingMsg::Node2Node(Node2NodeMsg::JoinAsRelocatedRequest(_))
                 ) {
                     return Err(eyre!("Should be JoinAsRelocatedRequest"));
                 }

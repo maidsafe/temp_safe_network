@@ -11,7 +11,7 @@ use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Node, Proposal, Result
 use sn_interface::{
     messaging::{
         signature_aggregator::{Error as AggregatorError, SignatureAggregator},
-        system::{SigShare, SystemMsg},
+        system::{SigShare, Node2NodeMsg},
         MsgId,
     },
     network_knowledge::{NetworkKnowledge, SectionKeyShare},
@@ -60,7 +60,7 @@ impl Node {
         )?;
 
         // Broadcast the proposal to the rest of the section elders.
-        let msg = SystemMsg::Propose {
+        let msg = Node2NodeMsg::Propose {
             proposal: proposal.clone().into_msg(),
             sig_share: sig_share.clone(),
         };

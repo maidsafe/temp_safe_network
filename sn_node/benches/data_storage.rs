@@ -251,7 +251,7 @@ pub fn create_random_register_replicated_data() -> ReplicatedData {
     let reg_cmd = RegisterCmd::Create {
         cmd: SignedRegisterCreate {
             op,
-            auth: sn_interface::messaging::ServiceAuth {
+            auth: sn_interface::messaging::ClientAuth {
                 public_key: keypair.public_key(),
                 signature,
             },

@@ -14,7 +14,7 @@ use sn_interface::{
     messaging::{
         system::{
             JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest,
-            JoinResponse, MembershipState, NodeState, SystemMsg,
+            JoinResponse, MembershipState, Node2NodeMsg, NodeState,
         },
         SectionTreeUpdate,
     },
@@ -67,7 +67,8 @@ impl Node {
         if !our_prefix.matches(&peer.name()) {
             debug!("Redirecting JoinRequest from {peer} - name doesn't match our prefix {our_prefix:?}.");
             let retry_sap = self.matching_section(&peer.name())?;
-            let msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Redirect(retry_sap.to_msg())));
+            let msg =
+                Node2NodeMsg::JoinResponse(Box::new(JoinResponse::Redirect(retry_sap.to_msg())));
             trace!("Sending {:?} to {}", msg, peer);
             trace!("{}", LogMarker::SendJoinRedirected);
             return Ok(Some(self.send_system_msg(msg, Peers::Single(peer))));
@@ -78,7 +79,7 @@ impl Node {
                 "Rejecting JoinRequest from {} - joins currently not allowed.",
                 peer,
             );
-            let msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Rejected(
+            let msg = Node2NodeMsg::JoinResponse(Box::new(JoinResponse::Rejected(
                 JoinRejectionReason::JoinsDisallowed,
             )));
             trace!("{}", LogMarker::SendJoinsDisallowed);
@@ -118,7 +119,7 @@ impl Node {
         if !section_key_matches || is_age_invalid {
             let signed_sap = self.network_knowledge.signed_sap();
             let proof_chain = self.network_knowledge.section_chain();
-            let msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
+            let msg = Node2NodeMsg::JoinResponse(Box::new(JoinResponse::Retry {
                 section_tree_update: SectionTreeUpdate::new(signed_sap, proof_chain),
                 expected_age,
             }));
@@ -128,7 +129,7 @@ impl Node {
 
         // Do reachability check only for the initial join request
         if comm.is_reachable(&peer.addr()).await.is_err() {
-            let msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Rejected(
+            let msg = Node2NodeMsg::JoinResponse(Box::new(JoinResponse::Rejected(
                 JoinRejectionReason::NodeNotReachable(peer.addr()),
             )));
             trace!("{}", LogMarker::SendJoinRejected);
@@ -204,9 +205,9 @@ impl Node {
                 "JoinAsRelocatedRequest from {peer} - name doesn't match our prefix {our_prefix:?}."
             );
 
-            let msg = SystemMsg::JoinAsRelocatedResponse(Box::new(JoinAsRelocatedResponse::Retry(
-                self.network_knowledge.section_auth().to_msg(),
-            )));
+            let msg = Node2NodeMsg::JoinAsRelocatedResponse(Box::new(
+                JoinAsRelocatedResponse::Retry(self.network_knowledge.section_auth().to_msg()),
+            ));
 
             trace!("{} b", LogMarker::SendJoinAsRelocatedResponse);
 
@@ -244,7 +245,7 @@ impl Node {
 
         // Finally do reachability check
         if comm.is_reachable(&peer.addr()).await.is_err() {
-            let msg = SystemMsg::JoinAsRelocatedResponse(Box::new(
+            let msg = Node2NodeMsg::JoinAsRelocatedResponse(Box::new(
                 JoinAsRelocatedResponse::NodeNotReachable(peer.addr()),
             ));
             trace!("{}", LogMarker::SendJoinAsRelocatedResponse);

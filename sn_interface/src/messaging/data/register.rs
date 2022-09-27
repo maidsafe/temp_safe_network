@@ -8,7 +8,7 @@
 
 use super::{Error, QueryResponse, Result};
 
-use crate::messaging::{data::OperationId, SectionAuth, ServiceAuth};
+use crate::messaging::{data::OperationId, ClientAuth, SectionAuth};
 #[allow(unused_imports)] // needed by rustdocs links
 use crate::types::register::Register;
 use crate::types::{
@@ -133,7 +133,7 @@ pub struct SignedRegisterCreate {
     /// A signature carrying authority to perform the operation.
     ///
     /// This will be verified against the register's owner and permissions.
-    pub auth: ServiceAuth,
+    pub auth: ClientAuth,
 }
 
 /// A [`Register`] write operation signed by the requester.
@@ -144,7 +144,7 @@ pub struct SignedRegisterEdit {
     /// A signature carrying authority to perform the operation.
     ///
     /// This will be verified against the register's owner and permissions.
-    pub auth: ServiceAuth,
+    pub auth: ClientAuth,
 }
 
 impl SignedRegisterCreate {

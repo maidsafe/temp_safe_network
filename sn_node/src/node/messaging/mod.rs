@@ -24,7 +24,8 @@ use crate::node::{flow_ctrl::cmds::Cmd, Error, Node, Result, DATA_QUERY_LIMIT};
 
 use sn_interface::{
     messaging::{
-        data::ServiceMsg, system::SystemMsg, BlsShareAuth, Dst, MsgType, NodeMsgAuthority, WireMsg,
+        data::ClientMsg, system::Node2NodeMsg, Dst, MsgType, NodeMsgAuthority, SectionAuthPart,
+        WireMsg,
     },
     network_knowledge::NetworkKnowledge,
     types::Peer,
@@ -36,9 +37,9 @@ use std::collections::BTreeSet;
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum OutgoingMsg {
-    System(SystemMsg),
-    Service(ServiceMsg),
-    DstAggregated((BlsShareAuth, Bytes)),
+    Node2Node(Node2NodeMsg),
+    Client(ClientMsg),
+    Consensus((SectionAuthPart, Bytes)),
 }
 
 #[derive(Debug, Clone)]
@@ -141,7 +142,7 @@ impl Node {
                 }
 
                 // First we check if it's query and we have too many on the go at the moment...
-                if let ServiceMsg::Query(query) = &msg {
+                if let ClientMsg::Query(query) = &msg {
                     // we have a query, check if we have too many on the go....
                     if self.pending_data_queries.len() > DATA_QUERY_LIMIT {
                         warn!("Pending queries length exceeded, dropping query {msg:?}");
@@ -181,7 +182,11 @@ impl Node {
     /// Verifies that the section key in the msg authority is trusted
     /// based on our current knowledge of the network and sections chains.
     #[instrument(skip_all)]
-    async fn verify_section_key(&self, msg_authority: &NodeMsgAuthority, msg: &SystemMsg) -> bool {
+    async fn verify_section_key(
+        &self,
+        msg_authority: &NodeMsgAuthority,
+        msg: &Node2NodeMsg,
+    ) -> bool {
         let known_keys = self.network_knowledge.known_keys();
         NetworkKnowledge::verify_node_msg_can_be_trusted(msg_authority, msg, &known_keys)
     }
@@ -192,7 +197,7 @@ impl Node {
     async fn apply_ae(
         &self,
         origin: &Peer,
-        msg: &SystemMsg,
+        msg: &Node2NodeMsg,
         wire_msg: &WireMsg,
         dst: &Dst,
     ) -> Result<Vec<Cmd>> {
@@ -208,9 +213,9 @@ impl Node {
         // TODO: consider changing the join and "join as relocated" flows to
         // make use of AntiEntropy retry/redirect responses.
         match msg {
-            SystemMsg::AntiEntropy { .. }
-            | SystemMsg::JoinRequest(_)
-            | SystemMsg::JoinAsRelocatedRequest(_) => {
+            Node2NodeMsg::AntiEntropy { .. }
+            | Node2NodeMsg::JoinRequest(_)
+            | Node2NodeMsg::JoinAsRelocatedRequest(_) => {
                 trace!(
                     "Entropy check skipped for {:?}, handling message directly",
                     wire_msg.msg_id()

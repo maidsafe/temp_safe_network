@@ -18,7 +18,7 @@ use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         data::{OperationId, ServiceMsg},
-        system::{KeyedSig, NodeState, SectionAuth, SystemMsg},
+        system::{KeyedSig, NodeState, SectionAuth, Node2NodeMsg},
         AuthorityProof, MsgId, NodeMsgAuthority, ServiceAuth, WireMsg,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare, SectionsDAG},
@@ -123,7 +123,7 @@ pub(crate) enum Cmd {
     },
     HandleValidSystemMsg {
         msg_id: MsgId,
-        msg: SystemMsg,
+        msg: Node2NodeMsg,
         origin: Peer,
         msg_authority: NodeMsgAuthority,
         #[debug(skip)]
@@ -133,10 +133,10 @@ pub(crate) enum Cmd {
     },
     HandleValidServiceMsg {
         msg_id: MsgId,
-        msg: ServiceMsg,
+        msg: ClientMsg,
         origin: Peer,
         /// Requester's authority over this message
-        auth: AuthorityProof<ServiceAuth>,
+        auth: AuthorityProof<ClientAuth>,
         #[cfg(feature = "traceroute")]
         traceroute: Traceroute,
     },
@@ -144,10 +144,10 @@ pub(crate) enum Cmd {
         proof_chain: SectionsDAG,
         signed_sap: SectionAuth<SectionAuthorityProvider>,
         msg_id: MsgId,
-        msg: ServiceMsg,
+        msg: ClientMsg,
         origin: Peer,
         /// Requester's authority over this message
-        auth: AuthorityProof<ServiceAuth>,
+        auth: AuthorityProof<ClientAuth>,
         #[cfg(feature = "traceroute")]
         traceroute: Traceroute,
     },
@@ -218,7 +218,7 @@ impl Cmd {
         use Cmd::*;
         match self {
             SendMsg { msg, .. } => match msg {
-                OutgoingMsg::System(_) => 20,
+                OutgoingMsg::Node2Node(_) => 20,
                 _ => 19,
             },
 

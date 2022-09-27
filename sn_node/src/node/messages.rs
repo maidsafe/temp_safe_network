@@ -10,8 +10,8 @@ use crate::node::{Error, Result};
 
 use sn_interface::{
     messaging::{
-        system::{SigShare, SystemMsg},
-        AuthKind, AuthorityProof, BlsShareAuth, Dst, MsgId, NodeAuth, WireMsg,
+        system::{Node2NodeMsg, SigShare},
+        AuthKind, AuthorityProof, Dst, MsgId, NodeAuth, SectionAuthPart, WireMsg,
     },
     network_knowledge::{NodeInfo, SectionKeyShare},
 };
@@ -26,7 +26,7 @@ pub(crate) trait WireMsgUtils {
         key_share: &SectionKeyShare,
         src_name: XorName,
         dst: Dst,
-        node_msg: SystemMsg,
+        node_msg: Node2NodeMsg,
         src_section_pk: BlsPublicKey,
     ) -> Result<WireMsg, Error>;
 
@@ -34,7 +34,7 @@ pub(crate) trait WireMsgUtils {
     fn single_src(
         node: &NodeInfo,
         dst: Dst,
-        node_msg: SystemMsg,
+        node_msg: Node2NodeMsg,
         src_section_pk: BlsPublicKey,
     ) -> Result<WireMsg>;
 }
@@ -45,13 +45,13 @@ impl WireMsgUtils for WireMsg {
         key_share: &SectionKeyShare,
         src_name: XorName,
         dst: Dst,
-        msg: SystemMsg,
+        msg: Node2NodeMsg,
         src_section_pk: BlsPublicKey,
     ) -> Result<WireMsg, Error> {
         let msg_payload =
             WireMsg::serialize_msg_payload(&msg).map_err(|_| Error::InvalidMessage)?;
 
-        let auth = AuthKind::NodeBlsShare(
+        let auth = AuthKind::SectionPart(
             bls_share_authorize(src_section_pk, src_name, key_share, &msg_payload).into_inner(),
         );
 
@@ -67,7 +67,7 @@ impl WireMsgUtils for WireMsg {
     fn single_src(
         node: &NodeInfo,
         dst: Dst,
-        msg: SystemMsg,
+        msg: Node2NodeMsg,
         src_section_pk: BlsPublicKey,
     ) -> Result<WireMsg> {
         let msg_payload =
@@ -92,8 +92,8 @@ fn bls_share_authorize(
     src_name: XorName,
     key_share: &SectionKeyShare,
     payload: impl AsRef<[u8]>,
-) -> AuthorityProof<BlsShareAuth> {
-    AuthorityProof(BlsShareAuth {
+) -> AuthorityProof<SectionAuthPart> {
+    AuthorityProof(SectionAuthPart {
         section_pk,
         src_name,
         sig_share: SigShare {

@@ -18,7 +18,7 @@ use qp2p::UsrMsgBytes;
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
-        system::{AntiEntropyKind, NodeCmd, NodeState, SectionAuth, SystemMsg},
+        system::{AntiEntropyKind, Node2NodeMsg, NodeCmd, NodeState, SectionAuth},
         MsgType, SectionTreeUpdate, WireMsg,
     },
     types::{log_markers::LogMarker, Peer, PublicKey},
@@ -82,7 +82,7 @@ impl Node {
     pub(crate) fn send_metadata_updates(&self, recipients: BTreeSet<Peer>, prefix: &Prefix) -> Cmd {
         let metadata = self.get_metadata_of(prefix);
         self.send_system_msg(
-            SystemMsg::NodeCmd(NodeCmd::ReceiveMetadata { metadata }),
+            Node2NodeMsg::NodeCmd(NodeCmd::ReceiveMetadata { metadata }),
             Peers::Multiple(recipients),
         )
     }
@@ -135,7 +135,7 @@ impl Node {
         &self,
         dst_section_key: Option<BlsPublicKey>,
         kind: AntiEntropyKind,
-    ) -> SystemMsg {
+    ) -> Node2NodeMsg {
         let signed_sap = self.network_knowledge.signed_sap();
 
         let proof_chain = dst_section_key
@@ -148,7 +148,7 @@ impl Node {
 
         let section_tree_update = SectionTreeUpdate::new(signed_sap, proof_chain);
 
-        SystemMsg::AntiEntropy {
+        Node2NodeMsg::AntiEntropy {
             section_tree_update,
             kind,
         }
@@ -361,7 +361,7 @@ impl Node {
                     let section_tree_update =
                         SectionTreeUpdate::new(signed_sap.clone(), proof_chain);
                     // Redirect to the closest section
-                    let ae_msg = SystemMsg::AntiEntropy {
+                    let ae_msg = Node2NodeMsg::AntiEntropy {
                         section_tree_update,
                         kind: AntiEntropyKind::Redirect { bounced_msg },
                     };
@@ -369,7 +369,7 @@ impl Node {
                     trace!("{}", LogMarker::AeSendRedirect);
 
                     return Ok(Some(Cmd::send_msg(
-                        OutgoingMsg::System(ae_msg),
+                        OutgoingMsg::Node2Node(ae_msg),
                         Peers::Single(*sender),
                     )));
                 }
@@ -409,7 +409,7 @@ impl Node {
         );
 
         Ok(Some(Cmd::send_msg(
-            OutgoingMsg::System(ae_msg),
+            OutgoingMsg::Node2Node(ae_msg),
             Peers::Single(*sender),
         )))
     }
@@ -425,7 +425,7 @@ impl Node {
         let ae_msg = self.generate_ae_msg(None, AntiEntropyKind::Redirect { bounced_msg });
 
         Ok(Cmd::send_msg(
-            OutgoingMsg::System(ae_msg),
+            OutgoingMsg::Node2Node(ae_msg),
             Peers::Single(sender),
         ))
     }
@@ -524,7 +524,7 @@ mod tests {
                 ));
 
                 // Other messages shall get rejected.
-                let other_msg = SystemMsg::AntiEntropyProbe(known_key);
+                let other_msg = Node2NodeMsg::AntiEntropyProbe(known_key);
                 assert!(!NetworkKnowledge::verify_node_msg_can_be_trusted(
                     &msg_authority,
                     &other_msg,
@@ -563,11 +563,11 @@ mod tests {
                     &sender,
                 );
 
-            let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg: OutgoingMsg::System(msg), .. })) => {
+            let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg: OutgoingMsg::Node2Node(msg), .. })) => {
                 msg
             });
 
-            assert_matches!(msg, SystemMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Redirect {..}, .. } => {
+            assert_matches!(msg, Node2NodeMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Redirect {..}, .. } => {
                 assert_eq!(section_tree_update.signed_sap(), env.node.network_knowledge().signed_sap());
             });
 
@@ -592,11 +592,11 @@ mod tests {
                     &sender,
                 );
 
-            let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg: OutgoingMsg::System(msg), .. })) => {
+            let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg: OutgoingMsg::Node2Node(msg), .. })) => {
                 msg
             });
 
-            assert_matches!(msg, SystemMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Redirect {..}, .. } => {
+            assert_matches!(msg, Node2NodeMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Redirect {..}, .. } => {
                 assert_eq!(section_tree_update.signed_sap(), env.other_signed_sap);
             });
             Result::<()>::Ok(())
@@ -632,11 +632,11 @@ mod tests {
                     &sender,
                 )?;
 
-            let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg: OutgoingMsg::System(msg), .. }) => {
+            let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg: OutgoingMsg::Node2Node(msg), .. }) => {
                 msg
             });
 
-            assert_matches!(&msg, SystemMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Retry{..}, .. } => {
+            assert_matches!(&msg, Node2NodeMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Retry{..}, .. } => {
                 assert_eq!(section_tree_update.signed_sap(), env.node.network_knowledge().signed_sap());
                 assert_eq!(section_tree_update.proof_chain()?, env.node.section_chain());
             });
@@ -674,11 +674,11 @@ mod tests {
                     &sender,
                 )?;
 
-            let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg: OutgoingMsg::System(msg), .. }) => {
+            let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg: OutgoingMsg::Node2Node(msg), .. }) => {
                 msg
             });
 
-            assert_matches!(&msg, SystemMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Retry {..}, .. } => {
+            assert_matches!(&msg, Node2NodeMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Retry {..}, .. } => {
                 assert_eq!(section_tree_update.signed_sap(), env.node.network_knowledge().signed_sap());
                 assert_eq!(section_tree_update.proof_chain()?, env.node.section_chain());
             });
@@ -760,7 +760,7 @@ mod tests {
             );
 
             // just some message we can construct easily
-            let payload_msg = SystemMsg::AntiEntropyProbe(src_section_pk);
+            let payload_msg = Node2NodeMsg::AntiEntropyProbe(src_section_pk);
 
             let payload = WireMsg::serialize_msg_payload(&payload_msg)?;
 
@@ -779,10 +779,10 @@ mod tests {
         fn create_update_msg(
             &self,
             proof_chain: SectionsDAG,
-        ) -> Result<(SystemMsg, NodeMsgAuthority)> {
+        ) -> Result<(Node2NodeMsg, NodeMsgAuthority)> {
             let section_tree_update =
                 SectionTreeUpdate::new(self.other_signed_sap.clone(), proof_chain);
-            let payload_msg = SystemMsg::AntiEntropy {
+            let payload_msg = Node2NodeMsg::AntiEntropy {
                 section_tree_update,
                 kind: AntiEntropyKind::Update {
                     members: BTreeSet::new(),

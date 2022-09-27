@@ -17,8 +17,8 @@ use sn_interface::{
     data_copy_count,
     messaging::{
         data::{DataQuery, MetadataExchange, StorageLevel},
-        system::{NodeCmd, NodeQuery, SystemMsg},
-        AuthorityProof, EndUser, MsgId, ServiceAuth,
+        system::{Node2NodeMsg, NodeCmd, NodeQuery},
+        AuthorityProof, ClientAuth, EndUser, MsgId,
     },
     types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData},
 };
@@ -43,7 +43,7 @@ impl Node {
         );
 
         self.trace_system_msg(
-            SystemMsg::NodeCmd(NodeCmd::ReplicateData(vec![data])),
+            Node2NodeMsg::NodeCmd(NodeCmd::ReplicateData(vec![data])),
             Peers::Multiple(targets),
             #[cfg(feature = "traceroute")]
             traceroute,
@@ -54,7 +54,7 @@ impl Node {
         &self,
         query: DataQuery,
         msg_id: MsgId,
-        auth: AuthorityProof<ServiceAuth>,
+        auth: AuthorityProof<ClientAuth>,
         source_client: Peer,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
@@ -105,7 +105,7 @@ impl Node {
             issue: IssueType::PendingRequestOperation(operation_id),
         });
 
-        let msg = SystemMsg::NodeQuery(NodeQuery::Data {
+        let msg = Node2NodeMsg::NodeQuery(NodeQuery::Data {
             query: query.variant,
             auth: auth.into_inner(),
             origin: EndUser(source_client.name()),

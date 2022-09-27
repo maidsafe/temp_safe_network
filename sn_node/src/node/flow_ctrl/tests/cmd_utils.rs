@@ -11,10 +11,10 @@ use eyre::Result;
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
-        data::{Error as MessagingDataError, ServiceMsg},
+        data::{ClientMsg, Error as MessagingDataError},
         serialisation::WireMsg,
-        system::{JoinResponse, MembershipState, NodeCmd, RelocateDetails, SystemMsg},
-        AuthorityProof, MsgId, MsgType, ServiceAuth,
+        system::{JoinResponse, MembershipState, Node2NodeMsg, NodeCmd, RelocateDetails},
+        AuthorityProof, ClientAuth, MsgId, MsgType,
     },
     network_knowledge::{test_utils::*, NodeState, SectionAuthorityProvider},
     types::{Keypair, Peer, ReplicatedData, SecretKeySet},
@@ -50,14 +50,14 @@ pub(crate) async fn handle_online_cmd(
         let (msg, recipients) = match cmd {
             Cmd::SendMsg {
                 recipients,
-                msg: OutgoingMsg::System(msg),
+                msg: OutgoingMsg::Node2Node(msg),
                 ..
             } => (msg, recipients),
             _ => continue,
         };
 
         match msg {
-            SystemMsg::JoinResponse(response) => {
+            Node2NodeMsg::JoinResponse(response) => {
                 if let JoinResponse::Approved {
                     section_tree_update,
                     ..
@@ -73,7 +73,7 @@ pub(crate) async fn handle_online_cmd(
                     status.node_approval_sent = true;
                 }
             }
-            SystemMsg::Propose {
+            Node2NodeMsg::Propose {
                 proposal: sn_interface::messaging::system::Proposal::VoteNodeOffline(node_state),
                 ..
             } => {
@@ -113,10 +113,10 @@ pub(crate) async fn run_and_collect_cmds(
     Ok(all_cmds)
 }
 
-pub(crate) fn wrap_service_msg_for_handling(msg: ServiceMsg, peer: Peer) -> Result<Cmd> {
+pub(crate) fn wrap_service_msg_for_handling(msg: ClientMsg, peer: Peer) -> Result<Cmd> {
     let payload = WireMsg::serialize_msg_payload(&msg)?;
     let src_client_keypair = Keypair::new_ed25519();
-    let auth = ServiceAuth {
+    let auth = ClientAuth {
         public_key: src_client_keypair.public_key(),
         signature: src_client_keypair.sign(&payload),
     };
@@ -155,8 +155,8 @@ impl Cmd {
     pub(crate) fn get_replicated_data(&self) -> Result<ReplicatedData> {
         match self {
             Cmd::SendMsg { msg, .. } => match msg {
-                OutgoingMsg::System(sys_msg) => match sys_msg {
-                    SystemMsg::NodeCmd(node_cmd) => match node_cmd {
+                OutgoingMsg::Node2Node(sys_msg) => match sys_msg {
+                    Node2NodeMsg::NodeCmd(node_cmd) => match node_cmd {
                         NodeCmd::ReplicateData(data) => {
                             if data.len() != 1 {
                                 return Err(eyre!("Only 1 replicated data instance is expected"));
@@ -174,10 +174,10 @@ impl Cmd {
     }
 
     /// Get a `ServiceMsg` from a `Cmd::SendMsg` enum variant.
-    pub(crate) fn get_service_msg(&self) -> Result<ServiceMsg> {
+    pub(crate) fn get_service_msg(&self) -> Result<ClientMsg> {
         match self {
             Cmd::SendMsg { msg, .. } => match msg {
-                OutgoingMsg::Service(service_msg) => Ok(service_msg.clone()),
+                OutgoingMsg::Client(service_msg) => Ok(service_msg.clone()),
                 _ => Err(eyre!("A OutgoingMsg::Service variant was expected")),
             },
             _ => Err(eyre!("A Cmd::SendMsg variant was expected")),
@@ -188,8 +188,8 @@ impl Cmd {
     pub(crate) fn get_error(&self) -> Result<MessagingDataError> {
         match self {
             Cmd::SendMsg { msg, .. } => match msg {
-                OutgoingMsg::Service(service_msg) => match service_msg {
-                    ServiceMsg::CmdError { error, .. } => Ok(error.clone()),
+                OutgoingMsg::Client(service_msg) => match service_msg {
+                    ClientMsg::CmdError { error, .. } => Ok(error.clone()),
                     _ => Err(eyre!("A ServiceMsg::CmdError variant was expected")),
                 },
                 _ => Err(eyre!("A OutgoingMsg::Service variant was expected")),

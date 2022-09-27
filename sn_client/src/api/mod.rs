@@ -23,8 +23,8 @@ use crate::{connections::Session, errors::Error};
 use sn_dbc::Owner;
 use sn_interface::{
     messaging::{
-        data::{DataQuery, DataQueryVariant, RegisterQuery, ServiceMsg},
-        ServiceAuth, WireMsg,
+        data::{ClientMsg, DataQuery, DataQueryVariant, RegisterQuery},
+        ClientAuth, WireMsg,
     },
     network_knowledge::SectionTree,
     types::{Chunk, Keypair, PublicKey, RegisterAddress},
@@ -81,11 +81,11 @@ impl Client {
         fn generate_probe_msg(
             client: &Client,
             pk: PublicKey,
-        ) -> Result<(XorName, ServiceAuth, Bytes), Error> {
+        ) -> Result<(XorName, ClientAuth, Bytes), Error> {
             // Generate a random query to send a dummy message
             let random_dst_addr = xor_name::rand::random();
             let serialised_cmd = {
-                let msg = ServiceMsg::Query(DataQuery {
+                let msg = ClientMsg::Query(DataQuery {
                     adult_index: 0,
                     variant: DataQueryVariant::Register(RegisterQuery::Get(RegisterAddress {
                         name: random_dst_addr,
@@ -95,7 +95,7 @@ impl Client {
                 WireMsg::serialize_msg_payload(&msg)?
             };
             let signature = client.keypair.sign(&serialised_cmd);
-            let auth = ServiceAuth {
+            let auth = ClientAuth {
                 public_key: pk,
                 signature,
             };

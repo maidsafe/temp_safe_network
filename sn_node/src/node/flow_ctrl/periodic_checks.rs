@@ -15,9 +15,9 @@ use ed25519_dalek::Signer;
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
-        data::{DataQuery, DataQueryVariant, ServiceMsg},
-        system::{NodeCmd, SystemMsg},
-        AuthorityProof, MsgId, ServiceAuth, WireMsg,
+        data::{ClientMsg, DataQuery, DataQueryVariant},
+        system::{Node2NodeMsg, NodeCmd},
+        AuthorityProof, ClientAuth, MsgId, WireMsg,
     },
     types::log_markers::LogMarker,
     types::{ChunkAddress, PublicKey, Signature},
@@ -173,7 +173,7 @@ impl FlowCtrl {
 
         let chunk_addr = our_prefix.substituted_in(chunk_addr);
 
-        let msg = ServiceMsg::Query(DataQuery {
+        let msg = ClientMsg::Query(DataQuery {
             variant: DataQueryVariant::GetChunk(ChunkAddress(chunk_addr)),
             adult_index: 0,
         });
@@ -345,7 +345,7 @@ impl FlowCtrl {
                     data_recipients,
                 );
 
-                let msg = SystemMsg::NodeCmd(NodeCmd::ReplicateData(vec![data_to_send]));
+                let msg = Node2NodeMsg::NodeCmd(NodeCmd::ReplicateData(vec![data_to_send]));
                 let node = node.read().await;
                 return Ok(Some(
                     node.send_system_msg(msg, Peers::Multiple(data_recipients)),
@@ -377,12 +377,12 @@ impl FlowCtrl {
     }
 }
 
-fn auth(node: &Node, msg: &ServiceMsg) -> Result<AuthorityProof<ServiceAuth>> {
+fn auth(node: &Node, msg: &ClientMsg) -> Result<AuthorityProof<ClientAuth>> {
     let keypair = node.keypair.clone();
     let payload = WireMsg::serialize_msg_payload(&msg)?;
     let signature = keypair.sign(&payload);
 
-    let auth = ServiceAuth {
+    let auth = ClientAuth {
         public_key: PublicKey::Ed25519(keypair.public),
         signature: Signature::Ed25519(signature),
     };

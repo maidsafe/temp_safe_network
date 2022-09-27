@@ -63,7 +63,7 @@ pub(crate) use relocation::{check as relocation_check, ChurnId};
 pub use sn_interface::network_knowledge::{
     FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
 };
-use sn_interface::{messaging::system::SystemMsg, types::Peer};
+use sn_interface::{messaging::system::Node2NodeMsg, types::Peer};
 
 pub use qp2p::{Config as NetworkConfig, SendStream};
 pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API update

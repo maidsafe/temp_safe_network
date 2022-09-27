@@ -24,7 +24,7 @@ use xor_name::XorName;
 
 /// Authority of a network peer.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
-pub struct ServiceAuth {
+pub struct ClientAuth {
     /// Peer's public key.
     pub public_key: PublicKey,
     /// Peer's signature.
@@ -62,7 +62,7 @@ impl NodeAuth {
 
 /// Authority of a single peer that uses it's BLS Keyshare to sign the message.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
-pub struct BlsShareAuth {
+pub struct SectionAuthPart {
     /// Section key of the source.
     pub section_pk: BlsPublicKey,
     /// Name in the source section.
@@ -84,7 +84,7 @@ impl SectionAuth {
     /// Try to construct verified section authority by aggregating a new share.
     pub fn try_authorize(
         aggregator: &mut SignatureAggregator,
-        share: BlsShareAuth,
+        share: SectionAuthPart,
         payload: impl AsRef<[u8]>,
     ) -> Result<AuthorityProof<Self>, AggregatorError> {
         let sig = aggregator.add(payload.as_ref(), share.sig_share.clone())?;
@@ -148,7 +148,7 @@ pub trait VerifyAuthority: Sized + sealed::Sealed {
     fn verify_authority(self, payload: impl AsRef<[u8]>) -> Result<Self>;
 }
 
-impl VerifyAuthority for ServiceAuth {
+impl VerifyAuthority for ClientAuth {
     fn verify_authority(self, payload: impl AsRef<[u8]>) -> Result<Self> {
         self.public_key
             .verify(&self.signature, payload)
@@ -156,7 +156,7 @@ impl VerifyAuthority for ServiceAuth {
         Ok(self)
     }
 }
-impl sealed::Sealed for ServiceAuth {}
+impl sealed::Sealed for ClientAuth {}
 
 impl VerifyAuthority for NodeAuth {
     fn verify_authority(self, payload: impl AsRef<[u8]>) -> Result<Self> {
@@ -168,7 +168,7 @@ impl VerifyAuthority for NodeAuth {
 }
 impl sealed::Sealed for NodeAuth {}
 
-impl VerifyAuthority for BlsShareAuth {
+impl VerifyAuthority for SectionAuthPart {
     fn verify_authority(self, payload: impl AsRef<[u8]>) -> Result<Self> {
         // Signed chain is required for accumulation at destination.
         if self.sig_share.public_key_set.public_key() != self.section_pk {
@@ -182,7 +182,7 @@ impl VerifyAuthority for BlsShareAuth {
         Ok(self)
     }
 }
-impl sealed::Sealed for BlsShareAuth {}
+impl sealed::Sealed for SectionAuthPart {}
 
 impl VerifyAuthority for SectionAuth {
     fn verify_authority(self, payload: impl AsRef<[u8]>) -> Result<Self> {
