@@ -299,10 +299,7 @@ mod tests {
                     Peers::Single(_) => assert_eq!(bootstrap.len(), 1),
                     Peers::Multiple(recipients) => assert_eq!(bootstrap.len(), recipients.len()),
                 }
-                if !matches!(
-                    msg,
-                    OutgoingMsg::Node2Node(NodeMsg::JoinAsRelocatedRequest(_))
-                ) {
+                if !matches!(msg, OutgoingMsg::Node(NodeMsg::JoinAsRelocatedRequest(_))) {
                     return Err(eyre!("Should be JoinAsRelocatedRequest"));
                 }
             }

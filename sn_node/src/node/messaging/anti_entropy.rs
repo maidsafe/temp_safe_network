@@ -563,7 +563,7 @@ mod tests {
                     &sender,
                 );
 
-            let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg: OutgoingMsg::Node2Node(msg), .. })) => {
+            let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg: OutgoingMsg::Node(msg), .. })) => {
                 msg
             });
 
@@ -592,7 +592,7 @@ mod tests {
                     &sender,
                 );
 
-            let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg: OutgoingMsg::Node2Node(msg), .. })) => {
+            let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg: OutgoingMsg::Node(msg), .. })) => {
                 msg
             });
 
@@ -632,7 +632,7 @@ mod tests {
                     &sender,
                 )?;
 
-            let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg: OutgoingMsg::Node2Node(msg), .. }) => {
+            let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg: OutgoingMsg::Node(msg), .. }) => {
                 msg
             });
 
@@ -674,7 +674,7 @@ mod tests {
                     &sender,
                 )?;
 
-            let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg: OutgoingMsg::Node2Node(msg), .. }) => {
+            let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg: OutgoingMsg::Node(msg), .. }) => {
                 msg
             });
 

@@ -112,7 +112,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
             assert!(all_cmds.into_iter().any(|cmd| {
                 match cmd {
                     Cmd::SendMsg {
-                        msg: OutgoingMsg::Node2Node(NodeMsg::JoinResponse(response)),
+                        msg: OutgoingMsg::Node(NodeMsg::JoinResponse(response)),
                         ..
                     } => matches!(*response, JoinResponse::ResourceChallenge { .. }),
                     _ => false,
