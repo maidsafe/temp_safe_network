@@ -13,7 +13,7 @@ use eyre::Result;
 
 use sn_client::{Client, Error};
 use sn_interface::{
-    messaging::{data::ClientMsg, ClientAuth, Dst, MsgId, WireMsg},
+    messaging::{self, data::ClientMsg, ClientAuth, Dst, MsgId, WireMsg},
     types::register::{Policy, User},
 };
 use tokio::runtime::Runtime;
@@ -95,7 +95,8 @@ fn criterion_benchmark(c: &mut Criterion) {
         name: xor_name::rand::random(),
         section_key: bls::SecretKey::random().public_key(),
     };
-    let mut the_wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
+    let mut the_wire_msg =
+        WireMsg::new_msg(msg_id, payload, messaging::AuthKind::Client(auth), dst);
     let (header, dst, payload) = match the_wire_msg.serialize_and_cache_bytes() {
         Ok(bytes) => bytes,
         Err(_erorr) => {
