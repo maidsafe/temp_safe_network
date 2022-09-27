@@ -565,7 +565,7 @@ mod core {
                     old_hashes.push(*hash);
                     debug!(
                         "Removing old DKG s{} of chain len {} when we are at {}",
-                        session_info.session_id.sum(),
+                        session_info.session_id.sh(),
                         session_info.session_id.section_chain_len,
                         current_chain_len
                     );

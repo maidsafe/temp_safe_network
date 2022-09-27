@@ -315,7 +315,7 @@ impl Node {
             SystemMsg::DkgStart(session_id) => {
                 trace!(
                     "Handling msg: DkgStart s{} {:?}: {} elders from {}",
-                    session_id.sum(),
+                    session_id.sh(),
                     session_id.prefix,
                     session_id.elders.len(),
                     sender
@@ -341,7 +341,7 @@ impl Node {
                 trace!(
                     "{} s{} from {}",
                     LogMarker::DkgHandleEphemeralPubKey,
-                    session_id.sum(),
+                    session_id.sh(),
                     sender
                 );
                 self.handle_dkg_ephemeral_pubkey(&session_id, section_auth, pub_key, sig, sender)
@@ -354,7 +354,7 @@ impl Node {
                 trace!(
                     "{} s{} from {}: {:?}",
                     LogMarker::DkgVotesHandling,
-                    session_id.sum(),
+                    session_id.sh(),
                     sender,
                     votes
                 );
@@ -362,7 +362,7 @@ impl Node {
                 self.handle_dkg_votes(&session_id, pub_keys, votes, sender)
             }
             SystemMsg::DkgAE(session_id) => {
-                trace!("Handling msg: DkgAE s{} from {}", session_id.sum(), sender);
+                trace!("Handling msg: DkgAE s{} from {}", session_id.sh(), sender);
                 self.handle_dkg_anti_entropy(session_id, sender)
             }
             SystemMsg::NodeCmd(NodeCmd::RecordStorageLevel { node_id, level, .. }) => {

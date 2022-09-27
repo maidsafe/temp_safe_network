@@ -65,9 +65,10 @@ impl DkgSessionId {
         hash
     }
 
-    /// A small checksum of the session id's hash used for logging as it is very short
-    pub fn sum(&self) -> u16 {
-        self.hash().iter().map(|i| *i as u16).sum::<u16>()
+    /// Short Hash: a small chunk of the session id's hash used for logging as it is very short
+    pub fn sh(&self) -> u16 {
+        let h = self.hash();
+        u16::from_le_bytes([h[0], h[1]])
     }
 
     pub fn hash_update(&self, hasher: &mut Sha3) {

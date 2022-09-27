@@ -8,7 +8,7 @@
 
 use crate::node::{
     core::DkgSessionInfo,
-    dkg::{check_key, DkgPubKeys},
+    dkg::{check_ephemeral_dkg_key, DkgPubKeys},
     flow_ctrl::cmds::Cmd,
     messaging::{OutgoingMsg, Peers},
     Error, Node, Proposal, Result,
@@ -79,7 +79,7 @@ impl Node {
         trace!(
             "{} s{} {:?} with {:?} to {:?}",
             LogMarker::SendDkgStart,
-            session_id.sum(),
+            session_id.sh(),
             session_id.prefix,
             session_id.elders,
             recipients
@@ -161,7 +161,7 @@ impl Node {
         trace!(
             "{} s{}: {:?}",
             LogMarker::DkgBroadcastVote,
-            session_id.sum(),
+            session_id.sh(),
             votes
         );
         let node_msg = SystemMsg::DkgVotes {
@@ -185,7 +185,7 @@ impl Node {
         } else {
             error!(
                 "DKG failed to start s{}: {our_name} is not a participant",
-                session_id.sum()
+                session_id.sh()
             );
             return Ok(vec![]);
         };
@@ -193,7 +193,7 @@ impl Node {
         // ignore DkgStart from old chains
         let current_chain_len = self.network_knowledge.section_chain_len();
         if session_id.section_chain_len < current_chain_len {
-            trace!("Skipping DkgStart for older chain: s{}", session_id.sum());
+            trace!("Skipping DkgStart for older chain: s{}", session_id.sh());
             return Ok(vec![]);
         }
 
@@ -207,7 +207,7 @@ impl Node {
                 Err(Error::DkgEphemeralKeyAlreadyGenerated) => {
                     trace!(
                         "Skipping already acknowledged DkgStart s{}",
-                        session_id.sum()
+                        session_id.sh()
                     );
                     return Ok(vec![]);
                 }
@@ -215,7 +215,7 @@ impl Node {
             };
 
         // assert people can check key
-        assert!(check_key(&session_id, our_name, ephemeral_pub_key, sig).is_ok());
+        assert!(check_ephemeral_dkg_key(&session_id, our_name, ephemeral_pub_key, sig).is_ok());
 
         // get original auth (as proof for those who missed the original DkgStart msg)
         let section_auth = self
@@ -229,7 +229,7 @@ impl Node {
         trace!(
             "{} s{} from {our_id:?}",
             LogMarker::DkgBroadcastEphemeralPubKey,
-            session_id.sum(),
+            session_id.sh(),
         );
         let peers = dkg_peers(our_id, &session_id);
         let node_msg = SystemMsg::DkgEphemeralPubKey {
@@ -253,7 +253,7 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         trace!(
             "Detected missed dkg start for s{:?} after msg from {sender:?}",
-            session_id.sum()
+            session_id.sh()
         );
 
         // reconstruct the original DKG start message and verify the section signature
@@ -262,14 +262,14 @@ impl Node {
         if self.network_knowledge.section_key() != auth.sig.public_key {
             warn!(
                 "Invalid section key in dkg auth proof in s{:?}: {sender:?}",
-                session_id.sum()
+                session_id.sh()
             );
             return Ok(vec![]);
         }
         if let Err(err) = AuthorityProof::verify(auth, payload) {
             error!(
                 "Invalid signature in dkg auth proof in s{:?}: {err:?}",
-                session_id.sum()
+                session_id.sh()
             );
             return Ok(vec![]);
         }
@@ -277,7 +277,7 @@ impl Node {
         // acknowledge Dkg Session
         info!(
             "Handling missed dkg start for s{:?} after msg from {sender:?}",
-            session_id.sum()
+            session_id.sh()
         );
         self.log_dkg_session(&sender.name());
         let session_info = DkgSessionInfo {
@@ -316,7 +316,7 @@ impl Node {
         } else {
             error!(
                 "DKG ephemeral key ignored for s{}: {name} is not a participant",
-                session_id.sum()
+                session_id.sh()
             );
             return Ok(vec![]);
         };
@@ -340,7 +340,7 @@ impl Node {
                 Err(e) => {
                     error!(
                         "Failed to init DKG s{} id:{our_id:?}: {:?}",
-                        session_id.sum(),
+                        session_id.sh(),
                         e
                     );
                     return Ok(vec![]);
@@ -357,7 +357,7 @@ impl Node {
         trace!(
             "{} s{} from id:{our_id:?}",
             LogMarker::DkgBroadcastFirstVote,
-            session_id.sum()
+            session_id.sh()
         );
         let peers = dkg_peers(our_id, session_id);
         let node_msg = SystemMsg::DkgVotes {
@@ -391,7 +391,7 @@ impl Node {
                 trace!(
                     "{} s{:?} {:?}: {} elders: {:?}",
                     LogMarker::DkgComplete,
-                    session_id.sum(),
+                    session_id.sh(),
                     session_id.prefix,
                     session_id.elders.len(),
                     new_pubs.public_key(),
@@ -418,7 +418,7 @@ impl Node {
         } else {
             error!(
                 "DKG failed to handle vote in s{}: {name} is not a participant",
-                session_id.sum()
+                session_id.sh()
             );
             return Ok(vec![]);
         };
@@ -446,11 +446,7 @@ impl Node {
         for v in votes {
             match self.dkg_voter.handle_dkg_vote(session_id, v.clone()) {
                 Ok(vote_response) => {
-                    debug!(
-                        "Dkg s{}: {:?} after: {v:?}",
-                        session_id.sum(),
-                        vote_response,
-                    );
+                    debug!("Dkg s{}: {:?} after: {v:?}", session_id.sh(), vote_response,);
                     if !matches!(vote_response, VoteResponse::IgnoringKnownVote) {
                         self.dkg_voter.learned_something_from_message();
                         is_old_gossip = false;
@@ -468,7 +464,7 @@ impl Node {
                 Err(err) => {
                     error!(
                         "Error processing DKG vote s{} id:{our_id:?} {v:?} from {sender:?}: {err:?}",
-                        session_id.sum()
+                        session_id.sh()
                     );
                 }
             }
@@ -487,7 +483,7 @@ impl Node {
                 Err(err) => {
                     error!(
                         "Error gossiping s{} id:{our_id:?} from {sender:?}: {err:?}",
-                        session_id.sum()
+                        session_id.sh()
                     );
                     vec![]
                 }
@@ -513,7 +509,7 @@ impl Node {
             trace!(
                 "{} s{}: gossip including missing votes to {sender:?}",
                 LogMarker::DkgBroadcastVote,
-                session_id.sum()
+                session_id.sh()
             );
             let node_msg = SystemMsg::DkgVotes {
                 session_id: session_id.clone(),
@@ -537,7 +533,7 @@ impl Node {
         trace!(
             "{} s{}: AE to {sender:?}",
             LogMarker::DkgBroadcastVote,
-            session_id.sum()
+            session_id.sh()
         );
         let node_msg = SystemMsg::DkgVotes {
             session_id,
@@ -560,7 +556,7 @@ impl Node {
             Err(_) => {
                 warn!(
                     "Unexpectedly missing dkg keys when gossiping s{}",
-                    session_id.sum()
+                    session_id.sh()
                 );
                 return vec![];
             }
@@ -568,7 +564,7 @@ impl Node {
         trace!(
             "{} s{}: gossiping votes",
             LogMarker::DkgBroadcastVote,
-            session_id.sum()
+            session_id.sh()
         );
         let cmd = self.broadcast_dkg_votes(&session_id, pub_keys, our_id, votes);
         vec![cmd]
@@ -587,7 +583,7 @@ impl Node {
             Err(_) => {
                 warn!(
                     "Unexpectedly missing dkg pub keys when gossiping s{}",
-                    session_id.sum()
+                    session_id.sh()
                 );
                 return vec![];
             }
@@ -597,7 +593,7 @@ impl Node {
             None => {
                 warn!(
                     "Unexpectedly missing our dkg key when gossiping s{}",
-                    session_id.sum()
+                    session_id.sh()
                 );
                 return vec![];
             }
@@ -609,7 +605,7 @@ impl Node {
             None => {
                 warn!(
                     "Unexpectedly missing dkg section info when gossiping s{}",
-                    session_id.sum()
+                    session_id.sh()
                 );
                 return vec![];
             }
@@ -619,7 +615,7 @@ impl Node {
         trace!(
             "{} s{}: gossiping ephemeral key",
             LogMarker::DkgBroadcastVote,
-            session_id.sum()
+            session_id.sh()
         );
 
         // broadcast our key
@@ -643,7 +639,7 @@ impl Node {
             Ok(Some((our_id, new_pubs, new_sec))) => {
                 trace!(
                     "Gossiping DKG outcome for s{} as we didn't notice SAP change",
-                    session_id.sum()
+                    session_id.sh()
                 );
                 let cmd = acknowledge_dkg_oucome(session_id, our_id.into(), new_pubs, new_sec);
                 vec![cmd]
@@ -651,14 +647,14 @@ impl Node {
             Ok(None) => {
                 error!(
                     "Missing DKG outcome for s{}, when trying to gossip outcome",
-                    session_id.sum()
+                    session_id.sh()
                 );
                 vec![]
             }
             Err(e) => {
                 error!(
                     "Failed to get DKG outcome for s{}, when trying to gossip outcome: {}",
-                    session_id.sum(),
+                    session_id.sh(),
                     e
                 );
                 vec![]
@@ -678,7 +674,7 @@ impl Node {
             } else {
                 error!(
                     "DKG failed gossip in s{}: {name} is not a participant",
-                    session_info.session_id.sum()
+                    session_info.session_id.sh()
                 );
                 continue;
             };
@@ -688,7 +684,7 @@ impl Node {
                 Ok(true) => {
                     trace!(
                         "Skipping DKG gossip for s{} as we have reached termination",
-                        session_info.session_id.sum()
+                        session_info.session_id.sh()
                     );
 
                     if !self.had_sap_change_since(&session_info.session_id) {
@@ -701,7 +697,7 @@ impl Node {
                 Err(err) => {
                     error!(
                         "DKG failed gossip in s{}: {:?}",
-                        session_info.session_id.sum(),
+                        session_info.session_id.sh(),
                         err
                     );
                 }

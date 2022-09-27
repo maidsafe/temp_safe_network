@@ -50,14 +50,14 @@ fn create_dkg_state(
     session_id: &DkgSessionId,
     participant_index: usize,
     secret_key: BlsSecretKey,
-    pub_keys: DkgPubKeys,
+    ephemeral_bls_pks: DkgPubKeys,
 ) -> Result<DkgState> {
     let mut rng = bls::rand::rngs::OsRng;
     let threshold = threshold(session_id.elders.len());
     let mut public_keys: BTreeMap<NodeId, BlsPublicKey> = BTreeMap::new();
-    for (xorname, (pubkey, _)) in pub_keys.iter() {
+    for (xorname, (ephemeral_pk, _)) in ephemeral_bls_pks.iter() {
         if let Some(index) = session_id.elder_index(*xorname) {
-            let _ = public_keys.insert(index as u8, *pubkey);
+            let _ = public_keys.insert(index as u8, *ephemeral_pk);
         } else {
             return Err(Error::NodeNotInDkgSession(*xorname));
         }
@@ -72,31 +72,31 @@ fn create_dkg_state(
 }
 
 // Helper that checks an ephemeral pubkey
-pub(crate) fn check_key(
+pub(crate) fn check_ephemeral_dkg_key(
     session_id: &DkgSessionId,
     key_owner: XorName,
     key: BlsPublicKey,
-    sig: Signature,
+    key_sig: Signature,
 ) -> Result<()> {
     // check key owner is in dkg session
     if !session_id.elders.contains_key(&key_owner) {
         return Err(Error::NodeNotInDkgSession(key_owner));
     }
 
-    // check sig
+    // check key_sig
     let sender_pubkey = pub_key(&key_owner).map_err(|_| Error::InvalidXorname(key_owner))?;
     debug!(
         "Checking dkg ephemeral key s{} from {:?}",
-        session_id.sum(),
+        session_id.sh(),
         key_owner
     );
-    let serialized = bincode::serialize(&key)?;
-    if sender_pubkey.verify(&serialized, &sig).is_err() {
+    let serialized_key = bincode::serialize(&key)?;
+    if sender_pubkey.verify(&serialized_key, &key_sig).is_err() {
         warn!(
-            "Got an invalid signature in Dkg s{} from {:?} sig: {:?} pubkey: {:?}",
-            session_id.sum(),
+            "Got an invalid signature in Dkg s{} from {:?} key_sig: {:?} pubkey: {:?}",
+            session_id.sh(),
             key_owner,
-            sig,
+            key_sig,
             sender_pubkey
         );
         return Err(Error::InvalidSignature);
@@ -123,26 +123,26 @@ impl DkgVoter {
         // gen new key
         let new_secret_key: BlsSecretKey = bls::rand::random();
         let new_pub_key = new_secret_key.public_key();
-        let serialized = bincode::serialize(&new_pub_key)?;
-        let sig = types::keys::ed25519::sign(&serialized, keypair);
+        let serialized_key = bincode::serialize(&new_pub_key)?;
+        let key_sig = types::keys::ed25519::sign(&serialized_key, keypair);
         let ephemeral_keys = DkgEphemeralKeys {
             secret_key: new_secret_key,
-            pub_keys: BTreeMap::from_iter([(our_name, (new_pub_key, sig))]),
+            pub_keys: BTreeMap::from_iter([(our_name, (new_pub_key, key_sig))]),
         };
 
-        // insert the key if we don't already have it
+        // insert the key
         let _did_insert = self
             .dkg_ephemeral_keys
             .insert(session_id_hash, ephemeral_keys);
 
         debug!(
-            "Signing Dkg ephemeral key s{} from {:?} sig: {:?} pubkey: {:?}",
+            "Signing Dkg ephemeral key s{} from {:?} key_sig: {:?} pubkey: {:?}",
             session_id_hash.iter().sum::<u8>(),
             our_name,
-            sig,
+            key_sig,
             new_pub_key,
         );
-        Ok((new_pub_key, sig))
+        Ok((new_pub_key, key_sig))
     }
 
     pub(crate) fn last_received_dkg_message(&self) -> Option<Instant> {
@@ -189,21 +189,21 @@ impl DkgVoter {
         session_id: &DkgSessionId,
         participant_index: usize,
         ephemeral_pub_key: BlsPublicKey,
-        sig: Signature,
+        key_sig: Signature,
         sender: XorName,
     ) -> Result<Option<(DkgSignedVote, DkgPubKeys)>> {
         // check and save key
-        let just_completed = self.save_key(session_id, sender, ephemeral_pub_key, sig)?;
+        let just_completed = self.save_key(session_id, sender, ephemeral_pub_key, key_sig)?;
         if !just_completed {
             debug!(
                 "Waiting for more Dkg keys s{} id:{participant_index}...",
-                session_id.sum()
+                session_id.sh()
             );
             return Ok(None);
         }
         debug!(
             "Got all Dkg keys s{} id:{participant_index}",
-            session_id.sum()
+            session_id.sh()
         );
 
         let (first_vote, pub_keys) = self.initialize_dkg_state(session_id, participant_index)?;
@@ -218,10 +218,10 @@ impl DkgVoter {
         session_id: &DkgSessionId,
         key_owner: XorName,
         key: BlsPublicKey,
-        sig: Signature,
+        key_sig: Signature,
     ) -> Result<bool> {
         // check key
-        check_key(session_id, key_owner, key, sig)?;
+        check_ephemeral_dkg_key(session_id, key_owner, key, key_sig)?;
 
         // check if we have our secret key yet
         let our_keys = self
@@ -235,7 +235,7 @@ impl DkgVoter {
                 return Err(Error::DoubleKeyAttackDetected(
                     key_owner,
                     Box::new(key),
-                    sig,
+                    key_sig,
                     Box::new(*already_had),
                     *old_sig,
                 ));
@@ -243,19 +243,22 @@ impl DkgVoter {
                 debug!(
                     "Ignoring known ephemeral key from {} in s{}",
                     key_owner,
-                    session_id.sum()
+                    session_id.sh()
                 );
                 return Ok(false);
             }
         }
 
-        let did_insert = our_keys.pub_keys.insert(key_owner, (key, sig)).is_some();
+        let did_insert = our_keys
+            .pub_keys
+            .insert(key_owner, (key, key_sig))
+            .is_some();
         let what_we_have = our_keys.pub_keys.keys().collect::<BTreeSet<_>>();
         let what_we_need = session_id.elders.keys().collect::<BTreeSet<_>>();
         let just_completed = what_we_have == what_we_need;
         debug!(
             "Dkg keys s{}: ours: {:?}, in session_id: {:?}",
-            session_id.sum(),
+            session_id.sh(),
             what_we_have,
             what_we_need,
         );
@@ -288,7 +291,7 @@ impl DkgVoter {
         // catch up with their keys
         let completed = keys
             .iter()
-            .map(|(name, (key, sig))| self.save_key(session_id, *name, *key, *sig))
+            .map(|(name, (key, key_sig))| self.save_key(session_id, *name, *key, *key_sig))
             .collect::<Result<Vec<bool>>>()?;
 
         // we should now have the same keys, tell caller if update helped us complete the set
