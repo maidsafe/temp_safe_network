@@ -31,8 +31,7 @@ pub use self::{
 use crate::{
     messaging::{
         system::{
-            KeyedSig, Node2NodeMsg, NodeMsgAuthorityUtils, SectionAuth,
-            SectionPeers as SectionPeersMsg,
+            KeyedSig, NodeMsg, NodeMsgAuthorityUtils, SectionAuth, SectionPeers as SectionPeersMsg,
         },
         Dst, NodeMsgAuthority, SectionTreeUpdate,
     },
@@ -579,20 +578,20 @@ impl NetworkKnowledge {
             .map(|info| *info.peer())
     }
 
-    pub fn anti_entropy_probe(&self) -> Node2NodeMsg {
-        Node2NodeMsg::AntiEntropyProbe(self.section_key())
+    pub fn anti_entropy_probe(&self) -> NodeMsg {
+        NodeMsg::AntiEntropyProbe(self.section_key())
     }
 
     /// Given a `NodeMsg` can we trust it (including verifying contents of an AE message)
     pub fn verify_node_msg_can_be_trusted(
         msg_authority: &NodeMsgAuthority,
-        msg: &Node2NodeMsg,
+        msg: &NodeMsg,
         known_keys: &BTreeSet<BlsPublicKey>,
     ) -> bool {
         if !msg_authority.verify_src_section_key_is_known(known_keys) {
             // In case the incoming message itself is trying to update our knowledge,
             // it shall be allowed.
-            if let Node2NodeMsg::AntiEntropy {
+            if let NodeMsg::AntiEntropy {
                 section_tree_update,
                 ..
             } = &msg

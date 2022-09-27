@@ -13,7 +13,7 @@ use sn_interface::{
     messaging::{
         data::{ClientMsg, Error as MessagingDataError},
         serialisation::WireMsg,
-        system::{JoinResponse, MembershipState, Node2NodeMsg, NodeCmd, RelocateDetails},
+        system::{JoinResponse, MembershipState, NodeCmd, NodeMsg, RelocateDetails},
         AuthorityProof, ClientAuth, MsgId, MsgType,
     },
     network_knowledge::{test_utils::*, NodeState, SectionAuthorityProvider},
@@ -50,14 +50,14 @@ pub(crate) async fn handle_online_cmd(
         let (msg, recipients) = match cmd {
             Cmd::SendMsg {
                 recipients,
-                msg: OutgoingMsg::Node2Node(msg),
+                msg: OutgoingMsg::Node(msg),
                 ..
             } => (msg, recipients),
             _ => continue,
         };
 
         match msg {
-            Node2NodeMsg::JoinResponse(response) => {
+            NodeMsg::JoinResponse(response) => {
                 if let JoinResponse::Approved {
                     section_tree_update,
                     ..
@@ -73,7 +73,7 @@ pub(crate) async fn handle_online_cmd(
                     status.node_approval_sent = true;
                 }
             }
-            Node2NodeMsg::Propose {
+            NodeMsg::Propose {
                 proposal: sn_interface::messaging::system::Proposal::VoteNodeOffline(node_state),
                 ..
             } => {
@@ -155,8 +155,8 @@ impl Cmd {
     pub(crate) fn get_replicated_data(&self) -> Result<ReplicatedData> {
         match self {
             Cmd::SendMsg { msg, .. } => match msg {
-                OutgoingMsg::Node2Node(sys_msg) => match sys_msg {
-                    Node2NodeMsg::NodeCmd(node_cmd) => match node_cmd {
+                OutgoingMsg::Node(sys_msg) => match sys_msg {
+                    NodeMsg::NodeCmd(node_cmd) => match node_cmd {
                         NodeCmd::ReplicateData(data) => {
                             if data.len() != 1 {
                                 return Err(eyre!("Only 1 replicated data instance is expected"));

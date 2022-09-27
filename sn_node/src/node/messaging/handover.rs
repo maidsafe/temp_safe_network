@@ -11,7 +11,7 @@ use crate::node::{
     handover::{Error as HandoverError, Handover},
     membership::{elder_candidates, try_split_dkg},
     messaging::Peers,
-    Error, Node, Node2NodeMsg, Peer, Proposal, Result,
+    Error, Node, NodeMsg, Peer, Proposal, Result,
 };
 use sn_consensus::{Generation, SignedVote, VoteResponse};
 use sn_interface::{
@@ -48,7 +48,7 @@ impl Node {
     pub(crate) fn broadcast_handover_vote_msg(&self, signed_vote: SignedVote<SapCandidate>) -> Cmd {
         // Deliver each SignedVote to all current Elders
         trace!("Broadcasting Vote msg: {:?}", signed_vote);
-        self.send_msg_to_our_elders(Node2NodeMsg::HandoverVotes(vec![signed_vote]))
+        self.send_msg_to_our_elders(NodeMsg::HandoverVotes(vec![signed_vote]))
     }
 
     /// Broadcast the decision of the terminated handover consensus by proposing the NewElders SAP
@@ -333,9 +333,7 @@ impl Node {
                     // We hit an error while processing this vote, perhaps we are missing information.
                     // We'll send a handover AE request to see if they can help us catch up.
                     debug!("{:?}", LogMarker::HandoverSendingAeUpdateRequest);
-                    cmds.push(
-                        self.send_system_msg(Node2NodeMsg::HandoverAE(gen), Peers::Single(peer)),
-                    );
+                    cmds.push(self.send_system_msg(NodeMsg::HandoverAE(gen), Peers::Single(peer)));
                     // return the vec w/ the AE cmd there so as not to loop and generate AE for
                     // any subsequent commands
                     return Ok(cmds);
@@ -359,10 +357,12 @@ impl Node {
 
         if let Some(handover) = self.handover_voting.as_ref() {
             match handover.anti_entropy(gen) {
-                Ok(catchup_votes) => Some(self.send_system_msg(
-                    Node2NodeMsg::HandoverVotes(catchup_votes),
-                    Peers::Single(peer),
-                )),
+                Ok(catchup_votes) => {
+                    Some(self.send_system_msg(
+                        NodeMsg::HandoverVotes(catchup_votes),
+                        Peers::Single(peer),
+                    ))
+                }
                 Err(e) => {
                     error!("Handover - Error while processing anti-entropy {:?}", e);
                     None

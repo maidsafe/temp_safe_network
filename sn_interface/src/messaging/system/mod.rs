@@ -55,7 +55,7 @@ pub enum AntiEntropyKind {
 #[derive(Clone, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
 #[allow(clippy::large_enum_variant, clippy::derive_partial_eq_without_eq)]
 /// Message sent over the among nodes
-pub enum Node2NodeMsg {
+pub enum NodeMsg {
     AntiEntropy {
         /// The update to our NetworkKnowledge containing the current `SectionAuthorityProvider`
         /// and the section chain truncated from the triggering msg's dst section_key or genesis_key
@@ -138,7 +138,7 @@ pub enum Node2NodeMsg {
     },
 }
 
-impl Node2NodeMsg {
+impl NodeMsg {
     /// The priority of the message, when handled by lower level comms.
     pub fn priority(&self) -> i32 {
         use super::msg_type::{
@@ -205,7 +205,7 @@ impl Node2NodeMsg {
     }
 }
 
-impl Display for Node2NodeMsg {
+impl Display for NodeMsg {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::AntiEntropy { .. } => write!(f, "SystemMsg::AntiEntropy"),

@@ -19,7 +19,7 @@ use sn_interface::{
     at_least_one_correct_elder,
     messaging::{
         data::{ClientMsg, Error as ErrorMsg},
-        system::{AntiEntropyKind, Node2NodeMsg, NodeMsgAuthorityUtils},
+        system::{AntiEntropyKind, NodeMsg, NodeMsgAuthorityUtils},
         AuthKind, AuthorityProof, ClientAuth, Dst, MsgId, MsgType, NodeMsgAuthority,
         SectionTreeUpdate, WireMsg,
     },
@@ -140,7 +140,7 @@ impl Session {
 
     async fn handle_system_msg(
         &mut self,
-        msg: Node2NodeMsg,
+        msg: NodeMsg,
         msg_authority: NodeMsgAuthority,
         sender: Peer,
     ) -> Result<(), Error> {
@@ -161,7 +161,7 @@ impl Session {
         }
 
         match msg {
-            Node2NodeMsg::AntiEntropy {
+            NodeMsg::AntiEntropy {
                 section_tree_update,
                 kind:
                     AntiEntropyKind::Redirect { bounced_msg } | AntiEntropyKind::Retry { bounced_msg },

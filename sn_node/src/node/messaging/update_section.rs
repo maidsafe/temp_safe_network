@@ -10,7 +10,7 @@ use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Node};
 
 use sn_interface::{
     data_copy_count,
-    messaging::system::{Node2NodeMsg, NodeCmd},
+    messaging::system::{NodeCmd, NodeMsg},
     types::{log_markers::LogMarker, DataAddress, Peer},
 };
 
@@ -113,7 +113,7 @@ impl Node {
             trace!("Sending our data list to: {:?}", target_members);
         }
 
-        let msg = Node2NodeMsg::NodeCmd(NodeCmd::SendAnyMissingRelevantData(data_i_have));
+        let msg = NodeMsg::NodeCmd(NodeCmd::SendAnyMissingRelevantData(data_i_have));
         self.send_system_msg(msg, Peers::Multiple(target_members))
     }
 }
