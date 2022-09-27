@@ -79,9 +79,9 @@ pub fn chunk_operation_id(address: &ChunkAddress) -> Result<OperationId> {
 
 /// Network service messages exchanged between clients
 /// and nodes in order for the clients to use the network services.
-/// NB: These are not used for node-to-node comms (see [`SystemMsg`] for those).
+/// NB: These are not used for node-to-node comms (see [`NodeMsg`] for those).
 ///
-/// [`SystemMsg`]: crate::messaging::system::SystemMsg
+/// [`NodeMsg`]: crate::messaging::system::NodeMsg
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum ClientMsg {
