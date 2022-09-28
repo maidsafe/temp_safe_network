@@ -359,13 +359,7 @@ impl Node {
             LogMarker::DkgBroadcastFirstVote,
             session_id.sh()
         );
-        let peers = dkg_peers(our_id, session_id);
-        let node_msg = SystemMsg::DkgVotes {
-            session_id: session_id.clone(),
-            pub_keys,
-            votes: vec![vote],
-        };
-        let cmd = self.send_system_msg(node_msg, Peers::Multiple(peers));
+        let cmd = self.broadcast_dkg_votes(session_id, pub_keys, our_id, vec![vote]);
         Ok(vec![cmd])
     }
 
