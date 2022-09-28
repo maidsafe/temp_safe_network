@@ -8,16 +8,16 @@
 
 mod agreement;
 mod anti_entropy;
+mod client_msgs;
 mod dkg;
 mod handover;
 mod join;
 mod membership;
+mod node_msgs;
 mod proposal;
 mod relocation;
 mod resource_proof;
-mod service_msgs;
 mod signing;
-mod system_msgs;
 mod update_section;
 
 use crate::node::{flow_ctrl::cmds::Cmd, Error, Node, Result, DATA_QUERY_LIMIT};
