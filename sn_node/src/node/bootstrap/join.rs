@@ -19,7 +19,7 @@ use sn_interface::{
         },
         AuthKind, Dst, MsgType, NodeAuth, WireMsg,
     },
-    network_knowledge::{NetworkKnowledge, NodeInfo, SectionTree, MIN_ADULT_AGE},
+    network_knowledge::{NetworkKnowledge, NodeInfo, SectionTree},
     types::{keys::ed25519, log_markers::LogMarker, Peer},
 };
 
@@ -27,6 +27,7 @@ use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
 use futures::future;
 use resource_proof::ResourceProof as ChallengeSolver;
+use std::collections::{BTreeMap, BTreeSet};
 use tokio::{
     sync::mpsc,
     time::{Duration, Instant},
@@ -70,6 +71,7 @@ struct Joiner<'a> {
     network_contacts: SectionTree,
     backoff: ExponentialBackoff,
     aggregated: bool,
+    retry_responses_cache: BTreeMap<Peer, u8>,
 }
 
 impl<'a> Joiner<'a> {
@@ -97,6 +99,7 @@ impl<'a> Joiner<'a> {
             network_contacts,
             backoff,
             aggregated: false,
+            retry_responses_cache: Default::default(),
         }
     }
 
@@ -234,7 +237,7 @@ impl<'a> Joiner<'a> {
                     }
 
                     // make sure we received a valid and trusted new SAP
-                    let is_new_sap = match self.network_contacts.update(section_tree_update) {
+                    let _is_new_sap = match self.network_contacts.update(section_tree_update) {
                         Ok(updated) => updated,
                         Err(err) => {
                             debug!("Ignoring JoinResponse::Retry with an invalid SAP: {err:?}");
@@ -242,10 +245,8 @@ impl<'a> Joiner<'a> {
                         }
                     };
 
-                    // if it's not a new SAP, ignore response unless the expected age is different.
-                    if self.node.age() != expected_age
-                        && (self.node.age() > expected_age || self.node.age() <= MIN_ADULT_AGE)
-                        && !self.aggregated
+                    if let Some(expected_age) =
+                        self.insert_retry_response(sender, expected_age, signed_sap.elders_set())
                     {
                         // adjust our joining age to the expected by the network
                         trace!(
@@ -270,25 +271,18 @@ impl<'a> Joiner<'a> {
 
                         info!("Setting Node name to {} (age {})", new_name, expected_age);
                         self.node = NodeInfo::new(new_keypair, self.node.addr);
-                    } else if !is_new_sap {
-                        debug!("Ignoring JoinResponse::Retry with same SAP as we previously sent to: {signed_sap:?}");
-                        continue;
+                        self.retry_responses_cache = Default::default();
+
+                        section_key = signed_sap.section_key();
+
+                        let msg = JoinRequest::Initiate { section_key };
+                        let new_recipients = signed_sap.elders_vec();
+
+                        self.send(msg, &new_recipients, section_key, true).await?;
                     }
-
-                    info!(
-                        "Newer Join response for us {:?}, SAP {signed_sap:?} from {sender:?}",
-                        self.node.name()
-                    );
-
-                    section_key = signed_sap.section_key();
-
-                    let msg = JoinRequest::Initiate { section_key };
-                    let new_recipients = signed_sap.elders_vec();
-
-                    self.send(msg, &new_recipients, section_key, true).await?;
                 }
                 JoinResponse::Redirect(section_auth) => {
-                    trace!("Received a redirect/retry JoinResponse from {}. Sending request to the latest contacts", sender);
+                    trace!("Received a redirect JoinResponse from {}. Sending request to the latest contacts", sender);
                     if section_auth.elders.is_empty() {
                         error!(
                             "Invalid JoinResponse::Redirect, empty list of Elders: {:?}",
@@ -347,6 +341,46 @@ impl<'a> Joiner<'a> {
                 }
             }
         }
+    }
+
+    // The retry responses may containing different expected ages, or only having
+    // more than 1/3 of elders voted (which blocks the aggregation).
+    // So a restart with new name shall happen when: received 1/3 of elders voted
+    // And with an age of: the most expected age
+    fn insert_retry_response(
+        &mut self,
+        sender: Peer,
+        expected_age: u8,
+        elders: BTreeSet<Peer>,
+    ) -> Option<u8> {
+        if !elders.contains(&sender) {
+            error!("Sender {sender:?} of the retry-response is not part of the elders {elders:?}");
+            return None;
+        }
+        let _ = self.retry_responses_cache.insert(sender, expected_age);
+        let mut responded = 0;
+        let mut expected_ages: BTreeMap<u8, u8> = Default::default();
+        for (elder, expected_age) in self.retry_responses_cache.iter() {
+            if elders.contains(elder) {
+                responded += 1;
+                *expected_ages.entry(*expected_age).or_insert(0) += 1;
+            }
+        }
+
+        if responded > elders.len() / 3 && !self.aggregated {
+            let (voted_expected_age, _count) = expected_ages
+                .iter()
+                // In case two ages got the same votes, we prefer the lower age
+                .max_by_key(|(age, count)| (*count, -(**age as i32)))?;
+            if self.node.age() != *voted_expected_age {
+                return Some(*voted_expected_age);
+            }
+            trace!(
+                "No restart as current age({}) same to the expected {voted_expected_age}",
+                self.node.age()
+            );
+        }
+        None
     }
 
     #[tracing::instrument(skip(self))]
@@ -489,6 +523,7 @@ mod tests {
         future::{self, Either},
         pin_mut,
     };
+    use itertools::Itertools;
     use std::collections::BTreeMap;
     use tokio::task;
     use xor_name::XorName;
@@ -501,15 +536,15 @@ mod tests {
 
         let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
         let (send_tx, mut send_rx) = mpsc::channel(1);
-        let (recv_tx, mut recv_rx) = mpsc::channel(1);
+        let (recv_tx, mut recv_rx) = mpsc::channel(10);
 
-        let (genesis_sap, genesis_nodes, genesis_sk_set) =
+        let (genesis_sap, _genesis_nodes, genesis_sk_set) =
             random_sap(Prefix::default(), elder_count(), 0, None);
         let genesis_sk = genesis_sk_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
 
         let node = NodeInfo::new(
-            ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
+            ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE + 1),
             gen_addr(),
         );
 
@@ -559,15 +594,19 @@ mod tests {
             assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest::Initiate { .. }));
 
             // Send JoinResponse::Retry with new SAP
-            send_response(
-                &recv_tx,
-                JoinResponse::Retry {
-                    section_tree_update: section_tree_update.clone(),
-                    expected_age: MIN_ADULT_AGE,
-                },
-                &genesis_nodes[0],
-                next_sap.section_key(),
-            )?;
+            let other_elders: Vec<&NodeInfo> =
+                next_elders.iter().take(elder_count() / 3 + 1).collect_vec();
+            for elder in other_elders.iter() {
+                send_response(
+                    &recv_tx,
+                    JoinResponse::Retry {
+                        section_tree_update: section_tree_update.clone(),
+                        expected_age: MIN_ADULT_AGE,
+                    },
+                    elder,
+                    next_sap.section_key(),
+                )?;
+            }
 
             // Receive the second JoinRequest with correct section info
             let (wire_msg, recipients) = send_rx
@@ -583,9 +622,11 @@ mod tests {
                 assert_eq!(section_key, next_section_key);
             });
 
+            // Name changed
+            let new_peer = Peer::new(dst.name, node.peer().addr());
             // Send JoinResponse::Approved
             let decision =
-                section_decision(&next_sk_set, NodeState::joined(node.peer(), None).to_msg())?;
+                section_decision(&next_sk_set, NodeState::joined(new_peer, None).to_msg())?;
             send_response(
                 &recv_tx,
                 JoinResponse::Approved {
@@ -825,7 +866,7 @@ mod tests {
 
         let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
         let (send_tx, mut send_rx) = mpsc::channel(1);
-        let (recv_tx, mut recv_rx) = mpsc::channel(1);
+        let (recv_tx, mut recv_rx) = mpsc::channel(10);
 
         let node = NodeInfo::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
@@ -833,7 +874,6 @@ mod tests {
         );
 
         let first_bit = node.name().bit(0);
-        let good_prefix = Prefix::default().pushed(first_bit);
         let bad_prefix = Prefix::default().pushed(!first_bit);
 
         let (genesis_sap, genesis_nodes, genesis_sk_set) =
@@ -877,9 +917,7 @@ mod tests {
             task::yield_now().await;
 
             // Send `Retry` with valid update
-
             let (next_sap, next_elders, next_sk_set) = random_sap(Prefix::default(), 1, 0, None);
-
             let next_section_key = next_sk_set.public_keys().public_key();
             let section_tree_update = {
                 let mut proof_chain = SectionsDAG::new(genesis_pk);
@@ -897,15 +935,19 @@ mod tests {
 
                 SectionTreeUpdate::new(signed_next_sap, proof_chain)
             };
-            send_response(
-                &recv_tx,
-                JoinResponse::Retry {
-                    section_tree_update,
-                    expected_age: MIN_ADULT_AGE,
-                },
-                &next_elders[0],
-                next_section_key,
-            )?;
+            let good_elders: Vec<&NodeInfo> =
+                next_elders.iter().take(elder_count() / 3 + 1).collect_vec();
+            for elder in good_elders.iter() {
+                send_response(
+                    &recv_tx,
+                    JoinResponse::Retry {
+                        section_tree_update: section_tree_update.clone(),
+                        expected_age: MIN_ADULT_AGE + 1,
+                    },
+                    elder,
+                    next_section_key,
+                )?;
+            }
 
             let (wire_msg, _) = send_rx
                 .recv()
