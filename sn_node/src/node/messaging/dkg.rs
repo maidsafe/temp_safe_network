@@ -37,7 +37,7 @@ fn dkg_peers(our_index: usize, session_id: &DkgSessionId) -> BTreeSet<Peer> {
     session_id
         .elder_peers()
         .enumerate()
-        .filter_map(|(index, peer)| (index != our_index).then(|| peer))
+        .filter_map(|(index, peer)| (index != our_index).then_some(peer))
         .collect()
 }
 
