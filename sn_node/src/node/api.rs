@@ -17,6 +17,7 @@ use crate::{
 use sn_interface::{
     network_knowledge::{
         NetworkKnowledge, NodeInfo, SectionAuthorityProvider, SectionKeyShare, SectionsDAG,
+        GENESIS_DBC_SK,
     },
     types::log_markers::LogMarker,
 };
@@ -44,8 +45,8 @@ impl Node {
             addr: our_addr,
         };
 
-        // Mint the genesis DBC to be owned by the provided genesis key
-        let genesis_dbc = gen_genesis_dbc(&genesis_sk_set)?;
+        let genesis_dbc =
+            gen_genesis_dbc(&genesis_sk_set, &bls::SecretKey::from_hex(GENESIS_DBC_SK)?)?;
 
         let (network_knowledge, section_key_share) =
             NetworkKnowledge::first_node(info.peer(), genesis_sk_set)?;
@@ -137,17 +138,29 @@ impl Node {
     }
 }
 
-// Helper to generate the (currently bearer) genesis DBC to be owned by the provided key.
-pub(crate) fn gen_genesis_dbc(input_sk_set: &bls::SecretKeySet) -> Result<Dbc> {
+/// Generate the genesis DBC.
+///
+/// Requires the initial section key to sign the share and a different secret key for the DBC.
+///
+/// The genesis DBC will be created using a different key from the initial section key. This is
+/// because the genesis DBC, along with its secret key, will be publicly available for auditing
+/// purposes. It needs to be a set rather than just a key because a spent proof share gets
+/// generated, which requires a key set. We can't use the same key for the genesis DBC and section
+/// because if the genesis DBC is publicly available, the secret key could be used to create a bad
+/// section that would be accepted by the network.
+pub(crate) fn gen_genesis_dbc(
+    genesis_section_sk_set: &bls::SecretKeySet,
+    genesis_dbc_sk: &bls::SecretKey,
+) -> Result<Dbc> {
     // Use the same key as the input and output of Genesis Tx.
-    let output_sk = input_sk_set.secret_key();
-    let output_owner = OwnerOnce::from_owner_base(Owner::from(output_sk), &mut rng::thread_rng());
+    let output_owner =
+        OwnerOnce::from_owner_base(Owner::from(genesis_dbc_sk.clone()), &mut rng::thread_rng());
 
     let revealed_commitment =
         RevealedCommitment::from_value(GENESIS_DBC_AMOUNT, &mut rng::thread_rng());
 
     // Use the same key as the input and output of Genesis Tx.
-    let true_input = TrueInput::new(input_sk_set.secret_key(), revealed_commitment);
+    let true_input = TrueInput::new(genesis_dbc_sk.clone(), revealed_commitment);
 
     // build our MlsagMaterial manually without randomness.
     // note: no decoy inputs because no other DBCs exist prior to genesis DBC.
@@ -155,8 +168,8 @@ pub(crate) fn gen_genesis_dbc(input_sk_set: &bls::SecretKeySet) -> Result<Dbc> {
         true_input,
         decoy_inputs: vec![],
         pi_base: 0,
-        alpha: (Default::default(), Default::default()),
-        r: vec![(Default::default(), Default::default())],
+        alpha: (1234.into(), 5678.into()),
+        r: vec![(9123.into(), 4567.into())],
     };
 
     let mut dbc_builder = TransactionBuilder::default()
@@ -186,14 +199,14 @@ pub(crate) fn gen_genesis_dbc(input_sk_set: &bls::SecretKeySet) -> Result<Dbc> {
     };
 
     let sk_share_index = 0;
-    let sig_share = input_sk_set
+    let sig_share = genesis_section_sk_set
         .secret_key_share(sk_share_index)
         .sign(content.hash().as_ref());
     let spentbook_sig_share = IndexedSignatureShare::new(sk_share_index, sig_share);
 
     let spent_proof_share = SpentProofShare {
         content,
-        spentbook_pks: input_sk_set.public_keys(),
+        spentbook_pks: genesis_section_sk_set.public_keys(),
         spentbook_sig_share,
     };
 

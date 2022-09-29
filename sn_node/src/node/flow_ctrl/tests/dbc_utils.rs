@@ -50,7 +50,7 @@ pub(crate) fn get_genesis_dbc_spend_info(
     BTreeSet<SpentProof>,
     BTreeSet<RingCtTransaction>,
 )> {
-    let genesis_dbc = gen_genesis_dbc(sk_set)?;
+    let genesis_dbc = gen_genesis_dbc(sk_set, &sk_set.secret_key())?;
     let dbc_owner = genesis_dbc.owner_base().clone();
     let output_owner = OwnerOnce::from_owner_base(dbc_owner, &mut rand::thread_rng());
     let tx_builder = TransactionBuilder::default()

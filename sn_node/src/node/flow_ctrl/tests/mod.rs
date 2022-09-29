@@ -1417,7 +1417,7 @@ async fn spentbook_spend_spent_proofs_do_not_relate_to_input_dbcs_should_return_
             // from `new_dbc`, which was our input to `new_dbc2`.
             let sap = section.section_auth();
             let keys_provider = dispatcher.node().read().await.section_keys_provider.clone();
-            let genesis_dbc = gen_genesis_dbc(&sk_set)?;
+            let genesis_dbc = gen_genesis_dbc(&sk_set, &sk_set.secret_key())?;
             let new_dbc = reissue_dbc(
                 &genesis_dbc,
                 10,
@@ -1485,7 +1485,7 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
             // These conditions will produce a failure on `tx.verify` in the message handler.
             let sap = section.section_auth();
             let keys_provider = dispatcher.node().read().await.section_keys_provider.clone();
-            let genesis_dbc = gen_genesis_dbc(&sk_set)?;
+            let genesis_dbc = gen_genesis_dbc(&sk_set, &sk_set.secret_key())?;
             let new_dbc = reissue_dbc(
                 &genesis_dbc,
                 10,
@@ -1553,7 +1553,7 @@ async fn spentbook_spend_with_random_key_image_should_return_spentbook_error() -
 
             let sap = section.section_auth();
             let keys_provider = dispatcher.node().read().await.section_keys_provider.clone();
-            let genesis_dbc = gen_genesis_dbc(&sk_set)?;
+            let genesis_dbc = gen_genesis_dbc(&sk_set, &sk_set.secret_key())?;
             let new_dbc = reissue_dbc(
                 &genesis_dbc,
                 10,
@@ -1661,7 +1661,7 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
             // The owners of the DBCs here don't really matter, so we just use random keys.
             let skp = SectionKeysProvider::new(Some(other_section_key_share.clone()));
             let sap = other_section.signed_sap();
-            let genesis_dbc = gen_genesis_dbc(&genesis_sk_set)?;
+            let genesis_dbc = gen_genesis_dbc(&genesis_sk_set, &genesis_sk_set.secret_key())?;
             let new_dbc = reissue_dbc(&genesis_dbc, 10, &bls::SecretKey::random(), &sap, &skp)?;
             let new_dbc2 = reissue_dbc(&new_dbc, 5, &bls::SecretKey::random(), &sap, &skp)?;
             let new_dbc2_spent_proof =
