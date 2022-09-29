@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1664333789319,
+  "lastUpdate": 1664477448499,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -24773,6 +24773,150 @@ window.BENCHMARK_DATA = {
             "name": "generating keys",
             "value": 4746967,
             "range": "± 199429",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "c6f2e2fb98e29911336f86f54c1d9b9605037b57",
+          "message": "Merge #1550\n\n1550: SDKG integration r=davidrusu a=grumbach\n\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\r\n- integrates `sn_sdkg` and removes `bls_dkg`\n\nCo-authored-by: grumbach <anselmega@gmail.com>",
+          "timestamp": "2022-09-29T16:29:15Z",
+          "tree_id": "11982ea12beec6d8b39454640d10047126deb36d",
+          "url": "https://github.com/maidsafe/safe_network/commit/c6f2e2fb98e29911336f86f54c1d9b9605037b57"
+        },
+        "date": 1664477446909,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 5190547,
+            "range": "± 174878",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 1935595326,
+            "range": "± 3915613909",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3042324147,
+            "range": "± 5214165256",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 6917977260,
+            "range": "± 5105656558",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 490269350,
+            "range": "± 1106725997",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 510125264,
+            "range": "± 648380378",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 691369771,
+            "range": "± 211027428",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 38826604,
+            "range": "± 8632409",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 1041474897,
+            "range": "± 340027507",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 7046901277,
+            "range": "± 1504312392",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 138046297,
+            "range": "± 69652845",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1348280409,
+            "range": "± 217566576",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 4984666445,
+            "range": "± 797650330",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 46630864,
+            "range": "± 3324609",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 435365290,
+            "range": "± 18328230",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1768118506,
+            "range": "± 75429335",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 12355452,
+            "range": "± 353709",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 100920748,
+            "range": "± 39210720",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 390341704,
+            "range": "± 28505905",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "generating keys",
+            "value": 4731214,
+            "range": "± 256402",
             "unit": "ns/iter"
           }
         ]
