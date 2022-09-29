@@ -236,10 +236,13 @@ impl<'a> Joiner<'a> {
                     }
 
                     // make sure we received a valid and trusted new SAP
-                    if let Err(err) = self.network_contacts.update(section_tree_update) {
-                        debug!("Ignoring JoinResponse::Retry with an invalid SAP: {err:?}");
-                        continue;
-                    }
+                    let is_new_sap = match self.network_contacts.update(section_tree_update) {
+                        Ok(updated) => updated,
+                        Err(err) => {
+                            debug!("Ignoring JoinResponse::Retry with an invalid SAP: {err:?}");
+                            continue;
+                        }
+                    };
 
                     // if it's not a new SAP, ignore response unless the expected age is different.
                     if self.node.age() != expected_age
@@ -269,13 +272,14 @@ impl<'a> Joiner<'a> {
 
                         info!("Setting Node name to {} (age {})", new_name, expected_age);
                         self.node = NodeInfo::new(new_keypair, self.node.addr);
+                    } else if !is_new_sap {
+                        debug!("Ignoring JoinResponse::Retry with same SAP as we previously sent to: {:?}", section_auth);
+                        continue;
                     }
 
                     info!(
-                        "Newer Join response for us {:?}, SAP {:?} from {:?}",
-                        self.node.name(),
-                        section_auth,
-                        sender
+                        "Newer Join response for us {:?}, SAP {section_auth:?} from {sender:?}",
+                        self.node.name()
                     );
 
                     section_key = section_auth.section_key();
