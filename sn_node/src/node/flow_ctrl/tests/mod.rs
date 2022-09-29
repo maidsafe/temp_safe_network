@@ -51,7 +51,7 @@ use sn_interface::{
 };
 
 use assert_matches::assert_matches;
-use bls_dkg::message::Message;
+use bls::Signature;
 use ed25519_dalek::Signer;
 use eyre::{bail, eyre, Context, Result};
 use itertools::Itertools;

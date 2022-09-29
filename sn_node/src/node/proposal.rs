@@ -6,10 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{dkg::SigShare, Result};
+use crate::node::Result;
 
 use sn_interface::{
-    messaging::system::{Proposal as ProposalMsg, SectionAuth},
+    messaging::system::{Proposal as ProposalMsg, SectionAuth, SigShare},
     network_knowledge::{NodeState, SectionAuthorityProvider},
 };
 

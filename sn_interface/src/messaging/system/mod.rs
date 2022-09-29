@@ -13,9 +13,11 @@ mod msg_authority;
 mod node_msgs;
 mod node_state;
 mod signed;
-use bls::PublicKey as BlsPublicKey;
 
-pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, Proposal, SectionAuth};
+use super::authority::SectionAuth as SectionAuthProof;
+use crate::messaging::{AuthorityProof, EndUser, MsgId, SectionTreeUpdate};
+use crate::network_knowledge::SapCandidate;
+pub use agreement::{DkgSessionId, Proposal, SectionAuth};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProof};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use msg_authority::NodeMsgAuthorityUtils;
@@ -23,17 +25,13 @@ pub use node_msgs::{NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse};
 pub use node_state::{MembershipState, NodeState, RelocateDetails};
 pub use signed::{KeyedSig, SigShare};
 
-use super::{authority::SectionAuth as SectionAuthProof, AuthorityProof};
+use bls::PublicKey as BlsPublicKey;
+use ed25519::Signature;
 use qp2p::UsrMsgBytes;
-
-use crate::messaging::{EndUser, MsgId, SectionTreeUpdate};
-use crate::network_knowledge::SapCandidate;
-
-use sn_consensus::{Generation, SignedVote};
-
-use bls_dkg::key_gen::message::Message as DkgMessage;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use sn_consensus::{Generation, SignedVote};
+use sn_sdkg::DkgSignedVote;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Display, Formatter};
 use xor_name::XorName;
 
@@ -86,60 +84,28 @@ pub enum SystemMsg {
     JoinAsRelocatedResponse(Box<JoinAsRelocatedResponse>),
     /// Sent to the new elder candidates to start the DKG process.
     DkgStart(DkgSessionId),
-    /// Message sent when a DKG session has not started
-    DkgSessionUnknown {
+    /// Sent when DKG is triggered to other participant
+    DkgEphemeralPubKey {
         /// The identifier of the DKG session this message is for.
-        session_id: DkgSessionId,
-        /// DKG message that came in
-        message: DkgMessage,
-    },
-    /// DKG session info along with section authority
-    DkgSessionInfo {
-        /// The identifier of the DKG session to start.
         session_id: DkgSessionId,
         /// Section authority for the DKG start message
         section_auth: AuthorityProof<SectionAuthProof>,
-        /// Messages processed in the session so far
-        message_cache: Vec<DkgMessage>,
-        /// The original DKG message
-        message: DkgMessage,
+        /// The ephemeral bls key chosen by candidate
+        pub_key: BlsPublicKey,
+        /// The ed25519 signature of the candidate
+        sig: Signature,
     },
-    /// Message exchanged for DKG process.
-    DkgMessage {
+    /// Votes exchanged for DKG process.
+    DkgVotes {
         /// The identifier of the DKG session this message is for.
         session_id: DkgSessionId,
+        /// The ephemeral bls public keys used for this Dkg round
+        pub_keys: BTreeMap<XorName, (BlsPublicKey, Signature)>,
         /// The DKG message.
-        message: DkgMessage,
+        votes: Vec<DkgSignedVote>,
     },
-    /// Message signalling that the node is not ready for the
-    /// DKG message yet
-    DkgNotReady {
-        /// The identifier of the DKG session this message is for.
-        session_id: DkgSessionId,
-        /// The sent DKG message.
-        message: DkgMessage,
-    },
-    /// Message containing a history of received DKG messages so other nodes can catch-up
-    DkgRetry {
-        /// History of messages received at the sender's end
-        message_history: Vec<DkgMessage>,
-        /// The identifier of the DKG session this message is for.
-        session_id: DkgSessionId,
-        /// The originally sent DKG message.
-        message: DkgMessage,
-    },
-    /// Broadcast to the other DKG participants when a DKG failure is observed.
-    DkgFailureObservation {
-        /// The DKG key
-        session_id: DkgSessionId,
-        /// Signature over the failure
-        sig: DkgFailureSig,
-        /// Nodes that failed to participate
-        failed_participants: BTreeSet<XorName>,
-    },
-    /// Sent to the current elders by the DKG participants when at least majority of them observe
-    /// a DKG failure.
-    DkgFailureAgreement(DkgFailureSigSet),
+    /// Dkg Anti-Entropy request when receiving votes that are ahead of our knowledge
+    DkgAE(DkgSessionId),
     /// Section handover consensus vote message
     HandoverVotes(Vec<SignedVote<SapCandidate>>),
     /// Handover Anti-Entropy request
@@ -182,13 +148,9 @@ impl SystemMsg {
         match self {
             // DKG messages
             Self::DkgStart { .. }
-            | Self::DkgSessionUnknown { .. }
-            | Self::DkgSessionInfo { .. }
-            | Self::DkgNotReady { .. }
-            | Self::DkgRetry { .. }
-            | Self::DkgMessage { .. }
-            | Self::DkgFailureObservation { .. }
-            | Self::DkgFailureAgreement(_) => DKG_MSG_PRIORITY,
+            | Self::DkgEphemeralPubKey { .. }
+            | Self::DkgVotes { .. }
+            | Self::DkgAE { .. } => DKG_MSG_PRIORITY,
 
             // Inter-node comms for AE updates
             Self::AntiEntropy { .. } | Self::AntiEntropyProbe(_) => ANTIENTROPY_MSG_PRIORITY,
@@ -228,14 +190,10 @@ impl SystemMsg {
             Self::JoinResponse(_) => State::Join,
             Self::JoinAsRelocatedRequest(_) => State::Join,
             Self::JoinAsRelocatedResponse(_) => State::Join,
-            Self::DkgStart(_) => State::Dkg,
-            Self::DkgSessionUnknown { .. } => State::Dkg,
-            Self::DkgSessionInfo { .. } => State::Dkg,
-            Self::DkgMessage { .. } => State::Dkg,
-            Self::DkgNotReady { .. } => State::Dkg,
-            Self::DkgRetry { .. } => State::Dkg,
-            Self::DkgFailureObservation { .. } => State::Dkg,
-            Self::DkgFailureAgreement(_) => State::Dkg,
+            Self::DkgStart { .. } => State::Dkg,
+            Self::DkgEphemeralPubKey { .. } => State::Dkg,
+            Self::DkgVotes { .. } => State::Dkg,
+            Self::DkgAE { .. } => State::Dkg,
             Self::HandoverVotes(_) => State::Handover,
             Self::HandoverAE(_) => State::Handover,
             Self::Propose { .. } => State::Propose,
@@ -264,15 +222,9 @@ impl Display for SystemMsg {
                 write!(f, "SystemMsg::JoinAsRelocatedResponse")
             }
             Self::DkgStart { .. } => write!(f, "SystemMsg::DkgStart"),
-            Self::DkgSessionUnknown { .. } => write!(f, "SystemMsg::DkgSessionUnknown"),
-            Self::DkgSessionInfo { .. } => write!(f, "SystemMsg::DkgSessionInfo"),
-            Self::DkgMessage { .. } => write!(f, "SystemMsg::DkgMessage"),
-            Self::DkgNotReady { .. } => write!(f, "SystemMsg::DkgNotReady"),
-            Self::DkgRetry { .. } => write!(f, "SystemMsg::DkgRetry"),
-            Self::DkgFailureObservation { .. } => {
-                write!(f, "SystemMsg::DkgFailureObservation")
-            }
-            Self::DkgFailureAgreement { .. } => write!(f, "SystemMsg::DkgFailureAgreement"),
+            Self::DkgEphemeralPubKey { .. } => write!(f, "SystemMsg::DkgEphemeralPubKey"),
+            Self::DkgVotes { .. } => write!(f, "SystemMsg::DkgVotes"),
+            Self::DkgAE { .. } => write!(f, "SystemMsg::DkgAE"),
             Self::HandoverVotes { .. } => write!(f, "SystemMsg::HandoverVotes"),
             Self::HandoverAE { .. } => write!(f, "SystemMsg::HandoverAE"),
             Self::Propose { .. } => write!(f, "SystemMsg::Propose"),
