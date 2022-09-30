@@ -121,7 +121,7 @@ pub(crate) enum Cmd {
         origin: Peer,
         target_adult: XorName,
     },
-    HandleValidSystemMsg {
+    HandleValidNodeMsg {
         msg_id: MsgId,
         msg: NodeMsg,
         origin: Peer,
@@ -131,7 +131,7 @@ pub(crate) enum Cmd {
         #[cfg(feature = "traceroute")]
         traceroute: Traceroute,
     },
-    HandleValidServiceMsg {
+    HandleValidClientMsg {
         msg_id: MsgId,
         msg: ClientMsg,
         origin: Peer,
@@ -140,7 +140,7 @@ pub(crate) enum Cmd {
         #[cfg(feature = "traceroute")]
         traceroute: Traceroute,
     },
-    UpdateNetworkAndHandleValidServiceMsg {
+    UpdateNetworkAndHandleValidClientMsg {
         proof_chain: SectionsDAG,
         signed_sap: SectionAuth<SectionAuthorityProvider>,
         msg_id: MsgId,
@@ -236,9 +236,9 @@ impl Cmd {
             AddToPendingQueries { .. } => 6,
 
             // See [`MsgType`] for the priority constants and the range of possible values.
-            HandleValidSystemMsg { msg, .. } => msg.priority(),
-            HandleValidServiceMsg { msg, .. } => msg.priority(),
-            UpdateNetworkAndHandleValidServiceMsg { msg, .. } => msg.priority(),
+            HandleValidNodeMsg { msg, .. } => msg.priority(),
+            HandleValidClientMsg { msg, .. } => msg.priority(),
+            UpdateNetworkAndHandleValidClientMsg { msg, .. } => msg.priority(),
 
             ValidateMsg { .. } => -9, // before it's validated, we cannot give it high prio, as it would be a spam vector
         }
@@ -251,9 +251,9 @@ impl Cmd {
             Cmd::SendMsg { .. } => State::Comms,
             Cmd::HandleFailedSendToNode { .. } => State::Comms,
             Cmd::ValidateMsg { .. } => State::Validation,
-            Cmd::HandleValidSystemMsg { msg, .. } => msg.statemap_states(),
-            Cmd::HandleValidServiceMsg { .. } => State::ServiceMsg,
-            Cmd::UpdateNetworkAndHandleValidServiceMsg { .. } => State::ServiceMsg,
+            Cmd::HandleValidNodeMsg { msg, .. } => msg.statemap_states(),
+            Cmd::HandleValidClientMsg { .. } => State::ClientMsg,
+            Cmd::UpdateNetworkAndHandleValidClientMsg { .. } => State::ClientMsg,
             Cmd::TrackNodeIssueInDysfunction { .. } => State::Dysfunction,
             Cmd::AddToPendingQueries { .. } => State::Dysfunction,
             Cmd::HandleAgreement { .. } => State::Agreement,
@@ -285,14 +285,14 @@ impl fmt::Display for Cmd {
                     wire_msg.payload_debug
                 )
             }
-            Cmd::HandleValidSystemMsg { msg_id, msg, .. } => {
-                write!(f, "HandleValidSystemMsg {:?}: {:?}", msg_id, msg)
+            Cmd::HandleValidNodeMsg { msg_id, msg, .. } => {
+                write!(f, "HandleValidNodeMsg {:?}: {:?}", msg_id, msg)
             }
-            Cmd::HandleValidServiceMsg { msg_id, msg, .. } => {
-                write!(f, "HandleValidServiceMsg {:?}: {:?}", msg_id, msg)
+            Cmd::HandleValidClientMsg { msg_id, msg, .. } => {
+                write!(f, "HandleValidClientMsg {:?}: {:?}", msg_id, msg)
             }
-            Cmd::UpdateNetworkAndHandleValidServiceMsg { msg_id, msg, .. } => {
-                write!(f, "UpdateAndHandleValidServiceMsg {:?}: {:?}", msg_id, msg)
+            Cmd::UpdateNetworkAndHandleValidClientMsg { msg_id, msg, .. } => {
+                write!(f, "UpdateAndHandleValidClientMsg {:?}: {:?}", msg_id, msg)
             }
             Cmd::HandleFailedSendToNode { peer, msg_id } => {
                 write!(f, "HandlePeerFailedSend({:?}, {:?})", peer.name(), msg_id)

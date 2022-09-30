@@ -162,17 +162,17 @@ impl ClientMsg {
 impl Display for ClientMsg {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Cmd(cmd) => write!(f, "ServiceMsg::Cmd({:?})", cmd),
+            Self::Cmd(cmd) => write!(f, "ClientMsg::Cmd({:?})", cmd),
             Self::CmdAck { correlation_id } => {
-                write!(f, "ServiceMsg::CmdAck({:?})", correlation_id)
+                write!(f, "ClientMsg::CmdAck({:?})", correlation_id)
             }
-            Self::CmdError { error, .. } => write!(f, "ServiceMsg::CmdError({:?})", error),
-            Self::Query(query) => write!(f, "ServiceMsg::Query({:?})", query),
+            Self::CmdError { error, .. } => write!(f, "ClientMsg::CmdError({:?})", error),
+            Self::Query(query) => write!(f, "ClientMsg::Query({:?})", query),
             Self::QueryResponse { response, .. } => {
-                write!(f, "ServiceMsg::QueryResponse({:?})", response)
+                write!(f, "ClientMsg::QueryResponse({:?})", response)
             }
             Self::ServiceError { reason, .. } => {
-                write!(f, "ServiceMsg::ServiceError({:?})", reason)
+                write!(f, "ClientMsg::ServiceError({:?})", reason)
             }
         }
     }

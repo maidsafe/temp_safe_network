@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### New Features
 
- - <csr-id-19abbe20724770e618e5d038f238bdf4b3de6ea2/> rename SystemMsg to BackPressure
+ - <csr-id-19abbe20724770e618e5d038f238bdf4b3de6ea2/> rename NodeMsg to BackPressure
  - <csr-id-08a0a8eb75a0ca9d51fa321686d17dbcf97fc04e/> fix time alignment; more states; mv to sn_interface
 
 ### Bug Fixes
@@ -87,7 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - applied use_self lint ([`f5d436f`](https://github.com/maidsafe/safe_network/commit/f5d436fba99e0e9c258c7ab3c3a256be3be58f84))
     - skip spentbook register creation if it already exists ([`183d7f8`](https://github.com/maidsafe/safe_network/commit/183d7f83985a36deeb5933ae9b1880df21da2866))
     - improving internal helpers in register storage mod to reuse some logic/code ([`a668534`](https://github.com/maidsafe/safe_network/commit/a6685348578fe546576bd13405e6485d984b3487))
-    - rename SystemMsg to BackPressure ([`19abbe2`](https://github.com/maidsafe/safe_network/commit/19abbe20724770e618e5d038f238bdf4b3de6ea2))
+    - rename NodeMsg to BackPressure ([`19abbe2`](https://github.com/maidsafe/safe_network/commit/19abbe20724770e618e5d038f238bdf4b3de6ea2))
     - add back-pressure system msg ([`95930d6`](https://github.com/maidsafe/safe_network/commit/95930d61dcb191d18ae417db4bf8a223b13824db))
     - fix time alignment; more states; mv to sn_interface ([`08a0a8e`](https://github.com/maidsafe/safe_network/commit/08a0a8eb75a0ca9d51fa321686d17dbcf97fc04e))
     - move probe creation to network knowledge ([`63958a8`](https://github.com/maidsafe/safe_network/commit/63958a8629c9fbca8e6604edb17d9b61ca92a4ee))
@@ -129,7 +129,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### New Features
 
- - <csr-id-19abbe20724770e618e5d038f238bdf4b3de6ea2/> rename SystemMsg to BackPressure
+ - <csr-id-19abbe20724770e618e5d038f238bdf4b3de6ea2/> rename NodeMsg to BackPressure
  - <csr-id-08a0a8eb75a0ca9d51fa321686d17dbcf97fc04e/> fix time alignment; more states; mv to sn_interface
 
 ### Bug Fixes
@@ -188,7 +188,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
      changed to `pub(crate)`.
    * The `Cmd` struct was extended in the test module to provide utils to get at the content of
      messages, which are used for test verification.
-   * Provide util function for wrapping a `ServiceMsg` inside a `WireMsg` and so on. Keeps the testing
+   * Provide util function for wrapping a `ClientMsg` inside a `WireMsg` and so on. Keeps the testing
      code cleaner.
    * Provide util function for extracting the spent proof share from the replicated data so that we can
      verify the message handler assigned the correct values to its fields.

@@ -55,7 +55,7 @@ impl Dispatcher {
                 #[cfg(feature = "traceroute")]
                 traceroute,
             } => {
-                // ServiceMsgs are only used for the communication between Client and Elders
+                // ClientMsgs are only used for the communication between Client and Elders
                 let is_msg_for_client = matches!(msg, OutgoingMsg::Client(_));
 
                 trace!("Sending msg: {msg_id:?}");
@@ -132,7 +132,7 @@ impl Dispatcher {
                 let node = self.node.read().await;
                 node.validate_msg(origin, wire_msg).await
             }
-            Cmd::HandleValidServiceMsg {
+            Cmd::HandleValidClientMsg {
                 msg_id,
                 msg,
                 origin,
@@ -166,7 +166,7 @@ impl Dispatcher {
                     }
                 }
             }
-            Cmd::UpdateNetworkAndHandleValidServiceMsg {
+            Cmd::UpdateNetworkAndHandleValidClientMsg {
                 proof_chain,
                 signed_sap,
                 msg_id,
@@ -195,7 +195,7 @@ impl Dispatcher {
                 )
                 .await
             }
-            Cmd::HandleValidSystemMsg {
+            Cmd::HandleValidNodeMsg {
                 origin,
                 msg_id,
                 msg,

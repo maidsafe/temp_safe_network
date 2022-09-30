@@ -1,5 +1,5 @@
 use crate::node::{
-    flow_ctrl::cmds::Cmd::HandleValidServiceMsg,
+    flow_ctrl::cmds::Cmd::HandleValidClientMsg,
     flow_ctrl::dispatcher::Dispatcher,
     messaging::{OutgoingMsg, Peers},
     Cmd,
@@ -121,7 +121,7 @@ pub(crate) fn wrap_service_msg_for_handling(msg: ClientMsg, peer: Peer) -> Resul
         signature: src_client_keypair.sign(&payload),
     };
     let auth_proof = AuthorityProof::verify(auth, &payload)?;
-    Ok(HandleValidServiceMsg {
+    Ok(HandleValidClientMsg {
         msg_id: MsgId::new(),
         msg,
         origin: peer,
@@ -165,7 +165,7 @@ impl Cmd {
                         }
                         _ => Err(eyre!("A NodeCmd::ReplicateData variant was expected")),
                     },
-                    _ => Err(eyre!("An SystemMsg::NodeCmd variant was expected")),
+                    _ => Err(eyre!("An NodeMsg::NodeCmd variant was expected")),
                 },
                 _ => Err(eyre!("An OutgoingMsg::System variant was expected")),
             },
@@ -173,7 +173,7 @@ impl Cmd {
         }
     }
 
-    /// Get a `ServiceMsg` from a `Cmd::SendMsg` enum variant.
+    /// Get a `ClientMsg` from a `Cmd::SendMsg` enum variant.
     pub(crate) fn get_service_msg(&self) -> Result<ClientMsg> {
         match self {
             Cmd::SendMsg { msg, .. } => match msg {
@@ -190,7 +190,7 @@ impl Cmd {
             Cmd::SendMsg { msg, .. } => match msg {
                 OutgoingMsg::Client(service_msg) => match service_msg {
                     ClientMsg::CmdError { error, .. } => Ok(error.clone()),
-                    _ => Err(eyre!("A ServiceMsg::CmdError variant was expected")),
+                    _ => Err(eyre!("A ClientMsg::CmdError variant was expected")),
                 },
                 _ => Err(eyre!("A OutgoingMsg::Service variant was expected")),
             },

@@ -200,7 +200,7 @@ impl Node {
             return Ok(vec![]);
         }
 
-        trace!("{:?} {:?}", LogMarker::ServiceMsgToBeHandled, msg);
+        trace!("{:?} {:?}", LogMarker::ClientMsgToBeHandled, msg);
 
         // extract the data from the request
         let data = match msg {
@@ -228,7 +228,7 @@ impl Node {
                             spent_transactions,
                             network_knowledge: None,
                         }));
-                    let update_command = Cmd::UpdateNetworkAndHandleValidServiceMsg {
+                    let update_command = Cmd::UpdateNetworkAndHandleValidClientMsg {
                         proof_chain,
                         signed_sap,
                         msg_id,
@@ -264,7 +264,7 @@ impl Node {
             }
             _ => {
                 warn!(
-                    "!!!! Unexpected ServiceMsg received, and it was not handled: {:?}",
+                    "!!!! Unexpected ClientMsg received, and it was not handled: {:?}",
                     msg
                 );
                 return Ok(vec![]);

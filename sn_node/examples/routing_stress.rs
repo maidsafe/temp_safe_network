@@ -302,7 +302,7 @@ impl Network {
                 self.stats.join_failures += 1;
             }
             Event::Routing { id, event } => match event {
-                RoutingEvent::Messaging(MessagingEvent::SystemMsgReceived { dst, .. }) => {
+                RoutingEvent::Messaging(MessagingEvent::NodeMsgReceived { dst, .. }) => {
                     self.probe_tracker
                         .receive(&dst.name, &dst.section_key)
                         .await;

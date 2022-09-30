@@ -18,7 +18,7 @@ This shows us the path the query took through the network to get processed and r
 ## Implementation
 Traceroute is implemented by enabling nodes to append their identities to a Vec<PublicKey> field in the MsgEnvelope of WireMsgHeader. Nodes that create (or) handle (or) forward a message is supposed to add its PublicKey to the already present list of PKs. It is a feature-gated implementation that requires the “traceroute” flag to be enabled, although it is now temporarily enabled by default for debugging.
 
-As of now, only Client Cmds, CmdAcks, Queries, QueryResponses, and AE-SystemMsgs support traceroute. This can be expanded in the future to support other SystemMsgs and be logged at the end of each flow to see how messages have traveled across the network. Though care must be taken to not overuse this as a trace for every message might be a bit overwhelming in the logs.
+As of now, only Client Cmds, CmdAcks, Queries, QueryResponses, and AE-NodeMsgs support traceroute. This can be expanded in the future to support other NodeMsgs and be logged at the end of each flow to see how messages have traveled across the network. Though care must be taken to not overuse this as a trace for every message might be a bit overwhelming in the logs.
 
 Another caveat is that it is easy to drop a trace mid-way through its flow, therefore extra care must be taken to ensure that traces are carried over if new WireMsgs are created in the same flow.
 

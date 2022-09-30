@@ -1700,10 +1700,7 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
             // the ack command, but we've already validated the other two as part of another test.
             assert_eq!(cmds.len(), 3);
             let update_cmd = cmds[0].clone();
-            assert_matches!(
-                update_cmd,
-                Cmd::UpdateNetworkAndHandleValidServiceMsg { .. }
-            );
+            assert_matches!(update_cmd, Cmd::UpdateNetworkAndHandleValidClientMsg { .. });
 
             // Now the proof chain should have the other section key.
             let tree = dispatcher

@@ -208,33 +208,33 @@ impl NodeMsg {
 impl Display for NodeMsg {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::AntiEntropy { .. } => write!(f, "SystemMsg::AntiEntropy"),
-            Self::AntiEntropyProbe { .. } => write!(f, "SystemMsg::AntiEntropyProbe"),
-            Self::Relocate { .. } => write!(f, "SystemMsg::Relocate"),
-            Self::MembershipVotes { .. } => write!(f, "SystemMsg::MembershipVotes"),
-            Self::MembershipAE { .. } => write!(f, "SystemMsg::MembershipAE"),
-            Self::JoinRequest { .. } => write!(f, "SystemMsg::JoinRequest"),
-            Self::JoinResponse { .. } => write!(f, "SystemMsg::JoinResponse"),
+            Self::AntiEntropy { .. } => write!(f, "NodeMsg::AntiEntropy"),
+            Self::AntiEntropyProbe { .. } => write!(f, "NodeMsg::AntiEntropyProbe"),
+            Self::Relocate { .. } => write!(f, "NodeMsg::Relocate"),
+            Self::MembershipVotes { .. } => write!(f, "NodeMsg::MembershipVotes"),
+            Self::MembershipAE { .. } => write!(f, "NodeMsg::MembershipAE"),
+            Self::JoinRequest { .. } => write!(f, "NodeMsg::JoinRequest"),
+            Self::JoinResponse { .. } => write!(f, "NodeMsg::JoinResponse"),
             Self::JoinAsRelocatedRequest { .. } => {
-                write!(f, "SystemMsg::JoinAsRelocatedRequest")
+                write!(f, "NodeMsg::JoinAsRelocatedRequest")
             }
             Self::JoinAsRelocatedResponse { .. } => {
-                write!(f, "SystemMsg::JoinAsRelocatedResponse")
+                write!(f, "NodeMsg::JoinAsRelocatedResponse")
             }
-            Self::DkgStart { .. } => write!(f, "SystemMsg::DkgStart"),
-            Self::DkgEphemeralPubKey { .. } => write!(f, "SystemMsg::DkgEphemeralPubKey"),
-            Self::DkgVotes { .. } => write!(f, "SystemMsg::DkgVotes"),
-            Self::DkgAE { .. } => write!(f, "SystemMsg::DkgAE"),
-            Self::HandoverVotes { .. } => write!(f, "SystemMsg::HandoverVotes"),
-            Self::HandoverAE { .. } => write!(f, "SystemMsg::HandoverAE"),
-            Self::Propose { .. } => write!(f, "SystemMsg::Propose"),
-            Self::NodeEvent { .. } => write!(f, "SystemMsg::NodeEvent"),
+            Self::DkgStart { .. } => write!(f, "NodeMsg::DkgStart"),
+            Self::DkgEphemeralPubKey { .. } => write!(f, "NodeMsg::DkgEphemeralPubKey"),
+            Self::DkgVotes { .. } => write!(f, "NodeMsg::DkgVotes"),
+            Self::DkgAE { .. } => write!(f, "NodeMsg::DkgAE"),
+            Self::HandoverVotes { .. } => write!(f, "NodeMsg::HandoverVotes"),
+            Self::HandoverAE { .. } => write!(f, "NodeMsg::HandoverAE"),
+            Self::Propose { .. } => write!(f, "NodeMsg::Propose"),
+            Self::NodeEvent { .. } => write!(f, "NodeMsg::NodeEvent"),
             #[cfg(any(feature = "chunks", feature = "registers"))]
-            Self::NodeCmd { .. } => write!(f, "SystemMsg::NodeCmd"),
+            Self::NodeCmd { .. } => write!(f, "NodeMsg::NodeCmd"),
             #[cfg(any(feature = "chunks", feature = "registers"))]
-            Self::NodeQuery { .. } => write!(f, "SystemMsg::NodeQuery"),
+            Self::NodeQuery { .. } => write!(f, "NodeMsg::NodeQuery"),
             #[cfg(any(feature = "chunks", feature = "registers"))]
-            Self::NodeQueryResponse { .. } => write!(f, "SystemMsg::NodeQueryResponse"),
+            Self::NodeQueryResponse { .. } => write!(f, "NodeMsg::NodeQueryResponse"),
         }
     }
 }

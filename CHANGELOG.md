@@ -136,7 +136,7 @@ All notable changes to this project will be documented in this file. See [standa
 
 ### ⚠ BREAKING CHANGES
 
-* **messaging:** SystemMsg::Propose::content was renamed to SystemMsg::Propose::proposal.
+* **messaging:** NodeMsg::Propose::content was renamed to NodeMsg::Propose::proposal.
 * **messaging:** change in messaging protocol.
 
 * **messaging:** removing unused MsgKind::SectionAuthMsg ([c295b3c](https://github.com/maidsafe/safe_network/commit/c295b3c14318823e37f129f81d082275104e101f))
@@ -155,7 +155,7 @@ All notable changes to this project will be documented in this file. See [standa
 ### ⚠ BREAKING CHANGES
 
 * **messaging:** Proposal::JoinsAllowed msg type changed
-* **messaging:** SystemMsg::BouncedUntrustedMessage msg type removed from messaging protocol.
+* **messaging:** NodeMsg::BouncedUntrustedMessage msg type removed from messaging protocol.
 
 ### Bug Fixes
 
