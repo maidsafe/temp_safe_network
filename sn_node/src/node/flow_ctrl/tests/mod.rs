@@ -25,7 +25,7 @@ use crate::{
     storage::UsedSpace,
 };
 
-use cmd_utils::{handle_online_cmd, run_and_collect_cmds, wrap_service_msg_for_handling};
+use cmd_utils::{handle_online_cmd, run_and_collect_cmds, wrap_client_msg_for_handling};
 use sn_consensus::Decision;
 use sn_dbc::{Hash, OwnerOnce, SpentProofShare, TransactionBuilder};
 #[cfg(feature = "traceroute")]
@@ -900,7 +900,7 @@ async fn msg_to_self() -> Result<()> {
             assert_matches!(wire_msg.into_msg(), Ok(msg_type) => msg_type)
         });
 
-        assert_matches!(msg_type, MsgType::System { msg, .. } => {
+        assert_matches!(msg_type, MsgType::Node { msg, .. } => {
             assert_eq!(
                 msg,
                 node_msg
@@ -1214,7 +1214,7 @@ async fn handle_demote_during_split() -> Result<()> {
 }
 
 #[tokio::test]
-async fn spentbook_spend_service_message_should_replicate_to_adults_and_send_ack() -> Result<()> {
+async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack() -> Result<()> {
     let local = tokio::task::LocalSet::new();
     local
         .run_until(async move {
@@ -1232,7 +1232,7 @@ async fn spentbook_spend_service_message_should_replicate_to_adults_and_send_ack
                 dbc_utils::get_genesis_dbc_spend_info(&sk_set)?;
 
             let cmds = run_and_collect_cmds(
-                wrap_service_msg_for_handling(
+                wrap_client_msg_for_handling(
                     ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                         key_image,
                         tx: tx.clone(),
@@ -1264,8 +1264,8 @@ async fn spentbook_spend_service_message_should_replicate_to_adults_and_send_ack
                 spent_proof_share.spentbook_pks().public_key().to_hex()
             );
 
-            let service_msg = cmds[1].clone().get_service_msg()?;
-            assert_matches!(service_msg, ClientMsg::CmdAck { .. });
+            let client_msg = cmds[1].clone().get_client_msg()?;
+            assert_matches!(client_msg, ClientMsg::CmdAck { .. });
 
             Result::<()>::Ok(())
         })
@@ -1299,7 +1299,7 @@ async fn spentbook_spend_spent_proof_with_invalid_pk_should_return_spentbook_err
                 .collect();
 
             let result = run_and_collect_cmds(
-                wrap_service_msg_for_handling(
+                wrap_client_msg_for_handling(
                     ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                         key_image,
                         tx,
@@ -1358,7 +1358,7 @@ async fn spentbook_spend_spent_proof_with_key_not_in_section_chain_should_return
                 dbc_utils::get_genesis_dbc_spend_info(&sk_set)?;
 
             let result = run_and_collect_cmds(
-                wrap_service_msg_for_handling(
+                wrap_client_msg_for_handling(
                     ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                         key_image,
                         tx,
@@ -1429,7 +1429,7 @@ async fn spentbook_spend_spent_proofs_do_not_relate_to_input_dbcs_should_return_
             let new_dbc2 = reissue_dbc(&new_dbc, 5, &new_dbc2_sk, &sap, &keys_provider)?;
 
             let result = run_and_collect_cmds(
-                wrap_service_msg_for_handling(
+                wrap_client_msg_for_handling(
                     ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                         key_image: new_dbc2_sk.public_key(),
                         tx: new_dbc2.transaction.clone(),
@@ -1498,7 +1498,7 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
                 dbc_utils::reissue_invalid_dbc_with_no_inputs(&new_dbc, 5, &new_dbc2_sk)?;
 
             let result = run_and_collect_cmds(
-                wrap_service_msg_for_handling(
+                wrap_client_msg_for_handling(
                     ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                         key_image: new_dbc2_sk.public_key(),
                         tx: new_dbc2.transaction.clone(),
@@ -1566,7 +1566,7 @@ async fn spentbook_spend_with_random_key_image_should_return_spentbook_error() -
 
             let pk = bls::SecretKey::random().public_key();
             let result = run_and_collect_cmds(
-                wrap_service_msg_for_handling(
+                wrap_client_msg_for_handling(
                     ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                         key_image: pk,
                         tx: new_dbc2.transaction.clone(),
@@ -1681,7 +1681,7 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
             let (key_image, tx) =
                 get_input_dbc_spend_info(&new_dbc2, 2, &bls::SecretKey::random())?;
             let cmds = run_and_collect_cmds(
-                wrap_service_msg_for_handling(
+                wrap_client_msg_for_handling(
                     ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                         key_image,
                         tx,

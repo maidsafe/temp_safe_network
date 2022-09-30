@@ -125,10 +125,10 @@ impl Session {
         mut session: Self,
     ) -> Result<(), Error> {
         match msg.clone() {
-            MsgType::Service { msg_id, msg, .. } => {
+            MsgType::Client { msg_id, msg, .. } => {
                 Self::handle_client_msg(session, msg_id, msg, src_peer)
             }
-            MsgType::System {
+            MsgType::Node {
                 msg, msg_authority, ..
             } => {
                 session
@@ -381,7 +381,7 @@ impl Session {
         received_auth: &SectionAuthorityProvider,
     ) -> Result<Option<(MsgId, Vec<Peer>, ClientMsg, Dst, AuthorityProof<ClientAuth>)>, Error> {
         let (msg_id, service_msg, dst, auth) = match WireMsg::deserialize(bounced_msg)? {
-            MsgType::Service {
+            MsgType::Client {
                 msg_id,
                 msg,
                 auth,

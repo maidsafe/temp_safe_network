@@ -120,7 +120,7 @@ impl FlowCtrl {
             let health_cmds = match Self::perform_health_checks(self.node.clone()).await {
                 Ok(cmds) => cmds,
                 Err(error) => {
-                    error!("Error handling service msg to perform health check: {error:?}");
+                    error!("Error handling client msg to perform health check: {error:?}");
                     vec![]
                 }
             };
@@ -185,7 +185,7 @@ impl FlowCtrl {
         let auth = auth(&node, &msg)?;
 
         // generate the cmds, and ensure we go through dysfunction tracking
-        node.handle_valid_service_msg(
+        node.handle_valid_client_msg(
             msg_id,
             msg,
             auth,

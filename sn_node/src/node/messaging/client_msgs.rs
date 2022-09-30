@@ -47,7 +47,7 @@ impl Node {
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Cmd {
         let the_ack_msg = ClientMsg::CmdAck { correlation_id };
-        self.send_service_msg(
+        self.send_client_msg(
             the_ack_msg,
             Peers::Single(target),
             #[cfg(feature = "traceroute")]
@@ -68,7 +68,7 @@ impl Node {
             correlation_id,
         };
 
-        self.send_service_msg(
+        self.send_client_msg(
             the_error_msg,
             Peers::Single(target),
             #[cfg(feature = "traceroute")]
@@ -77,7 +77,7 @@ impl Node {
     }
 
     /// Forms a cmd to send a cmd response error/ack to the client
-    fn send_service_msg(
+    fn send_client_msg(
         &self,
         msg: ClientMsg,
         recipients: Peers,
@@ -178,7 +178,7 @@ impl Node {
             correlation_id,
         };
 
-        Some(self.send_service_msg(
+        Some(self.send_client_msg(
             msg,
             Peers::Multiple(waiting_peers),
             #[cfg(feature = "traceroute")]
@@ -186,9 +186,9 @@ impl Node {
         ))
     }
 
-    /// Handle incoming service msgs. Though NOT queries, as this requires
+    /// Handle incoming client msgs. Though NOT queries, as this requires
     /// mutable access to the Node
-    pub(crate) async fn handle_valid_service_msg(
+    pub(crate) async fn handle_valid_client_msg(
         &self,
         msg_id: MsgId,
         msg: ClientMsg,
@@ -220,7 +220,7 @@ impl Node {
                         to update the node network knowledge before processing the spend."
                     );
                     // To avoid a loop, recompose the message without the updated proof_chain.
-                    let updated_service_msg =
+                    let updated_client_msg =
                         ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                             key_image,
                             tx,
@@ -232,7 +232,7 @@ impl Node {
                         proof_chain,
                         signed_sap,
                         msg_id,
-                        msg: updated_service_msg,
+                        msg: updated_client_msg,
                         origin,
                         auth,
                         #[cfg(feature = "traceroute")]

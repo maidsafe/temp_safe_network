@@ -113,7 +113,7 @@ pub(crate) async fn run_and_collect_cmds(
     Ok(all_cmds)
 }
 
-pub(crate) fn wrap_service_msg_for_handling(msg: ClientMsg, peer: Peer) -> Result<Cmd> {
+pub(crate) fn wrap_client_msg_for_handling(msg: ClientMsg, peer: Peer) -> Result<Cmd> {
     let payload = WireMsg::serialize_msg_payload(&msg)?;
     let src_client_keypair = Keypair::new_ed25519();
     let auth = ClientAuth {
@@ -174,11 +174,11 @@ impl Cmd {
     }
 
     /// Get a `ClientMsg` from a `Cmd::SendMsg` enum variant.
-    pub(crate) fn get_service_msg(&self) -> Result<ClientMsg> {
+    pub(crate) fn get_client_msg(&self) -> Result<ClientMsg> {
         match self {
             Cmd::SendMsg { msg, .. } => match msg {
-                OutgoingMsg::Client(service_msg) => Ok(service_msg.clone()),
-                _ => Err(eyre!("A OutgoingMsg::Service variant was expected")),
+                OutgoingMsg::Client(client_msg) => Ok(client_msg.clone()),
+                _ => Err(eyre!("A OutgoingMsg::Client variant was expected")),
             },
             _ => Err(eyre!("A Cmd::SendMsg variant was expected")),
         }
@@ -188,11 +188,11 @@ impl Cmd {
     pub(crate) fn get_error(&self) -> Result<MessagingDataError> {
         match self {
             Cmd::SendMsg { msg, .. } => match msg {
-                OutgoingMsg::Client(service_msg) => match service_msg {
+                OutgoingMsg::Client(client_msg) => match client_msg {
                     ClientMsg::CmdError { error, .. } => Ok(error.clone()),
                     _ => Err(eyre!("A ClientMsg::CmdError variant was expected")),
                 },
-                _ => Err(eyre!("A OutgoingMsg::Service variant was expected")),
+                _ => Err(eyre!("A OutgoingMsg::Client variant was expected")),
             },
             _ => Err(eyre!("A Cmd::SendMsg variant was expected")),
         }

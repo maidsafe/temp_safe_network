@@ -27,10 +27,10 @@ pub(crate) const JOIN_RELOCATE_MSG_PRIORITY: i32 = 2;
 pub(crate) const NODE_DATA_MSG_PRIORITY: i32 = -6;
 #[cfg(any(feature = "chunks", feature = "registers"))]
 // has payment throttle, but is not critical for network function
-pub(crate) const SERVICE_CMD_PRIORITY: i32 = -8;
+pub(crate) const CLIENT_CMD_PRIORITY: i32 = -8;
 #[cfg(any(feature = "chunks", feature = "registers"))]
 // has no throttle and is sent by clients, lowest prio
-pub(crate) const SERVICE_QUERY_PRIORITY: i32 = -10;
+pub(crate) const CLIENT_QUERY_PRIORITY: i32 = -10;
 
 /// Type of message.
 /// Note this is part of this crate's public API but this enum is
@@ -39,8 +39,8 @@ pub(crate) const SERVICE_QUERY_PRIORITY: i32 = -10;
 #[allow(clippy::large_enum_variant)]
 pub enum MsgType {
     #[cfg(any(feature = "chunks", feature = "registers"))]
-    /// Service message for client<->node comms.
-    Service {
+    /// Message for client<->node comms.
+    Client {
         /// Message ID
         msg_id: MsgId,
         /// Requester's authority over this message
@@ -51,7 +51,7 @@ pub enum MsgType {
         msg: ClientMsg,
     },
     /// System message for node<->node comms.
-    System {
+    Node {
         /// Message ID
         msg_id: MsgId,
         /// Node authority over this message
@@ -68,10 +68,10 @@ impl MsgType {
     pub fn priority(&self) -> i32 {
         match self {
             // node <-> node system comms
-            Self::System { msg, .. } => msg.priority(),
+            Self::Node { msg, .. } => msg.priority(),
             // client <-> node service comms
             #[cfg(any(feature = "chunks", feature = "registers"))]
-            Self::Service { msg, .. } => msg.priority(),
+            Self::Client { msg, .. } => msg.priority(),
         }
     }
 }
@@ -79,8 +79,8 @@ impl MsgType {
 impl Display for MsgType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::System { msg, .. } => write!(f, "MsgType::System({})", msg),
-            Self::Service { msg, .. } => write!(f, "MsgType::Service({})", msg),
+            Self::Node { msg, .. } => write!(f, "MsgType::System({})", msg),
+            Self::Client { msg, .. } => write!(f, "MsgType::Service({})", msg),
         }
     }
 }

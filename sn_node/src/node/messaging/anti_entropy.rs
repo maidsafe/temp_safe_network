@@ -266,7 +266,7 @@ impl Node {
         };
 
         let (msg_to_resend, msg_id, dst) = match WireMsg::deserialize(bounced_msg)? {
-            MsgType::System {
+            MsgType::Node {
                 msg, msg_id, dst, ..
             } => (msg, msg_id, dst),
             _ => {

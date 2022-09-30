@@ -242,7 +242,7 @@ impl WireMsg {
                     Error::FailedToParse(format!("Data message payload as Msgpack: {}", err))
                 })?;
 
-                let auth = if let ClientMsg::ServiceError {
+                let auth = if let ClientMsg::ClientError {
                     source_message: Some(payload),
                     ..
                 } = &msg
@@ -252,7 +252,7 @@ impl WireMsg {
                     AuthorityProof::verify(auth, &self.payload)?
                 };
 
-                Ok(MsgType::Service {
+                Ok(MsgType::Client {
                     msg_id: self.header.msg_envelope.msg_id,
                     auth,
                     dst: self.dst,
@@ -264,7 +264,7 @@ impl WireMsg {
                     Error::FailedToParse(format!("Node signed message payload as Msgpack: {}", err))
                 })?;
 
-                Ok(MsgType::System {
+                Ok(MsgType::Node {
                     msg_id: self.header.msg_envelope.msg_id,
                     msg_authority: NodeMsgAuthority::Node(AuthorityProof::verify(
                         node_signed,
@@ -282,7 +282,7 @@ impl WireMsg {
                     ))
                 })?;
 
-                Ok(MsgType::System {
+                Ok(MsgType::Node {
                     msg_id: self.header.msg_envelope.msg_id,
                     msg_authority: NodeMsgAuthority::BlsShare(AuthorityProof::verify(
                         bls_share_signed,
@@ -416,7 +416,7 @@ mod tests {
         // test deserialisation of payload
         assert_eq!(
             deserialized.into_msg()?,
-            MsgType::System {
+            MsgType::Node {
                 msg_id: wire_msg.msg_id(),
                 msg_authority: NodeMsgAuthority::Node(node_auth),
                 dst,
@@ -466,7 +466,7 @@ mod tests {
         // test deserialisation of payload
         assert_eq!(
             deserialized.into_msg()?,
-            MsgType::Service {
+            MsgType::Client {
                 msg_id: wire_msg.msg_id(),
                 auth: auth_proof,
                 dst,

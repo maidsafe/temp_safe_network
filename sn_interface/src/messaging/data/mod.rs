@@ -77,7 +77,7 @@ pub fn chunk_operation_id(address: &ChunkAddress) -> Result<OperationId> {
     Ok(OperationId(output))
 }
 
-/// Network service messages exchanged between clients
+/// Network messages exchanged between clients
 /// and nodes in order for the clients to use the network services.
 /// NB: These are not used for node-to-node comms (see [`NodeMsg`] for those).
 ///
@@ -116,7 +116,7 @@ pub enum ClientMsg {
         correlation_id: MsgId,
     },
     /// A message indicating that an error occurred as a node was handling a client's message.
-    ServiceError {
+    ClientError {
         /// Optional reason for the error.
         ///
         /// This can be used to handle the error.
@@ -149,12 +149,12 @@ impl ClientMsg {
     #[cfg(any(feature = "chunks", feature = "registers"))]
     /// The priority of the message, when handled by lower level comms.
     pub fn priority(&self) -> i32 {
-        use super::msg_type::{SERVICE_CMD_PRIORITY, SERVICE_QUERY_PRIORITY};
+        use super::msg_type::{CLIENT_CMD_PRIORITY, CLIENT_QUERY_PRIORITY};
 
         match self {
             // Client <-> node service comms
-            Self::Cmd(_) => SERVICE_CMD_PRIORITY,
-            _ => SERVICE_QUERY_PRIORITY,
+            Self::Cmd(_) => CLIENT_CMD_PRIORITY,
+            _ => CLIENT_QUERY_PRIORITY,
         }
     }
 }
@@ -171,8 +171,8 @@ impl Display for ClientMsg {
             Self::QueryResponse { response, .. } => {
                 write!(f, "ClientMsg::QueryResponse({:?})", response)
             }
-            Self::ServiceError { reason, .. } => {
-                write!(f, "ClientMsg::ServiceError({:?})", reason)
+            Self::ClientError { reason, .. } => {
+                write!(f, "ClientMsg::ClientError({:?})", reason)
             }
         }
     }

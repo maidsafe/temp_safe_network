@@ -28,7 +28,7 @@ impl Node {
     pub(crate) fn sign_msg(&self, msg: OutgoingMsg) -> Result<(AuthKind, Bytes)> {
         match msg {
             OutgoingMsg::Node(msg) => self.sign_system_msg(msg),
-            OutgoingMsg::Client(msg) => self.sign_service_msg(msg),
+            OutgoingMsg::Client(msg) => self.sign_client_msg(msg),
             OutgoingMsg::SectionAuth((auth, payload)) => {
                 Ok((AuthKind::SectionShare(auth), payload))
             }
@@ -36,7 +36,7 @@ impl Node {
     }
 
     /// Currently using node's Ed key. May need to use bls key share for consensus purpose.
-    fn sign_service_msg(&self, msg: ClientMsg) -> Result<(AuthKind, Bytes)> {
+    fn sign_client_msg(&self, msg: ClientMsg) -> Result<(AuthKind, Bytes)> {
         let payload = WireMsg::serialize_msg_payload(&msg)?;
         let signature = self.keypair.sign(&payload);
 
