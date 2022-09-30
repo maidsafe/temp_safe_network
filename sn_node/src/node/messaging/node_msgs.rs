@@ -32,7 +32,6 @@ use sn_interface::{
             NodeCmd,
             NodeEvent,
             NodeMsg,
-            NodeMsgAuthorityUtils,
             NodeQuery,
             Proposal as ProposalMsg,
         },
@@ -247,8 +246,8 @@ impl Node {
                     }
                 }
             }
-            Node2NodeMsg::HandoverVotes(votes) => self.handle_handover_msg(sender, votes).await,
-            Node2NodeMsg::HandoverAE(gen) => Ok(self
+            NodeMsg::HandoverVotes(votes) => self.handle_handover_msg(sender, votes).await,
+            NodeMsg::HandoverAE(gen) => Ok(self
                 .handle_handover_anti_entropy(sender, gen)
                 .into_iter()
                 .collect()),
@@ -313,7 +312,7 @@ impl Node {
                     &mut self.proposal_aggregator,
                 )
             }
-            Node2NodeMsg::DkgStart(session_id) => {
+            NodeMsg::DkgStart(session_id) => {
                 trace!(
                     "Handling msg: DkgStart s{} {:?}: {} elders from {}",
                     session_id.sh(),
@@ -362,11 +361,11 @@ impl Node {
                 self.log_dkg_session(&sender.name());
                 self.handle_dkg_votes(&session_id, pub_keys, votes, sender)
             }
-            Node2NodeMsg::DkgAE(session_id) => {
+            NodeMsg::DkgAE(session_id) => {
                 trace!("Handling msg: DkgAE s{} from {}", session_id.sh(), sender);
                 self.handle_dkg_anti_entropy(session_id, sender)
             }
-            Node2NodeMsg::NodeCmd(NodeCmd::RecordStorageLevel { node_id, level, .. }) => {
+            NodeMsg::NodeCmd(NodeCmd::RecordStorageLevel { node_id, level, .. }) => {
                 let changed = self.set_storage_level(&node_id, level);
                 if changed && level.value() == MIN_LEVEL_WHEN_FULL {
                     // ..then we accept a new node in place of the full node

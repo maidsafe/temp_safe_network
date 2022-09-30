@@ -19,8 +19,8 @@ use bytes::Bytes;
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
-        system::{DkgSessionId, SigShare, NodeMsg},
-        AuthorityProof, SectionAuthShare, NodeMsgAuthority, SectionAuth, WireMsg,
+        system::{DkgSessionId, NodeMsg, SigShare},
+        AuthorityProof, NodeMsgAuthority, SectionAuth, SectionAuthShare, WireMsg,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
     types::{self, log_markers::LogMarker, Peer},
@@ -164,7 +164,7 @@ impl Node {
             session_id.sh(),
             votes
         );
-        let node_msg = SystemMsg::DkgVotes {
+        let node_msg = NodeMsg::DkgVotes {
             session_id: session_id.clone(),
             pub_keys,
             votes,
@@ -173,7 +173,7 @@ impl Node {
     }
 
     fn request_dkg_ae(&self, session_id: &DkgSessionId, sender: Peer) -> Cmd {
-        let node_msg = SystemMsg::DkgAE(session_id.clone());
+        let node_msg = NodeMsg::DkgAE(session_id.clone());
         self.send_system_msg(node_msg, Peers::Single(sender))
     }
 
@@ -232,7 +232,7 @@ impl Node {
             session_id.sh(),
         );
         let peers = dkg_peers(our_id, &session_id);
-        let node_msg = SystemMsg::DkgEphemeralPubKey {
+        let node_msg = NodeMsg::DkgEphemeralPubKey {
             session_id,
             section_auth,
             pub_key: ephemeral_pub_key,
@@ -257,7 +257,7 @@ impl Node {
         );
 
         // reconstruct the original DKG start message and verify the section signature
-        let payload = WireMsg::serialize_msg_payload(&SystemMsg::DkgStart(session_id.clone()))?;
+        let payload = WireMsg::serialize_msg_payload(&NodeMsg::DkgStart(session_id.clone()))?;
         let auth = section_auth.clone().into_inner();
         if self.network_knowledge.section_key() != auth.sig.public_key {
             warn!(
@@ -505,7 +505,7 @@ impl Node {
                 LogMarker::DkgBroadcastVote,
                 session_id.sh()
             );
-            let node_msg = SystemMsg::DkgVotes {
+            let node_msg = NodeMsg::DkgVotes {
                 session_id: session_id.clone(),
                 pub_keys,
                 votes: our_votes,
@@ -529,7 +529,7 @@ impl Node {
             LogMarker::DkgBroadcastVote,
             session_id.sh()
         );
-        let node_msg = SystemMsg::DkgVotes {
+        let node_msg = NodeMsg::DkgVotes {
             session_id,
             pub_keys,
             votes,
@@ -614,7 +614,7 @@ impl Node {
 
         // broadcast our key
         let peers = dkg_peers(our_id, &session_id);
-        let node_msg = SystemMsg::DkgEphemeralPubKey {
+        let node_msg = NodeMsg::DkgEphemeralPubKey {
             session_id,
             section_auth,
             pub_key: *pub_key,

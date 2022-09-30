@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Node, Proposal, Result};
+use sn_interface::messaging::system::SigShare;
 
 use sn_interface::{
     messaging::{
