@@ -17,9 +17,9 @@ use sn_dysfunction::IssueType;
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
-        data::{OperationId, ServiceMsg},
-        system::{KeyedSig, NodeState, SectionAuth, Node2NodeMsg},
-        AuthorityProof, MsgId, NodeMsgAuthority, ServiceAuth, WireMsg,
+        data::{ClientMsg, OperationId},
+        system::{KeyedSig, NodeMsg, NodeState, SectionAuth},
+        AuthorityProof, ClientAuth, MsgId, NodeMsgAuthority, WireMsg,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare, SectionsDAG},
     types::{DataAddress, Peer},
