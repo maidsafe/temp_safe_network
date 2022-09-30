@@ -305,7 +305,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
      changed to `pub(crate)`.
    * The `Cmd` struct was extended in the test module to provide utils to get at the content of
      messages, which are used for test verification.
-   * Provide util function for wrapping a `ServiceMsg` inside a `WireMsg` and so on. Keeps the testing
+   * Provide util function for wrapping a `ClientMsg` inside a `WireMsg` and so on. Keeps the testing
      code cleaner.
    * Provide util function for extracting the spent proof share from the replicated data so that we can
      verify the message handler assigned the correct values to its fields.
@@ -728,7 +728,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-5a5f0f4608c27f463178f4a560f1f9b4c020e764/> remove the write lock on node while validating msgs
    This adds a new Cmd for tracking dysfunction, so we can pull the
    write locks out of longer running Cmd processes
- - <csr-id-83a3a98a6972c9a1824e41cb87325b037b65938c/> make Sign of SystemMsgs higher prio as this could hold them back before sending
+ - <csr-id-83a3a98a6972c9a1824e41cb87325b037b65938c/> make Sign of NodeMsgs higher prio as this could hold them back before sending
  - <csr-id-9c855c187465a0594cf18fb359a082742593a4d4/> log parent job id during processing
  - <csr-id-f8b6ff0edd7a64389439081b6306296402887ab1/> simplify data replication msg sending
  - <csr-id-c6fa7735a5e48a4caa6ee3aac000785a9da9413a/> temporarily allow DBC spent proofs singed by sections keys unknown to the Elder
@@ -1025,7 +1025,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - remove the write lock on node while validating msgs ([`5a5f0f4`](https://github.com/maidsafe/safe_network/commit/5a5f0f4608c27f463178f4a560f1f9b4c020e764))
     - Revert "feat: make traceroute default for now" ([`e9b97c7`](https://github.com/maidsafe/safe_network/commit/e9b97c72b860053285ba866b098937f6b25d99bf))
     - having spent proofs and Txs within SpentbookCmd::Send msg to be a set instead of a vec ([`d3a05a7`](https://github.com/maidsafe/safe_network/commit/d3a05a728be8752ea9ebff4e38e7c4c85e5db09b))
-    - make Sign of SystemMsgs higher prio as this could hold them back before sending ([`83a3a98`](https://github.com/maidsafe/safe_network/commit/83a3a98a6972c9a1824e41cb87325b037b65938c))
+    - make Sign of NodeMsgs higher prio as this could hold them back before sending ([`83a3a98`](https://github.com/maidsafe/safe_network/commit/83a3a98a6972c9a1824e41cb87325b037b65938c))
     - consolidate join / leave into decision handling ([`47179e6`](https://github.com/maidsafe/safe_network/commit/47179e695a7f351d9298c5bdbea006abb26b8e89))
     - make traceroute default for now ([`175d1b9`](https://github.com/maidsafe/safe_network/commit/175d1b909dff8c6729ac7f156ce1d0d22be8cc12))
     - log parent job id during processing ([`9c855c1`](https://github.com/maidsafe/safe_network/commit/9c855c187465a0594cf18fb359a082742593a4d4))
@@ -3171,7 +3171,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-784870abfdd5620da6839e7fd7df80702e0f3afa/> safe_network-0.58.5
  - <csr-id-df398e1017221c0027542b597c8f7c38c1828723/> clarify comment regarding bootstrap
- - <csr-id-8c3bcc2bb64063e646d368d90fff98420ab22dce/> remove unneeded HandleSystemMsg command
+ - <csr-id-8c3bcc2bb64063e646d368d90fff98420ab22dce/> remove unneeded HandleNodeMsg command
 
 ### New Features
 
@@ -4775,12 +4775,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Bug Fixes
 
- - <csr-id-0e505be2f57ab427cd3ed8c9564fd8b84909f6f3/> restore `ServiceMsg` authority check
+ - <csr-id-0e505be2f57ab427cd3ed8c9564fd8b84909f6f3/> restore `ClientMsg` authority check
    The `AuthorityProof` struct is designed to be a proof of valid
    authority, by ensuring all possible constructors either generate or
    validate a signature. This can only be guaranteed if the field remains
    module-private. At some point it seems the field was made `pub(crate)`,
-   which meant we were missing an authority check for some `ServiceMsg`s,
+   which meant we were missing an authority check for some `ClientMsg`s,
 
 ## v0.44.0 (2021-11-26)
 
@@ -4797,12 +4797,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Bug Fixes
 
- - <csr-id-0e505be2f57ab427cd3ed8c9564fd8b84909f6f3/> restore `ServiceMsg` authority check
+ - <csr-id-0e505be2f57ab427cd3ed8c9564fd8b84909f6f3/> restore `ClientMsg` authority check
    The `AuthorityProof` struct is designed to be a proof of valid
    authority, by ensuring all possible constructors either generate or
    validate a signature. This can only be guaranteed if the field remains
    module-private. At some point it seems the field was made `pub(crate)`,
-   which meant we were missing an authority check for some `ServiceMsg`s,
+   which meant we were missing an authority check for some `ClientMsg`s,
  - <csr-id-23bd9b23243da1d20cee8e7f06adc90f0894c2e7/> fix node joining age for genesis section Adults
  - <csr-id-5dd0961c5172ed890b2453eb33332380e4757ad3/> refactor join flows to use the new Peer type
  - <csr-id-1822857e35b888df75bea652a2858cfd34b8c2fc/> remove redundant send_node_approval
@@ -5045,7 +5045,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-f73364efa66718b92e04f24d4546c1e248198ce8/> replace `Sender` with `UnknownPeer`
    The `UnknownPeer` struct is more general, and will make it easier to
    propagate connections into more places (e.g. this already propagates
-   connections into `HandleSystemMsg`). It's also generally easier to use
+   connections into `HandleNodeMsg`). It's also generally easier to use
    than `Sender`, and doesn't need any special casing for test-only
    purposes.
    
@@ -5407,7 +5407,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    handle in the `messaging` struct, and just skip it when (de)serialising,
    this seems less clean than having a separate struct.
  - <csr-id-00acf0c0d8a65bdd5355ba909d73e74729a27044/> move `SectionPeers` from `messaging` to `routing`
-   `SectionPeers` was only used in the `SystemMsg::AntiEntropyUpdate`
+   `SectionPeers` was only used in the `NodeMsg::AntiEntropyUpdate`
    message. Rather than simply inlining the `DashMap`, it's been replaced
    by `BTreeSet<SectionAuth<NodeState>>` since the map keys are redundant
    with the `name` field of `NodeState` (and `BTreeSet` specifically for
@@ -5417,7 +5417,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    the public API this type has been removed.
  - <csr-id-7d5d5e11fef39a6dc1b89c972e42772db807374c/> move `ElderCandidates` to `routing`
    The `ElderCandidate` type was in `messaging`, and was only used in the
-   `SystemMsg::DkStart` message. It was more commonly used as network
+   `NodeMsg::DkStart` message. It was more commonly used as network
    state, so homing it in `routing::network_knowledge` makes more sense.
    This also means the type no longer needs to be public, and doesn't need
    to be (de)serialisable, which opens up the possibility of putting more
@@ -5517,7 +5517,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    handle in the `messaging` struct, and just skip it when (de)serialising,
    this seems less clean than having a separate struct.
  - <csr-id-00acf0c0d8a65bdd5355ba909d73e74729a27044/> move `SectionPeers` from `messaging` to `routing`
-   `SectionPeers` was only used in the `SystemMsg::AntiEntropyUpdate`
+   `SectionPeers` was only used in the `NodeMsg::AntiEntropyUpdate`
    message. Rather than simply inlining the `DashMap`, it's been replaced
    by `BTreeSet<SectionAuth<NodeState>>` since the map keys are redundant
    with the `name` field of `NodeState` (and `BTreeSet` specifically for
@@ -5527,7 +5527,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    the public API this type has been removed.
  - <csr-id-7d5d5e11fef39a6dc1b89c972e42772db807374c/> move `ElderCandidates` to `routing`
    The `ElderCandidate` type was in `messaging`, and was only used in the
-   `SystemMsg::DkStart` message. It was more commonly used as network
+   `NodeMsg::DkStart` message. It was more commonly used as network
    state, so homing it in `routing::network_knowledge` makes more sense.
    This also means the type no longer needs to be public, and doesn't need
    to be (de)serialisable, which opens up the possibility of putting more

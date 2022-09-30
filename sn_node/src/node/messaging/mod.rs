@@ -106,7 +106,7 @@ impl Node {
                 #[cfg(feature = "traceroute")]
                 let traceroute = wire_msg.traceroute();
 
-                Ok(vec![Cmd::HandleValidSystemMsg {
+                Ok(vec![Cmd::HandleValidNodeMsg {
                     origin,
                     msg_id,
                     msg,
@@ -166,7 +166,7 @@ impl Node {
                     return Ok(vec![cmd]);
                 }
 
-                Ok(vec![Cmd::HandleValidServiceMsg {
+                Ok(vec![Cmd::HandleValidClientMsg {
                     msg_id,
                     msg,
                     origin,

@@ -4,7 +4,7 @@ This post describes how DKG works in the Safe Network. For this implementation, 
 
 ## DkgStart
 
-DKG is triggered by the elders when they notice that the oldest members are not the elders or when a section splits. They do so by sending the candidates a `SystemMsg::DkgStart(DkgSessionId)` message. The `DkgSessionId` contains all the information that makes this DKG session unique.
+DKG is triggered by the elders when they notice that the oldest members are not the elders or when a section splits. They do so by sending the candidates a `NodeMsg::DkgStart(DkgSessionId)` message. The `DkgSessionId` contains all the information that makes this DKG session unique.
 
 ```rust
 pub struct DkgSessionId {
@@ -29,7 +29,7 @@ The first step in our DKG is generating temporary bls keys, that are used for en
 
 ```rust
 /// Sent when DKG is triggered to other participant
-SystemMsg::DkgEphemeralPubKey {
+NodeMsg::DkgEphemeralPubKey {
     /// The identifier of the DKG session this message is for.
     session_id: DkgSessionId,
     /// Section authority for the DKG start message
@@ -56,7 +56,7 @@ Votes are all signed so cheaters can be denounced with those cryptographic proof
 
 ```rust
 /// Votes exchanged for DKG process.
-SystemMsg::DkgVotes {
+NodeMsg::DkgVotes {
     /// The identifier of the DKG session this message is for.
     session_id: DkgSessionId,
     /// The ephemeral bls public keys used for this Dkg round
@@ -76,9 +76,9 @@ Sometimes though, messages are lost, so we need mechanisms to counter this.
 
 ## AE and Gossip
 
-When a node receives a vote that they don't understand (eg. an `Ack` vote when they don't have all the `Parts` yet) they send an AE request to the sender of this vote: `SystemMsg::DkgAE(DkgSessionId)`. The sender will respond to this with all their votes in a `SystemMsg::DkgVotes`.
+When a node receives a vote that they don't understand (eg. an `Ack` vote when they don't have all the `Parts` yet) they send an AE request to the sender of this vote: `NodeMsg::DkgAE(DkgSessionId)`. The sender will respond to this with all their votes in a `NodeMsg::DkgVotes`.
 
-If for some reason a node has not received any DKG messages for a while, and if they are expecting some (didn't reach termination), they send out all their votes to the others in a `SystemMsg::DkgVotes`. If DKG voting didn't start yet they send out their ephemeral key instead.
+If for some reason a node has not received any DKG messages for a while, and if they are expecting some (didn't reach termination), they send out all their votes to the others in a `NodeMsg::DkgVotes`. If DKG voting didn't start yet they send out their ephemeral key instead.
 
 Sometimes a node will receive a bunch of votes from another node (either from AE or gossip). If they notice that votes are missing from this batch, they send out all their votes in return to the sender. This way nodes actively keep each other up to date. This mechanism works even after a node reached termination, until the DKG session is discarded when enough section churn happened. The reason for this is that we want every node to terminate eventually, even if they missed many votes and are still gossiping long after the others terminated.
 

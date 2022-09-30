@@ -51,7 +51,7 @@ pub enum DataEvent {}
 #[derive(Debug)]
 pub enum MessagingEvent {
     /// Received a msg from another Node.
-    SystemMsgReceived {
+    NodeMsgReceived {
         /// The msg ID
         msg_id: MsgId,
         /// Msg authority
@@ -62,7 +62,7 @@ pub enum MessagingEvent {
         msg: Box<NodeMsg>,
     },
     /// Received a msg from a client.
-    ServiceMsgReceived {
+    ClientMsgReceived {
         /// The msg ID
         msg_id: MsgId,
         /// The content of the msg.

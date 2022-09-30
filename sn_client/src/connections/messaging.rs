@@ -160,7 +160,7 @@ impl Session {
         level = "debug",
         name = "session send query"
     )]
-    /// Send a `ServiceMsg` to the network awaiting for the response.
+    /// Send a `ClientMsg` to the network awaiting for the response.
     pub(crate) async fn send_query(
         &self,
         query: DataQuery,

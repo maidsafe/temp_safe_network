@@ -43,14 +43,14 @@ use sn_interface::{
 use xor_name::XorName;
 
 impl Node {
-    /// Send a (`SystemMsg`) message to all Elders in our section
+    /// Send a (`NodeMsg`) message to all Elders in our section
     pub(crate) fn send_msg_to_our_elders(&self, msg: NodeMsg) -> Cmd {
         let sap = self.network_knowledge.section_auth();
         let recipients = sap.elders_set();
         self.send_system_msg(msg, Peers::Multiple(recipients))
     }
 
-    /// Send a (`SystemMsg`) message to a node
+    /// Send a (`NodeMsg`) message to a node
     pub(crate) fn send_system_msg(&self, msg: NodeMsg, recipients: Peers) -> Cmd {
         self.trace_system_msg(
             msg,
@@ -60,7 +60,7 @@ impl Node {
         )
     }
 
-    /// Send a (`SystemMsg`) message to a node
+    /// Send a (`NodeMsg`) message to a node
     pub(crate) fn trace_system_msg(
         &self,
         msg: NodeMsg,
@@ -116,13 +116,13 @@ impl Node {
         comm: &Comm,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
-        trace!("{:?}", LogMarker::SystemMsgToBeHandled);
+        trace!("{:?}", LogMarker::NodeMsgToBeHandled);
 
         #[cfg(feature = "traceroute")]
         {
             if !traceroute.0.is_empty() {
                 info!(
-                    "Handling SystemMsg {}:{:?} with trace \n{:?}",
+                    "Handling NodeMsg {}:{:?} with trace \n{:?}",
                     msg, msg_id, traceroute
                 );
             }

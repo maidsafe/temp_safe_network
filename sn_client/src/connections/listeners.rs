@@ -214,7 +214,7 @@ impl Session {
         src_peer: Peer,
     ) -> Result<(), Error> {
         debug!(
-            "ServiceMsg with id {:?} received from {:?}",
+            "ClientMsg with id {:?} received from {:?}",
             msg_id,
             src_peer.addr()
         );
@@ -228,7 +228,7 @@ impl Session {
                     correlation_id,
                 } => {
                     trace!(
-                        "ServiceMsg with id {:?} is QueryResponse regarding correlation_id {:?} with response {:?}",
+                        "ClientMsg with id {:?} is QueryResponse regarding correlation_id {:?} with response {:?}",
                         msg_id,
                         correlation_id,
                         response,
@@ -389,7 +389,7 @@ impl Session {
             } => (msg_id, msg, dst, auth),
             other => {
                 warn!(
-                    "Unexpected non-serviceMsg returned in AE-Redirect response: {:?}",
+                    "Unexpected non-ClientMsg returned in AE-Redirect response: {:?}",
                     other
                 );
                 return Ok(None);

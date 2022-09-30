@@ -111,7 +111,7 @@ impl Node {
         }
 
         if handle {
-            cmds.push(Cmd::HandleValidSystemMsg {
+            cmds.push(Cmd::HandleValidNodeMsg {
                 origin: Peer::new(our_name, self.addr),
                 msg_id: sn_interface::messaging::MsgId::new(),
                 msg,

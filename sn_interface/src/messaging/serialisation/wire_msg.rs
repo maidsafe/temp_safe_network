@@ -331,7 +331,7 @@ impl WireMsg {
         Self::from(bytes)?.into_msg()
     }
 
-    /// Convenience function which validates the signature on a `ServiceMsg`.
+    /// Convenience function which validates the signature on a `ClientMsg`.
     pub fn verify_sig(auth: ClientAuth, msg: ClientMsg) -> Result<AuthorityProof<ClientAuth>> {
         Self::serialize_msg_payload(&msg).and_then(|payload| AuthorityProof::verify(auth, &payload))
     }
