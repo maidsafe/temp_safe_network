@@ -136,8 +136,8 @@ pub enum Error {
     /// Bincode error.
     #[error("Bincode error:: {0}")]
     Bincode(#[from] bincode::Error),
-    /// Network service message error.
-    #[error("Network service message error:: {0}")]
+    /// Network client message error.
+    #[error("Network client message error:: {0}")]
     ClientMsg(#[from] sn_interface::messaging::data::Error),
     /// Network data error.
     #[error("Network data error:: {0}")]

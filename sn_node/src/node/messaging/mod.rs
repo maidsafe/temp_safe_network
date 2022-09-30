@@ -78,7 +78,7 @@ impl Node {
         };
 
         match msg_type {
-            MsgType::System {
+            MsgType::Node {
                 msg_id,
                 msg_authority,
                 dst,
@@ -116,7 +116,7 @@ impl Node {
                     traceroute,
                 }])
             }
-            MsgType::Service {
+            MsgType::Client {
                 msg_id,
                 msg,
                 dst,
@@ -126,7 +126,7 @@ impl Node {
                     Some(name) => name,
                     None => {
                         error!(
-                            "Service msg {:?} from {} has been dropped since there is no dst address.",
+                            "Client msg {:?} from {} has been dropped since there is no dst address.",
                             msg_id, origin.addr(),
                         );
                         return Ok(vec![]);

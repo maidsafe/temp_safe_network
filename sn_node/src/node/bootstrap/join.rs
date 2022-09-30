@@ -448,11 +448,11 @@ impl<'a> Joiner<'a> {
                         continue;
                     }
                     AuthKind::Node(NodeAuth { .. }) => match wire_msg.into_msg() {
-                        Ok(MsgType::System {
+                        Ok(MsgType::Node {
                             msg: NodeMsg::JoinResponse(resp),
                             ..
                         }) => (*resp, sender),
-                        Ok(MsgType::Service { msg_id, .. } | MsgType::System { msg_id, .. }) => {
+                        Ok(MsgType::Client { msg_id, .. } | MsgType::Node { msg_id, .. }) => {
                             trace!("Bootstrap message discarded: sender: {sender:?} msg_id: {msg_id:?}");
                             continue;
                         }
@@ -573,7 +573,7 @@ mod tests {
                 .collect();
             assert_eq!(bootstrap_addrs, [bootstrap_addr]);
 
-            let node_msg = assert_matches!(wire_msg.into_msg(), Ok(MsgType::System { msg, .. }) =>
+            let node_msg = assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node { msg, .. }) =>
                 msg);
 
             assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest::Initiate { .. }));
@@ -600,7 +600,7 @@ mod tests {
                 .recv()
                 .await
                 .ok_or_else(|| eyre!("JoinRequest was not received"))?;
-            let (node_msg, dst) = assert_matches!(wire_msg.into_msg(), Ok(MsgType::System { msg, dst,.. }) =>
+            let (node_msg, dst) = assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node { msg, dst,.. }) =>
                 (msg, dst));
 
             assert_eq!(dst.section_key, original_section_key);
@@ -672,7 +672,7 @@ mod tests {
                 vec![bootstrap_node.addr]
             );
 
-            assert_matches!(wire_msg.into_msg(), Ok(MsgType::System { msg, .. }) =>
+            assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node { msg, .. }) =>
                     assert_matches!(msg, NodeMsg::JoinRequest{..}));
 
             // Send JoinResponse::Redirect
@@ -715,7 +715,7 @@ mod tests {
                     .collect::<Vec<_>>()
             );
 
-            let (node_msg, dst) = assert_matches!(wire_msg.into_msg(), Ok(MsgType::System { msg, dst,.. }) =>
+            let (node_msg, dst) = assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node { msg, dst,.. }) =>
                     (msg, dst));
 
             assert_eq!(dst.section_key, new_pk_set.public_key());
@@ -761,7 +761,7 @@ mod tests {
                 .await
                 .ok_or_else(|| eyre!("JoinRequest was not received"))?;
 
-            assert_matches!(wire_msg.into_msg(), Ok(MsgType::System { msg, .. }) =>
+            assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node { msg, .. }) =>
             assert_matches!(msg, NodeMsg::JoinRequest{..}));
 
             let (new_section_auth, _, new_sk_set) =
@@ -805,7 +805,7 @@ mod tests {
                 .await
                 .ok_or_else(|| eyre!("JoinRequest was not received"))?;
 
-            assert_matches!(wire_msg.into_msg(), Ok(MsgType::System { msg, .. }) =>
+            assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node { msg, .. }) =>
             assert_matches!(msg, NodeMsg::JoinRequest{..}));
 
             Ok(())
@@ -845,7 +845,7 @@ mod tests {
                 .await
                 .ok_or_else(|| eyre!("JoinRequest was not received"))?;
 
-            assert_matches!(wire_msg.into_msg(), Ok(MsgType::System { msg, .. }) =>
+            assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node { msg, .. }) =>
                                 assert_matches!(msg, NodeMsg::JoinRequest{..}));
 
             send_response(
@@ -920,7 +920,7 @@ mod tests {
                 .ok_or_else(|| eyre!("NodeMsg was not received"))?;
 
             let node_msg =
-                assert_matches!(wire_msg.into_msg(), Ok(MsgType::System{ msg, .. }) => msg);
+                assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node{ msg, .. }) => msg);
             assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest::Initiate { .. }));
 
             let proof_chain = SectionsDAG::new(section_key);
@@ -960,7 +960,7 @@ mod tests {
                 .ok_or_else(|| eyre!("NodeMsg was not received"))?;
 
             let node_msg =
-                assert_matches!(wire_msg.into_msg(), Ok(MsgType::System{ msg, .. }) => msg);
+                assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node{ msg, .. }) => msg);
             assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest::Initiate { .. }));
 
             Ok(())

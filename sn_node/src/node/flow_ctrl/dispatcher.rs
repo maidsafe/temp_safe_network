@@ -83,7 +83,7 @@ impl Dispatcher {
                     .filter_map(|result| match result {
                         Err(Error::FailedSend(peer)) => {
                             if is_msg_for_client {
-                                warn!("Service msg send failed to: {peer}, for {msg_id:?}");
+                                warn!("Client msg send failed to: {peer}, for {msg_id:?}");
                                 None
                             } else {
                                 Some(Cmd::HandleFailedSendToNode { peer, msg_id })
@@ -142,7 +142,7 @@ impl Dispatcher {
             } => {
                 let node = self.node.read().await;
                 match node
-                    .handle_valid_service_msg(
+                    .handle_valid_client_msg(
                         msg_id,
                         msg,
                         auth,
@@ -185,7 +185,7 @@ impl Dispatcher {
                     &name,
                 )?;
                 debug!("Network knowledge was updated: {updated}");
-                node.handle_valid_service_msg(
+                node.handle_valid_client_msg(
                     msg_id,
                     msg,
                     auth,
