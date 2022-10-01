@@ -43,7 +43,7 @@ impl NodeMsgAuthorityUtils for NodeMsgAuthority {
     // and if can be trusted based on a set of known keys.
     fn verify_src_section_key_is_known(&self, known_keys: &BTreeSet<BlsPublicKey>) -> bool {
         let section_pk = match &self {
-            Self::Node(_) => return true,
+            Self::Node(_) => return false, // it's not a section key
             Self::BlsShare(bls_share_auth) => &bls_share_auth.section_pk,
             Self::Section(section_auth) => &section_auth.sig.public_key,
         };
