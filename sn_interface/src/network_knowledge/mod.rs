@@ -44,6 +44,12 @@ use serde::Serialize;
 use std::{collections::BTreeSet, iter, net::SocketAddr};
 use xor_name::{Prefix, XorName};
 
+/// The secret key for the genesis DBC.
+///
+/// This key is public for auditing purposes. Hard coding its value means all nodes will be able to
+/// validate it.
+pub const GENESIS_DBC_SK: &str = "0c5152498fc5b2f9ed691ef875f2c16f1f950910391f7ba1df63e9f0ce4b2780";
+
 /// The minimum age a node becomes an adult node.
 pub const MIN_ADULT_AGE: u8 = 5;
 

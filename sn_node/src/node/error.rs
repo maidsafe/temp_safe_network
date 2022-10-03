@@ -203,6 +203,8 @@ pub enum Error {
     /// Cannot handle more queries at this point
     #[error("Cannot handle more queries at this point: {0:?}")]
     CannotHandleQuery(DataQuery),
+    #[error("BLS error: {0}")]
+    BlsError(#[from] bls::Error),
 }
 
 impl From<qp2p::ClientEndpointError> for Error {
