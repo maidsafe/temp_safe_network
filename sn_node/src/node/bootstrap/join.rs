@@ -212,25 +212,23 @@ impl<'a> Joiner<'a> {
                     section_tree_update,
                     expected_age,
                 } => {
-                    let section_auth = section_tree_update.signed_sap();
+                    let signed_sap = section_tree_update.signed_sap();
 
                     trace!(
-                        "Joining node {:?} - {:?}/{:?} received a Retry from {} with SAP {:?}, expected_age: {}, our age: {}",
+                        "Joining node {:?} - {:?}/{:?} received a Retry from {}, expected_age: {expected_age}, SAP: {}, proof_chain: {:?}",
                         self.prefix,
                         self.node.name(),
-                        self.node.age(),sender,
-                        section_auth,
-                        expected_age,
-                        self.node.age()
+                        self.node.age(),
+                        sender.name(),
+                        signed_sap.value,
+                        section_tree_update.proof_chain
                     );
 
-                    let prefix = section_auth.prefix();
+                    let prefix = signed_sap.prefix();
                     if !prefix.matches(&self.node.name()) {
                         warn!(
-                            "Ignoring newer JoinResponse::Retry response not for us {:?}, SAP {:?} from {:?}",
-                            self.node.name(),
-                            section_auth,
-                            sender,
+                            "Ignoring newer JoinResponse::Retry response not for us {:?}, SAP {signed_sap:?} from {sender:?}",
+                            self.node.name()
                         );
                         continue;
                     }
@@ -273,19 +271,19 @@ impl<'a> Joiner<'a> {
                         info!("Setting Node name to {} (age {})", new_name, expected_age);
                         self.node = NodeInfo::new(new_keypair, self.node.addr);
                     } else if !is_new_sap {
-                        debug!("Ignoring JoinResponse::Retry with same SAP as we previously sent to: {:?}", section_auth);
+                        debug!("Ignoring JoinResponse::Retry with same SAP as we previously sent to: {signed_sap:?}");
                         continue;
                     }
 
                     info!(
-                        "Newer Join response for us {:?}, SAP {section_auth:?} from {sender:?}",
+                        "Newer Join response for us {:?}, SAP {signed_sap:?} from {sender:?}",
                         self.node.name()
                     );
 
-                    section_key = section_auth.section_key();
+                    section_key = signed_sap.section_key();
 
                     let msg = JoinRequest::Initiate { section_key };
-                    let new_recipients = section_auth.elders_vec();
+                    let new_recipients = signed_sap.elders_vec();
 
                     self.send(msg, &new_recipients, section_key, true).await?;
                 }
@@ -834,19 +832,12 @@ mod tests {
             gen_addr(),
         );
 
-        let (good_prefix, bad_prefix) = {
-            let p0 = Prefix::default().pushed(false);
-            let p1 = Prefix::default().pushed(true);
-
-            if node.name().bit(0) {
-                (p1, p0)
-            } else {
-                (p0, p1)
-            }
-        };
+        let first_bit = node.name().bit(0);
+        let good_prefix = Prefix::default().pushed(first_bit);
+        let bad_prefix = Prefix::default().pushed(!first_bit);
 
         let (genesis_sap, genesis_nodes, genesis_sk_set) =
-            random_sap(good_prefix, elder_count(), 0, None);
+            random_sap(Prefix::default(), 1, 0, None);
         let genesis_sk = genesis_sk_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
 
@@ -869,8 +860,8 @@ mod tests {
 
             // Send `Retry` with bad prefix
             let bad_section_tree_update = {
+                let (bad_sap, _, _) = random_sap(bad_prefix, 1, 0, None);
                 let mut bad_signed_sap = signed_genesis_sap.clone();
-                let (bad_sap, _, _) = random_sap(bad_prefix, elder_count(), 0, None);
                 bad_signed_sap.value = bad_sap;
                 SectionTreeUpdate::new(bad_signed_sap, proof_chain.clone())
             };
@@ -886,15 +877,34 @@ mod tests {
             task::yield_now().await;
 
             // Send `Retry` with valid update
-            let section_tree_update = SectionTreeUpdate::new(signed_genesis_sap, proof_chain);
+
+            let (next_sap, next_elders, next_sk_set) = random_sap(Prefix::default(), 1, 0, None);
+
+            let next_section_key = next_sk_set.public_keys().public_key();
+            let section_tree_update = {
+                let mut proof_chain = SectionsDAG::new(genesis_pk);
+
+                let next_sk = next_sk_set.secret_key();
+                let signed_next_sap = section_signed(&next_sk, next_sap.clone())?;
+
+                let sig = bincode::serialize(&next_section_key)
+                    .map(|bytes| genesis_sk.sign(&bytes))
+                    .expect("failed to serialize public key");
+
+                proof_chain
+                    .insert(&genesis_pk, next_section_key, sig)
+                    .expect("Failed to update proof chain");
+
+                SectionTreeUpdate::new(signed_next_sap, proof_chain)
+            };
             send_response(
                 &recv_tx,
                 JoinResponse::Retry {
                     section_tree_update,
                     expected_age: MIN_ADULT_AGE,
                 },
-                &genesis_nodes[0],
-                genesis_pk,
+                &next_elders[0],
+                next_section_key,
             )?;
 
             let (wire_msg, _) = send_rx

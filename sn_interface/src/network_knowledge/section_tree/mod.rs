@@ -105,11 +105,8 @@ impl SectionTree {
     fn insert(&mut self, sap: SectionAuth<SectionAuthorityProvider>) -> bool {
         let prefix = sap.prefix();
         // Don't insert if any descendant is already present in the map.
-        if self
-            .sections
-            .iter()
-            .any(|(p, _)| p.is_extension_of(&prefix))
-        {
+        if let Some(extension_p) = self.sections.keys().find(|p| p.is_extension_of(&prefix)) {
+            info!("Dropping update since we have a prefix '{extension_p}' that is an extension of '{prefix}'");
             return false;
         }
 
@@ -237,6 +234,7 @@ impl SectionTree {
         match self.get_signed(incoming_prefix) {
             Some(sap) if sap == &signed_sap => {
                 // It's the same SAP we are already aware of
+                info!("Dropping SectionTree update since the SAP we have for prefix '{incoming_prefix}' is not new");
                 return Ok(false);
             }
             Some(sap) => {
