@@ -114,7 +114,7 @@ jobs:
 
       - shell: bash
         if: steps.sn_changes.outputs.src == 'true'
-        run: cargo clippy --all-targets --all-features
+        run: cargo clippy --all-targets --all-features -- -Dwarnings
 
       - name: Check documentation
         if: steps.sn_changes.outputs.src == 'true'
