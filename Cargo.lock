@@ -4304,9 +4304,9 @@ dependencies = [
 
 [[package]]
 name = "sn_sdkg"
-version = "2.0.0"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e051bfec67caec80388e9b39788994f1089061dfa6d13b7858d36509c72cc3cd"
+checksum = "8a8e52ceb0dd18791ad7a3426bc6b5f5cfe98c96e31e48b37969fde27409941b"
 dependencies = [
  "bincode",
  "blsttc",
