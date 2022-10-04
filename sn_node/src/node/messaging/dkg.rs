@@ -374,7 +374,7 @@ impl Node {
         let mut cmds = vec![];
         let mut ae_cmds = vec![];
         match vote_response {
-            VoteResponse::WaitingForMoreVotes | VoteResponse::IgnoringKnownVote => {}
+            VoteResponse::WaitingForMoreVotes => {}
             VoteResponse::RequestAntiEntropy => {
                 ae_cmds.push(self.request_dkg_ae(session_id, sender))
             }
@@ -445,7 +445,7 @@ impl Node {
                         session_id.sh(),
                         vote_responses,
                     );
-                    if !matches!(vote_responses.as_slice(), [VoteResponse::IgnoringKnownVote]) {
+                    if !vote_responses.is_empty() {
                         self.dkg_voter.learned_something_from_message();
                         is_old_gossip = false;
                     }
