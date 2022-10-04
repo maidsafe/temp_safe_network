@@ -322,7 +322,7 @@ impl DkgVoter {
         &mut self,
         session_id: &DkgSessionId,
         vote: DkgSignedVote,
-    ) -> Result<VoteResponse> {
+    ) -> Result<Vec<VoteResponse>> {
         let rng = bls::rand::rngs::OsRng;
         match self.dkg_states.get_mut(&session_id.hash()) {
             Some(state) => Ok(state.handle_signed_vote(vote, rng)?),
