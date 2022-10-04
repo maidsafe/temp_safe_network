@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1664836181294,
+  "lastUpdate": 1664917553303,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -25061,6 +25061,150 @@ window.BENCHMARK_DATA = {
             "name": "generating keys",
             "value": 4566007,
             "range": "± 331454",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "chriso83@protonmail.com",
+            "name": "Chris O'Neil",
+            "username": "jacderida"
+          },
+          "committer": {
+            "email": "davidrusu.me@gmail.com",
+            "name": "davidrusu",
+            "username": "davidrusu"
+          },
+          "distinct": true,
+          "id": "af995d2e00fb7eaf1e614b128efdba0a07629438",
+          "message": "ci: cause clippy step to fail on warnings\n\nYou need to explicitly add `-- -Dwarnings` to get Clippy to exit with a non-zero code. Not sure if\nthis was behaviour that just changed recently or we've always just missed it.\n\nAlso fixed a warning here.",
+          "timestamp": "2022-10-04T15:59:23-04:00",
+          "tree_id": "91e9d5b96a7099ccdbb120001d3059a241a8002e",
+          "url": "https://github.com/maidsafe/safe_network/commit/af995d2e00fb7eaf1e614b128efdba0a07629438"
+        },
+        "date": 1664917551492,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 7924531,
+            "range": "± 321005",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 1965824117,
+            "range": "± 3124471958",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 2031080180,
+            "range": "± 3053391267",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 2209223791,
+            "range": "± 3896971819",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 513105707,
+            "range": "± 502924823",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 544213204,
+            "range": "± 1453992598",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 809886453,
+            "range": "± 2135232482",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 61082482,
+            "range": "± 15090914",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 1250276430,
+            "range": "± 224931050",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 8454053913,
+            "range": "± 1332509173",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 249661341,
+            "range": "± 37083386",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 2208896100,
+            "range": "± 727636993",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 8678771755,
+            "range": "± 2325161475",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 62252565,
+            "range": "± 3924569",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 635161574,
+            "range": "± 55505196",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 2366285586,
+            "range": "± 88617768",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 14082125,
+            "range": "± 936678",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 115645129,
+            "range": "± 14263288",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 411867906,
+            "range": "± 55436601",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "generating keys",
+            "value": 6103646,
+            "range": "± 311214",
             "unit": "ns/iter"
           }
         ]
