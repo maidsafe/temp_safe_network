@@ -439,21 +439,27 @@ impl Node {
         let their_votes_len = votes.len();
         for v in votes {
             match self.dkg_voter.handle_dkg_vote(session_id, v.clone()) {
-                Ok(vote_response) => {
-                    debug!("Dkg s{}: {:?} after: {v:?}", session_id.sh(), vote_response,);
-                    if !matches!(vote_response, VoteResponse::IgnoringKnownVote) {
+                Ok(vote_responses) => {
+                    debug!(
+                        "Dkg s{}: {:?} after: {v:?}",
+                        session_id.sh(),
+                        vote_responses,
+                    );
+                    if !matches!(vote_responses.as_slice(), [VoteResponse::IgnoringKnownVote]) {
                         self.dkg_voter.learned_something_from_message();
                         is_old_gossip = false;
                     }
-                    let (cmd, ae_cmd) = self.handle_vote_response(
-                        session_id,
-                        pub_keys.clone(),
-                        sender,
-                        our_id,
-                        vote_response,
-                    );
-                    cmds.extend(cmd);
-                    ae_cmds.extend(ae_cmd);
+                    for r in vote_responses {
+                        let (cmd, ae_cmd) = self.handle_vote_response(
+                            session_id,
+                            pub_keys.clone(),
+                            sender,
+                            our_id,
+                            r,
+                        );
+                        cmds.extend(cmd);
+                        ae_cmds.extend(ae_cmd);
+                    }
                 }
                 Err(err) => {
                     error!(
