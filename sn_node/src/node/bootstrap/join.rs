@@ -358,22 +358,23 @@ impl<'a> Joiner<'a> {
             return None;
         }
         let _ = self.retry_responses_cache.insert(sender, expected_age);
-        let mut responded = 0;
         let mut expected_ages: BTreeMap<u8, u8> = Default::default();
         for (elder, expected_age) in self.retry_responses_cache.iter() {
             if elders.contains(elder) {
-                responded += 1;
                 *expected_ages.entry(*expected_age).or_insert(0) += 1;
             }
         }
 
-        if responded > elders.len() / 3 && !self.aggregated {
-            let (voted_expected_age, _count) = expected_ages
+        // To avoid restarting too quick, the voted age must got supermajority votes.
+        // In case there is split votes, leave to the overall join_timeout to restart.
+        if !self.aggregated {
+            let threshold = 2 * elders.len() / 3;
+            let voted_expected_age = expected_ages
                 .iter()
-                // In case two ages got the same votes, we prefer the lower age
-                .max_by_key(|(age, count)| (*count, -(**age as i32)))?;
-            if self.node.age() != *voted_expected_age {
-                return Some(*voted_expected_age);
+                .find(|(_age, count)| **count >= threshold as u8)
+                .map(|(age, _count)| *age)?;
+            if self.node.age() != voted_expected_age {
+                return Some(voted_expected_age);
             }
             trace!(
                 "No restart as current age({}) same to the expected {voted_expected_age}",
@@ -595,7 +596,7 @@ mod tests {
 
             // Send JoinResponse::Retry with new SAP
             let other_elders: Vec<&MyNodeInfo> =
-                next_elders.iter().take(elder_count() / 3 + 1).collect_vec();
+                next_elders.iter().take(2 * elder_count() / 3).collect_vec();
             for elder in other_elders.iter() {
                 send_response(
                     &recv_tx,
@@ -936,7 +937,7 @@ mod tests {
                 SectionTreeUpdate::new(signed_next_sap, proof_chain)
             };
             let good_elders: Vec<&MyNodeInfo> =
-                next_elders.iter().take(elder_count() / 3 + 1).collect_vec();
+                next_elders.iter().take(2 * elder_count() / 3).collect_vec();
             for elder in good_elders.iter() {
                 send_response(
                     &recv_tx,
