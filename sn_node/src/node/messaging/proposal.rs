@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Node, Proposal, Result};
-use sn_interface::messaging::system::SigShare;
+use sn_interface::messaging::system::SectionSigShare;
 
 use sn_interface::{
     messaging::{
@@ -98,7 +98,7 @@ impl Node {
     pub(crate) fn handle_proposal(
         msg_id: MsgId,
         proposal: Proposal,
-        sig_share: SigShare,
+        sig_share: SectionSigShare,
         sender: Peer,
         network_knowledge: &NetworkKnowledge,
         proposal_aggregator: &mut SignatureAggregator,

@@ -15,7 +15,7 @@ use bls::Signature;
 use sn_consensus::{Decision, Generation, SignedVote, VoteResponse};
 use sn_interface::{
     messaging::{
-        system::{JoinResponse, KeyedSig, MembershipState, NodeMsg, NodeState, SectionSigned},
+        system::{JoinResponse, MembershipState, NodeMsg, NodeState, SectionSig, SectionSigned},
         SectionTreeUpdate,
     },
     types::{log_markers::LogMarker, Peer},
@@ -226,7 +226,7 @@ impl Node {
     }
 
     async fn handle_node_joined(&mut self, new_info: NodeState, signature: Signature) -> Vec<Cmd> {
-        let sig = KeyedSig {
+        let sig = SectionSig {
             public_key: self.network_knowledge.section_key(),
             signature,
         };
@@ -284,7 +284,7 @@ impl Node {
         node_state: NodeState,
         signature: Signature,
     ) -> Option<Cmd> {
-        let sig = KeyedSig {
+        let sig = SectionSig {
             public_key: self.network_knowledge.section_key(),
             signature,
         };

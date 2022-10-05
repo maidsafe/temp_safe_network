@@ -46,7 +46,7 @@ pub use self::serialisation::{Entity, Traceroute};
 pub use self::{
     auth_kind::AuthKind,
     authority::{
-        AuthorityProof, ClientAuth, NodeSig, SectionAuth, SectionAuthShare, VerifyAuthority,
+        AuthorityProof, ClientAuth, NodeSig, SectionSig, SectionSigShare, VerifyAuthority,
     },
     dst::Dst,
     errors::{Error, Result},

@@ -8,25 +8,48 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::messaging::{
+    signature_aggregator::{Error as AggregatorError, SignatureAggregator},
+    AuthorityProof,
+};
+
 /// Signature created when a quorum of the section elders has agreed on something.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct KeyedSig {
+pub struct SectionSig {
     /// The BLS public key.
     pub public_key: bls::PublicKey,
     /// The BLS signature corresponding to the public key.
     pub signature: bls::Signature,
 }
 
-impl KeyedSig {
+impl SectionSig {
     /// Verifies this signature against the payload.
     pub fn verify(&self, payload: &[u8]) -> bool {
         self.public_key.verify(&self.signature, payload)
     }
+
+    /// Try to construct verified section authority by aggregating a new share.
+    pub fn try_authorize(
+        aggregator: &mut SignatureAggregator,
+        share: SectionSigShare,
+        payload: impl AsRef<[u8]>,
+    ) -> Result<AuthorityProof<Self>, AggregatorError> {
+        let sig = aggregator.add(payload.as_ref(), share.clone())?;
+
+        if share.public_key_set.public_key() != sig.public_key {
+            return Err(AggregatorError::InvalidShare);
+        }
+
+        Ok(AuthorityProof(Self {
+            public_key: sig.public_key,
+            signature: sig.signature,
+        }))
+    }
 }
 
-/// Single share of `KeyedSig`.
+/// Single share of `SectionSig`.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct SigShare {
+pub struct SectionSigShare {
     /// BLS public key set.
     pub public_key_set: bls::PublicKeySet,
     /// Index of the node that created this signature share.
@@ -35,7 +58,7 @@ pub struct SigShare {
     pub signature_share: bls::SignatureShare,
 }
 
-impl SigShare {
+impl SectionSigShare {
     /// Creates new signature share.
     pub fn new(
         public_key_set: bls::PublicKeySet,
@@ -69,7 +92,7 @@ mod tests {
         let public_key = sk.public_key();
         let data = "hello".to_string();
         let signature = sk.sign(&data);
-        let sig = KeyedSig {
+        let sig = SectionSig {
             public_key,
             signature,
         };

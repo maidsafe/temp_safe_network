@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{KeyedSig, NodeState};
+use super::{NodeState, SectionSig};
 use crate::types::keys::ed25519::Digest256;
 use crate::{messaging::SectionAuthorityProvider, types::Peer};
 use itertools::Itertools;
@@ -110,7 +110,7 @@ pub struct SectionSigned<T: Serialize> {
     /// some value agreed upon by elders
     pub value: T,
     /// section signature over the value
-    pub sig: KeyedSig,
+    pub sig: SectionSig,
 }
 
 impl<T> Borrow<Prefix> for SectionSigned<T>

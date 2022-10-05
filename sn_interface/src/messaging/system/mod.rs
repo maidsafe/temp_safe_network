@@ -9,21 +9,18 @@
 mod agreement;
 mod join;
 mod join_as_relocated;
-mod msg_authority;
 mod node_msgs;
 mod node_state;
-mod signed;
+mod section_sig;
 
-use super::authority::SectionAuth as SectionAuthProof;
 use crate::messaging::{AuthorityProof, EndUser, MsgId, SectionTreeUpdate};
 use crate::network_knowledge::SapCandidate;
 pub use agreement::{DkgSessionId, Proposal, SectionSigned};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProof};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
-pub use msg_authority::NodeMsgAuthorityUtils;
 pub use node_msgs::{NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse};
 pub use node_state::{MembershipState, NodeState, RelocateDetails};
-pub use signed::{KeyedSig, SigShare};
+pub use section_sig::{SectionSig, SectionSigShare};
 
 use bls::PublicKey as BlsPublicKey;
 use ed25519::Signature;
@@ -89,7 +86,7 @@ pub enum NodeMsg {
         /// The identifier of the DKG session this message is for.
         session_id: DkgSessionId,
         /// Section authority for the DKG start message
-        section_auth: AuthorityProof<SectionAuthProof>,
+        section_auth: AuthorityProof<SectionSig>,
         /// The ephemeral bls key chosen by candidate
         pub_key: BlsPublicKey,
         /// The ed25519 signature of the candidate
@@ -114,9 +111,8 @@ pub enum NodeMsg {
     Propose {
         /// The content of the proposal
         proposal: Proposal,
-        // TODO: try to remove this in favor of the msg header MsgKind sig share we already have
-        /// BLS signature share
-        sig_share: SigShare,
+        /// BLS signature share of an Elder
+        sig_share: SectionSigShare,
     },
     /// Events are facts about something that happened on a node.
     NodeEvent(NodeEvent),

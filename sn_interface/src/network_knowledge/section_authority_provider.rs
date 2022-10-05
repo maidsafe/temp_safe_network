@@ -10,7 +10,7 @@ use super::NodeState;
 
 use crate::messaging::system::DkgSessionId;
 use crate::messaging::{
-    system::{KeyedSig, SectionSigned},
+    system::{SectionSig, SectionSigned},
     SectionAuthorityProvider as SectionAuthorityProviderMsg,
 };
 use crate::types::Peer;
@@ -29,7 +29,7 @@ use std::{
 ///
 pub trait SectionAuthUtils<T: Serialize> {
     ///
-    fn new(value: T, sig: KeyedSig) -> Self;
+    fn new(value: T, sig: SectionSig) -> Self;
 
     ///
     fn verify(&self, section_dag: &SectionsDAG) -> bool;
@@ -39,7 +39,7 @@ pub trait SectionAuthUtils<T: Serialize> {
 }
 
 impl<T: Serialize> SectionAuthUtils<T> for SectionSigned<T> {
-    fn new(value: T, sig: KeyedSig) -> Self {
+    fn new(value: T, sig: SectionSig) -> Self {
         Self { value, sig }
     }
 

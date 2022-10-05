@@ -18,7 +18,7 @@ use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         data::{ClientMsg, OperationId},
-        system::{KeyedSig, NodeMsg, NodeState, SectionSigned},
+        system::{NodeMsg, NodeState, SectionSig, SectionSigned},
         AuthorityProof, ClientAuth, MsgId, NodeMsgAuthority, WireMsg,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare, SectionsDAG},
@@ -154,13 +154,13 @@ pub(crate) enum Cmd {
     /// Handle peer that's been detected as lost.
     HandleFailedSendToNode { peer: Peer, msg_id: MsgId },
     /// Handle agreement on a proposal.
-    HandleAgreement { proposal: Proposal, sig: KeyedSig },
+    HandleAgreement { proposal: Proposal, sig: SectionSig },
     /// Handle a membership decision.
     HandleMembershipDecision(Decision<NodeState>),
     /// Handle agree on elders. This blocks node message processing until complete.
     HandleNewEldersAgreement {
         new_elders: SectionSigned<SectionAuthorityProvider>,
-        sig: KeyedSig,
+        sig: SectionSig,
     },
     /// Handle the outcome of a DKG session where we are one of the participants (that is, one of
     /// the proposed new elders).

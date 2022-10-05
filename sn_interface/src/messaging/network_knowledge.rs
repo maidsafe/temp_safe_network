@@ -21,7 +21,7 @@ use tiny_keccak::{Hasher, Sha3};
 
 use xor_name::{Prefix, XorName};
 
-use crate::messaging::system::{KeyedSig, NodeState};
+use crate::messaging::system::{NodeState, SectionSig};
 
 // TODO: we need to maintain a list of nodes who have previously been members of this section (archived nodes)
 //       currently, only the final members of the section are preserved on the SAP.
@@ -103,6 +103,6 @@ pub struct SectionsDAG {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SectionTreeUpdate {
     pub section_auth: SectionAuthorityProvider,
-    pub section_signed: KeyedSig,
+    pub section_signed: SectionSig,
     pub proof_chain: SectionsDAG,
 }

@@ -92,7 +92,7 @@ mod core {
             data::OperationId,
             signature_aggregator::SignatureAggregator,
             system::{DkgSessionId, NodeState, SectionSigned},
-            AuthorityProof, SectionAuth, SectionAuthorityProvider,
+            AuthorityProof, SectionAuthorityProvider, SectionSig,
         },
         network_knowledge::{
             supermajority, NetworkKnowledge, NodeInfo,
@@ -150,7 +150,7 @@ mod core {
     #[derive(Debug, Clone)]
     pub(crate) struct DkgSessionInfo {
         pub(crate) session_id: DkgSessionId,
-        pub(crate) authority: AuthorityProof<SectionAuth>,
+        pub(crate) authority: AuthorityProof<SectionSig>,
     }
 
     // Store up to 100 in use backoffs

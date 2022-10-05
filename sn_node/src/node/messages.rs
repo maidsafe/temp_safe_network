@@ -9,25 +9,19 @@
 use crate::node::{Error, Result};
 
 use sn_interface::{
-    messaging::{
-        system::{NodeMsg, SigShare},
-        AuthKind, AuthorityProof, Dst, MsgId, NodeSig, SectionAuthShare, WireMsg,
-    },
+    messaging::{system::NodeMsg, AuthKind, Dst, MsgId, NodeSig, SectionSigShare, WireMsg},
     network_knowledge::{NodeInfo, SectionKeyShare},
 };
 
 use bls::PublicKey as BlsPublicKey;
-use xor_name::XorName;
 
 // Utilities for WireMsg.
 pub(crate) trait WireMsgUtils {
     /// Creates a message signed using a BLS `KeyShare` for destination accumulation
     fn for_dst_accumulation(
         key_share: &SectionKeyShare,
-        src_name: XorName,
         dst: Dst,
         node_msg: NodeMsg,
-        src_section_pk: BlsPublicKey,
     ) -> Result<WireMsg, Error>;
 
     /// Creates a signed message from single node.
@@ -43,17 +37,17 @@ impl WireMsgUtils for WireMsg {
     /// Creates a message signed using a BLS `KeyShare` for destination accumulation
     fn for_dst_accumulation(
         key_share: &SectionKeyShare,
-        src_name: XorName,
         dst: Dst,
         msg: NodeMsg,
-        src_section_pk: BlsPublicKey,
     ) -> Result<WireMsg, Error> {
         let msg_payload =
             WireMsg::serialize_msg_payload(&msg).map_err(|_| Error::InvalidMessage)?;
 
-        let auth = AuthKind::SectionShare(
-            bls_share_authorize(src_section_pk, src_name, key_share, &msg_payload).into_inner(),
-        );
+        let auth = AuthKind::SectionShare(SectionSigShare {
+            public_key_set: key_share.public_key_set.clone(),
+            index: key_share.index,
+            signature_share: key_share.secret_key_share.sign(&msg_payload),
+        });
 
         let wire_msg = WireMsg::new_msg(MsgId::new(), msg_payload, auth, dst);
 
@@ -84,22 +78,4 @@ impl WireMsgUtils for WireMsg {
 
         Ok(wire_msg)
     }
-}
-
-// Construct verified authority of a single node's share of section authority.
-fn bls_share_authorize(
-    section_pk: BlsPublicKey,
-    src_name: XorName,
-    key_share: &SectionKeyShare,
-    payload: impl AsRef<[u8]>,
-) -> AuthorityProof<SectionAuthShare> {
-    AuthorityProof(SectionAuthShare {
-        section_pk,
-        src_name,
-        sig_share: SigShare {
-            public_key_set: key_share.public_key_set.clone(),
-            index: key_share.index,
-            signature_share: key_share.secret_key_share.sign(payload),
-        },
-    })
 }

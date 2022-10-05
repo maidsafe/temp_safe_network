@@ -6,9 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{ClientAuth, NodeSig, SectionAuthShare};
+use super::system::SectionSigShare;
+use super::{ClientAuth, NodeSig};
 use serde::{Deserialize, Serialize};
-use xor_name::XorName;
 
 /// Source authority of a message.
 ///
@@ -35,17 +35,5 @@ pub enum AuthKind {
     ///
     /// Section share authority is needed for messages related to section administration, such as
     /// DKG and relocation.
-    SectionShare(SectionAuthShare),
-}
-
-impl AuthKind {
-    /// The src location of the msg.
-    pub fn src_name(&self) -> XorName {
-        match self {
-            Self::SectionShare(auth) => auth.src_name,
-            Self::Node(auth) => crate::types::PublicKey::Ed25519(auth.node_ed_pk).into(),
-            #[cfg(any(feature = "chunks", feature = "registers"))]
-            Self::Client(auth) => auth.public_key.into(),
-        }
-    }
+    SectionShare(SectionSigShare),
 }
