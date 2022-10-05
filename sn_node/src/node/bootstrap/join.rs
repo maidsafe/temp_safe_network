@@ -17,7 +17,7 @@ use sn_interface::{
         system::{
             JoinRejectionReason, JoinRequest, JoinResponse, MembershipState, NodeMsg, ResourceProof,
         },
-        AuthKind, Dst, MsgType, NodeEvidence, WireMsg,
+        AuthKind, Dst, MsgType, NodeSig, WireMsg,
     },
     network_knowledge::{NetworkKnowledge, NodeInfo, SectionTree},
     types::{keys::ed25519, log_markers::LogMarker, Peer},
@@ -456,7 +456,7 @@ impl<'a> Joiner<'a> {
                         trace!("Bootstrap message discarded: sender: {sender:?} wire_msg: {wire_msg:?}");
                         continue;
                     }
-                    AuthKind::Node(NodeEvidence { .. }) => match wire_msg.into_msg() {
+                    AuthKind::Node(NodeSig { .. }) => match wire_msg.into_msg() {
                         Ok(MsgType::Node {
                             msg: NodeMsg::JoinResponse(resp),
                             ..

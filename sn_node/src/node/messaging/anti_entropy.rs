@@ -448,7 +448,7 @@ mod tests {
     use sn_interface::{
         elder_count,
         messaging::{
-            AuthKind, AuthorityProof, Dst, MsgId, NodeEvidence, NodeMsgAuthority,
+            AuthKind, AuthorityProof, Dst, MsgId, NodeMsgAuthority, NodeSig,
             SectionAuth as SectionAuthMsg,
         },
         network_knowledge::{
@@ -770,7 +770,7 @@ mod tests {
             };
 
             let msg_id = MsgId::new();
-            let node_auth = NodeEvidence::authorize(src_section_pk, &sender.keypair, &payload);
+            let node_auth = NodeSig::authorize(src_section_pk, &sender.keypair, &payload);
             let auth = AuthKind::Node(node_auth.into_inner());
 
             Ok(WireMsg::new_msg(msg_id, payload, auth, dst))

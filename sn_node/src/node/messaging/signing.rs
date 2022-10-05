@@ -11,7 +11,7 @@ use super::OutgoingMsg;
 use crate::node::{Node, Result};
 
 use sn_interface::{
-    messaging::{data::ClientMsg, system::NodeMsg, AuthKind, ClientAuth, NodeEvidence, WireMsg},
+    messaging::{data::ClientMsg, system::NodeMsg, AuthKind, ClientAuth, NodeSig, WireMsg},
     types::{PublicKey, Signature},
 };
 
@@ -53,7 +53,7 @@ impl Node {
         let payload = WireMsg::serialize_msg_payload(&msg)?;
         let src_section_pk = self.network_knowledge.section_key();
         let auth = AuthKind::Node(
-            NodeEvidence::authorize(src_section_pk, &self.keypair, &payload).into_inner(),
+            NodeSig::authorize(src_section_pk, &self.keypair, &payload).into_inner(),
         );
 
         Ok((auth, payload))
