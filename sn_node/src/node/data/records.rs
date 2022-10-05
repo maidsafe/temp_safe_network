@@ -99,7 +99,7 @@ impl Node {
         }
 
         // we only add a pending request when we're actually sending out requests to new adults
-        trace!("adding pending req for {target:?} in dysfunction tracking");
+        trace!("Adding pending req for {target:?} in dysfunction tracking, req origin {source_client:?}");
         cmds.push(Cmd::TrackNodeIssueInDysfunction {
             name: target.name(),
             issue: IssueType::PendingRequestOperation(operation_id),

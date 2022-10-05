@@ -40,9 +40,13 @@
     clippy::unicode_not_nfc,
     clippy::unwrap_used
 )]
+// TODO: re-enable dysfunctional tracking
+#![allow(unused_variables)]
 
+/* TODO: re-enable dysfunctional tracking
 #[macro_use]
 extern crate tracing;
+*/
 
 mod detection;
 mod error;
@@ -97,30 +101,32 @@ impl DysfunctionDetection {
     ///
     /// The `op_id` only applies when adding an operational issue.
     pub fn track_issue(&mut self, node_id: NodeIdentifier, issue_type: IssueType) {
-        debug!("Adding a new issue to {node_id:?} the dysfunction tracker: {issue_type:?}");
-        match issue_type {
-            IssueType::Dkg => {
-                let queue = self.dkg_issues.entry(node_id).or_default();
-                queue.push_back(Instant::now());
-            }
-            IssueType::AwaitingProbeResponse => {
-                let queue = self.probe_issues.entry(node_id).or_default();
-                queue.push_back(Instant::now());
-            }
-            IssueType::Communication => {
-                let queue = self.communication_issues.entry(node_id).or_default();
-                queue.push_back(Instant::now());
-            }
-            IssueType::Knowledge => {
-                let queue = self.knowledge_issues.entry(node_id).or_default();
-                queue.push_back(Instant::now());
-            }
-            IssueType::PendingRequestOperation(op_id) => {
-                let queue = self.unfulfilled_ops.entry(node_id).or_default();
-                trace!("New issue has associated operation ID: {op_id:#?}");
-                queue.push((op_id, Instant::now()));
-            }
-        }
+        /* TODO: re-enable dysfunctional tracking
+                debug!("Adding a new issue to {node_id:?} the dysfunction tracker: {issue_type:?}");
+                match issue_type {
+                    IssueType::Dkg => {
+                        let queue = self.dkg_issues.entry(node_id).or_default();
+                        queue.push_back(Instant::now());
+                    }
+                    IssueType::AwaitingProbeResponse => {
+                        let queue = self.probe_issues.entry(node_id).or_default();
+                        queue.push_back(Instant::now());
+                    }
+                    IssueType::Communication => {
+                        let queue = self.communication_issues.entry(node_id).or_default();
+                        queue.push_back(Instant::now());
+                    }
+                    IssueType::Knowledge => {
+                        let queue = self.knowledge_issues.entry(node_id).or_default();
+                        queue.push_back(Instant::now());
+                    }
+                    IssueType::PendingRequestOperation(op_id) => {
+                        let queue = self.unfulfilled_ops.entry(node_id).or_default();
+                        trace!("New issue has associated operation ID: {op_id:#?}");
+                        queue.push((op_id, Instant::now()));
+                    }
+                }
+        */
     }
 
     /// Removes a `pending_operation` from the node liveness records. Returns true if a record was removed
@@ -129,72 +135,80 @@ impl DysfunctionDetection {
         node_id: &NodeIdentifier,
         operation_id: OperationId,
     ) -> bool {
-        trace!(
-            "Attempting to remove pending_operation {:?} op: {:?}",
-            node_id,
-            operation_id
-        );
-        let mut has_removed = false;
+        true
+        /* TODO: re-enable dysfunctional tracking
+                    trace!(
+                        "Attempting to remove pending_operation {:?} op: {:?}",
+                        node_id,
+                        operation_id
+                    );
+                    let mut has_removed = false;
 
-        if let Some(v) = self.unfulfilled_ops.get_mut(node_id) {
-            // only remove the first instance from the vec
-            v.retain(|(op_id, _)| {
-                if has_removed || op_id != &operation_id {
-                    true
-                } else {
-                    has_removed = true;
-                    false
-                }
-            });
-            if has_removed {
-                trace!(
-                    "Pending operation removed for node: {:?} op: {:?}",
-                    node_id,
-                    operation_id
-                );
-            } else {
-                trace!(
-                    "No Pending operation found for node: {:?} op: {:?}",
-                    node_id,
-                    operation_id
-                );
-            }
-        }
-        has_removed
+                    if let Some(v) = self.unfulfilled_ops.get_mut(node_id) {
+                        // only remove the first instance from the vec
+                        v.retain(|(op_id, _)| {
+                            if has_removed || op_id != &operation_id {
+                                true
+                            } else {
+                                has_removed = true;
+                                false
+                            }
+                        });
+                        if has_removed {
+                            trace!(
+                                "Pending operation removed for node: {:?} op: {:?}",
+                                node_id,
+                                operation_id
+                            );
+                        } else {
+                            trace!(
+                                "No Pending operation found for node: {:?} op: {:?}",
+                                node_id,
+                                operation_id
+                            );
+                        }
+                    }
+                    has_removed
+        */
     }
 
     /// Removes a DKG session from the node liveness records.
     pub fn dkg_ack_fulfilled(&mut self, node_id: &NodeIdentifier) {
-        trace!("Attempting to remove logged dkg session for {:?}", node_id,);
+        /* TODO: re-enable dysfunctional tracking
+                    trace!("Attempting to remove logged dkg session for {:?}", node_id,);
 
-        if let Some(v) = self.dkg_issues.get_mut(node_id) {
-            // only remove the first instance from the vec
-            let prev = v.pop_front();
+                    if let Some(v) = self.dkg_issues.get_mut(node_id) {
+                        // only remove the first instance from the vec
+                        let prev = v.pop_front();
 
-            if prev.is_some() {
-                trace!("Pending dkg session removed for node: {:?}", node_id,);
-            } else {
-                trace!("No Pending dkg session found for node: {:?}", node_id);
-            }
-        }
+                        if prev.is_some() {
+                            trace!("Pending dkg session removed for node: {:?}", node_id,);
+                        } else {
+                            trace!("No Pending dkg session found for node: {:?}", node_id);
+                        }
+                    }
+        */
     }
+
     /// Removes a probe tracker from the node liveness records.
     pub fn ae_update_msg_received(&mut self, node_id: &NodeIdentifier) {
-        trace!(
-            "Attempting to remove pending AEProbe response for {:?}",
-            node_id,
-        );
+        /* TODO: re-enable dysfunctional tracking
+                    trace!(
+                        "Attempting to remove pending AEProbe response for {:?}",
+                        node_id,
+                    );
 
-        if let Some(v) = self.probe_issues.get_mut(node_id) {
-            // only remove the first instance from the vec
-            let prev = v.pop_front();
+                    if let Some(v) = self.probe_issues.get_mut(node_id) {
+                        // only remove the first instance from the vec
+                        let prev = v.pop_front();
 
-            if prev.is_some() {
-                trace!("Pending probe msg removed for node: {:?}", node_id,);
-            } else {
-                trace!("No Pending probe session found for node: {:?}", node_id);
-            }
-        }
+                        if prev.is_some() {
+                            trace!("Pending probe msg removed for node: {:?}", node_id,);
+                        } else {
+                            trace!("No Pending probe session found for node: {:?}", node_id);
+                        }
+                    }
+        */
     }
 
     /// Gets the unfulfilled operation IDs for a given node.
@@ -204,9 +218,11 @@ impl DysfunctionDetection {
     ///
     /// If there are no unfulfilled operations tracked, an empty list will be returned.
     pub fn get_unfulfilled_ops(&self, node: XorName) -> Vec<OperationId> {
-        if let Some(val) = self.unfulfilled_ops.get(&node) {
-            return val.clone().iter().map(|(op_id, _)| *op_id).collect();
-        }
+        /* TODO: re-enable dysfunctional tracking
+                    if let Some(val) = self.unfulfilled_ops.get(&node) {
+                        return val.clone().iter().map(|(op_id, _)| *op_id).collect();
+                    }
+        */
         Vec::new()
     }
 
@@ -217,32 +233,38 @@ impl DysfunctionDetection {
 
     /// Add a new node to the tracker and recompute closest nodes.
     pub fn add_new_node(&mut self, node: XorName) {
-        info!("Adding new node:{node} to DysfunctionDetection tracker");
-        self.nodes.push(node);
+        /* TODO: re-enable dysfunctional tracking
+                    info!("Adding new node:{node} to DysfunctionDetection tracker");
+                    self.nodes.push(node);
+        */
     }
 
     /// Removes tracked nodes not present in `current_members`.
     ///
     /// Tracked issues related to nodes that were removed will also be removed.
     pub fn retain_members_only(&mut self, current_members: BTreeSet<XorName>) {
-        let nodes = self.current_nodes();
-        let nodes_being_removed = nodes
-            .iter()
-            .filter(|x| !current_members.contains(x))
-            .copied()
-            .collect::<Vec<XorName>>();
+        /* TODO: re-enable dysfunctional tracking
+                    let nodes = self.current_nodes();
+                    let nodes_being_removed = nodes
+                        .iter()
+                        .filter(|x| !current_members.contains(x))
+                        .copied()
+                        .collect::<Vec<XorName>>();
 
-        self.nodes.retain(|x| current_members.contains(x));
+                    self.nodes.retain(|x| current_members.contains(x));
 
-        for node in &nodes_being_removed {
-            let _ = self.communication_issues.remove(node);
-            let _ = self.knowledge_issues.remove(node);
-            let _ = self.dkg_issues.remove(node);
-            let _ = self.probe_issues.remove(node);
-            let _ = self.unfulfilled_ops.remove(node);
-        }
+                    for node in &nodes_being_removed {
+                        let _ = self.communication_issues.remove(node);
+                        let _ = self.knowledge_issues.remove(node);
+                        let _ = self.dkg_issues.remove(node);
+                        let _ = self.probe_issues.remove(node);
+                        let _ = self.unfulfilled_ops.remove(node);
+                    }
+        */
     }
 }
+
+/* TODO: re-enable dysfunctional tracking
 
 /// Calculates the avg value in a data set
 /// https://rust-lang-nursery.github.io/rust-cookbook/science/mathematics/statistics.html
@@ -541,3 +563,4 @@ mod tests {
         Ok(())
     }
 }
+*/

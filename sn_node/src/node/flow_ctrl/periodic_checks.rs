@@ -32,7 +32,9 @@ const MISSING_DKG_MSG_INTERVAL: Duration = Duration::from_secs(30);
 const SECTION_PROBE_INTERVAL: Duration = Duration::from_secs(300);
 const LINK_CLEANUP_INTERVAL: Duration = Duration::from_secs(120);
 const DATA_BATCH_INTERVAL: Duration = Duration::from_millis(50);
+/* TODO: re-enable dysfunctional tracking
 const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(5);
+*/
 // 30 adult nodes checked per minute., so each node should be queried 10x in 10 mins
 // Which should hopefully trigger dysfunction if we're not getting responses back
 const ADULT_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(2);
@@ -103,7 +105,7 @@ impl FlowCtrl {
         last_elder_health_check: &mut Instant,
         last_vote_check: &mut Instant,
         last_dkg_msg_check: &mut Instant,
-        last_dysfunction_check: &mut Instant,
+        _last_dysfunction_check: &mut Instant,
     ) {
         let now = Instant::now();
         let mut cmds = vec![];
@@ -117,6 +119,7 @@ impl FlowCtrl {
 
         if last_adult_health_check.elapsed() > ADULT_HEALTH_CHECK_INTERVAL {
             *last_adult_health_check = now;
+            /* TODO: re-enable dysfunctional tracking
             let health_cmds = match Self::perform_health_checks(self.node.clone()).await {
                 Ok(cmds) => cmds,
                 Err(error) => {
@@ -125,6 +128,7 @@ impl FlowCtrl {
                 }
             };
             cmds.extend(health_cmds);
+            */
         }
 
         // The above health check only queries for chunks
@@ -150,11 +154,13 @@ impl FlowCtrl {
             cmds.extend(dkg_cmds);
         }
 
+        /* TODO: re-enable dysfunctional tracking
         if last_dysfunction_check.elapsed() > DYSFUNCTION_CHECK_INTERVAL {
             *last_dysfunction_check = now;
             let dysf_cmds = Self::check_for_dysfunction(self.node.clone()).await;
             cmds.extend(dysf_cmds);
         }
+        */
 
         for cmd in cmds {
             // dont use sender here incase channel gets full
@@ -163,6 +169,7 @@ impl FlowCtrl {
     }
 
     /// Initiates and generates all the subsequent Cmds to perform a healthcheck
+    #[allow(dead_code)]
     async fn perform_health_checks(node: Arc<RwLock<Node>>) -> Result<Vec<Cmd>> {
         info!("Starting to check the section's health");
         let node = node.read().await;
@@ -356,6 +363,7 @@ impl FlowCtrl {
         Ok(None)
     }
 
+    #[allow(dead_code)]
     async fn check_for_dysfunction(node: Arc<RwLock<Node>>) -> Vec<Cmd> {
         info!("Performing dysfunction checking");
         let mut cmds = vec![];
