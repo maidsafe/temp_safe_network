@@ -10,7 +10,7 @@ use super::NodeState;
 
 use crate::messaging::system::DkgSessionId;
 use crate::messaging::{
-    system::{KeyedSig, SectionAuth},
+    system::{KeyedSig, SectionSigned},
     SectionAuthorityProvider as SectionAuthorityProviderMsg,
 };
 use crate::types::Peer;
@@ -38,7 +38,7 @@ pub trait SectionAuthUtils<T: Serialize> {
     fn self_verify(&self) -> bool;
 }
 
-impl<T: Serialize> SectionAuthUtils<T> for SectionAuth<T> {
+impl<T: Serialize> SectionAuthUtils<T> for SectionSigned<T> {
     fn new(value: T, sig: KeyedSig) -> Self {
         Self { value, sig }
     }
@@ -72,10 +72,10 @@ pub struct SectionAuthorityProvider {
 #[allow(clippy::large_enum_variant)]
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Serialize, Deserialize)]
 pub enum SapCandidate {
-    ElderHandover(SectionAuth<SectionAuthorityProvider>),
+    ElderHandover(SectionSigned<SectionAuthorityProvider>),
     SectionSplit(
-        SectionAuth<SectionAuthorityProvider>,
-        SectionAuth<SectionAuthorityProvider>,
+        SectionSigned<SectionAuthorityProvider>,
+        SectionSigned<SectionAuthorityProvider>,
     ),
 }
 
@@ -238,9 +238,9 @@ impl SectionAuthorityProvider {
     }
 }
 
-impl SectionAuth<SectionAuthorityProvider> {
-    pub fn into_authed_msg(self) -> SectionAuth<SectionAuthorityProviderMsg> {
-        SectionAuth {
+impl SectionSigned<SectionAuthorityProvider> {
+    pub fn into_authed_msg(self) -> SectionSigned<SectionAuthorityProviderMsg> {
+        SectionSigned {
             value: self.value.to_msg(),
             sig: self.sig,
         }
@@ -263,9 +263,9 @@ impl SectionAuthorityProviderMsg {
     }
 }
 
-impl SectionAuth<SectionAuthorityProviderMsg> {
-    pub fn into_authed_state(self) -> SectionAuth<SectionAuthorityProvider> {
-        SectionAuth {
+impl SectionSigned<SectionAuthorityProviderMsg> {
+    pub fn into_authed_state(self) -> SectionSigned<SectionAuthorityProvider> {
+        SectionSigned {
             value: self.value.into_state(),
             sig: self.sig,
         }

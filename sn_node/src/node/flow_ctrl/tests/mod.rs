@@ -37,9 +37,9 @@ use sn_interface::{
         system::{
             AntiEntropyKind, JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig,
             MembershipState, NodeCmd, NodeMsg, NodeMsgAuthorityUtils, NodeState as NodeStateMsg,
-            RelocateDetails, ResourceProof, SectionAuth,
+            RelocateDetails, ResourceProof, SectionSigned,
         },
-        Dst, MsgId, MsgType, SectionAuth as MsgKindSectionAuth, SectionTreeUpdate, WireMsg,
+        Dst, MsgId, MsgType, SectionAuth, SectionTreeUpdate, WireMsg,
     },
     network_knowledge::{
         recommended_section_size, supermajority, test_utils::*, Error as NetworkKnowledgeError,
@@ -335,7 +335,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             for peer in section_auth.elders() {
                 let node_state = NodeState::joined(*peer, None);
                 let sig = prove(&sk_set.secret_key(), &node_state)?;
-                let _updated = section.update_member(SectionAuth {
+                let _updated = section.update_member(SectionSigned {
                     value: node_state,
                     sig,
                 });
@@ -1138,7 +1138,7 @@ async fn handle_demote_during_split() -> Result<()> {
 
             // Create agreement on `OurElder` for both sub-sections
             let create_our_elders_cmd =
-                |signed_sap: SectionAuth<SectionAuthorityProvider>| -> Result<_> {
+                |signed_sap: SectionSigned<SectionAuthorityProvider>| -> Result<_> {
                     let proposal = Proposal::NewElders(signed_sap.clone());
                     let signature = sk_set_v0.secret_key().sign(&proposal.as_signable_bytes()?);
                     let sig = KeyedSig {

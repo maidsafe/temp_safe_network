@@ -16,7 +16,7 @@ use crate::node::{
 
 use sn_interface::{
     messaging::system::{
-        JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeMsg, NodeState, SectionAuth,
+        JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeMsg, NodeState, SectionSigned,
     },
     network_knowledge::{NodeInfo, SectionAuthorityProvider},
     types::{keys::ed25519, Peer, PublicKey},
@@ -30,7 +30,7 @@ use xor_name::{Prefix, XorName};
 /// Re-join as a relocated node.
 pub(crate) struct JoiningAsRelocated {
     pub(crate) node: NodeInfo,
-    relocate_proof: SectionAuth<NodeState>,
+    relocate_proof: SectionSigned<NodeState>,
     // Avoid sending more than one duplicated request (with same SectionKey) to the same peer.
     used_recipient_saps: UsedRecipientSaps,
     dst_xorname: XorName,
@@ -44,7 +44,7 @@ impl JoiningAsRelocated {
     // shall be fed back with `handle_join_response` function.
     pub(crate) fn start(
         node: NodeInfo,
-        relocate_proof: SectionAuth<NodeState>,
+        relocate_proof: SectionSigned<NodeState>,
         bootstrap_addrs: Vec<SocketAddr>,
         dst_xorname: XorName,
         dst_section_key: BlsPublicKey,

@@ -17,7 +17,7 @@ mod signed;
 use super::authority::SectionAuth as SectionAuthProof;
 use crate::messaging::{AuthorityProof, EndUser, MsgId, SectionTreeUpdate};
 use crate::network_knowledge::SapCandidate;
-pub use agreement::{DkgSessionId, Proposal, SectionAuth};
+pub use agreement::{DkgSessionId, Proposal, SectionSigned};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProof};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use msg_authority::NodeMsgAuthorityUtils;
@@ -36,7 +36,7 @@ use std::fmt::{Display, Formatter};
 use xor_name::XorName;
 
 /// List of peers of a section
-pub type SectionPeers = BTreeSet<SectionAuth<NodeState>>;
+pub type SectionPeers = BTreeSet<SectionSigned<NodeState>>;
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug)]
 pub enum AntiEntropyKind {
@@ -69,7 +69,7 @@ pub enum NodeMsg {
     /// This expects a response, even if we're up to date.
     AntiEntropyProbe(BlsPublicKey),
     /// Send from a section to the node to be immediately relocated.
-    Relocate(SectionAuth<NodeState>),
+    Relocate(SectionSigned<NodeState>),
     /// Membership Votes, in order they should be processed in.
     MembershipVotes(Vec<SignedVote<NodeState>>),
     /// Membership Anti-Entropy request

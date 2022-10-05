@@ -15,7 +15,7 @@ use bls::Signature;
 use sn_consensus::{Decision, Generation, SignedVote, VoteResponse};
 use sn_interface::{
     messaging::{
-        system::{JoinResponse, KeyedSig, MembershipState, NodeMsg, NodeState, SectionAuth},
+        system::{JoinResponse, KeyedSig, MembershipState, NodeMsg, NodeState, SectionSigned},
         SectionTreeUpdate,
     },
     types::{log_markers::LogMarker, Peer},
@@ -231,7 +231,7 @@ impl Node {
             signature,
         };
 
-        let new_info = SectionAuth {
+        let new_info = SectionSigned {
             value: new_info.into_state(),
             sig,
         };
@@ -289,7 +289,7 @@ impl Node {
             signature,
         };
 
-        let node_state = SectionAuth {
+        let node_state = SectionSigned {
             value: node_state,
             sig,
         }

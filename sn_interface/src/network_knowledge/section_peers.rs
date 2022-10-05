@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::system::{MembershipState, SectionAuth};
+use crate::messaging::system::{MembershipState, SectionSigned};
 use crate::network_knowledge::{errors::Result, NodeState, SectionsDAG};
 
 use dashmap::{mapref::entry::Entry, DashMap};
@@ -20,13 +20,13 @@ const ELDER_CHURN_EVENTS_TO_PRUNE_ARCHIVE: usize = 5;
 /// Container for storing information about (current and archived) members of our section.
 #[derive(Clone, Default, Debug)]
 pub(super) struct SectionPeers {
-    members: Arc<DashMap<XorName, SectionAuth<NodeState>>>,
-    archive: Arc<DashMap<XorName, SectionAuth<NodeState>>>,
+    members: Arc<DashMap<XorName, SectionSigned<NodeState>>>,
+    archive: Arc<DashMap<XorName, SectionSigned<NodeState>>>,
 }
 
 impl SectionPeers {
     /// Returns set of current members, i.e. those with state == `Joined`.
-    pub(super) fn members(&self) -> BTreeSet<SectionAuth<NodeState>> {
+    pub(super) fn members(&self) -> BTreeSet<SectionSigned<NodeState>> {
         self.members
             .iter()
             .map(|entry| {
@@ -55,7 +55,7 @@ impl SectionPeers {
     pub(super) fn is_either_member_or_archived(
         &self,
         name: &XorName,
-    ) -> Option<SectionAuth<NodeState>> {
+    ) -> Option<SectionSigned<NodeState>> {
         if let Some(member) = self.members.get(name).map(|state| state.value().clone()) {
             Some(member)
         } else {
@@ -70,7 +70,7 @@ impl SectionPeers {
     /// - Joined -> Left
     /// - Joined -> Relocated
     /// - Relocated <--> Left (should not happen, but needed for consistency)
-    pub(super) fn update(&self, new_state: SectionAuth<NodeState>) -> bool {
+    pub(super) fn update(&self, new_state: SectionSigned<NodeState>) -> bool {
         let node_name = new_state.name();
         // do ops on the dashmap _after_ matching, so we can drop any refs to prevent deadlocking
         let mut should_insert = false;

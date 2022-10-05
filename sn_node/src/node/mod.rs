@@ -91,7 +91,7 @@ mod core {
         messaging::{
             data::OperationId,
             signature_aggregator::SignatureAggregator,
-            system::{DkgSessionId, NodeState, SectionAuth as SectionAuthed},
+            system::{DkgSessionId, NodeState, SectionSigned},
             AuthorityProof, SectionAuth, SectionAuthorityProvider,
         },
         network_knowledge::{
@@ -177,7 +177,7 @@ mod core {
         pub(crate) dkg_sessions_info: HashMap<Digest256, DkgSessionInfo>,
         pub(crate) dkg_voter: DkgVoter,
         pub(crate) pending_split_sections:
-            BTreeMap<Generation, BTreeSet<SectionAuthed<SectionAuthProvider>>>,
+            BTreeMap<Generation, BTreeSet<SectionSigned<SectionAuthProvider>>>,
         pub(crate) relocate_state: Option<Box<JoiningAsRelocated>>,
         // ======================== Elder only ========================
         pub(crate) membership: Option<Membership>,
