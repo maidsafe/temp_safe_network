@@ -447,10 +447,7 @@ mod tests {
 
     use sn_interface::{
         elder_count,
-        messaging::{
-            AuthKind, AuthorityProof, Dst, MsgId, NodeMsgAuthority, SectionAuth,
-            NodeSig,
-        },
+        messaging::{AuthKind, AuthorityProof, Dst, MsgId, NodeMsgAuthority, NodeSig},
         network_knowledge::{
             test_utils::{gen_addr, random_sap, section_signed},
             NetworkKnowledge, NodeInfo, SectionKeyShare, SectionKeysProvider, SectionsDAG,
@@ -789,10 +786,7 @@ mod tests {
                 },
             };
 
-            let auth_proof = AuthorityProof(SectionAuth {
-                src_name: self.other_signed_sap.value.prefix().name(),
-                sig: self.other_signed_sap.sig.clone(),
-            });
+            let auth_proof = AuthorityProof(self.other_signed_sap.sig.clone());
             let node_auth = NodeMsgAuthority::Section(auth_proof);
 
             Ok((payload_msg, node_auth))

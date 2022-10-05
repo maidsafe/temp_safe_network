@@ -9,7 +9,7 @@
 use crate::node::{flow_ctrl::cmds::Cmd, Node, Proposal, Result};
 use sn_interface::{
     messaging::{
-        system::{KeyedSig, SectionSigned},
+        system::{SectionSig, SectionSigned},
         SectionTreeUpdate,
     },
     network_knowledge::{NodeState, SapCandidate, SectionAuthUtils, SectionAuthorityProvider},
@@ -23,7 +23,7 @@ impl Node {
     pub(crate) async fn handle_general_agreements(
         &mut self,
         proposal: Proposal,
-        sig: KeyedSig,
+        sig: SectionSig,
     ) -> Result<Option<Cmd>> {
         debug!("{:?} {:?}", LogMarker::ProposalAgreed, proposal);
         match proposal {
@@ -43,7 +43,7 @@ impl Node {
     }
 
     #[instrument(skip(self))]
-    fn handle_offline_agreement(&mut self, node_state: NodeState, sig: KeyedSig) -> Option<Cmd> {
+    fn handle_offline_agreement(&mut self, node_state: NodeState, sig: SectionSig) -> Option<Cmd> {
         info!(
             "Agreement - proposing membership change with node offline: {}",
             node_state.peer()
@@ -55,7 +55,7 @@ impl Node {
     async fn handle_section_info_agreement(
         &mut self,
         sap: SectionAuthorityProvider,
-        sig: KeyedSig,
+        sig: SectionSig,
     ) -> Result<Option<Cmd>> {
         // check if section matches our prefix
         let equal_prefix = sap.prefix() == self.network_knowledge.prefix();
@@ -128,7 +128,7 @@ impl Node {
     pub(crate) async fn handle_new_elders_agreement(
         &mut self,
         signed_sap: SectionSigned<SectionAuthorityProvider>,
-        key_sig: KeyedSig,
+        key_sig: SectionSig,
     ) -> Result<Vec<Cmd>> {
         trace!("{}", LogMarker::HandlingNewEldersAgreement);
         let snapshot = self.state_snapshot();

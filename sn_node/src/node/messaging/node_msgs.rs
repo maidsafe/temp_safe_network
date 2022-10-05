@@ -26,16 +26,8 @@ use sn_interface::{
     messaging::{
         data::StorageLevel,
         signature_aggregator::Error as AggregatorError,
-        system::{
-            // SectionAuth is gonna cause issue
-            JoinResponse,
-            NodeCmd,
-            NodeEvent,
-            NodeMsg,
-            NodeQuery,
-            Proposal as ProposalMsg,
-        },
-        MsgId, NodeMsgAuthority, SectionAuth,
+        system::{JoinResponse, NodeCmd, NodeEvent, NodeMsg, NodeQuery, Proposal as ProposalMsg},
+        MsgId, NodeMsgAuthority, SectionSig,
     },
     network_knowledge::NetworkKnowledge,
     types::{log_markers::LogMarker, Keypair, Peer, PublicKey},
@@ -593,7 +585,7 @@ impl Node {
             return Ok(Some(msg_authority));
         };
 
-        match SectionAuth::try_authorize(
+        match SectionSig::try_authorize(
             &mut self.message_aggregator,
             bls_share_auth.into_inner(),
             &payload,

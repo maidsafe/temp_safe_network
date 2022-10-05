@@ -19,8 +19,8 @@ use bytes::Bytes;
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
-        system::{DkgSessionId, NodeMsg, SigShare},
-        AuthorityProof, NodeMsgAuthority, SectionAuth, SectionAuthShare, WireMsg,
+        system::{DkgSessionId, NodeMsg, SectionSigShare},
+        AuthorityProof, NodeMsgAuthority, SectionSig, WireMsg,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
     types::{self, log_markers::LogMarker, Peer},
@@ -99,9 +99,8 @@ impl Node {
             }
         }
 
-        let src_name = session_id.prefix.name();
         let msg = NodeMsg::DkgStart(session_id);
-        let (auth, payload) = self.get_auth(&msg, src_name)?;
+        let (auth, payload) = self.get_auth(&msg)?;
 
         if !others.is_empty() {
             cmds.push(Cmd::send_msg(
@@ -125,7 +124,7 @@ impl Node {
         Ok(cmds)
     }
 
-    fn get_auth(&self, msg: &NodeMsg, src_name: XorName) -> Result<(SectionAuthShare, Bytes)> {
+    fn get_auth(&self, msg: &NodeMsg) -> Result<(SectionSigShare, Bytes)> {
         let section_key = self.network_knowledge.section_key();
         let key_share = self
             .section_keys_provider
@@ -137,14 +136,10 @@ impl Node {
 
         let payload = WireMsg::serialize_msg_payload(&msg).map_err(|_| Error::InvalidMessage)?;
 
-        let auth = SectionAuthShare {
-            section_pk: section_key,
-            src_name,
-            sig_share: SigShare {
-                public_key_set: key_share.public_key_set.clone(),
-                index: key_share.index,
-                signature_share: key_share.secret_key_share.sign(&payload),
-            },
+        let auth = SectionSigShare {
+            public_key_set: key_share.public_key_set.clone(),
+            index: key_share.index,
+            signature_share: key_share.secret_key_share.sign(&payload),
         };
 
         Ok((auth, payload))
@@ -246,7 +241,7 @@ impl Node {
     fn handle_missed_dkg_start(
         &mut self,
         session_id: &DkgSessionId,
-        section_auth: AuthorityProof<SectionAuth>,
+        section_auth: AuthorityProof<SectionSig>,
         pub_key: BlsPublicKey,
         sig: Signature,
         sender: Peer,
@@ -259,7 +254,7 @@ impl Node {
         // reconstruct the original DKG start message and verify the section signature
         let payload = WireMsg::serialize_msg_payload(&NodeMsg::DkgStart(session_id.clone()))?;
         let auth = section_auth.clone().into_inner();
-        if self.network_knowledge.section_key() != auth.sig.public_key {
+        if self.network_knowledge.section_key() != auth.public_key {
             warn!(
                 "Invalid section key in dkg auth proof in s{:?}: {sender:?}",
                 session_id.sh()
@@ -304,7 +299,7 @@ impl Node {
     pub(crate) fn handle_dkg_ephemeral_pubkey(
         &mut self,
         session_id: &DkgSessionId,
-        section_auth: AuthorityProof<SectionAuth>,
+        section_auth: AuthorityProof<SectionSig>,
         pub_key: BlsPublicKey,
         sig: Signature,
         sender: Peer,

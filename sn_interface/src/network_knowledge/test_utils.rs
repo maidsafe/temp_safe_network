@@ -1,5 +1,5 @@
 use super::*;
-use crate::messaging::system::{KeyedSig, SectionSigned};
+use crate::messaging::system::{SectionSig, SectionSigned};
 use crate::network_knowledge::section_keys::build_spent_proof_share;
 use crate::network_knowledge::{Error, NodeInfo, MIN_ADULT_AGE};
 use eyre::{eyre, Result};
@@ -111,9 +111,9 @@ pub fn random_sap_with_key(
 }
 
 // Create signature for the given payload using the given secret key.
-pub fn prove<T: Serialize>(secret_key: &bls::SecretKey, payload: &T) -> Result<KeyedSig> {
+pub fn prove<T: Serialize>(secret_key: &bls::SecretKey, payload: &T) -> Result<SectionSig> {
     let bytes = bincode::serialize(payload).map_err(|_| Error::InvalidPayload)?;
-    Ok(KeyedSig {
+    Ok(SectionSig {
         public_key: secret_key.public_key(),
         signature: secret_key.sign(&bytes),
     })

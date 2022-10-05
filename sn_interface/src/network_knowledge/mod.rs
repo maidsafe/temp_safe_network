@@ -30,10 +30,7 @@ pub use self::{
 
 use crate::{
     messaging::{
-        system::{
-            KeyedSig, NodeMsg, NodeMsgAuthorityUtils, SectionPeers as SectionPeersMsg,
-            SectionSigned,
-        },
+        system::{NodeMsg, SectionPeers as SectionPeersMsg, SectionSig, SectionSigned},
         Dst, NodeMsgAuthority, SectionTreeUpdate,
     },
     types::Peer,
@@ -640,14 +637,14 @@ fn create_first_sig<T: Serialize>(
     pk_set: &bls::PublicKeySet,
     sk_share: &bls::SecretKeyShare,
     payload: &T,
-) -> Result<KeyedSig> {
+) -> Result<SectionSig> {
     let bytes = bincode::serialize(payload).map_err(|_| Error::InvalidPayload)?;
     let signature_share = sk_share.sign(&bytes);
     let signature = pk_set
         .combine_signatures(iter::once((0, &signature_share)))
         .map_err(|_| Error::InvalidSignatureShare)?;
 
-    Ok(KeyedSig {
+    Ok(SectionSig {
         public_key: pk_set.public_key(),
         signature,
     })

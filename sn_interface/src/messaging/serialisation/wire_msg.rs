@@ -315,7 +315,9 @@ impl WireMsg {
     pub fn src_section_pk(&self) -> Option<bls::PublicKey> {
         match &self.header.msg_envelope.auth {
             AuthKind::Node(node_signed) => Some(node_signed.section_pk),
-            AuthKind::SectionShare(bls_share_signed) => Some(bls_share_signed.section_pk),
+            AuthKind::SectionShare(bls_share_signed) => {
+                Some(bls_share_signed.public_key_set.public_key())
+            }
             _ => None,
         }
     }

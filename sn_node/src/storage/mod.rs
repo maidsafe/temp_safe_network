@@ -368,20 +368,15 @@ mod tests {
         Ok(())
     }
 
-    fn section_auth() -> sn_interface::messaging::SectionAuth {
-        use sn_interface::messaging::system::KeyedSig;
-
+    use sn_interface::messaging::system::SectionSig;
+    fn section_auth() -> SectionSig {
         let sk = bls::SecretKey::random();
         let public_key = sk.public_key();
         let data = "hello".to_string();
         let signature = sk.sign(&data);
-        let sig = KeyedSig {
+        SectionSig {
             public_key,
             signature,
-        };
-        sn_interface::messaging::SectionAuth {
-            src_name: sn_interface::types::PublicKey::Bls(public_key).into(),
-            sig,
         }
     }
 

@@ -6,21 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{
-    system::{KeyedSig, SigShare},
-    Error, Result,
-};
-use crate::{
-    messaging::signature_aggregator::{Error as AggregatorError, SignatureAggregator},
-    types::{PublicKey, Signature},
-};
+pub use super::system::{SectionSig, SectionSigShare};
+use super::{Error, Result};
+use crate::types::{PublicKey, Signature};
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::{
     Keypair as EdKeypair, PublicKey as EdPublicKey, Signature as EdSignature, Signer as _,
     Verifier as _,
 };
 use serde::{Deserialize, Serialize};
-use xor_name::XorName;
 
 /// Authority of a network peer.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
@@ -57,50 +51,6 @@ impl NodeSig {
             node_ed_pk: keypair.public,
             signature: keypair.sign(payload.as_ref()),
         })
-    }
-}
-
-/// Authority of a single peer that uses it's BLS Keyshare to sign the message.
-#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
-pub struct SectionAuthShare {
-    /// Section key of the source.
-    pub section_pk: BlsPublicKey,
-    /// Name in the source section.
-    pub src_name: XorName,
-    /// Proof Share signed by the peer's BLS KeyShare.
-    pub sig_share: SigShare,
-}
-
-/// Authority of a whole section.
-#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
-pub struct SectionAuth {
-    /// Name in the source section.
-    pub src_name: XorName,
-    /// BLS proof of the message corresponding to the source section.
-    pub sig: KeyedSig,
-}
-
-impl SectionAuth {
-    /// Try to construct verified section authority by aggregating a new share.
-    pub fn try_authorize(
-        aggregator: &mut SignatureAggregator,
-        share: SectionAuthShare,
-        payload: impl AsRef<[u8]>,
-    ) -> Result<AuthorityProof<Self>, AggregatorError> {
-        let sig = aggregator.add(payload.as_ref(), share.sig_share.clone())?;
-
-        if share.sig_share.public_key_set.public_key() != sig.public_key {
-            return Err(AggregatorError::InvalidShare);
-        }
-
-        if sig.public_key != share.section_pk {
-            return Err(AggregatorError::InvalidShare);
-        }
-
-        Ok(AuthorityProof(Self {
-            src_name: share.src_name,
-            sig,
-        }))
     }
 }
 
@@ -168,32 +118,26 @@ impl VerifyAuthority for NodeSig {
 }
 impl sealed::Sealed for NodeSig {}
 
-impl VerifyAuthority for SectionAuthShare {
+impl VerifyAuthority for SectionSigShare {
     fn verify_authority(self, payload: impl AsRef<[u8]>) -> Result<Self> {
-        // Signed chain is required for accumulation at destination.
-        if self.sig_share.public_key_set.public_key() != self.section_pk {
+        if !self.verify(payload.as_ref()) {
             return Err(Error::InvalidSignature);
         }
+        Ok(self)
+    }
+}
+impl sealed::Sealed for SectionSigShare {}
 
-        if !self.sig_share.verify(payload.as_ref()) {
+impl VerifyAuthority for SectionSig {
+    fn verify_authority(self, payload: impl AsRef<[u8]>) -> Result<Self> {
+        if !self.public_key.verify(&self.signature, payload) {
             return Err(Error::InvalidSignature);
         }
 
         Ok(self)
     }
 }
-impl sealed::Sealed for SectionAuthShare {}
-
-impl VerifyAuthority for SectionAuth {
-    fn verify_authority(self, payload: impl AsRef<[u8]>) -> Result<Self> {
-        if !self.sig.public_key.verify(&self.sig.signature, payload) {
-            return Err(Error::InvalidSignature);
-        }
-
-        Ok(self)
-    }
-}
-impl sealed::Sealed for SectionAuth {}
+impl sealed::Sealed for SectionSig {}
 
 mod sealed {
     #[allow(missing_docs, unreachable_pub)]

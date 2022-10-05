@@ -12,11 +12,8 @@ mod wire_msg_header;
 pub use self::wire_msg::WireMsg;
 #[cfg(feature = "traceroute")]
 pub use self::wire_msg::{Entity, Traceroute};
-use super::{AuthorityProof, NodeSig, SectionAuth, SectionAuthShare};
-
-use crate::types::PublicKey;
-
-use xor_name::XorName;
+use super::{AuthorityProof, NodeSig, SectionSig, SectionSigShare};
+use std::collections::BTreeSet;
 
 /// Authority of a `NodeMsg`.
 /// Src of message and authority to send it. Authority is validated by the signature.
@@ -25,29 +22,28 @@ pub enum NodeMsgAuthority {
     /// Authority of a single peer.
     Node(AuthorityProof<NodeSig>),
     /// Authority of a single peer that uses it's BLS Keyshare to sign the message.
-    BlsShare(AuthorityProof<SectionAuthShare>),
+    BlsShare(AuthorityProof<SectionSigShare>),
     /// Authority of a whole section.
-    Section(AuthorityProof<SectionAuth>),
+    Section(AuthorityProof<SectionSig>),
 }
 
 impl NodeMsgAuthority {
-    /// Returns the `XorName` of the authority used for the auth signing
-    pub fn get_auth_xorname(&self) -> XorName {
-        match self.clone() {
-            Self::BlsShare(auth_proof) => {
-                let auth = auth_proof.into_inner();
-                auth.src_name
-            }
-            Self::Node(auth_proof) => {
-                let auth = auth_proof.into_inner();
-                let pk = auth.node_ed_pk;
+    pub fn verify_src_section_key_is_known(&self, known_keys: &BTreeSet<bls::PublicKey>) -> bool {
+        let section_pk = match &self {
+            // NB TODO this shouldnt be true! Remove all this
+            Self::Node(_) => return true,
+            Self::BlsShare(bls_share_auth) => bls_share_auth.public_key_set.public_key(),
+            Self::Section(section_auth) => section_auth.public_key,
+        };
 
-                XorName::from(PublicKey::from(pk))
-            }
-            Self::Section(auth_proof) => {
-                let auth = auth_proof.into_inner();
-                auth.src_name
-            }
+        known_keys.contains(&section_pk)
+    }
+
+    pub fn src_public_key(&self) -> bls::PublicKey {
+        match self {
+            Self::Node(node_auth) => node_auth.section_pk,
+            Self::BlsShare(bls_share_auth) => bls_share_auth.public_key_set.public_key(),
+            Self::Section(section_auth) => section_auth.public_key,
         }
     }
 }

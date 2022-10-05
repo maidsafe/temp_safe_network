@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::system::{KeyedSig, SigShare};
+use crate::messaging::system::{SectionSig, SectionSigShare};
 use std::{
     collections::BTreeMap,
     time::{Duration, Instant},
@@ -47,14 +47,14 @@ impl SignatureAggregator {
     }
 
     /// Add new share into the aggregator. If enough valid signature shares were collected, returns
-    /// its `KeyedSig` (signature + public key). Otherwise returns error which details why the
+    /// its `SectionSig` (signature + public key). Otherwise returns error which details why the
     /// aggregation did not succeed yet.
     ///
     /// Note: returned `Error::NotEnoughShares` does not indicate a failure. It simply means more
     /// shares still need to be added for that particular payload. This error could be safely
     /// ignored (it might still be useful perhaps for debugging). The other error variants, however,
     /// indicate failures and should be treated a such. See [`enum@Error`] for more info.
-    pub fn add(&mut self, payload: &[u8], sig_share: SigShare) -> Result<KeyedSig, Error> {
+    pub fn add(&mut self, payload: &[u8], sig_share: SectionSigShare) -> Result<SectionSig, Error> {
         self.remove_expired();
 
         if !sig_share.verify(payload) {
@@ -75,7 +75,7 @@ impl SignatureAggregator {
             .entry(hash)
             .or_insert_with(State::new)
             .add(sig_share)
-            .map(|signature| KeyedSig {
+            .map(|signature| SectionSig {
                 public_key,
                 signature,
             })
@@ -132,7 +132,7 @@ impl State {
         }
     }
 
-    fn add(&mut self, sig_share: SigShare) -> Result<bls::Signature, Error> {
+    fn add(&mut self, sig_share: SectionSigShare) -> Result<bls::Signature, Error> {
         if self
             .shares
             .insert(sig_share.index, sig_share.signature_share)
@@ -293,8 +293,12 @@ mod tests {
         assert!(aggregator.add(payload, sig_share).is_ok());
     }
 
-    fn create_sig_share(sk_set: &bls::SecretKeySet, index: usize, payload: &[u8]) -> SigShare {
+    fn create_sig_share(
+        sk_set: &bls::SecretKeySet,
+        index: usize,
+        payload: &[u8],
+    ) -> SectionSigShare {
         let sk_share = sk_set.secret_key_share(index);
-        SigShare::new(sk_set.public_keys(), index, &sk_share, payload)
+        SectionSigShare::new(sk_set.public_keys(), index, &sk_share, payload)
     }
 }

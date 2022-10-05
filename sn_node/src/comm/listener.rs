@@ -9,7 +9,7 @@
 use super::MsgEvent;
 
 use sn_interface::{
-    messaging::WireMsg,
+    messaging::{AuthKind, WireMsg},
     types::{log_markers::LogMarker, Peer},
 };
 
@@ -66,7 +66,14 @@ impl MsgListener {
                         }
                     };
 
-                    let src_name = wire_msg.auth().src_name();
+                    let src_name = match wire_msg.auth() {
+                        // NB TODO is default acceptable??
+                        AuthKind::SectionShare(_) => Default::default(),
+                        AuthKind::Client(auth) => auth.public_key.into(),
+                        AuthKind::Node(auth) => {
+                            sn_interface::types::PublicKey::Ed25519(auth.node_ed_pk).into()
+                        }
+                    };
 
                     if first {
                         first = false;
