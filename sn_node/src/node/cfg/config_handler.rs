@@ -318,6 +318,12 @@ impl Config {
         }
     }
 
+    /// Local address to be used for the node.
+    pub fn local_addr(&self) -> SocketAddr {
+        self.local_addr
+            .unwrap_or_else(|| SocketAddr::from((std::net::Ipv4Addr::UNSPECIFIED, 0)))
+    }
+
     /// Network configuration options.
     pub fn network_config(&self) -> &NetworkConfig {
         &self.network_config
