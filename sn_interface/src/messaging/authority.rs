@@ -33,7 +33,7 @@ pub struct ClientAuth {
 
 /// Authority of a single peer.
 #[derive(Clone, Eq, PartialEq, custom_debug::Debug, serde::Deserialize, serde::Serialize)]
-pub struct NodeAuth {
+pub struct NodeEvidence {
     /// Section key of the source.
     pub section_pk: BlsPublicKey,
     /// Public key of the source peer.
@@ -45,7 +45,7 @@ pub struct NodeAuth {
     pub signature: EdSignature,
 }
 
-impl NodeAuth {
+impl NodeEvidence {
     /// Construct verified node authority by signing a payload.
     pub fn authorize(
         section_pk: BlsPublicKey,
@@ -158,7 +158,7 @@ impl VerifyAuthority for ClientAuth {
 }
 impl sealed::Sealed for ClientAuth {}
 
-impl VerifyAuthority for NodeAuth {
+impl VerifyAuthority for NodeEvidence {
     fn verify_authority(self, payload: impl AsRef<[u8]>) -> Result<Self> {
         self.node_ed_pk
             .verify(payload.as_ref(), &self.signature)
@@ -166,7 +166,7 @@ impl VerifyAuthority for NodeAuth {
         Ok(self)
     }
 }
-impl sealed::Sealed for NodeAuth {}
+impl sealed::Sealed for NodeEvidence {}
 
 impl VerifyAuthority for SectionAuthShare {
     fn verify_authority(self, payload: impl AsRef<[u8]>) -> Result<Self> {

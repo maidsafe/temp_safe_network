@@ -11,7 +11,7 @@ use crate::node::{Error, Result};
 use sn_interface::{
     messaging::{
         system::{NodeMsg, SigShare},
-        AuthKind, AuthorityProof, Dst, MsgId, NodeAuth, SectionAuthShare, WireMsg,
+        AuthKind, AuthorityProof, Dst, MsgId, NodeEvidence, SectionAuthShare, WireMsg,
     },
     network_knowledge::{NodeInfo, SectionKeyShare},
 };
@@ -74,7 +74,7 @@ impl WireMsgUtils for WireMsg {
             WireMsg::serialize_msg_payload(&msg).map_err(|_| Error::InvalidMessage)?;
 
         let auth = AuthKind::Node(
-            NodeAuth::authorize(src_section_pk, &node.keypair, &msg_payload).into_inner(),
+            NodeEvidence::authorize(src_section_pk, &node.keypair, &msg_payload).into_inner(),
         );
 
         let wire_msg = WireMsg::new_msg(MsgId::new(), msg_payload, auth, dst);

@@ -369,7 +369,7 @@ mod tests {
         messaging::{
             data::{ClientMsg, DataQuery, DataQueryVariant, StorageLevel},
             system::{NodeCmd, NodeMsg},
-            AuthorityProof, ClientAuth, MsgId, NodeAuth,
+            AuthorityProof, ClientAuth, MsgId, NodeEvidence,
         },
         types::{ChunkAddress, Keypair},
     };
@@ -398,7 +398,7 @@ mod tests {
         });
 
         let payload = WireMsg::serialize_msg_payload(&msg)?;
-        let node_auth = NodeAuth::authorize(src_section_pk, &src_node_keypair, &payload);
+        let node_auth = NodeEvidence::authorize(src_section_pk, &src_node_keypair, &payload);
 
         let auth = AuthKind::Node(node_auth.clone().into_inner());
 

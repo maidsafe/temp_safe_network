@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{ClientAuth, NodeAuth, SectionAuthShare};
+use super::{ClientAuth, NodeEvidence, SectionAuthShare};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
@@ -29,7 +29,7 @@ pub enum AuthKind {
     ///
     /// Node authority is needed when nodes send messages directly to other nodes.
     // FIXME: is the above true? What does is the recieving node validating against?
-    Node(NodeAuth),
+    Node(NodeEvidence),
 
     /// A message from an Elder node with its share of the section authority.
     ///
