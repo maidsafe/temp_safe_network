@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use sn_interface::messaging::{
-    data::ClientMsg, system::NodeMsg, AuthorityProof, ClientAuth, Dst, EndUser, MsgId, NodeAuth,
+    data::ClientMsg, system::NodeMsg, AuthorityProof, ClientAuth, Dst, EndUser, MsgId, NodeEvidence,
 };
 
 use bls::PublicKey as BlsPublicKey;
@@ -55,7 +55,7 @@ pub enum MessagingEvent {
         /// The msg ID
         msg_id: MsgId,
         /// Msg authority
-        auth: AuthorityProof<NodeAuth>,
+        auth: AuthorityProof<NodeEvidence>,
         /// Dst of the msg
         dst: Dst,
         /// The msg.
