@@ -18,7 +18,7 @@ use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         data::{ClientMsg, OperationId},
-        system::{KeyedSig, NodeMsg, NodeState, SectionAuth},
+        system::{KeyedSig, NodeMsg, NodeState, SectionSigned},
         AuthorityProof, ClientAuth, MsgId, NodeMsgAuthority, WireMsg,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare, SectionsDAG},
@@ -142,7 +142,7 @@ pub(crate) enum Cmd {
     },
     UpdateNetworkAndHandleValidClientMsg {
         proof_chain: SectionsDAG,
-        signed_sap: SectionAuth<SectionAuthorityProvider>,
+        signed_sap: SectionSigned<SectionAuthorityProvider>,
         msg_id: MsgId,
         msg: ClientMsg,
         origin: Peer,
@@ -159,7 +159,7 @@ pub(crate) enum Cmd {
     HandleMembershipDecision(Decision<NodeState>),
     /// Handle agree on elders. This blocks node message processing until complete.
     HandleNewEldersAgreement {
-        new_elders: SectionAuth<SectionAuthorityProvider>,
+        new_elders: SectionSigned<SectionAuthorityProvider>,
         sig: KeyedSig,
     },
     /// Handle the outcome of a DKG session where we are one of the participants (that is, one of

@@ -15,7 +15,7 @@ use crate::node::{
 };
 use sn_consensus::{Generation, SignedVote, VoteResponse};
 use sn_interface::{
-    messaging::system::{NodeState, SectionAuth},
+    messaging::system::{NodeState, SectionSigned},
     network_knowledge::{SapCandidate, SectionAuthorityProvider},
     types::log_markers::LogMarker,
 };
@@ -85,7 +85,7 @@ impl Node {
     /// Send the `NewElders` proposal to all of the to-be-Elders so it's aggregated by them.
     fn propose_new_elders(
         &mut self,
-        sap: SectionAuth<SectionAuthorityProvider>,
+        sap: SectionSigned<SectionAuthorityProvider>,
     ) -> Result<Vec<Cmd>> {
         let proposal_recipients = sap.elders_vec();
         let proposal = Proposal::NewElders(sap);
@@ -130,7 +130,7 @@ impl Node {
 
     /// Verifies the SAP signature and checks that the signature's public key matches the
     /// signature of the SAP, because SAP candidates are signed by the candidate section key
-    fn check_sap_sig(&self, sap: &SectionAuth<SectionAuthorityProvider>) -> Result<()> {
+    fn check_sap_sig(&self, sap: &SectionSigned<SectionAuthorityProvider>) -> Result<()> {
         let sap_bytes = Proposal::SectionInfo(sap.value.clone()).as_signable_bytes()?;
         if !sap.sig.verify(&sap_bytes) {
             return Err(Error::InvalidSignature);

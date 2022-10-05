@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::system::{
-    MembershipState, NodeState as NodeStateMsg, RelocateDetails, SectionAuth,
+    MembershipState, NodeState as NodeStateMsg, RelocateDetails, SectionSigned,
 };
 use crate::network_knowledge::{section_has_room_for_node, Error, Result};
 use crate::types::Peer;
@@ -202,9 +202,9 @@ impl NodeState {
     }
 }
 
-impl SectionAuth<NodeState> {
-    pub fn into_authed_msg(self) -> SectionAuth<NodeStateMsg> {
-        SectionAuth {
+impl SectionSigned<NodeState> {
+    pub fn into_authed_msg(self) -> SectionSigned<NodeStateMsg> {
+        SectionSigned {
             value: self.value.to_msg(),
             sig: self.sig,
         }
@@ -221,9 +221,9 @@ impl NodeStateMsg {
     }
 }
 
-impl SectionAuth<NodeStateMsg> {
-    pub fn into_authed_state(self) -> SectionAuth<NodeState> {
-        SectionAuth {
+impl SectionSigned<NodeStateMsg> {
+    pub fn into_authed_state(self) -> SectionSigned<NodeState> {
+        SectionSigned {
             value: self.value.into_state(),
             sig: self.sig,
         }

@@ -19,7 +19,7 @@ mod stats;
 
 use self::stats::NetworkStats;
 
-use crate::messaging::{system::SectionAuth, SectionTreeUpdate, SectionsDAG as SectionsDAGMsg};
+use crate::messaging::{system::SectionSigned, SectionTreeUpdate, SectionsDAG as SectionsDAGMsg};
 use crate::network_knowledge::{
     Error, Result, SectionAuthUtils, SectionAuthorityProvider, SectionsDAG,
 };
@@ -41,7 +41,7 @@ use xor_name::{Prefix, XorName};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SectionTree {
     /// Map of sections prefixes to their latest signed section authority providers.
-    sections: BTreeMap<Prefix, SectionAuth<SectionAuthorityProvider>>,
+    sections: BTreeMap<Prefix, SectionSigned<SectionAuthorityProvider>>,
     /// A DAG containing all section chains of the whole network that we are aware of
     sections_dag: SectionsDAG,
 }
@@ -102,7 +102,7 @@ impl SectionTree {
     //
     // This is not a public API since we shall not allow any insert/update without a
     // proof chain, users shall call the `update` API.
-    fn insert(&mut self, sap: SectionAuth<SectionAuthorityProvider>) -> bool {
+    fn insert(&mut self, sap: SectionSigned<SectionAuthorityProvider>) -> bool {
         let prefix = sap.prefix();
         // Don't insert if any descendant is already present in the map.
         if let Some(extension_p) = self.sections.keys().find(|p| p.is_extension_of(&prefix)) {
@@ -123,7 +123,7 @@ impl SectionTree {
 
     /// For testing purpose, we may need to populate a `section_tree` without a proof chain.
     #[cfg(any(test, feature = "test-utils"))]
-    pub fn insert_without_chain(&mut self, sap: SectionAuth<SectionAuthorityProvider>) -> bool {
+    pub fn insert_without_chain(&mut self, sap: SectionSigned<SectionAuthorityProvider>) -> bool {
         self.insert(sap)
     }
 
@@ -134,7 +134,7 @@ impl SectionTree {
         &self,
         name: &XorName,
         exclude: Option<&Prefix>,
-    ) -> Option<&SectionAuth<SectionAuthorityProvider>> {
+    ) -> Option<&SectionSigned<SectionAuthorityProvider>> {
         self.sections
             .iter()
             .filter(|&(prefix, _)| Some(prefix) != exclude)
@@ -154,7 +154,7 @@ impl SectionTree {
     }
 
     /// Get signed `SectionAuthorityProvider` of a known section with the given prefix.
-    pub fn get_signed(&self, prefix: &Prefix) -> Option<&SectionAuth<SectionAuthorityProvider>> {
+    pub fn get_signed(&self, prefix: &Prefix) -> Option<&SectionSigned<SectionAuthorityProvider>> {
         self.sections.get(prefix)
     }
 
@@ -162,7 +162,7 @@ impl SectionTree {
     pub fn get_signed_by_key(
         &self,
         section_key: &bls::PublicKey,
-    ) -> Option<&SectionAuth<SectionAuthorityProvider>> {
+    ) -> Option<&SectionSigned<SectionAuthorityProvider>> {
         self.sections
             .iter()
             .map(|(_, signed_sap)| signed_sap)
@@ -441,7 +441,7 @@ impl Eq for SectionTree {}
 
 impl SectionTreeUpdate {
     pub fn new(
-        signed_sap: SectionAuth<SectionAuthorityProvider>,
+        signed_sap: SectionSigned<SectionAuthorityProvider>,
         proof_chain: SectionsDAG,
     ) -> Self {
         let proof_chain: SectionsDAGMsg = proof_chain.into();
@@ -456,8 +456,8 @@ impl SectionTreeUpdate {
         self.proof_chain.clone().try_into()
     }
 
-    pub fn signed_sap(&self) -> SectionAuth<SectionAuthorityProvider> {
-        SectionAuth {
+    pub fn signed_sap(&self) -> SectionSigned<SectionAuthorityProvider> {
+        SectionSigned {
             value: self.section_auth.clone().into_state(),
             sig: self.section_signed.clone(),
         }
@@ -769,7 +769,7 @@ pub(crate) mod tests {
     }
 
     // Test helpers
-    fn gen_section_auth(prefix: Prefix) -> Result<SectionAuth<SectionAuthorityProvider>> {
+    fn gen_section_auth(prefix: Prefix) -> Result<SectionSigned<SectionAuthorityProvider>> {
         let (section_auth, _, secret_key_set) = random_sap(prefix, 5, 0, None);
         section_signed(&secret_key_set.secret_key(), section_auth)
             .context(format!("Failed to generate SAP for prefix {:?}", prefix))

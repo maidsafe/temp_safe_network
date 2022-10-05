@@ -31,7 +31,8 @@ pub use self::{
 use crate::{
     messaging::{
         system::{
-            KeyedSig, NodeMsg, NodeMsgAuthorityUtils, SectionAuth, SectionPeers as SectionPeersMsg,
+            KeyedSig, NodeMsg, NodeMsgAuthorityUtils, SectionPeers as SectionPeersMsg,
+            SectionSigned,
         },
         Dst, NodeMsgAuthority, SectionTreeUpdate,
     },
@@ -152,7 +153,7 @@ pub fn section_has_room_for_node(
 #[derive(Clone, Debug)]
 pub struct NetworkKnowledge {
     /// Signed Section Authority Provider
-    signed_sap: SectionAuth<SectionAuthorityProvider>,
+    signed_sap: SectionSigned<SectionAuthorityProvider>,
     /// Members of our section
     section_peers: SectionPeers,
     /// The network section tree, i.e. a map from prefix to SAPs plus all sections keys
@@ -201,7 +202,7 @@ impl NetworkKnowledge {
         for peer in network_knowledge.signed_sap.elders() {
             let node_state = NodeState::joined(*peer, None);
             let sig = create_first_sig(&public_key_set, &secret_key_share, &node_state)?;
-            let _changed = network_knowledge.section_peers.update(SectionAuth {
+            let _changed = network_knowledge.section_peers.update(SectionSigned {
                 value: node_state,
                 sig,
             });
@@ -373,7 +374,7 @@ impl NetworkKnowledge {
     }
 
     /// Return a copy of current SAP with corresponding section authority
-    pub fn signed_sap(&self) -> SectionAuth<SectionAuthorityProvider> {
+    pub fn signed_sap(&self) -> SectionSigned<SectionAuthorityProvider> {
         self.signed_sap.clone()
     }
 
@@ -381,7 +382,7 @@ impl NetworkKnowledge {
     pub fn closest_signed_sap(
         &self,
         name: &XorName,
-    ) -> Option<(&SectionAuth<SectionAuthorityProvider>, SectionsDAG)> {
+    ) -> Option<(&SectionSigned<SectionAuthorityProvider>, SectionsDAG)> {
         let closest_sap = self
             .section_tree
             .closest(name, Some(&self.prefix()))
@@ -447,7 +448,7 @@ impl NetworkKnowledge {
 
     /// Try to merge this `NetworkKnowledge` members with `peers`.
     /// Checks if we're already up to date before attempting to verify and merge members
-    pub fn merge_members(&self, peers: BTreeSet<SectionAuth<NodeState>>) -> Result<bool> {
+    pub fn merge_members(&self, peers: BTreeSet<SectionSigned<NodeState>>) -> Result<bool> {
         let mut there_was_an_update = false;
         let our_current_members = self.section_peers.members();
 
@@ -478,7 +479,7 @@ impl NetworkKnowledge {
     }
 
     /// Update the member. Returns whether it actually updated it.
-    pub fn update_member(&self, node_state: SectionAuth<NodeState>) -> bool {
+    pub fn update_member(&self, node_state: SectionSigned<NodeState>) -> bool {
         let node_name = node_state.name();
         trace!(
             "Updating section member state, name: {node_name:?}, new state: {:?}",
@@ -551,7 +552,7 @@ impl NetworkKnowledge {
     }
 
     /// Returns current list of section signed members.
-    pub fn section_signed_members(&self) -> BTreeSet<SectionAuth<NodeState>> {
+    pub fn section_signed_members(&self) -> BTreeSet<SectionSigned<NodeState>> {
         self.section_peers.members()
     }
 
@@ -567,7 +568,7 @@ impl NetworkKnowledge {
 
     /// Get info for the member with the given name either from current members list,
     /// or from the archive of left/relocated members
-    pub fn is_either_member_or_archived(&self, name: &XorName) -> Option<SectionAuth<NodeState>> {
+    pub fn is_either_member_or_archived(&self, name: &XorName) -> Option<SectionSigned<NodeState>> {
         self.section_peers.is_either_member_or_archived(name)
     }
 
@@ -623,7 +624,7 @@ fn create_first_section_authority_provider(
     pk_set: &bls::PublicKeySet,
     sk_share: &bls::SecretKeyShare,
     peer: Peer,
-) -> Result<SectionAuth<SectionAuthorityProvider>> {
+) -> Result<SectionSigned<SectionAuthorityProvider>> {
     let section_auth = SectionAuthorityProvider::new(
         iter::once(peer),
         Prefix::default(),
@@ -632,7 +633,7 @@ fn create_first_section_authority_provider(
         0,
     );
     let sig = create_first_sig(pk_set, sk_share, &section_auth)?;
-    Ok(SectionAuth::new(section_auth, sig))
+    Ok(SectionSigned::new(section_auth, sig))
 }
 
 fn create_first_sig<T: Serialize>(

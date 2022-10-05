@@ -9,7 +9,7 @@
 use crate::node::Result;
 
 use sn_interface::{
-    messaging::system::{Proposal as ProposalMsg, SectionAuth, SigShare},
+    messaging::system::{Proposal as ProposalMsg, SectionSigned, SigShare},
     network_knowledge::{NodeState, SectionAuthorityProvider},
 };
 
@@ -18,7 +18,7 @@ use sn_interface::{
 pub(crate) enum Proposal {
     VoteNodeOffline(NodeState),
     SectionInfo(SectionAuthorityProvider),
-    NewElders(SectionAuth<SectionAuthorityProvider>),
+    NewElders(SectionSigned<SectionAuthorityProvider>),
     JoinsAllowed(bool),
 }
 

@@ -9,7 +9,7 @@
 use crate::node::{flow_ctrl::cmds::Cmd, Node, Proposal, Result};
 use sn_interface::{
     messaging::{
-        system::{KeyedSig, SectionAuth},
+        system::{KeyedSig, SectionSigned},
         SectionTreeUpdate,
     },
     network_knowledge::{NodeState, SapCandidate, SectionAuthUtils, SectionAuthorityProvider},
@@ -75,7 +75,7 @@ impl Node {
 
         // check if at the given memberhip gen, the elders candidates are matching
         let membership_gen = sap.membership_gen();
-        let signed_sap = SectionAuth::new(sap, sig.clone());
+        let signed_sap = SectionSigned::new(sap, sig.clone());
         let dkg_sessions_info = self.best_elder_candidates_at_gen(membership_gen);
 
         let elder_candidates = BTreeSet::from_iter(signed_sap.names());
@@ -127,7 +127,7 @@ impl Node {
     #[instrument(skip(self), level = "trace")]
     pub(crate) async fn handle_new_elders_agreement(
         &mut self,
-        signed_sap: SectionAuth<SectionAuthorityProvider>,
+        signed_sap: SectionSigned<SectionAuthorityProvider>,
         key_sig: KeyedSig,
     ) -> Result<Vec<Cmd>> {
         trace!("{}", LogMarker::HandlingNewEldersAgreement);

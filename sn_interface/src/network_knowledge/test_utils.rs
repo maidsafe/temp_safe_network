@@ -1,5 +1,5 @@
 use super::*;
-use crate::messaging::system::{KeyedSig, SectionAuth};
+use crate::messaging::system::{KeyedSig, SectionSigned};
 use crate::network_knowledge::section_keys::build_spent_proof_share;
 use crate::network_knowledge::{Error, NodeInfo, MIN_ADULT_AGE};
 use eyre::{eyre, Result};
@@ -166,13 +166,13 @@ pub fn section_decision<P: Proposition>(
     Ok(decision)
 }
 
-// Wrap the given payload in `SectionAuth`
+// Wrap the given payload in `SectionSigned`
 pub fn section_signed<T: Serialize>(
     secret_key: &bls::SecretKey,
     payload: T,
-) -> Result<SectionAuth<T>> {
+) -> Result<SectionSigned<T>> {
     let sig = prove(secret_key, &payload)?;
-    Ok(SectionAuth::new(payload, sig))
+    Ok(SectionSigned::new(payload, sig))
 }
 
 struct FakeProofKeyVerifier {}
