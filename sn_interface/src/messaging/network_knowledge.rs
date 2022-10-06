@@ -103,6 +103,6 @@ pub struct SectionsDAG {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SectionTreeUpdate {
     pub section_auth: SectionAuthorityProvider,
-    pub section_signed: SectionSig,
+    pub section_sig: SectionSig,
     pub proof_chain: SectionsDAG,
 }
