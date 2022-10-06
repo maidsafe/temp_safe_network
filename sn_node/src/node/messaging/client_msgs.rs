@@ -22,11 +22,10 @@ use sn_interface::{
     data_copy_count,
     messaging::{
         data::{
-            ClientMsg, DataCmd, DataQueryVariant, EditRegister, OperationId, SignedRegisterEdit,
-            SpentbookCmd,
+            ClientMsg, DataCmd, DataQueryVariant, EditRegister, SignedRegisterEdit, SpentbookCmd,
         },
-        system::{NodeMsg, NodeQueryResponse},
-        AuthorityProof, ClientAuth, EndUser, MsgId,
+        system::{NodeMsg, NodeQueryResponse, OperationId},
+        AuthorityProof, ClientAuth, MsgId,
     },
     types::{
         log_markers::LogMarker,
@@ -86,9 +85,12 @@ impl Node {
         #[cfg(feature = "traceroute")]
         traceroute.0.push(self.identity());
 
+        let msg_id = MsgId::new();
+
+        debug!("SendMsg formed for {:?} to {:?}", msg_id, recipients);
         Cmd::SendMsg {
             msg: OutgoingMsg::Client(msg),
-            msg_id: MsgId::new(),
+            msg_id,
             recipients,
             #[cfg(feature = "traceroute")]
             traceroute,
@@ -98,10 +100,9 @@ impl Node {
     /// Handle data query
     pub(crate) async fn handle_data_query_at_adult(
         &self,
-        correlation_id: MsgId,
+        operation_id: OperationId,
         query: &DataQueryVariant,
         auth: ClientAuth,
-        user: EndUser,
         requesting_elder: Peer,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Cmd {
@@ -110,11 +111,14 @@ impl Node {
             .query(query, User::Key(auth.public_key))
             .await;
 
-        trace!("data query response at adult is: {:?}", response);
+        trace!(
+            "Data query response at adult for operation id {:?} is: {:?}",
+            operation_id,
+            response
+        );
         let msg = NodeMsg::NodeQueryResponse {
             response,
-            correlation_id,
-            user,
+            operation_id,
         };
 
         self.trace_system_msg(
@@ -130,11 +134,9 @@ impl Node {
     /// Forms a response to send to the requester
     pub(crate) async fn handle_data_query_response_at_elder(
         &mut self,
-        correlation_id: MsgId,
-        response: NodeQueryResponse,
-        user: EndUser,
-        sending_node_pk: PublicKey,
         op_id: OperationId,
+        response: NodeQueryResponse,
+        sending_node_pk: PublicKey,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Option<Cmd> {
         debug!(
@@ -143,21 +145,19 @@ impl Node {
         );
 
         let node_id = XorName::from(sending_node_pk);
-        let query_peers = self.pending_data_queries.remove(&(op_id, node_id));
+        let query_peer = self.pending_data_queries.remove(&(op_id, node_id));
+
         // Clear expired queries from the cache.
         self.pending_data_queries.remove_expired();
 
         // First check for waiting peers. If no one is waiting, we drop the response
-        let waiting_peers = if let Some(peers) = query_peers {
-            if peers.is_empty() {
-                // nothing to do
-                return None;
-            }
-            peers
+        let (correlation_id, peer) = if let Some(waiting_peer) = query_peer {
+            waiting_peer
         } else {
             warn!(
-                "Dropping chunk query response from Adult {}. We might have already forwarded this chunk to the requesting client or the client connection cache has expired: {}",
-                sending_node_pk, user.0
+                "Dropping chunk query response from Adult {}. We might have already forwarded \
+                this response to the requesting client, or the client connection cache has expired: {}",
+                sending_node_pk, op_id
             );
             return None;
         };
@@ -171,16 +171,14 @@ impl Node {
             return None;
         }
 
-        let query_response = response.convert();
-
         let msg = ClientMsg::QueryResponse {
-            response: query_response,
+            response,
             correlation_id,
         };
 
         Some(self.send_client_msg(
             msg,
-            Peers::Multiple(waiting_peers),
+            Peers::Single(peer),
             #[cfg(feature = "traceroute")]
             traceroute,
         ))

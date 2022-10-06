@@ -199,20 +199,19 @@ impl Session {
 
         let (sender, mut receiver) = channel::<QueryResponse>(7);
 
-        if let Ok(op_id) = query.variant.operation_id() {
-            // Insert the response sender
-            trace!("Inserting channel for op_id {:?}", (msg_id, op_id));
-            if let Some(mut entry) = self.pending_queries.get_mut(&op_id) {
-                let senders_vec = entry.value_mut();
-                senders_vec.push((msg_id, sender))
-            } else {
-                let _nonexistant_entry = self.pending_queries.insert(op_id, vec![(msg_id, sender)]);
-            }
-
-            trace!("Inserted channel for {:?}", op_id);
+        // Insert the response sender, one copy of the sender per Elder
+        trace!("Inserting channel for msg_id {:?}", msg_id);
+        if self.pending_queries.contains_key(&msg_id) {
+            return Err(Error::MsgIdCollision(msg_id));
         } else {
-            warn!("No op_id found for query");
+            let senders = elders
+                .iter()
+                .map(|elder| (elder.addr(), sender.clone()))
+                .collect();
+            let _nonexistant_entry = self.pending_queries.insert(msg_id, senders);
         }
+
+        trace!("Inserted channel for {:?}", msg_id);
 
         let dst = Dst {
             name: dst,
@@ -262,11 +261,10 @@ impl Session {
                 // Saving error, but not returning until we have more responses in
                 // (note, this will overwrite prior errors, so we'll just return whichever was last received)
                 (response @ Some(QueryResponse::GetChunk(Err(_))), Some(_))
-                | (response @ Some(QueryResponse::GetRegister((Err(_), _))), None)
-                | (response @ Some(QueryResponse::GetRegisterPolicy((Err(_), _))), None)
-                | (response @ Some(QueryResponse::GetRegisterOwner((Err(_), _))), None)
-                | (response @ Some(QueryResponse::GetRegisterUserPermissions((Err(_), _))), None) =>
-                {
+                | (response @ Some(QueryResponse::GetRegister(Err(_))), None)
+                | (response @ Some(QueryResponse::GetRegisterPolicy(Err(_))), None)
+                | (response @ Some(QueryResponse::GetRegisterOwner(Err(_))), None)
+                | (response @ Some(QueryResponse::GetRegisterUserPermissions(Err(_))), None) => {
                     debug!("QueryResponse error received (but may be overridden by a non-error response from another elder): {:#?}", &response);
                     error_response = response;
                     discarded_responses += 1;
@@ -290,35 +288,16 @@ impl Session {
             msg_id, response
         );
 
-        if let Some(query) = &response {
-            if let Ok(query_op_id) = query.operation_id() {
-                // Remove the response sender
-                trace!("Removing channel for {:?}", (msg_id, &query_op_id));
-                if let Some(mut entry) = self.pending_queries.get_mut(&query_op_id) {
-                    let listeners_for_op = entry.value_mut();
-                    if let Some(index) = listeners_for_op
-                        .iter()
-                        .position(|(id, _sender)| *id == msg_id)
-                    {
-                        let _old_listener = listeners_for_op.swap_remove(index);
-                    }
-                } else {
-                    warn!("No listeners found for our op_id: {:?}", query_op_id)
-                }
-            }
+        if response.is_some() {
+            // Remove the response sender
+            trace!("Removing channel for {:?}", msg_id);
+            let _ = self.pending_queries.remove(&msg_id);
         }
 
-        match response {
-            Some(response) => {
-                let operation_id = response
-                    .operation_id()
-                    .map_err(|_| Error::UnknownOperationId(response.clone()))?;
-                Ok(QueryResult {
-                    response,
-                    operation_id,
-                })
-            }
-            None => Err(Error::NoResponse(elders)),
+        if let Some(response) = response {
+            Ok(QueryResult { response })
+        } else {
+            Err(Error::NoResponse(elders))
         }
     }
 

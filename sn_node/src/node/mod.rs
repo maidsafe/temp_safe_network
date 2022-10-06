@@ -32,8 +32,8 @@ mod statemap;
 use self::{
     bootstrap::join_network,
     core::{
-        Node, StateSnapshot, DATA_QUERY_LIMIT, GENESIS_DBC_AMOUNT, MAX_WAITING_PEERS_PER_QUERY,
-        RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
+        Node, StateSnapshot, DATA_QUERY_LIMIT, GENESIS_DBC_AMOUNT, RESOURCE_PROOF_DATA_SIZE,
+        RESOURCE_PROOF_DIFFICULTY,
     },
     data::MIN_LEVEL_WHEN_FULL,
     flow_ctrl::{
@@ -89,10 +89,9 @@ mod core {
 
     use sn_interface::{
         messaging::{
-            data::OperationId,
             signature_aggregator::SignatureAggregator,
-            system::{DkgSessionId, NodeState, SectionSigned},
-            AuthorityProof, SectionAuthorityProvider, SectionSig,
+            system::{DkgSessionId, NodeState, OperationId, SectionSigned},
+            AuthorityProof, MsgId, SectionAuthorityProvider, SectionSig,
         },
         network_knowledge::{
             supermajority, NetworkKnowledge, NodeInfo,
@@ -127,10 +126,6 @@ mod core {
     // This prevents pending query limit unbound growth
     // One insert per OpId/Adult.
     pub(crate) const DATA_QUERY_LIMIT: usize = 10_000;
-    // per query we can have this many peers, so the total peers waiting can be QUERY_LIMIT * MAX_WAITING_PEERS_PER_QUERY
-    // It's worth noting that nodes clean up all connections every two mins, so this max can only last that long.
-    // (and yes, some clients may unfortunately be disconnected quickly)
-    pub(crate) const MAX_WAITING_PEERS_PER_QUERY: usize = 100;
 
     const BACKOFF_CACHE_LIMIT: usize = 100;
 
@@ -188,7 +183,7 @@ mod core {
         pub(crate) capacity: Capacity,
         pub(crate) dysfunction_tracking: DysfunctionDetection,
         /// Cache the request combo,  (OperationId -> An adult xorname), to waiting Clients peers for that combo
-        pub(crate) pending_data_queries: Cache<(OperationId, XorName), BTreeSet<Peer>>,
+        pub(crate) pending_data_queries: Cache<(OperationId, XorName), (MsgId, Peer)>,
         // Caches
         pub(crate) ae_backoff_cache: AeBackoffCache,
     }

@@ -135,9 +135,7 @@ impl Client {
         let query = DataQueryVariant::Register(RegisterQuery::Get(address));
         let query_result = self.send_query(query.clone()).await?;
         match query_result.response {
-            QueryResponse::GetRegister((res, op_id)) => {
-                res.map_err(|err| Error::ErrorMsg { source: err, op_id })
-            }
+            QueryResponse::GetRegister(res) => res.map_err(|err| Error::ErrorMsg { source: err }),
             other => Err(Error::UnexpectedQueryResponse {
                 query,
                 response: other,
@@ -154,9 +152,7 @@ impl Client {
         let query = DataQueryVariant::Register(RegisterQuery::Read(address));
         let query_result = self.send_query(query.clone()).await?;
         match query_result.response {
-            QueryResponse::ReadRegister((res, op_id)) => {
-                res.map_err(|err| Error::ErrorMsg { source: err, op_id })
-            }
+            QueryResponse::ReadRegister(res) => res.map_err(|err| Error::ErrorMsg { source: err }),
             other => Err(Error::UnexpectedQueryResponse {
                 query,
                 response: other,
@@ -174,8 +170,8 @@ impl Client {
         let query = DataQueryVariant::Register(RegisterQuery::GetEntry { address, hash });
         let query_result = self.send_query(query.clone()).await?;
         match query_result.response {
-            QueryResponse::GetRegisterEntry((res, op_id)) => {
-                res.map_err(|err| Error::ErrorMsg { source: err, op_id })
+            QueryResponse::GetRegisterEntry(res) => {
+                res.map_err(|err| Error::ErrorMsg { source: err })
             }
             other => Err(Error::UnexpectedQueryResponse {
                 query,
@@ -194,8 +190,8 @@ impl Client {
         let query = DataQueryVariant::Register(RegisterQuery::GetOwner(address));
         let query_result = self.send_query(query.clone()).await?;
         match query_result.response {
-            QueryResponse::GetRegisterOwner((res, op_id)) => {
-                res.map_err(|err| Error::ErrorMsg { source: err, op_id })
+            QueryResponse::GetRegisterOwner(res) => {
+                res.map_err(|err| Error::ErrorMsg { source: err })
             }
             other => Err(Error::UnexpectedQueryResponse {
                 query,
@@ -218,8 +214,8 @@ impl Client {
         let query = DataQueryVariant::Register(RegisterQuery::GetUserPermissions { address, user });
         let query_result = self.send_query(query.clone()).await?;
         match query_result.response {
-            QueryResponse::GetRegisterUserPermissions((res, op_id)) => {
-                res.map_err(|err| Error::ErrorMsg { source: err, op_id })
+            QueryResponse::GetRegisterUserPermissions(res) => {
+                res.map_err(|err| Error::ErrorMsg { source: err })
             }
             other => Err(Error::UnexpectedQueryResponse {
                 query,
@@ -234,8 +230,8 @@ impl Client {
         let query = DataQueryVariant::Register(RegisterQuery::GetPolicy(address));
         let query_result = self.send_query(query.clone()).await?;
         match query_result.response {
-            QueryResponse::GetRegisterPolicy((res, op_id)) => {
-                res.map_err(|err| Error::ErrorMsg { source: err, op_id })
+            QueryResponse::GetRegisterPolicy(res) => {
+                res.map_err(|err| Error::ErrorMsg { source: err })
             }
             other => Err(Error::UnexpectedQueryResponse {
                 query,
@@ -473,7 +469,6 @@ mod tests {
             Ok(_) => bail!("Should not be able to retrieve an entry for a random user"),
             Err(Error::ErrorMsg {
                 source: ErrorMsg::NoSuchEntry,
-                ..
             }) => Ok(()),
             Err(err) => Err(eyre!(
                 "Unexpected error returned when retrieving non-existing Register user permission: {:?}", err,
@@ -610,7 +605,6 @@ mod tests {
         {
             Err(Error::ErrorMsg {
                 source: ErrorMsg::NoSuchEntry,
-                ..
             }) => Ok(()),
             Err(err) => Err(eyre!(
                 "Unexpected error returned when retrieving a non-existing Register entry: {:?}",

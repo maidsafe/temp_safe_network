@@ -17,8 +17,8 @@ use sn_dysfunction::IssueType;
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
-        data::{ClientMsg, OperationId},
-        system::{NodeMsg, NodeState, SectionSig, SectionSigned},
+        data::ClientMsg,
+        system::{NodeMsg, NodeState, OperationId, SectionSig, SectionSigned},
         AuthorityProof, ClientAuth, MsgId, NodeMsgAuthority, WireMsg,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare, SectionsDAG},
@@ -117,6 +117,7 @@ pub(crate) enum Cmd {
     /// Adds peer to set of recipients of an already pending query,
     /// or adds a pending query if it didn't already exist.
     AddToPendingQueries {
+        msg_id: MsgId,
         operation_id: OperationId,
         origin: Peer,
         target_adult: XorName,

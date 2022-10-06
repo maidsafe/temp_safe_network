@@ -6,9 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{
-    messaging::Peers, Cmd, Error, Node, Prefix, Result, MAX_WAITING_PEERS_PER_QUERY,
-};
+use crate::node::{messaging::Peers, Cmd, Error, Node, Prefix, Result};
 
 use sn_dysfunction::IssueType;
 #[cfg(feature = "traceroute")]
@@ -17,8 +15,8 @@ use sn_interface::{
     data_copy_count,
     messaging::{
         data::{DataQuery, MetadataExchange, StorageLevel},
-        system::{NodeCmd, NodeMsg, NodeQuery},
-        AuthorityProof, ClientAuth, EndUser, MsgId,
+        system::{NodeCmd, NodeMsg, NodeQuery, OperationId},
+        AuthorityProof, ClientAuth, MsgId,
     },
     types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData},
 };
@@ -58,13 +56,16 @@ impl Node {
         source_client: Peer,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
+        // We generate the operation id to track the response from the Adult
+        // by using the query msg id, which shall be unique per query.
+        let operation_id = OperationId(*msg_id.as_ref());
         let address = query.variant.address();
-        let operation_id = query.variant.operation_id()?;
         trace!(
-            "{:?} preparing to query adults for data at {:?} with op_id: {:?}",
+            "{:?} preparing to query adults for data at {:?} with op_id: {:?} to fulfill msg {:?}",
             LogMarker::DataQueryReceviedAtElder,
             address,
-            operation_id
+            operation_id,
+            msg_id
         );
 
         let targets = self.target_data_holders_including_full(address.name());
@@ -81,22 +82,29 @@ impl Node {
             });
         };
 
+        // make sure we don't already have a pending query for the same op id and target Adult
+        if self
+            .pending_data_queries
+            .get(&(operation_id, target.name()))
+            .is_some()
+        {
+            warn!("Dropping query from {source_client:?}, there is a query waiting already for {msg_id:?} and target Adult {:?}", target.name());
+            let cmd = self.cmd_error_response(
+                Error::CannotHandleQuery(query),
+                source_client,
+                msg_id,
+                #[cfg(feature = "traceroute")]
+                traceroute,
+            );
+            return Ok(vec![cmd]);
+        }
+
         let mut cmds = vec![Cmd::AddToPendingQueries {
+            msg_id,
             origin: source_client,
             operation_id,
             target_adult: target.name(),
         }];
-
-        // here we conflate adults targetted!!
-        if let Some(peers) = self
-            .pending_data_queries
-            .get(&(operation_id, target.name()))
-        {
-            if peers.len() > MAX_WAITING_PEERS_PER_QUERY {
-                warn!("Dropping query from {source_client:?}, there are more than {MAX_WAITING_PEERS_PER_QUERY} waiting already");
-                return Ok(vec![]);
-            }
-        }
 
         // we only add a pending request when we're actually sending out requests to new adults
         trace!("adding pending req for {target:?} in dysfunction tracking");
@@ -108,8 +116,7 @@ impl Node {
         let msg = NodeMsg::NodeQuery(NodeQuery::Data {
             query: query.variant,
             auth: auth.into_inner(),
-            origin: EndUser(source_client.name()),
-            correlation_id: msg_id,
+            operation_id,
         });
 
         cmds.push(self.trace_system_msg(

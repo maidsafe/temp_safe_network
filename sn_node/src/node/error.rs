@@ -200,8 +200,8 @@ pub enum Error {
     /// Error thrown by DBC public API
     #[error("DbcError: {0}")]
     DbcError(#[from] DbcError),
-    /// Cannot handle more queries at this point
-    #[error("Cannot handle more queries at this point: {0:?}")]
+    /// Cannot handle the same query at this point
+    #[error("Cannot handle the same query at this point: {0:?}")]
     CannotHandleQuery(DataQuery),
     #[error("BLS error: {0}")]
     BlsError(#[from] bls::Error),

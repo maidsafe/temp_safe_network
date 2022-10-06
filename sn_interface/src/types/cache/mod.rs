@@ -10,9 +10,7 @@ mod item;
 
 use self::item::Item;
 use itertools::Itertools;
-use std::collections::BTreeMap;
-use std::hash::Hash;
-use std::time::Duration;
+use std::{collections::BTreeMap, hash::Hash, time::Duration};
 
 /// A [`BTreeMap`]-backed cache supporting capacity- and duration-based expiry.
 #[derive(Debug)]

@@ -8,7 +8,7 @@
 
 use sn_interface::{
     messaging::{
-        data::{DataQuery, DataQueryVariant, Error as ErrorMsg, OperationId, QueryResponse},
+        data::{DataQuery, DataQueryVariant, Error as ErrorMsg, QueryResponse},
         Error as MessagingError, MsgId,
     },
     types::{Error as DtError, Peer},
@@ -116,9 +116,6 @@ pub enum Error {
         /// Source of error in last attempt
         last_error: Box<Self>,
     },
-    /// No operation Id could be found
-    #[error("Could not retrieve the operation id of a query response: {0:?}")]
-    UnknownOperationId(QueryResponse),
     /// Unexpected query response received
     #[error("Unexpected response received for {query:?}. Received: {response:?}")]
     UnexpectedQueryResponse {
@@ -131,12 +128,10 @@ pub enum Error {
     #[error(transparent)]
     NetworkDataError(#[from] DtError),
     /// Errors received from the network via sn_messaging
-    #[error("Error received from the network: {source:?} Operationid: {op_id:?}")]
+    #[error("Error received from the network: {source:?}")]
     ErrorMsg {
         /// The source of an error msg
         source: ErrorMsg,
-        /// operation ID that was used to send the query
-        op_id: OperationId,
     },
     /// Error response received for a client cmd sent to the network
     #[error("Error received from the network: {source:?} for cmd: {msg_id:?}")]
@@ -205,4 +200,7 @@ pub enum Error {
     /// Occurs if a section key is not found when searching the sections DAG.
     #[error("Section key {0:?} was not found in the sections DAG")]
     SectionsDagKeyNotFound(PublicKey),
+    /// The random msg id generated for a query collides with a pending query already sent
+    #[error("The msg id generated ({0:?}) for a query collides with a pending query already sent")]
+    MsgIdCollision(MsgId),
 }
