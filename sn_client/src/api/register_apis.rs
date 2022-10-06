@@ -75,7 +75,7 @@ impl Client {
                     signature,
                 },
             },
-            section_auth: section_auth(), // obtained after presenting a valid payment to the network
+            section_auth: section_sig(), // obtained after presenting a valid payment to the network
         });
 
         debug!("Creating Register: {:?}", cmd);
@@ -246,7 +246,7 @@ impl Client {
 }
 
 // temp dummy
-fn section_auth() -> sn_interface::messaging::SectionSig {
+fn section_sig() -> sn_interface::messaging::SectionSig {
     use sn_interface::messaging::system::SectionSig;
 
     let sk = bls::SecretKey::random();

@@ -212,7 +212,7 @@ fn bench_data_storage_reads(c: &mut Criterion) -> Result<()> {
     Ok(())
 }
 
-fn section_auth() -> sn_interface::messaging::SectionSig {
+fn section_sig() -> sn_interface::messaging::SectionSig {
     use sn_interface::messaging::system::SectionSig;
 
     let sk = bls::SecretKey::random();
@@ -252,7 +252,7 @@ pub fn create_random_register_replicated_data() -> ReplicatedData {
                 signature,
             },
         },
-        section_auth: section_auth(), // obtained after presenting a valid payment to the network
+        section_auth: section_sig(), // obtained after presenting a valid payment to the network
     };
 
     ReplicatedData::RegisterWrite(reg_cmd)
