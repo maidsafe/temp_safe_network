@@ -242,15 +242,7 @@ impl WireMsg {
                     Error::FailedToParse(format!("Data message payload as Msgpack: {}", err))
                 })?;
 
-                let auth = if let ClientMsg::ClientError {
-                    source_message: Some(payload),
-                    ..
-                } = &msg
-                {
-                    AuthorityProof::verify(auth, payload)?
-                } else {
-                    AuthorityProof::verify(auth, &self.payload)?
-                };
+                let auth = AuthorityProof::verify(auth, &self.payload)?;
 
                 Ok(MsgType::Client {
                     msg_id: self.header.msg_envelope.msg_id,

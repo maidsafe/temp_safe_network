@@ -122,28 +122,21 @@ impl Node {
                 dst,
                 auth,
             } => {
-                let dst_name = match msg.dst_address() {
-                    Some(name) => name,
-                    None => {
-                        error!(
-                            "Client msg {:?} from {} has been dropped since there is no dst address.",
-                            msg_id, origin.addr(),
-                        );
-                        return Ok(vec![]);
-                    }
-                };
-
                 if self.is_not_elder() {
-                    trace!("Redirecting from adult to section elders");
+                    trace!("Redirecting from Adult to section Elders");
                     return Ok(vec![
                         self.ae_redirect_to_our_elders(origin, wire_msg.serialize()?)?
                     ]);
                 }
 
-                // First we check if it's query and we have too many on the go at the moment...
-                if let ClientMsg::Query(query) = &msg {
-                    // we have a query, check if we have too many on the go....
-                    if self.pending_data_queries.len() > DATA_QUERY_LIMIT {
+                // We shall perform AE checks only if this is a query coming from the client,
+                // if it's otherwise a response for a client we shall skip drop it.
+                let dst_name = match &msg {
+                    ClientMsg::Cmd(cmd) => cmd.dst_name(),
+                    ClientMsg::Query(query)
+                        if self.pending_data_queries.len() > DATA_QUERY_LIMIT =>
+                    {
+                        // we have a query, and we have too many on the go....
                         warn!("Pending queries length exceeded, dropping query {msg:?}");
                         let cmd = self.cmd_error_response(
                             Error::CannotHandleQuery(query.clone()),
@@ -154,9 +147,18 @@ impl Node {
                         );
                         return Ok(vec![cmd]);
                     }
-                }
-
-                // TODO: track clients for spam
+                    ClientMsg::Query(query) => query.variant.dst_name(),
+                    other => {
+                        error!(
+                            "Client msg {:?}, from {}, has been dropped since it's not meant \
+                            to be handled by a node: {:?}",
+                            msg_id,
+                            origin.addr(),
+                            other
+                        );
+                        return Ok(vec![]);
+                    }
+                };
 
                 // Then we perform AE checks
                 if let Some(cmd) =
