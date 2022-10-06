@@ -10,7 +10,7 @@ use sn_interface::{
         data::{ClientMsg, DataQuery, DataQueryVariant, QueryResponse},
         WireMsg,
     },
-    types::{Chunk, ChunkAddress},
+    types::{ChunkAddress, SignedChunk},
 };
 use std::{
     fs::File,
@@ -109,7 +109,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn query_chunk(client: &Client, adult_index: usize, address: XorName) -> Result<Chunk> {
+async fn query_chunk(client: &Client, adult_index: usize, address: XorName) -> Result<SignedChunk> {
     let variant = DataQueryVariant::GetChunk(ChunkAddress(address));
     let query = DataQuery {
         adult_index,

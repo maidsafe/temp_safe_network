@@ -29,7 +29,7 @@ pub use crate::messaging::{data::RegisterCmd, SectionSig};
 
 pub use address::{ChunkAddress, DataAddress, RegisterAddress, SpentbookAddress};
 pub use cache::Cache;
-pub use chunk::{Chunk, MAX_CHUNK_SIZE_IN_BYTES};
+pub use chunk::{Chunk, SignedChunk, MAX_CHUNK_SIZE_IN_BYTES};
 pub use connections::{PeerLinks, SendToOneError};
 pub use errors::{convert_dt_error_to_error_msg, Error, Result};
 pub use keys::{
@@ -65,7 +65,7 @@ pub struct ReplicatedRegisterLog {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum ReplicatedData {
     /// A chunk of data.
-    Chunk(Chunk),
+    Chunk(SignedChunk),
     /// A single cmd for a register.
     RegisterWrite(RegisterCmd),
     /// An entire op log of a register.
@@ -79,7 +79,7 @@ pub enum ReplicatedData {
 impl ReplicatedData {
     pub fn name(&self) -> XorName {
         match self {
-            Self::Chunk(chunk) => *chunk.name(),
+            Self::Chunk(signed_chunk) => *signed_chunk.chunk.name(),
             Self::RegisterLog(log) => *log.address.name(),
             Self::RegisterWrite(cmd) => *cmd.dst_address().name(),
             Self::SpentbookLog(log) => *log.address.name(),
@@ -89,7 +89,7 @@ impl ReplicatedData {
 
     pub fn address(&self) -> DataAddress {
         match self {
-            Self::Chunk(chunk) => DataAddress::Bytes(*chunk.address()),
+            Self::Chunk(signed_chunk) => DataAddress::Bytes(*signed_chunk.chunk.address()),
             Self::RegisterLog(log) => DataAddress::Register(log.address),
             Self::RegisterWrite(cmd) => DataAddress::Register(cmd.dst_address()),
             Self::SpentbookLog(log) => {

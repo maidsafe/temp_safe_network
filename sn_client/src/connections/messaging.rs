@@ -243,14 +243,15 @@ impl Session {
         let response = loop {
             let mut error_response = None;
             match (receiver.recv().await, chunk_addr) {
-                (Some(QueryResponse::GetChunk(Ok(chunk))), Some(chunk_addr)) => {
+                (Some(QueryResponse::GetChunk(Ok(signed_chunk))), Some(chunk_addr)) => {
                     // We are dealing with Chunk query responses, thus we validate its hash
                     // matches its xorname, if so, we don't need to await for more responses
+                    let chunk = &signed_chunk.chunk;
                     debug!("Chunk QueryResponse received is: {:#?}", chunk);
 
                     if chunk_addr.name() == chunk.name() {
                         trace!("Valid Chunk received for {:?}", msg_id);
-                        break Some(QueryResponse::GetChunk(Ok(chunk)));
+                        break Some(QueryResponse::GetChunk(Ok(signed_chunk)));
                     } else {
                         // the Chunk content doesn't match its XorName,
                         // this is suspicious and it could be a byzantine node

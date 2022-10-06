@@ -25,6 +25,7 @@ use crate::{
     storage::UsedSpace,
 };
 
+use bytes::Bytes;
 use cmd_utils::{handle_online_cmd, run_and_collect_cmds, wrap_client_msg_for_handling};
 use sn_consensus::Decision;
 use sn_dbc::{Hash, OwnerOnce, SpentProofShare, TransactionBuilder};
@@ -47,7 +48,7 @@ use sn_interface::{
         SectionKeysProvider, SectionTree, SectionsDAG, FIRST_SECTION_MAX_AGE,
         FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
     },
-    types::{keyed_signed, keys::ed25519, Peer, PublicKey, ReplicatedData, SecretKeySet},
+    types::{keyed_signed, keys::ed25519, Chunk, Peer, PublicKey, ReplicatedData, SecretKeySet},
 };
 
 use assert_matches::assert_matches;
@@ -1480,11 +1481,7 @@ async fn spentbook_spend_with_random_key_image_should_return_spentbook_error() -
         .await
 }
 
-/// This could potentially be the start of a case for the updated proof chain and SAP being sent
-/// with the spend request, but I don't know exactly what the conditions are for getting the
-/// network knowledge to update correctly.
 #[tokio::test]
-//#[ignore]
 async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node() -> Result<()> {
     let local = tokio::task::LocalSet::new();
     local
@@ -1602,6 +1599,59 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
                     .next()
                     .ok_or_else(|| eyre!("The proof chain should include the other section key"))?
             );
+
+            Result::<()>::Ok(())
+        })
+        .await
+}
+
+#[tokio::test]
+async fn store_chunk_should_replicate_and_sign_chunk() -> Result<()> {
+    let local = tokio::task::LocalSet::new();
+    local
+        .run_until(async move {
+            init_logger();
+            let replication_count = 5;
+            let (dispatcher, _, peer, section_sks) =
+                network_utils::TestNodeBuilder::new(Prefix::default().pushed(false), elder_count())
+                    .adult_count(6)
+                    .section_sk_threshold(0)
+                    .data_copy_count(replication_count)
+                    .build()
+                    .await?;
+
+            let chunk = Chunk::new(Bytes::from(b"Hello".to_vec()));
+            let cmds = run_and_collect_cmds(
+                wrap_client_msg_for_handling(
+                    ClientMsg::Cmd(DataCmd::StoreChunk(chunk.clone())),
+                    peer,
+                )?,
+                &dispatcher,
+            )
+            .await?;
+
+            assert_eq!(cmds.len(), 2);
+            let replicate_cmd = cmds[0].clone();
+            let recipients = replicate_cmd.recipients()?;
+            assert_eq!(recipients.len(), replication_count);
+
+            let replicated_data = replicate_cmd.get_replicated_data()?;
+            assert_matches!(replicated_data, ReplicatedData::Chunk(_));
+
+            let signed_chunk = cmd_utils::get_signed_chunk(replicated_data)?;
+            let stored_chunk = &signed_chunk.chunk;
+            assert_eq!(chunk.address(), stored_chunk.address());
+            assert_eq!(chunk.name(), stored_chunk.name());
+            assert_eq!(chunk.value(), stored_chunk.value());
+
+            let section_sig = &signed_chunk.authority;
+            assert_eq!(
+                section_sig.public_key,
+                section_sks.public_keys().public_key()
+            );
+
+            let client_msg = cmds[1].clone().get_client_msg()?;
+            assert_matches!(client_msg, ClientMsg::CmdAck { .. });
 
             Result::<()>::Ok(())
         })

@@ -10,7 +10,7 @@ use sn_interface::{
     messaging::data::{CreateRegister, SignedRegisterCreate},
     types::{
         register::{Policy, User},
-        Chunk, Keypair, PublicKey, RegisterCmd, ReplicatedData,
+        Chunk, Keypair, PublicKey, RegisterCmd, ReplicatedData, SignedChunk,
     },
 };
 use sn_node::{
@@ -136,8 +136,12 @@ fn bench_data_storage_writes(c: &mut Criterion) -> Result<()> {
                     .unwrap();
                 b.to_async(&runtime).iter(|| async {
                     for _ in 0..**size {
-                        let random_data =
-                            ReplicatedData::Chunk(Chunk::new(grows_vec_to_bytes(seed)));
+                        let chunk = Chunk::new(grows_vec_to_bytes(seed));
+                        let signed_chunk = SignedChunk {
+                            chunk,
+                            authority: section_sig(),
+                        };
+                        let random_data = ReplicatedData::Chunk(signed_chunk);
                         storage
                             .clone()
                             .store(&random_data, pk, keypair.clone())
@@ -194,7 +198,12 @@ fn bench_data_storage_reads(c: &mut Criterion) -> Result<()> {
 
             for _ in 0..size {
                 let file = sn_interface::types::utils::random_bytes(NONSENSE_CHUNK_SIZE);
-                let random_data = ReplicatedData::Chunk(Chunk::new(file));
+                let chunk = Chunk::new(file);
+                let signed_chunk = SignedChunk {
+                    chunk,
+                    authority: section_sig(),
+                };
+                let random_data = ReplicatedData::Chunk(signed_chunk);
                 if let Err(error) = runtime
                     .block_on(storage.store(&random_data, pk, keypair.clone()))
                     .context("could not store chunk")

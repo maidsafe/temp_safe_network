@@ -27,7 +27,7 @@ use sn_interface::{
         ClientAuth, WireMsg,
     },
     network_knowledge::SectionTree,
-    types::{Chunk, Keypair, PublicKey, RegisterAddress},
+    types::{Keypair, PublicKey, RegisterAddress, SignedChunk},
 };
 
 use bytes::Bytes;
@@ -50,7 +50,7 @@ const CHUNK_CACHE_SIZE: usize = 50;
 const NETWORK_PROBE_RETRY_COUNT: usize = 5; // 5 x 5 second wait in between = ~25 seconds (plus ~ 3 seconds in between attempts internal to `make_contact`)
 
 // LRU cache to keep the Chunks we retrieve.
-type ChunksCache = LRUCache<Chunk, CHUNK_CACHE_SIZE>;
+type ChunksCache = LRUCache<SignedChunk, CHUNK_CACHE_SIZE>;
 
 /// Client object
 #[derive(Clone, Debug)]

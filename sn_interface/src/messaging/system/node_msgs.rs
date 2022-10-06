@@ -12,7 +12,7 @@ use crate::messaging::{
 };
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register, User},
-    Chunk, DataAddress, PublicKey, ReplicatedData,
+    DataAddress, PublicKey, ReplicatedData, SignedChunk,
 };
 
 use serde::{Deserialize, Serialize};
@@ -89,7 +89,7 @@ pub enum NodeQueryResponse {
     /// Response to [`GetChunk`]
     ///
     /// [`GetChunk`]: crate::messaging::data::DataQueryVariant::GetChunk
-    GetChunk(Result<Chunk>),
+    GetChunk(Result<SignedChunk>),
     //
     // ===== Register Data =====
     //

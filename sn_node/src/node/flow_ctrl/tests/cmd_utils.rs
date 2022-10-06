@@ -17,7 +17,7 @@ use sn_interface::{
         AuthorityProof, ClientAuth, MsgId, MsgType,
     },
     network_knowledge::{test_utils::*, NodeState, SectionAuthorityProvider},
-    types::{Keypair, Peer, ReplicatedData, SecretKeySet},
+    types::{Chunk, Keypair, Peer, ReplicatedData, SecretKeySet, SignedChunk},
 };
 use std::collections::BTreeSet;
 
@@ -129,6 +129,13 @@ pub(crate) fn wrap_client_msg_for_handling(msg: ClientMsg, peer: Peer) -> Result
         #[cfg(feature = "traceroute")]
         traceroute: Traceroute(Vec::new()),
     })
+}
+
+pub(crate) fn get_signed_chunk(replicated_data: ReplicatedData) -> Result<SignedChunk> {
+    match replicated_data {
+        ReplicatedData::Chunk(chunk) => Ok(chunk),
+        _ => Err(eyre!("A ReplicatedData::Chunk variant was expected")),
+    }
 }
 
 /// Extend the `Cmd` enum with some utilities for testing.

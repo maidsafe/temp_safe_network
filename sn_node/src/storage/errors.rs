@@ -70,6 +70,12 @@ pub enum Error {
         cmd_dst_addr: RegisterAddress,
         reg_addr: RegisterAddress,
     },
+    /// RMP Serde encode error.
+    #[error("Serialisation error: {0}")]
+    SerialisationError(#[from] rmp_serde::encode::Error),
+    /// RMP Serde decode error.
+    #[error("Deserialisation error: {0}")]
+    DeserialisationError(#[from] rmp_serde::decode::Error),
 }
 
 // Convert storage error to messaging error message for sending over the network.

@@ -31,7 +31,8 @@ use sn_interface::{
     types::{
         log_markers::LogMarker,
         register::{Permissions, Policy, Register, User},
-        Keypair, Peer, PublicKey, RegisterCmd, ReplicatedData, SPENTBOOK_TYPE_TAG,
+        Keypair, Peer, PublicKey, RegisterCmd, ReplicatedData, SectionSig, SignedChunk,
+        SPENTBOOK_TYPE_TAG,
     },
 };
 
@@ -249,7 +250,20 @@ impl MyNode {
                 let reg_cmd = self.gen_register_cmd(&key_image, &spent_proof_share)?;
                 ReplicatedData::SpentbookWrite(reg_cmd)
             }
-            ClientMsg::Cmd(DataCmd::StoreChunk(chunk)) => ReplicatedData::Chunk(chunk),
+            ClientMsg::Cmd(DataCmd::StoreChunk(chunk)) => {
+                let section_key = self.network_knowledge.section_key();
+                let (_, sig_share) = self
+                    .section_keys_provider
+                    .sign_with(chunk.value(), &section_key)?;
+                let section_sig = SectionSig {
+                    public_key: section_key,
+                    signature: sig_share.0,
+                };
+                ReplicatedData::Chunk(SignedChunk {
+                    chunk,
+                    authority: section_sig,
+                })
+            }
             ClientMsg::Query(query) => {
                 return self
                     .read_data_from_adults(

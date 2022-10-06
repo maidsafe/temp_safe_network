@@ -31,7 +31,7 @@ pub use self::{
 use crate::messaging::{data::Error as ErrorMsg, MsgId};
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register, User},
-    utils, Chunk, ChunkAddress, DataAddress,
+    utils, ChunkAddress, DataAddress, SignedChunk,
 };
 
 use serde::{Deserialize, Serialize};
@@ -164,7 +164,7 @@ pub enum QueryResponse {
     /// Response to [`GetChunk`]
     ///
     /// [`GetChunk`]: crate::messaging::data::DataQueryVariant::GetChunk
-    GetChunk(Result<Chunk>),
+    GetChunk(Result<SignedChunk>),
     //
     // ===== Register Data =====
     //
@@ -233,7 +233,7 @@ impl QueryResponse {
         // TODO: Operation Id should eventually encompass _who_ the op is for.
         match self {
             GetChunk(result) => match result {
-                Ok(chunk) => chunk_operation_id(chunk.address()),
+                Ok(signed_chunk) => chunk_operation_id(signed_chunk.chunk.address()),
                 Err(ErrorMsg::DataNotFound(DataAddress::Bytes(name))) => chunk_operation_id(name),
                 Err(ErrorMsg::DataNotFound(another_address)) => {
                     error!(
@@ -289,7 +289,7 @@ macro_rules! try_from {
 
 // try_from!(Chunk, GetChunk);
 
-impl TryFrom<QueryResponse> for Chunk {
+impl TryFrom<QueryResponse> for SignedChunk {
     type Error = TryFromError;
     fn try_from(response: QueryResponse) -> std::result::Result<Self, Self::Error> {
         match response {
@@ -309,7 +309,7 @@ try_from!(Permissions, GetRegisterUserPermissions);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{utils::random_bytes, Chunk, Keypair, PublicKey};
+    use crate::types::{utils::random_bytes, Chunk, Keypair, PublicKey, SectionSig};
     use bytes::Bytes;
     use eyre::{eyre, Result};
     use std::convert::{TryFrom, TryInto};
@@ -356,7 +356,16 @@ mod tests {
             None => return Err(eyre!("Could not generate public key")),
         };
 
-        let i_data = Chunk::new(Bytes::from(vec![1, 3, 1, 4]));
+        let bytes = vec![1_u8, 3_u8, 1_u8, 4_u8];
+        let sk = bls::SecretKey::random();
+        let signature = sk.sign(&bytes);
+        let i_data = SignedChunk {
+            chunk: Chunk::new(Bytes::from(bytes)),
+            authority: SectionSig {
+                public_key: sk.public_key(),
+                signature,
+            },
+        };
         let e = Error::AccessDenied(key);
         assert_eq!(
             i_data,
@@ -366,7 +375,7 @@ mod tests {
         );
         assert_eq!(
             Err(TryFromError::Response(e.clone())),
-            Chunk::try_from(GetChunk(Err(e)))
+            SignedChunk::try_from(GetChunk(Err(e)))
         );
 
         Ok(())

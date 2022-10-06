@@ -68,7 +68,7 @@ impl DataStorage {
     ) -> Result<Option<StorageLevel>> {
         debug!("Replicating {data:?}");
         match data {
-            ReplicatedData::Chunk(chunk) => self.chunks.store(chunk).await?,
+            ReplicatedData::Chunk(signed_chunk) => self.chunks.store(signed_chunk).await?,
             ReplicatedData::RegisterLog(data) => {
                 info!("Updating register: {:?}", data.address);
                 self.registers.update(data).await?
@@ -264,6 +264,7 @@ mod tests {
             register::{Policy, User},
             utils::random_bytes,
             Chunk, ChunkAddress, DataAddress, Keypair, PublicKey, RegisterCmd, ReplicatedData,
+            SectionSig, SignedChunk,
         },
     };
 
@@ -282,6 +283,21 @@ mod tests {
     const CHUNK_MIN: usize = 1;
     const CHUNK_MAX: usize = 5;
 
+    /// Get a signed chunk with `size` megabytes of data.
+    fn random_chunk(size: usize) -> SignedChunk {
+        let bytes = random_bytes(size * 1024 * 1024);
+        let sk = bls::SecretKey::random();
+        let signature = sk.sign(bytes.to_vec());
+        let chunk = Chunk::new(bytes);
+        SignedChunk {
+            chunk,
+            authority: SectionSig {
+                public_key: sk.public_key(),
+                signature,
+            },
+        }
+    }
+
     #[tokio::test]
     async fn data_storage_basics() -> Result<(), Error> {
         // Generate temp path for storage
@@ -293,11 +309,8 @@ mod tests {
         // Create instance
         let mut storage = DataStorage::new(path, used_space)?;
 
-        // 5mb random data chunk
-        let bytes = random_bytes(5 * 1024 * 1024);
-        let chunk = Chunk::new(bytes);
-        let replicated_data = ReplicatedData::Chunk(chunk.clone());
-
+        let signed_chunk = random_chunk(5);
+        let replicated_data = ReplicatedData::Chunk(signed_chunk.clone());
         let pk = PublicKey::Bls(bls::SecretKey::random().public_key());
         let keypair = Keypair::new_ed25519();
 
@@ -312,12 +325,15 @@ mod tests {
         assert_eq!(replicated_data, fetched_data);
 
         // Test client fetch
-        let query = DataQueryVariant::GetChunk(*chunk.address());
+        let query = DataQueryVariant::GetChunk(*signed_chunk.chunk.address());
         let user = User::Anyone;
 
         let query_response = storage.query(&query, user).await;
 
-        assert_eq!(query_response, NodeQueryResponse::GetChunk(Ok(chunk)));
+        assert_eq!(
+            query_response,
+            NodeQueryResponse::GetChunk(Ok(signed_chunk))
+        );
 
         // Remove from storage
         storage.remove(&replicated_data.address()).await?;
@@ -347,19 +363,18 @@ mod tests {
         let mut storage = DataStorage::new(path, used_space)?;
 
         // 5mb random data chunk
-        let bytes = random_bytes(5 * 1024 * 1024);
-        let chunk = Chunk::new(bytes);
-        let replicated_chunk = ReplicatedData::Chunk(chunk.clone());
+        let signed_chunk = random_chunk(5);
+        let replicated_data = ReplicatedData::Chunk(signed_chunk.clone());
 
         let pk = PublicKey::Bls(bls::SecretKey::random().public_key());
         let keypair = Keypair::new_ed25519();
 
         // Store the chunk
-        let _ = storage.store(&replicated_chunk, pk, keypair).await?;
+        let _ = storage.store(&replicated_data, pk, keypair).await?;
 
         let keys = storage.data_addrs().await;
 
-        let expected_key = replicated_chunk.address();
+        let expected_key = replicated_data.address();
         assert!(
             keys.contains(&expected_key),
             "data storage does not contain our keys: {expected_key:?}"
@@ -368,7 +383,6 @@ mod tests {
         Ok(())
     }
 
-    use sn_interface::messaging::system::SectionSig;
     fn section_sig() -> SectionSig {
         let sk = bls::SecretKey::random();
         let public_key = sk.public_key();
@@ -500,14 +514,14 @@ mod tests {
                                 Some(data) => data.clone(),
                                 // when hashmap is empty, xor_name is random, get random_bytes
                                 None => {
-                                    let chunk = Chunk::new(random_bytes(chunk_size * 1024 * 1024));
+                                    let chunk = random_chunk(chunk_size);
                                     ReplicatedData::Chunk(chunk)
                                 }
                             }
                         }
                         // random bytes
                         _ => {
-                            let chunk = Chunk::new(random_bytes(chunk_size * 1024 * 1024));
+                            let chunk = random_chunk(chunk_size);
                             ReplicatedData::Chunk(chunk)
                         }
                     };
@@ -528,8 +542,8 @@ mod tests {
                     // Adding some delay fixes it
                     thread::sleep(Duration::from_millis(15));
 
-                    if let ReplicatedData::Chunk(chunk) = &data {
-                        let _ = model.insert(*chunk.name(), data);
+                    if let ReplicatedData::Chunk(signed_chunk) = &data {
+                        let _ = model.insert(*signed_chunk.chunk.name(), data);
                     }
                 }
                 Op::Query(idx) => {

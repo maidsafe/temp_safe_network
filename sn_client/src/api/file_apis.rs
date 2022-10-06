@@ -14,7 +14,7 @@ use crate::{api::data::DataMapLevel, Error, Result};
 
 use sn_interface::{
     messaging::data::{DataCmd, DataQueryVariant, QueryResponse},
-    types::{Chunk, ChunkAddress},
+    types::{Chunk, ChunkAddress, SignedChunk},
 };
 
 use bincode::deserialize;
@@ -30,14 +30,14 @@ impl Client {
     #[instrument(skip(self), level = "debug")]
     /// Reads [`Bytes`] from the network, whose contents are contained within on or more chunks.
     pub async fn read_bytes(&self, address: XorName) -> Result<Bytes> {
-        let chunk = self.get_chunk(&address).await?;
+        let signed_chunk = self.get_chunk(&address).await?;
 
         // first try to deserialize a LargeFile, if it works, we go and seek it
-        if let Ok(data_map) = self.unpack_chunk(chunk.clone()).await {
+        if let Ok(data_map) = self.unpack_chunk(signed_chunk.chunk.clone()).await {
             self.read_all(data_map).await
         } else {
             // if an error occurs, we assume it's a SmallFile
-            Ok(chunk.value().clone())
+            Ok(signed_chunk.chunk.value().clone())
         }
     }
 
@@ -61,18 +61,18 @@ impl Client {
             &position,
         );
 
-        let chunk = self.get_chunk(&address).await?;
+        let signed_chunk = self.get_chunk(&address).await?;
 
         // First try to deserialize a LargeFile, if it works, we go and seek it.
         // If an error occurs, we consider it to be a SmallFile.
-        if let Ok(data_map) = self.unpack_chunk(chunk.clone()).await {
+        if let Ok(data_map) = self.unpack_chunk(signed_chunk.chunk.clone()).await {
             return self.seek(data_map, position, length).await;
         }
 
         // The error above is ignored to avoid leaking the storage format detail of SmallFiles and LargeFiles.
         // The basic idea is that we're trying to deserialize as one, and then the other.
         // The cost of it is that some errors will not be seen without a refactor.
-        let mut bytes = chunk.value().clone();
+        let mut bytes = signed_chunk.chunk.value().clone();
 
         let _ = bytes.split_to(position);
         bytes.truncate(length);
@@ -81,13 +81,13 @@ impl Client {
     }
 
     #[instrument(skip(self), level = "trace")]
-    pub(crate) async fn get_chunk(&self, name: &XorName) -> Result<Chunk> {
+    pub(crate) async fn get_chunk(&self, name: &XorName) -> Result<SignedChunk> {
         // first check it's not already in our Chunks' cache
         if let Some(chunk) = self
             .chunks_cache
             .write()
             .await
-            .find(|c| c.address().name() == name)
+            .find(|s| s.chunk.address().name() == name)
         {
             trace!("Chunk retrieved from local cache: {:?}", name);
             return Ok(chunk.clone());
@@ -97,7 +97,7 @@ impl Client {
         let res = self.send_query(query.clone()).await?;
 
         let op_id = res.operation_id;
-        let chunk: Chunk = match res.response {
+        let chunk: SignedChunk = match res.response {
             QueryResponse::GetChunk(result) => {
                 result.map_err(|err| Error::ErrorMsg { source: err, op_id })
             }
@@ -272,9 +272,9 @@ impl Client {
             let client = client.clone();
             task::spawn(async move {
                 match client.get_chunk(&chunk_info.dst_hash).await {
-                    Ok(chunk) => Ok(EncryptedChunk {
+                    Ok(signed_chunk) => Ok(EncryptedChunk {
                         index: chunk_info.index,
-                        content: chunk.value().clone(),
+                        content: signed_chunk.chunk.value().clone(),
                     }),
                     Err(err) => {
                         warn!(

@@ -6,22 +6,31 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{ChunkAddress, XorName};
+use super::{ChunkAddress, SectionSig, XorName};
 use bytes::Bytes;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Maximum allowed size for a serialised Chunk to grow to.
 pub const MAX_CHUNK_SIZE_IN_BYTES: usize = 1024 * 1024 + 10 * 1024;
 
-/// Chunk, an immutable chunk of data
+/// Represents an immutable chunk of data.
+///
+/// This is one of the primitive data types for the network.
 #[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, custom_debug::Debug)]
 pub struct Chunk {
-    /// Network address. Omitted when serialising and
-    /// calculated from the `value` when deserialising.
+    /// Network address.
+    ///
+    /// Omitted when serialising and calculated from `value` when deserialising.
     address: ChunkAddress,
-    /// Contained data.
+    /// The data for the chunk.
     #[debug(skip)]
     value: Bytes,
+}
+
+#[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize, Debug)]
+pub struct SignedChunk {
+    pub chunk: Chunk,
+    pub authority: SectionSig,
 }
 
 impl Chunk {

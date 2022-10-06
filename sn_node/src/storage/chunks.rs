@@ -10,10 +10,9 @@ use super::{list_files_in, prefix_tree_path, Error, Result, UsedSpace};
 
 use sn_interface::{
     messaging::system::NodeQueryResponse,
-    types::{log_markers::LogMarker, Chunk, ChunkAddress, DataAddress},
+    types::{log_markers::LogMarker, ChunkAddress, DataAddress, SignedChunk},
 };
 
-use bytes::Bytes;
 use hex::FromHex;
 use std::{
     fmt::{self, Display, Formatter},
@@ -84,31 +83,34 @@ impl ChunkStorage {
         Ok(())
     }
 
-    pub(super) async fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
+    pub(super) async fn get_chunk(&self, address: &ChunkAddress) -> Result<SignedChunk> {
         debug!("Getting chunk {:?}", address);
 
         let file_path = self.chunk_addr_to_filepath(address)?;
         let bytes = match read(file_path).await {
-            Ok(bytes) => Ok(Bytes::from(bytes)),
+            Ok(bytes) => Ok(bytes),
             Err(io_error @ io::Error { .. }) if io_error.kind() == ErrorKind::NotFound => {
                 Err(Error::ChunkNotFound(*address.name()))
             }
             Err(other) => Err(other.into()),
         }?;
 
-        Ok(Chunk::new(bytes))
+        let signed_chunk: SignedChunk = rmp_serde::from_slice(&bytes)?;
+        Ok(signed_chunk)
     }
 
-    // Read chunk from local store and return NodeQueryResponse
+    /// Read chunk and return `NodeQueryResponse`.
     pub(super) async fn get(&self, address: &ChunkAddress) -> NodeQueryResponse {
         trace!("{:?}", LogMarker::ChunkQueryReceviedAtAdult);
         NodeQueryResponse::GetChunk(self.get_chunk(address).await.map_err(|error| error.into()))
     }
 
-    /// Store a chunk in the local disk store
-    /// If that chunk was already in the local store, just overwrites it
+    /// Store a signed chunk.
+    ///
+    /// If the chunk already exists it will be overwritten.
     #[instrument(skip_all)]
-    pub(super) async fn store(&self, chunk: &Chunk) -> Result<()> {
+    pub(super) async fn store(&self, signed_chunk: &SignedChunk) -> Result<()> {
+        let chunk = &signed_chunk.chunk;
         let addr = chunk.address();
         let filepath = self.chunk_addr_to_filepath(addr)?;
 
@@ -124,7 +126,8 @@ impl ChunkStorage {
         // cheap extra security check for space (prone to race conditions)
         // just so we don't go too much overboard
         // should not be triggered as chunks should not be sent to full adults
-        if !self.used_space.can_add(chunk.value().len()) {
+        let serialized = rmp_serde::to_vec(signed_chunk)?;
+        if !self.used_space.can_add(serialized.len()) {
             return Err(Error::NotEnoughSpace);
         }
 
@@ -136,8 +139,8 @@ impl ChunkStorage {
 
         let mut file = File::create(filepath).await?;
 
-        file.write_all(chunk.value()).await?;
-        self.used_space.increase(chunk.value().len());
+        file.write_all(&serialized).await?;
+        self.used_space.increase(serialized.len());
         trace!("{:?}", LogMarker::StoredNewChunk);
 
         Ok(())
@@ -153,8 +156,9 @@ impl Display for ChunkStorage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sn_interface::types::utils::random_bytes;
+    use sn_interface::types::{utils::random_bytes, Chunk, SectionSig};
 
+    use bytes::Bytes;
     use futures::future::join_all;
     use rayon::prelude::*;
     use tempfile::tempdir;
@@ -171,14 +175,27 @@ mod tests {
         let storage = init_file_store();
         // test that a range of different chunks return the written chunk
         for _ in 0..10 {
+            let sk = bls::SecretKey::random();
             let chunk = Chunk::new(random_bytes(100));
+            let sig = sk.sign(chunk.value());
+            let signed_chunk = SignedChunk {
+                chunk: chunk.clone(),
+                authority: SectionSig {
+                    public_key: sk.public_key(),
+                    signature: sig,
+                },
+            };
 
-            storage.store(&chunk).await.expect("Failed to write chunk.");
+            storage
+                .store(&signed_chunk)
+                .await
+                .expect("Failed to write chunk.");
 
-            let read_chunk = storage
+            let signed_chunk = storage
                 .get_chunk(chunk.address())
                 .await
                 .expect("Failed to read chunk.");
+            let read_chunk = &signed_chunk.chunk;
 
             assert_eq!(chunk.value(), read_chunk.value());
         }
@@ -206,15 +223,26 @@ mod tests {
     async fn write_and_read_chunks(chunks: &[Chunk], storage: ChunkStorage) {
         // write all chunks
         let mut tasks = Vec::new();
-        for c in chunks.iter() {
-            tasks.push(async { storage.store(c).await.map(|_| *c.address()) });
+        for chunk in chunks.iter() {
+            tasks.push(async {
+                let sk = bls::SecretKey::random();
+                let sig = sk.sign(chunk.value());
+                let signed_chunk = SignedChunk {
+                    chunk: chunk.clone(),
+                    authority: SectionSig {
+                        public_key: sk.public_key(),
+                        signature: sig,
+                    },
+                };
+                storage.store(&signed_chunk).await.map(|_| *chunk.address())
+            });
         }
         let results = join_all(tasks).await;
 
         // read all chunks
         let tasks = results.iter().flatten().map(|addr| storage.get_chunk(addr));
         let results = join_all(tasks).await;
-        let read_chunks: Vec<&Chunk> = results.iter().flatten().collect();
+        let read_chunks: Vec<Chunk> = results.iter().flatten().map(|c| c.chunk.clone()).collect();
 
         // verify all written were read
         assert!(chunks
