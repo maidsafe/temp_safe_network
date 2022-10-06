@@ -369,7 +369,7 @@ mod tests {
     }
 
     use sn_interface::messaging::system::SectionSig;
-    fn section_auth() -> SectionSig {
+    fn section_sig() -> SectionSig {
         let sk = bls::SecretKey::random();
         let public_key = sk.public_key();
         let data = "hello".to_string();
@@ -409,7 +409,7 @@ mod tests {
 
         let op = CreateRegister { name, tag, policy };
         let signature = keypair.sign(&bincode::serialize(&op).expect("could not serialize op"));
-        let section_auth = section_auth();
+        let section_auth = section_sig();
         let cmd = RegisterCmd::Create {
             cmd: SignedRegisterCreate {
                 op,

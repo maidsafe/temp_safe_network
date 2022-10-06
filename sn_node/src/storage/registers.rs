@@ -427,11 +427,11 @@ fn create_reg_w_policy(
 
     Ok(RegisterCmd::Create {
         cmd: SignedRegisterCreate { op, auth },
-        section_sig: section_auth(),
+        section_sig: section_sig(),
     })
 }
 
-fn section_auth() -> SectionSig {
+fn section_sig() -> SectionSig {
     let sk = bls::SecretKey::random();
     let public_key = sk.public_key();
     let data = "TODO-spentbook".to_string();

@@ -70,7 +70,7 @@ impl Node {
             .network_knowledge
             .section_signed_members()
             .iter()
-            .map(|state| state.clone().into_authed_msg())
+            .map(|state| state.clone().into_signed_msg())
             .collect();
 
         let ae_msg = self.generate_ae_msg(Some(section_pk), AntiEntropyKind::Update { members });

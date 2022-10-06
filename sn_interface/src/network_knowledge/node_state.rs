@@ -203,7 +203,7 @@ impl NodeState {
 }
 
 impl SectionSigned<NodeState> {
-    pub fn into_authed_msg(self) -> SectionSigned<NodeStateMsg> {
+    pub fn into_signed_msg(self) -> SectionSigned<NodeStateMsg> {
         SectionSigned {
             value: self.value.to_msg(),
             sig: self.sig,
@@ -222,7 +222,7 @@ impl NodeStateMsg {
 }
 
 impl SectionSigned<NodeStateMsg> {
-    pub fn into_authed_state(self) -> SectionSigned<NodeState> {
+    pub fn into_signed_state(self) -> SectionSigned<NodeState> {
         SectionSigned {
             value: self.value.into_state(),
             sig: self.sig,

@@ -293,7 +293,7 @@ impl Node {
             value: node_state,
             sig,
         }
-        .into_authed_state();
+        .into_signed_state();
 
         let _ = self.network_knowledge.update_member(node_state.clone());
 
@@ -308,7 +308,7 @@ impl Node {
         // containing the relocation details.
         if node_state.is_relocated() {
             let peer = *node_state.peer();
-            let msg = NodeMsg::Relocate(node_state.into_authed_msg());
+            let msg = NodeMsg::Relocate(node_state.into_signed_msg());
             Some(self.send_system_msg(msg, Peers::Single(peer)))
         } else {
             None
