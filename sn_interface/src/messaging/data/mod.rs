@@ -34,7 +34,6 @@ use crate::types::{
     utils, Chunk, ChunkAddress, DataAddress,
 };
 
-use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use sn_dbc::SpentProofShare;
 use std::{
@@ -43,7 +42,6 @@ use std::{
     fmt::{self, Debug, Display, Formatter},
 };
 use tiny_keccak::{Hasher, Sha3};
-use xor_name::XorName;
 
 /// Derivable Id of an operation. Query/Response should return the same id for simple tracking purposes.
 /// TODO: make uniquer per requester for some operations
@@ -115,17 +113,6 @@ pub enum ClientMsg {
         /// [`Cmd`]: Self::Cmd
         correlation_id: MsgId,
     },
-    /// A message indicating that an error occurred as a node was handling a client's message.
-    ClientError {
-        /// Optional reason for the error.
-        ///
-        /// This can be used to handle the error.
-        reason: Option<Error>,
-        /// Message that triggered this error.
-        ///
-        /// This could be used to retry the message if the error could be handled.
-        source_message: Option<Bytes>,
-    },
     /// CmdAck will be sent back to the client when the handling on the
     /// receiving Elder has been succeeded.
     CmdAck {
@@ -137,15 +124,6 @@ pub enum ClientMsg {
 }
 
 impl ClientMsg {
-    /// Returns the destination address for cmds and Queries only.
-    pub fn dst_address(&self) -> Option<XorName> {
-        match self {
-            Self::Cmd(cmd) => Some(cmd.dst_name()),
-            Self::Query(query) => Some(query.variant.dst_name()),
-            _ => None,
-        }
-    }
-
     #[cfg(any(feature = "chunks", feature = "registers"))]
     /// The priority of the message, when handled by lower level comms.
     pub fn priority(&self) -> i32 {
@@ -170,9 +148,6 @@ impl Display for ClientMsg {
             Self::Query(query) => write!(f, "ClientMsg::Query({:?})", query),
             Self::QueryResponse { response, .. } => {
                 write!(f, "ClientMsg::QueryResponse({:?})", response)
-            }
-            Self::ClientError { reason, .. } => {
-                write!(f, "ClientMsg::ClientError({:?})", reason)
             }
         }
     }
