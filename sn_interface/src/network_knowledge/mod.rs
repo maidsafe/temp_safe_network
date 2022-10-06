@@ -319,7 +319,7 @@ impl NetworkKnowledge {
         if let Some(members) = updated_members {
             let peers: BTreeSet<_> = members
                 .into_iter()
-                .map(|member| member.into_authed_state())
+                .map(|member| member.into_signed_state())
                 .collect();
 
             if !peers.is_empty() && self.merge_members(peers)? {

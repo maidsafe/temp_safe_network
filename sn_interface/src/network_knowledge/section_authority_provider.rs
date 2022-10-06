@@ -239,7 +239,7 @@ impl SectionAuthorityProvider {
 }
 
 impl SectionSigned<SectionAuthorityProvider> {
-    pub fn into_authed_msg(self) -> SectionSigned<SectionAuthorityProviderMsg> {
+    pub fn into_signed_msg(self) -> SectionSigned<SectionAuthorityProviderMsg> {
         SectionSigned {
             value: self.value.to_msg(),
             sig: self.sig,
@@ -264,7 +264,7 @@ impl SectionAuthorityProviderMsg {
 }
 
 impl SectionSigned<SectionAuthorityProviderMsg> {
-    pub fn into_authed_state(self) -> SectionSigned<SectionAuthorityProvider> {
+    pub fn into_signed_state(self) -> SectionSigned<SectionAuthorityProvider> {
         SectionSigned {
             value: self.value.into_state(),
             sig: self.sig,

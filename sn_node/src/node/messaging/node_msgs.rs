@@ -291,7 +291,7 @@ impl Node {
                         CoreProposal::VoteNodeOffline(node_state.into_state())
                     }
                     ProposalMsg::SectionInfo(sap) => CoreProposal::SectionInfo(sap.into_state()),
-                    ProposalMsg::NewElders(sap) => CoreProposal::NewElders(sap.into_authed_state()),
+                    ProposalMsg::NewElders(sap) => CoreProposal::NewElders(sap.into_signed_state()),
                     ProposalMsg::JoinsAllowed(allowed) => CoreProposal::JoinsAllowed(allowed),
                 };
 
