@@ -128,7 +128,7 @@ impl Node {
     pub(crate) async fn handle_new_elders_agreement(
         &mut self,
         signed_sap: SectionSigned<SectionAuthorityProvider>,
-        key_sig: SectionSig,
+        section_sig: SectionSig,
     ) -> Result<Vec<Cmd>> {
         trace!("{}", LogMarker::HandlingNewEldersAgreement);
         let snapshot = self.state_snapshot();
@@ -143,7 +143,7 @@ impl Node {
         // Let's update our network knowledge, including our
         // section SAP and chain if the new SAP's prefix matches our name
         // We need to generate the proof chain to connect our current chain to new SAP.
-        match section_chain.insert(&last_key, signed_sap.section_key(), key_sig.signature) {
+        match section_chain.insert(&last_key, signed_sap.section_key(), section_sig.signature) {
             Ok(()) => {
                 let section_tree_update = SectionTreeUpdate::new(signed_sap, section_chain);
                 match self.update_network_knowledge(section_tree_update, None) {
