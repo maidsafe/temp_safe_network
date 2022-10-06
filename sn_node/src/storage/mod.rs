@@ -418,7 +418,7 @@ mod tests {
                     signature,
                 },
             },
-            section_auth: section_auth.clone(), // obtained after presenting a valid payment to the network
+            section_sig: section_auth.clone(), // obtained after presenting a valid payment to the network
         };
 
         // ReplicatedData::RegisterWrite(reg_cmd)

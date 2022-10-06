@@ -83,7 +83,7 @@ pub enum RegisterCmd {
         cmd: SignedRegisterCreate,
         /// Section signature over the operation,
         /// verifying that it was paid for.
-        section_auth: SectionSig,
+        section_sig: SectionSig,
     },
     /// Edit the [`Register`].
     Edit(SignedRegisterEdit),

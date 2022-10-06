@@ -75,7 +75,7 @@ impl Client {
                     signature,
                 },
             },
-            section_auth: section_sig(), // obtained after presenting a valid payment to the network
+            section_sig: section_sig(), // obtained after presenting a valid payment to the network
         });
 
         debug!("Creating Register: {:?}", cmd);

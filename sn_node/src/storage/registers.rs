@@ -427,7 +427,7 @@ fn create_reg_w_policy(
 
     Ok(RegisterCmd::Create {
         cmd: SignedRegisterCreate { op, auth },
-        section_auth: section_auth(),
+        section_sig: section_auth(),
     })
 }
 

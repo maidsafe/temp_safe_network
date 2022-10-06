@@ -447,7 +447,7 @@ impl SectionTreeUpdate {
         let proof_chain: SectionsDAGMsg = proof_chain.into();
         Self {
             section_auth: signed_sap.to_msg(),
-            section_signed: signed_sap.sig,
+            section_sig: signed_sap.sig,
             proof_chain,
         }
     }
@@ -459,7 +459,7 @@ impl SectionTreeUpdate {
     pub fn signed_sap(&self) -> SectionSigned<SectionAuthorityProvider> {
         SectionSigned {
             value: self.section_auth.clone().into_state(),
-            sig: self.section_signed.clone(),
+            sig: self.section_sig.clone(),
         }
     }
 }
