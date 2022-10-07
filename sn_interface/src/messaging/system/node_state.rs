@@ -9,45 +9,9 @@
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::{Signature, Verifier};
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
-use xor_name::{XorName, XOR_NAME_LEN};
+use xor_name::XorName;
 
 use crate::{network_knowledge::NetworkKnowledge, types::Peer};
-
-/// Information about a member of our section.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
-pub struct NodeState {
-    /// Peer's name.
-    pub name: XorName,
-    /// Peer's address.
-    pub addr: SocketAddr,
-    /// Current state of the peer
-    pub state: MembershipState,
-    /// To avoid sybil attack via relocation, a relocated node's original name will be recorded.
-    pub previous_name: Option<XorName>,
-}
-
-impl NodeState {
-    /// Build a `NodeState` in the Joined state.
-    pub fn joined(name: XorName, addr: SocketAddr, previous_name: Option<XorName>) -> Self {
-        Self {
-            name,
-            addr,
-            state: MembershipState::Joined,
-            previous_name,
-        }
-    }
-
-    /// Returns the peer struct for this node.
-    pub fn peer(&self) -> Peer {
-        Peer::new(self.name, self.addr)
-    }
-
-    /// Returns the age.
-    pub fn age(&self) -> u8 {
-        self.name[XOR_NAME_LEN - 1]
-    }
-}
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
 /// Node's current section membership state

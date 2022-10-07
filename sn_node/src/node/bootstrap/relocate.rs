@@ -15,10 +15,8 @@ use crate::node::{
 };
 
 use sn_interface::{
-    messaging::system::{
-        JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeMsg, NodeState, SectionSigned,
-    },
-    network_knowledge::{MyNodeInfo, SectionAuthorityProvider},
+    messaging::system::{JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeMsg, SectionSigned},
+    network_knowledge::{MyNodeInfo, NodeState, SectionAuthorityProvider},
     types::{keys::ed25519, Peer, PublicKey},
 };
 
@@ -254,14 +252,14 @@ mod tests {
     use sn_interface::{
         elder_count,
         messaging::{
-            system::{JoinAsRelocatedResponse, NodeMsg, NodeState},
+            system::{JoinAsRelocatedResponse, NodeMsg},
             SectionAuthorityProvider,
         },
         network_knowledge::{
             test_utils::{gen_addr, section_signed},
-            MyNodeInfo, MIN_ADULT_AGE,
+            MyNodeInfo, NodeState, MIN_ADULT_AGE,
         },
-        types::keys::ed25519,
+        types::{keys::ed25519, Peer},
     };
     use std::{collections::BTreeMap, net::SocketAddr};
     use tokio;
@@ -275,7 +273,7 @@ mod tests {
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE + 1),
             gen_addr(),
         );
-        let node_state = NodeState::joined(node.name(), node.addr, None);
+        let node_state = NodeState::joined(node.peer(), None);
         let _ = from_sap.members.insert(node.name(), node_state.clone());
         let signed_node_state = section_signed(&from_sk_set.secret_key(), node_state)?;
         // to_sap
@@ -323,7 +321,7 @@ mod tests {
                 ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE + 1),
                 gen_addr(),
             );
-            let node_state = NodeState::joined(node.name(), node.addr, None);
+            let node_state = NodeState::joined(node.peer(), None);
             let _ = from_sap.members.insert(node.name(), node_state.clone());
             let signed_node_state = section_signed(&from_sk_set.secret_key(), node_state)?;
             // to_sap
@@ -389,7 +387,7 @@ mod tests {
                 ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE + 1),
                 gen_addr(),
             );
-            let node_state = NodeState::joined(node.name(), node.addr, None);
+            let node_state = NodeState::joined(node.peer(), None);
             let _ = from_sap.members.insert(node.name(), node_state.clone());
             let signed_node_state = section_signed(&from_sk_set.secret_key(), node_state)?;
             // to_sap
@@ -441,7 +439,8 @@ mod tests {
             let xor_name = xor_name::rand::random();
             let socket_addr = gen_addr();
             let _ = elders.insert(xor_name, socket_addr);
-            let _ = members.insert(xor_name, NodeState::joined(xor_name, socket_addr, None));
+            let peer = Peer::new(xor_name, socket_addr);
+            let _ = members.insert(xor_name, NodeState::joined(peer, None));
         }
         let sap = SectionAuthorityProvider {
             prefix: Prefix::default(),

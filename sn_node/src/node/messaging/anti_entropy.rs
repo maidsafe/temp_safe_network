@@ -18,9 +18,10 @@ use qp2p::UsrMsgBytes;
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
-        system::{AntiEntropyKind, NodeCmd, NodeMsg, NodeState, SectionSigned},
+        system::{AntiEntropyKind, NodeCmd, NodeMsg, SectionSigned},
         MsgType, SectionTreeUpdate, WireMsg,
     },
+    network_knowledge::NodeState,
     types::{log_markers::LogMarker, Peer, PublicKey},
 };
 
@@ -66,12 +67,7 @@ impl MyNode {
         recipients: BTreeSet<Peer>,
         section_pk: BlsPublicKey,
     ) -> Cmd {
-        let members = self
-            .network_knowledge
-            .section_signed_members()
-            .iter()
-            .map(|state| state.clone().into_signed_msg())
-            .collect();
+        let members = self.network_knowledge.section_signed_members();
 
         let ae_msg = self.generate_ae_msg(Some(section_pk), AntiEntropyKind::Update { members });
 

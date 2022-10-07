@@ -15,7 +15,8 @@ use crate::node::{
 
 use sn_interface::{
     elder_count,
-    messaging::system::{MembershipState, NodeState as NodeStateMsg, SectionSigned},
+    messaging::system::{MembershipState, SectionSigned},
+    network_knowledge::NodeState,
     types::log_markers::LogMarker,
 };
 
@@ -45,10 +46,9 @@ impl MyNode {
             find_nodes_to_relocate(&self.network_knowledge, &churn_id, excluded)
         {
             debug!(
-                "Relocating {:?} to {} (on churn of {})",
+                "Relocating {:?} to {} (on churn of {churn_id})",
                 node_state.peer(),
                 relocate_details.dst,
-                churn_id
             );
 
             cmds.extend(self.propose(Proposal::VoteNodeOffline(
@@ -61,10 +61,10 @@ impl MyNode {
 
     pub(crate) async fn handle_relocate(
         &mut self,
-        relocate_proof: SectionSigned<NodeStateMsg>,
+        relocate_proof: SectionSigned<NodeState>,
     ) -> Result<Option<Cmd>> {
         let (dst_xorname, dst_section_key, new_age) =
-            if let MembershipState::Relocated(ref relocate_details) = relocate_proof.value.state {
+            if let MembershipState::Relocated(ref relocate_details) = relocate_proof.state() {
                 (
                     relocate_details.dst,
                     relocate_details.dst_section_key,
@@ -73,7 +73,7 @@ impl MyNode {
             } else {
                 debug!(
                     "Ignoring Relocate msg containing invalid NodeState: {:?}",
-                    relocate_proof.state
+                    relocate_proof.state()
                 );
                 return Ok(None);
             };
@@ -85,10 +85,7 @@ impl MyNode {
             return Ok(None);
         }
 
-        debug!(
-            "Received Relocate message to join the section at {}",
-            dst_xorname
-        );
+        debug!("Received Relocate message to join the section at {dst_xorname}");
 
         match self.relocate_state {
             Some(_) => {

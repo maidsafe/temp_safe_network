@@ -287,7 +287,7 @@ impl MyNode {
                 // lets convert our message into a usable proposal for core
                 let core_proposal = match proposal {
                     ProposalMsg::VoteNodeOffline(node_state) => {
-                        CoreProposal::VoteNodeOffline(node_state.into_state())
+                        CoreProposal::VoteNodeOffline(node_state)
                     }
                     ProposalMsg::SectionInfo(sap) => CoreProposal::SectionInfo(sap.into_state()),
                     ProposalMsg::NewElders(sap) => CoreProposal::NewElders(sap.into_signed_state()),

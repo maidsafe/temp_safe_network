@@ -33,7 +33,7 @@ pub(crate) async fn handle_online_cmd(
     section_auth: &SectionAuthorityProvider,
 ) -> Result<HandleOnlineStatus> {
     let node_state = NodeState::joined(*peer, None);
-    let membership_decision = section_decision(sk_set, node_state.to_msg())?;
+    let membership_decision = section_decision(sk_set, node_state)?;
 
     let all_cmds = run_and_collect_cmds(
         Cmd::HandleMembershipDecision(membership_decision),
@@ -77,7 +77,7 @@ pub(crate) async fn handle_online_cmd(
                 proposal: sn_interface::messaging::system::Proposal::VoteNodeOffline(node_state),
                 ..
             } => {
-                if let MembershipState::Relocated(details) = node_state.state {
+                if let MembershipState::Relocated(details) = node_state.state() {
                     if details.previous_name != peer.name() {
                         continue;
                     }

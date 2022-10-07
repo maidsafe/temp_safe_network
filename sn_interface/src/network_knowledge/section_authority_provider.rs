@@ -147,11 +147,7 @@ impl SectionAuthorityProvider {
         Self::new(
             session_id.elder_peers(),
             session_id.prefix,
-            session_id
-                .bootstrap_members
-                .iter()
-                .cloned()
-                .map(|n| n.into_state()),
+            session_id.bootstrap_members.clone(),
             pk_set,
             session_id.membership_gen,
         )
@@ -231,7 +227,7 @@ impl SectionAuthorityProvider {
             members: self
                 .members
                 .iter()
-                .map(|state| (state.name(), state.to_msg()))
+                .map(|state| (state.name(), state.clone()))
                 .collect(),
             membership_gen: self.membership_gen,
         }
@@ -254,9 +250,7 @@ impl SectionAuthorityProviderMsg {
                 .into_iter()
                 .map(|(name, value)| Peer::new(name, value)),
             self.prefix,
-            self.members
-                .into_iter()
-                .map(|(_name, state)| state.into_state()),
+            self.members.into_iter().map(|(_name, state)| state),
             self.public_key_set,
             self.membership_gen,
         )

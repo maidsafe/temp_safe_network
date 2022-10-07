@@ -14,11 +14,11 @@ use sn_interface::{
     messaging::{
         system::{
             JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest,
-            JoinResponse, MembershipState, NodeMsg, NodeState,
+            JoinResponse, MembershipState, NodeMsg,
         },
         SectionTreeUpdate,
     },
-    network_knowledge::{SectionAuthUtils, FIRST_SECTION_MAX_AGE, MIN_ADULT_AGE},
+    network_knowledge::{NodeState, SectionAuthUtils, FIRST_SECTION_MAX_AGE, MIN_ADULT_AGE},
     types::{log_markers::LogMarker, Peer},
 };
 
@@ -62,10 +62,7 @@ impl MyNode {
         }
 
         if !self.joins_allowed {
-            debug!(
-                "Rejecting JoinRequest from {} - joins currently not allowed.",
-                peer,
-            );
+            debug!("Rejecting JoinRequest from {peer} - joins currently not allowed.");
             let msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Rejected(
                 JoinRejectionReason::JoinsDisallowed,
             )));
@@ -76,31 +73,16 @@ impl MyNode {
 
         let (is_age_invalid, expected_age) = self.verify_joining_node_age(&peer)?;
 
-        trace!(
-            "our_prefix {:?} expected_age {:?} is_age_invalid {:?}",
-            our_prefix,
-            expected_age,
-            is_age_invalid
-        );
+        trace!("our_prefix {our_prefix:?} expected_age {expected_age:?} is_age_invalid {is_age_invalid:?}");
 
         if !section_key_matches {
             trace!("{}", LogMarker::SendJoinRetryNotCorrectKey);
-            trace!(
-                "JoinRequest from {} doesn't have our latest section_key {:?}, provided {:?}.",
-                peer,
-                our_section_key,
-                provided_section_key,
-            );
+            trace!("JoinRequest from {peer} doesn't have our latest section_key {our_section_key:?}, provided {provided_section_key:?}.");
         }
 
         if is_age_invalid {
             trace!("{}", LogMarker::SendJoinRetryAgeIssue);
-            trace!(
-                "JoinRequest from {} (with age {}) doesn't have the expected age: {}",
-                peer,
-                peer.age(),
-                expected_age,
-            );
+            trace!("JoinRequest from {peer} (with age {}) doesn't have the expected age: {expected_age}", peer.age());
         }
 
         if !section_key_matches || is_age_invalid {
@@ -124,7 +106,7 @@ impl MyNode {
             Ok(Some(self.send_system_msg(msg, Peers::Single(peer))))
         } else {
             // It's reachable, let's then propose membership
-            let node_state = NodeState::joined(peer.name(), peer.addr(), None);
+            let node_state = NodeState::joined(peer, None);
             Ok(self.propose_membership_change(node_state))
         }
     }
@@ -189,9 +171,7 @@ impl MyNode {
         if !our_prefix.matches(&peer.name())
             || join_request.section_key != self.network_knowledge.section_key()
         {
-            debug!(
-                "JoinAsRelocatedRequest from {peer} - name doesn't match our prefix {our_prefix:?}."
-            );
+            debug!("JoinAsRelocatedRequest from {peer} - name doesn't match our prefix {our_prefix:?}.");
 
             let msg = NodeMsg::JoinAsRelocatedResponse(Box::new(JoinAsRelocatedResponse::Retry(
                 self.network_knowledge.section_auth().to_msg(),
@@ -203,9 +183,8 @@ impl MyNode {
             return Some(self.send_system_msg(msg, Peers::Single(peer)));
         }
 
-        let relocate_details = if let MembershipState::Relocated(ref details) =
-            join_request.relocate_proof.value.state
-        {
+        let state = join_request.relocate_proof.value.state();
+        let relocate_details = if let MembershipState::Relocated(ref details) = state {
             // Check for signatures and trust of the relocate_proof
             if !join_request.relocate_proof.self_verify() {
                 debug!("Ignoring JoinAsRelocatedRequest from {peer} - invalid sig.");
@@ -219,10 +198,7 @@ impl MyNode {
 
             details
         } else {
-            debug!(
-                "Ignoring JoinAsRelocatedRequest from {peer} with invalid relocate proof state: {:?}",
-                join_request.relocate_proof.value.state
-            );
+            debug!("Ignoring JoinAsRelocatedRequest from {peer} with invalid relocate proof state: {state:?}");
             return None;
         };
 

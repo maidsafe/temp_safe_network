@@ -51,7 +51,7 @@ impl Proposal {
     // We prefer this over `From<...>` to make it easier to read the conversion.
     pub(crate) fn into_msg(self) -> ProposalMsg {
         match self {
-            Self::VoteNodeOffline(node_state) => ProposalMsg::VoteNodeOffline(node_state.to_msg()),
+            Self::VoteNodeOffline(node_state) => ProposalMsg::VoteNodeOffline(node_state),
             Self::SectionInfo(sap) => ProposalMsg::SectionInfo(sap.to_msg()),
             Self::NewElders(sap) => ProposalMsg::NewElders(sap.into_signed_msg()),
             Self::JoinsAllowed(allowed) => ProposalMsg::JoinsAllowed(allowed),

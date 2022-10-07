@@ -15,8 +15,8 @@ use crate::node::{
 };
 use sn_consensus::{Generation, SignedVote, VoteResponse};
 use sn_interface::{
-    messaging::system::{NodeState, SectionSigned},
-    network_knowledge::{SapCandidate, SectionAuthorityProvider},
+    messaging::system::SectionSigned,
+    network_knowledge::{NodeState, SapCandidate, SectionAuthorityProvider},
     types::log_markers::LogMarker,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -170,7 +170,7 @@ impl MyNode {
         let expected_peers: BTreeSet<Peer> =
             elder_candidates(members.values().cloned(), &previous_gen_sap)
                 .iter()
-                .map(|node| Peer::new(node.name, node.addr))
+                .map(|node| *node.peer())
                 .collect();
         let expected_candidates: BTreeSet<&Peer> = expected_peers.iter().collect();
         if received_candidates != expected_candidates {

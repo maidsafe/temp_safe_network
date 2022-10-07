@@ -11,8 +11,10 @@ use sn_consensus::{
     Ballot, Consensus, Decision, Generation, NodeId, SignedVote, Vote, VoteResponse,
 };
 use sn_interface::{
-    messaging::system::{DkgSessionId, MembershipState, NodeState},
-    network_knowledge::{partition_by_prefix, recommended_section_size, SectionAuthorityProvider},
+    messaging::system::{DkgSessionId, MembershipState},
+    network_knowledge::{
+        partition_by_prefix, recommended_section_size, NodeState, SectionAuthorityProvider,
+    },
 };
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 use std::time::Instant;
@@ -74,14 +76,14 @@ pub(crate) fn try_split_dkg(
     // create the DKG session IDs
     let zero_id = DkgSessionId {
         prefix: zero_prefix,
-        elders: BTreeMap::from_iter(zero_elders.iter().map(|node| (node.name, node.addr))),
+        elders: BTreeMap::from_iter(zero_elders.iter().map(|node| (node.name(), node.addr()))),
         section_chain_len,
         bootstrap_members: zero,
         membership_gen,
     };
     let one_id = DkgSessionId {
         prefix: one_prefix,
-        elders: BTreeMap::from_iter(one_elders.iter().map(|node| (node.name, node.addr))),
+        elders: BTreeMap::from_iter(one_elders.iter().map(|node| (node.name(), node.addr()))),
         section_chain_len,
         bootstrap_members: one,
         membership_gen,
@@ -110,8 +112,8 @@ pub(crate) fn elder_candidates(
         rhs.age()
             .cmp(&lhs.age())
             .then_with(|| {
-                let lhs_is_elder = current_elders.contains_elder(&lhs.name);
-                let rhs_is_elder = current_elders.contains_elder(&rhs.name);
+                let lhs_is_elder = current_elders.contains_elder(&lhs.name());
+                let rhs_is_elder = current_elders.contains_elder(&rhs.name());
 
                 match (lhs_is_elder, rhs_is_elder) {
                     (true, false) => Ordering::Less,
@@ -119,7 +121,7 @@ pub(crate) fn elder_candidates(
                     _ => Ordering::Equal,
                 }
             })
-            .then_with(|| lhs.name.cmp(&rhs.name))
+            .then_with(|| lhs.name().cmp(&rhs.name()))
         // TODO: replace name cmp above with sig cmp.
         // .then_with(|| lhs.sig.signature.cmp(&rhs.sig.signature))
     }
@@ -215,21 +217,21 @@ impl Membership {
                 .iter()
                 .filter(|n| {
                     matches!(
-                        n.state,
+                        n.state(),
                         MembershipState::Left | MembershipState::Relocated(..)
                     )
                 })
-                .map(|n| n.name),
+                .map(|n| n.name()),
         );
 
         for (decision, _) in self.history.values() {
             for node_state in decision.proposals.keys() {
-                match node_state.state {
+                match node_state.state() {
                     MembershipState::Joined => {
                         continue;
                     }
                     MembershipState::Left | MembershipState::Relocated(_) => {
-                        let _ = members.insert(node_state.name);
+                        let _ = members.insert(node_state.name());
                     }
                 }
             }
@@ -243,8 +245,8 @@ impl Membership {
             self.bootstrap_members
                 .iter()
                 .cloned()
-                .filter(|n| matches!(n.state, MembershipState::Joined))
-                .map(|n| (n.name, n)),
+                .filter(|n| matches!(n.state(), MembershipState::Joined))
+                .map(|n| (n.name(), n)),
         );
 
         if gen == 0 {
@@ -253,18 +255,18 @@ impl Membership {
 
         for (history_gen, (decision, _)) in &self.history {
             for node_state in decision.proposals.keys() {
-                match node_state.state {
+                match node_state.state() {
                     MembershipState::Joined => {
-                        let _ = members.insert(node_state.name, node_state.clone());
+                        let _ = members.insert(node_state.name(), node_state.clone());
                     }
                     MembershipState::Left => {
-                        let _ = members.remove(&node_state.name);
+                        let _ = members.remove(&node_state.name());
                     }
                     MembershipState::Relocated(_) => {
-                        if let Entry::Vacant(e) = members.entry(node_state.name) {
+                        if let Entry::Vacant(e) = members.entry(node_state.name()) {
                             let _ = e.insert(node_state.clone());
                         } else {
-                            let _ = members.remove(&node_state.name);
+                            let _ = members.remove(&node_state.name());
                         }
                     }
                 }
@@ -419,18 +421,13 @@ impl Membership {
             .consensus_at_gen(signed_vote.vote.gen)
             .map_err(|_| Error::RequestAntiEntropy)?;
 
-        let members = BTreeMap::from_iter(
-            self.section_members(signed_vote.vote.gen - 1)?
-                .into_iter()
-                .map(|(name, node)| (name, node.into_state())),
-        );
+        let members =
+            BTreeMap::from_iter(self.section_members(signed_vote.vote.gen - 1)?.into_iter());
 
         let archived_members = self.archived_members();
 
         for proposal in signed_vote.proposals() {
-            proposal
-                .into_state()
-                .validate(prefix, &members, &archived_members)?;
+            proposal.validate(prefix, &members, &archived_members)?;
         }
 
         Ok(())
