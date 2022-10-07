@@ -14,10 +14,10 @@ use crate::node::{messages::WireMsgUtils, Error, Result};
 
 use sn_interface::{
     messaging::{
-        system::{JoinRejectionReason, JoinRequest, JoinResponse, MembershipState, NodeMsg},
+        system::{JoinRejectionReason, JoinRequest, JoinResponse, NodeMsg},
         Dst, MsgType, WireMsg,
     },
-    network_knowledge::{MyNodeInfo, NetworkKnowledge, SectionTree},
+    network_knowledge::{MembershipState, MyNodeInfo, NetworkKnowledge, SectionTree},
     types::{keys::ed25519, log_markers::LogMarker, Peer},
 };
 

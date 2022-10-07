@@ -10,8 +10,7 @@
 
 use sn_interface::{
     elder_count,
-    messaging::system::RelocateDetails,
-    network_knowledge::{recommended_section_size, NetworkKnowledge, NodeState},
+    network_knowledge::{recommended_section_size, NetworkKnowledge, NodeState, RelocateDetails},
 };
 use std::{
     cmp::min,

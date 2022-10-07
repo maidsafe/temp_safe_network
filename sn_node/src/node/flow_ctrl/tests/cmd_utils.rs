@@ -13,10 +13,12 @@ use sn_interface::{
     messaging::{
         data::{ClientMsg, Error as MessagingDataError},
         serialisation::WireMsg,
-        system::{JoinResponse, MembershipState, NodeCmd, NodeMsg, RelocateDetails},
+        system::{JoinResponse, NodeCmd, NodeMsg},
         AuthorityProof, ClientAuth, MsgId, MsgType,
     },
-    network_knowledge::{test_utils::*, NodeState, SectionAuthorityProvider},
+    network_knowledge::{
+        test_utils::*, MembershipState, NodeState, RelocateDetails, SectionAuthorityProvider,
+    },
     types::{Keypair, Peer, ReplicatedData, SecretKeySet},
 };
 use std::collections::BTreeSet;

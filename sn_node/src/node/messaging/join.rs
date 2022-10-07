@@ -14,11 +14,13 @@ use sn_interface::{
     messaging::{
         system::{
             JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest,
-            JoinResponse, MembershipState, NodeMsg,
+            JoinResponse, NodeMsg,
         },
         SectionTreeUpdate,
     },
-    network_knowledge::{NodeState, SectionAuthUtils, FIRST_SECTION_MAX_AGE, MIN_ADULT_AGE},
+    network_knowledge::{
+        MembershipState, NodeState, SectionAuthUtils, FIRST_SECTION_MAX_AGE, MIN_ADULT_AGE,
+    },
     types::{log_markers::LogMarker, Peer},
 };
 

@@ -15,10 +15,10 @@ use bls::Signature;
 use sn_consensus::{Decision, Generation, SignedVote, VoteResponse};
 use sn_interface::{
     messaging::{
-        system::{JoinResponse, MembershipState, NodeMsg, SectionSig, SectionSigned},
+        system::{JoinResponse, NodeMsg, SectionSig, SectionSigned},
         SectionTreeUpdate,
     },
-    network_knowledge::NodeState,
+    network_knowledge::{MembershipState, NodeState},
     types::{log_markers::LogMarker, Peer},
 };
 

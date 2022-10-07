@@ -21,7 +21,7 @@ pub mod test_utils;
 pub use self::{
     errors::{Error, Result},
     node_info::MyNodeInfo,
-    node_state::NodeState,
+    node_state::{MembershipState, NodeState, RelocateDetails},
     section_authority_provider::{SapCandidate, SectionAuthUtils, SectionAuthorityProvider},
     section_keys::{SectionKeyShare, SectionKeysProvider},
     section_tree::SectionTree,

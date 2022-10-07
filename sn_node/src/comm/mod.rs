@@ -21,8 +21,8 @@ use crate::node::{Error, Result};
 use qp2p::UsrMsgBytes;
 
 use sn_interface::{
-    messaging::{system::MembershipState, MsgId, WireMsg},
-    network_knowledge::NodeState,
+    messaging::{MsgId, WireMsg},
+    network_knowledge::{MembershipState, NodeState},
     types::Peer,
 };
 
