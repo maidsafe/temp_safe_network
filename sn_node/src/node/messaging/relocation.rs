@@ -15,8 +15,8 @@ use crate::node::{
 
 use sn_interface::{
     elder_count,
-    messaging::system::{MembershipState, SectionSigned},
-    network_knowledge::NodeState,
+    messaging::system::SectionSigned,
+    network_knowledge::{MembershipState, NodeState},
     types::log_markers::LogMarker,
 };
 

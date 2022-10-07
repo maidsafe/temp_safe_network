@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    messaging::system::{MembershipState, SectionSigned},
-    network_knowledge::{errors::Result, NodeState, SectionsDAG},
+    messaging::system::SectionSigned,
+    network_knowledge::{errors::Result, MembershipState, NodeState, SectionsDAG},
 };
 use dashmap::{mapref::entry::Entry, DashMap};
 use std::{collections::BTreeSet, sync::Arc};
@@ -139,10 +139,10 @@ impl SectionPeers {
 mod tests {
     use super::{SectionPeers, SectionsDAG};
     use crate::{
-        messaging::system::{MembershipState, RelocateDetails, SectionSigned},
+        messaging::system::SectionSigned,
         network_knowledge::{
             test_utils::{assert_lists, gen_addr, section_signed},
-            NodeState,
+            MembershipState, NodeState, RelocateDetails,
         },
         types::{Peer, SecretKeySet},
     };

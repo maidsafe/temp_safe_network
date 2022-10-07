@@ -10,7 +10,6 @@ mod agreement;
 mod join;
 mod join_as_relocated;
 mod node_msgs;
-mod node_state;
 mod section_sig;
 
 use crate::messaging::{AuthorityProof, EndUser, MsgId, SectionTreeUpdate};
@@ -19,7 +18,6 @@ pub use agreement::{DkgSessionId, Proposal, SectionSigned};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use node_msgs::{NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse};
-pub use node_state::{MembershipState, RelocateDetails};
 pub use section_sig::{SectionSig, SectionSigShare};
 
 use bls::PublicKey as BlsPublicKey;

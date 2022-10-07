@@ -35,16 +35,16 @@ use sn_interface::{
     messaging::{
         data::{ClientMsg, DataCmd, Error as MessagingDataError, RegisterCmd, SpentbookCmd},
         system::{
-            AntiEntropyKind, JoinAsRelocatedRequest, JoinRequest, JoinResponse, MembershipState,
-            NodeCmd, NodeMsg, RelocateDetails, SectionSig, SectionSigned,
+            AntiEntropyKind, JoinAsRelocatedRequest, JoinRequest, JoinResponse, NodeCmd, NodeMsg,
+            SectionSig, SectionSigned,
         },
         Dst, MsgId, MsgType, SectionTreeUpdate, WireMsg,
     },
     network_knowledge::{
         recommended_section_size, supermajority, test_utils::*, Error as NetworkKnowledgeError,
-        MyNodeInfo, NetworkKnowledge, NodeState, SectionAuthorityProvider, SectionKeyShare,
-        SectionKeysProvider, SectionTree, SectionsDAG, FIRST_SECTION_MAX_AGE,
-        FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
+        MembershipState, MyNodeInfo, NetworkKnowledge, NodeState, RelocateDetails,
+        SectionAuthorityProvider, SectionKeyShare, SectionKeysProvider, SectionTree, SectionsDAG,
+        FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
     },
     types::{keyed_signed, keys::ed25519, Peer, PublicKey, ReplicatedData, SecretKeySet},
 };

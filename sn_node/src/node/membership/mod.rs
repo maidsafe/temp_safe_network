@@ -11,9 +11,10 @@ use sn_consensus::{
     Ballot, Consensus, Decision, Generation, NodeId, SignedVote, Vote, VoteResponse,
 };
 use sn_interface::{
-    messaging::system::{DkgSessionId, MembershipState},
+    messaging::system::DkgSessionId,
     network_knowledge::{
-        partition_by_prefix, recommended_section_size, NodeState, SectionAuthorityProvider,
+        partition_by_prefix, recommended_section_size, MembershipState, NodeState,
+        SectionAuthorityProvider,
     },
 };
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};

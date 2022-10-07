@@ -6,14 +6,27 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::system::{MembershipState, RelocateDetails};
+use crate::network_knowledge::NetworkKnowledge;
 use crate::network_knowledge::{section_has_room_for_node, Error, Result};
 use crate::types::Peer;
 
+use bls::PublicKey as BlsPublicKey;
+use ed25519_dalek::{Signature, Verifier};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::net::SocketAddr;
 use xor_name::{Prefix, XorName};
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
+/// Node's current section membership state
+pub enum MembershipState {
+    /// Node is active member of the section.
+    Joined,
+    /// Node went offline.
+    Left,
+    /// Node was relocated to a different section.
+    Relocated(Box<RelocateDetails>),
+}
 
 /// Information about a member of our section.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -178,5 +191,50 @@ impl NodeState {
     }
 }
 
-// Add conversion methods to/from `messaging::...::NodeState`
-// We prefer this over `From<...>` to make it easier to read the conversion.
+/// Details of a node that has been relocated
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+pub struct RelocateDetails {
+    /// Name of the node to relocate (this is the node's name before relocation).
+    pub previous_name: XorName,
+    /// Relocation destination, the node will be relocated to
+    /// a section whose prefix matches this name.
+    pub dst: XorName,
+    /// The BLS key of the destination section used by the relocated node to verify messages.
+    pub dst_section_key: BlsPublicKey,
+    /// The age the node will have post-relocation.
+    pub age: u8,
+}
+
+impl RelocateDetails {
+    /// Constructs RelocateDetails given current network knowledge
+    pub fn with_age(
+        network_knowledge: &NetworkKnowledge,
+        peer: &Peer,
+        dst: XorName,
+        age: u8,
+    ) -> Self {
+        let genesis_key = *network_knowledge.genesis_key();
+
+        let dst_section_key = network_knowledge
+            .section_auth_by_name(&dst)
+            .map_or_else(|_| genesis_key, |section_auth| section_auth.section_key());
+
+        Self {
+            previous_name: peer.name(),
+            dst,
+            dst_section_key,
+            age,
+        }
+    }
+
+    pub fn verify_identity(&self, new_name: &XorName, new_name_sig: &Signature) -> bool {
+        let pub_key = if let Ok(pub_key) = crate::types::keys::ed25519::pub_key(&self.previous_name)
+        {
+            pub_key
+        } else {
+            return false;
+        };
+
+        pub_key.verify(&new_name.0, new_name_sig).is_ok()
+    }
+}
