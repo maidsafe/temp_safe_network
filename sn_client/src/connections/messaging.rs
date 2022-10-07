@@ -207,6 +207,7 @@ impl Session {
         level = "debug",
         name = "session send query"
     )]
+    #[allow(clippy::too_many_arguments)]
     /// Send a `ClientMsg` to the network awaiting for the response.
     pub(crate) async fn send_query(
         &self,

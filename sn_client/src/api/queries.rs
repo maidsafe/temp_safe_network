@@ -15,7 +15,7 @@ use sn_interface::{
     data_copy_count,
     messaging::{
         data::{ClientMsg, DataQuery, DataQueryVariant},
-        ClientAuth, WireMsg, MsgId
+        ClientAuth, MsgId, WireMsg,
     },
     types::{Peer, PublicKey, Signature},
 };

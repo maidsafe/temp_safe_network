@@ -339,7 +339,6 @@ impl SendToOneError {
                 | SendToOneError::Send(qp2p::SendError::ConnectionLost(
                     qp2p::ConnectionError::Closed(qp2p::Close::Local)
                 ))
-                | SendToOneError::NoConnection
         )
     }
 }

@@ -223,7 +223,7 @@ impl PeerSessionWorker {
                     job.reporter.send(SendStatus::Sent);
                 }
                 Err(err) if err.is_local_close() => {
-                    info!("Peer linked dropped");
+                    info!("Peer linked dropped when trying to send {:?}", id);
                     job.reporter.send(SendStatus::PeerLinkDropped);
                     // return SessionStatus::Terminating;
                 }
