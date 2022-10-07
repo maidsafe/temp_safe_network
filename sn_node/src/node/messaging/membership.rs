@@ -15,9 +15,10 @@ use bls::Signature;
 use sn_consensus::{Decision, Generation, SignedVote, VoteResponse};
 use sn_interface::{
     messaging::{
-        system::{JoinResponse, MembershipState, NodeMsg, NodeState, SectionSig, SectionSigned},
+        system::{JoinResponse, MembershipState, NodeMsg, SectionSig, SectionSigned},
         SectionTreeUpdate,
     },
+    network_knowledge::NodeState,
     types::{log_markers::LogMarker, Peer},
 };
 
@@ -28,7 +29,8 @@ impl MyNode {
     pub(crate) fn propose_membership_change(&mut self, node_state: NodeState) -> Option<Cmd> {
         info!(
             "Proposing membership change: {} - {:?}",
-            node_state.name, node_state.state
+            node_state.name(),
+            node_state.state()
         );
         let prefix = self.network_knowledge.prefix();
         if let Some(membership) = self.membership.as_mut() {
@@ -170,12 +172,12 @@ impl MyNode {
             .proposals
             .clone()
             .into_iter()
-            .partition(|(n, _)| n.state == MembershipState::Joined);
+            .partition(|(n, _)| n.state() == MembershipState::Joined);
 
         info!(
             "Handling membership decision: joining = {:?}, leaving = {:?}",
-            Vec::from_iter(joining_nodes.iter().map(|(n, _)| n.name)),
-            Vec::from_iter(leaving_nodes.iter().map(|(n, _)| n.name))
+            Vec::from_iter(joining_nodes.iter().map(|(n, _)| n.name())),
+            Vec::from_iter(leaving_nodes.iter().map(|(n, _)| n.name()))
         );
 
         for (new_info, signature) in joining_nodes.iter().cloned() {
@@ -199,7 +201,7 @@ impl MyNode {
         if let Some((_, sig)) = decision.proposals.iter().max_by_key(|(_, sig)| *sig) {
             let churn_id = ChurnId(sig.to_bytes());
             let excluded_from_relocation =
-                BTreeSet::from_iter(joining_nodes.iter().map(|(n, _)| n.name));
+                BTreeSet::from_iter(joining_nodes.iter().map(|(n, _)| n.name()));
 
             cmds.extend(self.relocate_peers(churn_id, excluded_from_relocation)?);
         }
@@ -232,7 +234,7 @@ impl MyNode {
         };
 
         let new_info = SectionSigned {
-            value: new_info.into_state(),
+            value: new_info,
             sig,
         };
 
@@ -261,8 +263,8 @@ impl MyNode {
         let peers: BTreeSet<_> = decision
             .proposals
             .keys()
-            .filter(|n| n.state == MembershipState::Joined)
-            .map(|n| n.peer())
+            .filter(|n| n.state() == MembershipState::Joined)
+            .map(|n| *n.peer())
             .collect();
         let prefix = self.network_knowledge.prefix();
         info!("Section {prefix:?} has approved new peers {peers:?}.");
@@ -292,8 +294,7 @@ impl MyNode {
         let node_state = SectionSigned {
             value: node_state,
             sig,
-        }
-        .into_signed_state();
+        };
 
         let _ = self.network_knowledge.update_member(node_state.clone());
 
@@ -308,7 +309,7 @@ impl MyNode {
         // containing the relocation details.
         if node_state.is_relocated() {
             let peer = *node_state.peer();
-            let msg = NodeMsg::Relocate(node_state.into_signed_msg());
+            let msg = NodeMsg::Relocate(node_state);
             Some(self.send_system_msg(msg, Peers::Single(peer)))
         } else {
             None

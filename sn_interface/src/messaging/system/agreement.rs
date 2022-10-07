@@ -45,7 +45,7 @@ impl DkgSessionId {
     ) -> Self {
         assert!(elders
             .keys()
-            .all(|e| bootstrap_members.iter().any(|m| &m.name == e)));
+            .all(|e| bootstrap_members.iter().any(|m| &m.name() == e)));
 
         // Calculate the hash without involving serialization to avoid having to return `Result`.
         Self {
@@ -81,7 +81,7 @@ impl DkgSessionId {
         hasher.update(&self.section_chain_len.to_le_bytes());
 
         for member in &self.bootstrap_members {
-            hasher.update(&member.name);
+            hasher.update(&member.name());
         }
     }
 

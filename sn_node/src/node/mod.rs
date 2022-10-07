@@ -90,11 +90,11 @@ mod core {
         messaging::{
             data::OperationId,
             signature_aggregator::SignatureAggregator,
-            system::{DkgSessionId, NodeState, SectionSigned},
+            system::{DkgSessionId, SectionSigned},
             AuthorityProof, SectionAuthorityProvider, SectionSig,
         },
         network_knowledge::{
-            supermajority, MyNodeInfo, NetworkKnowledge,
+            supermajority, MyNodeInfo, NetworkKnowledge, NodeState,
             SectionAuthorityProvider as SectionAuthProvider, SectionKeyShare, SectionKeysProvider,
         },
         types::{keys::ed25519::Digest256, log_markers::LogMarker, Cache, DataAddress, Peer},
@@ -208,7 +208,7 @@ mod core {
                     network_knowledge
                         .section_signed_members()
                         .into_iter()
-                        .map(|section_auth| section_auth.value.to_msg()),
+                        .map(|section_auth| section_auth.value),
                 );
 
                 Some(Membership::from(
@@ -468,7 +468,7 @@ mod core {
                     elders: BTreeMap::from_iter(
                         elder_candidates
                             .into_iter()
-                            .map(|node| (node.name, node.addr)),
+                            .map(|node| (node.name(), node.addr())),
                     ),
                     section_chain_len: chain_len,
                     bootstrap_members: BTreeSet::from_iter(members.into_values()),

@@ -21,7 +21,7 @@ use tiny_keccak::{Hasher, Sha3};
 
 use xor_name::{Prefix, XorName};
 
-use crate::messaging::system::{NodeState, SectionSig};
+use crate::{messaging::system::SectionSig, network_knowledge::NodeState};
 
 // TODO: we need to maintain a list of nodes who have previously been members of this section (archived nodes)
 //       currently, only the final members of the section are preserved on the SAP.

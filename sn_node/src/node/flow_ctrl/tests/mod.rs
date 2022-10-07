@@ -36,8 +36,7 @@ use sn_interface::{
         data::{ClientMsg, DataCmd, Error as MessagingDataError, RegisterCmd, SpentbookCmd},
         system::{
             AntiEntropyKind, JoinAsRelocatedRequest, JoinRequest, JoinResponse, MembershipState,
-            NodeCmd, NodeMsg, NodeState as NodeStateMsg, RelocateDetails, SectionSig,
-            SectionSigned,
+            NodeCmd, NodeMsg, RelocateDetails, SectionSig, SectionSigned,
         },
         Dst, MsgId, MsgType, SectionTreeUpdate, WireMsg,
     },
@@ -107,7 +106,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
                 Some(relocated_node_old_name),
                 relocate_details,
             );
-            let relocate_proof = section_signed(&sk_set.secret_key(), node_state.to_msg())?;
+            let relocate_proof = section_signed(&sk_set.secret_key(), node_state)?;
 
             let signature_over_new_name =
                 ed25519::sign(&relocated_node.name().0, &relocated_node_old_keypair);
@@ -233,7 +232,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             let new_peer = network_utils::create_peer(MIN_ADULT_AGE + 1);
             let node_state = NodeState::joined(new_peer, Some(xor_name::rand::random()));
 
-            let membership_decision = section_decision(&sk_set, node_state.to_msg())?;
+            let membership_decision = section_decision(&sk_set, node_state.clone())?;
 
             // Force this node to join
             dispatcher
@@ -243,7 +242,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                 .membership
                 .as_mut()
                 .ok_or_else(|| eyre!("Membership for the node must be set"))?
-                .force_bootstrap(node_state.to_msg());
+                .force_bootstrap(node_state);
 
             let cmds = run_and_collect_cmds(
                 Cmd::HandleMembershipDecision(membership_decision),
@@ -315,10 +314,10 @@ async fn handle_join_request_of_rejoined_node() -> Result<()> {
                 .membership
                 .as_mut()
                 .ok_or_else(|| eyre!("Membership for the node must be set"))?
-                .force_bootstrap(NodeState::left(peer, None).to_msg());
+                .force_bootstrap(NodeState::left(peer, None));
 
             // Simulate the same peer rejoining
-            let node_state = NodeState::joined(peer, None).to_msg();
+            let node_state = NodeState::joined(peer, None);
             let join_cmd = dispatcher
                 .node()
                 .write()
@@ -715,8 +714,8 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
                     ..
                 } = msg
                 {
-                    assert_eq!(node_state.name, relocated_peer.name());
-                    if let MembershipState::Relocated(relocate_details) = node_state.state {
+                    assert_eq!(node_state.name(), relocated_peer.name());
+                    if let MembershipState::Relocated(relocate_details) = node_state.state() {
                         assert_eq!(relocate_details.age, relocated_peer.age() + 1);
                         offline_relocate_sent = true;
                     }

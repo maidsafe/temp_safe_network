@@ -18,10 +18,10 @@ use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         data::{ClientMsg, OperationId},
-        system::{NodeMsg, NodeState, SectionSig, SectionSigned},
+        system::{NodeMsg, SectionSig, SectionSigned},
         AuthorityProof, ClientAuth, MsgId, NodeMsgAuthority, WireMsg,
     },
-    network_knowledge::{SectionAuthorityProvider, SectionKeyShare, SectionsDAG},
+    network_knowledge::{NodeState, SectionAuthorityProvider, SectionKeyShare, SectionsDAG},
     types::{DataAddress, Peer},
 };
 

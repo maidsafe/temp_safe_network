@@ -14,12 +14,12 @@ mod node_state;
 mod section_sig;
 
 use crate::messaging::{AuthorityProof, EndUser, MsgId, SectionTreeUpdate};
-use crate::network_knowledge::SapCandidate;
+use crate::network_knowledge::{NodeState, SapCandidate};
 pub use agreement::{DkgSessionId, Proposal, SectionSigned};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use node_msgs::{NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse};
-pub use node_state::{MembershipState, NodeState, RelocateDetails};
+pub use node_state::{MembershipState, RelocateDetails};
 pub use section_sig::{SectionSig, SectionSigShare};
 
 use bls::PublicKey as BlsPublicKey;

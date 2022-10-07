@@ -6,32 +6,23 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::system::{
-    MembershipState, NodeState as NodeStateMsg, RelocateDetails, SectionSigned,
-};
+use crate::messaging::system::{MembershipState, RelocateDetails};
 use crate::network_knowledge::{section_has_room_for_node, Error, Result};
 use crate::types::Peer;
 
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::net::SocketAddr;
 use xor_name::{Prefix, XorName};
 
 /// Information about a member of our section.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct NodeState {
     peer: Peer,
+    /// Current state of the peer
     state: MembershipState,
+    /// To avoid sybil attack via relocation, a relocated node's original name will be recorded.
     previous_name: Option<XorName>,
-}
-
-impl serde::Serialize for NodeState {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        // Serialize as a `NodeStateMsg`
-        self.to_msg().serialize(serializer)
-    }
 }
 
 impl NodeState {
@@ -189,43 +180,3 @@ impl NodeState {
 
 // Add conversion methods to/from `messaging::...::NodeState`
 // We prefer this over `From<...>` to make it easier to read the conversion.
-
-impl NodeState {
-    /// Create a message from the current state.
-    pub fn to_msg(&self) -> NodeStateMsg {
-        NodeStateMsg {
-            name: self.name(),
-            addr: self.addr(),
-            state: self.state.clone(),
-            previous_name: self.previous_name,
-        }
-    }
-}
-
-impl SectionSigned<NodeState> {
-    pub fn into_signed_msg(self) -> SectionSigned<NodeStateMsg> {
-        SectionSigned {
-            value: self.value.to_msg(),
-            sig: self.sig,
-        }
-    }
-}
-
-impl NodeStateMsg {
-    pub fn into_state(self) -> NodeState {
-        NodeState {
-            peer: Peer::new(self.name, self.addr),
-            state: self.state,
-            previous_name: self.previous_name,
-        }
-    }
-}
-
-impl SectionSigned<NodeStateMsg> {
-    pub fn into_signed_state(self) -> SectionSigned<NodeState> {
-        SectionSigned {
-            value: self.value.into_state(),
-            sig: self.sig,
-        }
-    }
-}

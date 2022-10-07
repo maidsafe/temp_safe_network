@@ -48,7 +48,7 @@ impl MyNode {
             "Agreement - proposing membership change with node offline: {}",
             node_state.peer()
         );
-        self.propose_membership_change(node_state.to_msg())
+        self.propose_membership_change(node_state)
     }
 
     #[instrument(skip(self), level = "trace")]

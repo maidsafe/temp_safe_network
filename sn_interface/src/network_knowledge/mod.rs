@@ -314,12 +314,7 @@ impl NetworkKnowledge {
 
         // Update members if changes were provided
         if let Some(members) = updated_members {
-            let peers: BTreeSet<_> = members
-                .into_iter()
-                .map(|member| member.into_signed_state())
-                .collect();
-
-            if !peers.is_empty() && self.merge_members(peers)? {
+            if !members.is_empty() && self.merge_members(members)? {
                 there_was_an_update = true;
                 let prefix = self.prefix();
                 info!(

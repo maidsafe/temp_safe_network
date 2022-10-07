@@ -15,7 +15,7 @@ use eyre::{bail, eyre, Context, Result};
 use sn_consensus::Decision;
 use sn_interface::{
     elder_count,
-    messaging::{system::NodeState as NodeStateMsg, SectionTreeUpdate},
+    messaging::SectionTreeUpdate,
     network_knowledge::{
         test_utils::*, MyNodeInfo, NetworkKnowledge, NodeState, SectionAuthorityProvider,
         SectionKeyShare, SectionTree, SectionsDAG, MIN_ADULT_AGE,
@@ -388,10 +388,10 @@ pub(crate) async fn create_comm() -> Result<Comm> {
 pub(crate) fn create_relocation_trigger(
     sk_set: &bls::SecretKeySet,
     age: u8,
-) -> Result<Decision<NodeStateMsg>> {
+) -> Result<Decision<NodeState>> {
     loop {
         let node_state =
-            NodeState::joined(create_peer(MIN_ADULT_AGE), Some(xor_name::rand::random())).to_msg();
+            NodeState::joined(create_peer(MIN_ADULT_AGE), Some(xor_name::rand::random()));
         let decision = section_decision(sk_set, node_state.clone())?;
 
         let sig: Signature = decision.proposals[&node_state].clone();

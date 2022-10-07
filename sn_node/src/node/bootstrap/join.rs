@@ -167,8 +167,8 @@ impl<'a> Joiner<'a> {
                     if decision
                         .proposals
                         .keys()
-                        .filter(|n| n.state == MembershipState::Joined)
-                        .all(|n| n.name != self.node.name())
+                        .filter(|n| n.state() == MembershipState::Joined)
+                        .all(|n| n.name() != self.node.name())
                     {
                         trace!("Ignore join approval decision not for us: {decision:?}");
                         continue;
@@ -571,8 +571,7 @@ mod tests {
             // Name changed
             let new_peer = Peer::new(dst.name, node.peer().addr());
             // Send JoinResponse::Approved
-            let decision =
-                section_decision(&next_sk_set, NodeState::joined(new_peer, None).to_msg())?;
+            let decision = section_decision(&next_sk_set, NodeState::joined(new_peer, None))?;
             send_response(
                 &recv_tx,
                 JoinResponse::Approved {
