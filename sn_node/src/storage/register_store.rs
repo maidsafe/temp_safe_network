@@ -13,7 +13,7 @@ use crate::UsedSpace;
 use sn_interface::{
     messaging::data::SignedRegisterCreate,
     types::{
-        register::Register,
+        register::{Register, SignedRegister},
         utils::{deserialise, serialise},
         RegisterAddress, RegisterCmd,
     },
@@ -37,7 +37,7 @@ pub(super) type RegisterLog = Vec<RegisterCmd>;
 
 #[derive(Clone, Debug)]
 pub(super) struct StoredRegister {
-    pub(super) state: Option<Register>,
+    pub(super) state: Option<SignedRegister>,
     pub(super) op_log: RegisterLog,
     pub(super) op_log_path: PathBuf,
 }
@@ -131,14 +131,17 @@ impl RegisterStore {
                 Ok(Ok(reg_cmd)) => {
                     stored_reg.op_log.push(reg_cmd.clone());
 
-                    if let RegisterCmd::Create { cmd, .. } = reg_cmd {
+                    if let RegisterCmd::Create { cmd, section_sig } = reg_cmd {
                         // TODO: if we already have read a RegisterCreate op, check if there
                         // is any difference with this other one,...if so perhaps log a warning?
                         let SignedRegisterCreate { op, .. } = cmd;
                         if stored_reg.state.is_none() {
                             let register =
                                 Register::new(*op.policy.owner(), op.name, op.tag, op.policy);
-                            stored_reg.state = Some(register);
+                            stored_reg.state = Some(SignedRegister {
+                                register,
+                                authority: section_sig.ok_or(Error::RegisterCreateCmdNotSigned)?,
+                            });
                         }
                     }
                 }

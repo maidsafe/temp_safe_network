@@ -132,9 +132,9 @@ impl DataStorage {
                         NodeQueryResponse::SpentProofShares((Ok(Vec::new()), spentbook_op_id))
                     }
                     NodeQueryResponse::GetRegister((result, _)) => {
-                        let proof_shares_result = result.map(|reg| {
+                        let proof_shares_result = result.map(|signed_reg| {
                             let mut proof_shares = Vec::new();
-                            let entries = reg.read();
+                            let entries = signed_reg.register.read();
                             for (_, entry) in entries {
                                 // Deserialise spent proof share from the entry
                                 let spent_proof_share: SpentProofShare = match rmp_serde::from_slice(&entry) {
@@ -287,7 +287,7 @@ mod tests {
     fn random_chunk(size: usize) -> SignedChunk {
         let bytes = random_bytes(size * 1024 * 1024);
         let sk = bls::SecretKey::random();
-        let signature = sk.sign(bytes.to_vec());
+        let signature = sk.sign(&bytes);
         let chunk = Chunk::new(bytes);
         SignedChunk {
             chunk,
@@ -432,7 +432,7 @@ mod tests {
                     signature,
                 },
             },
-            section_sig: section_auth.clone(), // obtained after presenting a valid payment to the network
+            section_sig: Some(section_auth.clone()), // obtained after presenting a valid payment to the network
         };
 
         // ReplicatedData::RegisterWrite(reg_cmd)
@@ -461,7 +461,7 @@ mod tests {
     proptest! {
         #[test]
         #[allow(clippy::unwrap_used)]
-        fn model_based_test(ops in arbitrary_ops(0..MAX_N_OPS)){
+        fn proptest_model_based_test(ops in arbitrary_ops(0..MAX_N_OPS)){
             model_based_test_imp(ops).unwrap();
         }
     }

@@ -1606,7 +1606,7 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
 }
 
 #[tokio::test]
-async fn store_chunk_should_replicate_and_sign_chunk() -> Result<()> {
+async fn store_chunk_cmd_should_replicate_and_sign_chunk() -> Result<()> {
     let local = tokio::task::LocalSet::new();
     local
         .run_until(async move {
@@ -1654,6 +1654,105 @@ async fn store_chunk_should_replicate_and_sign_chunk() -> Result<()> {
             assert_matches!(client_msg, ClientMsg::CmdAck { .. });
 
             Result::<()>::Ok(())
+        })
+        .await
+}
+
+#[tokio::test]
+async fn register_cmd_with_create_should_replicate_and_sign_register() -> Result<()> {
+    let local = tokio::task::LocalSet::new();
+    local
+        .run_until(async move {
+            init_logger();
+            let replication_count = 5;
+            let (dispatcher, _, peer, section_sks) =
+                network_utils::TestNodeBuilder::new(Prefix::default().pushed(false), elder_count())
+                    .adult_count(6)
+                    .section_sk_threshold(0)
+                    .data_copy_count(replication_count)
+                    .build()
+                    .await?;
+
+            let cmds = run_and_collect_cmds(
+                wrap_client_msg_for_handling(
+                    ClientMsg::Cmd(cmd_utils::get_create_register_cmd()?),
+                    peer,
+                )?,
+                &dispatcher,
+            )
+            .await?;
+
+            assert_eq!(cmds.len(), 2);
+            let replicate_cmd = cmds[0].clone();
+            let recipients = replicate_cmd.recipients()?;
+            assert_eq!(recipients.len(), replication_count);
+
+            let replicated_data = replicate_cmd.get_replicated_data()?;
+            assert_matches!(replicated_data, ReplicatedData::RegisterWrite(_));
+
+            let register_cmd = cmd_utils::get_register_cmd(replicated_data)?;
+            let section_sig = register_cmd
+                .section_sig()
+                .ok_or_else(|| eyre!("The replicate register command should have been signed"))?;
+            assert_eq!(
+                section_sig.public_key,
+                section_sks.public_keys().public_key()
+            );
+
+            let client_msg = cmds[1].clone().get_client_msg()?;
+            assert_matches!(client_msg, ClientMsg::CmdAck { .. });
+
+            Result::<()>::Ok(())
+        })
+        .await
+}
+
+#[tokio::test]
+async fn register_cmd_with_edit_should_still_replicate_register() -> Result<()> {
+    // The word "still" is used in this test case because I inadvertently introduced a bug
+    // where edit commands were not processed. The create and edit commands go through different
+    // code paths.
+    let local = tokio::task::LocalSet::new();
+    local
+        .run_until(async move {
+            init_logger();
+            let replication_count = 5;
+            let (dispatcher, _, peer, _) =
+                network_utils::TestNodeBuilder::new(Prefix::default().pushed(false), elder_count())
+                    .adult_count(6)
+                    .section_sk_threshold(0)
+                    .data_copy_count(replication_count)
+                    .build()
+                    .await?;
+
+            let result = run_and_collect_cmds(
+                wrap_client_msg_for_handling(
+                    ClientMsg::Cmd(cmd_utils::get_edit_register_cmd()?),
+                    peer,
+                )?,
+                &dispatcher,
+            )
+            .await;
+
+            let cmds = result.map_err(|err| {
+                eyre!(
+                    "A cmd to send the error to the client was expected for this case: {:?}",
+                    err
+                )
+            })?;
+
+            assert_eq!(cmds.len(), 2);
+            let replicate_cmd = cmds[0].clone();
+            let recipients = replicate_cmd.recipients()?;
+            assert_eq!(recipients.len(), replication_count);
+
+            let replicated_data = replicate_cmd.get_replicated_data()?;
+            assert_matches!(replicated_data, ReplicatedData::RegisterWrite(_));
+
+            let register_cmd = cmd_utils::get_register_cmd(replicated_data)?;
+            assert_matches!(register_cmd, RegisterCmd::Edit(_));
+
+            Ok(())
         })
         .await
 }

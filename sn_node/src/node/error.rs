@@ -208,6 +208,9 @@ pub enum Error {
     CannotHandleQuery(DataQuery),
     #[error("BLS error: {0}")]
     BlsError(#[from] bls::Error),
+    /// RMP Serde encode error.
+    #[error("Serialisation error: {0}")]
+    SerialisationError(#[from] rmp_serde::encode::Error),
 }
 
 impl From<qp2p::ClientEndpointError> for Error {

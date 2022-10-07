@@ -16,7 +16,7 @@ use sn_interface::{
         RegisterQuery, SignedRegisterCreate, SignedRegisterEdit,
     },
     types::{
-        register::{Action, Entry, EntryHash, Permissions, Policy, Register, User},
+        register::{Action, Entry, EntryHash, Permissions, Policy, SignedRegister, User},
         RegisterAddress as Address,
     },
 };
@@ -75,7 +75,7 @@ impl Client {
                     signature,
                 },
             },
-            section_sig: section_sig(), // obtained after presenting a valid payment to the network
+            section_sig: None, // obtained after presenting a valid payment to the network
         });
 
         debug!("Creating Register: {:?}", cmd);
@@ -97,15 +97,17 @@ impl Client {
         // First we fetch it so we can get the causality info,
         // either from local CRDT replica or from the network if not found
         debug!("Writing to register at {:?}", address);
-        let mut register = self.get_register(address).await?;
+        let mut signed_reg = self.get_register(address).await?;
 
         // Let's check the policy/permissions to make sure this operation is allowed,
         // otherwise it will fail when the operation is applied on the network replica.
         let public_key = self.keypair.public_key();
-        register.check_permissions(Action::Write, Some(User::Key(public_key)))?;
+        signed_reg
+            .register
+            .check_permissions(Action::Write, Some(User::Key(public_key)))?;
 
         // We can now write the entry to the Register
-        let (hash, op) = register.write(entry, children)?;
+        let (hash, op) = signed_reg.register.write(entry, children)?;
         let op = EditRegister { address, edit: op };
 
         let signature = self.keypair.sign(&bincode::serialize(&op)?);
@@ -130,7 +132,7 @@ impl Client {
 
     /// Get the entire Register from the Network
     #[instrument(skip(self), level = "debug")]
-    pub async fn get_register(&self, address: Address) -> Result<Register, Error> {
+    pub async fn get_register(&self, address: Address) -> Result<SignedRegister, Error> {
         // Let's fetch the Register from the network
         let query = DataQueryVariant::Register(RegisterQuery::Get(address));
         let query_result = self.send_query(query.clone()).await?;
@@ -245,20 +247,6 @@ impl Client {
     }
 }
 
-// temp dummy
-fn section_sig() -> sn_interface::messaging::SectionSig {
-    use sn_interface::messaging::system::SectionSig;
-
-    let sk = bls::SecretKey::random();
-    let public_key = sk.public_key();
-    let data = "hello".to_string();
-    let signature = sk.sign(&data);
-    SectionSig {
-        public_key,
-        signature,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::{
@@ -309,13 +297,15 @@ mod tests {
         tokio::time::sleep(one_sec).await;
 
         // check they're both there
-        let register1 = client.get_register(address).await?;
+        let signed_reg1 = client.get_register(address).await?;
+        let register1 = &signed_reg1.register;
         assert_eq!(*register1.name(), name);
         assert_eq!(register1.tag(), tag);
         assert_eq!(register1.size(), 0);
         assert_eq!(register1.owner(), owner);
 
-        let register2 = client.get_register(address2).await?;
+        let signed_reg2 = client.get_register(address2).await?;
+        let register2 = &signed_reg2.register;
         assert_eq!(*register2.name(), name);
         assert_eq!(register2.tag(), tag);
         assert_eq!(register2.size(), 0);
@@ -413,8 +403,8 @@ mod tests {
         let delay = tokio::time::Duration::from_secs(1);
         tokio::time::sleep(delay).await;
 
-        let register = client.get_register(address).await?;
-
+        let signed_reg = client.get_register(address).await?;
+        let register = &signed_reg.register;
         assert_eq!(*register.name(), name);
         assert_eq!(register.tag(), tag);
         assert_eq!(register.size(), 0);
@@ -425,8 +415,9 @@ mod tests {
         client.publish_register_ops(batch).await?;
 
         tokio::time::sleep(delay).await;
-        let register = client.get_register(address).await?;
 
+        let signed_reg = client.get_register(address).await?;
+        let register = &signed_reg.register;
         assert_eq!(*register.name(), name);
         assert_eq!(register.tag(), tag);
         assert_eq!(register.size(), 0);

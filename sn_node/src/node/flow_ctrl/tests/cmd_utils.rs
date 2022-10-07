@@ -5,21 +5,29 @@ use crate::node::{
     Cmd,
 };
 use assert_matches::assert_matches;
+use bytes::Bytes;
 use eyre::eyre;
 use eyre::Result;
 #[cfg(feature = "traceroute")]
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
-        data::{ClientMsg, Error as MessagingDataError},
+        data::{
+            ClientMsg, CreateRegister, DataCmd, EditRegister, Error as MessagingDataError,
+            RegisterCmd, SignedRegisterCreate, SignedRegisterEdit,
+        },
         serialisation::WireMsg,
         system::{JoinResponse, MembershipState, NodeCmd, NodeMsg, RelocateDetails},
         AuthorityProof, ClientAuth, MsgId, MsgType,
     },
     network_knowledge::{test_utils::*, NodeState, SectionAuthorityProvider},
-    types::{Chunk, Keypair, Peer, ReplicatedData, SecretKeySet, SignedChunk},
+    types::{
+        register::{Permissions, Policy, Register, User},
+        Chunk, Keypair, Peer, RegisterAddress, ReplicatedData, SecretKeySet, SignedChunk,
+    },
 };
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
+use xor_name::XorName;
 
 pub(crate) struct HandleOnlineStatus {
     pub(crate) node_approval_sent: bool,
@@ -136,6 +144,71 @@ pub(crate) fn get_signed_chunk(replicated_data: ReplicatedData) -> Result<Signed
         ReplicatedData::Chunk(chunk) => Ok(chunk),
         _ => Err(eyre!("A ReplicatedData::Chunk variant was expected")),
     }
+}
+
+pub(crate) fn get_register_cmd(replicated_data: ReplicatedData) -> Result<RegisterCmd> {
+    match replicated_data {
+        ReplicatedData::RegisterWrite(cmd) => Ok(cmd),
+        _ => Err(eyre!(
+            "A ReplicatedData::RegisterWrite variant was expected"
+        )),
+    }
+}
+
+pub(crate) fn get_create_register_cmd() -> Result<DataCmd> {
+    let client_keypair = Keypair::new_ed25519();
+    let name = xor_name::rand::random();
+    let tag = 15000;
+    let owner = User::Key(client_keypair.public_key());
+    let mut permissions = BTreeMap::new();
+    let _ = permissions.insert(owner, Permissions::new(None));
+    let policy = Policy { owner, permissions };
+    let op = CreateRegister { name, tag, policy };
+    let op_bytes = rmp_serde::to_vec(&op)?;
+    let signature = client_keypair.sign(&op_bytes);
+    let cmd = DataCmd::Register(RegisterCmd::Create {
+        cmd: SignedRegisterCreate {
+            op,
+            auth: ClientAuth {
+                public_key: client_keypair.public_key(),
+                signature,
+            },
+        },
+        section_sig: None,
+    });
+    Ok(cmd)
+}
+
+pub(crate) fn get_edit_register_cmd() -> Result<DataCmd> {
+    let client_keypair = Keypair::new_ed25519();
+    let tag = 15000;
+    let owner = User::Key(client_keypair.public_key());
+    let mut permissions = BTreeMap::new();
+    let _ = permissions.insert(owner, Permissions::new(None));
+    let policy = Policy { owner, permissions };
+    let mut register = Register::new(
+        owner,
+        XorName::from_content(&bls::SecretKey::random().public_key().to_bytes()),
+        tag,
+        policy,
+    );
+
+    let entry = Bytes::from(rmp_serde::to_vec_named("register edit content")?);
+    let (_, op) = register.write(entry.to_vec(), BTreeSet::default())?;
+    let op = EditRegister {
+        address: *register.address(),
+        edit: op,
+    };
+    let op_bytes = rmp_serde::to_vec(&op)?;
+    let signature = client_keypair.sign(&op_bytes);
+    let cmd = DataCmd::Register(RegisterCmd::Edit(SignedRegisterEdit {
+        op,
+        auth: ClientAuth {
+            public_key: client_keypair.public_key(),
+            signature,
+        },
+    }));
+    Ok(cmd)
 }
 
 /// Extend the `Cmd` enum with some utilities for testing.

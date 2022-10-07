@@ -30,7 +30,7 @@ pub use self::{
 
 use crate::messaging::{data::Error as ErrorMsg, MsgId};
 use crate::types::{
-    register::{Entry, EntryHash, Permissions, Policy, Register, User},
+    register::{Entry, EntryHash, Permissions, Policy, SignedRegister, User},
     utils, ChunkAddress, DataAddress, SignedChunk,
 };
 
@@ -169,7 +169,7 @@ pub enum QueryResponse {
     // ===== Register Data =====
     //
     /// Response to [`RegisterQuery::Get`].
-    GetRegister((Result<Register>, OperationId)),
+    GetRegister((Result<SignedRegister>, OperationId)),
     /// Response to [`RegisterQuery::GetEntry`].
     GetRegisterEntry((Result<Entry>, OperationId)),
     /// Response to [`RegisterQuery::GetOwner`].
@@ -300,7 +300,7 @@ impl TryFrom<QueryResponse> for SignedChunk {
     }
 }
 
-try_from!(Register, GetRegister);
+try_from!(SignedRegister, GetRegister);
 try_from!(User, GetRegisterOwner);
 try_from!(BTreeSet<(EntryHash, Entry)>, ReadRegister);
 try_from!(Policy, GetRegisterPolicy);

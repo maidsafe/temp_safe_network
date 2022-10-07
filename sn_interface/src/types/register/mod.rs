@@ -17,7 +17,7 @@ pub use reg_crdt::EntryHash;
 pub(crate) use reg_crdt::{CrdtOperation, RegisterCrdt};
 
 use super::{Error, Result};
-use crate::types::RegisterAddress;
+use crate::types::{RegisterAddress, SectionSig};
 use self_encryption::MIN_ENCRYPTABLE_BYTES;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -41,6 +41,12 @@ pub struct Register {
     owner: User,
     pub(super) crdt: RegisterCrdt, // Temporarily exposed to 'super' till spentbook fully implemented.
     policy: Policy,
+}
+
+#[derive(Clone, Eq, PartialEq, PartialOrd, Hash, Serialize, Deserialize, Debug)]
+pub struct SignedRegister {
+    pub register: Register,
+    pub authority: SectionSig,
 }
 
 impl Register {

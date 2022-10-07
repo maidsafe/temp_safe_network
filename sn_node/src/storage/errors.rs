@@ -29,6 +29,9 @@ pub enum Error {
     /// Register not found in local storage.
     #[error("Register data not found in local storage: {0:?}")]
     RegisterNotFound(RegisterAddress),
+    /// The register create command was not signed with a section signature.
+    #[error("The register creation command was not signed with a section signature")]
+    RegisterCreateCmdNotSigned,
     /// Chunk not found.
     #[error("Chunk not found: {0:?}")]
     ChunkNotFound(XorName),
@@ -76,6 +79,8 @@ pub enum Error {
     /// RMP Serde decode error.
     #[error("Deserialisation error: {0}")]
     DeserialisationError(#[from] rmp_serde::decode::Error),
+    #[error("BLS error: {0}")]
+    BlsError(#[from] bls::Error),
 }
 
 // Convert storage error to messaging error message for sending over the network.

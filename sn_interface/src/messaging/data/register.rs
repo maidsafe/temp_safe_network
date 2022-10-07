@@ -83,7 +83,7 @@ pub enum RegisterCmd {
         cmd: SignedRegisterCreate,
         /// Section signature over the operation,
         /// verifying that it was paid for.
-        section_sig: SectionSig,
+        section_sig: Option<SectionSig>,
     },
     /// Edit the [`Register`].
     Edit(SignedRegisterEdit),
@@ -238,6 +238,13 @@ impl RegisterCmd {
                 cmd: SignedRegisterCreate { op, .. },
                 ..
             } => Some(op.owner()),
+            _ => None,
+        }
+    }
+
+    pub fn section_sig(&self) -> Option<SectionSig> {
+        match self {
+            Self::Create { section_sig, .. } => section_sig.clone(),
             _ => None,
         }
     }

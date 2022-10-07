@@ -206,7 +206,18 @@ impl MyNode {
         // extract the data from the request
         let data = match msg {
             // These reads/writes are for adult nodes...
-            ClientMsg::Cmd(DataCmd::Register(cmd)) => ReplicatedData::RegisterWrite(cmd),
+            ClientMsg::Cmd(DataCmd::Register(cmd)) => match cmd {
+                RegisterCmd::Create { cmd, .. } => {
+                    let op_bytes = rmp_serde::to_vec(&cmd.op)?;
+                    let section_sig = self.section_sig(&op_bytes)?;
+                    let cmd_with_sig = RegisterCmd::Create {
+                        cmd,
+                        section_sig: Some(section_sig),
+                    };
+                    ReplicatedData::RegisterWrite(cmd_with_sig)
+                }
+                _ => ReplicatedData::RegisterWrite(cmd),
+            },
             ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                 key_image,
                 tx,
@@ -251,14 +262,7 @@ impl MyNode {
                 ReplicatedData::SpentbookWrite(reg_cmd)
             }
             ClientMsg::Cmd(DataCmd::StoreChunk(chunk)) => {
-                let section_key = self.network_knowledge.section_key();
-                let (_, sig_share) = self
-                    .section_keys_provider
-                    .sign_with(chunk.value(), &section_key)?;
-                let section_sig = SectionSig {
-                    public_key: section_key,
-                    signature: sig_share.0,
-                };
+                let section_sig = self.section_sig(chunk.value())?;
                 ReplicatedData::Chunk(SignedChunk {
                     chunk,
                     authority: section_sig,
@@ -443,5 +447,14 @@ impl MyNode {
 
         debug!("Successfully generated spent proof share for spend request");
         Ok(RegisterCmd::Edit(signed_edit))
+    }
+
+    fn section_sig(&self, data: &[u8]) -> Result<SectionSig> {
+        let section_key = self.network_knowledge.section_key();
+        let (_, sig_share) = self.section_keys_provider.sign_with(data, &section_key)?;
+        Ok(SectionSig {
+            public_key: section_key,
+            signature: sig_share.0,
+        })
     }
 }

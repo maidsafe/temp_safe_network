@@ -11,7 +11,7 @@ use crate::messaging::{
     ClientAuth, EndUser, MsgId,
 };
 use crate::types::{
-    register::{Entry, EntryHash, Permissions, Policy, Register, User},
+    register::{Entry, EntryHash, Permissions, Policy, SignedRegister, User},
     DataAddress, PublicKey, ReplicatedData, SignedChunk,
 };
 
@@ -95,7 +95,7 @@ pub enum NodeQueryResponse {
     //
     #[cfg(feature = "registers")]
     /// Response to [`crate::messaging::data::RegisterQuery::Get`].
-    GetRegister((Result<Register>, OperationId)),
+    GetRegister((Result<SignedRegister>, OperationId)),
     #[cfg(feature = "registers")]
     /// Response to [`crate::messaging::data::RegisterQuery::GetOwner`].
     GetRegisterOwner((Result<User>, OperationId)),

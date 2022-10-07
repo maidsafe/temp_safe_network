@@ -261,7 +261,7 @@ pub fn create_random_register_replicated_data() -> ReplicatedData {
                 signature,
             },
         },
-        section_sig: section_sig(), // obtained after presenting a valid payment to the network
+        section_sig: Some(section_sig()), // obtained after presenting a valid payment to the network
     };
 
     ReplicatedData::RegisterWrite(reg_cmd)

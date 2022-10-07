@@ -21,7 +21,7 @@ use sn_interface::{
         ClientAuth, SectionSig, VerifyAuthority,
     },
     types::{
-        register::{Action, EntryHash, Permissions, Policy, Register, User},
+        register::{Action, EntryHash, Permissions, Policy, Register, SignedRegister, User},
         DataAddress, Keypair, PublicKey, RegisterAddress, ReplicatedRegisterLog,
         SPENTBOOK_TYPE_TAG,
     },
@@ -153,14 +153,15 @@ impl RegisterStorage {
         address: &RegisterAddress,
         action: Action,
         requester: User,
-    ) -> Result<Register> {
+    ) -> Result<SignedRegister> {
         let stored_reg = self.try_load_stored_register(address).await?;
-        if let Some(register) = stored_reg.state {
-            register
+        if let Some(signed_register) = stored_reg.state {
+            signed_register
+                .register
                 .check_permissions(action, Some(requester))
                 .map_err(Error::from)?;
 
-            Ok(register)
+            Ok(signed_register)
         } else {
             Err(Error::RegisterNotFound(*address))
         }
@@ -191,7 +192,7 @@ impl RegisterStorage {
         operation_id: OperationId,
     ) -> NodeQueryResponse {
         let result = match self.get_register(&address, Action::Read, requester).await {
-            Ok(register) => Ok(register.read()),
+            Ok(signed_register) => Ok(signed_register.register.read()),
             Err(error) => Err(error),
         };
 
@@ -205,7 +206,7 @@ impl RegisterStorage {
         operation_id: OperationId,
     ) -> NodeQueryResponse {
         let result = match self.get_register(&address, Action::Read, requester).await {
-            Ok(res) => Ok(res.owner()),
+            Ok(res) => Ok(res.register.owner()),
             Err(error) => Err(error.into()),
         };
 
@@ -222,8 +223,13 @@ impl RegisterStorage {
         let result = match self
             .get_register(&address, Action::Read, requester)
             .await
-            .and_then(|register| register.get(hash).map(|c| c.clone()).map_err(Error::from))
-        {
+            .and_then(|signed_reg| {
+                signed_reg
+                    .register
+                    .get(hash)
+                    .map(|c| c.clone())
+                    .map_err(Error::from)
+            }) {
             Ok(res) => Ok(res),
             Err(error) => Err(error.into()),
         };
@@ -241,7 +247,7 @@ impl RegisterStorage {
         let result = match self
             .get_register(&address, Action::Read, requester)
             .await
-            .and_then(|register| register.permissions(user).map_err(Error::from))
+            .and_then(|signed_reg| signed_reg.register.permissions(user).map_err(Error::from))
         {
             Ok(res) => Ok(res),
             Err(error) => Err(error.into()),
@@ -259,7 +265,7 @@ impl RegisterStorage {
         let result = match self
             .get_register(&address, Action::Read, requester_pk)
             .await
-            .map(|register| register.policy().clone())
+            .map(|signed_reg| signed_reg.register.policy().clone())
         {
             Ok(res) => Ok(res),
             Err(error) => Err(error.into()),
@@ -313,8 +319,10 @@ impl RegisterStorage {
         // cmd let's verify it's valid before accepting it, however 'Edits cmds' cannot be
         // verified untill we have the `Register create` cmd.
         match (stored_reg.state.as_mut(), cmd) {
-            (Some(ref mut register), cmd) => self.apply(cmd, register).await?,
-            (None, RegisterCmd::Create { cmd, .. }) => {
+            (Some(ref mut signed_register), cmd) => {
+                self.apply(cmd, &mut signed_register.register).await?
+            }
+            (None, RegisterCmd::Create { cmd, section_sig }) => {
                 // the target Register is not in our store or we don't have the 'Register create',
                 // let's verify the create cmd we received is valid and try to apply stored cmds we may have.
                 let SignedRegisterCreate { op, auth } = cmd;
@@ -334,7 +342,12 @@ impl RegisterStorage {
                     self.apply(cmd, &mut register).await?;
                 }
 
-                stored_reg.state = Some(register);
+                stored_reg.state = Some(SignedRegister {
+                    register,
+                    authority: section_sig
+                        .clone()
+                        .ok_or(Error::RegisterCreateCmdNotSigned)?,
+                });
             }
             (None, _edit_cmd) => { /* we cannot validate it right now, but we'll store it */ }
         }
@@ -388,11 +401,12 @@ impl RegisterStorage {
     async fn try_load_stored_register(&self, addr: &RegisterAddress) -> Result<StoredRegister> {
         let mut stored_reg = self.file_store.open_reg_log_from_disk(addr).await?;
         // if we have the Register creation cmd, apply all ops to reconstruct the Register
-        if let Some(register) = &mut stored_reg.state {
+        if let Some(signed_register) = &mut stored_reg.state {
             for cmd in &stored_reg.op_log {
                 if let RegisterCmd::Edit(SignedRegisterEdit { op, .. }) = cmd {
                     let EditRegister { edit, .. } = op;
-                    register
+                    signed_register
+                        .register
                         .apply_op(edit.clone())
                         .map_err(Error::NetworkData)?;
                 }
@@ -427,24 +441,26 @@ fn create_reg_w_policy(
 
     Ok(RegisterCmd::Create {
         cmd: SignedRegisterCreate { op, auth },
-        section_sig: section_sig(),
+        section_sig: section_sig()?,
     })
 }
 
-fn section_sig() -> SectionSig {
-    let sk = bls::SecretKey::random();
+fn section_sig() -> Result<Option<SectionSig>> {
+    let sk = bls::SecretKey::from_hex(
+        "01275e09359849ec8bada62eaf7319bd1558663e25e3accaae9f0fd2e5748964",
+    )?;
     let public_key = sk.public_key();
     let data = "TODO-spentbook".to_string();
     let signature = sk.sign(&data);
-    SectionSig {
+    Ok(Some(SectionSig {
         public_key,
         signature,
-    }
+    }))
 }
 
 #[cfg(test)]
 mod test {
-    use super::{create_reg_w_policy, Error, RegisterStorage, UsedSpace};
+    use super::{create_reg_w_policy, section_sig, Error, RegisterStorage, UsedSpace};
     use sn_interface::{
         messaging::{
             data::{EditRegister, RegisterCmd, RegisterQuery, SignedRegisterEdit},
@@ -482,10 +498,30 @@ mod test {
         store.write(&cmd_create).await?;
         let stored_reg = store.try_load_stored_register(&addr).await?;
         // it should contain the create cmd
-        assert_eq!(stored_reg.state.as_ref(), Some(&register));
+        assert_eq!(
+            stored_reg
+                .state
+                .as_ref()
+                .ok_or_else(|| eyre!("The signed register should be populated"))?
+                .register,
+            register
+        );
         assert_eq!(stored_reg.op_log, vec![cmd_create.clone()]);
         assert_eq!(stored_reg.op_log_path, log_path);
-        assert_eq!(stored_reg.state.map(|reg| reg.size()), Some(0));
+        assert_eq!(
+            stored_reg
+                .state
+                .as_ref()
+                .map(|signed_reg| signed_reg.register.size()),
+            Some(0)
+        );
+        assert_eq!(
+            stored_reg
+                .state
+                .as_ref()
+                .map(|signed_reg| signed_reg.authority.clone()),
+            section_sig()?
+        );
 
         // let's now edit the register
         let cmd_edit = edit_register(&mut register, &keypair)?;
@@ -493,7 +529,14 @@ mod test {
 
         let stored_reg = store.try_load_stored_register(&addr).await?;
         // it should contain the create and edit cmds
-        assert_eq!(stored_reg.state.as_ref(), Some(&register));
+        assert_eq!(
+            stored_reg
+                .state
+                .as_ref()
+                .ok_or_else(|| eyre!("The signed register should be populated"))?
+                .register,
+            register
+        );
         assert_eq!(stored_reg.op_log.len(), 2);
         assert!(
             stored_reg
@@ -503,7 +546,12 @@ mod test {
             "Op log doesn't match"
         );
         assert_eq!(stored_reg.op_log_path, log_path);
-        assert_eq!(stored_reg.state.map(|reg| reg.size()), Some(1));
+        assert_eq!(
+            stored_reg
+                .state
+                .map(|signed_reg| signed_reg.register.size()),
+            Some(1)
+        );
 
         Ok(())
     }
@@ -532,7 +580,14 @@ mod test {
 
         let stored_reg = store.try_load_stored_register(&addr).await?;
         // it should contain the create and edit cmds
-        assert_eq!(stored_reg.state.as_ref(), Some(&register));
+        assert_eq!(
+            stored_reg
+                .state
+                .as_ref()
+                .ok_or_else(|| eyre!("The signed register should be populated"))?
+                .register,
+            register
+        );
         assert_eq!(stored_reg.op_log.len(), 2);
         assert!(
             stored_reg
@@ -542,7 +597,13 @@ mod test {
             "Op log doesn't match"
         );
         assert_eq!(stored_reg.op_log_path, log_path);
-        assert_eq!(stored_reg.state.map(|reg| reg.size()), Some(1));
+        assert_eq!(
+            stored_reg
+                .state
+                .as_ref()
+                .map(|signed_reg| signed_reg.register.size()),
+            Some(1)
+        );
 
         Ok(())
     }
@@ -562,10 +623,23 @@ mod test {
             .try_to_apply_cmd_against_register_state(&cmd_create, &mut stored_reg)
             .await?;
         // it should contain the create cmd
-        assert_eq!(stored_reg.state.as_ref(), Some(&register));
+        assert_eq!(
+            stored_reg
+                .state
+                .as_ref()
+                .ok_or_else(|| eyre!("The signed register should be populated"))?
+                .register,
+            register
+        );
         assert_eq!(stored_reg.op_log, vec![cmd_create.clone()]);
         assert_eq!(stored_reg.op_log_path, log_path);
-        assert_eq!(stored_reg.state.as_ref().map(|reg| reg.size()), Some(0));
+        assert_eq!(
+            stored_reg
+                .state
+                .as_ref()
+                .map(|signed_reg| signed_reg.register.size()),
+            Some(0)
+        );
 
         // apply the create cmd again should fail with DataExists
         match store
@@ -585,7 +659,14 @@ mod test {
             .try_to_apply_cmd_against_register_state(&cmd_edit, &mut stored_reg)
             .await?;
         // it should contain the create and edit cmds
-        assert_eq!(stored_reg.state.as_ref(), Some(&register));
+        assert_eq!(
+            stored_reg
+                .state
+                .as_ref()
+                .ok_or_else(|| eyre!("The signed register should be populated"))?
+                .register,
+            register
+        );
         assert_eq!(stored_reg.op_log.len(), 2);
         assert!(
             stored_reg
@@ -595,14 +676,27 @@ mod test {
             "Op log doesn't match"
         );
         assert_eq!(stored_reg.op_log_path, log_path);
-        assert_eq!(stored_reg.state.as_ref().map(|reg| reg.size()), Some(1));
+        assert_eq!(
+            stored_reg
+                .state
+                .as_ref()
+                .map(|signed_reg| signed_reg.register.size()),
+            Some(1)
+        );
 
         // applying the edit cmd again shouldn't fail or alter the register content,
         // although the log will contain the edit cmd duplicated
         store
             .try_to_apply_cmd_against_register_state(&cmd_edit, &mut stored_reg)
             .await?;
-        assert_eq!(stored_reg.state.as_ref(), Some(&register));
+        assert_eq!(
+            stored_reg
+                .state
+                .as_ref()
+                .ok_or_else(|| eyre!("The signed register should be populated"))?
+                .register,
+            register
+        );
         assert_eq!(stored_reg.op_log.len(), 3);
         assert!(
             stored_reg
@@ -612,7 +706,13 @@ mod test {
             "Op log doesn't match"
         );
         assert_eq!(stored_reg.op_log_path, log_path);
-        assert_eq!(stored_reg.state.map(|reg| reg.size()), Some(1));
+        assert_eq!(
+            stored_reg
+                .state
+                .as_ref()
+                .map(|signed_reg| signed_reg.register.size()),
+            Some(1)
+        );
 
         Ok(())
     }
@@ -655,7 +755,14 @@ mod test {
             .try_to_apply_cmd_against_register_state(&cmd_create, &mut stored_reg)
             .await?;
         // it should contain the create and edit cmds
-        assert_eq!(stored_reg.state.as_ref(), Some(&register));
+        assert_eq!(
+            stored_reg
+                .state
+                .as_ref()
+                .ok_or_else(|| eyre!("The signed register should be populated"))?
+                .register,
+            register
+        );
         assert_eq!(stored_reg.op_log.len(), 3);
         assert!(
             stored_reg
@@ -665,7 +772,13 @@ mod test {
             "Op log doesn't match"
         );
         assert_eq!(stored_reg.op_log_path, log_path);
-        assert_eq!(stored_reg.state.as_ref().map(|reg| reg.size()), Some(1));
+        assert_eq!(
+            stored_reg
+                .state
+                .as_ref()
+                .map(|signed_reg| signed_reg.register.size()),
+            Some(1)
+        );
 
         // apply the create cmd again should fail with DataExists
         match store
@@ -694,9 +807,17 @@ mod test {
         // get register
         let address = cmd.dst_address();
         match store.read(&RegisterQuery::Get(address), authority).await {
-            NodeQueryResponse::GetRegister((Ok(reg), _)) => {
-                assert_eq!(reg.address(), &address, "Should have same address!");
-                assert_eq!(reg.owner(), authority, "Should have same owner!");
+            NodeQueryResponse::GetRegister((Ok(signed_reg), _)) => {
+                assert_eq!(
+                    signed_reg.register.address(),
+                    &address,
+                    "Should have same address!"
+                );
+                assert_eq!(
+                    signed_reg.register.owner(),
+                    authority,
+                    "Should have same owner!"
+                );
             }
             e => bail!("Could not read register! {:?}", e),
         }
@@ -774,9 +895,17 @@ mod test {
         let res = new_store.read(&RegisterQuery::Get(addr), authority).await;
 
         match res {
-            NodeQueryResponse::GetRegister((Ok(reg), _)) => {
-                assert_eq!(reg.address(), &addr, "Should have same address!");
-                assert_eq!(reg.owner(), authority, "Should have same owner!");
+            NodeQueryResponse::GetRegister((Ok(signed_reg), _)) => {
+                assert_eq!(
+                    signed_reg.register.address(),
+                    &addr,
+                    "Should have same address!"
+                );
+                assert_eq!(
+                    signed_reg.register.owner(),
+                    authority,
+                    "Should have same owner!"
+                );
             }
             e => panic!("Could not read! {:?}", e),
         }
