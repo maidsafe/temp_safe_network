@@ -62,6 +62,8 @@ impl Session {
                         }
                     },
                     Ok(None) => {
+
+                        debug!("No more msgs coming in on _this_ listener to {peer:?}");
                         // once the msg loop breaks, we know this specific connection is closed
                         break;
                     }
@@ -87,11 +89,14 @@ impl Session {
                 }
             }
 
-            session.peer_links.remove(&peer).await;
+            // Are we being heavy handed and removing a peer here
+            // when another link may well exist...?
+
+            // session.peer_links.remove(&peer).await;
             // once the msg loop breaks, we know the connection is closed
             trace!("{} to {} (id: {})", LogMarker::ConnectionClosed, addr, connection_id);
 
-        }.instrument(info_span!("Listening for incoming msgs from {}", ?addr))).in_current_span();
+        }.instrument(info_span!("Listener for incoming msgs from peer addr {}", ?addr))).in_current_span();
     }
 
     #[instrument(skip_all, level = "debug")]
