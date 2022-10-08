@@ -36,7 +36,6 @@ itertools = "~0.10.0"
 lazy_static = "1"
 multibase = "~0.9.1"
 num_cpus = "1.13.0"
-priority-queue = "1.2.1"
 proptest = { version ="1.0.0", optional =true }
 qp2p = "~0.30.0"
 rand = "~0.8.5"
