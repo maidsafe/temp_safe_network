@@ -198,17 +198,6 @@ impl Comm {
                     // but let's handle it anyway..
                     continue; // moves on to awaiting a new change
                 }
-                SendStatus::PeerLinkDropped => {
-                    // The connection was closed by us which means
-                    // we have dropped this peer for some reason
-                    error!(
-                        "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed, as we have dropped the link to it.",
-                        msg_id,
-                        peer.addr(),
-                        peer.name(),
-                    );
-                    return Err(Error::PeerLinkDropped);
-                }
                 SendStatus::WatcherDropped => {
                     // the send job is dropped for some reason,
                     // that happens when the peer session dropped

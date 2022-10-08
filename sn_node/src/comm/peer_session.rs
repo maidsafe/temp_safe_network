@@ -6,8 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::time::Duration;
-
 use super::Link;
 
 use crate::node::{Error, Result};
@@ -87,7 +85,7 @@ impl PeerSession {
         let job = SendJob {
             msg_id,
             bytes,
-            retries: 0,
+            connection_retries: 0,
             reporter,
             is_msg_for_client,
         };
@@ -188,9 +186,15 @@ impl PeerSessionWorker {
         let should_establish_new_connection = !job.is_msg_for_client;
         trace!("Performing sendjob: {id:?} , should_establish_new_connection? {should_establish_new_connection}");
 
-        if job.retries > MAX_SENDJOB_RETRIES {
+        if should_establish_new_connection && job.connection_retries > MAX_SENDJOB_RETRIES {
             job.reporter.send(SendStatus::MaxRetriesReached);
             return Ok(SessionStatus::Ok);
+        }
+
+        if !should_establish_new_connection && job.connection_retries > MAX_SENDJOB_RETRIES {
+            debug!(
+                "Continuing to attempt to send to client while we have connections in the queue"
+            );
         }
 
         // we can't spawn this atm as it edits/updates the link
@@ -243,7 +247,8 @@ impl PeerSessionWorker {
                                 "No connections left on this link to {:?}, terminating session.",
                                 the_peer
                             );
-                            job.reporter.send(SendStatus::PeerLinkDropped);
+                            job.connection_retries += 1;
+                            // job.reporter.send(SendStatus::PeerLinkDropped);
                             // return Ok(SessionStatus::Terminating);
                         }
                     }
@@ -252,13 +257,8 @@ impl PeerSessionWorker {
                         "Transient error while attempting to send, re-enqueing job {id:?} {err:?}. Connection id was {:?}",connection_id
                     );
 
-                    // sleep so connection removal.cleanup in the link can occur before we try again.
-                    tokio::time::sleep(Duration::from_millis(200)).await;
-
                     job.reporter
                         .send(SendStatus::TransientError(format!("{err:?}")));
-
-                    job.retries += 1;
 
                     if let Err(e) = queue.send(SessionCmd::Send(job)).await {
                         warn!("Failed to re-enqueue job {id:?} after transient error {e:?}");
@@ -277,14 +277,16 @@ pub(crate) struct SendJob {
     msg_id: MsgId,
     #[debug(skip)]
     bytes: UsrMsgBytes,
-    retries: usize, // TAI: Do we need this if we are using QP2P's retry
+    connection_retries: usize, // TAI: Do we need this if we are using QP2P's retry
     reporter: StatusReporting,
     pub(crate) is_msg_for_client: bool,
 }
 
 impl PartialEq for SendJob {
     fn eq(&self, other: &Self) -> bool {
-        self.msg_id == other.msg_id && self.bytes == other.bytes && self.retries == other.retries
+        self.msg_id == other.msg_id
+            && self.bytes == other.bytes
+            && self.connection_retries == other.connection_retries
     }
 }
 
@@ -294,7 +296,7 @@ impl std::hash::Hash for SendJob {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.msg_id.hash(state);
         self.bytes.hash(state);
-        self.retries.hash(state);
+        self.connection_retries.hash(state);
     }
 }
 
@@ -302,7 +304,6 @@ impl std::hash::Hash for SendJob {
 pub(crate) enum SendStatus {
     Enqueued,
     Sent,
-    PeerLinkDropped,
     TransientError(String),
     WatcherDropped,
     MaxRetriesReached,
