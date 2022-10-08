@@ -174,6 +174,10 @@ impl ClientBuilder {
             qp2p.idle_timeout = Some(Duration::from_secs(6));
         }
 
+        if qp2p.keep_alive_interval.is_none() {
+            qp2p.keep_alive_interval = Some(Duration::from_millis(500));
+        }
+
         let session = Session::new(
             qp2p,
             self.local_addr
