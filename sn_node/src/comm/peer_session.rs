@@ -208,6 +208,9 @@ impl PeerSessionWorker {
         let queue = self.queue.clone();
         let link_connections = self.link.connections.clone();
         let link_queue = self.link.queue.clone();
+        let conns_count = self.link.connections.len();
+        let the_peer = *self.link.peer();
+
         let _handle = tokio::spawn(async move {
             let send_resp = Link::send_with(
                 job.bytes.clone(),
@@ -224,12 +227,25 @@ impl PeerSessionWorker {
                 Ok(_) => {
                     job.reporter.send(SendStatus::Sent);
                 }
-                Err(err) if err.is_local_close() => {
-                    info!("Peer linked dropped when trying to send {:?}", id);
-                    job.reporter.send(SendStatus::PeerLinkDropped);
-                    // return SessionStatus::Terminating;
-                }
+                // Err(err) if err.is_local_close() => {
+                //     info!("Peer linked dropped when trying to send {:?}", id);
+                //     job.reporter.send(SendStatus::PeerLinkDropped);
+                //     // return SessionStatus::Terminating;
+                // }
                 Err(err) => {
+                    if err.is_local_close() {
+                        debug!("Peer linked dropped when trying to send {:?}. But link has {:?} connections", id, conns_count );
+                        // we can retry if we've more connections!
+                        if conns_count <= 1 {
+                            debug!(
+                                "No connections left on this link to {:?}, terminating session.",
+                                the_peer
+                            );
+                            job.reporter.send(SendStatus::PeerLinkDropped);
+                            // return Ok(SessionStatus::Terminating);
+                        }
+                    }
+
                     warn!(
                         "Transient error while attempting to send, re-enqueing job {id:?} {err:?}"
                     );
@@ -244,7 +260,7 @@ impl PeerSessionWorker {
 
                     if let Err(e) = queue.send(SessionCmd::Send(job)).await {
                         warn!("Failed to re-enqueue job {id:?} after transient error {e:?}");
-                        // return SessionStatus::Terminating;
+                        // return Ok(SessionStatus::Terminating);
                     }
                 }
             }
