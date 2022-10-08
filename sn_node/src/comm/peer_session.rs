@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use std::time::Duration;
+
 use super::Link;
 
 use crate::node::{Error, Result};
@@ -231,6 +233,10 @@ impl PeerSessionWorker {
                     warn!(
                         "Transient error while attempting to send, re-enqueing job {id:?} {err:?}"
                     );
+
+                    // sleep so connection removal.cleanup in the link can occur before we try again.
+                    tokio::time::sleep(Duration::from_millis(200)).await;
+
                     job.reporter
                         .send(SendStatus::TransientError(format!("{err:?}")));
 
