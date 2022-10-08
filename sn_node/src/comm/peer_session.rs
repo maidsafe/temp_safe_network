@@ -144,7 +144,7 @@ impl PeerSessionWorker {
                     }
                 }
                 SessionCmd::RemoveExpired => {
-                    if self.link.is_connected_after_cleanup().await {
+                    if self.link.is_connected().await {
                         SessionStatus::Ok
                     } else {
                         // close down the session
@@ -176,7 +176,7 @@ impl PeerSessionWorker {
         }
 
         // disconnect the link.
-        self.link.disconnect().await;
+        // self.link.disconnect_link().await;
 
         info!("Finished peer session shutdown");
     }
@@ -211,7 +211,6 @@ impl PeerSessionWorker {
             .map_err(|_| Error::PeerLinkDropped)?;
         let queue = self.queue.clone();
         let link_connections = self.link.connections.clone();
-        let link_queue = self.link.queue.clone();
         let conns_count = self.link.connections.len();
         let the_peer = *self.link.peer();
 
@@ -225,7 +224,6 @@ impl PeerSessionWorker {
                 should_establish_new_connection,
                 conn,
                 link_connections,
-                link_queue,
             )
             .await;
 
