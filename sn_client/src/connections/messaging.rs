@@ -701,7 +701,7 @@ impl Session {
                                 Close::Application { reason, error_code },
                             )),
                         });
-                        self.peer_links.remove(&peer).await;
+                        self.peer_links.remove_link_from_peer_links(&peer).await;
                     }
                     Err(Error::QuicP2pSend {
                         peer,
@@ -713,7 +713,7 @@ impl Session {
                             error: SendError::ConnectionLost(error),
                         });
 
-                        self.peer_links.remove(&peer).await;
+                        self.peer_links.remove_link_from_peer_links(&peer).await;
                     }
                     Err(error) => {
                         warn!(
@@ -722,7 +722,7 @@ impl Session {
                         );
                         last_error = Some(error);
                         if let Some(peer) = self.peer_links.get_peer_by_name(&peer_name).await {
-                            self.peer_links.remove(&peer).await;
+                            self.peer_links.remove_link_from_peer_links(&peer).await;
                         }
                     }
                     Ok(_) => successful_sends += 1,

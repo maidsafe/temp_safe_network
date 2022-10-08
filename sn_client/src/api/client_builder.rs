@@ -170,12 +170,12 @@ impl ClientBuilder {
 
         let mut qp2p = self.qp2p.unwrap_or_default();
         // If `idle_timeout` is not set, set it to 6 seconds (instead of 18s default).
-        if qp2p.idle_timeout.is_none() {
-            qp2p.idle_timeout = Some(Duration::from_secs(6));
-        }
+        // if qp2p.idle_timeout.is_none() {
+        //     qp2p.idle_timeout = Some(Duration::from_secs(6));
+        // }
 
         if qp2p.keep_alive_interval.is_none() {
-            qp2p.keep_alive_interval = Some(Duration::from_millis(500));
+            qp2p.keep_alive_interval = Some(Duration::from_secs(3));
         }
 
         let session = Session::new(

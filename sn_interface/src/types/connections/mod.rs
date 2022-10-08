@@ -85,8 +85,8 @@ impl PeerLinks {
     /// I.e. it will not connect here, but on calling send on the returned link.
     pub async fn get_or_create_link(&self, peer: &Peer, force_new_link: bool) -> Link {
         if force_new_link {
-            // first remove any existing
-            self.remove(peer).await;
+            // first remove any existing link
+            self.remove_link_from_peer_links(peer).await;
 
             let link = Link::new(*peer, self.endpoint.clone());
             let _ = self.links.write().await.insert(*peer, link.clone());
@@ -148,12 +148,11 @@ impl PeerLinks {
         None
     }
 
-    pub async fn remove(&self, id: &Peer) {
+    /// Removes a link from PeerLinks
+    /// Does NOT disconnect it, as it could still be used to receveive
+    /// messages on
+    pub async fn remove_link_from_peer_links(&self, id: &Peer) {
         let mut links = self.links.write().await;
-        let existing_link = links.remove(id);
-
-        if let Some(actual_link) = existing_link {
-            actual_link.disconnect().await;
-        }
+        let _existing_link = links.remove(id);
     }
 }
