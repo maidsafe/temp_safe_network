@@ -9,7 +9,7 @@
 use crate::node::{flow_ctrl::cmds::Cmd, Node, Proposal, Result};
 use sn_interface::{
     messaging::{
-        system::{KeyedSig, SectionAuth},
+        system::{SectionSig, SectionSigned},
         SectionTreeUpdate,
     },
     network_knowledge::{NodeState, SapCandidate, SectionAuthUtils, SectionAuthorityProvider},
@@ -23,7 +23,7 @@ impl Node {
     pub(crate) async fn handle_general_agreements(
         &mut self,
         proposal: Proposal,
-        sig: KeyedSig,
+        sig: SectionSig,
     ) -> Result<Option<Cmd>> {
         debug!("{:?} {:?}", LogMarker::ProposalAgreed, proposal);
         match proposal {
@@ -43,7 +43,7 @@ impl Node {
     }
 
     #[instrument(skip(self))]
-    fn handle_offline_agreement(&mut self, node_state: NodeState, sig: KeyedSig) -> Option<Cmd> {
+    fn handle_offline_agreement(&mut self, node_state: NodeState, sig: SectionSig) -> Option<Cmd> {
         info!(
             "Agreement - proposing membership change with node offline: {}",
             node_state.peer()
@@ -55,7 +55,7 @@ impl Node {
     async fn handle_section_info_agreement(
         &mut self,
         sap: SectionAuthorityProvider,
-        sig: KeyedSig,
+        sig: SectionSig,
     ) -> Result<Option<Cmd>> {
         // check if section matches our prefix
         let equal_prefix = sap.prefix() == self.network_knowledge.prefix();
@@ -75,7 +75,7 @@ impl Node {
 
         // check if at the given memberhip gen, the elders candidates are matching
         let membership_gen = sap.membership_gen();
-        let signed_sap = SectionAuth::new(sap, sig.clone());
+        let signed_sap = SectionSigned::new(sap, sig.clone());
         let dkg_sessions_info = self.best_elder_candidates_at_gen(membership_gen);
 
         let elder_candidates = BTreeSet::from_iter(signed_sap.names());
@@ -127,8 +127,8 @@ impl Node {
     #[instrument(skip(self), level = "trace")]
     pub(crate) async fn handle_new_elders_agreement(
         &mut self,
-        signed_sap: SectionAuth<SectionAuthorityProvider>,
-        key_sig: KeyedSig,
+        signed_sap: SectionSigned<SectionAuthorityProvider>,
+        section_sig: SectionSig,
     ) -> Result<Vec<Cmd>> {
         trace!("{}", LogMarker::HandlingNewEldersAgreement);
         let snapshot = self.state_snapshot();
@@ -143,7 +143,7 @@ impl Node {
         // Let's update our network knowledge, including our
         // section SAP and chain if the new SAP's prefix matches our name
         // We need to generate the proof chain to connect our current chain to new SAP.
-        match section_chain.insert(&last_key, signed_sap.section_key(), key_sig.signature) {
+        match section_chain.insert(&last_key, signed_sap.section_key(), section_sig.signature) {
             Ok(()) => {
                 let section_tree_update = SectionTreeUpdate::new(signed_sap, section_chain);
                 match self.update_network_knowledge(section_tree_update, None) {

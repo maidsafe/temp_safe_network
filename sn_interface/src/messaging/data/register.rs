@@ -8,7 +8,7 @@
 
 use super::{Error, QueryResponse, Result};
 
-use crate::messaging::{data::OperationId, ClientAuth, SectionAuth};
+use crate::messaging::{data::OperationId, ClientAuth, SectionSig};
 #[allow(unused_imports)] // needed by rustdocs links
 use crate::types::register::Register;
 use crate::types::{
@@ -83,7 +83,7 @@ pub enum RegisterCmd {
         cmd: SignedRegisterCreate,
         /// Section signature over the operation,
         /// verifying that it was paid for.
-        section_auth: SectionAuth,
+        section_sig: SectionSig,
     },
     /// Edit the [`Register`].
     Edit(SignedRegisterEdit),

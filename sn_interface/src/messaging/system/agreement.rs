@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{KeyedSig, NodeState};
+use super::{NodeState, SectionSig};
 use crate::types::keys::ed25519::Digest256;
 use crate::{messaging::SectionAuthorityProvider, types::Peer};
 use itertools::Itertools;
@@ -104,16 +104,16 @@ impl DkgSessionId {
     }
 }
 
-/// A value together with the signature that it was agreed on by the majority of the section elders.
+/// A section signed piece of data
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize)]
-pub struct SectionAuth<T: Serialize> {
-    /// some value to be agreed upon by elders
+pub struct SectionSigned<T: Serialize> {
+    /// some value agreed upon by elders
     pub value: T,
-    /// signature over the value
-    pub sig: KeyedSig,
+    /// section signature over the value
+    pub sig: SectionSig,
 }
 
-impl<T> Borrow<Prefix> for SectionAuth<T>
+impl<T> Borrow<Prefix> for SectionSigned<T>
 where
     T: Borrow<Prefix> + Serialize,
 {
@@ -122,7 +122,7 @@ where
     }
 }
 
-impl<T: Serialize> Deref for SectionAuth<T> {
+impl<T: Serialize> Deref for SectionSigned<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -154,7 +154,7 @@ pub enum Proposal {
     ///   4. the signature of the new key using the current key
     /// Which we can use to update the section section authority provider and the section chain at
     /// the same time as a single atomic operation without needing to cache anything.
-    NewElders(SectionAuth<SectionAuthorityProvider>),
+    NewElders(SectionSigned<SectionAuthorityProvider>),
     /// Proposal to change whether new nodes are allowed to join our section.
     JoinsAllowed(bool),
 }

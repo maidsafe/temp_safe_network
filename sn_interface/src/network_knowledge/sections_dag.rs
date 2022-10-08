@@ -473,7 +473,7 @@ pub(crate) mod tests {
     use super::{Error, SectionInfo, SectionsDAG};
     use crate::types::SecretKeySet;
     use crate::{
-        messaging::system::SectionAuth,
+        messaging::system::SectionSigned,
         network_knowledge::test_utils::{prefix, random_sap_with_rng, section_signed},
         SectionAuthorityProvider,
     };
@@ -1106,7 +1106,7 @@ pub(crate) mod tests {
     ) -> impl Strategy<
         Value = (
             SectionsDAG,
-            Vec<(SectionsDAG, SectionAuth<SectionAuthorityProvider>)>,
+            Vec<(SectionsDAG, SectionSigned<SectionAuthorityProvider>)>,
         ),
     > {
         (any::<u64>(), 2..=max_sections).prop_map(move |(seed, size)| {
@@ -1182,7 +1182,7 @@ pub(crate) mod tests {
         n_sections: usize,
     ) -> Result<(
         SectionsDAG,
-        BTreeMap<bls::PublicKey, SectionAuth<SectionAuthorityProvider>>,
+        BTreeMap<bls::PublicKey, SectionSigned<SectionAuthorityProvider>>,
     )> {
         let mut rng = match seed {
             Some(seed) => StdRng::seed_from_u64(seed),
@@ -1213,7 +1213,7 @@ pub(crate) mod tests {
             rng: &mut R,
             sections_map: &mut BTreeMap<
                 bls::PublicKey,
-                (bls::SecretKey, SectionAuth<SectionAuthorityProvider>),
+                (bls::SecretKey, SectionSigned<SectionAuthorityProvider>),
             >,
             dag: &mut SectionsDAG,
         ) -> Result<()> {

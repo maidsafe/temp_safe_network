@@ -18,7 +18,7 @@ use sn_interface::{
             SignedRegisterCreate, SignedRegisterEdit,
         },
         system::NodeQueryResponse,
-        ClientAuth, SectionAuth, VerifyAuthority,
+        ClientAuth, SectionSig, VerifyAuthority,
     },
     types::{
         register::{Action, EntryHash, Permissions, Policy, Register, User},
@@ -427,24 +427,18 @@ fn create_reg_w_policy(
 
     Ok(RegisterCmd::Create {
         cmd: SignedRegisterCreate { op, auth },
-        section_auth: section_auth(),
+        section_sig: section_sig(),
     })
 }
 
-fn section_auth() -> SectionAuth {
-    use sn_interface::messaging::system::KeyedSig;
-
+fn section_sig() -> SectionSig {
     let sk = bls::SecretKey::random();
     let public_key = sk.public_key();
     let data = "TODO-spentbook".to_string();
     let signature = sk.sign(&data);
-    let sig = KeyedSig {
+    SectionSig {
         public_key,
         signature,
-    };
-    SectionAuth {
-        src_name: sn_interface::types::PublicKey::Bls(public_key).into(),
-        sig,
     }
 }
 

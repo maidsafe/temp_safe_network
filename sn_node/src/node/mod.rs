@@ -91,8 +91,8 @@ mod core {
         messaging::{
             data::OperationId,
             signature_aggregator::SignatureAggregator,
-            system::{DkgSessionId, NodeState, SectionAuth as SectionAuthed},
-            AuthorityProof, SectionAuth, SectionAuthorityProvider,
+            system::{DkgSessionId, NodeState, SectionSigned},
+            AuthorityProof, SectionAuthorityProvider, SectionSig,
         },
         network_knowledge::{
             supermajority, NetworkKnowledge, NodeInfo,
@@ -150,7 +150,7 @@ mod core {
     #[derive(Debug, Clone)]
     pub(crate) struct DkgSessionInfo {
         pub(crate) session_id: DkgSessionId,
-        pub(crate) authority: AuthorityProof<SectionAuth>,
+        pub(crate) authority: AuthorityProof<SectionSig>,
     }
 
     // Store up to 100 in use backoffs
@@ -177,7 +177,7 @@ mod core {
         pub(crate) dkg_sessions_info: HashMap<Digest256, DkgSessionInfo>,
         pub(crate) dkg_voter: DkgVoter,
         pub(crate) pending_split_sections:
-            BTreeMap<Generation, BTreeSet<SectionAuthed<SectionAuthProvider>>>,
+            BTreeMap<Generation, BTreeSet<SectionSigned<SectionAuthProvider>>>,
         pub(crate) relocate_state: Option<Box<JoiningAsRelocated>>,
         // ======================== Elder only ========================
         pub(crate) membership: Option<Membership>,

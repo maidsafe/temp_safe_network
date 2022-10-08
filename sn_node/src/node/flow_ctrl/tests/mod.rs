@@ -35,11 +35,11 @@ use sn_interface::{
     messaging::{
         data::{ClientMsg, DataCmd, Error as MessagingDataError, RegisterCmd, SpentbookCmd},
         system::{
-            AntiEntropyKind, JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig,
-            MembershipState, NodeCmd, NodeMsg, NodeMsgAuthorityUtils, NodeState as NodeStateMsg,
-            RelocateDetails, ResourceProof, SectionAuth,
+            AntiEntropyKind, JoinAsRelocatedRequest, JoinRequest, JoinResponse, MembershipState,
+            NodeCmd, NodeMsg, NodeState as NodeStateMsg, RelocateDetails, ResourceProof,
+            SectionSig, SectionSigned,
         },
-        Dst, MsgId, MsgType, SectionAuth as MsgKindSectionAuth, SectionTreeUpdate, WireMsg,
+        Dst, MsgId, MsgType, SectionTreeUpdate, WireMsg,
     },
     network_knowledge::{
         recommended_section_size, supermajority, test_utils::*, Error as NetworkKnowledgeError,
@@ -335,7 +335,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             for peer in section_auth.elders() {
                 let node_state = NodeState::joined(*peer, None);
                 let sig = prove(&sk_set.secret_key(), &node_state)?;
-                let _updated = section.update_member(SectionAuth {
+                let _updated = section.update_member(SectionSigned {
                     value: node_state,
                     sig,
                 });
@@ -972,7 +972,7 @@ async fn handle_elders_update() -> Result<()> {
         let signed_sap1 = section_signed(sk_set1.secret_key(), sap1)?;
         let proposal = Proposal::NewElders(signed_sap1.clone());
         let signature = sk_set0.secret_key().sign(&proposal.as_signable_bytes()?);
-        let sig = KeyedSig {
+        let sig = SectionSig {
             signature,
             public_key: pk0,
         };
@@ -1138,10 +1138,10 @@ async fn handle_demote_during_split() -> Result<()> {
 
             // Create agreement on `OurElder` for both sub-sections
             let create_our_elders_cmd =
-                |signed_sap: SectionAuth<SectionAuthorityProvider>| -> Result<_> {
+                |signed_sap: SectionSigned<SectionAuthorityProvider>| -> Result<_> {
                     let proposal = Proposal::NewElders(signed_sap.clone());
                     let signature = sk_set_v0.secret_key().sign(&proposal.as_signable_bytes()?);
-                    let sig = KeyedSig {
+                    let sig = SectionSig {
                         signature,
                         public_key: sk_set_v0.public_keys().public_key(),
                     };

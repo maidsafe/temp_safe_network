@@ -24,7 +24,7 @@ use crate::node::{flow_ctrl::cmds::Cmd, Error, Node, Result, DATA_QUERY_LIMIT};
 
 use sn_interface::{
     messaging::{
-        data::ClientMsg, system::NodeMsg, Dst, MsgType, NodeMsgAuthority, SectionAuthShare, WireMsg,
+        data::ClientMsg, system::NodeMsg, Dst, MsgType, NodeMsgAuthority, SectionSigShare, WireMsg,
     },
     network_knowledge::NetworkKnowledge,
     types::Peer,
@@ -38,7 +38,7 @@ use std::collections::BTreeSet;
 pub(crate) enum OutgoingMsg {
     Node(NodeMsg),
     Client(ClientMsg),
-    SectionAuth((SectionAuthShare, Bytes)),
+    SectionAuth((SectionSigShare, Bytes)),
 }
 
 #[derive(Debug, Clone)]

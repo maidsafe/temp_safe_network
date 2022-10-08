@@ -18,7 +18,7 @@ use qp2p::UsrMsgBytes;
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
-        system::{AntiEntropyKind, NodeCmd, NodeMsg, NodeState, SectionAuth},
+        system::{AntiEntropyKind, NodeCmd, NodeMsg, NodeState, SectionSigned},
         MsgType, SectionTreeUpdate, WireMsg,
     },
     types::{log_markers::LogMarker, Peer, PublicKey},
@@ -70,7 +70,7 @@ impl Node {
             .network_knowledge
             .section_signed_members()
             .iter()
-            .map(|state| state.clone().into_authed_msg())
+            .map(|state| state.clone().into_signed_msg())
             .collect();
 
         let ae_msg = self.generate_ae_msg(Some(section_pk), AntiEntropyKind::Update { members });
@@ -162,7 +162,7 @@ impl Node {
     pub(crate) fn update_network_knowledge(
         &mut self,
         section_tree_update: SectionTreeUpdate,
-        members: Option<BTreeSet<SectionAuth<NodeState>>>,
+        members: Option<BTreeSet<SectionSigned<NodeState>>>,
     ) -> Result<bool> {
         let our_name = self.info().name();
         let sap = section_tree_update.signed_sap();
@@ -442,15 +442,12 @@ mod tests {
     };
     use crate::UsedSpace;
     use sn_interface::{
-        messaging::system::SectionAuth, network_knowledge::SectionAuthorityProvider,
+        messaging::system::SectionSigned, network_knowledge::SectionAuthorityProvider,
     };
 
     use sn_interface::{
         elder_count,
-        messaging::{
-            AuthKind, AuthorityProof, Dst, MsgId, NodeMsgAuthority, NodeSig,
-            SectionAuth as SectionAuthMsg,
-        },
+        messaging::{AuthKind, AuthorityProof, Dst, MsgId, NodeMsgAuthority, NodeSig},
         network_knowledge::{
             test_utils::{gen_addr, random_sap, section_signed},
             NetworkKnowledge, NodeInfo, SectionKeyShare, SectionKeysProvider, SectionsDAG,
@@ -688,7 +685,7 @@ mod tests {
 
     struct Env {
         node: Node,
-        other_signed_sap: SectionAuth<SectionAuthorityProvider>,
+        other_signed_sap: SectionSigned<SectionAuthorityProvider>,
         proof_chain: SectionsDAG,
     }
 
@@ -789,10 +786,7 @@ mod tests {
                 },
             };
 
-            let auth_proof = AuthorityProof(SectionAuthMsg {
-                src_name: self.other_signed_sap.value.prefix().name(),
-                sig: self.other_signed_sap.sig.clone(),
-            });
+            let auth_proof = AuthorityProof(self.other_signed_sap.sig.clone());
             let node_auth = NodeMsgAuthority::Section(auth_proof);
 
             Ok((payload_msg, node_auth))

@@ -87,7 +87,7 @@ impl Display for SecretKey {
 
 #[cfg(any(test, feature = "test-utils"))]
 pub(crate) mod test_utils {
-    use crate::messaging::system::KeyedSig;
+    use crate::messaging::system::SectionSig;
     use crate::network_knowledge::{elder_count, supermajority};
     use rand::RngCore;
     use std::ops::Deref;
@@ -133,8 +133,8 @@ pub(crate) mod test_utils {
     }
 
     /// Create signature for the given bytes using the given secret key.
-    pub fn keyed_signed(secret_key: &bls::SecretKey, bytes: &[u8]) -> KeyedSig {
-        KeyedSig {
+    pub fn keyed_signed(secret_key: &bls::SecretKey, bytes: &[u8]) -> SectionSig {
+        SectionSig {
             public_key: secret_key.public_key(),
             signature: secret_key.sign(bytes),
         }

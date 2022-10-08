@@ -15,7 +15,7 @@ use crate::node::{
 
 use sn_interface::{
     elder_count,
-    messaging::system::{MembershipState, NodeState as NodeStateMsg, SectionAuth},
+    messaging::system::{MembershipState, NodeState as NodeStateMsg, SectionSigned},
     types::log_markers::LogMarker,
 };
 
@@ -61,7 +61,7 @@ impl Node {
 
     pub(crate) async fn handle_relocate(
         &mut self,
-        relocate_proof: SectionAuth<NodeStateMsg>,
+        relocate_proof: SectionSigned<NodeStateMsg>,
     ) -> Result<Option<Cmd>> {
         let (dst_xorname, dst_section_key, new_age) =
             if let MembershipState::Relocated(ref relocate_details) = relocate_proof.value.state {

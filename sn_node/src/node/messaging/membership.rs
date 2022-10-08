@@ -15,7 +15,7 @@ use bls::Signature;
 use sn_consensus::{Decision, Generation, SignedVote, VoteResponse};
 use sn_interface::{
     messaging::{
-        system::{JoinResponse, KeyedSig, MembershipState, NodeMsg, NodeState, SectionAuth},
+        system::{JoinResponse, MembershipState, NodeMsg, NodeState, SectionSig, SectionSigned},
         SectionTreeUpdate,
     },
     types::{log_markers::LogMarker, Peer},
@@ -226,12 +226,12 @@ impl Node {
     }
 
     async fn handle_node_joined(&mut self, new_info: NodeState, signature: Signature) -> Vec<Cmd> {
-        let sig = KeyedSig {
+        let sig = SectionSig {
             public_key: self.network_knowledge.section_key(),
             signature,
         };
 
-        let new_info = SectionAuth {
+        let new_info = SectionSigned {
             value: new_info.into_state(),
             sig,
         };
@@ -284,16 +284,16 @@ impl Node {
         node_state: NodeState,
         signature: Signature,
     ) -> Option<Cmd> {
-        let sig = KeyedSig {
+        let sig = SectionSig {
             public_key: self.network_knowledge.section_key(),
             signature,
         };
 
-        let node_state = SectionAuth {
+        let node_state = SectionSigned {
             value: node_state,
             sig,
         }
-        .into_authed_state();
+        .into_signed_state();
 
         let _ = self.network_knowledge.update_member(node_state.clone());
 
@@ -308,7 +308,7 @@ impl Node {
         // containing the relocation details.
         if node_state.is_relocated() {
             let peer = *node_state.peer();
-            let msg = NodeMsg::Relocate(node_state.into_authed_msg());
+            let msg = NodeMsg::Relocate(node_state.into_signed_msg());
             Some(self.send_system_msg(msg, Peers::Single(peer)))
         } else {
             None

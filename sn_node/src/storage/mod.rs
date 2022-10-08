@@ -368,20 +368,15 @@ mod tests {
         Ok(())
     }
 
-    fn section_auth() -> sn_interface::messaging::SectionAuth {
-        use sn_interface::messaging::system::KeyedSig;
-
+    use sn_interface::messaging::system::SectionSig;
+    fn section_sig() -> SectionSig {
         let sk = bls::SecretKey::random();
         let public_key = sk.public_key();
         let data = "hello".to_string();
         let signature = sk.sign(&data);
-        let sig = KeyedSig {
+        SectionSig {
             public_key,
             signature,
-        };
-        sn_interface::messaging::SectionAuth {
-            src_name: sn_interface::types::PublicKey::Bls(public_key).into(),
-            sig,
         }
     }
 
@@ -414,7 +409,7 @@ mod tests {
 
         let op = CreateRegister { name, tag, policy };
         let signature = keypair.sign(&bincode::serialize(&op).expect("could not serialize op"));
-        let section_auth = section_auth();
+        let section_auth = section_sig();
         let cmd = RegisterCmd::Create {
             cmd: SignedRegisterCreate {
                 op,
@@ -423,7 +418,7 @@ mod tests {
                     signature,
                 },
             },
-            section_auth: section_auth.clone(), // obtained after presenting a valid payment to the network
+            section_sig: section_auth.clone(), // obtained after presenting a valid payment to the network
         };
 
         // ReplicatedData::RegisterWrite(reg_cmd)

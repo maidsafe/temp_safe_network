@@ -9,7 +9,7 @@
 use crate::node::Result;
 
 use sn_interface::{
-    messaging::system::{Proposal as ProposalMsg, SectionAuth, SigShare},
+    messaging::system::{Proposal as ProposalMsg, SectionSigShare, SectionSigned},
     network_knowledge::{NodeState, SectionAuthorityProvider},
 };
 
@@ -18,7 +18,7 @@ use sn_interface::{
 pub(crate) enum Proposal {
     VoteNodeOffline(NodeState),
     SectionInfo(SectionAuthorityProvider),
-    NewElders(SectionAuth<SectionAuthorityProvider>),
+    NewElders(SectionSigned<SectionAuthorityProvider>),
     JoinsAllowed(bool),
 }
 
@@ -29,8 +29,8 @@ impl Proposal {
         public_key_set: bls::PublicKeySet,
         index: usize,
         secret_key_share: &bls::SecretKeyShare,
-    ) -> Result<SigShare> {
-        Ok(SigShare::new(
+    ) -> Result<SectionSigShare> {
+        Ok(SectionSigShare::new(
             public_key_set,
             index,
             secret_key_share,
@@ -53,7 +53,7 @@ impl Proposal {
         match self {
             Self::VoteNodeOffline(node_state) => ProposalMsg::VoteNodeOffline(node_state.to_msg()),
             Self::SectionInfo(sap) => ProposalMsg::SectionInfo(sap.to_msg()),
-            Self::NewElders(sap) => ProposalMsg::NewElders(sap.into_authed_msg()),
+            Self::NewElders(sap) => ProposalMsg::NewElders(sap.into_signed_msg()),
             Self::JoinsAllowed(allowed) => ProposalMsg::JoinsAllowed(allowed),
         }
     }

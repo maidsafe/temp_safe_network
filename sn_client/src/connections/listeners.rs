@@ -19,7 +19,7 @@ use sn_interface::{
     at_least_one_correct_elder,
     messaging::{
         data::{ClientMsg, Error as ErrorMsg},
-        system::{AntiEntropyKind, NodeMsg, NodeMsgAuthorityUtils},
+        system::{AntiEntropyKind, NodeMsg},
         AuthKind, AuthorityProof, ClientAuth, Dst, MsgId, MsgType, NodeMsgAuthority,
         SectionTreeUpdate, WireMsg,
     },
@@ -156,8 +156,8 @@ impl Session {
 
         if !NetworkKnowledge::verify_node_msg_can_be_trusted(&msg_authority, &msg, &known_keys) {
             warn!("Untrusted message has been dropped, from {sender:?}: {msg:?} ");
-            let (_, section_pk) = msg_authority.src_location();
-            return Err(Error::UntrustedMessage(section_pk));
+            let pk = msg_authority.src_public_key();
+            return Err(Error::UntrustedMessage(pk));
         }
 
         match msg {

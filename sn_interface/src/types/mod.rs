@@ -25,7 +25,7 @@ mod chunk;
 mod errors;
 mod peer;
 
-pub use crate::messaging::{data::RegisterCmd, SectionAuth};
+pub use crate::messaging::{data::RegisterCmd, SectionSig};
 
 pub use address::{ChunkAddress, DataAddress, RegisterAddress, SpentbookAddress};
 pub use cache::Cache;
