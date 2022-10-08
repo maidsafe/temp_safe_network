@@ -211,6 +211,8 @@ impl PeerSessionWorker {
         let conns_count = self.link.connections.len();
         let the_peer = *self.link.peer();
 
+        let connection_id = conn.id();
+
         let _handle = tokio::spawn(async move {
             let send_resp = Link::send_with(
                 job.bytes.clone(),
@@ -247,7 +249,7 @@ impl PeerSessionWorker {
                     }
 
                     warn!(
-                        "Transient error while attempting to send, re-enqueing job {id:?} {err:?}"
+                        "Transient error while attempting to send, re-enqueing job {id:?} {err:?}. Connection id was {:?}",connection_id
                     );
 
                     // sleep so connection removal.cleanup in the link can occur before we try again.

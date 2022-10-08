@@ -115,22 +115,31 @@ impl Link {
         connections: LinkConnections,
         queue: LinkQueue,
     ) -> Result<(), SendToOneError> {
-        // trace!(
-        //     "We have {} open connections to node {:?}.",
-        //     self.queue.len(),
-        //     self.peer
-        // );
+        trace!(
+            "We have {}/{} open connections to node {:?}.",
+            queue.read().await.len(),
+            connections.len(),
+            conn.id()
+        );
 
         match conn.send_with(bytes, priority, retry_config).await {
             Ok(()) => Ok(()),
             Err(error) => {
+                error!(
+                    "Error sending out from link... We have {}/{} open connections to node {:?}.",
+                    queue.read().await.len(),
+                    connections.len(),
+                    conn.id()
+                );
                 // clean up failing connections at once, no nead to leak it outside of here
                 // next send (e.g. when retrying) will use/create a new connection
                 let id = &conn.id();
                 // We could write just `self.queue.remove(id)`, but the library warns for `unused_results`.
                 {
                     let _ = connections.remove(id);
+                    debug!("about toclean conn {id:?} from queue");
                     let _ = queue.write().await.remove(id);
+                    debug!("cleaned up conn {id:?} from queue");
                 }
                 conn.close(Some(format!("{:?}", error)));
                 Err(SendToOneError::Send(error))
