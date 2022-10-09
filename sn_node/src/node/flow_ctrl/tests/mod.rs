@@ -19,8 +19,7 @@ use crate::{
         flow_ctrl::{dispatcher::Dispatcher, event_channel},
         messages::WireMsgUtils,
         messaging::{OutgoingMsg, Peers},
-        Cmd, Error, Event, MembershipEvent, MyNode, Proposal, Result as RoutingResult,
-        RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
+        Cmd, Error, Event, MembershipEvent, Node, Proposal, Result as RoutingResult,
     },
     storage::UsedSpace,
 };
@@ -36,8 +35,8 @@ use sn_interface::{
         data::{ClientMsg, DataCmd, Error as MessagingDataError, RegisterCmd, SpentbookCmd},
         system::{
             AntiEntropyKind, JoinAsRelocatedRequest, JoinRequest, JoinResponse, MembershipState,
-            NodeCmd, NodeMsg, NodeState as NodeStateMsg, RelocateDetails, ResourceProof,
-            SectionSig, SectionSigned,
+            NodeCmd, NodeMsg, NodeState as NodeStateMsg, RelocateDetails, SectionSig,
+            SectionSigned,
         },
         Dst, MsgId, MsgType, SectionTreeUpdate, WireMsg,
     },
@@ -71,130 +70,6 @@ use tokio::{
     time::{timeout, Duration},
 };
 use xor_name::{Prefix, XorName};
-
-#[tokio::test]
-async fn receive_join_request_without_resource_proof_response() -> Result<()> {
-    let local = tokio::task::LocalSet::new();
-    local
-        .run_until(async move {
-            let prefix1 = Prefix::default().pushed(true);
-            let (dispatcher, _, _, sk_set) =
-                network_utils::TestNodeBuilder::new(prefix1, elder_count())
-                    .build()
-                    .await?;
-            let section_key = sk_set.public_keys().public_key();
-
-            let new_node_comm = network_utils::create_comm().await?;
-            let new_node = MyNodeInfo::new(
-                ed25519::gen_keypair(&prefix1.range_inclusive(), MIN_ADULT_AGE),
-                new_node_comm.socket_addr(),
-            );
-
-            let wire_msg = WireMsg::single_src(
-                &new_node,
-                Dst {
-                    name: XorName::from(PublicKey::Bls(section_key)),
-                    section_key,
-                },
-                NodeMsg::JoinRequest(JoinRequest::Initiate { section_key }),
-                section_key,
-            )?;
-
-            let all_cmds = run_and_collect_cmds(
-                Cmd::ValidateMsg {
-                    origin: new_node.peer(),
-                    wire_msg,
-                },
-                &dispatcher,
-            )
-            .await?;
-
-            assert!(all_cmds.into_iter().any(|cmd| {
-                match cmd {
-                    Cmd::SendMsg {
-                        msg: OutgoingMsg::Node(NodeMsg::JoinResponse(response)),
-                        ..
-                    } => matches!(*response, JoinResponse::ResourceChallenge { .. }),
-                    _ => false,
-                }
-            }));
-
-            Result::<()>::Ok(())
-        })
-        .await
-}
-
-#[tokio::test]
-async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result<()> {
-    let local = tokio::task::LocalSet::new();
-    local
-        .run_until(async move {
-            let prefix1 = Prefix::default().pushed(true);
-            let (dispatcher, _, _, sk_set) =
-                network_utils::TestNodeBuilder::new(prefix1, elder_count())
-                    .build()
-                    .await?;
-            let section_key = sk_set.public_keys().public_key();
-            let node = dispatcher.node();
-
-            let new_node = MyNodeInfo::new(
-                ed25519::gen_keypair(&prefix1.range_inclusive(), MIN_ADULT_AGE),
-                gen_addr(),
-            );
-
-            let nonce: [u8; 32] = rand::random();
-            let serialized = bincode::serialize(&(new_node.name(), nonce))?;
-            let nonce_signature = ed25519::sign(&serialized, &node.read().await.info().keypair);
-
-            let rp = ChallengeSolver::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY);
-            let data = rp.create_proof_data(&nonce);
-            let mut prover = rp.create_prover(data.clone());
-            let solution = prover.solve();
-            let resource_proof = ResourceProof {
-                solution,
-                data,
-                nonce,
-                nonce_signature,
-            };
-            let wire_msg = WireMsg::single_src(
-                &new_node,
-                Dst {
-                    name: XorName::from(PublicKey::Bls(section_key)),
-                    section_key,
-                },
-                NodeMsg::JoinRequest(JoinRequest::SubmitResourceProof {
-                    section_key,
-                    proof: Box::new(resource_proof.clone()),
-                }),
-                section_key,
-            )?;
-
-            let _ = run_and_collect_cmds(
-                Cmd::ValidateMsg {
-                    origin: new_node.peer(),
-                    wire_msg,
-                },
-                &dispatcher,
-            )
-            .await?;
-
-            assert!(node
-                .read()
-                .await
-                .membership
-                .as_ref()
-                .ok_or_else(|| eyre!("Membership for the node must be set"))?
-                .is_churn_in_progress());
-            // makes sure that the nonce signature is always valid
-            let random_peer = Peer::new(xor_name::rand::random(), gen_addr());
-            assert!(!node
-                .read()
-                .await
-                .validate_resource_proof(&random_peer.name(), resource_proof));
-            Result::<()>::Ok(())
-        })
-        .await
-}
 
 #[tokio::test]
 async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result<()> {
