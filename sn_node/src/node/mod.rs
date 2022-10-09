@@ -95,7 +95,7 @@ mod core {
             AuthorityProof, SectionAuthorityProvider, SectionSig,
         },
         network_knowledge::{
-            supermajority, NetworkKnowledge, MyNodeInfo,
+            supermajority, MyNodeInfo, NetworkKnowledge,
             SectionAuthorityProvider as SectionAuthProvider, SectionKeyShare, SectionKeysProvider,
         },
         types::{keys::ed25519::Digest256, log_markers::LogMarker, Cache, DataAddress, Peer},

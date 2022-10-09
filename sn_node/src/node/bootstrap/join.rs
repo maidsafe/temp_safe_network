@@ -19,7 +19,7 @@ use sn_interface::{
         },
         AuthKind, Dst, MsgType, NodeSig, WireMsg,
     },
-    network_knowledge::{NetworkKnowledge, MyNodeInfo, SectionTree},
+    network_knowledge::{MyNodeInfo, NetworkKnowledge, SectionTree},
     types::{keys::ed25519, log_markers::LogMarker, Peer},
 };
 

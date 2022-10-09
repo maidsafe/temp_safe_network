@@ -450,7 +450,7 @@ mod tests {
         messaging::{AuthKind, AuthorityProof, Dst, MsgId, NodeMsgAuthority, NodeSig},
         network_knowledge::{
             test_utils::{gen_addr, random_sap, section_signed},
-            NetworkKnowledge, MyNodeInfo, SectionKeyShare, SectionKeysProvider, SectionsDAG,
+            MyNodeInfo, NetworkKnowledge, SectionKeyShare, SectionKeysProvider, SectionsDAG,
         },
         types::keys::ed25519,
     };

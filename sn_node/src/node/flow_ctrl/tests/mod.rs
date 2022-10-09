@@ -43,7 +43,7 @@ use sn_interface::{
     },
     network_knowledge::{
         recommended_section_size, supermajority, test_utils::*, Error as NetworkKnowledgeError,
-        NetworkKnowledge, MyNodeInfo, NodeState, SectionAuthorityProvider, SectionKeyShare,
+        MyNodeInfo, NetworkKnowledge, NodeState, SectionAuthorityProvider, SectionKeyShare,
         SectionKeysProvider, SectionTree, SectionsDAG, FIRST_SECTION_MAX_AGE,
         FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
     },
