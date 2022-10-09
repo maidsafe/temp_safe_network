@@ -12,7 +12,8 @@ use crate::{
         core::DkgSessionInfo,
         flow_ctrl::cmds::Cmd,
         messaging::{OutgoingMsg, Peers},
-        Error, Event, MembershipEvent, MyNode, Proposal as CoreProposal, Result, MIN_LEVEL_WHEN_FULL,
+        Error, Event, MembershipEvent, MyNode, Proposal as CoreProposal, Result,
+        MIN_LEVEL_WHEN_FULL,
     },
     storage::Error as StorageError,
 };

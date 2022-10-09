@@ -16,7 +16,7 @@ use crate::{
 
 use sn_interface::{
     network_knowledge::{
-        NetworkKnowledge, MyNodeInfo, SectionAuthorityProvider, SectionKeyShare, SectionsDAG,
+        MyNodeInfo, NetworkKnowledge, SectionAuthorityProvider, SectionKeyShare, SectionsDAG,
         GENESIS_DBC_SK,
     },
     types::log_markers::LogMarker,

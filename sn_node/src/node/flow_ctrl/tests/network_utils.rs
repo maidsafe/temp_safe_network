@@ -17,7 +17,7 @@ use sn_interface::{
     elder_count,
     messaging::{system::NodeState as NodeStateMsg, SectionTreeUpdate},
     network_knowledge::{
-        test_utils::*, NetworkKnowledge, MyNodeInfo, NodeState, SectionAuthorityProvider,
+        test_utils::*, MyNodeInfo, NetworkKnowledge, NodeState, SectionAuthorityProvider,
         SectionKeyShare, SectionTree, SectionsDAG, MIN_ADULT_AGE,
     },
     types::{keys::ed25519, Peer, SecretKeySet},
