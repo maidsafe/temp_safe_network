@@ -21,6 +21,7 @@ Before running the node, an OTLP endpoint should be available. An example of an 
 ```
 docker run --name jaeger \
   -e COLLECTOR_OTLP_ENABLED=true \
+  -p 16685:16685 \
   -p 16686:16686 \
   -p 4317:4317 \
   -p 4318:4318 \
