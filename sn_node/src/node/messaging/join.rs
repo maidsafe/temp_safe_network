@@ -34,19 +34,7 @@ impl MyNode {
     ) -> Result<Option<Cmd>> {
         debug!("Received {:?} from {}", join_request, peer);
 
-        let provided_section_key = match join_request {
-            JoinRequest::Initiate { section_key } => section_key,
-            JoinRequest::SubmitResourceProof { proof, .. } => {
-                // Require resource signed if joining as a new node.
-                if !self.validate_resource_proof(&peer.name(), *proof) {
-                    debug!("Ignoring JoinRequest from {peer} - invalid resource signed response");
-                    return Ok(None);
-                }
-
-                let node_state = NodeState::joined(peer.name(), peer.addr(), None);
-                return Ok(self.propose_membership_change(node_state));
-            }
-        };
+        let provided_section_key = join_request.section_key().clone();
 
         let our_section_key = self.network_knowledge.section_key();
         let section_key_matches = provided_section_key == our_section_key;
@@ -135,9 +123,10 @@ impl MyNode {
             trace!("Sending {:?} to {}", msg, peer);
             Ok(Some(self.send_system_msg(msg, Peers::Single(peer))))
         } else {
-            // It's reachable, let's then send the proof challenge
-            self.send_resource_proof_challenge(peer).map(Some)
-        }
+            // It's reachable, let's then propose membership
+            let node_state = NodeState::joined(peer.name(), peer.addr(), None);
+            Ok(self.propose_membership_change(node_state))
+    }
     }
 
     pub(crate) fn verify_joining_node_age(&self, peer: &Peer) -> Result<(bool, u8)> {

@@ -16,7 +16,7 @@ mod section_sig;
 use crate::messaging::{AuthorityProof, EndUser, MsgId, SectionTreeUpdate};
 use crate::network_knowledge::SapCandidate;
 pub use agreement::{DkgSessionId, Proposal, SectionSigned};
-pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProof};
+pub use join::{JoinRejectionReason, JoinRequest, JoinResponse};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use node_msgs::{NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse};
 pub use node_state::{MembershipState, NodeState, RelocateDetails};

@@ -14,9 +14,7 @@ use crate::node::{messages::WireMsgUtils, Error, Result};
 
 use sn_interface::{
     messaging::{
-        system::{
-            JoinRejectionReason, JoinRequest, JoinResponse, MembershipState, NodeMsg, ResourceProof,
-        },
+        system::{JoinRejectionReason, JoinRequest, JoinResponse, MembershipState, NodeMsg},
         AuthKind, Dst, MsgType, NodeSig, WireMsg,
     },
     network_knowledge::{MyNodeInfo, NetworkKnowledge, SectionTree},
@@ -26,7 +24,7 @@ use sn_interface::{
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
 use futures::future;
-use resource_proof::ResourceProof as ChallengeSolver;
+
 use std::collections::{BTreeMap, BTreeSet};
 use tokio::{
     sync::mpsc,
@@ -141,7 +139,7 @@ impl<'a> Joiner<'a> {
         // We send a first join request to obtain the resource challenge, which
         // we will then use to generate the challenge proof and send the
         // `JoinRequest` again with it.
-        let msg = JoinRequest::Initiate { section_key };
+        let msg = JoinRequest { section_key };
 
         self.send(msg, &recipients, section_key, false).await?;
 
@@ -152,30 +150,6 @@ impl<'a> Joiner<'a> {
             let (response, sender) = self.receive_join_response(response_timeout).await?;
 
             match response {
-                JoinResponse::ResourceChallenge {
-                    data_size,
-                    difficulty,
-                    nonce,
-                    nonce_signature,
-                } => {
-                    trace!("Received a ResourceChallenge from {}", sender);
-
-                    let rp = ChallengeSolver::new(data_size, difficulty);
-                    let data = rp.create_proof_data(&nonce);
-                    let mut prover = rp.create_prover(data.clone());
-                    let solution = prover.solve();
-
-                    let msg = JoinRequest::SubmitResourceProof {
-                        section_key,
-                        proof: Box::new(ResourceProof {
-                            solution,
-                            data,
-                            nonce,
-                            nonce_signature,
-                        }),
-                    };
-                    self.send(msg, &[sender], section_key, false).await?;
-                }
                 JoinResponse::Approved {
                     section_tree_update,
                     decision,
@@ -275,7 +249,7 @@ impl<'a> Joiner<'a> {
 
                         section_key = signed_sap.section_key();
 
-                        let msg = JoinRequest::Initiate { section_key };
+                        let msg = JoinRequest { section_key };
                         let new_recipients = signed_sap.elders_vec();
 
                         self.send(msg, &new_recipients, section_key, true).await?;
@@ -327,7 +301,7 @@ impl<'a> Joiner<'a> {
                     section_key = new_section_key;
                     self.prefix = section_auth.prefix();
 
-                    let msg = JoinRequest::Initiate { section_key };
+                    let msg = JoinRequest { section_key };
 
                     self.send(msg, &new_recipients, section_key, true).await?;
                 }
@@ -592,7 +566,7 @@ mod tests {
             let node_msg = assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node { msg, .. }) =>
                 msg);
 
-            assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest::Initiate { .. }));
+            assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest { .. }));
 
             // Send JoinResponse::Retry with new SAP
             let other_elders: Vec<&MyNodeInfo> =
@@ -619,7 +593,7 @@ mod tests {
 
             assert_eq!(dst.section_key, next_section_key);
             itertools::assert_equal(recipients, next_sap.elders());
-            assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest::Initiate { section_key }) => {
+            assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest{ section_key }) => {
                 assert_eq!(section_key, next_section_key);
             });
 
@@ -712,7 +686,7 @@ mod tests {
                     (msg, dst));
 
             assert_eq!(dst.section_key, new_sap.section_key());
-            assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest::Initiate { section_key }) => {
+            assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest{ section_key }) => {
                 assert_eq!(section_key, new_sap.section_key());
             });
 
@@ -895,7 +869,7 @@ mod tests {
 
             let node_msg =
                 assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node{ msg, .. }) => msg);
-            assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest::Initiate { .. }));
+            assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest { .. }));
 
             let proof_chain = SectionsDAG::new(genesis_pk);
 
@@ -949,15 +923,6 @@ mod tests {
                     next_section_key,
                 )?;
             }
-
-            let (wire_msg, _) = send_rx
-                .recv()
-                .await
-                .ok_or_else(|| eyre!("NodeMsg was not received"))?;
-
-            let node_msg =
-                assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node{ msg, .. }) => msg);
-            assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest::Initiate { .. }));
 
             Ok(())
         };

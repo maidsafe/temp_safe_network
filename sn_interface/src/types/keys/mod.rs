@@ -15,6 +15,6 @@
 pub mod ed25519;
 pub(super) mod keypair;
 pub(super) mod node_keypairs;
-pub(super) mod public_key;
+pub(crate) mod public_key;
 pub(super) mod secret_key;
 pub(super) mod signature;

@@ -33,7 +33,6 @@ use self::{
     bootstrap::join_network,
     core::{
         MyNode, StateSnapshot, DATA_QUERY_LIMIT, GENESIS_DBC_AMOUNT, MAX_WAITING_PEERS_PER_QUERY,
-        RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
     },
     data::MIN_LEVEL_WHEN_FULL,
     flow_ctrl::{
@@ -104,7 +103,7 @@ mod core {
     use backoff::ExponentialBackoff;
     use ed25519_dalek::Keypair;
     use itertools::Itertools;
-    use resource_proof::ResourceProof;
+
     use sn_consensus::Generation;
     use std::{
         collections::{BTreeMap, BTreeSet, HashMap},
@@ -120,9 +119,6 @@ mod core {
     /// Each whole token can be subdivided 10^9 times,
     /// thus creating a total of 4,525,524,120,000,000,000 available units.
     pub(crate) const GENESIS_DBC_AMOUNT: u64 = 4_525_524_120 * u64::pow(10, 9);
-
-    pub(crate) const RESOURCE_PROOF_DATA_SIZE: usize = 128;
-    pub(crate) const RESOURCE_PROOF_DIFFICULTY: u8 = 10;
 
     // This prevents pending query limit unbound growth
     // One insert per OpId/Adult.
@@ -166,7 +162,6 @@ mod core {
         // TODO: This can probably be reworked into the general per peer msg queue, but as
         // we need to pull data first before we form the WireMsg, we won't do that just now
         pub(crate) pending_data_to_replicate_to_peers: BTreeMap<DataAddress, BTreeSet<Peer>>,
-        pub(crate) resource_proof: ResourceProof,
         // Network resources
         pub(crate) section_keys_provider: SectionKeysProvider,
         pub(crate) network_knowledge: NetworkKnowledge,
@@ -269,10 +264,6 @@ mod core {
                 event_sender,
                 handover_voting: handover,
                 joins_allowed: true,
-                resource_proof: ResourceProof::new(
-                    RESOURCE_PROOF_DATA_SIZE,
-                    RESOURCE_PROOF_DIFFICULTY,
-                ),
                 data_storage,
                 capacity: Capacity::default(),
                 dysfunction_tracking: node_dysfunction_detector,
