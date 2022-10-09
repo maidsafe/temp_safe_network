@@ -10,7 +10,7 @@ use crate::node::{
     bootstrap::JoiningAsRelocated,
     flow_ctrl::cmds::Cmd,
     relocation::{find_nodes_to_relocate, ChurnId},
-    Event, MembershipEvent, Node, Proposal, Result,
+    Event, MembershipEvent, MyNode, Proposal, Result,
 };
 
 use sn_interface::{
@@ -23,7 +23,7 @@ use std::collections::BTreeSet;
 use xor_name::XorName;
 
 // Relocation
-impl Node {
+impl MyNode {
     pub(crate) fn relocate_peers(
         &mut self,
         churn_id: ChurnId,

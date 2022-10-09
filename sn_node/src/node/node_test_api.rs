@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{CmdChannel, Error, Node, Peer, Result};
+use crate::node::{CmdChannel, Error, MyNode, Peer, Result};
 
 use sn_interface::{
     messaging::system::NodeMsg,
@@ -30,12 +30,12 @@ use super::{
 /// `Node` or as a part of a section or group location.
 #[allow(missing_debug_implementations)]
 pub struct NodeTestApi {
-    node: Arc<RwLock<Node>>,
+    node: Arc<RwLock<MyNode>>,
     cmd_channel: CmdChannel,
 }
 
 impl NodeTestApi {
-    pub(crate) fn new(node: Arc<RwLock<Node>>, cmd_channel: CmdChannel) -> Self {
+    pub(crate) fn new(node: Arc<RwLock<MyNode>>, cmd_channel: CmdChannel) -> Self {
         Self { node, cmd_channel }
     }
 

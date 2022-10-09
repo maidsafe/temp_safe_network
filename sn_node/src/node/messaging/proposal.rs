@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Node, Proposal, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, Proposal, Result};
 use sn_interface::messaging::system::SectionSigShare;
 
 use sn_interface::{
@@ -19,7 +19,7 @@ use sn_interface::{
     types::Peer,
 };
 
-impl Node {
+impl MyNode {
     /// Send proposal to all our elders.
     pub(crate) fn propose(&mut self, proposal: Proposal) -> Result<Vec<Cmd>> {
         let elders = self.network_knowledge.section_auth().elders_vec();
@@ -73,7 +73,7 @@ impl Node {
         // handle ourselves if we should
         for peer in recipients.clone() {
             if peer.name() == our_name {
-                cmds.extend(Node::handle_proposal(
+                cmds.extend(MyNode::handle_proposal(
                     msg_id,
                     proposal.clone(),
                     sig_share.clone(),

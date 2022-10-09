@@ -19,12 +19,12 @@ use crate::node::{
     },
     join_network,
     logging::{log_ctx::LogCtx, run_system_logger},
-    Config, Error, Node, Result,
+    Config, Error, MyNode, Result,
 };
 use crate::UsedSpace;
 
 use sn_interface::{
-    network_knowledge::{NodeInfo, SectionTree, MIN_ADULT_AGE},
+    network_knowledge::{MyNodeInfo, SectionTree, MIN_ADULT_AGE},
     types::{keys::ed25519, log_markers::LogMarker, PublicKey as TypesPublicKey},
 };
 
@@ -66,7 +66,7 @@ pub async fn new_test_api(
 /// that transports events from the node.
 #[allow(missing_debug_implementations, dead_code)]
 pub struct NodeRef {
-    node: Arc<RwLock<Node>>,
+    node: Arc<RwLock<MyNode>>,
     /// Sender which can be used to add a Cmd to the Node's CmdQueue
     cmd_channel: CmdChannel,
 }
@@ -85,7 +85,7 @@ pub async fn start_node(
 async fn new_node(
     config: &Config,
     join_timeout: Duration,
-) -> Result<(Arc<RwLock<Node>>, CmdChannel, EventReceiver)> {
+) -> Result<(Arc<RwLock<MyNode>>, CmdChannel, EventReceiver)> {
     let root_dir_buf = config.root_dir()?;
     let root_dir = root_dir_buf.as_path();
     fs::create_dir_all(root_dir).await?;
@@ -140,7 +140,7 @@ async fn bootstrap_node(
     used_space: UsedSpace,
     root_storage_dir: &Path,
     join_timeout: Duration,
-) -> Result<(Arc<RwLock<Node>>, CmdChannel, EventReceiver)> {
+) -> Result<(Arc<RwLock<MyNode>>, CmdChannel, EventReceiver)> {
     let (connection_event_tx, mut connection_event_rx) = mpsc::channel(100);
 
     let (event_sender, event_receiver) = event_channel::new(EVENT_CHANNEL_SIZE);
@@ -186,7 +186,7 @@ async fn bootstrap_genesis_node(
     used_space: UsedSpace,
     root_storage_dir: &Path,
     event_sender: EventSender,
-) -> Result<Node> {
+) -> Result<MyNode> {
     // Genesis node having a fix age of 255.
     let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), 255);
     let node_name = ed25519::name(&keypair.public);
@@ -200,7 +200,7 @@ async fn bootstrap_genesis_node(
     // Generate the genesis key, this will be the first key in the sections chain,
     // as well as the owner of the genesis DBC minted by this first node of the network.
     let genesis_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
-    let (node, genesis_dbc) = Node::first_node(
+    let (node, genesis_dbc) = MyNode::first_node(
         comm.socket_addr(),
         Arc::new(keypair),
         event_sender,
@@ -250,7 +250,7 @@ async fn bootstrap_normal_node(
     event_sender: EventSender,
     used_space: UsedSpace,
     root_storage_dir: &Path,
-) -> Result<Node> {
+) -> Result<MyNode> {
     let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE);
     let node_name = ed25519::name(&keypair.public);
     info!("{} Bootstrapping as a new node.", node_name);
@@ -265,7 +265,7 @@ async fn bootstrap_normal_node(
         comm.socket_addr(),
         network_contacts.genesis_key()
     );
-    let joining_node = NodeInfo::new(keypair, comm.socket_addr());
+    let joining_node = MyNodeInfo::new(keypair, comm.socket_addr());
     let (info, network_knowledge) = join_network(
         joining_node,
         comm,
@@ -274,7 +274,7 @@ async fn bootstrap_normal_node(
         join_timeout,
     )
     .await?;
-    let node = Node::new(
+    let node = MyNode::new(
         comm.socket_addr(),
         info.keypair.clone(),
         network_knowledge,

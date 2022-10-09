@@ -8,7 +8,7 @@
 
 use crate::node::messaging::{OutgoingMsg, Peers};
 
-use crate::node::{flow_ctrl::cmds::Cmd, Error, Node, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result};
 use bytes::Bytes;
 
 use sn_dbc::{
@@ -38,7 +38,7 @@ use sn_interface::{
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
-impl Node {
+impl MyNode {
     /// Forms a `CmdAck` msg to send back to the client
     pub(crate) fn send_cmd_ack(
         &self,

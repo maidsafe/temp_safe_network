@@ -32,7 +32,7 @@ mod statemap;
 use self::{
     bootstrap::join_network,
     core::{
-        Node, StateSnapshot, DATA_QUERY_LIMIT, GENESIS_DBC_AMOUNT, MAX_WAITING_PEERS_PER_QUERY,
+        MyNode, StateSnapshot, DATA_QUERY_LIMIT, GENESIS_DBC_AMOUNT, MAX_WAITING_PEERS_PER_QUERY,
         RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
     },
     data::MIN_LEVEL_WHEN_FULL,
@@ -95,7 +95,7 @@ mod core {
             AuthorityProof, SectionAuthorityProvider, SectionSig,
         },
         network_knowledge::{
-            supermajority, NetworkKnowledge, NodeInfo,
+            supermajority, NetworkKnowledge, MyNodeInfo,
             SectionAuthorityProvider as SectionAuthProvider, SectionKeyShare, SectionKeysProvider,
         },
         types::{keys::ed25519::Digest256, log_markers::LogMarker, Cache, DataAddress, Peer},
@@ -156,7 +156,7 @@ mod core {
     // Store up to 100 in use backoffs
     pub(crate) type AeBackoffCache = LRUCache<(Peer, ExponentialBackoff), BACKOFF_CACHE_LIMIT>;
 
-    pub(crate) struct Node {
+    pub(crate) struct MyNode {
         pub(crate) addr: SocketAddr, // does this change? if so... when? only at node start atm?
         pub(crate) event_sender: EventSender,
         root_storage_dir: PathBuf,
@@ -193,7 +193,7 @@ mod core {
         pub(crate) ae_backoff_cache: AeBackoffCache,
     }
 
-    impl Node {
+    impl MyNode {
         #[allow(clippy::too_many_arguments)]
         pub(crate) async fn new(
             addr: SocketAddr,
@@ -290,10 +290,10 @@ mod core {
             Ok(node)
         }
 
-        pub(crate) fn info(&self) -> NodeInfo {
+        pub(crate) fn info(&self) -> MyNodeInfo {
             let keypair = self.keypair.clone();
             let addr = self.addr;
-            NodeInfo { keypair, addr }
+            MyNodeInfo { keypair, addr }
         }
 
         pub(crate) fn name(&self) -> XorName {

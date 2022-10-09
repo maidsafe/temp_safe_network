@@ -50,7 +50,7 @@ impl CmdCtrl {
         }
     }
 
-    pub(crate) fn node(&self) -> Arc<RwLock<crate::node::Node>> {
+    pub(crate) fn node(&self) -> Arc<RwLock<crate::node::MyNode>> {
         self.dispatcher.node()
     }
 

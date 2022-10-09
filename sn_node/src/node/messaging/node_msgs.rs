@@ -12,7 +12,7 @@ use crate::{
         core::DkgSessionInfo,
         flow_ctrl::cmds::Cmd,
         messaging::{OutgoingMsg, Peers},
-        Error, Event, MembershipEvent, Node, Proposal as CoreProposal, Result, MIN_LEVEL_WHEN_FULL,
+        Error, Event, MembershipEvent, MyNode, Proposal as CoreProposal, Result, MIN_LEVEL_WHEN_FULL,
     },
     storage::Error as StorageError,
 };
@@ -34,7 +34,7 @@ use sn_interface::{
 };
 use xor_name::XorName;
 
-impl Node {
+impl MyNode {
     /// Send a (`NodeMsg`) message to all Elders in our section
     pub(crate) fn send_msg_to_our_elders(&self, msg: NodeMsg) -> Cmd {
         let sap = self.network_knowledge.section_auth();
@@ -295,7 +295,7 @@ impl Node {
                     ProposalMsg::JoinsAllowed(allowed) => CoreProposal::JoinsAllowed(allowed),
                 };
 
-                Node::handle_proposal(
+                MyNode::handle_proposal(
                     msg_id,
                     core_proposal,
                     sig_share,

@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    flow_ctrl::cmds::Cmd, messaging::Peers, Error, Node, Result, RESOURCE_PROOF_DATA_SIZE,
+    flow_ctrl::cmds::Cmd, messaging::Peers, Error, MyNode, Result, RESOURCE_PROOF_DATA_SIZE,
     RESOURCE_PROOF_DIFFICULTY,
 };
 
@@ -20,7 +20,7 @@ use ed25519_dalek::Verifier;
 use xor_name::XorName;
 
 // Resource signed
-impl Node {
+impl MyNode {
     pub(crate) fn validate_resource_proof(
         &self,
         peer_name: &XorName,

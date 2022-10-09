@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{flow_ctrl::cmds::Cmd, Node, Proposal, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, MyNode, Proposal, Result};
 use sn_interface::{
     messaging::{
         system::{SectionSig, SectionSigned},
@@ -18,7 +18,7 @@ use sn_interface::{
 use std::collections::BTreeSet;
 
 // Agreement
-impl Node {
+impl MyNode {
     #[instrument(skip(self), level = "trace")]
     pub(crate) async fn handle_general_agreements(
         &mut self,
