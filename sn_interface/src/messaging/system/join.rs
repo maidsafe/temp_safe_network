@@ -21,8 +21,8 @@ pub struct JoinRequest {
 }
 
 impl JoinRequest {
-    pub fn section_key(&self) -> &bls::PublicKey {
-        &self.section_key
+    pub fn section_key(&self) -> bls::PublicKey {
+        self.section_key
     }
 
     pub fn set_section_key(&mut self, section_key: bls::PublicKey) {
