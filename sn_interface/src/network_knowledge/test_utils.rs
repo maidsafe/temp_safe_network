@@ -1,7 +1,7 @@
 use super::*;
 use crate::messaging::system::{SectionSig, SectionSigned};
 use crate::network_knowledge::section_keys::build_spent_proof_share;
-use crate::network_knowledge::{Error, NodeInfo, MIN_ADULT_AGE};
+use crate::network_knowledge::{Error, MyNodeInfo, MIN_ADULT_AGE};
 use eyre::{eyre, Result};
 use itertools::Itertools;
 use rand::RngCore;
@@ -36,7 +36,7 @@ pub fn gen_addr() -> SocketAddr {
 // The `age_diff` flag is used to trigger nodes being generated with different age pattern.
 // The test of `handle_agreement_on_online_of_elder_candidate` requires most nodes to be with
 // age of MIN_AGE + 2 and one node with age of MIN_ADULT_AGE.
-pub fn gen_sorted_nodes(prefix: &Prefix, count: usize, age_diff: bool) -> Vec<NodeInfo> {
+pub fn gen_sorted_nodes(prefix: &Prefix, count: usize, age_diff: bool) -> Vec<MyNodeInfo> {
     (0..count)
         .map(|index| {
             let age = if age_diff && index < count - 1 {
@@ -44,7 +44,7 @@ pub fn gen_sorted_nodes(prefix: &Prefix, count: usize, age_diff: bool) -> Vec<No
             } else {
                 MIN_ADULT_AGE
             };
-            NodeInfo::new(
+            MyNodeInfo::new(
                 crate::types::keys::ed25519::gen_keypair(&prefix.range_inclusive(), age),
                 gen_addr(),
             )
@@ -67,9 +67,9 @@ pub fn random_sap_with_rng<R: RngCore>(
     elder_count: usize,
     adult_count: usize,
     sk_threshold_size: Option<usize>,
-) -> (SectionAuthorityProvider, Vec<NodeInfo>, bls::SecretKeySet) {
+) -> (SectionAuthorityProvider, Vec<MyNodeInfo>, bls::SecretKeySet) {
     let nodes = gen_sorted_nodes(&prefix, elder_count + adult_count, false);
-    let elders = nodes.iter().map(NodeInfo::peer).take(elder_count);
+    let elders = nodes.iter().map(MyNodeInfo::peer).take(elder_count);
     let members = nodes.iter().map(|i| NodeState::joined(i.peer(), None));
     let poly = bls::poly::Poly::random(sk_threshold_size.unwrap_or(0), rng);
     let sks = bls::SecretKeySet::from(poly);
@@ -82,7 +82,7 @@ pub fn random_sap(
     elder_count: usize,
     adult_count: usize,
     sk_threshold_size: Option<usize>,
-) -> (SectionAuthorityProvider, Vec<NodeInfo>, bls::SecretKeySet) {
+) -> (SectionAuthorityProvider, Vec<MyNodeInfo>, bls::SecretKeySet) {
     random_sap_with_rng(
         &mut rand::thread_rng(),
         prefix,
@@ -101,9 +101,9 @@ pub fn random_sap_with_key(
     elder_count: usize,
     adult_count: usize,
     sk_set: &bls::SecretKeySet,
-) -> (SectionAuthorityProvider, Vec<NodeInfo>) {
+) -> (SectionAuthorityProvider, Vec<MyNodeInfo>) {
     let nodes = gen_sorted_nodes(&prefix, elder_count + adult_count, false);
-    let elders = nodes.iter().map(NodeInfo::peer).take(elder_count);
+    let elders = nodes.iter().map(MyNodeInfo::peer).take(elder_count);
     let members = nodes.iter().map(|i| NodeState::joined(i.peer(), None));
     let section_auth =
         SectionAuthorityProvider::new(elders, prefix, members, sk_set.public_keys(), 0);

@@ -9,14 +9,14 @@
 use crate::{
     node::{
         flow_ctrl::{cmds::Cmd, event_channel::EventSender},
-        Error, Event, Node, Result, GENESIS_DBC_AMOUNT,
+        Error, Event, MyNode, Result, GENESIS_DBC_AMOUNT,
     },
     UsedSpace,
 };
 
 use sn_interface::{
     network_knowledge::{
-        NetworkKnowledge, NodeInfo, SectionAuthorityProvider, SectionKeyShare, SectionsDAG,
+        NetworkKnowledge, MyNodeInfo, SectionAuthorityProvider, SectionKeyShare, SectionsDAG,
         GENESIS_DBC_SK,
     },
     types::log_markers::LogMarker,
@@ -31,7 +31,7 @@ use sn_dbc::{
 use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 use xor_name::XorName;
 
-impl Node {
+impl MyNode {
     pub(crate) async fn first_node(
         our_addr: SocketAddr,
         keypair: Arc<Keypair>,
@@ -40,7 +40,7 @@ impl Node {
         root_storage_dir: PathBuf,
         genesis_sk_set: bls::SecretKeySet,
     ) -> Result<(Self, Dbc)> {
-        let info = NodeInfo {
+        let info = MyNodeInfo {
             keypair: keypair.clone(),
             addr: our_addr,
         };

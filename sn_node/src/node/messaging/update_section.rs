@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Node};
+use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, MyNode};
 
 use sn_interface::{
     data_copy_count,
@@ -17,7 +17,7 @@ use sn_interface::{
 use itertools::Itertools;
 use std::collections::BTreeSet;
 
-impl Node {
+impl MyNode {
     /// Given what data the peer has, we shall calculate what data the peer is missing that
     /// we have, and send such data to the peer.
     #[instrument(skip(self, data_sender_has))]

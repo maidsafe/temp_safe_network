@@ -8,7 +8,7 @@
 
 use crate::node::{
     flow_ctrl::cmds::Cmd, membership, messaging::Peers, relocation::ChurnId, Event,
-    MembershipEvent, Node, Result,
+    MembershipEvent, MyNode, Result,
 };
 
 use bls::Signature;
@@ -24,7 +24,7 @@ use sn_interface::{
 use std::{collections::BTreeSet, vec};
 
 // Message handling
-impl Node {
+impl MyNode {
     pub(crate) fn propose_membership_change(&mut self, node_state: NodeState) -> Option<Cmd> {
         info!(
             "Proposing membership change: {} - {:?}",

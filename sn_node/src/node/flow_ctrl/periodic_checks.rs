@@ -8,7 +8,7 @@
 
 use super::FlowCtrl;
 
-use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Node, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, Result};
 
 use ed25519_dalek::Signer;
 #[cfg(feature = "traceroute")]
@@ -163,7 +163,7 @@ impl FlowCtrl {
     }
 
     /// Initiates and generates all the subsequent Cmds to perform a healthcheck
-    async fn perform_health_checks(node: Arc<RwLock<Node>>) -> Result<Vec<Cmd>> {
+    async fn perform_health_checks(node: Arc<RwLock<MyNode>>) -> Result<Vec<Cmd>> {
         info!("Starting to check the section's health");
         let node = node.read().await;
         let our_prefix = node.network_knowledge.prefix();
@@ -198,7 +198,7 @@ impl FlowCtrl {
 
     /// Generates a probe msg, which goes to a random section in order to
     /// passively maintain network knowledge over time
-    async fn probe_the_network(node: Arc<RwLock<Node>>) -> Option<Cmd> {
+    async fn probe_the_network(node: Arc<RwLock<MyNode>>) -> Option<Cmd> {
         let node = node.read().await;
         let prefix = node.network_knowledge().prefix();
 
@@ -220,7 +220,7 @@ impl FlowCtrl {
 
     /// Generates a probe msg, which goes to our elders in order to
     /// passively maintain network knowledge over time
-    async fn probe_the_section(node: Arc<RwLock<Node>>) -> Cmd {
+    async fn probe_the_section(node: Arc<RwLock<MyNode>>) -> Cmd {
         let node = node.read().await;
 
         // Send a probe message to an elder
@@ -231,7 +231,7 @@ impl FlowCtrl {
     /// Generates a probe msg, which goes to all section elders in order to
     /// passively maintain network knowledge over time and track dysfunction
     /// Tracking dysfunction while awaiting a response
-    async fn health_check_elders_in_section(node: Arc<RwLock<Node>>) -> Vec<Cmd> {
+    async fn health_check_elders_in_section(node: Arc<RwLock<MyNode>>) -> Vec<Cmd> {
         let mut cmds = vec![];
         let node = node.read().await;
 
@@ -255,7 +255,7 @@ impl FlowCtrl {
     }
 
     /// Checks the interval since last vote received during a generation
-    async fn check_for_missed_votes(node: Arc<RwLock<Node>>) -> Option<Cmd> {
+    async fn check_for_missed_votes(node: Arc<RwLock<MyNode>>) -> Option<Cmd> {
         info!("Checking for missed votes");
         let node = node.read().await;
         let membership = &node.membership;
@@ -279,7 +279,7 @@ impl FlowCtrl {
     }
 
     /// Checks the interval since last dkg vote received
-    async fn check_for_missed_dkg_messages(node: Arc<RwLock<Node>>) -> Vec<Cmd> {
+    async fn check_for_missed_dkg_messages(node: Arc<RwLock<MyNode>>) -> Vec<Cmd> {
         info!("Checking for DKG missed messages");
         let node = node.read().await;
         let dkg_voter = &node.dkg_voter;
@@ -300,7 +300,7 @@ impl FlowCtrl {
     }
 
     /// Periodically loop over any pending data batches and queue up `send_msg` for those
-    async fn replicate_queued_data(node: Arc<RwLock<Node>>) -> Result<Option<Cmd>> {
+    async fn replicate_queued_data(node: Arc<RwLock<MyNode>>) -> Result<Option<Cmd>> {
         use rand::seq::IteratorRandom;
         let mut rng = rand::rngs::OsRng;
         let data_queued = {
@@ -356,7 +356,7 @@ impl FlowCtrl {
         Ok(None)
     }
 
-    async fn check_for_dysfunction(node: Arc<RwLock<Node>>) -> Vec<Cmd> {
+    async fn check_for_dysfunction(node: Arc<RwLock<MyNode>>) -> Vec<Cmd> {
         info!("Performing dysfunction checking");
         let mut cmds = vec![];
         let dysfunctional_nodes = node.write().await.get_dysfunctional_node_names();
@@ -377,7 +377,7 @@ impl FlowCtrl {
     }
 }
 
-fn auth(node: &Node, msg: &ClientMsg) -> Result<AuthorityProof<ClientAuth>> {
+fn auth(node: &MyNode, msg: &ClientMsg) -> Result<AuthorityProof<ClientAuth>> {
     let keypair = node.keypair.clone();
     let payload = WireMsg::serialize_msg_payload(&msg)?;
     let signature = keypair.sign(&payload);

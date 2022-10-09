@@ -6,11 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{flow_ctrl::cmds::Cmd, Node, Proposal, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, MyNode, Proposal, Result};
 use std::{collections::BTreeSet, net::SocketAddr};
 use xor_name::XorName;
 
-impl Node {
+impl MyNode {
     /// Track comms issue if this is a peer we know and care about
     pub(crate) fn handle_failed_send(&mut self, addr: &SocketAddr) {
         let name = if let Some(peer) = self.network_knowledge.find_member_by_addr(addr) {
@@ -20,11 +20,6 @@ impl Node {
             trace!("Lost unknown peer {}", addr);
             return;
         };
-
-        if self.is_not_elder() {
-            // Adults cannot complain about connectivity.
-            return;
-        }
 
         self.log_comm_issue(name);
     }

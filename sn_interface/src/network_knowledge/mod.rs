@@ -20,7 +20,7 @@ pub mod test_utils;
 
 pub use self::{
     errors::{Error, Result},
-    node_info::NodeInfo,
+    node_info::MyNodeInfo,
     node_state::NodeState,
     section_authority_provider::{SapCandidate, SectionAuthUtils, SectionAuthorityProvider},
     section_keys::{SectionKeyShare, SectionKeysProvider},

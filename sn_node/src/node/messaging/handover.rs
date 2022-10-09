@@ -11,7 +11,7 @@ use crate::node::{
     handover::{Error as HandoverError, Handover},
     membership::{elder_candidates, try_split_dkg},
     messaging::Peers,
-    Error, Node, NodeMsg, Peer, Proposal, Result,
+    Error, MyNode, NodeMsg, Peer, Proposal, Result,
 };
 use sn_consensus::{Generation, SignedVote, VoteResponse};
 use sn_interface::{
@@ -23,7 +23,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use tracing::warn;
 use xor_name::{Prefix, XorName};
 
-impl Node {
+impl MyNode {
     /// Make a handover consensus proposal vote for a sap candidate
     pub(crate) fn propose_handover_consensus(
         &mut self,

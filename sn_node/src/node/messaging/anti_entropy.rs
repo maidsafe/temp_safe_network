@@ -10,7 +10,7 @@ use crate::log_sleep;
 use crate::node::{
     flow_ctrl::cmds::Cmd,
     messaging::{OutgoingMsg, Peers},
-    Error, Event, MembershipEvent, Node, Result, StateSnapshot,
+    Error, Event, MembershipEvent, MyNode, Result, StateSnapshot,
 };
 
 use qp2p::UsrMsgBytes;
@@ -29,7 +29,7 @@ use bls::PublicKey as BlsPublicKey;
 use std::{collections::BTreeSet, time::Duration};
 use xor_name::{Prefix, XorName};
 
-impl Node {
+impl MyNode {
     /// Send `AntiEntropy` update message to all nodes in our own section.
     pub(crate) fn send_ae_update_to_our_section(&self) -> Result<Option<Cmd>> {
         let our_name = self.info().name();
@@ -450,7 +450,7 @@ mod tests {
         messaging::{AuthKind, AuthorityProof, Dst, MsgId, NodeMsgAuthority, NodeSig},
         network_knowledge::{
             test_utils::{gen_addr, random_sap, section_signed},
-            NetworkKnowledge, NodeInfo, SectionKeyShare, SectionKeysProvider, SectionsDAG,
+            NetworkKnowledge, MyNodeInfo, SectionKeyShare, SectionKeysProvider, SectionsDAG,
         },
         types::keys::ed25519,
     };
@@ -684,7 +684,7 @@ mod tests {
     }
 
     struct Env {
-        node: Node,
+        node: MyNode,
         other_signed_sap: SectionSigned<SectionAuthorityProvider>,
         proof_chain: SectionsDAG,
     }
@@ -707,7 +707,7 @@ mod tests {
             assert_eq!(genesis_pk, *proof_chain.genesis_key());
 
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-            let (mut node, _) = Node::first_node(
+            let (mut node, _) = MyNode::first_node(
                 create_comm().await?.socket_addr(),
                 info.keypair.clone(),
                 event_channel::new(1).0,
@@ -751,7 +751,7 @@ mod tests {
             src_section_prefix: &Prefix,
             src_section_pk: BlsPublicKey,
         ) -> Result<WireMsg> {
-            let sender = NodeInfo::new(
+            let sender = MyNodeInfo::new(
                 ed25519::gen_keypair(&src_section_prefix.range_inclusive(), MIN_ADULT_AGE),
                 gen_addr(),
             );

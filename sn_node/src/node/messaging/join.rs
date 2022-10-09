@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::comm::Comm;
-use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Error, Node, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Error, MyNode, Result};
 
 use sn_interface::{
     elder_count,
@@ -25,7 +25,7 @@ use sn_interface::{
 const FIRST_SECTION_MIN_ELDER_AGE: u8 = 82;
 
 // Message handling
-impl Node {
+impl MyNode {
     pub(crate) async fn handle_join_request(
         &mut self,
         peer: Peer,

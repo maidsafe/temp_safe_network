@@ -17,7 +17,7 @@ use xor_name::{XorName, XOR_NAME_LEN};
 
 /// Information and state of our node
 #[derive(Clone, custom_debug::Debug)]
-pub struct NodeInfo {
+pub struct MyNodeInfo {
     // Keep the secret key in Arc to allow Clone while also preventing multiple copies to exist in
     // memory which might be insecure.
     #[debug(skip)]
@@ -25,7 +25,7 @@ pub struct NodeInfo {
     pub addr: SocketAddr,
 }
 
-impl NodeInfo {
+impl MyNodeInfo {
     pub fn new(keypair: Keypair, addr: SocketAddr) -> Self {
         Self {
             keypair: Arc::new(keypair),
@@ -51,7 +51,7 @@ impl NodeInfo {
     }
 }
 
-impl Display for NodeInfo {
+impl Display for MyNodeInfo {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{}", self.name())
     }

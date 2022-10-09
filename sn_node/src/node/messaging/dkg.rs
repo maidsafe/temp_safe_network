@@ -11,7 +11,7 @@ use crate::node::{
     dkg::{check_ephemeral_dkg_key, DkgPubKeys},
     flow_ctrl::cmds::Cmd,
     messaging::{OutgoingMsg, Peers},
-    Error, Node, Proposal, Result,
+    Error, MyNode, Proposal, Result,
 };
 
 use bytes::Bytes;
@@ -60,7 +60,7 @@ fn acknowledge_dkg_oucome(
     }
 }
 
-impl Node {
+impl MyNode {
     /// Send a `DkgStart` message to the provided set of candidates
     /// Before a DKG session kicks off, the `DkgStart { ... }` message is individually signed
     /// by the current _set of elders_ and sent to the _new elder candidates_ to be accumulated.

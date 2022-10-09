@@ -20,7 +20,7 @@ use event_channel::EventSender;
 
 use crate::comm::MsgEvent;
 
-use crate::node::{flow_ctrl::cmds::Cmd, Error, Node, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result};
 
 use sn_interface::types::log_markers::LogMarker;
 
@@ -38,7 +38,7 @@ const PROCESS_BATCH_COUNT: usize = 5;
 /// Listens for incoming msgs and forms Cmds for each,
 /// Periodically triggers other Cmd Processes (eg health checks, dysfunction etc)
 pub(crate) struct FlowCtrl {
-    node: Arc<RwLock<Node>>,
+    node: Arc<RwLock<MyNode>>,
     cmd_ctrl: CmdCtrl,
     incoming_msg_events: mpsc::Receiver<MsgEvent>,
     incoming_cmds_from_apis: mpsc::Receiver<(Cmd, Option<usize>)>,

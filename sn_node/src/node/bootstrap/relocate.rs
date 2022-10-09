@@ -18,7 +18,7 @@ use sn_interface::{
     messaging::system::{
         JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeMsg, NodeState, SectionSigned,
     },
-    network_knowledge::{NodeInfo, SectionAuthorityProvider},
+    network_knowledge::{MyNodeInfo, SectionAuthorityProvider},
     types::{keys::ed25519, Peer, PublicKey},
 };
 
@@ -29,7 +29,7 @@ use xor_name::{Prefix, XorName};
 
 /// Re-join as a relocated node.
 pub(crate) struct JoiningAsRelocated {
-    pub(crate) node: NodeInfo,
+    pub(crate) node: MyNodeInfo,
     relocate_proof: SectionSigned<NodeState>,
     // Avoid sending more than one duplicated request (with same SectionKey) to the same peer.
     used_recipient_saps: UsedRecipientSaps,
@@ -43,7 +43,7 @@ impl JoiningAsRelocated {
     // Generates the first cmd to send a `JoinAsRelocatedRequest`, responses
     // shall be fed back with `handle_join_response` function.
     pub(crate) fn start(
-        node: NodeInfo,
+        node: MyNodeInfo,
         relocate_proof: SectionSigned<NodeState>,
         bootstrap_addrs: Vec<SocketAddr>,
         dst_xorname: XorName,
@@ -198,7 +198,7 @@ impl JoiningAsRelocated {
         let signature_over_new_name = ed25519::sign(&new_name.0, &self.old_keypair);
 
         info!("Changing name to {}", new_name);
-        self.node = NodeInfo::new(new_keypair, self.node.addr);
+        self.node = MyNodeInfo::new(new_keypair, self.node.addr);
 
         signature_over_new_name
     }
@@ -259,7 +259,7 @@ mod tests {
         },
         network_knowledge::{
             test_utils::{gen_addr, section_signed},
-            NodeInfo, MIN_ADULT_AGE,
+            MyNodeInfo, MIN_ADULT_AGE,
         },
         types::keys::ed25519,
     };
@@ -271,7 +271,7 @@ mod tests {
     async fn should_send_join_as_relocated_request_system_msg() -> Result<()> {
         // from_sap
         let (mut from_sap, from_sk_set) = generate_sap();
-        let node = NodeInfo::new(
+        let node = MyNodeInfo::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE + 1),
             gen_addr(),
         );
@@ -319,7 +319,7 @@ mod tests {
         fn relocate(response: Response) -> Result<()> {
             // from_sap
             let (mut from_sap, from_sk_set) = generate_sap();
-            let node = NodeInfo::new(
+            let node = MyNodeInfo::new(
                 ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE + 1),
                 gen_addr(),
             );
@@ -385,7 +385,7 @@ mod tests {
         fn relocate(response: Response) -> Result<()> {
             // from_sap
             let (mut from_sap, from_sk_set) = generate_sap();
-            let node = NodeInfo::new(
+            let node = MyNodeInfo::new(
                 ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE + 1),
                 gen_addr(),
             );
