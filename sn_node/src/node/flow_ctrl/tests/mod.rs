@@ -16,10 +16,11 @@ use crate::{
     node::{
         api::gen_genesis_dbc,
         cfg::create_test_max_capacity_and_root_storage,
+        core::MyNode,
         flow_ctrl::{dispatcher::Dispatcher, event_channel},
         messages::WireMsgUtils,
         messaging::{OutgoingMsg, Peers},
-        Cmd, Error, Event, MembershipEvent, Node, Proposal, Result as RoutingResult,
+        Cmd, Error, Event, MembershipEvent, MyNode, Proposal, Result as RoutingResult,
     },
     storage::UsedSpace,
 };
