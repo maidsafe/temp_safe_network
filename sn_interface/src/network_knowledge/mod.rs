@@ -586,13 +586,25 @@ impl NetworkKnowledge {
         NodeMsg::AntiEntropyProbe(self.section_key())
     }
 
-    /// Given a `NodeMsg` can we trust it (including verifying contents of an AE message)
-    pub fn verify_node_msg_can_be_trusted(
+    /// Checks messages signed by a section or elder (section bls share)
+    /// making sure that we either know the key or that the message is valid AE if we don't
+    /// For messages signed by a Node (ed key), this check doesn't apply, so we return true
+    pub fn verify_msg_section_key(
         msg_authority: &NodeMsgAuthority,
         msg: &NodeMsg,
         known_keys: &BTreeSet<BlsPublicKey>,
     ) -> bool {
-        if !msg_authority.verify_src_section_key_is_known(known_keys) {
+        let is_from_unknown_section = match &msg_authority {
+            NodeMsgAuthority::Node(_) => false,
+            NodeMsgAuthority::BlsShare(bls_share_auth) => {
+                !known_keys.contains(&bls_share_auth.public_key_set.public_key())
+            }
+            NodeMsgAuthority::Section(section_auth) => {
+                !known_keys.contains(&section_auth.public_key)
+            }
+        };
+
+        if is_from_unknown_section {
             // In case the incoming message itself is trying to update our knowledge,
             // it shall be allowed.
             if let NodeMsg::AntiEntropy {

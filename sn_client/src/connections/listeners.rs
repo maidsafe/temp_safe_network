@@ -154,8 +154,8 @@ impl Session {
             .cloned()
             .collect();
 
-        if !NetworkKnowledge::verify_node_msg_can_be_trusted(&msg_authority, &msg, &known_keys) {
-            warn!("Untrusted message has been dropped, from {sender:?}: {msg:?} ");
+        if !NetworkKnowledge::verify_msg_section_key(&msg_authority, &msg, &known_keys) {
+            warn!("Message with unknown section key has been dropped, from {sender:?}: {msg:?} ");
             let pk = msg_authority.src_public_key();
             return Err(Error::UntrustedMessage(pk));
         }

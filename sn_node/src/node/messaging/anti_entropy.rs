@@ -504,7 +504,7 @@ mod tests {
                 let (msg, msg_authority) = env.create_update_msg(proof_chain)?;
 
                 // AeUpdate message shall get pass through.
-                assert!(NetworkKnowledge::verify_node_msg_can_be_trusted(
+                assert!(NetworkKnowledge::verify_msg_section_key(
                     &msg_authority,
                     &msg,
                     &known_keys
@@ -514,7 +514,7 @@ mod tests {
                 let other_env = Env::new().await?;
                 let (corrupted_msg, _msg_authority) =
                     env.create_update_msg(other_env.proof_chain)?;
-                assert!(!NetworkKnowledge::verify_node_msg_can_be_trusted(
+                assert!(!NetworkKnowledge::verify_msg_section_key(
                     &msg_authority,
                     &corrupted_msg,
                     &known_keys
@@ -522,7 +522,7 @@ mod tests {
 
                 // Other messages shall get rejected.
                 let other_msg = NodeMsg::AntiEntropyProbe(known_key);
-                assert!(!NetworkKnowledge::verify_node_msg_can_be_trusted(
+                assert!(!NetworkKnowledge::verify_msg_section_key(
                     &msg_authority,
                     &other_msg,
                     &known_keys

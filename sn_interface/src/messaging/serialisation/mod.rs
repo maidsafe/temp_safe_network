@@ -13,7 +13,6 @@ pub use self::wire_msg::WireMsg;
 #[cfg(feature = "traceroute")]
 pub use self::wire_msg::{Entity, Traceroute};
 use super::{AuthorityProof, NodeSig, SectionSig, SectionSigShare};
-use std::collections::BTreeSet;
 
 /// Authority of a `NodeMsg`.
 /// Src of message and authority to send it. Authority is validated by the signature.
@@ -28,17 +27,6 @@ pub enum NodeMsgAuthority {
 }
 
 impl NodeMsgAuthority {
-    pub fn verify_src_section_key_is_known(&self, known_keys: &BTreeSet<bls::PublicKey>) -> bool {
-        let section_pk = match &self {
-            // NB TODO this shouldnt be true! Remove all this
-            Self::Node(_) => return true,
-            Self::BlsShare(bls_share_auth) => bls_share_auth.public_key_set.public_key(),
-            Self::Section(section_auth) => section_auth.public_key,
-        };
-
-        known_keys.contains(&section_pk)
-    }
-
     pub fn src_public_key(&self) -> bls::PublicKey {
         match self {
             Self::Node(node_auth) => node_auth.section_pk,
