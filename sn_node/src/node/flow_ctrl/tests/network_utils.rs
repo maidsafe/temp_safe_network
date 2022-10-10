@@ -6,7 +6,7 @@ use crate::node::{
         event_channel,
         event_channel::{EventReceiver, EventSender},
     },
-    relocation_check, ChurnId, Node,
+    relocation_check, ChurnId, MyNode,
 };
 use crate::storage::UsedSpace;
 use bls::Signature;
@@ -17,7 +17,7 @@ use sn_interface::{
     elder_count,
     messaging::{system::NodeState as NodeStateMsg, SectionTreeUpdate},
     network_knowledge::{
-        test_utils::*, NetworkKnowledge, NodeInfo, NodeState, SectionAuthorityProvider,
+        test_utils::*, MyNodeInfo, NetworkKnowledge, NodeState, SectionAuthorityProvider,
         SectionKeyShare, SectionTree, SectionsDAG, MIN_ADULT_AGE,
     },
     types::{keys::ed25519, Peer, SecretKeySet},
@@ -40,7 +40,7 @@ pub(crate) struct TestNodeBuilder {
     pub(crate) data_copy_count: usize,
     pub(crate) node_event_sender: EventSender,
     pub(crate) section: Option<NetworkKnowledge>,
-    pub(crate) first_node: Option<NodeInfo>,
+    pub(crate) first_node: Option<MyNodeInfo>,
     pub(crate) genesis_sk_set: Option<bls::SecretKeySet>,
     pub(crate) sap: Option<SectionAuthorityProvider>,
     pub(crate) custom_peer: Option<Peer>,
@@ -159,7 +159,7 @@ impl TestNodeBuilder {
         mut self,
         section: NetworkKnowledge,
         sk_set: bls::SecretKeySet,
-        first_node: NodeInfo,
+        first_node: MyNodeInfo,
     ) -> TestNodeBuilder {
         self.section = Some(section);
         self.genesis_sk_set = Some(sk_set);
@@ -279,7 +279,7 @@ impl TestNodeBuilder {
 
         let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
         let comm = create_comm().await?;
-        let node = Node::new(
+        let node = MyNode::new(
             comm.socket_addr(),
             keypair,
             section.clone(),
@@ -350,7 +350,7 @@ pub(crate) fn create_section_key_share(
     }
 }
 
-pub(crate) fn create_section_auth() -> (SectionAuthorityProvider, Vec<NodeInfo>, bls::SecretKeySet)
+pub(crate) fn create_section_auth() -> (SectionAuthorityProvider, Vec<MyNodeInfo>, bls::SecretKeySet)
 {
     let (section_auth, elders, secret_key_set) =
         random_sap(Prefix::default(), elder_count(), 0, None);
@@ -367,8 +367,8 @@ pub(crate) fn create_peer_in_prefix(prefix: &Prefix, age: u8) -> Peer {
     Peer::new(prefix.substituted_in(name), gen_addr())
 }
 
-pub(crate) fn gen_info(age: u8, prefix: Option<Prefix>) -> NodeInfo {
-    NodeInfo::new(
+pub(crate) fn gen_info(age: u8, prefix: Option<Prefix>) -> MyNodeInfo {
+    MyNodeInfo::new(
         ed25519::gen_keypair(&prefix.unwrap_or_default().range_inclusive(), age),
         gen_addr(),
     )

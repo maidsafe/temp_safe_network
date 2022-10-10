@@ -19,7 +19,7 @@ use sn_interface::{
         },
         AuthKind, Dst, MsgType, NodeSig, WireMsg,
     },
-    network_knowledge::{NetworkKnowledge, NodeInfo, SectionTree},
+    network_knowledge::{MyNodeInfo, NetworkKnowledge, SectionTree},
     types::{keys::ed25519, log_markers::LogMarker, Peer},
 };
 
@@ -41,12 +41,12 @@ use xor_name::Prefix;
 /// lost in transit or other reasons. It's the responsibility of the caller to handle this case,
 /// for example by using a timeout.
 pub(crate) async fn join_network(
-    node: NodeInfo,
+    node: MyNodeInfo,
     comm: &Comm,
     incoming_msgs: &mut mpsc::Receiver<MsgEvent>,
     network_contacts: SectionTree,
     join_timeout: Duration,
-) -> Result<(NodeInfo, NetworkKnowledge)> {
+) -> Result<(MyNodeInfo, NetworkKnowledge)> {
     let (outgoing_msgs_sender, outgoing_msgs_receiver) = mpsc::channel(100);
 
     let span = trace_span!("bootstrap");
@@ -66,7 +66,7 @@ struct Joiner<'a> {
     outgoing_msgs: mpsc::Sender<(WireMsg, Vec<Peer>)>,
     // Receiver for incoming messages.
     incoming_msgs: &'a mut mpsc::Receiver<MsgEvent>,
-    node: NodeInfo,
+    node: MyNodeInfo,
     prefix: Prefix,
     network_contacts: SectionTree,
     backoff: ExponentialBackoff,
@@ -76,7 +76,7 @@ struct Joiner<'a> {
 
 impl<'a> Joiner<'a> {
     fn new(
-        node: NodeInfo,
+        node: MyNodeInfo,
         outgoing_msgs: mpsc::Sender<(WireMsg, Vec<Peer>)>,
         incoming_msgs: &'a mut mpsc::Receiver<MsgEvent>,
         network_contacts: SectionTree,
@@ -109,7 +109,7 @@ impl<'a> Joiner<'a> {
     // - `ResourceChallenge`: carry out resource proof calculation.
     // - `Approval`: returns the initial `Section` value to use by this node,
     //    completing the bootstrap.
-    async fn try_join(self, join_timeout: Duration) -> Result<(NodeInfo, NetworkKnowledge)> {
+    async fn try_join(self, join_timeout: Duration) -> Result<(MyNodeInfo, NetworkKnowledge)> {
         trace!(
             "Bootstrap run, network contacts as we have it: {:?}",
             self.network_contacts
@@ -127,7 +127,7 @@ impl<'a> Joiner<'a> {
     }
 
     #[tracing::instrument(skip(self))]
-    async fn join(mut self, response_timeout: Duration) -> Result<(NodeInfo, NetworkKnowledge)> {
+    async fn join(mut self, response_timeout: Duration) -> Result<(MyNodeInfo, NetworkKnowledge)> {
         let (target_section_key, recipients) = self.join_target()?;
 
         debug!("Initiating join with {recipients:?}");
@@ -270,7 +270,7 @@ impl<'a> Joiner<'a> {
                         let new_name = ed25519::name(&new_keypair.public);
 
                         info!("Setting Node name to {} (age {})", new_name, expected_age);
-                        self.node = NodeInfo::new(new_keypair, self.node.addr);
+                        self.node = MyNodeInfo::new(new_keypair, self.node.addr);
                         self.retry_responses_cache = Default::default();
 
                         section_key = signed_sap.section_key();
@@ -543,7 +543,7 @@ mod tests {
         let genesis_sk = genesis_sk_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
 
-        let node = NodeInfo::new(
+        let node = MyNodeInfo::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE + 1),
             gen_addr(),
         );
@@ -594,7 +594,7 @@ mod tests {
             assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest::Initiate { .. }));
 
             // Send JoinResponse::Retry with new SAP
-            let other_elders: Vec<&NodeInfo> =
+            let other_elders: Vec<&MyNodeInfo> =
                 next_elders.iter().take(elder_count() / 3 + 1).collect_vec();
             for elder in other_elders.iter() {
                 send_response(
@@ -663,7 +663,7 @@ mod tests {
         let genesis_sk = genesis_sk_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
 
-        let node = NodeInfo::new(
+        let node = MyNodeInfo::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
@@ -741,7 +741,7 @@ mod tests {
         let genesis_sk = genesis_sk_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
 
-        let node = NodeInfo::new(
+        let node = MyNodeInfo::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
@@ -818,7 +818,7 @@ mod tests {
         let genesis_sk = genesis_sk_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
 
-        let node = NodeInfo::new(
+        let node = MyNodeInfo::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
@@ -868,7 +868,7 @@ mod tests {
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(10);
 
-        let node = NodeInfo::new(
+        let node = MyNodeInfo::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
@@ -935,7 +935,7 @@ mod tests {
 
                 SectionTreeUpdate::new(signed_next_sap, proof_chain)
             };
-            let good_elders: Vec<&NodeInfo> =
+            let good_elders: Vec<&MyNodeInfo> =
                 next_elders.iter().take(elder_count() / 3 + 1).collect_vec();
             for elder in good_elders.iter() {
                 send_response(
@@ -975,7 +975,7 @@ mod tests {
     fn send_response(
         recv_tx: &mpsc::Sender<MsgEvent>,
         response: JoinResponse,
-        bootstrap_node: &NodeInfo,
+        bootstrap_node: &MyNodeInfo,
         section_pk: BlsPublicKey,
     ) -> Result<()> {
         let wire_msg = WireMsg::single_src(

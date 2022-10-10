@@ -20,7 +20,7 @@ mod resource_proof;
 mod signing;
 mod update_section;
 
-use crate::node::{flow_ctrl::cmds::Cmd, Error, Node, Result, DATA_QUERY_LIMIT};
+use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result, DATA_QUERY_LIMIT};
 
 use sn_interface::{
     messaging::{
@@ -58,7 +58,7 @@ impl Peers {
 }
 
 // Message handling
-impl Node {
+impl MyNode {
     #[instrument(skip(self))]
     pub(crate) async fn validate_msg(&self, origin: Peer, wire_msg: WireMsg) -> Result<Vec<Cmd>> {
         // Deserialize the payload of the incoming message

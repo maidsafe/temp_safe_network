@@ -8,7 +8,7 @@
 
 use super::OutgoingMsg;
 
-use crate::node::{Node, Result};
+use crate::node::{MyNode, Result};
 
 use sn_interface::{
     messaging::{data::ClientMsg, system::NodeMsg, AuthKind, ClientAuth, NodeSig, WireMsg},
@@ -19,7 +19,7 @@ use bytes::Bytes;
 use signature::Signer;
 
 // Message handling
-impl Node {
+impl MyNode {
     /// Signing an outgoing msg.
     ///
     /// We don't need the destination,

@@ -8,10 +8,10 @@
 
 //! Instrumentation for statemaps: <https://github.com/TritonDataCenter/statemap>
 
-use super::core::Node;
+use super::core::MyNode;
 use sn_interface::statemap::State;
 
-impl Node {
+impl MyNode {
     pub(crate) fn statemap_log_metadata(&self) {
         #[cfg(feature = "statemap")]
         sn_interface::statemap::log_metadata()

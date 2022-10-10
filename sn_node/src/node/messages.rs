@@ -10,7 +10,7 @@ use crate::node::{Error, Result};
 
 use sn_interface::{
     messaging::{system::NodeMsg, AuthKind, Dst, MsgId, NodeSig, SectionSigShare, WireMsg},
-    network_knowledge::{NodeInfo, SectionKeyShare},
+    network_knowledge::{MyNodeInfo, SectionKeyShare},
 };
 
 use bls::PublicKey as BlsPublicKey;
@@ -26,7 +26,7 @@ pub(crate) trait WireMsgUtils {
 
     /// Creates a signed message from single node.
     fn single_src(
-        node: &NodeInfo,
+        node: &MyNodeInfo,
         dst: Dst,
         node_msg: NodeMsg,
         src_section_pk: BlsPublicKey,
@@ -59,7 +59,7 @@ impl WireMsgUtils for WireMsg {
 
     /// Creates a signed message from single node.
     fn single_src(
-        node: &NodeInfo,
+        node: &MyNodeInfo,
         dst: Dst,
         msg: NodeMsg,
         src_section_pk: BlsPublicKey,

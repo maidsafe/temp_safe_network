@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    messaging::Peers, Cmd, Error, Node, Prefix, Result, MAX_WAITING_PEERS_PER_QUERY,
+    messaging::Peers, Cmd, Error, MyNode, Prefix, Result, MAX_WAITING_PEERS_PER_QUERY,
 };
 
 use sn_dysfunction::IssueType;
@@ -28,7 +28,7 @@ use std::{cmp::Ordering, collections::BTreeSet};
 use tracing::info;
 use xor_name::XorName;
 
-impl Node {
+impl MyNode {
     // Locate ideal holders for this data, instruct them to store the data
     pub(crate) fn replicate_data(
         &self,

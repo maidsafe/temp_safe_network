@@ -19,7 +19,7 @@ use crate::{
         flow_ctrl::{dispatcher::Dispatcher, event_channel},
         messages::WireMsgUtils,
         messaging::{OutgoingMsg, Peers},
-        Cmd, Error, Event, MembershipEvent, Node, Proposal, Result as RoutingResult,
+        Cmd, Error, Event, MembershipEvent, MyNode, Proposal, Result as RoutingResult,
         RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
     },
     storage::UsedSpace,
@@ -43,7 +43,7 @@ use sn_interface::{
     },
     network_knowledge::{
         recommended_section_size, supermajority, test_utils::*, Error as NetworkKnowledgeError,
-        NetworkKnowledge, NodeInfo, NodeState, SectionAuthorityProvider, SectionKeyShare,
+        MyNodeInfo, NetworkKnowledge, NodeState, SectionAuthorityProvider, SectionKeyShare,
         SectionKeysProvider, SectionTree, SectionsDAG, FIRST_SECTION_MAX_AGE,
         FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
     },
@@ -85,7 +85,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
             let section_key = sk_set.public_keys().public_key();
 
             let new_node_comm = network_utils::create_comm().await?;
-            let new_node = NodeInfo::new(
+            let new_node = MyNodeInfo::new(
                 ed25519::gen_keypair(&prefix1.range_inclusive(), MIN_ADULT_AGE),
                 new_node_comm.socket_addr(),
             );
@@ -137,7 +137,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
             let section_key = sk_set.public_keys().public_key();
             let node = dispatcher.node();
 
-            let new_node = NodeInfo::new(
+            let new_node = MyNodeInfo::new(
                 ed25519::gen_keypair(&prefix1.range_inclusive(), MIN_ADULT_AGE),
                 gen_addr(),
             );
@@ -214,7 +214,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
             let relocated_node_old_name = node_info.name();
             let relocated_node_old_keypair = node_info.keypair.clone();
 
-            let relocated_node = NodeInfo::new(
+            let relocated_node = MyNodeInfo::new(
                 ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE + 1),
                 gen_addr(),
             );
@@ -315,7 +315,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             // Creates nodes where everybody has age 6 except one has 5.
             let mut nodes: Vec<_> = gen_sorted_nodes(&Prefix::default(), elder_count(), true);
 
-            let elders = nodes.iter().map(NodeInfo::peer);
+            let elders = nodes.iter().map(MyNodeInfo::peer);
             let members = nodes.iter().map(|n| NodeState::joined(n.peer(), None));
             let section_auth = SectionAuthorityProvider::new(
                 elders,
@@ -589,7 +589,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             let node = nodes.remove(0);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let comm = network_utils::create_comm().await?;
-            let mut node = Node::new(
+            let mut node = MyNode::new(
                 comm.socket_addr(),
                 node.keypair.clone(),
                 network_knowledge,
@@ -801,7 +801,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
             let node = nodes.remove(0);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let comm = network_utils::create_comm().await?;
-            let node = Node::new(
+            let node = MyNode::new(
                 comm.socket_addr(),
                 node.keypair.clone(),
                 section,
@@ -872,7 +872,7 @@ async fn msg_to_self() -> Result<()> {
         let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
 
         let genesis_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
-        let (node, _) = Node::first_node(
+        let (node, _) = MyNode::first_node(
             comm.socket_addr(),
             info.keypair.clone(),
             event_sender,
@@ -980,7 +980,7 @@ async fn handle_elders_update() -> Result<()> {
         let (event_sender, mut event_receiver) = event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE);
         let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
         let comm = network_utils::create_comm().await?;
-        let mut node = Node::new(
+        let mut node = MyNode::new(
             comm.socket_addr(),
             info.keypair.clone(),
             section0.clone(),
@@ -1110,7 +1110,7 @@ async fn handle_demote_during_split() -> Result<()> {
             let (event_sender, _) = event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let comm = network_utils::create_comm().await?;
-            let mut node = Node::new(
+            let mut node = MyNode::new(
                 comm.socket_addr(),
                 info.keypair.clone(),
                 section,

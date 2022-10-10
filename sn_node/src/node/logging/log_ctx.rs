@@ -6,18 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::Node;
+use crate::node::MyNode;
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use xor_name::Prefix;
 
 pub(crate) struct LogCtx {
-    node: Arc<RwLock<Node>>,
+    node: Arc<RwLock<MyNode>>,
 }
 
 impl LogCtx {
-    pub(crate) fn new(node: Arc<RwLock<Node>>) -> Self {
+    pub(crate) fn new(node: Arc<RwLock<MyNode>>) -> Self {
         Self { node }
     }
 

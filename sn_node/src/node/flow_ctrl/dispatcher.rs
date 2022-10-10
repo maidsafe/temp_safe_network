@@ -9,7 +9,7 @@
 use crate::comm::Comm;
 use crate::node::{
     messaging::{OutgoingMsg, Peers},
-    Cmd, Error, Node, Result,
+    Cmd, Error, MyNode, Result,
 };
 
 #[cfg(feature = "traceroute")]
@@ -27,16 +27,16 @@ use tokio::sync::RwLock;
 
 // Cmd Dispatcher.
 pub(crate) struct Dispatcher {
-    node: Arc<RwLock<Node>>,
+    node: Arc<RwLock<MyNode>>,
     comm: Comm,
 }
 
 impl Dispatcher {
-    pub(crate) fn new(node: Arc<RwLock<Node>>, comm: Comm) -> Self {
+    pub(crate) fn new(node: Arc<RwLock<MyNode>>, comm: Comm) -> Self {
         Self { node, comm }
     }
 
-    pub(crate) fn node(&self) -> Arc<RwLock<Node>> {
+    pub(crate) fn node(&self) -> Arc<RwLock<MyNode>> {
         self.node.clone()
     }
 
@@ -288,7 +288,7 @@ impl Dispatcher {
 // and produces one [`WireMsg`] instance per recipient -
 // the last step before passing it over to comms module.
 fn into_msg_bytes(
-    node: &Node,
+    node: &MyNode,
     msg: OutgoingMsg,
     msg_id: MsgId,
     recipients: Peers,
