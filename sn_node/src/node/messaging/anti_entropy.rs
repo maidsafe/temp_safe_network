@@ -19,9 +19,9 @@ use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         system::{AntiEntropyKind, NodeCmd, NodeMsg, SectionSigned},
-        MsgType, SectionTreeUpdate, WireMsg,
+        MsgType, WireMsg,
     },
-    network_knowledge::NodeState,
+    network_knowledge::{NodeState, SectionTreeUpdate},
     types::{log_markers::LogMarker, Peer, PublicKey},
 };
 
@@ -161,15 +161,15 @@ impl MyNode {
         members: Option<BTreeSet<SectionSigned<NodeState>>>,
     ) -> Result<bool> {
         let our_name = self.info().name();
-        let sap = section_tree_update.signed_sap();
+        let sap = section_tree_update.signed_sap.clone();
 
         let we_have_a_share_of_this_key = self
             .section_keys_provider
-            .key_share(&section_tree_update.signed_sap().section_key())
+            .key_share(&sap.section_key())
             .is_ok();
 
         // check we should be _becoming_ an elder
-        let we_should_become_an_elder = sap.value.contains_elder(&our_name);
+        let we_should_become_an_elder = sap.contains_elder(&our_name);
 
         trace!("we_have_a_share_of_this_key: {we_have_a_share_of_this_key}, we_should_become_an_elder: {we_should_become_an_elder}");
 
@@ -197,7 +197,7 @@ impl MyNode {
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         let snapshot = self.state_snapshot();
-        let section_auth = section_tree_update.signed_sap().value;
+        let section_auth = section_tree_update.signed_sap.value.clone();
 
         let members = if let AntiEntropyKind::Update { members } = kind.clone() {
             Some(members)
@@ -561,7 +561,7 @@ mod tests {
             });
 
             assert_matches!(msg, NodeMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Redirect {..}, .. } => {
-                assert_eq!(section_tree_update.signed_sap(), env.node.network_knowledge().signed_sap());
+                assert_eq!(section_tree_update.signed_sap, env.node.network_knowledge().signed_sap());
             });
 
             // now let's insert the other SAP to make it aware of the other prefix
@@ -590,7 +590,7 @@ mod tests {
             });
 
             assert_matches!(msg, NodeMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Redirect {..}, .. } => {
-                assert_eq!(section_tree_update.signed_sap(), env.other_signed_sap);
+                assert_eq!(section_tree_update.signed_sap, env.other_signed_sap);
             });
             Result::<()>::Ok(())
         }).await
@@ -630,8 +630,8 @@ mod tests {
             });
 
             assert_matches!(&msg, NodeMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Retry{..}, .. } => {
-                assert_eq!(section_tree_update.signed_sap(), env.node.network_knowledge().signed_sap());
-                assert_eq!(section_tree_update.proof_chain()?, env.node.section_chain());
+                assert_eq!(section_tree_update.signed_sap, env.node.network_knowledge().signed_sap());
+                assert_eq!(section_tree_update.proof_chain, env.node.section_chain());
             });
             Ok(())
         }).await
@@ -672,8 +672,8 @@ mod tests {
             });
 
             assert_matches!(&msg, NodeMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Retry {..}, .. } => {
-                assert_eq!(section_tree_update.signed_sap(), env.node.network_knowledge().signed_sap());
-                assert_eq!(section_tree_update.proof_chain()?, env.node.section_chain());
+                assert_eq!(section_tree_update.signed_sap, env.node.network_knowledge().signed_sap());
+                assert_eq!(section_tree_update.proof_chain, env.node.section_chain());
             });
             Ok(())
         }).await

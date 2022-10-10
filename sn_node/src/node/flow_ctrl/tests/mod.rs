@@ -38,13 +38,14 @@ use sn_interface::{
             AntiEntropyKind, JoinAsRelocatedRequest, JoinRequest, JoinResponse, NodeCmd, NodeMsg,
             SectionSig, SectionSigned,
         },
-        Dst, MsgId, MsgType, SectionTreeUpdate, WireMsg,
+        Dst, MsgId, MsgType, WireMsg,
     },
     network_knowledge::{
         recommended_section_size, supermajority, test_utils::*, Error as NetworkKnowledgeError,
         MembershipState, MyNodeInfo, NetworkKnowledge, NodeState, RelocateDetails,
-        SectionAuthorityProvider, SectionKeyShare, SectionKeysProvider, SectionTree, SectionsDAG,
-        FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
+        SectionAuthorityProvider, SectionKeyShare, SectionKeysProvider, SectionTree,
+        SectionTreeUpdate, SectionsDAG, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE,
+        MIN_ADULT_AGE,
     },
     types::{keyed_signed, keys::ed25519, Peer, PublicKey, ReplicatedData, SecretKeySet},
 };
@@ -889,7 +890,7 @@ async fn handle_elders_update() -> Result<()> {
                 _ => continue,
             };
 
-            assert_eq!(section_tree_update.proof_chain()?.last_key()?, pk1);
+            assert_eq!(section_tree_update.proof_chain.last_key()?, pk1);
             // Merging the section contained in the message with the original section succeeds.
             assert!(section0.clone().update_knowledge_if_valid(section_tree_update, None, &info.name()).is_ok());
 

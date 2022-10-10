@@ -65,10 +65,7 @@ pub(crate) async fn handle_online_cmd(
                     ..
                 } = *response
                 {
-                    assert_eq!(
-                        section_tree_update.section_auth,
-                        section_auth.clone().to_msg()
-                    );
+                    assert_eq!(section_tree_update.signed_sap.value, *section_auth);
                     assert_matches!(recipients, Peers::Multiple(peers) => {
                         assert_eq!(peers, BTreeSet::from([*peer]));
                     });

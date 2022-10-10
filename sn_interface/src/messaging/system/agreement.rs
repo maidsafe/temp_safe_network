@@ -8,7 +8,7 @@
 
 use super::{NodeState, SectionSig};
 use crate::types::keys::ed25519::Digest256;
-use crate::{messaging::SectionAuthorityProvider, types::Peer};
+use crate::{network_knowledge::SectionAuthorityProvider, types::Peer};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use sn_consensus::Generation;

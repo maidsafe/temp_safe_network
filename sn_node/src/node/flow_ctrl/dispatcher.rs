@@ -15,7 +15,8 @@ use crate::node::{
 #[cfg(feature = "traceroute")]
 use sn_interface::{messaging::Entity, messaging::Traceroute};
 use sn_interface::{
-    messaging::{AuthKind, Dst, MsgId, SectionTreeUpdate, WireMsg},
+    messaging::{AuthKind, Dst, MsgId, WireMsg},
+    network_knowledge::SectionTreeUpdate,
     types::Peer,
 };
 

@@ -9,10 +9,7 @@
 use super::NodeState;
 
 use crate::messaging::system::DkgSessionId;
-use crate::messaging::{
-    system::{SectionSig, SectionSigned},
-    SectionAuthorityProvider as SectionAuthorityProviderMsg,
-};
+use crate::messaging::system::{SectionSig, SectionSigned};
 use crate::types::Peer;
 use sn_consensus::Generation;
 use xor_name::{Prefix, XorName};
@@ -59,12 +56,17 @@ impl<T: Serialize> SectionAuthUtils<T> for SectionSigned<T> {
 ///
 /// A new `SectionAuthorityProvider` is created whenever the elders change, due to an elder being
 /// added or removed, or the section splitting or merging.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct SectionAuthorityProvider {
+    /// The section prefix. It matches all the members' names.
     prefix: Prefix,
+    /// Public key set of the section.
     public_key_set: PublicKeySet,
+    /// The section's complete set of elders.
     elders: BTreeSet<Peer>,
+    /// The section members at the time of this elder churn.
     members: BTreeSet<NodeState>,
+    /// The membership generation this SAP was instantiated on
     membership_gen: Generation,
 }
 
@@ -94,30 +96,6 @@ impl Display for SectionAuthorityProvider {
             self.membership_gen,
             elders_info,
         )
-    }
-}
-
-impl Serialize for SectionAuthorityProvider {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        // Serialize as `SectionAuthorityProviderMsg`
-        self.to_msg().serialize(serializer)
-    }
-}
-
-// NB TODO we should remove this and make sure SectionAuthorityProvider is only created at one place
-// at the system's boundaries when we receive it and verify it.
-// This way we can make sure that this type means that the data can always be considered verified.
-// To achieve this, we will also need to get rid of the `into_state` (from `messaging`) below.
-impl<'de> Deserialize<'de> for SectionAuthorityProvider {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        // Deserialize as `SectionAuthorityProviderMsg`
-        Ok(SectionAuthorityProviderMsg::deserialize(deserializer)?.into_state())
     }
 }
 
@@ -212,56 +190,5 @@ impl SectionAuthorityProvider {
     /// Key of the section.
     pub fn section_key(&self) -> PublicKey {
         self.public_key_set.public_key()
-    }
-
-    // We prefer this over `From<...>` to make it easier to read the conversion.
-    pub fn to_msg(&self) -> SectionAuthorityProviderMsg {
-        SectionAuthorityProviderMsg {
-            prefix: self.prefix,
-            public_key_set: self.public_key_set.clone(),
-            elders: self
-                .elders
-                .iter()
-                .map(|elder| (elder.name(), elder.addr()))
-                .collect(),
-            members: self
-                .members
-                .iter()
-                .map(|state| (state.name(), state.clone()))
-                .collect(),
-            membership_gen: self.membership_gen,
-        }
-    }
-}
-
-impl SectionSigned<SectionAuthorityProvider> {
-    pub fn into_signed_msg(self) -> SectionSigned<SectionAuthorityProviderMsg> {
-        SectionSigned {
-            value: self.value.to_msg(),
-            sig: self.sig,
-        }
-    }
-}
-
-impl SectionAuthorityProviderMsg {
-    pub fn into_state(self) -> SectionAuthorityProvider {
-        SectionAuthorityProvider::new(
-            self.elders
-                .into_iter()
-                .map(|(name, value)| Peer::new(name, value)),
-            self.prefix,
-            self.members.into_iter().map(|(_name, state)| state),
-            self.public_key_set,
-            self.membership_gen,
-        )
-    }
-}
-
-impl SectionSigned<SectionAuthorityProviderMsg> {
-    pub fn into_signed_state(self) -> SectionSigned<SectionAuthorityProvider> {
-        SectionSigned {
-            value: self.value.into_state(),
-            sig: self.sig,
-        }
     }
 }

@@ -8,11 +8,10 @@
 
 use crate::node::{flow_ctrl::cmds::Cmd, MyNode, Proposal, Result};
 use sn_interface::{
-    messaging::{
-        system::{SectionSig, SectionSigned},
-        SectionTreeUpdate,
+    messaging::system::{SectionSig, SectionSigned},
+    network_knowledge::{
+        NodeState, SapCandidate, SectionAuthUtils, SectionAuthorityProvider, SectionTreeUpdate,
     },
-    network_knowledge::{NodeState, SapCandidate, SectionAuthUtils, SectionAuthorityProvider},
     types::log_markers::LogMarker,
 };
 use std::collections::BTreeSet;

@@ -123,9 +123,9 @@ mod tests {
 
     use sn_interface::{
         elder_count,
-        messaging::SectionTreeUpdate,
         network_knowledge::{
-            test_utils::section_signed, SectionAuthorityProvider, SectionsDAG, MIN_ADULT_AGE,
+            test_utils::section_signed, SectionAuthorityProvider, SectionTreeUpdate, SectionsDAG,
+            MIN_ADULT_AGE,
         },
         types::{Peer, SecretKeySet},
     };

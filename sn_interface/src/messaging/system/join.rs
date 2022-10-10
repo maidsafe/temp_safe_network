@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::NodeState;
-use crate::messaging::{SectionAuthorityProvider, SectionTreeUpdate};
+use crate::network_knowledge::{SectionAuthorityProvider, SectionTreeUpdate};
 use serde::{Deserialize, Serialize};
 use sn_consensus::Decision;
 use std::net::SocketAddr;

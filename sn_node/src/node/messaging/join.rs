@@ -11,15 +11,13 @@ use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Error, MyNode, Result}
 
 use sn_interface::{
     elder_count,
-    messaging::{
-        system::{
-            JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest,
-            JoinResponse, NodeMsg,
-        },
-        SectionTreeUpdate,
+    messaging::system::{
+        JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest,
+        JoinResponse, NodeMsg,
     },
     network_knowledge::{
-        MembershipState, NodeState, SectionAuthUtils, FIRST_SECTION_MAX_AGE, MIN_ADULT_AGE,
+        MembershipState, NodeState, SectionAuthUtils, SectionTreeUpdate, FIRST_SECTION_MAX_AGE,
+        MIN_ADULT_AGE,
     },
     types::{log_markers::LogMarker, Peer},
 };
@@ -57,7 +55,7 @@ impl MyNode {
         if !our_prefix.matches(&peer.name()) {
             debug!("Redirecting JoinRequest from {peer} - name doesn't match our prefix {our_prefix:?}.");
             let retry_sap = self.matching_section(&peer.name())?;
-            let msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Redirect(retry_sap.to_msg())));
+            let msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Redirect(retry_sap)));
             trace!("Sending {:?} to {}", msg, peer);
             trace!("{}", LogMarker::SendJoinRedirected);
             return Ok(Some(self.send_system_msg(msg, Peers::Single(peer))));
@@ -176,7 +174,7 @@ impl MyNode {
             debug!("JoinAsRelocatedRequest from {peer} - name doesn't match our prefix {our_prefix:?}.");
 
             let msg = NodeMsg::JoinAsRelocatedResponse(Box::new(JoinAsRelocatedResponse::Retry(
-                self.network_knowledge.section_auth().to_msg(),
+                self.network_knowledge.section_auth(),
             )));
 
             trace!("{} b", LogMarker::SendJoinAsRelocatedResponse);

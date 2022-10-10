@@ -52,8 +52,8 @@ impl Proposal {
     pub(crate) fn into_msg(self) -> ProposalMsg {
         match self {
             Self::VoteNodeOffline(node_state) => ProposalMsg::VoteNodeOffline(node_state),
-            Self::SectionInfo(sap) => ProposalMsg::SectionInfo(sap.to_msg()),
-            Self::NewElders(sap) => ProposalMsg::NewElders(sap.into_signed_msg()),
+            Self::SectionInfo(sap) => ProposalMsg::SectionInfo(sap),
+            Self::NewElders(sap) => ProposalMsg::NewElders(sap),
             Self::JoinsAllowed(allowed) => ProposalMsg::JoinsAllowed(allowed),
         }
     }

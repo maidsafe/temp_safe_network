@@ -24,14 +24,14 @@ pub use self::{
     node_state::{MembershipState, NodeState, RelocateDetails},
     section_authority_provider::{SapCandidate, SectionAuthUtils, SectionAuthorityProvider},
     section_keys::{SectionKeyShare, SectionKeysProvider},
-    section_tree::SectionTree,
+    section_tree::{SectionTree, SectionTreeUpdate},
     sections_dag::SectionsDAG,
 };
 
 use crate::{
     messaging::{
         system::{NodeMsg, SectionPeers as SectionPeersMsg, SectionSig, SectionSigned},
-        Dst, NodeMsgAuthority, SectionTreeUpdate,
+        Dst, NodeMsgAuthority,
     },
     types::Peer,
 };
@@ -164,7 +164,7 @@ impl NetworkKnowledge {
         section_tree_update: SectionTreeUpdate,
     ) -> Result<Self, Error> {
         let mut section_tree = section_tree;
-        let signed_sap = section_tree_update.signed_sap();
+        let signed_sap = section_tree_update.signed_sap.clone();
 
         // Update fails if the proof chain's genesis key is not part of the SectionTree's dag.
         if let Err(err) = section_tree.update(section_tree_update.clone()) {
@@ -273,8 +273,8 @@ impl NetworkKnowledge {
         our_name: &XorName,
     ) -> Result<bool> {
         let mut there_was_an_update = false;
-        let sap = section_tree_update.signed_sap();
-        let sap_prefix = sap.prefix();
+        let signed_sap = section_tree_update.signed_sap.clone();
+        let sap_prefix = signed_sap.prefix();
 
         // If the update is for a different prefix, we just update the section_tree; else we should
         // update the section_tree and signed_sap together. Or else they might go out of sync and
@@ -288,23 +288,23 @@ impl NetworkKnowledge {
                     let our_prev_prefix = self.prefix();
                     // Remove any peer which doesn't belong to our new section's prefix
                     self.section_peers.retain(&sap_prefix);
-                    info!("Updated our section's SAP ({our_prev_prefix:?} to {sap_prefix:?}) with new one: {:?}", sap.value);
+                    info!("Updated our section's SAP ({our_prev_prefix:?} to {sap_prefix:?}) with new one: {:?}", signed_sap.value);
 
                     let proof_chain = self
                         .section_tree
                         .get_sections_dag()
-                        .partial_dag(self.genesis_key(), &sap.section_key())?;
+                        .partial_dag(self.genesis_key(), &signed_sap.section_key())?;
 
                     // Prune list of archived members
                     self.section_peers
-                        .prune_members_archive(&proof_chain, &sap.section_key())?;
+                        .prune_members_archive(&proof_chain, &signed_sap.section_key())?;
 
                     // Switch to new SAP
-                    self.signed_sap = sap;
+                    self.signed_sap = signed_sap;
                 }
             }
             Ok(false) => {
-                debug!("Anti-Entropy: discarded SAP for {sap_prefix:?} since it's the same as the one in our records: {:?}", sap.value);
+                debug!("Anti-Entropy: discarded SAP for {sap_prefix:?} since it's the same as the one in our records: {:?}", signed_sap.value);
             }
             Err(err) => {
                 debug!("Anti-Entropy: discarded SAP for {sap_prefix:?} since we failed to update section tree with: {err:?}");
@@ -604,10 +604,10 @@ impl NetworkKnowledge {
                 ..
             } = &msg
             {
-                // The attached chain shall contains a key known to us
-                // Check if `SectionsDAGMsg::genesis_key` is present in the list of known_keys instead
-                // of creating `SectionsDAG` and calling `check_trust`
-                if !known_keys.contains(&section_tree_update.proof_chain.genesis_key) {
+                // The attached chain shall contains a key known to us.
+                // Use the following check instead of calling SectionsDAG::check_trust as it requires us to construct
+                // a SectionsDAG
+                if !known_keys.contains(section_tree_update.proof_chain.genesis_key()) {
                     return false;
                 } else {
                     trace!("Allows AntiEntropyUpdate msg({msg:?}) ahead of our knowledge");

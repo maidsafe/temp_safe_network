@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{NodeState, SectionSigned};
-use crate::messaging::SectionAuthorityProvider;
+use crate::network_knowledge::SectionAuthorityProvider;
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::Signature;
 use serde::{Deserialize, Serialize};
