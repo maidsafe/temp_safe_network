@@ -15,10 +15,9 @@ use eyre::{bail, eyre, Context, Result};
 use sn_consensus::Decision;
 use sn_interface::{
     elder_count,
-    messaging::SectionTreeUpdate,
     network_knowledge::{
         test_utils::*, MyNodeInfo, NetworkKnowledge, NodeState, SectionAuthorityProvider,
-        SectionKeyShare, SectionTree, SectionsDAG, MIN_ADULT_AGE,
+        SectionKeyShare, SectionTree, SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
     },
     types::{keys::ed25519, Peer, SecretKeySet},
 };

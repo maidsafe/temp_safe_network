@@ -92,7 +92,6 @@ impl JoiningAsRelocated {
         trace!("Hanlde JoinResponse {:?}", join_response);
         match join_response {
             JoinAsRelocatedResponse::Retry(section_auth) => {
-                let section_auth = section_auth.into_state();
                 if !self.check_autority_provider(&section_auth, &self.dst_xorname) {
                     trace!("failed to check authority");
                     return Ok(None);
@@ -133,8 +132,6 @@ impl JoiningAsRelocated {
                 Ok(Some(cmd))
             }
             JoinAsRelocatedResponse::Redirect(section_auth) => {
-                let section_auth = section_auth.into_state();
-
                 if !self.check_autority_provider(&section_auth, &self.dst_xorname) {
                     return Ok(None);
                 }
@@ -251,35 +248,31 @@ mod tests {
     use eyre::eyre;
     use sn_interface::{
         elder_count,
-        messaging::{
-            system::{JoinAsRelocatedResponse, NodeMsg},
-            SectionAuthorityProvider,
-        },
+        messaging::system::{JoinAsRelocatedResponse, NodeMsg},
         network_knowledge::{
             test_utils::{gen_addr, section_signed},
-            MyNodeInfo, NodeState, MIN_ADULT_AGE,
+            MyNodeInfo, NodeState, SectionAuthorityProvider, MIN_ADULT_AGE,
         },
         types::{keys::ed25519, Peer},
     };
-    use std::{collections::BTreeMap, net::SocketAddr};
+    use std::{collections::BTreeSet, net::SocketAddr};
     use tokio;
-    use xor_name::{Prefix, XorName};
+    use xor_name::Prefix;
 
     #[tokio::test]
     async fn should_send_join_as_relocated_request_system_msg() -> Result<()> {
         // from_sap
-        let (mut from_sap, from_sk_set) = generate_sap();
+        let (_, from_sk_set) = generate_sap();
         let node = MyNodeInfo::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE + 1),
             gen_addr(),
         );
         let node_state = NodeState::joined(node.peer(), None);
-        let _ = from_sap.members.insert(node.name(), node_state.clone());
         let signed_node_state = section_signed(&from_sk_set.secret_key(), node_state)?;
         // to_sap
         let (to_sap, _) = generate_sap();
 
-        let bootstrap: Vec<SocketAddr> = to_sap.elders.iter().map(|(_, addr)| *addr).collect();
+        let bootstrap: Vec<SocketAddr> = to_sap.elders().map(|peer| peer.addr()).collect();
         let (_, cmd) = JoiningAsRelocated::start(
             node.clone(),
             signed_node_state,
@@ -316,18 +309,17 @@ mod tests {
 
         fn relocate(response: Response) -> Result<()> {
             // from_sap
-            let (mut from_sap, from_sk_set) = generate_sap();
+            let (_, from_sk_set) = generate_sap();
             let node = MyNodeInfo::new(
                 ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE + 1),
                 gen_addr(),
             );
             let node_state = NodeState::joined(node.peer(), None);
-            let _ = from_sap.members.insert(node.name(), node_state.clone());
             let signed_node_state = section_signed(&from_sk_set.secret_key(), node_state)?;
             // to_sap
             let (to_sap, to_sk_set) = generate_sap();
 
-            let bootstrap: Vec<SocketAddr> = to_sap.elders.iter().map(|(_, addr)| *addr).collect();
+            let bootstrap: Vec<SocketAddr> = to_sap.elders().map(|peer| peer.addr()).collect();
             let (mut joining, _) = JoiningAsRelocated::start(
                 node.clone(),
                 signed_node_state,
@@ -344,12 +336,12 @@ mod tests {
                 Response::Retry => JoinAsRelocatedResponse::Retry(to_sap.clone()),
                 Response::Redirect => JoinAsRelocatedResponse::Redirect(to_sap.clone()),
             };
-            let (_, sender) = to_sap
-                .elders
-                .iter()
+            let sender = to_sap
+                .elders()
+                .map(|peer| peer.addr())
                 .next()
                 .ok_or_else(|| eyre!("Elder will be present"))?;
-            let handled = joining.handle_join_response(response.clone(), *sender);
+            let handled = joining.handle_join_response(response.clone(), sender);
 
             // updated with section's latest key
             assert_eq!(joining.dst_section_key, to_sk_set.secret_key().public_key());
@@ -365,7 +357,7 @@ mod tests {
             // The to_sap's elder list is exhausted after the first handle_join_response
             // Thus it should return None when new_recipients is empty and with outdated section key
             joining.dst_section_key = bls::SecretKey::random().public_key();
-            let handled = joining.handle_join_response(response, *sender);
+            let handled = joining.handle_join_response(response, sender);
             if let Ok(Some(_)) = handled {
                 return Err(eyre!("Should return Ok(None)"));
             }
@@ -382,18 +374,17 @@ mod tests {
 
         fn relocate(response: Response) -> Result<()> {
             // from_sap
-            let (mut from_sap, from_sk_set) = generate_sap();
+            let (_, from_sk_set) = generate_sap();
             let node = MyNodeInfo::new(
                 ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE + 1),
                 gen_addr(),
             );
             let node_state = NodeState::joined(node.peer(), None);
-            let _ = from_sap.members.insert(node.name(), node_state.clone());
             let signed_node_state = section_signed(&from_sk_set.secret_key(), node_state)?;
             // to_sap
             let (to_sap, to_sk_set) = generate_sap();
 
-            let bootstrap: Vec<SocketAddr> = to_sap.elders.iter().map(|(_, addr)| *addr).collect();
+            let bootstrap: Vec<SocketAddr> = to_sap.elders().map(|peer| peer.addr()).collect();
             let (mut joining, _) = JoiningAsRelocated::start(
                 node.clone(),
                 signed_node_state,
@@ -409,12 +400,12 @@ mod tests {
                 Response::Retry => JoinAsRelocatedResponse::Retry(to_sap.clone()),
                 Response::Redirect => JoinAsRelocatedResponse::Redirect(to_sap.clone()),
             };
-            let (_, sender) = to_sap
-                .elders
-                .iter()
+            let sender = to_sap
+                .elders()
+                .map(|peer| peer.addr())
                 .next()
                 .ok_or_else(|| eyre!("Elder will be present"))?;
-            let handled = joining.handle_join_response(response, *sender);
+            let handled = joining.handle_join_response(response, sender);
 
             if let Ok(Some(_)) = handled {
                 return Err(eyre!("Should return Ok(None)"));
@@ -432,23 +423,23 @@ mod tests {
     fn generate_sap() -> (SectionAuthorityProvider, bls::SecretKeySet) {
         let sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
 
-        let mut elders: BTreeMap<XorName, SocketAddr> = BTreeMap::new();
-        let mut members: BTreeMap<XorName, NodeState> = BTreeMap::new();
+        let mut elders: BTreeSet<Peer> = BTreeSet::new();
+        let mut members: BTreeSet<NodeState> = BTreeSet::new();
 
         for _ in 0..elder_count() {
             let xor_name = xor_name::rand::random();
             let socket_addr = gen_addr();
-            let _ = elders.insert(xor_name, socket_addr);
             let peer = Peer::new(xor_name, socket_addr);
-            let _ = members.insert(xor_name, NodeState::joined(peer, None));
+            let _ = elders.insert(peer);
+            let _ = members.insert(NodeState::joined(peer, None));
         }
-        let sap = SectionAuthorityProvider {
-            prefix: Prefix::default(),
-            public_key_set: sk_set.public_keys(),
+        let sap = SectionAuthorityProvider::new(
             elders,
+            Prefix::default(),
             members,
-            membership_gen: 0,
-        };
+            sk_set.public_keys(),
+            0,
+        );
         (sap, sk_set)
     }
 }

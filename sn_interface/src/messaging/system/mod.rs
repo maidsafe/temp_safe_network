@@ -12,8 +12,8 @@ mod join_as_relocated;
 mod node_msgs;
 mod section_sig;
 
-use crate::messaging::{AuthorityProof, EndUser, MsgId, SectionTreeUpdate};
-use crate::network_knowledge::{NodeState, SapCandidate};
+use crate::messaging::{AuthorityProof, EndUser, MsgId};
+use crate::network_knowledge::{NodeState, SapCandidate, SectionTreeUpdate};
 pub use agreement::{DkgSessionId, Proposal, SectionSigned};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};

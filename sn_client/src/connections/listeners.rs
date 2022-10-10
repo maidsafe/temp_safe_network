@@ -20,10 +20,9 @@ use sn_interface::{
     messaging::{
         data::{ClientMsg, Error as ErrorMsg},
         system::{AntiEntropyKind, NodeMsg},
-        AuthKind, AuthorityProof, ClientAuth, Dst, MsgId, MsgType, NodeMsgAuthority,
-        SectionTreeUpdate, WireMsg,
+        AuthKind, AuthorityProof, ClientAuth, Dst, MsgId, MsgType, NodeMsgAuthority, WireMsg,
     },
-    network_knowledge::{NetworkKnowledge, SectionAuthorityProvider},
+    network_knowledge::{NetworkKnowledge, SectionAuthorityProvider, SectionTreeUpdate},
     types::{log_markers::LogMarker, Peer},
 };
 
@@ -300,7 +299,7 @@ impl Session {
         bounced_msg: UsrMsgBytes,
         src_peer: Peer,
     ) -> Result<(), Error> {
-        let target_sap = section_tree_update.signed_sap().value;
+        let target_sap = section_tree_update.signed_sap.value.clone();
         debug!("Received Anti-Entropy from {src_peer}, with SAP: {target_sap:?}");
 
         // Try to update our network knowledge first
@@ -344,7 +343,7 @@ impl Session {
         section_tree_update: SectionTreeUpdate,
         sender: Peer,
     ) {
-        let sap = section_tree_update.signed_sap().value;
+        let sap = section_tree_update.signed_sap.value.clone();
         // Update our network PrefixMap based upon passed in knowledge
         match self.network.write().await.update(section_tree_update) {
             Ok(true) => {

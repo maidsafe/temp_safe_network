@@ -14,11 +14,8 @@ use crate::node::{
 use bls::Signature;
 use sn_consensus::{Decision, Generation, SignedVote, VoteResponse};
 use sn_interface::{
-    messaging::{
-        system::{JoinResponse, NodeMsg, SectionSig, SectionSigned},
-        SectionTreeUpdate,
-    },
-    network_knowledge::{MembershipState, NodeState},
+    messaging::system::{JoinResponse, NodeMsg, SectionSig, SectionSigned},
+    network_knowledge::{MembershipState, NodeState, SectionTreeUpdate},
     types::{log_markers::LogMarker, Peer},
 };
 

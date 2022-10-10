@@ -157,7 +157,7 @@ impl<'a> Joiner<'a> {
                 } => {
                     info!("{}", LogMarker::ReceivedJoinApproval);
                     if let Err(e) =
-                        decision.validate(&section_tree_update.section_auth.public_key_set)
+                        decision.validate(&section_tree_update.signed_sap.public_key_set())
                     {
                         error!("Dropping invalid join decision: {e:?}");
                         continue;
@@ -176,7 +176,7 @@ impl<'a> Joiner<'a> {
 
                     trace!(
                         "=========>> This node has been approved to join the network at {:?}!",
-                        section_tree_update.section_auth.prefix,
+                        section_tree_update.signed_sap.prefix(),
                     );
 
                     // Building our network knowledge instance will validate the section_tree_update
@@ -190,7 +190,7 @@ impl<'a> Joiner<'a> {
                     section_tree_update,
                     expected_age,
                 } => {
-                    let signed_sap = section_tree_update.signed_sap();
+                    let signed_sap = section_tree_update.signed_sap.clone();
 
                     trace!(
                         "Joining node {:?} - {:?}/{:?} received a Retry from {}, expected_age: {expected_age}, SAP: {}, proof_chain: {:?}",
@@ -264,7 +264,7 @@ impl<'a> Joiner<'a> {
                 }
                 JoinResponse::Redirect(section_auth) => {
                     trace!("Received a redirect JoinResponse from {}. Sending request to the latest contacts", sender);
-                    if section_auth.elders.is_empty() {
+                    if section_auth.elders().next().is_none() {
                         error!(
                             "Invalid JoinResponse::Redirect, empty list of Elders: {:?}",
                             section_auth
@@ -272,7 +272,6 @@ impl<'a> Joiner<'a> {
                         continue;
                     }
 
-                    let section_auth = section_auth.into_state();
                     if !section_auth.prefix().matches(&self.node.name()) {
                         warn!(
                             "Ignoring newer JoinResponse::Redirect response not for us {:?}, SAP {:?} from {:?}",
@@ -469,8 +468,9 @@ mod tests {
 
     use sn_interface::{
         elder_count, init_logger,
-        messaging::{SectionAuthorityProvider as SectionAuthorityProviderMsg, SectionTreeUpdate},
-        network_knowledge::{test_utils::*, NodeState, SectionsDAG},
+        network_knowledge::{
+            test_utils::*, NodeState, SectionAuthorityProvider, SectionTreeUpdate, SectionsDAG,
+        },
         types::PublicKey,
     };
 
@@ -481,7 +481,6 @@ mod tests {
         pin_mut,
     };
     use itertools::Itertools;
-    use std::collections::BTreeMap;
     use tokio::task;
     use xor_name::XorName;
 
@@ -637,7 +636,7 @@ mod tests {
 
             send_response(
                 &recv_tx,
-                JoinResponse::Redirect(new_sap.to_msg()),
+                JoinResponse::Redirect(new_sap.clone()),
                 &genesis_nodes[0],
                 new_sap.section_key(),
             )?;
@@ -712,13 +711,13 @@ mod tests {
 
             send_response(
                 &recv_tx,
-                JoinResponse::Redirect(SectionAuthorityProviderMsg {
-                    prefix: Prefix::default(),
-                    public_key_set: new_pk_set.clone(),
-                    elders: BTreeMap::new(),
-                    members: BTreeMap::new(),
-                    membership_gen: 0,
-                }),
+                JoinResponse::Redirect(SectionAuthorityProvider::new(
+                    BTreeSet::new(),
+                    Prefix::default(),
+                    BTreeSet::new(),
+                    new_pk_set.clone(),
+                    0,
+                )),
                 &genesis_nodes[0],
                 new_sap.section_key(),
             )?;
@@ -726,7 +725,7 @@ mod tests {
 
             send_response(
                 &recv_tx,
-                JoinResponse::Redirect(new_sap.to_msg()),
+                JoinResponse::Redirect(new_sap.clone()),
                 &genesis_nodes[0],
                 new_sap.section_key(),
             )?;

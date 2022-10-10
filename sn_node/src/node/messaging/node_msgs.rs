@@ -200,7 +200,8 @@ impl MyNode {
                                 previous_name, new_name
                             );
 
-                            let recipients = section_tree_update.section_auth.elders.clone();
+                            let recipients: Vec<_> =
+                                section_tree_update.signed_sap.elders().cloned().collect();
 
                             let section_tree = self.network_knowledge.section_tree().clone();
                             let new_network_knowledge =
@@ -289,8 +290,8 @@ impl MyNode {
                     ProposalMsg::VoteNodeOffline(node_state) => {
                         CoreProposal::VoteNodeOffline(node_state)
                     }
-                    ProposalMsg::SectionInfo(sap) => CoreProposal::SectionInfo(sap.into_state()),
-                    ProposalMsg::NewElders(sap) => CoreProposal::NewElders(sap.into_signed_state()),
+                    ProposalMsg::SectionInfo(sap) => CoreProposal::SectionInfo(sap),
+                    ProposalMsg::NewElders(sap) => CoreProposal::NewElders(sap),
                     ProposalMsg::JoinsAllowed(allowed) => CoreProposal::JoinsAllowed(allowed),
                 };
 

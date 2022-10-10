@@ -19,7 +19,7 @@ mod stats;
 
 use self::stats::NetworkStats;
 
-use crate::messaging::{system::SectionSigned, SectionTreeUpdate, SectionsDAG as SectionsDAGMsg};
+use crate::messaging::system::SectionSigned;
 use crate::network_knowledge::{
     Error, Result, SectionAuthUtils, SectionAuthorityProvider, SectionsDAG,
 };
@@ -172,8 +172,8 @@ impl SectionTree {
     /// Update our `SectionTree` if the provided update can be verified
     /// Returns true if an update was made
     pub fn update(&mut self, section_tree_update: SectionTreeUpdate) -> Result<bool> {
-        let signed_sap = section_tree_update.signed_sap();
-        let proof_chain = section_tree_update.proof_chain()?;
+        let signed_sap = section_tree_update.signed_sap;
+        let proof_chain = section_tree_update.proof_chain;
 
         // Check if SAP signature is valid
         if !signed_sap.self_verify() {
@@ -439,27 +439,22 @@ impl PartialEq for SectionTree {
 
 impl Eq for SectionTree {}
 
+/// The update to our `NetworkKnowledge` containing the section's `SectionAuthorityProvider` signed
+/// by the section and the proof chain to validate the it.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SectionTreeUpdate {
+    pub signed_sap: SectionSigned<SectionAuthorityProvider>,
+    pub proof_chain: SectionsDAG,
+}
+
 impl SectionTreeUpdate {
     pub fn new(
         signed_sap: SectionSigned<SectionAuthorityProvider>,
         proof_chain: SectionsDAG,
     ) -> Self {
-        let proof_chain: SectionsDAGMsg = proof_chain.into();
         Self {
-            section_auth: signed_sap.to_msg(),
-            section_sig: signed_sap.sig,
+            signed_sap,
             proof_chain,
-        }
-    }
-
-    pub fn proof_chain(&self) -> Result<SectionsDAG> {
-        self.proof_chain.clone().try_into()
-    }
-
-    pub fn signed_sap(&self) -> SectionSigned<SectionAuthorityProvider> {
-        SectionSigned {
-            value: self.section_auth.clone().into_state(),
-            sig: self.section_sig.clone(),
         }
     }
 }

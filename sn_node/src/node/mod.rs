@@ -91,11 +91,11 @@ mod core {
             data::OperationId,
             signature_aggregator::SignatureAggregator,
             system::{DkgSessionId, SectionSigned},
-            AuthorityProof, SectionAuthorityProvider, SectionSig,
+            AuthorityProof, SectionSig,
         },
         network_knowledge::{
-            supermajority, MyNodeInfo, NetworkKnowledge, NodeState,
-            SectionAuthorityProvider as SectionAuthProvider, SectionKeyShare, SectionKeysProvider,
+            supermajority, MyNodeInfo, NetworkKnowledge, NodeState, SectionAuthorityProvider,
+            SectionKeyShare, SectionKeysProvider,
         },
         types::{keys::ed25519::Digest256, log_markers::LogMarker, Cache, DataAddress, Peer},
     };
@@ -173,7 +173,7 @@ mod core {
         pub(crate) dkg_sessions_info: HashMap<Digest256, DkgSessionInfo>,
         pub(crate) dkg_voter: DkgVoter,
         pub(crate) pending_split_sections:
-            BTreeMap<Generation, BTreeSet<SectionSigned<SectionAuthProvider>>>,
+            BTreeMap<Generation, BTreeSet<SectionSigned<SectionAuthorityProvider>>>,
         pub(crate) relocate_state: Option<Box<JoiningAsRelocated>>,
         // ======================== Elder only ========================
         pub(crate) membership: Option<Membership>,
@@ -503,8 +503,8 @@ mod core {
             self.membership = Some(Membership::from(
                 (key.index as u8, key.secret_key_share),
                 key.public_key_set,
-                sap.elders.len(),
-                BTreeSet::from_iter(sap.members.into_values()),
+                sap.elders().count(),
+                BTreeSet::from_iter(sap.members().cloned()),
             ));
 
             Ok(())
@@ -526,7 +526,7 @@ mod core {
         }
 
         fn initialize_elder_state(&mut self) -> Result<()> {
-            let sap = self.network_knowledge.signed_sap().value.to_msg();
+            let sap = self.network_knowledge.signed_sap().value;
             self.initialize_membership(sap)?;
             self.initialize_handover()?;
             Ok(())
