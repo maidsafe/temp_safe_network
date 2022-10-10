@@ -20,7 +20,7 @@ use crate::{
         flow_ctrl::{dispatcher::Dispatcher, event_channel},
         messages::WireMsgUtils,
         messaging::{OutgoingMsg, Peers},
-        Cmd, Error, Event, MembershipEvent, MyNode, Proposal, Result as RoutingResult,
+        Cmd, Error, Event, MembershipEvent, Proposal, Result as RoutingResult,
     },
     storage::UsedSpace,
 };
