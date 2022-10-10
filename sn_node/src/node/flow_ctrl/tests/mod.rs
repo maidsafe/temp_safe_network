@@ -383,7 +383,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                 let (payload, recipients) = match cmd {
                     Cmd::SendMsg {
                         recipients,
-                        msg: OutgoingMsg::SectionAuth((_, payload)),
+                        msg: OutgoingMsg::Elder((_, payload)),
                         ..
                     } => (payload, recipients),
                     _ => continue,

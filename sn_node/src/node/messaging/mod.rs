@@ -38,7 +38,7 @@ use std::collections::BTreeSet;
 pub(crate) enum OutgoingMsg {
     Node(NodeMsg),
     Client(ClientMsg),
-    SectionAuth((SectionSigShare, Bytes)),
+    Elder((SectionSigShare, Bytes)),
 }
 
 #[derive(Debug, Clone)]
@@ -185,7 +185,7 @@ impl Node {
     #[instrument(skip_all)]
     async fn verify_section_key(&self, msg_authority: &NodeMsgAuthority, msg: &NodeMsg) -> bool {
         let known_keys = self.network_knowledge.known_keys();
-        NetworkKnowledge::verify_node_msg_can_be_trusted(msg_authority, msg, &known_keys)
+        NetworkKnowledge::verify_msg_section_key(msg_authority, msg, &known_keys)
     }
 
     /// Check if the origin needs to be updated on network structure/members.

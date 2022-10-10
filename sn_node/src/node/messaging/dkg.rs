@@ -104,7 +104,7 @@ impl Node {
 
         if !others.is_empty() {
             cmds.push(Cmd::send_msg(
-                OutgoingMsg::SectionAuth((auth.clone(), payload.clone())),
+                OutgoingMsg::Elder((auth.clone(), payload.clone())),
                 Peers::Multiple(others),
             ));
         }
