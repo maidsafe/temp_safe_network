@@ -415,7 +415,12 @@ impl<'a> Joiner<'a> {
 
     #[tracing::instrument(skip(self))]
     async fn receive_join_response(&mut self) -> Result<(JoinResponse, Peer)> {
-        while let Some(MsgFromPeer { sender, wire_msg }) = self.incoming_msgs.recv().await {
+        while let Some(MsgFromPeer {
+            sender,
+            wire_msg,
+            send_stream: _,
+        }) = self.incoming_msgs.recv().await
+        {
             // We are interested only in `JoinResponse` type of messages
 
             match wire_msg.into_msg() {
@@ -917,6 +922,7 @@ mod tests {
         recv_tx.try_send(MsgFromPeer {
             sender: bootstrap_node.peer(),
             wire_msg,
+            send_stream: None,
         })?;
 
         Ok(())
