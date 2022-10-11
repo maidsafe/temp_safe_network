@@ -92,17 +92,12 @@ impl MsgListener {
                         .receive_msg
                         .send(MsgEvent::Received {
                             sender: Peer::new(src_name, remote_address),
-                            wire_msg: wire_msg.clone(),
+                            wire_msg,
                         })
                         .await
                     {
                         error!("Error pushing msg onto internal msg channel... {error:?}");
                     }
-
-                    debug!(
-                        "MsgEvent received from: {src_name:?} was pushed to chanel: {:?}",
-                        wire_msg
-                    );
                 }
                 Err(error) => {
                     // TODO: should we propagate this?
