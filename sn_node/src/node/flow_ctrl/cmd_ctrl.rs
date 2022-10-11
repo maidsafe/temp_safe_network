@@ -132,16 +132,16 @@ impl CmdCtrl {
         let cmd_string = cmd.clone().to_string();
         let priority = job.priority();
 
-        node_event_sender
-            .send(Event::CmdProcessing(CmdProcessEvent::Started {
-                id,
-                parent_id: job.parent_id(),
-                priority,
-                cmd_creation_time: job.created_at(),
-                time: SystemTime::now(),
-                cmd_string: cmd.to_string(),
-            }))
-            .await;
+        // node_event_sender
+        //     .send(Event::CmdProcessing(CmdProcessEvent::Started {
+        //         id,
+        //         parent_id: job.parent_id(),
+        //         priority,
+        //         cmd_creation_time: job.created_at(),
+        //         time: SystemTime::now(),
+        //         cmd_string: cmd.to_string(),
+        //     }))
+        //     .await;
 
         trace!("about to spawn for processing cmd: {cmd:?}");
         let dispatcher = self.dispatcher.clone();
@@ -164,26 +164,26 @@ impl CmdCtrl {
                             }
                         }
                     }
-                    node_event_sender
-                        .send(Event::CmdProcessing(CmdProcessEvent::Finished {
-                            id,
-                            priority,
-                            cmd_string,
-                            time: SystemTime::now(),
-                        }))
-                        .await;
+                    // node_event_sender
+                    //     .send(Event::CmdProcessing(CmdProcessEvent::Finished {
+                    //         id,
+                    //         priority,
+                    //         cmd_string,
+                    //         time: SystemTime::now(),
+                    //     }))
+                    //     .await;
                 }
                 Err(error) => {
                     debug!("Error when processing command: {:?}", error);
-                    node_event_sender
-                        .send(Event::CmdProcessing(CmdProcessEvent::Failed {
-                            id,
-                            priority,
-                            time: SystemTime::now(),
-                            cmd_string,
-                            error: format!("{:?}", &error.to_string()),
-                        }))
-                        .await;
+                    // node_event_sender
+                    //     .send(Event::CmdProcessing(CmdProcessEvent::Failed {
+                    //         id,
+                    //         priority,
+                    //         time: SystemTime::now(),
+                    //         cmd_string,
+                    //         error: format!("{:?}", &error.to_string()),
+                    //     }))
+                    //     .await;
                 }
             }
             dispatcher
