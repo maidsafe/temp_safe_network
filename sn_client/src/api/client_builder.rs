@@ -176,6 +176,7 @@ impl ClientBuilder {
 
         if qp2p.keep_alive_interval.is_none() {
             qp2p.keep_alive_interval = Some(Duration::from_secs(3));
+            debug!("Session config w/ keep alive: {:?}", qp2p);
         }
 
         let session = Session::new(
