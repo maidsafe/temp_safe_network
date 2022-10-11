@@ -54,9 +54,9 @@ impl MsgListener {
         let remote_address = conn.remote_address();
         let mut first = true;
 
-        while let Some(result) = incoming_msgs.next().await.transpose() {
+        while let Some(result) = incoming_msgs.next_with_stream().await.transpose() {
             match result {
-                Ok(msg_bytes) => {
+                Ok((msg_bytes, send_stream)) => {
                     let wire_msg = match WireMsg::from(msg_bytes) {
                         Ok(wire_msg) => wire_msg,
                         Err(error) => {
@@ -91,6 +91,7 @@ impl MsgListener {
                         .send(MsgFromPeer {
                             sender: Peer::new(src_name, remote_address),
                             wire_msg,
+                            send_stream,
                         })
                         .await
                     {
