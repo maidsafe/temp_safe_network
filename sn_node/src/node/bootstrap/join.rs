@@ -8,14 +8,14 @@
 
 use super::UsedRecipientSaps;
 
-use crate::comm::{Comm, MsgEvent};
+use crate::comm::{Comm, MsgFromPeer};
 use crate::log_sleep;
 use crate::node::{messages::WireMsgUtils, Error, Result};
 
 use sn_interface::{
     messaging::{
         system::{JoinRejectionReason, JoinRequest, JoinResponse, MembershipState, NodeMsg},
-        AuthKind, Dst, MsgType, NodeSig, WireMsg,
+        Dst, MsgType, WireMsg,
     },
     network_knowledge::{MyNodeInfo, NetworkKnowledge, SectionTree},
     types::{keys::ed25519, log_markers::LogMarker, Peer},
@@ -38,7 +38,7 @@ use xor_name::Prefix;
 pub(crate) async fn join_network(
     node: MyNodeInfo,
     comm: &Comm,
-    incoming_msgs: &mut mpsc::Receiver<MsgEvent>,
+    incoming_msgs: &mut mpsc::Receiver<MsgFromPeer>,
     section_tree: SectionTree,
     join_timeout: Duration,
 ) -> Result<(MyNodeInfo, NetworkKnowledge)> {
@@ -60,7 +60,7 @@ struct Joiner<'a> {
     // Sender for outgoing messages.
     outgoing_msgs: mpsc::Sender<(WireMsg, Vec<Peer>)>,
     // Receiver for incoming messages.
-    incoming_msgs: &'a mut mpsc::Receiver<MsgEvent>,
+    incoming_msgs: &'a mut mpsc::Receiver<MsgFromPeer>,
     node: MyNodeInfo,
     prefix: Prefix,
     section_tree: SectionTree,
@@ -73,7 +73,7 @@ impl<'a> Joiner<'a> {
     fn new(
         node: MyNodeInfo,
         outgoing_msgs: mpsc::Sender<(WireMsg, Vec<Peer>)>,
-        incoming_msgs: &'a mut mpsc::Receiver<MsgEvent>,
+        incoming_msgs: &'a mut mpsc::Receiver<MsgFromPeer>,
         section_tree: SectionTree,
     ) -> Self {
         let mut backoff = ExponentialBackoff {
@@ -414,39 +414,23 @@ impl<'a> Joiner<'a> {
         Ok(())
     }
 
-    // TODO: receive JoinResponse from the JoinResponse handler directly,
-    // analogous to the JoinAsRelocated flow.
     #[tracing::instrument(skip(self))]
     async fn receive_join_response(&mut self) -> Result<(JoinResponse, Peer)> {
-        while let Some(event) = self.incoming_msgs.recv().await {
+        while let Some(MsgFromPeer { sender, wire_msg }) = self.incoming_msgs.recv().await {
             // We are interested only in `JoinResponse` type of messages
-            let (join_response, sender) = match event {
-                MsgEvent::Received {
-                    sender, wire_msg, ..
-                } => match wire_msg.auth() {
-                    AuthKind::Client(_) => continue,
-                    AuthKind::SectionShare(_) => {
-                        trace!("Bootstrap message discarded: sender: {sender:?} wire_msg: {wire_msg:?}");
-                        continue;
-                    }
-                    AuthKind::Node(NodeSig { .. }) => match wire_msg.into_msg() {
-                        Ok(MsgType::Node {
-                            msg: NodeMsg::JoinResponse(resp),
-                            ..
-                        }) => (*resp, sender),
-                        Ok(MsgType::Client { msg_id, .. } | MsgType::Node { msg_id, .. }) => {
-                            trace!("Bootstrap message discarded: sender: {sender:?} msg_id: {msg_id:?}");
-                            continue;
-                        }
-                        Err(err) => {
-                            debug!("Failed to deserialize message payload: {:?}", err);
-                            continue;
-                        }
-                    },
-                },
-            };
 
-            return Ok((join_response, sender));
+            match wire_msg.into_msg() {
+                Ok(MsgType::Node {
+                    msg: NodeMsg::JoinResponse(resp),
+                    ..
+                }) => return Ok((*resp, sender)),
+                Ok(MsgType::Client { msg_id, .. } | MsgType::Node { msg_id, .. }) => {
+                    trace!("Bootstrap message discarded: sender: {sender:?} msg_id: {msg_id:?}");
+                }
+                Err(err) => {
+                    error!("Failed to deserialize message payload: {:?}", err);
+                }
+            };
         }
 
         error!("NodeMsg sender unexpectedly closed");
@@ -937,7 +921,7 @@ mod tests {
     // test helper
     #[instrument]
     fn send_response(
-        recv_tx: &mpsc::Sender<MsgEvent>,
+        recv_tx: &mpsc::Sender<MsgFromPeer>,
         response: JoinResponse,
         bootstrap_node: &MyNodeInfo,
         section_pk: BlsPublicKey,
@@ -954,7 +938,7 @@ mod tests {
 
         debug!("wire msg built");
 
-        recv_tx.try_send(MsgEvent::Received {
+        recv_tx.try_send(MsgFromPeer {
             sender: bootstrap_node.peer(),
             wire_msg,
         })?;

@@ -47,7 +47,7 @@ impl Comm {
     pub(crate) async fn new(
         local_addr: SocketAddr,
         config: qp2p::Config,
-        incoming_msg_pipe: Sender<MsgEvent>,
+        incoming_msg_pipe: Sender<MsgFromPeer>,
     ) -> Result<Self> {
         // Doesn't bootstrap, just creates an endpoint to listen to
         // the incoming messages from other nodes.
@@ -262,7 +262,7 @@ fn setup_comms(
     our_endpoint: Endpoint,
     incoming_connections: IncomingConnections,
     // monitoring: RateLimits,
-    incoming_msg_pipe: Sender<MsgEvent>,
+    incoming_msg_pipe: Sender<MsgFromPeer>,
 ) -> (Comm, MsgListener) {
     let (comm, msg_listener) = setup(our_endpoint, incoming_msg_pipe);
 
@@ -272,7 +272,7 @@ fn setup_comms(
 }
 
 #[tracing::instrument(skip_all)]
-fn setup(our_endpoint: Endpoint, receive_msg: Sender<MsgEvent>) -> (Comm, MsgListener) {
+fn setup(our_endpoint: Endpoint, receive_msg: Sender<MsgFromPeer>) -> (Comm, MsgListener) {
     let (add_connection, conn_receiver) = mpsc::channel(100);
 
     let msg_listener = MsgListener::new(add_connection, receive_msg);
@@ -322,8 +322,9 @@ impl Drop for Comm {
 }
 
 #[derive(Debug)]
-pub(crate) enum MsgEvent {
-    Received { sender: Peer, wire_msg: WireMsg },
+pub(crate) struct MsgFromPeer {
+    pub(crate) sender: Peer,
+    pub(crate) wire_msg: WireMsg,
 }
 
 #[cfg(test)]
@@ -490,7 +491,7 @@ mod tests {
                 // Send a message to establish the connection
                 comm1.send(peer, msg.msg_id(), msg.serialize()?).await?;
 
-                assert_matches!(rx0.recv().await, Some(MsgEvent::Received { .. }));
+                assert_matches!(rx0.recv().await, Some(MsgFromPeer { .. }));
 
                 // Drop `comm1` to cause connection lost.
                 drop(comm1);

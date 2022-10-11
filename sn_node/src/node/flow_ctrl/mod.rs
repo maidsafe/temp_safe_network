@@ -19,7 +19,7 @@ pub(crate) use cmd_ctrl::CmdCtrl;
 use event_channel::EventSender;
 use periodic_checks::PeriodicChecksTimestamps;
 
-use crate::comm::MsgEvent;
+use crate::comm::MsgFromPeer;
 use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result};
 
 use sn_interface::types::log_markers::LogMarker;
@@ -37,7 +37,7 @@ const PROCESS_BATCH_COUNT: usize = 5;
 pub(crate) struct FlowCtrl {
     node: Arc<RwLock<MyNode>>,
     cmd_ctrl: CmdCtrl,
-    incoming_msg_events: mpsc::Receiver<MsgEvent>,
+    incoming_msg_events: mpsc::Receiver<MsgFromPeer>,
     incoming_cmds_from_apis: mpsc::Receiver<(Cmd, Option<usize>)>,
     cmd_sender_channel: mpsc::Sender<(Cmd, Option<usize>)>,
     outgoing_node_event_sender: EventSender,
@@ -49,7 +49,7 @@ impl FlowCtrl {
     /// returning the channel where it can receive commands on
     pub(crate) fn start(
         cmd_ctrl: CmdCtrl,
-        incoming_msg_events: mpsc::Receiver<MsgEvent>,
+        incoming_msg_events: mpsc::Receiver<MsgFromPeer>,
         outgoing_node_event_sender: EventSender,
     ) -> mpsc::Sender<(Cmd, Option<usize>)> {
         let node = cmd_ctrl.node();
@@ -106,7 +106,7 @@ impl FlowCtrl {
         loop {
             match self.incoming_msg_events.try_recv() {
                 Ok(msg) => {
-                    let cmd = match self.handle_new_msg_event(msg).await {
+                    let cmd = match self.handle_new_msg_from_peer(msg).await {
                         Ok(cmd) => cmd,
                         Err(error) => {
                             error!("Could not handle incoming msg event: {error:?}");
@@ -180,42 +180,33 @@ impl FlowCtrl {
     }
 
     // Listen for a new incoming connection event and handle it.
-    async fn handle_new_msg_event(&self, event: MsgEvent) -> Result<Cmd> {
-        match event {
-            MsgEvent::Received { sender, wire_msg } => {
-                let (header, dst, payload) = wire_msg.serialize()?;
-                let original_bytes_len = header.len() + dst.len() + payload.len();
+    async fn handle_new_msg_from_peer(&self, msg: MsgFromPeer) -> Result<Cmd> {
+        let MsgFromPeer { sender, wire_msg } = msg;
 
-                debug!(
-                    "New message ({} bytes) received from: {:?}",
-                    original_bytes_len, sender
-                );
+        let (header, dst, payload) = wire_msg.serialize()?;
+        let original_bytes_len = header.len() + dst.len() + payload.len();
 
-                let span = {
-                    // let name = node_info.name();
-                    trace_span!("handle_message", ?sender, msg_id = ?wire_msg.msg_id())
-                };
-                let _span_guard = span.enter();
+        let span = {
+            // let name = node_info.name();
+            trace_span!("handle_message", ?sender, msg_id = ?wire_msg.msg_id())
+        };
+        let _span_guard = span.enter();
 
-                trace!(
-                    "{:?} from {:?} length {}",
-                    LogMarker::DispatchHandleMsgCmd,
-                    sender,
-                    original_bytes_len
-                );
+        trace!(
+            "{:?} from {sender:?} length {original_bytes_len}",
+            LogMarker::DispatchHandleMsgCmd,
+        );
 
-                #[cfg(feature = "test-utils")]
-                let wire_msg = if let Ok(msg) = wire_msg.into_msg() {
-                    wire_msg.set_payload_debug(msg)
-                } else {
-                    wire_msg
-                };
+        #[cfg(feature = "test-utils")]
+        let wire_msg = if let Ok(msg) = wire_msg.into_msg() {
+            wire_msg.set_payload_debug(msg)
+        } else {
+            wire_msg
+        };
 
-                Ok(Cmd::ValidateMsg {
-                    origin: sender,
-                    wire_msg,
-                })
-            }
-        }
+        Ok(Cmd::ValidateMsg {
+            origin: sender,
+            wire_msg,
+        })
     }
 }

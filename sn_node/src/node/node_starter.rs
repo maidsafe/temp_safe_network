@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::comm::{Comm, MsgEvent};
+use crate::comm::{Comm, MsgFromPeer};
 use crate::node::{
     cfg::keypair_storage::{get_reward_pk, store_network_keypair, store_new_reward_keypair},
     flow_ctrl::{
@@ -238,7 +238,7 @@ async fn bootstrap_genesis_node(
 async fn bootstrap_normal_node(
     config: &Config,
     comm: &Comm,
-    connection_event_rx: &mut tokio::sync::mpsc::Receiver<MsgEvent>,
+    connection_event_rx: &mut tokio::sync::mpsc::Receiver<MsgFromPeer>,
     join_timeout: Duration,
     event_sender: EventSender,
     used_space: UsedSpace,
