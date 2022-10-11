@@ -129,6 +129,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
                 Cmd::ValidateMsg {
                     origin: relocated_node.peer(),
                     wire_msg,
+                    send_stream: None,
                 },
                 &dispatcher,
             )
@@ -529,6 +530,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
                 Cmd::ValidateMsg {
                     origin: old_node.peer(),
                     wire_msg,
+                    send_stream: None,
                 },
                 &dispatcher,
             )
@@ -594,6 +596,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
                     Cmd::ValidateMsg {
                         origin: sender.peer(),
                         wire_msg,
+                        send_stream: None,
                     },
                     &dispatcher,
                 )
