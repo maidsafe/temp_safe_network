@@ -111,8 +111,10 @@ impl FlowCtrl {
                         }
                     };
 
+                    debug!("fire and forget a msg: {:?}", cmd);
                     // dont use sender here incase channel gets full
-                    self.fire_and_forget(cmd, None).await;
+                    self.fire_and_forget(cmd.clone(), None).await;
+                    debug!("fire and forget a msg DONE: {:?}", cmd);
                 }
                 Err(TryRecvError::Empty) => {
                     // do nothing else
@@ -142,6 +144,7 @@ impl FlowCtrl {
 
         // the internal process loop
         loop {
+            debug!(" ----> Starting the process loop");
             // if we want to throttle cmd throughput, we do that here.
             // if there is nothing in the cmd queue, we wait here too.
             self.cmd_ctrl
@@ -163,11 +166,6 @@ impl FlowCtrl {
                 self.process_next_cmd().await;
 
                 if let Err(error) = self.enqeue_new_cmds_from_channel().await {
-                    error!("{error:?}");
-                    break;
-                }
-
-                if let Err(error) = self.enqueue_new_incoming_msgs().await {
                     error!("{error:?}");
                     break;
                 }
@@ -197,6 +195,9 @@ impl FlowCtrl {
                 &mut last_dysfunction_check,
             )
             .await;
+
+            // give us time for any cmds to get properly processed before adding more.
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }
 
         error!("Internal processing ended.")
