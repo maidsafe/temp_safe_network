@@ -2,7 +2,7 @@ use super::*;
 use crate::messaging::system::{SectionSig, SectionSigned};
 use crate::network_knowledge::section_keys::build_spent_proof_share;
 use crate::network_knowledge::{Error, MyNodeInfo, MIN_ADULT_AGE};
-use eyre::{eyre, Result};
+use eyre::{bail, eyre, Result};
 use itertools::Itertools;
 use rand::RngCore;
 use serde::Serialize;
@@ -11,8 +11,7 @@ use sn_dbc::{
     get_public_commitments_from_transaction, Commitment, Dbc, Owner, OwnerOnce, RingCtTransaction,
     Token, TransactionBuilder,
 };
-use std::collections::BTreeMap;
-use std::{cell::Cell, net::SocketAddr};
+use std::{cell::Cell, collections::BTreeMap, fmt, net::SocketAddr};
 use xor_name::Prefix;
 
 // Parse `Prefix` from string
@@ -280,4 +279,30 @@ pub fn get_input_dbc_spend_info(
         .first()
         .ok_or_else(|| eyre!("There must be at least one input on the transaction"))?;
     Ok(first.clone())
+}
+
+pub fn assert_lists<I, J>(a: I, b: J) -> Result<()>
+where
+    I: IntoIterator,
+    J: IntoIterator,
+    I::Item: fmt::Debug + PartialEq<J::Item> + Eq,
+    J::Item: fmt::Debug + PartialEq<I::Item> + Eq,
+{
+    let vec1: Vec<_> = a.into_iter().collect();
+    let mut vec2: Vec<_> = b.into_iter().collect();
+    if vec1.len() != vec2.len() {
+        bail!(
+            "Lists lengths don't match: {} vs. {}",
+            vec1.len(),
+            vec2.len()
+        );
+    }
+    for item1 in &vec1 {
+        let idx2 = vec2.iter().position(|item2| *item2 == *item1);
+        vec2.remove(
+            idx2.ok_or_else(|| eyre!("An item that was expected to be in list two was not found"))?,
+        );
+    }
+    assert_eq!(vec2.len(), 0);
+    Ok(())
 }
