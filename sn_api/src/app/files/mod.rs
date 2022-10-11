@@ -2675,14 +2675,14 @@ mod tests {
         // let's add another file but with the same name
         let data = Bytes::from("9876543210");
         let other_file_xorurl = retry_loop!(safe.store_bytes(data.clone(), None));
-        let (version2_content, new_processed_files) = retry_loop!(safe.files_container_add(
+        let (version2_content, mut new_processed_files) = retry_loop!(safe.files_container_add(
             &other_file_xorurl,
             &url_with_path.to_string(),
             true, // force to overwrite it with new link
             false,
             false,
         ));
-        let (version2, new_files_map) =
+        let (mut version2, mut new_files_map) =
             version2_content.ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
         // we know there a change, so we wait for an udpated version here
