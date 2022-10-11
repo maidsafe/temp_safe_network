@@ -11,7 +11,7 @@ use super::Peer;
 use crate::types::log_markers::LogMarker;
 use qp2p::UsrMsgBytes;
 
-use qp2p::{Connection, ConnectionIncoming as IncomingMsgs, Endpoint, RetryConfig};
+use qp2p::{Connection, ConnectionIncoming as IncomingMsgs, Endpoint};
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::sync::RwLock;
 use xor_name::XorName;
@@ -74,7 +74,7 @@ impl Link {
         bytes: UsrMsgBytes,
         listen: F,
     ) -> Result<(), SendToOneError> {
-        self.send_with(bytes, None, listen).await
+        self.send_with(bytes, listen).await
     }
 
     /// Send a message to the peer using the given configuration.
@@ -84,7 +84,6 @@ impl Link {
     pub async fn send_with<F: Fn(Connection, IncomingMsgs)>(
         &self,
         bytes: UsrMsgBytes,
-        retry_config: Option<&RetryConfig>,
         listen: F,
     ) -> Result<(), SendToOneError> {
         let default_priority = 10;
@@ -120,7 +119,7 @@ impl Link {
             }
         }
 
-        match conn.send_with(bytes, default_priority, retry_config).await {
+        match conn.send_with(bytes, default_priority, None).await {
             Ok(()) => {
                 // self.remove_expired().await;
                 Ok(())
