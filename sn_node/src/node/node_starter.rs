@@ -250,20 +250,20 @@ async fn bootstrap_normal_node(
     let section_tree_path = config.network_contacts_file().ok_or_else(|| {
         Error::Configuration("Could not obtain network contacts file path".to_string())
     })?;
-    let network_contacts = SectionTree::from_disk(&section_tree_path).await?;
+    let section_tree = SectionTree::from_disk(&section_tree_path).await?;
     info!(
         "{} Joining as a new node (PID: {}) our socket: {}, network's genesis key: {:?}",
         node_name,
         std::process::id(),
         comm.socket_addr(),
-        network_contacts.genesis_key()
+        section_tree.genesis_key()
     );
     let joining_node = MyNodeInfo::new(keypair, comm.socket_addr());
     let (info, network_knowledge) = join_network(
         joining_node,
         comm,
         connection_event_rx,
-        network_contacts,
+        section_tree,
         join_timeout,
     )
     .await?;

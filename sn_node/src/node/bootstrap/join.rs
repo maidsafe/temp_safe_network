@@ -42,13 +42,13 @@ pub(crate) async fn join_network(
     node: MyNodeInfo,
     comm: &Comm,
     incoming_msgs: &mut mpsc::Receiver<MsgEvent>,
-    network_contacts: SectionTree,
+    section_tree: SectionTree,
     join_timeout: Duration,
 ) -> Result<(MyNodeInfo, NetworkKnowledge)> {
     let (outgoing_msgs_sender, outgoing_msgs_receiver) = mpsc::channel(100);
 
     let span = trace_span!("bootstrap");
-    let joiner = Joiner::new(node, outgoing_msgs_sender, incoming_msgs, network_contacts);
+    let joiner = Joiner::new(node, outgoing_msgs_sender, incoming_msgs, section_tree);
 
     future::join(
         joiner.try_join(join_timeout),
@@ -66,7 +66,7 @@ struct Joiner<'a> {
     incoming_msgs: &'a mut mpsc::Receiver<MsgEvent>,
     node: MyNodeInfo,
     prefix: Prefix,
-    network_contacts: SectionTree,
+    section_tree: SectionTree,
     backoff: ExponentialBackoff,
     aggregated: bool,
     retry_responses_cache: BTreeMap<Peer, u8>,
@@ -77,7 +77,7 @@ impl<'a> Joiner<'a> {
         node: MyNodeInfo,
         outgoing_msgs: mpsc::Sender<(WireMsg, Vec<Peer>)>,
         incoming_msgs: &'a mut mpsc::Receiver<MsgEvent>,
-        network_contacts: SectionTree,
+        section_tree: SectionTree,
     ) -> Self {
         let mut backoff = ExponentialBackoff {
             initial_interval: Duration::from_millis(50),
@@ -94,7 +94,7 @@ impl<'a> Joiner<'a> {
             incoming_msgs,
             node,
             prefix: Prefix::default(),
-            network_contacts,
+            section_tree,
             backoff,
             aggregated: false,
             retry_responses_cache: Default::default(),
@@ -109,8 +109,8 @@ impl<'a> Joiner<'a> {
     //    completing the bootstrap.
     async fn try_join(self, join_timeout: Duration) -> Result<(MyNodeInfo, NetworkKnowledge)> {
         trace!(
-            "Bootstrap run, network contacts as we have it: {:?}",
-            self.network_contacts
+            "Bootstrap run, section tree as we have it: {:?}",
+            self.section_tree
         );
 
         tokio::time::timeout(join_timeout, self.join(join_timeout / 10))
@@ -120,7 +120,7 @@ impl<'a> Joiner<'a> {
 
     fn join_target(&self) -> Result<(BlsPublicKey, Vec<Peer>)> {
         let our_name = self.node.name();
-        let sap = self.network_contacts.section_by_name(&our_name)?;
+        let sap = self.section_tree.section_by_name(&our_name)?;
         Ok((sap.section_key(), sap.elders_vec()))
     }
 
@@ -181,7 +181,7 @@ impl<'a> Joiner<'a> {
                     // Building our network knowledge instance will validate the section_tree_update
 
                     let network_knowledge =
-                        NetworkKnowledge::new(self.network_contacts, section_tree_update)?;
+                        NetworkKnowledge::new(self.section_tree, section_tree_update)?;
 
                     return Ok((self.node, network_knowledge));
                 }
