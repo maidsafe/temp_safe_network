@@ -12,15 +12,16 @@ use crate::comm::{Comm, MsgFromPeer};
 use crate::log_sleep;
 use crate::node::{messages::WireMsgUtils, Error, Result};
 
-use sn_interface::messaging::system::SectionSigned;
-use sn_interface::SectionAuthorityProvider;
 use sn_interface::{
     messaging::{
-        system::{JoinRejectionReason, JoinRequest, JoinResponse, NodeMsg},
+        system::{JoinRejectionReason, JoinRequest, JoinResponse, NodeMsg, SectionSigned},
         Dst, MsgType, WireMsg,
     },
-    network_knowledge::{MembershipState, MyNodeInfo, NetworkKnowledge, SectionTree},
+    network_knowledge::{
+        MembershipState, MyNodeInfo, NetworkKnowledge, SectionTree, SectionTreeUpdate,
+    },
     types::{keys::ed25519, log_markers::LogMarker, Peer},
+    SectionAuthorityProvider,
 };
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
@@ -139,6 +140,8 @@ impl<'a> Joiner<'a> {
 
     #[tracing::instrument(skip(self))]
     async fn join(mut self, response_timeout: Duration) -> Result<(MyNodeInfo, NetworkKnowledge)> {
+        self.bootstrap_section_tree(response_timeout).await?;
+
         let (target_section_key, recipients) = self.join_target()?;
 
         debug!(
@@ -343,6 +346,29 @@ impl<'a> Joiner<'a> {
         }
     }
 
+    async fn bootstrap_section_tree(&mut self, response_timeout: Duration) -> Result<()> {
+        loop {
+            let (section_key, elders) = self.join_target()?;
+
+            self.send(
+                NodeMsg::AntiEntropyProbe(section_key),
+                &elders,
+                section_key,
+                true,
+            )
+            .await?;
+
+            let section_tree_update =
+                tokio::time::timeout(response_timeout, self.receive_section_tree_update())
+                    .await
+                    .map_err(|_| Error::JoinTimeout)??;
+
+            if !self.section_tree.update(section_tree_update)? {
+                return Ok(());
+            }
+        }
+    }
+
     // We'll restart the join process once we receive Retry responses from >1/3 of elders
     fn should_retry_after_response(&mut self, sender: Peer, elders: BTreeSet<Peer>) -> bool {
         if !elders.contains(&sender) {
@@ -398,29 +424,47 @@ impl<'a> Joiner<'a> {
 
     #[tracing::instrument(skip(self))]
     async fn receive_join_response(&mut self) -> Result<(JoinResponse, Peer)> {
+        loop {
+            let (msg, sender) = self.receive_node_msg().await?;
+            match msg {
+                NodeMsg::JoinResponse(resp) => return Ok((*resp, sender)),
+                _ => {
+                    trace!("Bootstrap message discarded: sender: {sender:?} msg: {msg:?}")
+                }
+            }
+        }
+    }
+
+    #[tracing::instrument(skip(self))]
+    async fn receive_section_tree_update(&mut self) -> Result<SectionTreeUpdate> {
+        loop {
+            let (msg, sender) = self.receive_node_msg().await?;
+            match msg {
+                NodeMsg::AntiEntropy {
+                    section_tree_update,
+                    ..
+                } => return Ok(section_tree_update),
+                _ => {
+                    trace!("Bootstrap message discarded: sender: {sender:?} msg: {msg:?}")
+                }
+            }
+        }
+    }
+
+    #[tracing::instrument(skip(self))]
+    async fn receive_node_msg(&mut self) -> Result<(NodeMsg, Peer)> {
         while let Some(MsgFromPeer {
-            sender,
-            wire_msg,
-            send_stream: _,
+            sender, wire_msg, ..
         }) = self.incoming_msgs.recv().await
         {
             // We are interested only in `JoinResponse` type of messages
 
-            match wire_msg.into_msg() {
-                Ok(MsgType::Node {
-                    msg: NodeMsg::JoinResponse(resp),
-                    ..
-                }) => return Ok((*resp, sender)),
-                Ok(
-                    MsgType::Client { msg_id, .. }
-                    | MsgType::Node { msg_id, .. }
-                    | MsgType::ClientDataResponse { msg_id, .. }
-                    | MsgType::NodeDataResponse { msg_id, .. },
-                ) => {
-                    trace!("Bootstrap message discarded: sender: {sender:?} msg_id: {msg_id:?}");
-                }
-                Err(err) => {
-                    error!("Failed to deserialize message payload: {:?}", err);
+            match wire_msg.into_msg()? {
+                MsgType::Node { msg, .. } => return Ok((msg, sender)),
+                MsgType::Client { msg_id, .. }
+                | MsgType::ClientDataResponse { msg_id, .. }
+                | MsgType::NodeDataResponse { msg_id, .. } => {
+                    trace!("Non-NodeMsg bootstrap message discarded: sender: {sender:?} msg_id: {msg_id:?}")
                 }
             };
         }
