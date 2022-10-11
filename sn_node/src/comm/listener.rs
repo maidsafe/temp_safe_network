@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::MsgEvent;
+use super::MsgFromPeer;
 
 use sn_interface::{
     messaging::{AuthKind, WireMsg},
@@ -28,13 +28,13 @@ pub(crate) enum ListenerEvent {
 #[derive(Clone)]
 pub(crate) struct MsgListener {
     add_connection: mpsc::Sender<ListenerEvent>,
-    receive_msg: mpsc::Sender<MsgEvent>,
+    receive_msg: mpsc::Sender<MsgFromPeer>,
 }
 
 impl MsgListener {
     pub(crate) fn new(
         add_connection: mpsc::Sender<ListenerEvent>,
-        receive_msg: mpsc::Sender<MsgEvent>,
+        receive_msg: mpsc::Sender<MsgFromPeer>,
     ) -> Self {
         Self {
             add_connection,
@@ -88,7 +88,7 @@ impl MsgListener {
 
                     if let Err(error) = self
                         .receive_msg
-                        .send(MsgEvent::Received {
+                        .send(MsgFromPeer {
                             sender: Peer::new(src_name, remote_address),
                             wire_msg,
                         })

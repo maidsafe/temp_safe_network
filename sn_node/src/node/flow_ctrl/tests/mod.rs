@@ -12,7 +12,7 @@ pub(crate) mod dbc_utils;
 pub(crate) mod network_utils;
 
 use crate::{
-    comm::{Comm, MsgEvent},
+    comm::{Comm, MsgFromPeer},
     node::{
         api::gen_genesis_dbc,
         cfg::create_test_max_capacity_and_root_storage,
@@ -771,7 +771,7 @@ async fn msg_to_self() -> Result<()> {
 
         assert!(cmds.is_empty());
 
-        let msg_type = assert_matches!(comm_rx.recv().await, Some(MsgEvent::Received { sender, wire_msg, .. }) => {
+        let msg_type = assert_matches!(comm_rx.recv().await, Some(MsgFromPeer { sender, wire_msg, .. }) => {
             assert_eq!(sender.addr(), info.addr);
             assert_matches!(wire_msg.into_msg(), Ok(msg_type) => msg_type)
         });
