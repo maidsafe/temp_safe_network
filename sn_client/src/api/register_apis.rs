@@ -502,7 +502,7 @@ mod tests {
 
         // Different entries written to the same rigister from root shall giving different hash
         let (value1_hash, _batch) = client
-            .write_to_register(address, value_1.clone(), BTreeSet::new())
+            .write_to_local_register(address, value_1.clone(), BTreeSet::new())
             .await?;
 
         let value_2 = random_register_entry();
@@ -511,7 +511,7 @@ mod tests {
             tracing::info_span!("test__register_write_without_publish__second_write").entered();
 
         let (value2_hash, _batch) = client
-            .write_to_register(address, value_2.clone(), BTreeSet::new())
+            .write_to_local_register(address, value_2.clone(), BTreeSet::new())
             .await?;
 
         assert!(value1_hash != value2_hash);
@@ -526,10 +526,10 @@ mod tests {
             tracing::info_span!("test__register_write_without_publish__third_write").entered();
 
         let (value1_3_hash, _batch) = client
-            .write_to_register(address, value_3.clone(), children.clone())
+            .write_to_local_register(address, value_3.clone(), children.clone())
             .await?;
         let (value1_2_hash, _batch) = client
-            .write_to_register(address, value_2.clone(), children.clone())
+            .write_to_local_register(address, value_2.clone(), children.clone())
             .await?;
         assert!(value1_2_hash != value1_3_hash);
 
