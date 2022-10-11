@@ -12,7 +12,7 @@ use crate::types::log_markers::LogMarker;
 use qp2p::UsrMsgBytes;
 
 use priority_queue::DoublePriorityQueue;
-use qp2p::{ConnectionIncoming as IncomingMsgs, Endpoint, RetryConfig};
+use qp2p::{ConnectionIncoming as IncomingMsgs, Endpoint};
 use std::{
     collections::BTreeMap,
     sync::{
@@ -97,7 +97,7 @@ impl Link {
         guard.clear();
     }
 
-    /// Send a message to the peer with default retry configuration.
+    /// Send a message to the peer.
     ///
     /// The message will be sent on a unidirectional QUIC stream, meaning the application is
     /// responsible for correlating any anticipated responses from incoming streams.
@@ -110,19 +110,6 @@ impl Link {
     pub async fn send<F: Fn(qp2p::Connection, IncomingMsgs)>(
         &self,
         bytes: UsrMsgBytes,
-        listen: F,
-    ) -> Result<(), SendToOneError> {
-        self.send_with(bytes, None, listen).await
-    }
-
-    /// Send a message to the peer using the given configuration.
-    ///
-    /// See [`send`](Self::send) if you want to send with the default configuration.
-    #[instrument(skip_all)]
-    pub async fn send_with<F: Fn(qp2p::Connection, IncomingMsgs)>(
-        &self,
-        bytes: UsrMsgBytes,
-        retry_config: Option<&RetryConfig>,
         listen: F,
     ) -> Result<(), SendToOneError> {
         let default_priority = 10;
@@ -161,7 +148,7 @@ impl Link {
             }
         }
 
-        match conn.send_with(bytes, default_priority, retry_config).await {
+        match conn.send_with(bytes, default_priority, None).await {
             Ok(()) => {
                 self.remove_expired().await;
                 Ok(())
