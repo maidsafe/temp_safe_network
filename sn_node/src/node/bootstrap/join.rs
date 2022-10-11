@@ -26,10 +26,7 @@ use bls::PublicKey as BlsPublicKey;
 use futures::future;
 
 use std::collections::{BTreeMap, BTreeSet};
-use tokio::{
-    sync::mpsc,
-    time::{Duration, Instant},
-};
+use tokio::{sync::mpsc, time::Duration};
 use tracing::Instrument;
 use xor_name::Prefix;
 
@@ -141,7 +138,8 @@ impl<'a> Joiner<'a> {
         // `JoinRequest` again with it.
         let msg = JoinRequest { section_key };
 
-        self.send(msg, &recipients, section_key, false).await?;
+        self.send(NodeMsg::JoinRequest(msg), &recipients, section_key, false)
+            .await?;
 
         // Avoid sending more than one duplicated request (with same SectionKey) to the same peer.
         let mut used_recipient_saps = UsedRecipientSaps::new();
@@ -214,7 +212,7 @@ impl<'a> Joiner<'a> {
                     }
 
                     // make sure we received a valid and trusted new SAP
-                    let _is_new_sap = match self.network_contacts.update(section_tree_update) {
+                    let _is_new_sap = match self.section_tree.update(section_tree_update) {
                         Ok(updated) => updated,
                         Err(err) => {
                             debug!("Ignoring JoinResponse::Retry with an invalid SAP: {err:?}");
@@ -255,7 +253,13 @@ impl<'a> Joiner<'a> {
                         let msg = JoinRequest { section_key };
                         let new_recipients = signed_sap.elders_vec();
 
-                        self.send(msg, &new_recipients, section_key, true).await?;
+                        self.send(
+                            NodeMsg::JoinRequest(msg),
+                            &new_recipients,
+                            section_key,
+                            true,
+                        )
+                        .await?;
                     }
                 }
                 JoinResponse::Redirect(section_auth) => {
@@ -306,7 +310,13 @@ impl<'a> Joiner<'a> {
 
                     let msg = JoinRequest { section_key };
 
-                    self.send(msg, &new_recipients, section_key, true).await?;
+                    self.send(
+                        NodeMsg::JoinRequest(msg),
+                        &new_recipients,
+                        section_key,
+                        true,
+                    )
+                    .await?;
                 }
                 JoinResponse::Rejected(JoinRejectionReason::JoinsDisallowed) => {
                     error!("Network is set to not taking any new joining node, try join later.");
@@ -364,7 +374,7 @@ impl<'a> Joiner<'a> {
     #[tracing::instrument(skip(self))]
     async fn send(
         &mut self,
-        msg: JoinRequest,
+        msg: NodeMsg,
         recipients: &[Peer],
         section_key: BlsPublicKey,
         should_backoff: bool,
@@ -392,7 +402,7 @@ impl<'a> Joiner<'a> {
                 name: self.node.name(), // we want to target a section where our name fits
                 section_key,
             },
-            NodeMsg::JoinRequest(msg),
+            msg,
             section_key,
         )?;
 
