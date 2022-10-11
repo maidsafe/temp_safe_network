@@ -147,7 +147,10 @@ impl<'a> Joiner<'a> {
         let mut used_recipient_saps = UsedRecipientSaps::new();
 
         loop {
-            let (response, sender) = self.receive_join_response(response_timeout).await?;
+            let (response, sender) =
+                tokio::time::timeout(response_timeout, self.receive_join_response())
+                    .await
+                    .map_err(|_| Error::JoinTimeout)??;
 
             match response {
                 JoinResponse::Approved {
@@ -404,23 +407,8 @@ impl<'a> Joiner<'a> {
     // TODO: receive JoinResponse from the JoinResponse handler directly,
     // analogous to the JoinAsRelocated flow.
     #[tracing::instrument(skip(self))]
-    async fn receive_join_response(
-        &mut self,
-        mut response_timeout: Duration,
-    ) -> Result<(JoinResponse, Peer)> {
-        let mut timer = Instant::now();
-
-        // Awaits at most the time left of join_timeout.
-        while let Some(event) = tokio::time::timeout(response_timeout, self.incoming_msgs.recv())
-            .await
-            .map_err(|_| Error::JoinTimeout)?
-        {
-            // Breaks the loop raising an error, if response_timeout time elapses.
-            response_timeout = response_timeout
-                .checked_sub(timer.elapsed())
-                .ok_or(Error::JoinTimeout)?;
-            timer = Instant::now(); // reset timer
-
+    async fn receive_join_response(&mut self) -> Result<(JoinResponse, Peer)> {
+        while let Some(event) = self.incoming_msgs.recv().await {
             // We are interested only in `JoinResponse` type of messages
             let (join_response, sender) = match event {
                 MsgEvent::Received {
