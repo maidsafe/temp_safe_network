@@ -467,10 +467,9 @@ impl SectionTreeUpdate {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::network_knowledge::sections_dag::tests::assert_lists;
     use crate::network_knowledge::{
         sections_dag::tests::arb_sections_dag_and_proof_chains,
-        test_utils::{prefix, random_sap, section_signed},
+        test_utils::{assert_lists, prefix, random_sap, section_signed},
     };
     use eyre::{Context, Result};
     use proptest::{prelude::ProptestConfig, prop_assert_eq, proptest};
@@ -479,8 +478,8 @@ pub(crate) mod tests {
     fn insert_existing_prefix() -> Result<()> {
         let (mut tree, _, _) = new_network_section_tree();
         let p0 = prefix("0")?;
-        let sap0 = gen_section_auth(p0)?;
-        let new_sap0 = gen_section_auth(p0)?;
+        let (sap0, _) = gen_section_auth(p0)?;
+        let (new_sap0, _) = gen_section_auth(p0)?;
         assert_ne!(sap0, new_sap0);
 
         assert!(tree.insert(sap0));
@@ -497,11 +496,11 @@ pub(crate) mod tests {
         let p00 = prefix("00")?;
         let p01 = prefix("01")?;
 
-        let sap0 = gen_section_auth(p0)?;
+        let (sap0, _) = gen_section_auth(p0)?;
         assert!(tree.insert(sap0));
 
         // Insert the first sibling. Parent get pruned in the map.
-        let sap00 = gen_section_auth(p00)?;
+        let (sap00, _) = gen_section_auth(p00)?;
         assert!(tree.insert(sap00.clone()));
 
         assert_eq!(tree.get(&p00), Some(sap00.value.clone()));
@@ -509,7 +508,7 @@ pub(crate) mod tests {
         assert_eq!(tree.get(&p0), None);
 
         // Insert the other sibling.
-        let sap3 = gen_section_auth(p01)?;
+        let (sap3, _) = gen_section_auth(p01)?;
         assert!(tree.insert(sap3.clone()));
 
         assert_eq!(tree.get(&p00), Some(sap00.value));
@@ -525,7 +524,7 @@ pub(crate) mod tests {
         let p0 = prefix("0")?;
         let p1 = prefix("1")?;
 
-        let sap0 = gen_section_auth(p0)?;
+        let (sap0, _) = gen_section_auth(p0)?;
 
         let _changed = tree.insert(sap0.clone());
 
@@ -560,10 +559,10 @@ pub(crate) mod tests {
         let p00 = prefix("00")?;
         let p01 = prefix("01")?;
 
-        let sap0 = gen_section_auth(p0)?;
-        let sap01 = gen_section_auth(p01)?;
-        let sap000 = gen_section_auth(p000)?;
-        let sap001 = gen_section_auth(p001)?;
+        let (sap0, _) = gen_section_auth(p0)?;
+        let (sap01, _) = gen_section_auth(p01)?;
+        let (sap000, _) = gen_section_auth(p000)?;
+        let (sap001, _) = gen_section_auth(p001)?;
 
         assert!(tree.insert(sap0));
 
@@ -597,8 +596,8 @@ pub(crate) mod tests {
         let p0 = prefix("0")?;
         let p00 = prefix("00")?;
 
-        let sap0 = gen_section_auth(p0)?;
-        let sap00 = gen_section_auth(p00)?;
+        let (sap0, _) = gen_section_auth(p0)?;
+        let (sap00, _) = gen_section_auth(p00)?;
         let _changed = tree.insert(sap00.clone());
 
         assert!(!tree.insert(sap0));
@@ -616,10 +615,10 @@ pub(crate) mod tests {
         let p1 = prefix("1")?;
         let p10 = prefix("10")?;
 
-        let sap = gen_section_auth(p)?;
-        let sap0 = gen_section_auth(p0)?;
-        let sap1 = gen_section_auth(p1)?;
-        let sap10 = gen_section_auth(p10)?;
+        let (sap, _) = gen_section_auth(p)?;
+        let (sap0, _) = gen_section_auth(p0)?;
+        let (sap1, _) = gen_section_auth(p1)?;
+        let (sap10, _) = gen_section_auth(p10)?;
 
         let _changed = tree.insert(sap.clone());
 
@@ -664,9 +663,9 @@ pub(crate) mod tests {
         let p1 = prefix("1")?;
         let p10 = prefix("10")?;
 
-        let sap0 = gen_section_auth(p0)?;
-        let sap1 = gen_section_auth(p1)?;
-        let sap10 = gen_section_auth(p10)?;
+        let (sap0, _) = gen_section_auth(p0)?;
+        let (sap1, _) = gen_section_auth(p1)?;
+        let (sap10, _) = gen_section_auth(p10)?;
 
         let _changed = tree.insert(sap0.clone());
         let _changed = tree.insert(sap1);
@@ -694,19 +693,19 @@ pub(crate) mod tests {
         let p11 = prefix("11")?;
 
         let mut dag_01 = dag.clone();
-        let section_auth_01 = gen_section_auth(p01)?;
-        let pk01 = section_auth_01.section_key();
+        let (sap01, _) = gen_section_auth(p01)?;
+        let pk01 = sap01.section_key();
         let sig01 = bincode::serialize(&pk01).map(|bytes| genesis_sk.sign(&bytes))?;
         dag_01.insert(&genesis_pk, pk01, sig01)?;
-        let tree_update = SectionTreeUpdate::new(section_auth_01, dag_01);
+        let tree_update = SectionTreeUpdate::new(sap01, dag_01);
         assert!(tree.update(tree_update)?);
 
         let mut dag_10 = dag;
-        let section_auth_10 = gen_section_auth(p10)?;
-        let pk10 = section_auth_10.section_key();
+        let (sap10, _) = gen_section_auth(p10)?;
+        let pk10 = sap10.section_key();
         let sig10 = bincode::serialize(&pk10).map(|bytes| genesis_sk.sign(&bytes))?;
         dag_10.insert(&genesis_pk, pk10, sig10)?;
-        let tree_update = SectionTreeUpdate::new(section_auth_10, dag_10);
+        let tree_update = SectionTreeUpdate::new(sap10, dag_10);
         assert!(tree.update(tree_update)?);
 
         let n01 = p01.substituted_in(xor_name::rand::random());
@@ -722,24 +721,18 @@ pub(crate) mod tests {
 
     #[test]
     fn proof_chain_should_contain_a_single_branch_during_update() -> Result<()> {
-        let (mut tree, genesis_sk, genesis_pk) = new_network_section_tree();
+        let (mut tree, genesis_sk, _) = new_network_section_tree();
 
-        let section_auth_0 = gen_section_auth(prefix("0")?)?;
-        let pk0 = section_auth_0.section_key();
-        let sig0 = bincode::serialize(&pk0).map(|bytes| genesis_sk.sign(&bytes))?;
-        let mut proof_chain = tree.get_sections_dag().clone();
-        proof_chain.insert(&genesis_pk, pk0, sig0)?;
-        let tree_update = SectionTreeUpdate::new(section_auth_0, proof_chain);
+        let (sap0, _) = gen_section_auth(prefix("0")?)?;
+        let tree_update =
+            gen_section_tree_update(&sap0, tree.get_sections_dag().clone(), &genesis_sk)?;
         assert!(tree.update(tree_update)?);
 
-        let section_auth_1 = gen_section_auth(prefix("1")?)?;
-        let pk1 = section_auth_1.section_key();
-        let sig1 = bincode::serialize(&pk1).map(|bytes| genesis_sk.sign(&bytes))?;
+        let (sap1, _) = gen_section_auth(prefix("1")?)?;
         // instead of constructing a proof_chain from gen -> 1; we also include the branch '0'
         // which will result in an error while updating the SectionTree
-        let mut proof_chain = tree.get_sections_dag().clone();
-        proof_chain.insert(&genesis_pk, pk1, sig1)?;
-        let tree_update = SectionTreeUpdate::new(section_auth_1, proof_chain);
+        let tree_update =
+            gen_section_tree_update(&sap1, tree.get_sections_dag().clone(), &genesis_sk)?;
         assert!(matches!(
             tree.update(tree_update),
             Err(Error::MultipleBranchError)
@@ -748,6 +741,74 @@ pub(crate) mod tests {
         Ok(())
     }
 
+    #[test]
+    fn updating_with_same_sap_should_return_false() -> Result<()> {
+        let (mut tree, genesis_sk, _) = new_network_section_tree();
+
+        // node updated with sap0
+        let (sap0, _) = gen_section_auth(prefix("0")?)?;
+        let tree_update =
+            gen_section_tree_update(&sap0, tree.get_sections_dag().clone(), &genesis_sk)?;
+        let tree_update_same = tree_update.clone();
+        assert!(tree.update(tree_update)?);
+
+        // node tries to call update with the same information
+        assert!(!tree.update(tree_update_same)?);
+
+        Ok(())
+    }
+
+    #[test]
+    fn sap_with_same_parent_and_prefix_should_result_in_error_during_update() -> Result<()> {
+        let (mut tree, genesis_sk, _) = new_network_section_tree();
+
+        // node updated with sap0
+        let (sap0, _) = gen_section_auth(prefix("0")?)?;
+        let proof_chain = tree.get_sections_dag().clone();
+        let proof_chain_gen = proof_chain.clone();
+        let tree_update = gen_section_tree_update(&sap0, proof_chain, &genesis_sk)?;
+        assert!(tree.update(tree_update)?);
+
+        // node tries to update with sap signed by same parent for the same prefix
+        let (sap0_same, _) = gen_section_auth(prefix("0")?)?;
+        let tree_update = gen_section_tree_update(&sap0_same, proof_chain_gen, &genesis_sk)?;
+        assert!(matches!(
+            tree.update(tree_update),
+            Err(Error::UntrustedProofChain(_))
+        ));
+
+        Ok(())
+    }
+
+    #[test]
+    fn outdated_sap_for_the_same_prefix_should_result_in_error_during_update() -> Result<()> {
+        let (mut tree, genesis_sk, _) = new_network_section_tree();
+
+        // node updated with sap0
+        let (sap0, sk0) = gen_section_auth(prefix("0")?)?;
+        let tree_update =
+            gen_section_tree_update(&sap0, tree.get_sections_dag().clone(), &genesis_sk)?;
+        let tree_update_outdated = tree_update.clone();
+        assert!(tree.update(tree_update)?);
+
+        // node updated with sap1 with same prefix
+        let (sap1, _) = gen_section_auth(prefix("0")?)?;
+        let tree_update = gen_section_tree_update(&sap1, tree.get_sections_dag().clone(), &sk0)?;
+        assert!(tree.update(tree_update)?);
+
+        // node receives an outdated AE update for sap0
+        assert!(matches!(
+            tree.update(tree_update_outdated),
+            Err(Error::UntrustedProofChain(_))
+        ));
+
+        Ok(())
+    }
+
+    // Proptest which updates the `SectionTree` using randomized length/order of proof_chain. Error cases, no update cases
+    // are ignored, i.e., each update results in a new SAP being added. At the end of each update verify that the
+    // leaves of `SectionTree::sections_dag` are the keys of all the `SectionTree::sections` (SAPs). After all the
+    // updates, verify that we got back the original `SectionsDAG`
     proptest! {
         #![proptest_config(ProptestConfig {
             cases: 100, .. ProptestConfig::default()
@@ -769,10 +830,13 @@ pub(crate) mod tests {
     }
 
     // Test helpers
-    fn gen_section_auth(prefix: Prefix) -> Result<SectionSigned<SectionAuthorityProvider>> {
+    fn gen_section_auth(
+        prefix: Prefix,
+    ) -> Result<(SectionSigned<SectionAuthorityProvider>, bls::SecretKey)> {
         let (section_auth, _, secret_key_set) = random_sap(prefix, 5, 0, None);
-        section_signed(&secret_key_set.secret_key(), section_auth)
-            .context(format!("Failed to generate SAP for prefix {:?}", prefix))
+        let sap = section_signed(&secret_key_set.secret_key(), section_auth)
+            .context(format!("Failed to generate SAP for prefix {:?}", prefix))?;
+        Ok((sap, secret_key_set.secret_key()))
     }
 
     fn new_network_section_tree() -> (SectionTree, bls::SecretKey, BlsPublicKey) {
@@ -782,5 +846,17 @@ pub(crate) mod tests {
         let map = SectionTree::new(genesis_pk);
 
         (map, genesis_sk, genesis_pk)
+    }
+
+    fn gen_section_tree_update(
+        sap: &SectionSigned<SectionAuthorityProvider>,
+        proof_chain: SectionsDAG,
+        parent_sk: &bls::SecretKey,
+    ) -> Result<SectionTreeUpdate> {
+        let pk = sap.section_key();
+        let sig = bincode::serialize(&pk).map(|bytes| parent_sk.sign(&bytes))?;
+        let mut proof_chain = proof_chain;
+        proof_chain.insert(&parent_sk.public_key(), pk, sig)?;
+        Ok(SectionTreeUpdate::new(sap.clone(), proof_chain))
     }
 }

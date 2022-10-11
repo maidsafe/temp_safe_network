@@ -469,22 +469,21 @@ impl SectionsDAG {
 }
 
 #[cfg(test)]
-pub(crate) mod tests {
+pub(super) mod tests {
     use super::{Error, SectionInfo, SectionsDAG};
-    use crate::types::SecretKeySet;
     use crate::{
         messaging::system::SectionSigned,
-        network_knowledge::test_utils::{prefix, random_sap_with_rng, section_signed},
+        network_knowledge::test_utils::{
+            assert_lists, prefix, random_sap_with_rng, section_signed,
+        },
+        types::SecretKeySet,
         SectionAuthorityProvider,
     };
     use crdts::CmRDT;
-    use eyre::{bail, eyre, Result};
+    use eyre::{eyre, Result};
     use proptest::prelude::{any, proptest, ProptestConfig, Strategy};
     use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
-    use std::{
-        collections::{BTreeMap, BTreeSet},
-        fmt,
-    };
+    use std::collections::{BTreeMap, BTreeSet};
     use xor_name::Prefix;
 
     #[test]
@@ -1050,32 +1049,6 @@ pub(crate) mod tests {
     }
 
     // Test helpers
-    pub(crate) fn assert_lists<I, J>(a: I, b: J) -> Result<()>
-    where
-        I: IntoIterator,
-        J: IntoIterator,
-        I::Item: fmt::Debug + PartialEq<J::Item> + Eq,
-        J::Item: fmt::Debug + PartialEq<I::Item> + Eq,
-    {
-        let vec1: Vec<_> = a.into_iter().collect();
-        let mut vec2: Vec<_> = b.into_iter().collect();
-        if vec1.len() != vec2.len() {
-            bail!(
-                "Lists lengths don't match: {} vs. {}",
-                vec1.len(),
-                vec2.len()
-            );
-        }
-        for item1 in &vec1 {
-            let idx2 = vec2.iter().position(|item2| *item2 == *item1);
-            vec2.remove(idx2.ok_or_else(|| {
-                eyre!("An item that was expected to be in list two was not found")
-            })?);
-        }
-        assert_eq!(vec2.len(), 0);
-        Ok(())
-    }
-
     fn gen_keypair() -> (bls::SecretKey, bls::PublicKey) {
         let sk_set = SecretKeySet::random(None);
         let sk = sk_set.secret_key();
@@ -1098,7 +1071,7 @@ pub(crate) mod tests {
     // Generate an arbitrary sized `SectionsDAG` and a list of partial_dags which inserted in
     // that order gives back the main_dag
     // new_information_only: if false, the partial_dags can end with keys which has been previously
-    // inserted, providing no new information. Useful in `SectionTree` proptest.
+    // inserted, providing no new information. Useful in `SectionTree` proptest where we want new_information_only.
     #[allow(clippy::unwrap_used)]
     pub(crate) fn arb_sections_dag_and_proof_chains(
         max_sections: usize,
@@ -1177,7 +1150,7 @@ pub(crate) mod tests {
     }
 
     // Generate a random `SectionsDAG` and the SAP for each of the section key
-    pub(crate) fn gen_random_sections_dag(
+    pub(super) fn gen_random_sections_dag(
         seed: Option<u64>,
         n_sections: usize,
     ) -> Result<(
