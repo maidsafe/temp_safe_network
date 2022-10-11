@@ -169,11 +169,19 @@ impl FlowCtrl {
                 debug!(" ----> About to kick cmd off");
                 self.process_next_cmd().await;
 
-                debug!(" ----> About to Q more cmds");
+                // debug!(" ----> About to Q more cmds");
                 if let Err(error) = self.enqeue_new_cmds_from_channel().await {
                     error!("{error:?}");
                     break;
                 }
+
+                // if let Err(error) = self.enqueue_new_incoming_msgs().await {
+                //     error!("{error:?}");
+                //     break;
+                // }
+
+                // give each cmd 10ms to complete...?
+                tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
             }
 
             debug!(" ----> All cmds parsed");
@@ -208,7 +216,7 @@ impl FlowCtrl {
 
             debug!(" ----> All Elders checks done");
             // give us time for any cmds to get properly processed before adding more.
-            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
             debug!(" ----> Wait done there.");
         }
 
