@@ -53,7 +53,7 @@ impl FlowCtrl {
         outgoing_node_event_sender: EventSender,
     ) -> mpsc::Sender<(Cmd, Option<usize>)> {
         let node = cmd_ctrl.node();
-        let (cmd_sender_channel, incoming_cmds_from_apis) = mpsc::channel(100);
+        let (cmd_sender_channel, incoming_cmds_from_apis) = mpsc::channel(10_000);
         let flow_ctrl = Self {
             cmd_ctrl,
             node,
