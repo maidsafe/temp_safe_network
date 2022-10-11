@@ -11,26 +11,23 @@ pub(crate) mod cmds;
 pub(super) mod dispatcher;
 pub(super) mod event;
 pub(super) mod event_channel;
+mod periodic_checks;
 #[cfg(test)]
 pub(crate) mod tests;
-pub(crate) use self::cmd_ctrl::CmdCtrl;
-mod periodic_checks;
 
+pub(crate) use cmd_ctrl::CmdCtrl;
 use event_channel::EventSender;
+use periodic_checks::PeriodicChecksTimestamps;
 
 use crate::comm::MsgEvent;
-
 use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result};
 
 use sn_interface::types::log_markers::LogMarker;
 
 use std::sync::Arc;
-use tokio::{
-    sync::{
-        mpsc::{self, error::TryRecvError},
-        RwLock,
-    },
-    time::Instant,
+use tokio::sync::{
+    mpsc::{self, error::TryRecvError},
+    RwLock,
 };
 
 const PROCESS_BATCH_COUNT: usize = 5;
@@ -44,28 +41,34 @@ pub(crate) struct FlowCtrl {
     incoming_cmds_from_apis: mpsc::Receiver<(Cmd, Option<usize>)>,
     cmd_sender_channel: mpsc::Sender<(Cmd, Option<usize>)>,
     outgoing_node_event_sender: EventSender,
+    timestamps: PeriodicChecksTimestamps,
 }
 
 impl FlowCtrl {
-    pub(crate) fn new(
+    /// Constructs a FlowCtrl instance, spawnning a task which starts processing messages,
+    /// returning the channel where it can receive commands on
+    pub(crate) fn start(
         cmd_ctrl: CmdCtrl,
         incoming_msg_events: mpsc::Receiver<MsgEvent>,
         outgoing_node_event_sender: EventSender,
-    ) -> (Self, mpsc::Sender<(Cmd, Option<usize>)>) {
+    ) -> mpsc::Sender<(Cmd, Option<usize>)> {
         let node = cmd_ctrl.node();
         let (cmd_sender_channel, incoming_cmds_from_apis) = mpsc::channel(100);
+        let flow_ctrl = Self {
+            cmd_ctrl,
+            node,
+            incoming_msg_events,
+            incoming_cmds_from_apis,
+            cmd_sender_channel: cmd_sender_channel.clone(),
+            outgoing_node_event_sender,
+            timestamps: PeriodicChecksTimestamps::now(),
+        };
 
-        (
-            Self {
-                cmd_ctrl,
-                node,
-                incoming_msg_events,
-                incoming_cmds_from_apis,
-                cmd_sender_channel: cmd_sender_channel.clone(),
-                outgoing_node_event_sender,
-            },
-            cmd_sender_channel,
-        )
+        let _ = tokio::task::spawn_local(async move {
+            flow_ctrl.process_messages_and_periodic_checks().await
+        });
+
+        cmd_sender_channel
     }
 
     /// Process the next pending cmds
@@ -128,18 +131,8 @@ impl FlowCtrl {
 
     /// This is a never ending loop as long as the node is live.
     /// This loop drives the periodic events internal to the node.
-    pub(crate) async fn process_messages_and_periodic_checks(mut self) {
+    async fn process_messages_and_periodic_checks(mut self) {
         debug!("Starting internal processing...");
-        let mut last_probe = Instant::now();
-        let mut last_section_probe = Instant::now();
-        let mut last_adult_health_check = Instant::now();
-        let mut last_elder_health_check = Instant::now();
-        let mut last_vote_check = Instant::now();
-        let mut last_dkg_msg_check = Instant::now();
-        let mut last_data_batch_check = Instant::now();
-        let mut last_link_cleanup = Instant::now();
-        let mut last_dysfunction_check = Instant::now();
-
         // the internal process loop
         loop {
             // if we want to throttle cmd throughput, we do that here.
@@ -175,37 +168,14 @@ impl FlowCtrl {
                 }
             }
 
-            self.enqueue_cmds_for_standard_periodic_checks(
-                &mut last_link_cleanup,
-                &mut last_data_batch_check,
-            )
-            .await;
-
-            if !self.node.read().await.is_elder() {
-                self.enqueue_cmds_for_adult_periodic_checks(&mut last_section_probe)
-                    .await;
-
-                // we've pushed what we have as an adult and processed incoming msgs
-                // and cmds... so we can continue
-                continue;
-            }
-
-            self.enqueue_cmds_for_elder_periodic_checks(
-                &mut last_probe,
-                &mut last_adult_health_check,
-                &mut last_elder_health_check,
-                &mut last_vote_check,
-                &mut last_dkg_msg_check,
-                &mut last_dysfunction_check,
-            )
-            .await;
+            self.perform_periodic_checks().await;
         }
 
         error!("Internal processing ended.")
     }
 
     /// Does not await the completion of the cmd.
-    pub(crate) async fn fire_and_forget(&mut self, cmd: Cmd, parent_id: Option<usize>) {
+    pub(super) async fn fire_and_forget(&mut self, cmd: Cmd, parent_id: Option<usize>) {
         self.cmd_ctrl.push(cmd, parent_id).await
     }
 
