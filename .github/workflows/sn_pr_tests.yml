@@ -261,7 +261,7 @@ jobs:
       - name: Run client tests
         uses: maidsafe/cargo-nextest@main
         env:
-          RUST_LOG: "sn_client=trace"
+          RUST_LOG: "sn_client=trace,qp2p=debug"
         with:
           test-run-name: e2e-client-${{ matrix.os }}
           profile: ci
