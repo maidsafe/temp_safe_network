@@ -101,7 +101,11 @@ impl FlowCtrl {
 
     // Listen for a new incoming connection event and handle it.
     async fn handle_new_msg_event(msg: MsgFromPeer) -> Result<Cmd> {
-        let MsgFromPeer { sender, wire_msg } = msg;
+        let MsgFromPeer {
+            sender,
+            wire_msg,
+            send_stream,
+        } = msg;
 
         let (header, dst, payload) = wire_msg.serialize()?;
         let original_bytes_len = header.len() + dst.len() + payload.len();
@@ -124,6 +128,7 @@ impl FlowCtrl {
         Ok(Cmd::ValidateMsg {
             origin: sender,
             wire_msg,
+            send_stream,
         })
     }
 }
