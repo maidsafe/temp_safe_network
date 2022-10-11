@@ -47,7 +47,7 @@ use super::flow_ctrl::event_channel::EventSender;
 // set to GENESIS_DBC_AMOUNT (currently 4,525,524,120 * 10^9) individual units.
 const GENESIS_DBC_FILENAME: &str = "genesis_dbc";
 
-static EVENT_CHANNEL_SIZE: usize = 20;
+static EVENT_CHANNEL_SIZE: usize = 100_000;
 
 pub(crate) type CmdChannel = mpsc::Sender<(Cmd, Option<usize>)>;
 
