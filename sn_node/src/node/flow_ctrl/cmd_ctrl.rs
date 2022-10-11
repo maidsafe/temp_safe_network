@@ -71,6 +71,7 @@ impl CmdCtrl {
         if let Cmd::ValidateMsg {
             wire_msg: original_wire_msg,
             origin: original_origin,
+            ..
         } = &cmd
         {
             for (job, job_prio) in &self.cmd_queue {
@@ -82,6 +83,7 @@ impl CmdCtrl {
                 if let Cmd::ValidateMsg {
                     wire_msg: job_wire_msg,
                     origin: job_origin,
+                    ..
                 } = job.cmd()
                 {
                     if original_origin == job_origin && original_wire_msg == job_wire_msg {

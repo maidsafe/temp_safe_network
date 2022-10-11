@@ -9,7 +9,7 @@
 use super::Peer;
 
 use crate::types::log_markers::LogMarker;
-use qp2p::UsrMsgBytes;
+use qp2p::{RecvStream, UsrMsgBytes};
 
 use priority_queue::DoublePriorityQueue;
 use qp2p::{ConnectionIncoming as IncomingMsgs, Endpoint};
@@ -167,6 +167,29 @@ impl Link {
                 Err(SendToOneError::Send(error))
             }
         }
+    }
+
+    pub async fn send_bi(&self, bytes: UsrMsgBytes) -> Result<RecvStream, SendToOneError> {
+        let (conn, _) = self
+            .endpoint
+            .connect_to(&self.peer.addr())
+            .await
+            .map_err(SendToOneError::Connection)?;
+
+        let (mut send_stream, recv_stream) = conn
+            .open_bi()
+            .await
+            .map_err(qp2p::SendError::ConnectionLost)
+            .unwrap();
+        send_stream.set_priority(10);
+        send_stream.send_user_msg(bytes).await.unwrap();
+
+        send_stream.finish().await.or_else(|err| match err {
+            qp2p::SendError::StreamLost(qp2p::StreamError::Stopped(_)) => Ok(()),
+            _ => Err(SendToOneError::Send(err)),
+        })?;
+
+        Ok(recv_stream)
     }
 
     async fn get_or_connect<F: Fn(qp2p::Connection, IncomingMsgs)>(

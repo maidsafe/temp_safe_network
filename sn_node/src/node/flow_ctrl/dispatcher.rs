@@ -156,9 +156,13 @@ impl Dispatcher {
 
                 Ok(vec![])
             }
-            Cmd::ValidateMsg { origin, wire_msg } => {
+            Cmd::ValidateMsg {
+                origin,
+                wire_msg,
+                send_stream,
+            } => {
                 let node = self.node.read().await;
-                node.validate_msg(origin, wire_msg).await
+                node.validate_msg(origin, wire_msg, send_stream).await
             }
             Cmd::HandleValidServiceMsg {
                 msg_id,
