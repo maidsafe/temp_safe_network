@@ -22,6 +22,7 @@ mod update_section;
 
 use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result, DATA_QUERY_LIMIT};
 
+use qp2p::SendStream;
 use sn_interface::{
     messaging::{
         data::ClientMsg, system::NodeMsg, Dst, MsgType, NodeMsgAuthority, SectionSigShare, WireMsg,
@@ -31,7 +32,8 @@ use sn_interface::{
 };
 
 use bytes::Bytes;
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, sync::Arc};
+use tokio::sync::Mutex;
 
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
@@ -60,7 +62,12 @@ impl Peers {
 // Message handling
 impl MyNode {
     #[instrument(skip(self))]
-    pub(crate) async fn validate_msg(&self, origin: Peer, wire_msg: WireMsg) -> Result<Vec<Cmd>> {
+    pub(crate) async fn validate_msg(
+        &self,
+        origin: Peer,
+        wire_msg: WireMsg,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
+    ) -> Result<Vec<Cmd>> {
         // Deserialize the payload of the incoming message
         let msg_id = wire_msg.msg_id();
         // payload needed for aggregation

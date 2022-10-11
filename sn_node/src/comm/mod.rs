@@ -17,7 +17,7 @@ use self::{
 };
 
 use crate::node::{Error, Result};
-use qp2p::UsrMsgBytes;
+use qp2p::{SendStream, UsrMsgBytes};
 
 use sn_interface::{
     messaging::{MsgId, WireMsg},
@@ -28,7 +28,10 @@ use dashmap::DashMap;
 use qp2p::{Endpoint, IncomingConnections};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
-    sync::mpsc::{self, Receiver, Sender},
+    sync::{
+        mpsc::{self, Receiver, Sender},
+        Mutex,
+    },
     task,
 };
 
@@ -383,7 +386,11 @@ impl Drop for Comm {
 
 #[derive(Debug)]
 pub(crate) enum MsgEvent {
-    Received { sender: Peer, wire_msg: WireMsg },
+    Received {
+        sender: Peer,
+        wire_msg: WireMsg,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
+    },
 }
 
 #[cfg(test)]

@@ -32,7 +32,6 @@ use qp2p::{Close, ConnectionError, SendError};
 use rand::{rngs::OsRng, seq::SliceRandom};
 use std::collections::BTreeSet;
 use std::time::Duration;
-use tokio::task::JoinHandle;
 use tracing::{debug, error, trace, warn};
 use xor_name::XorName;
 
@@ -648,11 +647,7 @@ impl Session {
             let bytes = bytes.clone();
             let peer_name = peer.name();
 
-            let task_handle: JoinHandle<(XorName, Result<()>)> = tokio::spawn(async move {
-                let listen = |conn, incoming_msgs| {
-                    Self::spawn_msg_listener_thread(session.clone(), peer, conn, incoming_msgs);
-                };
-
+            let task_handle = tokio::spawn(async move {
                 let session_clone = session.clone();
 
                 let link = session_clone
@@ -660,8 +655,8 @@ impl Session {
                     .get_or_create_link(&peer, force_new_link)
                     .await;
 
-                let result = match link.send(bytes.clone(), listen).await {
-                    Ok(()) => Ok(()),
+                let result = match link.send_bi(bytes.clone()).await {
+                    Ok(recv) => Ok(recv),
                     Err(SendToOneError::Connection(err)) => {
                         Err(Error::QuicP2pConnection { peer, error: err })
                     }

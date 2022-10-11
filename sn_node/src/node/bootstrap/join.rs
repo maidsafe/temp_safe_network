@@ -994,6 +994,7 @@ mod tests {
         recv_tx.try_send(MsgEvent::Received {
             sender: bootstrap_node.peer(),
             wire_msg,
+            send_stream: None,
         })?;
 
         Ok(())

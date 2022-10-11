@@ -11,6 +11,7 @@ use crate::node::{
     Proposal, XorName,
 };
 
+use qp2p::SendStream;
 use sn_consensus::Decision;
 use sn_dysfunction::IssueType;
 #[cfg(feature = "traceroute")]
@@ -27,7 +28,9 @@ use sn_interface::{
 
 use bytes::Bytes;
 use custom_debug::Debug;
+use std::sync::Arc;
 use std::{collections::BTreeSet, fmt, time::SystemTime};
+use tokio::sync::Mutex;
 
 /// A struct for the job of controlling the flow
 /// of a [`Cmd`] in the system.
@@ -58,7 +61,11 @@ pub(crate) enum Cmd {
     CleanupPeerLinks,
     /// Validate `wire_msg` from `sender`.
     /// Holding the WireMsg that has been received from the network,
-    ValidateMsg { origin: Peer, wire_msg: WireMsg },
+    ValidateMsg {
+        origin: Peer,
+        wire_msg: WireMsg,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
+    },
     /// Log a Node's Punishment, this pulls dysfunction and write locks out of some functions
     TrackNodeIssueInDysfunction { name: XorName, issue: IssueType },
     /// Adds peer to set of recipients of an already pending query,
