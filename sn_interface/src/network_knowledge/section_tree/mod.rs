@@ -166,7 +166,7 @@ impl SectionTree {
         self.sections
             .iter()
             .map(|(_, signed_sap)| signed_sap)
-            .find(|sap| sap.public_key_set().public_key() == *section_key)
+            .find(|&signed_sap| signed_sap.public_key_set().public_key() == *section_key)
     }
 
     /// Update our `SectionTree` if the provided update can be verified
