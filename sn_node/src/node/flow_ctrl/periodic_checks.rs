@@ -38,25 +38,64 @@ const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 const ADULT_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(2);
 const ELDER_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(3);
 
+pub(super) struct PeriodicChecksTimestamps {
+    last_probe: Instant,
+    last_section_probe: Instant,
+    last_adult_health_check: Instant,
+    last_elder_health_check: Instant,
+    last_vote_check: Instant,
+    last_dkg_msg_check: Instant,
+    last_data_batch_check: Instant,
+    last_link_cleanup: Instant,
+    last_dysfunction_check: Instant,
+}
+
+impl PeriodicChecksTimestamps {
+    pub(super) fn now() -> Self {
+        Self {
+            last_probe: Instant::now(),
+            last_section_probe: Instant::now(),
+            last_adult_health_check: Instant::now(),
+            last_elder_health_check: Instant::now(),
+            last_vote_check: Instant::now(),
+            last_dkg_msg_check: Instant::now(),
+            last_data_batch_check: Instant::now(),
+            last_link_cleanup: Instant::now(),
+            last_dysfunction_check: Instant::now(),
+        }
+    }
+}
+
 impl FlowCtrl {
+    /// Generate and fire commands for all types of periodic checks
+    pub(super) async fn perform_periodic_checks(&mut self) {
+        self.enqueue_cmds_for_standard_periodic_checks().await;
+
+        if !self.node.read().await.is_elder() {
+            self.enqueue_cmds_for_adult_periodic_checks().await;
+
+            // we've pushed what we have as an adult and processed incoming msgs
+            // and cmds... so we can return already
+            return;
+        }
+
+        self.enqueue_cmds_for_elder_periodic_checks().await;
+    }
+
     /// Periodic tasks run for elders and adults alike
-    pub(super) async fn enqueue_cmds_for_standard_periodic_checks(
-        &mut self,
-        last_link_cleanup: &mut Instant,
-        last_data_batch_check: &mut Instant,
-    ) {
+    async fn enqueue_cmds_for_standard_periodic_checks(&mut self) {
         let now = Instant::now();
         let mut cmds = vec![];
 
         // happens regardless of if elder or adult
-        if last_link_cleanup.elapsed() > LINK_CLEANUP_INTERVAL {
-            *last_link_cleanup = now;
+        if self.timestamps.last_link_cleanup.elapsed() > LINK_CLEANUP_INTERVAL {
+            self.timestamps.last_link_cleanup = now;
             cmds.push(Cmd::CleanupPeerLinks);
         }
 
         // if we've passed enough time, batch outgoing data
-        if last_data_batch_check.elapsed() > DATA_BATCH_INTERVAL {
-            *last_data_batch_check = now;
+        if self.timestamps.last_data_batch_check.elapsed() > DATA_BATCH_INTERVAL {
+            self.timestamps.last_data_batch_check = now;
             if let Some(cmd) = match Self::replicate_queued_data(self.node.clone()).await {
                 Ok(cmd) => cmd,
                 Err(error) => {
@@ -77,15 +116,12 @@ impl FlowCtrl {
     }
 
     /// Periodic tasks run for adults only
-    pub(super) async fn enqueue_cmds_for_adult_periodic_checks(
-        &mut self,
-        last_section_probe: &mut Instant,
-    ) {
+    async fn enqueue_cmds_for_adult_periodic_checks(&mut self) {
         let mut cmds = vec![];
 
         // if we've passed enough time, section probe
-        if last_section_probe.elapsed() > SECTION_PROBE_INTERVAL {
-            *last_section_probe = Instant::now();
+        if self.timestamps.last_section_probe.elapsed() > SECTION_PROBE_INTERVAL {
+            self.timestamps.last_section_probe = Instant::now();
             cmds.push(Self::probe_the_section(self.node.clone()).await);
         }
 
@@ -96,27 +132,19 @@ impl FlowCtrl {
     }
 
     /// Periodic tasks run for elders only
-    pub(super) async fn enqueue_cmds_for_elder_periodic_checks(
-        &mut self,
-        last_probe: &mut Instant,
-        last_adult_health_check: &mut Instant,
-        last_elder_health_check: &mut Instant,
-        last_vote_check: &mut Instant,
-        last_dkg_msg_check: &mut Instant,
-        last_dysfunction_check: &mut Instant,
-    ) {
+    async fn enqueue_cmds_for_elder_periodic_checks(&mut self) {
         let now = Instant::now();
         let mut cmds = vec![];
 
-        if last_probe.elapsed() > PROBE_INTERVAL {
-            *last_probe = now;
+        if self.timestamps.last_probe.elapsed() > PROBE_INTERVAL {
+            self.timestamps.last_probe = now;
             if let Some(cmd) = Self::probe_the_network(self.node.clone()).await {
                 cmds.push(cmd);
             }
         }
 
-        if last_adult_health_check.elapsed() > ADULT_HEALTH_CHECK_INTERVAL {
-            *last_adult_health_check = now;
+        if self.timestamps.last_adult_health_check.elapsed() > ADULT_HEALTH_CHECK_INTERVAL {
+            self.timestamps.last_adult_health_check = now;
             let health_cmds = match Self::perform_health_checks(self.node.clone()).await {
                 Ok(cmds) => cmds,
                 Err(error) => {
@@ -130,28 +158,28 @@ impl FlowCtrl {
         // The above health check only queries for chunks
         // here we specifically ask for AE prob msgs and manually
         // track dysfunction
-        if last_elder_health_check.elapsed() > ELDER_HEALTH_CHECK_INTERVAL {
-            *last_elder_health_check = now;
+        if self.timestamps.last_elder_health_check.elapsed() > ELDER_HEALTH_CHECK_INTERVAL {
+            self.timestamps.last_elder_health_check = now;
             for cmd in Self::health_check_elders_in_section(self.node.clone()).await {
                 cmds.push(cmd);
             }
         }
 
-        if last_vote_check.elapsed() > MISSING_VOTE_INTERVAL {
-            *last_vote_check = now;
+        if self.timestamps.last_vote_check.elapsed() > MISSING_VOTE_INTERVAL {
+            self.timestamps.last_vote_check = now;
             if let Some(cmd) = Self::check_for_missed_votes(self.node.clone()).await {
                 cmds.push(cmd);
             };
         }
 
-        if last_dkg_msg_check.elapsed() > MISSING_DKG_MSG_INTERVAL {
-            *last_dkg_msg_check = now;
+        if self.timestamps.last_dkg_msg_check.elapsed() > MISSING_DKG_MSG_INTERVAL {
+            self.timestamps.last_dkg_msg_check = now;
             let dkg_cmds = Self::check_for_missed_dkg_messages(self.node.clone()).await;
             cmds.extend(dkg_cmds);
         }
 
-        if last_dysfunction_check.elapsed() > DYSFUNCTION_CHECK_INTERVAL {
-            *last_dysfunction_check = now;
+        if self.timestamps.last_dysfunction_check.elapsed() > DYSFUNCTION_CHECK_INTERVAL {
+            self.timestamps.last_dysfunction_check = now;
             let dysf_cmds = Self::check_for_dysfunction(self.node.clone()).await;
             cmds.extend(dysf_cmds);
         }

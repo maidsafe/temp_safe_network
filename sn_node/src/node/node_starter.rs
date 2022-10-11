@@ -169,14 +169,7 @@ async fn bootstrap_node(
 
     let node = Arc::new(RwLock::new(node));
     let cmd_ctrl = CmdCtrl::new(Dispatcher::new(node.clone(), comm));
-    let (msg_and_period_ctrl, cmd_channel) =
-        FlowCtrl::new(cmd_ctrl, connection_event_rx, event_sender);
-
-    let _ = tokio::task::spawn_local(async move {
-        msg_and_period_ctrl
-            .process_messages_and_periodic_checks()
-            .await
-    });
+    let cmd_channel = FlowCtrl::start(cmd_ctrl, connection_event_rx, event_sender);
 
     Ok((node, cmd_channel, event_receiver))
 }
