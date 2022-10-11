@@ -53,7 +53,7 @@ impl FlowCtrl {
         outgoing_node_event_sender: EventSender,
     ) -> (Self, mpsc::Sender<(Cmd, Option<usize>)>) {
         let node = cmd_ctrl.node();
-        let (cmd_sender_channel, incoming_cmds_from_apis) = mpsc::channel(100);
+        let (cmd_sender_channel, incoming_cmds_from_apis) = mpsc::channel(10_000);
 
         (
             Self {
@@ -103,7 +103,7 @@ impl FlowCtrl {
         loop {
             match self.incoming_msg_events.try_recv() {
                 Ok(msg) => {
-                    let cmd = match self.handle_new_msg_event(msg).await {
+                    let cmd = match Self::handle_new_msg_event(msg).await {
                         Ok(cmd) => cmd,
                         Err(error) => {
                             error!("Could not handle incoming msg event: {error:?}");
@@ -111,10 +111,9 @@ impl FlowCtrl {
                         }
                     };
 
-                    debug!("fire and forget a msg: {:?}", cmd);
-                    // dont use sender here incase channel gets full
-                    self.fire_and_forget(cmd.clone(), None).await;
-                    debug!("fire and forget a msg DONE: {:?}", cmd);
+                    if let Err(error) = self.cmd_sender_channel.send((cmd.clone(), None)).await {
+                        error!("Error sending msg onto cmd channel {error:?}");
+                    }
                 }
                 Err(TryRecvError::Empty) => {
                     // do nothing else
@@ -144,6 +143,7 @@ impl FlowCtrl {
 
         // the internal process loop
         loop {
+            debug!(" ---------------------------------------------->>>>>> ");
             debug!(" ----> Starting the process loop");
             // if we want to throttle cmd throughput, we do that here.
             // if there is nothing in the cmd queue, we wait here too.
@@ -156,20 +156,27 @@ impl FlowCtrl {
                 break;
             }
 
+            debug!(" ----> New msgs enqueued");
+
             if let Err(error) = self.enqeue_new_cmds_from_channel().await {
                 error!("{error:?}");
                 break;
             }
 
+            debug!(" ----> New cmds enqueued");
             // we go through all pending cmds in this loop
             while self.cmd_ctrl.has_items_queued() {
+                debug!(" ----> About to kick cmd off");
                 self.process_next_cmd().await;
 
+                debug!(" ----> About to Q more cmds");
                 if let Err(error) = self.enqeue_new_cmds_from_channel().await {
                     error!("{error:?}");
                     break;
                 }
             }
+
+            debug!(" ----> All cmds parsed");
 
             self.enqueue_cmds_for_standard_periodic_checks(
                 &mut last_link_cleanup,
@@ -177,10 +184,13 @@ impl FlowCtrl {
             )
             .await;
 
+            debug!(" ----> All std checks Qd");
+
             if !self.node.read().await.is_elder() {
                 self.enqueue_cmds_for_adult_periodic_checks(&mut last_section_probe)
                     .await;
 
+                debug!(" ----> All std checks Qd for adult");
                 // we've pushed what we have as an adult and processed incoming msgs
                 // and cmds... so we can continue
                 continue;
@@ -196,8 +206,10 @@ impl FlowCtrl {
             )
             .await;
 
+            debug!(" ----> All Elders checks done");
             // give us time for any cmds to get properly processed before adding more.
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            debug!(" ----> Wait done there.");
         }
 
         error!("Internal processing ended.")
@@ -210,7 +222,7 @@ impl FlowCtrl {
     }
 
     // Listen for a new incoming connection event and handle it.
-    async fn handle_new_msg_event(&self, event: MsgEvent) -> Result<Cmd> {
+    async fn handle_new_msg_event(event: MsgEvent) -> Result<Cmd> {
         match event {
             MsgEvent::Received { sender, wire_msg } => {
                 let (header, dst, payload) = wire_msg.serialize()?;
