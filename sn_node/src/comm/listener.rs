@@ -82,16 +82,23 @@ impl MsgListener {
                             .await;
                     }
 
+                    debug!("MsgEvent received from: {src_name:?} was: {:?}", wire_msg);
+
                     if let Err(error) = self
                         .receive_msg
                         .send(MsgFromPeer {
                             sender: Peer::new(src_name, remote_address),
-                            wire_msg,
+                            wire_msg: wire_msg.clone(),
                         })
                         .await
                     {
                         error!("Error pushing msg onto internal msg channel... {error:?}");
                     }
+
+                    debug!(
+                        "MsgEvent received from: {src_name:?} was pushed to chanel: {:?}",
+                        wire_msg
+                    );
                 }
                 Err(error) => {
                     // TODO: should we propagate this?
