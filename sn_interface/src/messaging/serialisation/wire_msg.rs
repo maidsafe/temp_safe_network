@@ -266,24 +266,6 @@ impl WireMsg {
                     msg,
                 })
             }
-            AuthKind::SectionShare(bls_share_signed) => {
-                let msg: NodeMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
-                    Error::FailedToParse(format!(
-                        "Node message payload (BLS share signed) as Msgpack: {}",
-                        err
-                    ))
-                })?;
-
-                Ok(MsgType::Node {
-                    msg_id: self.header.msg_envelope.msg_id,
-                    msg_authority: NodeMsgAuthority::BlsShare(AuthorityProof::verify(
-                        bls_share_signed,
-                        &self.payload,
-                    )?),
-                    dst: self.dst,
-                    msg,
-                })
-            }
         }
     }
 
@@ -307,9 +289,6 @@ impl WireMsg {
     pub fn src_section_pk(&self) -> Option<bls::PublicKey> {
         match &self.header.msg_envelope.auth {
             AuthKind::Node(node_signed) => Some(node_signed.section_pk),
-            AuthKind::SectionShare(bls_share_signed) => {
-                Some(bls_share_signed.public_key_set.public_key())
-            }
             _ => None,
         }
     }

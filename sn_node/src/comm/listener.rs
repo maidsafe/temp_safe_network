@@ -67,8 +67,6 @@ impl MsgListener {
                     };
 
                     let src_name = match wire_msg.auth() {
-                        // NB TODO is default acceptable??
-                        AuthKind::SectionShare(_) => Default::default(),
                         AuthKind::Client(auth) => auth.public_key.into(),
                         AuthKind::Node(auth) => {
                             sn_interface::types::PublicKey::Ed25519(auth.node_ed_pk).into()
