@@ -95,12 +95,6 @@ impl SectionPeers {
                 let _prev = self.archive.insert(node_name, new_state.clone());
                 true
             }
-            (Entry::Occupied(entry), MembershipState::Joined)
-                if new_state.age() > entry.get().age() =>
-            {
-                should_insert = true;
-                true
-            }
             (Entry::Occupied(_), MembershipState::Joined) => false,
             (Entry::Occupied(_entry), MembershipState::Left | MembershipState::Relocated(_)) => {
                 //  remove it from our current members, and insert it into our archive
