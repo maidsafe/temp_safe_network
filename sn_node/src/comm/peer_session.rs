@@ -64,12 +64,6 @@ impl PeerSession {
         let cmd = SessionCmd::AddConnection(conn.clone());
         if let Err(e) = self.channel.send(cmd).await {
             error!("Error while sending AddConnection {e:?}");
-
-            // if we have disconnected from a peer, will we allow it to connect to us again anyway..??
-            conn.close(Some(
-                "We have disconnected from the peer and do not allow incoming connections."
-                    .to_string(),
-            ));
         }
     }
 
