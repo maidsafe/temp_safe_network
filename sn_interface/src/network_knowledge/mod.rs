@@ -661,8 +661,17 @@ fn create_first_sig<T: Serialize>(
 
 #[cfg(test)]
 mod tests {
-    use super::supermajority;
+    use super::{
+        supermajority,
+        test_utils::{gen_addr, prefix, random_sap, section_signed},
+        NetworkKnowledge,
+    };
+    use crate::{messaging::SectionTreeUpdate, network_knowledge::SectionsDAG, types::Peer};
+    use bls::SecretKeySet;
+    use eyre::Result;
     use proptest::prelude::*;
+    use rand::thread_rng;
+    use xor_name::XorName;
 
     #[test]
     fn supermajority_of_small_group() {
@@ -686,5 +695,53 @@ mod tests {
             assert_eq!(supermajority(n + 1), 2 * a + 1);
             assert_eq!(supermajority(n + 2), 2 * a + 2);
         }
+    }
+
+    #[test]
+    fn signed_sap_field_should_not_be_changed_if_the_update_is_for_a_different_prefix() -> Result<()>
+    {
+        let mut rng = thread_rng();
+        let sk_gen = SecretKeySet::random(0, &mut rng);
+        let peer = Peer::new(XorName::random(&mut rng), gen_addr());
+        let (mut knowledge, _) = NetworkKnowledge::first_node(peer, sk_gen.clone())?;
+
+        // section 1
+        let (sap1, _, sk_1) = random_sap(prefix("1")?, 0, 0, None);
+        let sap1 = section_signed(&sk_1.secret_key(), sap1)?;
+        let our_node_name_prefix_1 = sap1.prefix().name();
+        let section_tree_update = {
+            let sig = bincode::serialize(&sap1.section_key())
+                .map(|bytes| sk_gen.secret_key().sign(&bytes))?;
+            let mut proof_chain = knowledge.section_chain();
+            proof_chain.insert(&sk_gen.secret_key().public_key(), sap1.section_key(), sig)?;
+            SectionTreeUpdate::new(sap1.clone(), proof_chain)
+        };
+        assert!(knowledge.update_knowledge_if_valid(
+            section_tree_update,
+            None,
+            &our_node_name_prefix_1
+        )?);
+        assert_eq!(knowledge.signed_sap, sap1);
+
+        // section with different prefix (0) and our node name doesn't match
+        let (sap0, _, sk_0) = random_sap(prefix("0")?, 0, 0, None);
+        let sap0 = section_signed(&sk_0.secret_key(), sap0)?;
+        let section_tree_update = {
+            let sig = bincode::serialize(&sap0.section_key())
+                .map(|bytes| sk_gen.secret_key().sign(&bytes))?;
+            let mut proof_chain = SectionsDAG::new(sk_gen.secret_key().public_key());
+            proof_chain.insert(&sk_gen.secret_key().public_key(), sap0.section_key(), sig)?;
+            SectionTreeUpdate::new(sap0, proof_chain)
+        };
+        // our node is still in prefix1
+        assert!(knowledge.update_knowledge_if_valid(
+            section_tree_update,
+            None,
+            &our_node_name_prefix_1
+        )?);
+        // sap should not be updated
+        assert_eq!(knowledge.signed_sap, sap1);
+
+        Ok(())
     }
 }
