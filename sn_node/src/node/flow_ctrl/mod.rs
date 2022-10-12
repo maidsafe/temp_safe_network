@@ -186,10 +186,7 @@ impl FlowCtrl {
         let (header, dst, payload) = wire_msg.serialize()?;
         let original_bytes_len = header.len() + dst.len() + payload.len();
 
-        let span = {
-            // let name = node_info.name();
-            trace_span!("handle_message", ?sender, msg_id = ?wire_msg.msg_id())
-        };
+        let span = trace_span!("handle_message", ?sender, msg_id = ?wire_msg.msg_id());
         let _span_guard = span.enter();
 
         trace!(
