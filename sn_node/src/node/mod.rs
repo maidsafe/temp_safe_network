@@ -34,10 +34,7 @@ use self::{
         MyNode, StateSnapshot, DATA_QUERY_LIMIT, GENESIS_DBC_AMOUNT, MAX_WAITING_PEERS_PER_QUERY,
     },
     data::MIN_LEVEL_WHEN_FULL,
-    flow_ctrl::{
-        cmds::Cmd,
-        event::{CmdProcessEvent, Elders},
-    },
+    flow_ctrl::{cmds::Cmd, event::Elders},
     node_starter::CmdChannel,
     proposal::Proposal,
 };

@@ -22,7 +22,6 @@ use sn_interface::{
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bytes::Bytes;
-use tokio::time::Duration;
 use tracing::{debug, info_span};
 
 impl Client {
@@ -72,7 +71,7 @@ impl Client {
         let max_interval = self.max_backoff_interval;
 
         let mut backoff = ExponentialBackoff {
-            initial_interval: Duration::from_secs(1),
+            initial_interval: max_interval / 2,
             max_interval,
             max_elapsed_time: Some(self.query_timeout),
             randomization_factor: 1.5,

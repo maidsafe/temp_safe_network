@@ -117,8 +117,9 @@ impl FlowCtrl {
         }
 
         for cmd in cmds {
-            // dont use sender here incase channel gets full
-            self.fire_and_forget(cmd, None).await;
+            if let Err(error) = self.cmd_sender_channel.send((cmd, None)).await {
+                error!("Error queuing std periodic check: {error:?}");
+            }
         }
     }
 
@@ -133,8 +134,9 @@ impl FlowCtrl {
         }
 
         for cmd in cmds {
-            // dont use sender here incase channel gets full
-            self.fire_and_forget(cmd, None).await;
+            if let Err(error) = self.cmd_sender_channel.send((cmd, None)).await {
+                error!("Error queuing adult periodic check: {error:?}");
+            }
         }
     }
 
@@ -206,9 +208,11 @@ impl FlowCtrl {
         }
 
         debug!(" ----> all elder periodics cmds ready to push ");
+
         for cmd in cmds {
-            // dont use sender here incase channel gets full
-            self.fire_and_forget(cmd, None).await;
+            if let Err(error) = self.cmd_sender_channel.send((cmd, None)).await {
+                error!("Error queuing std periodic check: {error:?}");
+            }
         }
         debug!(" ----> all elder periodics cmds pushed ");
     }
@@ -337,7 +341,7 @@ impl FlowCtrl {
         info!("Checking for DKG missed messages");
 
         // DKG checks can be long running, move off thread to unblock the main loop
-        let _handle = tokio::task::spawn_local(async move {
+        let _handle = tokio::task::spawn(async move {
             let node = node.read().await;
             let dkg_voter = &node.dkg_voter;
 

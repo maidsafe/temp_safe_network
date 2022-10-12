@@ -64,12 +64,6 @@ impl PeerSession {
         let cmd = SessionCmd::AddConnection(conn.clone());
         if let Err(e) = self.channel.send(cmd).await {
             error!("Error while sending AddConnection {e:?}");
-
-            // if we have disconnected from a peer, will we allow it to connect to us again anyway..??
-            conn.close(Some(
-                "We have disconnected from the peer and do not allow incoming connections."
-                    .to_string(),
-            ));
         }
     }
 
@@ -175,9 +169,6 @@ impl PeerSessionWorker {
             info!("Draining channel: dropping {:?}", msg);
         }
 
-        // disconnect the link.
-        // self.link.disconnect_link().await;
-
         info!("Finished peer session shutdown");
     }
 
@@ -191,24 +182,33 @@ impl PeerSessionWorker {
             return Ok(SessionStatus::Ok);
         }
 
-        if !should_establish_new_connection && job.connection_retries > MAX_SENDJOB_RETRIES {
-            debug!(
-                "Continuing to attempt to send to client while we have connections in the queue"
-            );
-        }
-
-        // we can't spawn this atm as it edits/updates the link
-        // if we can separate out those parts, we could hopefully get this all properly
-        // spawnable.
-        // But right now we have to wait to ensure the link has connection
-        // before spawning the send
-
-        // TODO: this link makes sense?
-        let conn = self
+        // Attempt to get a connection or make one to another node.
+        // if there's no connection here yet, we requeue the job after a wait
+        // incase there's been a delay adding the connection to Comms
+        let conn = match self
             .link
             .get_or_connect(should_establish_new_connection)
             .await
-            .map_err(|_| Error::PeerLinkDropped)?;
+        {
+            Ok(conn) => conn,
+            Err(error) => {
+                error!("Error when attempting to send to peer. Job will be reenqueued for another attempt after a small timeout");
+
+                job.connection_retries += 1;
+                job.reporter
+                    .send(SendStatus::TransientError(format!("{error:?}")));
+
+                // we await here in case the connection is fresh and has not yet been added
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                if let Err(e) = self.queue.send(SessionCmd::Send(job)).await {
+                    warn!("Failed to re-enqueue job {id:?} after failed connection retrieval error {e:?}");
+                }
+
+                return Ok(SessionStatus::Ok);
+            }
+        };
+
+        debug!("Connection exists for sendjob: {id:?}");
         let queue = self.queue.clone();
         let link_connections = self.link.connections.clone();
         let conns_count = self.link.connections.len();
@@ -231,11 +231,6 @@ impl PeerSessionWorker {
                 Ok(_) => {
                     job.reporter.send(SendStatus::Sent);
                 }
-                // Err(err) if err.is_local_close() => {
-                //     info!("Peer linked dropped when trying to send {:?}", id);
-                //     job.reporter.send(SendStatus::PeerLinkDropped);
-                //     // return SessionStatus::Terminating;
-                // }
                 Err(err) => {
                     if err.is_local_close() {
                         debug!("Peer linked dropped when trying to send {:?}. But link has {:?} connections", id, conns_count );
@@ -246,8 +241,6 @@ impl PeerSessionWorker {
                                 the_peer
                             );
                             job.connection_retries += 1;
-                            // job.reporter.send(SendStatus::PeerLinkDropped);
-                            // return Ok(SessionStatus::Terminating);
                         }
                     }
 
@@ -260,7 +253,6 @@ impl PeerSessionWorker {
 
                     if let Err(e) = queue.send(SessionCmd::Send(job)).await {
                         warn!("Failed to re-enqueue job {id:?} after transient error {e:?}");
-                        // return Ok(SessionStatus::Terminating);
                     }
                 }
             }

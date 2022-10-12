@@ -99,7 +99,8 @@ impl Link {
                     // Timeouts etc should register instantly so we should clean those up fair fast
                     let _ = connections.remove(id);
                 }
-                conn.close(Some(format!("{:?}", error)));
+                // dont close just let the conn timeout incase msgs are coming in...
+                // it's removed from out Peer tracking, so wont be used again for sending.
                 Err(SendToOneError::Send(error))
             }
         }
@@ -155,18 +156,8 @@ impl Link {
     /// Are we still connected here  after cleanup
     /// retruens true if a connection remains
     pub(crate) async fn is_connected(&mut self) -> bool {
-        // self.remove_expired().await;
         !self.connections.is_empty()
     }
-
-    // TODO: we need a method to know if connection is actually connected or no...
-
-    // pub async fn remove_expired(&mut self) {
-    //     for conn in self.connections.iter() {
-    //         let the_conn = conn.value();
-    //         if the_conn
-    //     }
-    // }
 }
 
 /// Errors that can be returned from `Comm::send_to_one`.

@@ -169,7 +169,7 @@ async fn bootstrap_node(
 
     let node = Arc::new(RwLock::new(node));
     let cmd_ctrl = CmdCtrl::new(Dispatcher::new(node.clone(), comm));
-    let cmd_channel = FlowCtrl::start(cmd_ctrl, connection_event_rx, event_sender);
+    let cmd_channel = FlowCtrl::start(cmd_ctrl, connection_event_rx);
 
     Ok((node, cmd_channel, event_receiver))
 }

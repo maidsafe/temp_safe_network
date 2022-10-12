@@ -56,7 +56,7 @@ pub mod node;
 macro_rules! log_sleep {
     ($duration_expr:expr) => {
         let duration = $duration_expr;
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rngs::OsRng;
         let sleep_id = xor_name::XorName::random(&mut rng);
         // To reduce the logs, only log long time sleeps.
         if duration > Duration::from_millis(500) {

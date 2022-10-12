@@ -141,40 +141,7 @@ impl Dispatcher {
                 let node = self.node.read().await;
                 node.validate_msg(origin, wire_msg).await
             }
-            Cmd::HandleValidClientMsg {
-                msg_id,
-                msg,
-                origin,
-                auth,
-                #[cfg(feature = "traceroute")]
-                traceroute,
-            } => {
-                let node = self.node.read().await;
-                match node
-                    .handle_valid_client_msg(
-                        msg_id,
-                        msg,
-                        auth,
-                        origin,
-                        #[cfg(feature = "traceroute")]
-                        traceroute.clone(),
-                    )
-                    .await
-                {
-                    Ok(cmds) => Ok(cmds),
-                    Err(err) => {
-                        debug!("Will send error response back to client");
-                        let cmd = node.cmd_error_response(
-                            err,
-                            origin,
-                            msg_id,
-                            #[cfg(feature = "traceroute")]
-                            traceroute,
-                        );
-                        Ok(vec![cmd])
-                    }
-                }
-            }
+
             Cmd::UpdateNetworkAndHandleValidClientMsg {
                 proof_chain,
                 signed_sap,

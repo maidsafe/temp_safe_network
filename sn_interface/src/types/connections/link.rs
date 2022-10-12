@@ -133,7 +133,7 @@ impl Link {
                 {
                     let _ = self.connections.write().await.remove(id);
                 }
-                conn.close(Some(format!("{:?}", error)));
+                // conn.close(Some(format!("{:?}", error)));
                 Err(SendToOneError::Send(error))
             }
         }

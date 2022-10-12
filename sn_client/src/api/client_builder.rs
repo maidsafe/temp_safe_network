@@ -40,9 +40,9 @@ pub const ENV_AE_WAIT: &str = "SN_AE_WAIT";
 /// Bind by default to all network interfaces on a OS assigned port
 pub const DEFAULT_LOCAL_ADDR: (Ipv4Addr, u16) = (Ipv4Addr::UNSPECIFIED, 0);
 /// Default timeout to use before timing out queries and commands
-pub const DEFAULT_QUERY_CMD_TIMEOUT: Duration = Duration::from_secs(30);
-/// Max amountof time for an operation backoff (time between attempts). In Seconds.
-pub const DEFAULT_MAX_QUERY_CMD_BACKOFF_INTERVAL: Duration = Duration::from_secs(5);
+pub const DEFAULT_QUERY_CMD_TIMEOUT: Duration = Duration::from_secs(45);
+/// Max amount of time for an operation backoff (time between attempts). In Seconds.
+pub const DEFAULT_MAX_QUERY_CMD_BACKOFF_INTERVAL: Duration = Duration::from_secs(10);
 
 /// Build a [`crate::Client`]
 #[derive(Debug, Default)]
