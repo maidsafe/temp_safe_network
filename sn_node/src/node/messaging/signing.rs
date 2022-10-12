@@ -29,7 +29,6 @@ impl MyNode {
         match msg {
             OutgoingMsg::Node(msg) => self.sign_system_msg(msg),
             OutgoingMsg::Client(msg) => self.sign_client_msg(msg),
-            OutgoingMsg::Elder((auth, payload)) => Ok((AuthKind::SectionShare(auth), payload)),
         }
     }
 
