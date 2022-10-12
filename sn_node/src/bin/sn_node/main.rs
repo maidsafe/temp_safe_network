@@ -73,10 +73,10 @@ async fn main() -> Result<()> {
 
 /// Create a tokio runtime per `run_node` instance.
 async fn create_runtime_and_node(config: &Config) -> Result<()> {
-    let local = tokio::task::LocalSet::new();
+    // let local = tokio::task::LocalSet::new();
 
-    local
-        .run_until(async move {
+    // local
+    //     .run_until(async move {
             // loops ready to catch any ChurnJoinMiss
             match run_node(config).await {
                 Ok(_) => {
@@ -86,8 +86,8 @@ async fn create_runtime_and_node(config: &Config) -> Result<()> {
                     warn!("Node instance finished with an error: {error:?}");
                 }
             };
-        })
-        .await;
+        // })
+        // .await;
 
     Ok(())
 }

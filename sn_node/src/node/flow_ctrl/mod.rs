@@ -65,7 +65,7 @@ impl FlowCtrl {
             timestamps: PeriodicChecksTimestamps::now(),
         };
 
-        let _ = tokio::task::spawn_local(async move {
+        let _ = tokio::task::spawn(async move {
             flow_ctrl.process_messages_and_periodic_checks().await
         });
 
@@ -73,7 +73,7 @@ impl FlowCtrl {
         let cmd_channel_for_msgs = cmd_sender_channel.clone();
 
         // start a new thread to kick off incoming cmds
-        let _ = tokio::task::spawn_local(async move {
+        let _ = tokio::task::spawn(async move {
             while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
                 // Self::process_next_cmd(cmd).await;
 
@@ -89,7 +89,7 @@ impl FlowCtrl {
         });
 
         // start a new thread to convert msgs to Cmds
-        let _ = tokio::task::spawn_local(async move {
+        let _ = tokio::task::spawn(async move {
             while let Some(peer_msg) = incoming_msg_events.recv().await {
                 // Self::process_next_cmd(cmd).await;
 

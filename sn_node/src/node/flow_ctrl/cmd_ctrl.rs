@@ -104,13 +104,13 @@ impl CmdCtrl {
         self.cmd_queue.pop().map(|(job, _prio)| job)
     }
 
-    /// Wait if required by the cmd rate monitoring
-    pub(crate) async fn wait_if_not_processing_at_expected_rate(&self) {
-        if self.cmd_queue.is_empty() {
-            trace!("Empty queue, waiting {EMPTY_QUEUE_SLEEP_TIME:?} to not loop heavily");
-            log_sleep!(EMPTY_QUEUE_SLEEP_TIME);
-        }
-    }
+    // /// Wait if required by the cmd rate monitoring
+    // pub(crate) async fn wait_if_not_processing_at_expected_rate(&self) {
+    //     if self.cmd_queue.is_empty() {
+    //         trace!("Empty queue, waiting {EMPTY_QUEUE_SLEEP_TIME:?} to not loop heavily");
+    //         log_sleep!(EMPTY_QUEUE_SLEEP_TIME);
+    //     }
+    // }
 
     /// Processes the next priority cmd
     pub(crate) async fn process_cmd_job(
@@ -142,7 +142,7 @@ impl CmdCtrl {
 
         trace!("about to spawn for processing cmd: {cmd:?}");
 
-        let _ = tokio::task::spawn_local(async move {
+        let _ = tokio::task::spawn(async move {
             dispatcher
                 .node()
                 .read()

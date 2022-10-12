@@ -334,7 +334,7 @@ impl FlowCtrl {
         info!("Checking for DKG missed messages");
 
         // DKG checks can be long running, move off thread to unblock the main loop
-        let _handle = tokio::task::spawn_local(async move {
+        let _handle = tokio::task::spawn(async move {
             let node = node.read().await;
             let dkg_voter = &node.dkg_voter;
 
