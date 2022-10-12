@@ -22,14 +22,11 @@ mod update_section;
 use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result, DATA_QUERY_LIMIT};
 
 use sn_interface::{
-    messaging::{
-        data::ClientMsg, system::NodeMsg, Dst, MsgType, NodeMsgAuthority, SectionSigShare, WireMsg,
-    },
+    messaging::{data::ClientMsg, system::NodeMsg, Dst, MsgType, NodeMsgAuthority, WireMsg},
     network_knowledge::NetworkKnowledge,
     types::Peer,
 };
 
-use bytes::Bytes;
 use std::collections::BTreeSet;
 
 #[derive(Debug, Clone)]
@@ -37,9 +34,6 @@ use std::collections::BTreeSet;
 pub(crate) enum OutgoingMsg {
     Node(NodeMsg),
     Client(ClientMsg),
-    #[allow(dead_code)]
-    // NB TODO will remove this soon
-    Elder((SectionSigShare, Bytes)),
 }
 
 #[derive(Debug, Clone)]
