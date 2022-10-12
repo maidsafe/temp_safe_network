@@ -144,6 +144,7 @@ impl FlowCtrl {
         let mut cmds = vec![];
 
         if self.timestamps.last_probe.elapsed() > PROBE_INTERVAL {
+            debug!(" ----> probe periodics start");
             self.timestamps.last_probe = now;
             if let Some(cmd) = Self::probe_the_network(self.node.clone()).await {
                 cmds.push(cmd);
@@ -152,6 +153,7 @@ impl FlowCtrl {
         }
 
         if self.timestamps.last_adult_health_check.elapsed() > ADULT_HEALTH_CHECK_INTERVAL {
+            debug!(" ----> adult health periodics sgtart");
             self.timestamps.last_adult_health_check = now;
             let health_cmds = match Self::perform_health_checks(self.node.clone()).await {
                 Ok(cmds) => cmds,
@@ -168,6 +170,7 @@ impl FlowCtrl {
         // here we specifically ask for AE prob msgs and manually
         // track dysfunction
         if self.timestamps.last_elder_health_check.elapsed() > ELDER_HEALTH_CHECK_INTERVAL {
+            debug!(" ----> elder health periodics start");
             self.timestamps.last_elder_health_check = now;
             for cmd in Self::health_check_elders_in_section(self.node.clone()).await {
                 cmds.push(cmd);
@@ -176,6 +179,7 @@ impl FlowCtrl {
         }
 
         if self.timestamps.last_vote_check.elapsed() > MISSING_VOTE_INTERVAL {
+            debug!(" ----> vote periodics start");
             self.timestamps.last_vote_check = now;
             if let Some(cmd) = Self::check_for_missed_votes(self.node.clone()).await {
                 cmds.push(cmd);
@@ -184,6 +188,7 @@ impl FlowCtrl {
         }
 
         if self.timestamps.last_dkg_msg_check.elapsed() > MISSING_DKG_MSG_INTERVAL {
+            debug!(" ----> dkg msg periodics start");
             self.timestamps.last_dkg_msg_check = now;
             let dkg_cmds = Self::check_for_missed_dkg_messages(self.node.clone()).await;
             cmds.extend(dkg_cmds);
@@ -191,12 +196,14 @@ impl FlowCtrl {
         }
 
         if self.timestamps.last_dysfunction_check.elapsed() > DYSFUNCTION_CHECK_INTERVAL {
+            debug!(" ----> dysfn periodics start");
             self.timestamps.last_dysfunction_check = now;
             let dysf_cmds = Self::check_for_dysfunction(self.node.clone()).await;
             cmds.extend(dysf_cmds);
             debug!(" ----> dysfn periodics done");
         }
 
+        debug!(" ----> all elder periodics cmds ready to push ");
         for cmd in cmds {
             // dont use sender here incase channel gets full
             self.fire_and_forget(cmd, None).await;

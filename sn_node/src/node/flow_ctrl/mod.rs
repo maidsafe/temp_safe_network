@@ -173,8 +173,6 @@ impl FlowCtrl {
                 //     break;
                 // }
 
-                // give each cmd 10ms to complete...?
-                tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
             }
 
             debug!(" ----> Before checks");
