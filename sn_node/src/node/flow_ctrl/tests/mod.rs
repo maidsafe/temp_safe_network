@@ -256,17 +256,17 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             let _changed = expected_new_elders.insert(&new_peer);
 
             for cmd in cmds {
-                let (payload, recipients) = match cmd {
+                let (msg, recipients) = match cmd {
                     Cmd::SendMsg {
                         recipients,
-                        msg: OutgoingMsg::Elder((_, payload)),
+                        msg: OutgoingMsg::Node(msg),
                         ..
-                    } => (payload, recipients),
+                    } => (msg, recipients),
                     _ => continue,
                 };
 
-                let actual_elder_candidates = match rmp_serde::from_slice(&payload) {
-                    Ok(NodeMsg::DkgStart(session, _)) => session.elders,
+                let actual_elder_candidates = match msg {
+                    NodeMsg::DkgStart(session, _) => session.elders,
                     _ => continue,
                 };
                 itertools::assert_equal(
