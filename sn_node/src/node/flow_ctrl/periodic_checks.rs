@@ -8,7 +8,9 @@
 
 use super::FlowCtrl;
 
-use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, Result};
+use crate::node::{
+    flow_ctrl::cmds::Cmd, messaging::Peers, node_starter::CmdChannel, MyNode, Result,
+};
 
 use ed25519_dalek::Signer;
 #[cfg(feature = "traceroute")]
@@ -28,7 +30,7 @@ use tokio::{sync::RwLock, time::Instant};
 
 const PROBE_INTERVAL: Duration = Duration::from_secs(30);
 const MISSING_VOTE_INTERVAL: Duration = Duration::from_secs(5);
-const MISSING_DKG_MSG_INTERVAL: Duration = Duration::from_secs(30);
+const MISSING_DKG_MSG_INTERVAL: Duration = Duration::from_secs(5);
 const SECTION_PROBE_INTERVAL: Duration = Duration::from_secs(300);
 const LINK_CLEANUP_INTERVAL: Duration = Duration::from_secs(120);
 const DATA_BATCH_INTERVAL: Duration = Duration::from_millis(50);
@@ -190,8 +192,8 @@ impl FlowCtrl {
         if self.timestamps.last_dkg_msg_check.elapsed() > MISSING_DKG_MSG_INTERVAL {
             debug!(" ----> dkg msg periodics start");
             self.timestamps.last_dkg_msg_check = now;
-            let dkg_cmds = Self::check_for_missed_dkg_messages(self.node.clone()).await;
-            cmds.extend(dkg_cmds);
+            Self::check_for_missed_dkg_messages(self.node.clone(), self.cmd_sender_channel.clone())
+                .await;
             debug!(" ----> dkg msg periodics done");
         }
 
@@ -328,24 +330,32 @@ impl FlowCtrl {
     }
 
     /// Checks the interval since last dkg vote received
-    async fn check_for_missed_dkg_messages(node: Arc<RwLock<MyNode>>) -> Vec<Cmd> {
+    async fn check_for_missed_dkg_messages(node: Arc<RwLock<MyNode>>, cmd_channel: CmdChannel) {
         info!("Checking for DKG missed messages");
-        let node = node.read().await;
-        let dkg_voter = &node.dkg_voter;
 
-        let last_received_dkg_message = dkg_voter.last_received_dkg_message();
+        // DKG checks can be long running, move off thread to unblock the main loop
+        let _handle = tokio::task::spawn_local(async move {
+            let node = node.read().await;
+            let dkg_voter = &node.dkg_voter;
 
-        if let Some(time) = last_received_dkg_message {
-            if time.elapsed() >= MISSING_DKG_MSG_INTERVAL {
-                debug!("Dkg voting appears stalled...");
-                let cmds = node.dkg_gossip_msgs();
-                if !cmds.is_empty() {
-                    trace!("Dkg msg resending cmd");
-                    return cmds;
+            let last_received_dkg_message = dkg_voter.last_received_dkg_message();
+
+            if let Some(time) = last_received_dkg_message {
+                if time.elapsed() >= MISSING_DKG_MSG_INTERVAL {
+                    debug!("Dkg voting appears stalled...");
+                    let cmds = node.dkg_gossip_msgs();
+                    if !cmds.is_empty() {
+                        trace!("Dkg msg resending cmd");
+                    }
+
+                    for cmd in cmds {
+                        if let Err(error) = cmd_channel.send((cmd, None)).await {
+                            error!("Error sending DKG gossip msgs {error:?}");
+                        }
+                    }
                 }
             }
-        }
-        vec![]
+        });
     }
 
     /// Periodically loop over any pending data batches and queue up `send_msg` for those
