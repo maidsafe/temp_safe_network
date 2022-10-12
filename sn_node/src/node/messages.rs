@@ -9,21 +9,14 @@
 use crate::node::{Error, Result};
 
 use sn_interface::{
-    messaging::{system::NodeMsg, AuthKind, Dst, MsgId, NodeSig, SectionSigShare, WireMsg},
-    network_knowledge::{MyNodeInfo, SectionKeyShare},
+    messaging::{system::NodeMsg, AuthKind, Dst, MsgId, NodeSig, WireMsg},
+    network_knowledge::MyNodeInfo,
 };
 
 use bls::PublicKey as BlsPublicKey;
 
 // Utilities for WireMsg.
 pub(crate) trait WireMsgUtils {
-    /// Creates a message signed using a BLS `KeyShare` for destination accumulation
-    fn for_dst_accumulation(
-        key_share: &SectionKeyShare,
-        dst: Dst,
-        node_msg: NodeMsg,
-    ) -> Result<WireMsg, Error>;
-
     /// Creates a signed message from single node.
     fn single_src(
         node: &MyNodeInfo,
@@ -34,29 +27,6 @@ pub(crate) trait WireMsgUtils {
 }
 
 impl WireMsgUtils for WireMsg {
-    /// Creates a message signed using a BLS `KeyShare` for destination accumulation
-    fn for_dst_accumulation(
-        key_share: &SectionKeyShare,
-        dst: Dst,
-        msg: NodeMsg,
-    ) -> Result<WireMsg, Error> {
-        let msg_payload =
-            WireMsg::serialize_msg_payload(&msg).map_err(|_| Error::InvalidMessage)?;
-
-        let auth = AuthKind::SectionShare(SectionSigShare {
-            public_key_set: key_share.public_key_set.clone(),
-            index: key_share.index,
-            signature_share: key_share.secret_key_share.sign(&msg_payload),
-        });
-
-        let wire_msg = WireMsg::new_msg(MsgId::new(), msg_payload, auth, dst);
-
-        #[cfg(feature = "test-utils")]
-        let wire_msg = wire_msg.set_payload_debug(msg);
-
-        Ok(wire_msg)
-    }
-
     /// Creates a signed message from single node.
     fn single_src(
         node: &MyNodeInfo,
