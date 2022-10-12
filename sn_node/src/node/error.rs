@@ -151,6 +151,9 @@ pub enum Error {
     /// Signature verification failed
     #[error("Invalid signature")]
     InvalidSignature,
+    /// Key share is not from the expected section
+    #[error("Invalid key share section key")]
+    InvalidKeyShareSectionKey,
     /// Configuration error.
     #[error("Configuration error: {0}")]
     Configuration(String),

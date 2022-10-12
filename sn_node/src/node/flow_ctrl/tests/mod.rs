@@ -390,7 +390,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                 };
 
                 let actual_elder_candidates = match rmp_serde::from_slice(&payload) {
-                    Ok(NodeMsg::DkgStart(session)) => session.elders,
+                    Ok(NodeMsg::DkgStart(session, _)) => session.elders,
                     _ => continue,
                 };
                 itertools::assert_equal(

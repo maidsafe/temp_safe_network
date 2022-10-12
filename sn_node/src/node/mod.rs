@@ -92,7 +92,7 @@ mod core {
             data::OperationId,
             signature_aggregator::SignatureAggregator,
             system::{DkgSessionId, NodeState, SectionSigned},
-            AuthorityProof, SectionAuthorityProvider, SectionSig,
+            AuthorityProof, SectionAuthorityProvider, SectionSig, SectionSigShare,
         },
         network_knowledge::{
             supermajority, MyNodeInfo, NetworkKnowledge,
@@ -174,6 +174,7 @@ mod core {
         pub(crate) message_aggregator: SignatureAggregator,
         pub(crate) proposal_aggregator: SignatureAggregator,
         // DKG/Split/Churn modules
+        pub(crate) dkg_start_aggregator: HashMap<Digest256, BTreeSet<SectionSigShare>>,
         pub(crate) dkg_sessions_info: HashMap<Digest256, DkgSessionInfo>,
         pub(crate) dkg_voter: DkgVoter,
         pub(crate) pending_split_sections:
@@ -264,6 +265,7 @@ mod core {
                 proposal_aggregator: SignatureAggregator::default(),
                 pending_split_sections: Default::default(),
                 message_aggregator: SignatureAggregator::default(),
+                dkg_start_aggregator: HashMap::default(),
                 dkg_voter: DkgVoter::default(),
                 relocate_state: None,
                 event_sender,
