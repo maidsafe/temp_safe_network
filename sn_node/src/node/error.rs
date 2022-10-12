@@ -32,9 +32,9 @@ pub enum Error {
     /// This Peer SendJob could not be sent. We should remove this peer
     #[error("Peer channel errored")]
     PeerSessionChannel,
-    /// This sendjob channel is closed, this peer needs cleaned up
-    #[error("Peer link has been dropped, and should be removed. ")]
-    PeerLinkDropped,
+    /// This peer has no connections, and none will be created
+    #[error("Peer link has no connections ")]
+    NoConnectionsForPeer,
     /// This should not be possible as the channel is stored in node, and used to process child commands
     #[error("No more Cmds will be received or processed. CmdChannel senders have been dropped. ")]
     CmdCtrlChannelDropped,
