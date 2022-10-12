@@ -55,7 +55,7 @@ impl Client {
         let max_interval = self.max_backoff_interval;
 
         let mut backoff = ExponentialBackoff {
-            initial_interval: Duration::from_secs(1),
+            initial_interval: Duration::from_secs(5),
             max_interval,
             max_elapsed_time: Some(op_limit),
             randomization_factor: 0.5,
