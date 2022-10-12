@@ -6,22 +6,78 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::system::{MembershipState, SectionSigned};
-use crate::network_knowledge::{errors::Result, NodeState, SectionsDAG};
-
+use crate::{
+    messaging::system::{MembershipState, SectionSigned},
+    network_knowledge::{errors::Result, NodeState, SectionsDAG},
+};
 use dashmap::{mapref::entry::Entry, DashMap};
-use std::{collections::BTreeSet, sync::Arc};
-use xor_name::{Prefix, XorName};
+use std::{
+    collections::BTreeSet,
+    fmt::{self, Debug, Formatter},
+    hash::{Hash, Hasher},
+    ops::Deref,
+    sync::Arc,
+};
+use xor_name::{Prefix, XorName, XOR_NAME_LEN};
 
 // Number of Elder churn events before a Left/Relocated member
 // can be removed from the section members archive.
+#[cfg(not(test))]
 const ELDER_CHURN_EVENTS_TO_PRUNE_ARCHIVE: usize = 5;
+#[cfg(test)]
+const ELDER_CHURN_EVENTS_TO_PRUNE_ARCHIVE: usize = 3;
+
+#[derive(Copy, Clone, Default, Eq, Ord, PartialOrd)]
+struct XorNameAgeAgnostic(XorName);
+
+impl XorNameAgeAgnostic {
+    fn name_without_age(&self) -> &[u8] {
+        &self.0 .0[0..XOR_NAME_LEN - 1]
+    }
+}
+
+impl From<&XorName> for XorNameAgeAgnostic {
+    fn from(item: &XorName) -> Self {
+        XorNameAgeAgnostic(*item)
+    }
+}
+
+impl From<XorName> for XorNameAgeAgnostic {
+    fn from(item: XorName) -> Self {
+        XorNameAgeAgnostic(item)
+    }
+}
+
+impl Deref for XorNameAgeAgnostic {
+    type Target = XorName;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Debug for XorNameAgeAgnostic {
+    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
+        write!(formatter, "{}", self.0)
+    }
+}
+
+impl Hash for XorNameAgeAgnostic {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name_without_age().hash(state);
+    }
+}
+impl PartialEq for XorNameAgeAgnostic {
+    fn eq(&self, other: &Self) -> bool {
+        self.name_without_age() == other.name_without_age()
+    }
+}
 
 /// Container for storing information about (current and archived) members of our section.
 #[derive(Clone, Default, Debug)]
 pub(super) struct SectionPeers {
-    members: Arc<DashMap<XorName, SectionSigned<NodeState>>>,
-    archive: Arc<DashMap<XorName, SectionSigned<NodeState>>>,
+    members: Arc<DashMap<XorNameAgeAgnostic, SectionSigned<NodeState>>>,
+    archive: Arc<DashMap<XorNameAgeAgnostic, SectionSigned<NodeState>>>,
 }
 
 impl SectionPeers {
@@ -43,12 +99,14 @@ impl SectionPeers {
 
     /// Get the `NodeState` for the member with the given name.
     pub(super) fn get(&self, name: &XorName) -> Option<NodeState> {
-        self.members.get(name).map(|state| state.value.clone())
+        self.members
+            .get(&name.into())
+            .map(|state| state.value.clone())
     }
 
     /// Returns whether the given peer is currently a member of our section.
     pub(super) fn is_member(&self, name: &XorName) -> bool {
-        self.members.get(name).is_some()
+        self.members.get(&name.into()).is_some()
     }
 
     /// Get section signed `NodeState` for the member with the given name.
@@ -56,10 +114,16 @@ impl SectionPeers {
         &self,
         name: &XorName,
     ) -> Option<SectionSigned<NodeState>> {
-        if let Some(member) = self.members.get(name).map(|state| state.value().clone()) {
+        if let Some(member) = self
+            .members
+            .get(&name.into())
+            .map(|state| state.value().clone())
+        {
             Some(member)
         } else {
-            self.archive.get(name).map(|state| state.value().clone())
+            self.archive
+                .get(&name.into())
+                .map(|state| state.value().clone())
         }
     }
 
@@ -71,7 +135,7 @@ impl SectionPeers {
     /// - Joined -> Relocated
     /// - Relocated <--> Left (should not happen, but needed for consistency)
     pub(super) fn update(&self, new_state: SectionSigned<NodeState>) -> bool {
-        let node_name = new_state.name();
+        let node_name: XorNameAgeAgnostic = new_state.name().into();
         // do ops on the dashmap _after_ matching, so we can drop any refs to prevent deadlocking
         let mut should_insert = false;
         let mut should_remove = false;
