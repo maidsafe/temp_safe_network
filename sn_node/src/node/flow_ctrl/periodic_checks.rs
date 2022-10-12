@@ -69,10 +69,14 @@ impl PeriodicChecksTimestamps {
 impl FlowCtrl {
     /// Generate and fire commands for all types of periodic checks
     pub(super) async fn perform_periodic_checks(&mut self) {
+        debug!(" ----> starting periodics");
+
         self.enqueue_cmds_for_standard_periodic_checks().await;
+        debug!(" ----> standard periodics done");
 
         if !self.node.read().await.is_elder() {
             self.enqueue_cmds_for_adult_periodic_checks().await;
+            debug!(" ----> adult periodics done");
 
             // we've pushed what we have as an adult and processed incoming msgs
             // and cmds... so we can return already
@@ -80,6 +84,7 @@ impl FlowCtrl {
         }
 
         self.enqueue_cmds_for_elder_periodic_checks().await;
+        debug!(" ----> elder periodics done");
     }
 
     /// Periodic tasks run for elders and adults alike
@@ -133,17 +138,22 @@ impl FlowCtrl {
 
     /// Periodic tasks run for elders only
     async fn enqueue_cmds_for_elder_periodic_checks(&mut self) {
+        debug!(" ----> elder periodics START");
+
         let now = Instant::now();
         let mut cmds = vec![];
 
         if self.timestamps.last_probe.elapsed() > PROBE_INTERVAL {
+            debug!(" ----> probe periodics start");
             self.timestamps.last_probe = now;
             if let Some(cmd) = Self::probe_the_network(self.node.clone()).await {
                 cmds.push(cmd);
             }
+            debug!(" ----> probe periodics done");
         }
 
         if self.timestamps.last_adult_health_check.elapsed() > ADULT_HEALTH_CHECK_INTERVAL {
+            debug!(" ----> adult health periodics sgtart");
             self.timestamps.last_adult_health_check = now;
             let health_cmds = match Self::perform_health_checks(self.node.clone()).await {
                 Ok(cmds) => cmds,
@@ -153,41 +163,52 @@ impl FlowCtrl {
                 }
             };
             cmds.extend(health_cmds);
+            debug!(" ----> adult health periodics done");
         }
 
         // The above health check only queries for chunks
         // here we specifically ask for AE prob msgs and manually
         // track dysfunction
         if self.timestamps.last_elder_health_check.elapsed() > ELDER_HEALTH_CHECK_INTERVAL {
+            debug!(" ----> elder health periodics start");
             self.timestamps.last_elder_health_check = now;
             for cmd in Self::health_check_elders_in_section(self.node.clone()).await {
                 cmds.push(cmd);
             }
+            debug!(" ----> elder health periodics done");
         }
 
         if self.timestamps.last_vote_check.elapsed() > MISSING_VOTE_INTERVAL {
+            debug!(" ----> vote periodics start");
             self.timestamps.last_vote_check = now;
             for cmd in self.check_for_missed_votes().await {
                 cmds.push(cmd);
             }
+            debug!(" ----> vote periodics done");
         }
 
         if self.timestamps.last_dkg_msg_check.elapsed() > MISSING_DKG_MSG_INTERVAL {
+            debug!(" ----> dkg msg periodics start");
             self.timestamps.last_dkg_msg_check = now;
             let dkg_cmds = Self::check_for_missed_dkg_messages(self.node.clone()).await;
             cmds.extend(dkg_cmds);
+            debug!(" ----> dkg msg periodics done");
         }
 
         if self.timestamps.last_dysfunction_check.elapsed() > DYSFUNCTION_CHECK_INTERVAL {
+            debug!(" ----> dysfn periodics start");
             self.timestamps.last_dysfunction_check = now;
             let dysf_cmds = Self::check_for_dysfunction(self.node.clone()).await;
             cmds.extend(dysf_cmds);
+            debug!(" ----> dysfn periodics done");
         }
 
+        debug!(" ----> all elder periodics cmds ready to push ");
         for cmd in cmds {
             // dont use sender here incase channel gets full
             self.fire_and_forget(cmd, None).await;
         }
+        debug!(" ----> all elder periodics cmds pushed ");
     }
 
     /// Initiates and generates all the subsequent Cmds to perform a healthcheck
