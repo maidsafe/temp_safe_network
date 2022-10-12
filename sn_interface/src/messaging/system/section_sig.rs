@@ -9,7 +9,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::messaging::{
-    signature_aggregator::{Error as AggregatorError, SignatureAggregator},
+    signature_aggregator::{AggregatorError, SignatureAggregator},
     AuthorityProof,
 };
 
@@ -33,17 +33,14 @@ impl SectionSig {
         aggregator: &mut SignatureAggregator,
         share: SectionSigShare,
         payload: impl AsRef<[u8]>,
-    ) -> Result<AuthorityProof<Self>, AggregatorError> {
-        let sig = aggregator.add(payload.as_ref(), share.clone())?;
-
-        if share.public_key_set.public_key() != sig.public_key {
-            return Err(AggregatorError::InvalidShare);
+    ) -> Result<Option<AuthorityProof<Self>>, AggregatorError> {
+        match aggregator.try_aggregate(payload.as_ref(), share)? {
+            Some(sig) => Ok(Some(AuthorityProof(Self {
+                public_key: sig.public_key,
+                signature: sig.signature,
+            }))),
+            None => Ok(None),
         }
-
-        Ok(AuthorityProof(Self {
-            public_key: sig.public_key,
-            signature: sig.signature,
-        }))
     }
 }
 

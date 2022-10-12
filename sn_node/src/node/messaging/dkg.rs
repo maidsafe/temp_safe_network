@@ -175,32 +175,17 @@ impl MyNode {
             return Err(Error::InvalidKeyShareSectionKey);
         }
         let serialized_session_id = bincode::serialize(session_id)?;
-        if !elder_sig.verify(&serialized_session_id) {
-            return Err(Error::InvalidSignatureShare);
-        }
 
-        // save it
-        let sigs_for_this_session = self
-            .dkg_start_aggregator
-            .entry(session_id.hash())
-            .or_insert(BTreeSet::new());
-        let _ = sigs_for_this_session.insert(elder_sig.clone());
-
-        // check if we have enough shares to create a section signature
-        if sigs_for_this_session.len() > elder_sig.public_key_set.threshold() {
-            let signature = elder_sig.public_key_set.combine_signatures(
-                sigs_for_this_session
-                    .iter()
-                    .map(|s| (s.index, s.signature_share.clone())),
-            )?;
-            let section_sig = SectionSig {
-                public_key,
-                signature,
-            };
-            Ok(Some(section_sig))
-        } else {
-            Ok(None)
-        }
+        // try aggregate
+        self.dkg_start_aggregator
+            .try_aggregate(&serialized_session_id, elder_sig)
+            .map_err(|err| {
+                warn!(
+                    "Error aggregating signature in DkgStart s{}: {err:?}",
+                    session_id.sh()
+                );
+                Error::InvalidSignatureShare
+            })
     }
 
     pub(crate) fn handle_dkg_start(

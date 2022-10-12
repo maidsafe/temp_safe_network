@@ -25,7 +25,6 @@ use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         data::StorageLevel,
-        signature_aggregator::Error as AggregatorError,
         system::{JoinResponse, NodeCmd, NodeEvent, NodeMsg, NodeQuery, Proposal as ProposalMsg},
         MsgId, NodeMsgAuthority, SectionSig,
     },
@@ -581,11 +580,11 @@ impl MyNode {
             bls_share_auth.into_inner(),
             &payload,
         ) {
-            Ok(section_auth) => {
+            Ok(Some(section_auth)) => {
                 info!("Successfully aggregated message");
                 Ok(Some(NodeMsgAuthority::Section(section_auth)))
             }
-            Err(AggregatorError::NotEnoughShares) => {
+            Ok(None) => {
                 info!("Not enough shares to aggregate received message");
                 Ok(None)
             }

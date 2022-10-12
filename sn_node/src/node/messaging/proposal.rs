@@ -10,11 +10,7 @@ use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, Proposal, Resu
 use sn_interface::messaging::system::SectionSigShare;
 
 use sn_interface::{
-    messaging::{
-        signature_aggregator::{Error as AggregatorError, SignatureAggregator},
-        system::NodeMsg,
-        MsgId,
-    },
+    messaging::{signature_aggregator::SignatureAggregator, system::NodeMsg, MsgId},
     network_knowledge::{NetworkKnowledge, SectionKeyShare},
     types::Peer,
 };
@@ -159,14 +155,14 @@ impl MyNode {
                 sender, msg_id, error
             ),
             Ok(serialised_proposal) => {
-                match proposal_aggregator.add(&serialised_proposal, sig_share) {
-                    Ok(sig) => match proposal {
+                match proposal_aggregator.try_aggregate(&serialised_proposal, sig_share) {
+                    Ok(Some(sig)) => match proposal {
                         Proposal::NewElders(new_elders) => {
                             cmds.push(Cmd::HandleNewEldersAgreement { new_elders, sig })
                         }
                         _ => cmds.push(Cmd::HandleAgreement { proposal, sig }),
                     },
-                    Err(AggregatorError::NotEnoughShares) => {
+                    Ok(None) => {
                         // we add elders too fast in initial....
                         trace!(
                         "Proposal from {} inserted in aggregator, not enough sig shares yet: {proposal:?} {:?}",
