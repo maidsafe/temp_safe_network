@@ -37,7 +37,7 @@ use tokio::sync::{
 pub(crate) struct FlowCtrl {
     node: Arc<RwLock<MyNode>>,
     cmd_ctrl: CmdCtrl,
-    incoming_msg_events: mpsc::Receiver<MsgEvent>,
+    // incoming_msg_events: mpsc::Receiver<MsgEvent>,
     // incoming_cmds_from_apis: mpsc::Receiver<(Cmd, Option<usize>)>,
     cmd_sender_channel: mpsc::Sender<(Cmd, Option<usize>)>,
     outgoing_node_event_sender: EventSender,
@@ -49,7 +49,7 @@ impl FlowCtrl {
     /// returning the channel where it can receive commands on
     pub(crate) fn start(
         cmd_ctrl: CmdCtrl,
-        incoming_msg_events: mpsc::Receiver<MsgEvent>,
+        mut incoming_msg_events: mpsc::Receiver<MsgEvent>,
         outgoing_node_event_sender: EventSender,
     ) -> mpsc::Sender<(Cmd, Option<usize>)> {
         let dispatcher = cmd_ctrl.dispatcher.clone();
@@ -58,7 +58,7 @@ impl FlowCtrl {
         let flow_ctrl = Self {
             cmd_ctrl,
             node,
-            incoming_msg_events,
+            // incoming_msg_events,
             // incoming_cmds_from_apis,
             cmd_sender_channel: cmd_sender_channel.clone(),
             outgoing_node_event_sender,
@@ -70,6 +70,7 @@ impl FlowCtrl {
         });
 
         let cmd_channel = cmd_sender_channel.clone();
+        let cmd_channel_for_msgs = cmd_sender_channel.clone();
 
         // start a new thread to kick off incoming cmds
         let _ = tokio::task::spawn_local(async move {
@@ -84,6 +85,34 @@ impl FlowCtrl {
                     // self.outgoing_node_event_sender.clone(),
                 )
                 .await
+            }
+        });
+
+        // start a new thread to convert msgs to Cmds
+        let _ = tokio::task::spawn_local(async move {
+            while let Some(peer_msg) = incoming_msg_events.recv().await {
+                // Self::process_next_cmd(cmd).await;
+
+                let cmd = match Self::handle_new_msg_event(peer_msg).await {
+                    Ok(cmd) => cmd,
+                    Err(error) => {
+                        error!("Could not handle incoming msg event: {error:?}");
+                        continue;
+                    }
+                };
+
+                if let Err(error) = cmd_channel_for_msgs.send((cmd.clone(), None)).await {
+                    error!("Error sending msg onto cmd channel {error:?}");
+                }
+
+                // CmdCtrl::process_cmd_job(
+                //     dispatcher.clone(),
+                //     cmd,
+                //     cmd_id,
+                //     cmd_channel.clone(),
+                //     // self.outgoing_node_event_sender.clone(),
+                // )
+                // .await
             }
         });
 
@@ -123,33 +152,33 @@ impl FlowCtrl {
     // }
 
     /// Pull and queue up all pending msgs from the MsgSender
-    async fn enqueue_new_incoming_msgs(&mut self) -> Result<()> {
-        loop {
-            match self.incoming_msg_events.try_recv() {
-                Ok(msg) => {
-                    let cmd = match Self::handle_new_msg_event(msg).await {
-                        Ok(cmd) => cmd,
-                        Err(error) => {
-                            error!("Could not handle incoming msg event: {error:?}");
-                            continue;
-                        }
-                    };
+    // async fn enqueue_new_incoming_msgs(&mut self) -> Result<()> {
+    //     loop {
+    //         match self.incoming_msg_events.try_recv() {
+    //             Ok(msg) => {
+    //                 let cmd = match Self::handle_new_msg_event(msg).await {
+    //                     Ok(cmd) => cmd,
+    //                     Err(error) => {
+    //                         error!("Could not handle incoming msg event: {error:?}");
+    //                         continue;
+    //                     }
+    //                 };
 
-                    if let Err(error) = self.cmd_sender_channel.send((cmd.clone(), None)).await {
-                        error!("Error sending msg onto cmd channel {error:?}");
-                    }
-                }
-                Err(TryRecvError::Empty) => {
-                    // do nothing else
-                    return Ok(());
-                }
-                Err(TryRecvError::Disconnected) => {
-                    error!("Senders to `incoming_cmds_from_apis` have disconnected.");
-                    return Err(Error::MsgChannelDropped);
-                }
-            }
-        }
-    }
+    //                 if let Err(error) = self.cmd_sender_channel.send((cmd.clone(), None)).await {
+    //                     error!("Error sending msg onto cmd channel {error:?}");
+    //                 }
+    //             }
+    //             Err(TryRecvError::Empty) => {
+    //                 // do nothing else
+    //                 return Ok(());
+    //             }
+    //             Err(TryRecvError::Disconnected) => {
+    //                 error!("Senders to `incoming_cmds_from_apis` have disconnected.");
+    //                 return Err(Error::MsgChannelDropped);
+    //             }
+    //         }
+    //     }
+    // }
 
     /// This is a never ending loop as long as the node is live.
     /// This loop drives the periodic events internal to the node.
@@ -161,14 +190,14 @@ impl FlowCtrl {
             debug!(" ----> Starting the process loop");
             // if we want to throttle cmd throughput, we do that here.
             // if there is nothing in the cmd queue, we wait here too.
-            self.cmd_ctrl
-                .wait_if_not_processing_at_expected_rate()
-                .await;
+            // self.cmd_ctrl
+            //     .wait_if_not_processing_at_expected_rate()
+            //     .await;
 
-            if let Err(error) = self.enqueue_new_incoming_msgs().await {
-                error!("{error:?}");
-                break;
-            }
+            // if let Err(error) = self.enqueue_new_incoming_msgs().await {
+            //     error!("{error:?}");
+            //     break;
+            // }
 
             debug!(" ----> New msgs enqueued");
 
@@ -177,7 +206,7 @@ impl FlowCtrl {
             //     break;
             // }
 
-            debug!(" ----> New cmds enqueued");
+            // debug!(" ----> New cmds enqueued");
             // we go through all pending cmds in this loop
             // while self.cmd_ctrl.has_items_queued() {
             //     debug!(" ----> About to kick cmd off");
@@ -199,6 +228,8 @@ impl FlowCtrl {
 
             self.perform_periodic_checks().await;
             debug!(" ----> After checks");
+
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }
 
         error!("Internal processing ended.")
