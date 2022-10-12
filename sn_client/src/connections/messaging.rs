@@ -121,7 +121,7 @@ impl Session {
             }
 
             if ack_checks >= max_ack_checks {
-                return Err(Error::InsufficientAcksReceived);
+                return Err(Error::InsufficientAcksReceived(msg_id));
             }
 
             ack_checks += 1;
