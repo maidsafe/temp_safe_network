@@ -172,12 +172,12 @@ impl FlowCtrl {
                 //     error!("{error:?}");
                 //     break;
                 // }
-
-                // give each cmd 10ms to complete...?
-                tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
             }
 
+            debug!(" ----> Before checks");
+
             self.perform_periodic_checks().await;
+            debug!(" ----> After checks");
         }
 
         error!("Internal processing ended.")
