@@ -162,7 +162,7 @@ impl FlowCtrl {
                 debug!(" ----> About to kick cmd off");
                 self.process_next_cmd().await;
 
-                // debug!(" ----> About to Q more cmds");
+                debug!(" ----> About to Q more cmds");
                 if let Err(error) = self.enqeue_new_cmds_from_channel().await {
                     error!("{error:?}");
                     break;
