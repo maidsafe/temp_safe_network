@@ -28,8 +28,6 @@ use sn_interface::{
 use custom_debug::Debug;
 use std::{collections::BTreeSet, fmt, time::SystemTime};
 
-pub(crate) const VALIDATE_MSG_PRIO: i32 = -9;
-
 /// A struct for the job of controlling the flow
 /// of a [`Cmd`] in the system.
 ///
@@ -42,63 +40,7 @@ pub(crate) struct CmdJob {
     id: usize,
     parent_id: Option<usize>,
     cmd: Cmd,
-    priority: i32,
     created_at: SystemTime,
-}
-
-impl PartialEq for CmdJob {
-    fn eq(&self, other: &Self) -> bool {
-        self.id() == other.id()
-    }
-}
-
-impl Eq for CmdJob {}
-
-impl std::hash::Hash for CmdJob {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.id().hash(state);
-    }
-}
-
-impl CmdJob {
-    pub(crate) fn new(
-        id: usize,
-        parent_id: Option<usize>,
-        cmd: Cmd,
-        created_at: SystemTime,
-    ) -> Self {
-        let priority = cmd.priority();
-        Self {
-            id,
-            parent_id,
-            cmd,
-            priority,
-            created_at,
-        }
-    }
-
-    pub(crate) fn id(&self) -> usize {
-        self.id
-    }
-
-    pub(crate) fn parent_id(&self) -> Option<usize> {
-        self.parent_id
-    }
-
-    pub(crate) fn into_cmd(self) -> Cmd {
-        self.cmd
-    }
-    pub(crate) fn cmd(&self) -> &Cmd {
-        &self.cmd
-    }
-
-    pub(crate) fn priority(&self) -> i32 {
-        self.priority
-    }
-
-    pub(crate) fn created_at(&self) -> SystemTime {
-        self.created_at
-    }
 }
 
 /// Commands for a node.
@@ -130,15 +72,6 @@ pub(crate) enum Cmd {
         msg_id: MsgId,
         msg: NodeMsg,
         origin: Peer,
-        #[cfg(feature = "traceroute")]
-        traceroute: Traceroute,
-    },
-    HandleValidClientMsg {
-        msg_id: MsgId,
-        msg: ClientMsg,
-        origin: Peer,
-        /// Requester's authority over this message
-        auth: AuthorityProof<ClientAuth>,
         #[cfg(feature = "traceroute")]
         traceroute: Traceroute,
     },
@@ -215,33 +148,6 @@ impl Cmd {
         }
     }
 
-    /// The priority of the cmd
-    pub(crate) fn priority(&self) -> i32 {
-        use Cmd::*;
-        match self {
-            SendMsg { .. } => 20,
-            HandleAgreement { .. } => 10,
-            HandleNewEldersAgreement { .. } => 10,
-            HandleDkgOutcome { .. } => 10,
-            ProposeVoteNodesOffline(_) => 10,
-
-            HandleFailedSendToNode { .. } => 9,
-            TrackNodeIssueInDysfunction { .. } => 9,
-            HandleMembershipDecision(_) => 9,
-            EnqueueDataForReplication { .. } => 9,
-            CleanupPeerLinks => 9,
-
-            AddToPendingQueries { .. } => 6,
-
-            // See [`MsgType`] for the priority constants and the range of possible values.
-            HandleValidNodeMsg { msg, .. } => msg.priority(),
-            HandleValidClientMsg { msg, .. } => msg.priority(),
-            UpdateNetworkAndHandleValidClientMsg { msg, .. } => msg.priority(),
-
-            ValidateMsg { .. } => VALIDATE_MSG_PRIO, // before it's validated, we cannot give it high prio, as it would be a spam vector
-        }
-    }
-
     pub(crate) fn statemap_state(&self) -> sn_interface::statemap::State {
         use sn_interface::statemap::State;
         match self {
@@ -250,7 +156,6 @@ impl Cmd {
             Cmd::HandleFailedSendToNode { .. } => State::Comms,
             Cmd::ValidateMsg { .. } => State::Validation,
             Cmd::HandleValidNodeMsg { msg, .. } => msg.statemap_states(),
-            Cmd::HandleValidClientMsg { .. } => State::ClientMsg,
             Cmd::UpdateNetworkAndHandleValidClientMsg { .. } => State::ClientMsg,
             Cmd::TrackNodeIssueInDysfunction { .. } => State::Dysfunction,
             Cmd::AddToPendingQueries { .. } => State::Dysfunction,
@@ -285,9 +190,6 @@ impl fmt::Display for Cmd {
             }
             Cmd::HandleValidNodeMsg { msg_id, msg, .. } => {
                 write!(f, "HandleValidNodeMsg {:?}: {:?}", msg_id, msg)
-            }
-            Cmd::HandleValidClientMsg { msg_id, msg, .. } => {
-                write!(f, "HandleValidClientMsg {:?}: {:?}", msg_id, msg)
             }
             Cmd::UpdateNetworkAndHandleValidClientMsg { msg_id, msg, .. } => {
                 write!(f, "UpdateAndHandleValidClientMsg {:?}: {:?}", msg_id, msg)
