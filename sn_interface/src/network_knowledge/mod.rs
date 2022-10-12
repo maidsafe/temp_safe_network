@@ -223,9 +223,8 @@ impl NetworkKnowledge {
         Ok(())
     }
 
-    /// If we already have the signed SAP and section chain for the provided key and prefix
-    /// we make them the current SAP and section chain, and if so, this returns 'true'.
-    /// Note this function assumes we already have the key share for the provided section key.
+    /// If we already have the signed SAP for the provided key and prefix, we make it the current SAP, and if so, this
+    /// returns 'true'. Note this function assumes we already have the key share for the provided section key.
     pub fn try_update_current_sap(&mut self, section_key: BlsPublicKey, prefix: &Prefix) -> bool {
         // Let's try to find the signed SAP corresponding to the provided prefix and section key
         match self.section_tree.get_signed(prefix) {
@@ -243,9 +242,7 @@ impl NetworkKnowledge {
                         // Prune list of archived members
                         if let Err(e) = self.section_peers.prune_members_archive(&pc, &section_key)
                         {
-                            error!(
-                                "Error while pruning member archive with last_key: {section_key:?}, err: {e:?}"
-                            );
+                            error!("Error while pruning member archive with last_key: {section_key:?}, err: {e:?}");
                         }
                         // Let's then update our current SAP and section chain
                         let our_prev_prefix = self.prefix();
