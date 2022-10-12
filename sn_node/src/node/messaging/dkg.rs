@@ -10,17 +10,14 @@ use crate::node::{
     core::DkgSessionInfo,
     dkg::{check_ephemeral_dkg_key, DkgPubKeys},
     flow_ctrl::cmds::Cmd,
-    messaging::{OutgoingMsg, Peers},
+    messaging::Peers,
     Error, MyNode, Proposal, Result,
 };
 
-use bytes::Bytes;
-#[cfg(feature = "traceroute")]
-use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         system::{DkgSessionId, NodeMsg, SectionSigShare},
-        AuthorityProof, NodeMsgAuthority, SectionSig, WireMsg,
+        AuthorityProof, SectionSig,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
     types::{self, log_markers::LogMarker, Peer},
@@ -72,7 +69,7 @@ impl MyNode {
     /// DKG is triggered by the following events:
     /// - A change in the Elders
     /// - Section Split
-    pub(crate) fn send_dkg_start(&self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
+    pub(crate) fn send_dkg_start(&mut self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
         // Send DKG start to all candidates
         let recipients = Vec::from_iter(session_id.elder_peers());
 
@@ -85,7 +82,7 @@ impl MyNode {
             recipients
         );
 
-        let mut handle = true;
+        let mut we_are_a_participant = false;
         let mut cmds = vec![];
         let mut others = BTreeSet::new();
 
@@ -93,56 +90,51 @@ impl MyNode {
         let our_name = self.info().name();
         for recipient in recipients {
             if recipient.name() == our_name {
-                handle = true;
+                we_are_a_participant = true;
             } else {
                 let _ = others.insert(recipient);
             }
         }
 
-        let msg = NodeMsg::DkgStart(session_id);
-        let (auth, payload) = self.get_auth(&msg)?;
+        // sign the DkgSessionId
+        let section_sig_share = self.sign_session_id(&session_id)?;
+        let node_msg = NodeMsg::DkgStart(session_id.clone(), section_sig_share.clone());
 
+        // send it to the other participants
         if !others.is_empty() {
-            cmds.push(Cmd::send_msg(
-                OutgoingMsg::Elder((auth.clone(), payload.clone())),
-                Peers::Multiple(others),
-            ));
+            cmds.push(self.send_system_msg(node_msg, Peers::Multiple(others)))
         }
 
-        if handle {
-            cmds.push(Cmd::HandleValidNodeMsg {
-                origin: Peer::new(our_name, self.addr),
-                msg_id: sn_interface::messaging::MsgId::new(),
-                msg,
-                msg_authority: NodeMsgAuthority::BlsShare(AuthorityProof(auth)),
-                wire_msg_payload: payload,
-                #[cfg(feature = "traceroute")]
-                traceroute: Traceroute(vec![]),
-            });
+        // handle our own
+        if we_are_a_participant {
+            cmds.extend(self.handle_dkg_start(session_id, section_sig_share)?);
         }
 
         Ok(cmds)
     }
 
-    fn get_auth(&self, msg: &NodeMsg) -> Result<(SectionSigShare, Bytes)> {
+    fn sign_session_id(&self, session_id: &DkgSessionId) -> Result<SectionSigShare> {
+        // get section key
         let section_key = self.network_knowledge.section_key();
         let key_share = self
             .section_keys_provider
             .key_share(&section_key)
             .map_err(|err| {
-                trace!("Can't create message {:?} for accumulation: {:?}", msg, err);
+                warn!(
+                    "Can't obtain key share to sign DkgSessionId s{} {:?}",
+                    session_id.sh(),
+                    err
+                );
                 err
             })?;
 
-        let payload = WireMsg::serialize_msg_payload(&msg).map_err(|_| Error::InvalidMessage)?;
-
-        let auth = SectionSigShare {
+        // sign
+        let serialized_session_id = bincode::serialize(session_id)?;
+        Ok(SectionSigShare {
             public_key_set: key_share.public_key_set.clone(),
             index: key_share.index,
-            signature_share: key_share.secret_key_share.sign(&payload),
-        };
-
-        Ok((auth, payload))
+            signature_share: key_share.secret_key_share.sign(&serialized_session_id),
+        })
     }
 
     fn broadcast_dkg_votes(
@@ -172,7 +164,81 @@ impl MyNode {
         self.send_system_msg(node_msg, Peers::Single(sender))
     }
 
-    pub(crate) fn handle_dkg_start(&mut self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
+    fn aggregate_dkg_start(
+        &mut self,
+        session_id: &DkgSessionId,
+        elder_sig: SectionSigShare,
+    ) -> Result<Option<SectionSig>> {
+        // check sig share
+        let public_key = elder_sig.public_key_set.public_key();
+        if self.network_knowledge.section_key() != public_key {
+            return Err(Error::InvalidKeyShareSectionKey);
+        }
+        let serialized_session_id = bincode::serialize(session_id)?;
+        if !elder_sig.verify(&serialized_session_id) {
+            return Err(Error::InvalidSignatureShare);
+        }
+
+        // save it
+        let sigs_for_this_session = self
+            .dkg_start_aggregator
+            .entry(session_id.hash())
+            .or_insert(BTreeSet::new());
+        let _ = sigs_for_this_session.insert(elder_sig.clone());
+
+        // check if we have enough shares to create a section signature
+        if sigs_for_this_session.len() > elder_sig.public_key_set.threshold() {
+            let signature = elder_sig.public_key_set.combine_signatures(
+                sigs_for_this_session
+                    .iter()
+                    .map(|s| (s.index, s.signature_share.clone())),
+            )?;
+            let section_sig = SectionSig {
+                public_key,
+                signature,
+            };
+            Ok(Some(section_sig))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub(crate) fn handle_dkg_start(
+        &mut self,
+        session_id: DkgSessionId,
+        elder_sig: SectionSigShare,
+    ) -> Result<Vec<Cmd>> {
+        // try to create a section sig by aggregating the elder_sig
+        match self.aggregate_dkg_start(&session_id, elder_sig) {
+            Ok(Some(section_sig)) => {
+                trace!(
+                    "DkgStart: section key aggregated, starting session s{}",
+                    session_id.sh()
+                );
+                self.dkg_start(session_id, section_sig)
+            }
+            Ok(None) => {
+                trace!(
+                    "DkgStart: waiting for more shares for session s{}",
+                    session_id.sh()
+                );
+                Ok(vec![])
+            }
+            Err(e) => {
+                warn!(
+                    "DkgStart: failed to aggregate received elder sig in s{}: {e:?}",
+                    session_id.sh()
+                );
+                Ok(vec![])
+            }
+        }
+    }
+
+    pub(crate) fn dkg_start(
+        &mut self,
+        session_id: DkgSessionId,
+        section_sig: SectionSig,
+    ) -> Result<Vec<Cmd>> {
         // make sure we are in this dkg session
         let our_name = types::keys::ed25519::name(&self.keypair.public);
         let our_id = if let Some(index) = session_id.elder_index(our_name) {
@@ -191,6 +257,15 @@ impl MyNode {
             trace!("Skipping DkgStart for older chain: s{}", session_id.sh());
             return Ok(vec![]);
         }
+
+        // acknowledge Dkg session
+        let session_info = DkgSessionInfo {
+            session_id: session_id.clone(),
+            authority: AuthorityProof(section_sig),
+        };
+        let _existing = self
+            .dkg_sessions_info
+            .insert(session_id.hash(), session_info);
 
         // gen key
         let (ephemeral_pub_key, sig) =
@@ -251,17 +326,17 @@ impl MyNode {
             session_id.sh()
         );
 
-        // reconstruct the original DKG start message and verify the section signature
-        let payload = WireMsg::serialize_msg_payload(&NodeMsg::DkgStart(session_id.clone()))?;
-        let auth = section_auth.clone().into_inner();
-        if self.network_knowledge.section_key() != auth.public_key {
+        // check the signature
+        let serialized_session_id = bincode::serialize(session_id)?;
+        let section_sig = section_auth.clone().into_inner();
+        if self.network_knowledge.section_key() != section_sig.public_key {
             warn!(
                 "Invalid section key in dkg auth proof in s{:?}: {sender:?}",
                 session_id.sh()
             );
             return Ok(vec![]);
         }
-        if let Err(err) = AuthorityProof::verify(auth, payload) {
+        if let Err(err) = AuthorityProof::verify(section_sig.clone(), serialized_session_id) {
             error!(
                 "Invalid signature in dkg auth proof in s{:?}: {err:?}",
                 session_id.sh()
@@ -269,23 +344,13 @@ impl MyNode {
             return Ok(vec![]);
         }
 
-        // acknowledge Dkg Session
+        // catch back up
         info!(
             "Handling missed dkg start for s{:?} after msg from {sender:?}",
             session_id.sh()
         );
-        self.log_dkg_session(&sender.name());
-        let session_info = DkgSessionInfo {
-            session_id: session_id.clone(),
-            authority: section_auth.clone(),
-        };
-        let _existing = self
-            .dkg_sessions_info
-            .insert(session_id.hash(), session_info);
-
-        // catch back up
         let mut cmds = vec![];
-        cmds.extend(self.handle_dkg_start(session_id.clone())?);
+        cmds.extend(self.dkg_start(session_id.clone(), section_sig)?);
         cmds.extend(self.handle_dkg_ephemeral_pubkey(
             session_id,
             section_auth,

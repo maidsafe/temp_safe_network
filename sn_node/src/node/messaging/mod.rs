@@ -37,6 +37,8 @@ use std::collections::BTreeSet;
 pub(crate) enum OutgoingMsg {
     Node(NodeMsg),
     Client(ClientMsg),
+    #[allow(dead_code)]
+    // NB TODO will remove this soon
     Elder((SectionSigShare, Bytes)),
 }
 

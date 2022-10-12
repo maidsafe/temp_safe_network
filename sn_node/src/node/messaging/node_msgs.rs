@@ -9,7 +9,6 @@
 use crate::{
     comm::Comm,
     node::{
-        core::DkgSessionInfo,
         flow_ctrl::cmds::Cmd,
         messaging::{OutgoingMsg, Peers},
         Error, Event, MembershipEvent, MyNode, Proposal as CoreProposal, Result,
@@ -305,7 +304,7 @@ impl MyNode {
                     &mut self.proposal_aggregator,
                 )
             }
-            NodeMsg::DkgStart(session_id) => {
+            NodeMsg::DkgStart(session_id, elder_sig) => {
                 trace!(
                     "Handling msg: DkgStart s{} {:?}: {} elders from {}",
                     session_id.sh(),
@@ -314,16 +313,7 @@ impl MyNode {
                     sender
                 );
                 self.log_dkg_session(&sender.name());
-                if let NodeMsgAuthority::Section(authority) = msg_authority {
-                    let session_info = DkgSessionInfo {
-                        session_id: session_id.clone(),
-                        authority,
-                    };
-                    let _existing = self
-                        .dkg_sessions_info
-                        .insert(session_id.hash(), session_info);
-                }
-                self.handle_dkg_start(session_id)
+                self.handle_dkg_start(session_id, elder_sig)
             }
             NodeMsg::DkgEphemeralPubKey {
                 session_id,

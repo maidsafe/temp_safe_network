@@ -79,13 +79,13 @@ pub enum NodeMsg {
     JoinAsRelocatedRequest(Box<JoinAsRelocatedRequest>),
     /// Response to a `JoinAsRelocatedRequest`
     JoinAsRelocatedResponse(Box<JoinAsRelocatedResponse>),
-    /// Sent to the new elder candidates to start the DKG process.
-    DkgStart(DkgSessionId),
+    /// Sent to the new elder candidates to start the DKG process, along with a sig of the DkgSessionId
+    DkgStart(DkgSessionId, SectionSigShare),
     /// Sent when DKG is triggered to other participant
     DkgEphemeralPubKey {
         /// The identifier of the DKG session this message is for.
         session_id: DkgSessionId,
-        /// Section authority for the DKG start message
+        /// Section authority for the DkgSessionId (if you missed the DkgStart you can trust this)
         section_auth: AuthorityProof<SectionSig>,
         /// The ephemeral bls key chosen by candidate
         pub_key: BlsPublicKey,
