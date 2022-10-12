@@ -47,6 +47,7 @@ impl SignatureAggregator {
     /// Add new share into the aggregator. If enough valid signature shares were collected, returns
     /// the aggregated signature: `Some(SectionSig)` else returns None.
     /// Checks if the signature are valid
+    /// Resets current shares upon completion of a signature so we don't accumulate finished aggregations endlessly
     pub fn try_aggregate(
         &mut self,
         payload: &[u8],
@@ -84,6 +85,9 @@ impl SignatureAggregator {
                 public_key,
                 signature,
             };
+
+            // reset current shares upon completion
+            self.map.remove(&hash);
             Ok(Some(section_sig))
         } else {
             Ok(None)
@@ -179,11 +183,17 @@ mod tests {
 
         for index in 0..threshold {
             let sig_share = create_sig_share(&sk_set, index, payload);
-            assert!(aggregator.try_aggregate(payload, sig_share).is_err());
+            assert!(matches!(
+                aggregator.try_aggregate(payload, sig_share),
+                Ok(None)
+            ));
         }
 
         let sig_share = create_sig_share(&sk_set, threshold, payload);
-        assert!(aggregator.try_aggregate(payload, sig_share).is_ok());
+        assert!(matches!(
+            aggregator.try_aggregate(payload, sig_share),
+            Ok(Some(_))
+        ));
 
         // round 2
 
@@ -191,11 +201,17 @@ mod tests {
 
         for index in offset..(threshold + offset) {
             let sig_share = create_sig_share(&sk_set, index, payload);
-            assert!(aggregator.try_aggregate(payload, sig_share).is_err());
+            assert!(matches!(
+                aggregator.try_aggregate(payload, sig_share),
+                Ok(None)
+            ));
         }
 
         let sig_share = create_sig_share(&sk_set, threshold + offset + 1, payload);
-        assert!(aggregator.try_aggregate(payload, sig_share).is_ok());
+        assert!(matches!(
+            aggregator.try_aggregate(payload, sig_share),
+            Ok(Some(_))
+        ));
     }
 
     fn create_sig_share(
