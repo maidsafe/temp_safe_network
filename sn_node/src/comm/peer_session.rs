@@ -185,11 +185,6 @@ impl PeerSessionWorker {
             return Ok(SessionStatus::Ok);
         }
 
-        if !should_establish_new_connection && job.connection_retries > MAX_SENDJOB_RETRIES {
-            debug!(
-                "Continuing to attempt to send to client while we have connections in the queue"
-            );
-        }
 
         // we can't spawn this atm as it edits/updates the link
         // if we can separate out those parts, we could hopefully get this all properly
@@ -202,7 +197,9 @@ impl PeerSessionWorker {
             .link
             .get_or_connect(should_establish_new_connection)
             .await
-            .map_err(|_| Error::PeerLinkDropped)?;
+            .map_err(|_| Error::NoConnectionsForPeer)?;
+
+        debug!("Connection exists for sendjob: {id:?}");
         let queue = self.queue.clone();
         let link_connections = self.link.connections.clone();
         let conns_count = self.link.connections.len();

@@ -136,13 +136,13 @@ impl Comm {
                     let send_was_successful = match Self::is_sent(watcher, msg_id, peer).await {
                         Ok(result) => result,
                         Err(error) => match error {
-                            Error::PeerLinkDropped => {
+                            Error::NoConnectionsForPeer => {
                                 // remove the peer link
                                 let perhaps_session = sessions.remove(&peer);
                                 if let Some((_peer, session)) = perhaps_session {
                                     session.disconnect().await;
                                 }
-                                return Err(Error::PeerLinkDropped);
+                                return Err(Error::NoConnectionsForPeer);
                             }
                             _ => return Err(error),
                         },
