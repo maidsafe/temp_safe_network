@@ -185,7 +185,6 @@ impl PeerSessionWorker {
             return Ok(SessionStatus::Ok);
         }
 
-
         // we can't spawn this atm as it edits/updates the link
         // if we can separate out those parts, we could hopefully get this all properly
         // spawnable.

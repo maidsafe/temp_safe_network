@@ -137,15 +137,6 @@ pub(crate) enum Cmd {
         #[cfg(feature = "traceroute")]
         traceroute: Traceroute,
     },
-    HandleValidClientMsg {
-        msg_id: MsgId,
-        msg: ClientMsg,
-        origin: Peer,
-        /// Requester's authority over this message
-        auth: AuthorityProof<ClientAuth>,
-        #[cfg(feature = "traceroute")]
-        traceroute: Traceroute,
-    },
     UpdateNetworkAndHandleValidClientMsg {
         proof_chain: SectionsDAG,
         signed_sap: SectionSigned<SectionAuthorityProvider>,
@@ -239,7 +230,6 @@ impl Cmd {
 
             // See [`MsgType`] for the priority constants and the range of possible values.
             HandleValidNodeMsg { msg, .. } => msg.priority(),
-            HandleValidClientMsg { msg, .. } => msg.priority(),
             UpdateNetworkAndHandleValidClientMsg { msg, .. } => msg.priority(),
 
             ValidateMsg { .. } => VALIDATE_MSG_PRIO, // before it's validated, we cannot give it high prio, as it would be a spam vector
@@ -254,7 +244,6 @@ impl Cmd {
             Cmd::HandleFailedSendToNode { .. } => State::Comms,
             Cmd::ValidateMsg { .. } => State::Validation,
             Cmd::HandleValidNodeMsg { msg, .. } => msg.statemap_states(),
-            Cmd::HandleValidClientMsg { .. } => State::ClientMsg,
             Cmd::UpdateNetworkAndHandleValidClientMsg { .. } => State::ClientMsg,
             Cmd::TrackNodeIssueInDysfunction { .. } => State::Dysfunction,
             Cmd::AddToPendingQueries { .. } => State::Dysfunction,
@@ -289,9 +278,6 @@ impl fmt::Display for Cmd {
             }
             Cmd::HandleValidNodeMsg { msg_id, msg, .. } => {
                 write!(f, "HandleValidNodeMsg {:?}: {:?}", msg_id, msg)
-            }
-            Cmd::HandleValidClientMsg { msg_id, msg, .. } => {
-                write!(f, "HandleValidClientMsg {:?}: {:?}", msg_id, msg)
             }
             Cmd::UpdateNetworkAndHandleValidClientMsg { msg_id, msg, .. } => {
                 write!(f, "UpdateAndHandleValidClientMsg {:?}: {:?}", msg_id, msg)

@@ -106,6 +106,7 @@ impl MyNode {
                 #[cfg(feature = "traceroute")]
                 let traceroute = wire_msg.traceroute();
 
+                // this needs write access...
                 Ok(vec![Cmd::HandleValidNodeMsg {
                     origin,
                     msg_id,
@@ -168,14 +169,39 @@ impl MyNode {
                     return Ok(vec![cmd]);
                 }
 
-                Ok(vec![Cmd::HandleValidClientMsg {
-                    msg_id,
-                    msg,
-                    origin,
-                    auth,
-                    #[cfg(feature = "traceroute")]
-                    traceroute: wire_msg.traceroute(),
-                }])
+                // Ok(vec![Cmd::HandleValidClientMsg {
+                //     msg_id,
+                //     msg,
+                //     origin,
+                //     auth,
+                //     #[cfg(feature = "traceroute")]
+                //     traceroute: wire_msg.traceroute(),
+                // }])
+
+                match self
+                    .handle_valid_client_msg(
+                        msg_id,
+                        msg,
+                        auth,
+                        origin,
+                        #[cfg(feature = "traceroute")]
+                        wire_msg.traceroute(),
+                    )
+                    .await
+                {
+                    Ok(cmds) => Ok(cmds),
+                    Err(err) => {
+                        debug!("Will send error response back to client");
+                        let cmd = self.cmd_error_response(
+                            err,
+                            origin,
+                            msg_id,
+                            #[cfg(feature = "traceroute")]
+                            wire_msg.traceroute(),
+                        );
+                        Ok(vec![cmd])
+                    }
+                }
             }
         }
     }
