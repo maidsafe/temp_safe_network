@@ -38,7 +38,7 @@ pub(crate) struct FlowCtrl {
     node: Arc<RwLock<MyNode>>,
     cmd_ctrl: CmdCtrl,
     incoming_msg_events: mpsc::Receiver<MsgEvent>,
-    incoming_cmds_from_apis: mpsc::Receiver<(Cmd, Option<usize>)>,
+    // incoming_cmds_from_apis: mpsc::Receiver<(Cmd, Option<usize>)>,
     cmd_sender_channel: mpsc::Sender<(Cmd, Option<usize>)>,
     outgoing_node_event_sender: EventSender,
     timestamps: PeriodicChecksTimestamps,
@@ -52,13 +52,14 @@ impl FlowCtrl {
         incoming_msg_events: mpsc::Receiver<MsgEvent>,
         outgoing_node_event_sender: EventSender,
     ) -> mpsc::Sender<(Cmd, Option<usize>)> {
+        let dispatcher = cmd_ctrl.dispatcher.clone();
         let node = cmd_ctrl.node();
-        let (cmd_sender_channel, incoming_cmds_from_apis) = mpsc::channel(10_000);
+        let (cmd_sender_channel, mut incoming_cmds_from_apis) = mpsc::channel(10_000);
         let flow_ctrl = Self {
             cmd_ctrl,
             node,
             incoming_msg_events,
-            incoming_cmds_from_apis,
+            // incoming_cmds_from_apis,
             cmd_sender_channel: cmd_sender_channel.clone(),
             outgoing_node_event_sender,
             timestamps: PeriodicChecksTimestamps::now(),
@@ -68,38 +69,58 @@ impl FlowCtrl {
             flow_ctrl.process_messages_and_periodic_checks().await
         });
 
+        let cmd_channel = cmd_sender_channel.clone();
+
+        // start a new thread to kick off incoming cmds
+        let _ = tokio::task::spawn_local(async move {
+            while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
+                // Self::process_next_cmd(cmd).await;
+
+                CmdCtrl::process_cmd_job(
+                    dispatcher.clone(),
+                    cmd,
+                    cmd_id,
+                    cmd_channel.clone(),
+                    // self.outgoing_node_event_sender.clone(),
+                )
+                .await
+            }
+        });
+
         cmd_sender_channel
     }
 
-    /// Process the next pending cmds
-    async fn process_next_cmd(&mut self) {
-        if let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {
-            self.cmd_ctrl
-                .process_cmd_job(
-                    next_cmd_job,
-                    self.cmd_sender_channel.clone(),
-                    self.outgoing_node_event_sender.clone(),
-                )
-                .await
-        }
-    }
+    // /// Process the next pending cmds
+    // async fn process_next_cmd(&self, ) {
 
-    /// Pull and queue up all pending cmds from the CmdChannel
-    async fn enqeue_new_cmds_from_channel(&mut self) -> Result<()> {
-        loop {
-            match self.incoming_cmds_from_apis.try_recv() {
-                Ok((cmd, id)) => self.fire_and_forget(cmd, id).await,
-                Err(TryRecvError::Empty) => {
-                    // do nothing else
-                    return Ok(());
-                }
-                Err(TryRecvError::Disconnected) => {
-                    error!("Senders to `incoming_cmds_from_apis` have disconnected.");
-                    return Err(Error::CmdCtrlChannelDropped);
-                }
-            }
-        }
-    }
+    //     let dispatcher = self.cmd_ctrl.dispatcher.clone();
+    //     // if let Some(next_cmd_job) = self.cmd_ctrl.next_cmd() {
+    //         CmdCtrl::process_cmd_job(
+    //                 dispatcher,
+    //                 next_cmd_job,
+    //                 self.cmd_sender_channel.clone(),
+    //                 self.outgoing_node_event_sender.clone(),
+    //             )
+    //             .await
+    //     // }
+    // }
+
+    // /// Pull and queue up all pending cmds from the CmdChannel
+    // async fn enqeue_new_cmds_from_channel(&mut self) -> Result<()> {
+    //     loop {
+    //         match self.incoming_cmds_from_apis.try_recv() {
+    //             Ok((cmd, id)) => self.fire_and_forget(cmd, id).await,
+    //             Err(TryRecvError::Empty) => {
+    //                 // do nothing else
+    //                 return Ok(());
+    //             }
+    //             Err(TryRecvError::Disconnected) => {
+    //                 error!("Senders to `incoming_cmds_from_apis` have disconnected.");
+    //                 return Err(Error::CmdCtrlChannelDropped);
+    //             }
+    //         }
+    //     }
+    // }
 
     /// Pull and queue up all pending msgs from the MsgSender
     async fn enqueue_new_incoming_msgs(&mut self) -> Result<()> {
@@ -151,28 +172,28 @@ impl FlowCtrl {
 
             debug!(" ----> New msgs enqueued");
 
-            if let Err(error) = self.enqeue_new_cmds_from_channel().await {
-                error!("{error:?}");
-                break;
-            }
+            // if let Err(error) = self.enqeue_new_cmds_from_channel().await {
+            //     error!("{error:?}");
+            //     break;
+            // }
 
             debug!(" ----> New cmds enqueued");
             // we go through all pending cmds in this loop
-            while self.cmd_ctrl.has_items_queued() {
-                debug!(" ----> About to kick cmd off");
-                self.process_next_cmd().await;
+            // while self.cmd_ctrl.has_items_queued() {
+            //     debug!(" ----> About to kick cmd off");
+            //     self.process_next_cmd().await;
 
-                debug!(" ----> About to Q more cmds");
-                if let Err(error) = self.enqeue_new_cmds_from_channel().await {
-                    error!("{error:?}");
-                    break;
-                }
+            //     debug!(" ----> About to Q more cmds");
+            //     if let Err(error) = self.enqeue_new_cmds_from_channel().await {
+            //         error!("{error:?}");
+            //         break;
+            //     }
 
-                // if let Err(error) = self.enqueue_new_incoming_msgs().await {
-                //     error!("{error:?}");
-                //     break;
-                // }
-            }
+            //     // if let Err(error) = self.enqueue_new_incoming_msgs().await {
+            //     //     error!("{error:?}");
+            //     //     break;
+            //     // }
+            // }
 
             debug!(" ----> Before checks");
 

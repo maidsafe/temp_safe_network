@@ -114,37 +114,34 @@ impl CmdCtrl {
 
     /// Processes the next priority cmd
     pub(crate) async fn process_cmd_job(
-        &mut self,
-        job: CmdJob,
+        // &mut self,
+        dispatcher: Arc<Dispatcher>,
+        cmd: Cmd,
+        id: Option<usize>,
         cmd_process_api: tokio::sync::mpsc::Sender<(Cmd, Option<usize>)>,
-        node_event_sender: EventSender,
+        // node_event_sender: EventSender,
     ) {
-        #[cfg(feature = "test-utils")]
-        {
-            debug!("Cmd queue length: {}", self.cmd_queue.len());
-        }
-
-        let id = job.id();
-        let cmd = job.clone().into_cmd();
+        // let id = job.id();
+        // let cmd = job.clone().into_cmd();
 
         trace!("Processing cmd: {cmd:?}");
 
         let cmd_string = cmd.clone().to_string();
-        let priority = job.priority();
+        // let priority = job.priority();
 
-        node_event_sender
-            .send(Event::CmdProcessing(CmdProcessEvent::Started {
-                id,
-                parent_id: job.parent_id(),
-                priority,
-                cmd_creation_time: job.created_at(),
-                time: SystemTime::now(),
-                cmd_string: cmd.to_string(),
-            }))
-            .await;
+        // node_event_sender
+        //     .send(Event::CmdProcessing(CmdProcessEvent::Started {
+        //         id,
+        //         parent_id: job.parent_id(),
+        //         priority,
+        //         cmd_creation_time: job.created_at(),
+        //         time: SystemTime::now(),
+        //         cmd_string: cmd.to_string(),
+        //     }))
+        //     .await;
 
         trace!("about to spawn for processing cmd: {cmd:?}");
-        let dispatcher = self.dispatcher.clone();
+
         let _ = tokio::task::spawn_local(async move {
             dispatcher
                 .node()
@@ -155,7 +152,7 @@ impl CmdCtrl {
             match dispatcher.process_cmd(cmd).await {
                 Ok(cmds) => {
                     for cmd in cmds {
-                        match cmd_process_api.send((cmd, Some(id))).await {
+                        match cmd_process_api.send((cmd, id)).await {
                             Ok(_) => {
                                 //no issues
                             }
@@ -164,26 +161,26 @@ impl CmdCtrl {
                             }
                         }
                     }
-                    node_event_sender
-                        .send(Event::CmdProcessing(CmdProcessEvent::Finished {
-                            id,
-                            priority,
-                            cmd_string,
-                            time: SystemTime::now(),
-                        }))
-                        .await;
+                    // node_event_sender
+                    //     .send(Event::CmdProcessing(CmdProcessEvent::Finished {
+                    //         id,
+                    //         priority,
+                    //         cmd_string,
+                    //         time: SystemTime::now(),
+                    //     }))
+                    //     .await;
                 }
                 Err(error) => {
                     debug!("Error when processing command: {:?}", error);
-                    node_event_sender
-                        .send(Event::CmdProcessing(CmdProcessEvent::Failed {
-                            id,
-                            priority,
-                            time: SystemTime::now(),
-                            cmd_string,
-                            error: format!("{:?}", &error.to_string()),
-                        }))
-                        .await;
+                    // node_event_sender
+                    //     .send(Event::CmdProcessing(CmdProcessEvent::Failed {
+                    //         id,
+                    //         priority,
+                    //         time: SystemTime::now(),
+                    //         cmd_string,
+                    //         error: format!("{:?}", &error.to_string()),
+                    //     }))
+                    //     .await;
                 }
             }
             dispatcher
