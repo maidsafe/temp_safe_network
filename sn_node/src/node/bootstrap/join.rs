@@ -898,7 +898,7 @@ mod tests {
                 let mut proof_chain = SectionsDAG::new(genesis_pk);
 
                 let next_sk = next_sk_set.secret_key();
-                let signed_next_sap = section_signed(&next_sk, next_sap.clone())?;
+                let signed_next_sap = section_signed(&next_sk, next_sap)?;
 
                 let sig = bincode::serialize(&next_section_key)
                     .map(|bytes| genesis_sk.sign(&bytes))
