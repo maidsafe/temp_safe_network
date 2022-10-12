@@ -47,7 +47,7 @@ use super::flow_ctrl::event_channel::EventSender;
 // set to GENESIS_DBC_AMOUNT (currently 4,525,524,120 * 10^9) individual units.
 const GENESIS_DBC_FILENAME: &str = "genesis_dbc";
 
-static EVENT_CHANNEL_SIZE: usize = 20;
+static EVENT_CHANNEL_SIZE: usize = 10_000;
 
 pub(crate) type CmdChannel = mpsc::Sender<(Cmd, Option<usize>)>;
 
@@ -141,7 +141,7 @@ async fn bootstrap_node(
     root_storage_dir: &Path,
     join_timeout: Duration,
 ) -> Result<(Arc<RwLock<MyNode>>, CmdChannel, EventReceiver)> {
-    let (connection_event_tx, mut connection_event_rx) = mpsc::channel(100);
+    let (connection_event_tx, mut connection_event_rx) = mpsc::channel(10_000);
 
     let (event_sender, event_receiver) = event_channel::new(EVENT_CHANNEL_SIZE);
 
@@ -169,14 +169,7 @@ async fn bootstrap_node(
 
     let node = Arc::new(RwLock::new(node));
     let cmd_ctrl = CmdCtrl::new(Dispatcher::new(node.clone(), comm));
-    let (msg_and_period_ctrl, cmd_channel) =
-        FlowCtrl::new(cmd_ctrl, connection_event_rx, event_sender);
-
-    let _ = tokio::task::spawn_local(async move {
-        msg_and_period_ctrl
-            .process_messages_and_periodic_checks()
-            .await
-    });
+    let cmd_channel = FlowCtrl::start(cmd_ctrl, connection_event_rx, event_sender);
 
     Ok((node, cmd_channel, event_receiver))
 }

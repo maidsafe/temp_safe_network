@@ -8,59 +8,32 @@
 
 use super::NodeState;
 use crate::messaging::{SectionAuthorityProvider, SectionTreeUpdate};
-use bls::PublicKey as BlsPublicKey;
-use ed25519_dalek::Signature;
 use serde::{Deserialize, Serialize};
 use sn_consensus::Decision;
-use std::{collections::VecDeque, net::SocketAddr};
+use std::net::SocketAddr;
 
 /// Response to a request to join a section
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
-pub enum JoinRequest {
-    Initiate {
-        /// The public key of the section to join.
-        section_key: BlsPublicKey,
-    },
-    SubmitResourceProof {
-        /// The public key of the section to join.
-        section_key: BlsPublicKey,
-        /// The challenge solution
-        proof: Box<ResourceProof>,
-    },
+pub struct JoinRequest {
+    /// The public key of the section to join.
+    pub section_key: bls::PublicKey,
 }
 
-/// Joining peer's proof of resolvement of given resource proofing challenge.
-#[derive(Clone, Eq, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
-pub struct ResourceProof {
-    #[allow(missing_docs)]
-    pub solution: u64,
-    #[allow(missing_docs)]
-    #[debug(skip)]
-    pub data: VecDeque<u8>,
-    #[allow(missing_docs)]
-    #[debug(skip)]
-    pub nonce: [u8; 32],
-    #[allow(missing_docs)]
-    #[debug(with = "crate::types::Signature::fmt_ed25519")]
-    pub nonce_signature: Signature,
+impl JoinRequest {
+    pub fn section_key(&self) -> bls::PublicKey {
+        self.section_key
+    }
+
+    pub fn set_section_key(&mut self, section_key: bls::PublicKey) {
+        self.section_key = section_key;
+    }
 }
 
 /// Response to a request to join a section
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
 pub enum JoinResponse {
-    /// Challenge sent from existing elder nodes to the joining peer for resource proofing.
-    ResourceChallenge {
-        #[allow(missing_docs)]
-        data_size: usize,
-        /// how hard the challenge should be to solve
-        difficulty: u8,
-        #[allow(missing_docs)]
-        nonce: [u8; 32],
-        #[allow(missing_docs)]
-        nonce_signature: Signature,
-    },
     /// Up to date section information for a joining peer to retry its join request with
     Retry {
         /// The update to our NetworkKnowledge containing the current `SectionAuthorityProvider`

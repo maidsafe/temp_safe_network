@@ -84,19 +84,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - uses: dorny/paths-filter@v2
-        id: sn_changes
-        with:
-          filters: |
-            src:
-              - 'sn_api/src/**'
-              - 'sn_cli/src/**'
-              - 'sn_client/src/**'
-              - 'sn_interface/src/**'
-              - 'sn_node/src/**'
-
       - uses: actions-rs/toolchain@v1
-        if: steps.sn_changes.outputs.src == 'true'
         id: toolchain
         with:
           profile: minimal
@@ -109,15 +97,12 @@ jobs:
           cache-on-failure: true
 
       - name: Check formatting
-        if: steps.sn_changes.outputs.src == 'true'
         run: cargo fmt --all -- --check
 
       - shell: bash
-        if: steps.sn_changes.outputs.src == 'true'
         run: cargo clippy --all-targets --all-features -- -Dwarnings
 
       - name: Check documentation
-        if: steps.sn_changes.outputs.src == 'true'
         # Deny certain `rustdoc` lints that are unwanted.
         # See https://doc.rust-lang.org/rustdoc/lints.html for lints that are 'warning' by default.
         run: RUSTDOCFLAGS="--deny=warnings" cargo doc --no-deps

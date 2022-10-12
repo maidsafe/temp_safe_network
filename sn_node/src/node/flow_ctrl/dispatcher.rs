@@ -109,14 +109,15 @@ impl Dispatcher {
                 // cleanup
                 node.pending_data_queries.remove_expired();
 
+                trace!(
+                    "Adding to pending data queries for op id {:?}, target Adult: {:?}",
+                    operation_id,
+                    target_adult
+                );
                 if let Some(peers) = node
                     .pending_data_queries
                     .get_mut(&(operation_id, origin.name()))
                 {
-                    trace!(
-                        "Adding to pending data queries for op id: {:?}",
-                        operation_id
-                    );
                     let _ = peers.insert(origin);
                 } else {
                     let _prior_value = node.pending_data_queries.set(
@@ -124,7 +125,7 @@ impl Dispatcher {
                         BTreeSet::from([origin]),
                         None,
                     );
-                };
+                }
 
                 Ok(vec![])
             }

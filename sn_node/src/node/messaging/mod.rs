@@ -16,7 +16,6 @@ mod membership;
 mod node_msgs;
 mod proposal;
 mod relocation;
-mod resource_proof;
 mod signing;
 mod update_section;
 
