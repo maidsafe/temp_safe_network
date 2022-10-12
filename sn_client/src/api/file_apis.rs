@@ -752,7 +752,11 @@ mod tests {
     }
 
     fn compare(original: Bytes, result: Bytes) -> Result<()> {
-        assert_eq!(original.len(), result.len());
+        assert_eq!(
+            original.len(),
+            result.len(),
+            "origina bytes len matches result"
+        );
 
         for (counter, (a, b)) in original.into_iter().zip(result).enumerate() {
             if a != b {
