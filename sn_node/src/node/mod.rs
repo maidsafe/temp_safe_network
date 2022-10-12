@@ -36,10 +36,7 @@ use self::{
         RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
     },
     data::MIN_LEVEL_WHEN_FULL,
-    flow_ctrl::{
-        cmds::Cmd,
-        event::{CmdProcessEvent, Elders},
-    },
+    flow_ctrl::{cmds::Cmd, event::Elders},
     node_starter::CmdChannel,
     proposal::Proposal,
 };
