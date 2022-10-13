@@ -2,7 +2,7 @@ use super::*;
 use crate::messaging::system::{SectionSig, SectionSigned};
 use crate::network_knowledge::section_keys::build_spent_proof_share;
 use crate::network_knowledge::{Error, MyNodeInfo, MIN_ADULT_AGE};
-use eyre::{bail, eyre, Result};
+use eyre::{eyre, Result};
 use itertools::Itertools;
 use rand::RngCore;
 use serde::Serialize;
@@ -297,28 +297,25 @@ pub fn get_input_dbc_spend_info(
     Ok(first.clone())
 }
 
-pub fn assert_lists<I, J>(a: I, b: J) -> Result<()>
+pub fn assert_lists<I, J, K>(a: I, b: J)
 where
-    I: IntoIterator,
-    J: IntoIterator,
-    I::Item: fmt::Debug + PartialEq<J::Item> + Eq,
-    J::Item: fmt::Debug + PartialEq<I::Item> + Eq,
+    K: fmt::Debug + Eq,
+    I: IntoIterator<Item = K>,
+    J: IntoIterator<Item = K>,
 {
     let vec1: Vec<_> = a.into_iter().collect();
     let mut vec2: Vec<_> = b.into_iter().collect();
-    if vec1.len() != vec2.len() {
-        bail!(
-            "Lists lengths don't match: {} vs. {}",
-            vec1.len(),
-            vec2.len()
-        );
-    }
+
+    assert_eq!(vec1.len(), vec2.len());
+
     for item1 in &vec1 {
-        let idx2 = vec2.iter().position(|item2| *item2 == *item1);
-        vec2.remove(
-            idx2.ok_or_else(|| eyre!("An item that was expected to be in list two was not found"))?,
-        );
+        let idx2 = vec2
+            .iter()
+            .position(|item2| item1 == item2)
+            .expect("Item not found in second list");
+
+        vec2.swap_remove(idx2);
     }
+
     assert_eq!(vec2.len(), 0);
-    Ok(())
 }

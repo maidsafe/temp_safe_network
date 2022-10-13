@@ -798,16 +798,22 @@ pub(crate) mod tests {
         #[test]
         #[allow(clippy::unwrap_used)]
         fn proptest_section_tree_fields_should_stay_in_sync((main_dag, list_of_proof_chains) in arb_sections_dag_and_proof_chains(100, true)) {
-                let mut section_tree = SectionTree::new(*main_dag.genesis_key());
-                for (proof_chain, sap) in &list_of_proof_chains {
-                    let tree_update = SectionTreeUpdate::new(sap.clone(), proof_chain.clone());
-                    assert!(section_tree.update(tree_update)?);
-                    // The `sections` are supposed to hold the SAP of the `sections_dag`'s leaves. Verify it
-                    assert_lists(section_tree.sections.values().map(|sap|sap.section_key()), section_tree.sections_dag.leaf_keys()).unwrap();
-                }
-                assert_lists(section_tree.sections.values().map(|sap|sap.section_key()), section_tree.sections_dag.leaf_keys()).unwrap();
-                // Finally, verify that we got the main_dag back
-                prop_assert_eq!(main_dag, section_tree.sections_dag);
+            let mut section_tree = SectionTree::new(*main_dag.genesis_key());
+            for (proof_chain, sap) in &list_of_proof_chains {
+                let tree_update = SectionTreeUpdate::new(sap.clone(), proof_chain.clone());
+                assert!(section_tree.update(tree_update)?);
+                // The `sections` are supposed to hold the SAP of the `sections_dag`'s leaves. Verify it
+                assert_lists(
+                    section_tree.sections.values().map(|sap| sap.section_key()),
+                    section_tree.sections_dag.leaf_keys()
+                );
+            }
+            assert_lists(
+                section_tree.sections.values().map(|sap| sap.section_key()),
+                section_tree.sections_dag.leaf_keys()
+            );
+            // Finally, verify that we got the main_dag back
+            prop_assert_eq!(main_dag, section_tree.sections_dag);
         }
     }
 

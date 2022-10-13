@@ -121,7 +121,7 @@ impl<'de> Deserialize<'de> for SectionsDAG {
 
 impl Debug for SectionsDAG {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        let keys: Vec<_> = self.keys().cloned().collect();
+        let keys: Vec<_> = self.keys().collect();
         let key_positions: BTreeMap<&bls::PublicKey, usize> = keys
             .iter()
             .enumerate()
@@ -324,8 +324,8 @@ impl SectionsDAG {
     }
 
     /// Iterator over all the keys in the `SectionsDAG`
-    pub fn keys(&self) -> impl Iterator<Item = &bls::PublicKey> {
-        iter::once(&self.genesis_key).chain(self.dag.all_nodes().map(|node| &node.value.key))
+    pub fn keys(&self) -> impl Iterator<Item = bls::PublicKey> + '_ {
+        iter::once(self.genesis_key).chain(self.dag.all_nodes().map(|node| node.value.key))
     }
 
     /// Returns whether `key` is present in this `SectionsDAG`.
@@ -373,12 +373,11 @@ impl SectionsDAG {
     }
 
     /// Returns `true` if the `genesis_key` is present in the list of `trusted_keys`
-    pub fn check_trust<'a, I>(&self, trusted_keys: I) -> bool
+    pub fn check_trust<I>(&self, trusted_keys: I) -> bool
     where
-        I: IntoIterator<Item = &'a bls::PublicKey>,
+        I: IntoIterator<Item = bls::PublicKey>,
     {
-        let trusted_keys: BTreeSet<_> = trusted_keys.into_iter().collect();
-        trusted_keys.contains(&self.genesis_key)
+        trusted_keys.into_iter().any(|k| k == self.genesis_key)
     }
 
     /// Returns the parent of the provided key. None is returned if we're provided the `genesis_key`
@@ -521,7 +520,7 @@ pub(super) mod tests {
             expected_keys.push(info.key);
             last_sk = sk;
         }
-        assert_lists(dag.keys(), &expected_keys)?;
+        assert_lists(dag.keys(), expected_keys);
         Ok(())
     }
 
@@ -542,21 +541,18 @@ pub(super) mod tests {
         dag.insert(&info_a1.key, info_a2.key, info_a2.sig)?;
         dag.insert(&pk_gen, info_b.key, info_b.sig)?;
 
-        assert_lists(
-            dag.keys(),
-            &vec![pk_gen, info_a1.key, info_a2.key, info_b.key],
-        )?;
+        assert_lists(dag.keys(), [pk_gen, info_a1.key, info_a2.key, info_b.key]);
 
         // cannot get partial dag till genesis
         assert!(dag.partial_dag(&pk_gen, &pk_gen).is_err());
         assert_lists(
             dag.partial_dag(&pk_gen, &info_a2.key)?.keys(),
-            &vec![pk_gen, info_a1.key, info_a2.key],
-        )?;
+            [pk_gen, info_a1.key, info_a2.key],
+        );
         assert_lists(
             dag.partial_dag(&pk_gen, &info_b.key)?.keys(),
-            &vec![pk_gen, info_b.key],
-        )?;
+            [pk_gen, info_b.key],
+        );
 
         assert!(dag.partial_dag(&info_a2.key, &pk_gen).is_err());
         assert!(dag.partial_dag(&info_a1.key, &info_b.key).is_err());
@@ -588,7 +584,7 @@ pub(super) mod tests {
         let (partial_gen, last_key_gen) = dag.single_branch_dag_for_key(&pk_gen)?;
         assert!(partial_gen.self_verify());
         assert_eq!(last_key_gen, pk_gen);
-        assert_lists(partial_gen.keys(), &vec![pk_gen])?;
+        assert_lists(partial_gen.keys(), [pk_gen]);
 
         // let's insert only a1 into the DAG for now
         dag.insert(&pk_gen, info_a1.key, info_a1.sig)?;
@@ -600,8 +596,8 @@ pub(super) mod tests {
         assert!(partial_a1.self_verify());
         assert_eq!(last_key_gen, info_a1.key);
         assert_eq!(last_key_a1, info_a1.key);
-        assert_lists(partial_gen.keys(), &vec![pk_gen, info_a1.key])?;
-        assert_lists(partial_a1.keys(), partial_gen.keys())?;
+        assert_lists(partial_gen.keys(), [pk_gen, info_a1.key]);
+        assert_lists(partial_a1.keys(), partial_gen.keys());
 
         // let's now insert a2 into the DAG
         dag.insert(&info_a1.key, info_a2.key, info_a2.sig)?;
@@ -616,9 +612,9 @@ pub(super) mod tests {
         assert_eq!(last_key_gen, info_a2.key);
         assert_eq!(last_key_a1, info_a2.key);
         assert_eq!(last_key_a2, info_a2.key);
-        assert_lists(partial_gen.keys(), &vec![pk_gen, info_a1.key, info_a2.key])?;
-        assert_lists(partial_a1.keys(), partial_gen.keys())?;
-        assert_lists(partial_a2.keys(), partial_gen.keys())?;
+        assert_lists(partial_gen.keys(), [pk_gen, info_a1.key, info_a2.key]);
+        assert_lists(partial_a1.keys(), partial_gen.keys());
+        assert_lists(partial_a2.keys(), partial_gen.keys());
 
         // let's now insert the other two branches (b and c) into the DAG
         dag.insert(&pk_gen, info_b1.key, info_b1.sig)?;
@@ -628,7 +624,7 @@ pub(super) mod tests {
         assert!(dag.self_verify());
         assert_lists(
             dag.keys(),
-            &vec![
+            [
                 pk_gen,
                 info_a1.key,
                 info_a2.key,
@@ -637,7 +633,7 @@ pub(super) mod tests {
                 info_b3.key,
                 info_c.key,
             ],
-        )?;
+        );
 
         let (partial_gen, last_key_gen) = dag.single_branch_dag_for_key(&pk_gen)?;
         let (partial_a1, last_key_a1) = dag.single_branch_dag_for_key(&info_a1.key)?;
@@ -676,45 +672,53 @@ pub(super) mod tests {
         );
 
         // branch from a1 or a2 is a partial DAG with [genesis key, a1, a2]
-        assert_lists(partial_a1.keys(), &vec![pk_gen, info_a1.key, info_a2.key])?;
-        assert_lists(partial_a1.keys(), partial_a2.keys())?;
+        assert_lists(partial_a1.keys(), [pk_gen, info_a1.key, info_a2.key]);
+        assert_lists(partial_a1.keys(), partial_a2.keys());
 
         // branch from b3 is a partial DAG with [genesis key, b1, b2, b3]
         assert_lists(
             partial_b3.keys(),
-            &vec![pk_gen, info_b1.key, info_b2.key, info_b3.key],
-        )?;
+            [pk_gen, info_b1.key, info_b2.key, info_b3.key],
+        );
 
         // branch from c is a partial DAG with [genesis key, b1, b2, c]
         assert_lists(
             partial_c.keys(),
-            &vec![pk_gen, info_b1.key, info_b2.key, info_c.key],
-        )?;
+            [pk_gen, info_b1.key, info_b2.key, info_c.key],
+        );
 
         // branch from b1 is a partial DAG with either:
         // - [genesis key, b1, b2, b3]
         // - or [genesis key, b1, b2, c]
-        assert!(
-            assert_lists(partial_b1.keys(), partial_b3.keys()).is_ok()
-                ^ assert_lists(partial_b1.keys(), partial_c.keys()).is_ok()
+        assert_eq!(
+            [&partial_b3, &partial_c]
+                .into_iter()
+                .filter(|b| b == &&partial_b1)
+                .count(),
+            1
         );
 
         // branch from b2 is a partial DAG with either:
         // - [genesis key, b1, b2, b3]
         // - or [genesis key, b1, b2, c]
-        assert!(
-            assert_lists(partial_b2.keys(), partial_b3.keys()).is_ok()
-                ^ assert_lists(partial_b2.keys(), partial_c.keys()).is_ok()
+        assert_eq!(
+            [&partial_b3, &partial_c]
+                .into_iter()
+                .filter(|b| b == &&partial_b2)
+                .count(),
+            1
         );
 
         // branch from genesis key is a partial DAG with either:
         // - [genesis key, a1, a2]
         // - or [genesis key, b1, b2, b3]
         // - or [genesis key, b1, b2, c]
-        assert!(
-            assert_lists(partial_gen.keys(), partial_a2.keys()).is_ok()
-                ^ assert_lists(partial_gen.keys(), partial_b3.keys()).is_ok()
-                ^ assert_lists(partial_gen.keys(), partial_c.keys()).is_ok()
+        assert_eq!(
+            [partial_a2, partial_b3, partial_c]
+                .into_iter()
+                .filter(|b| b == &partial_gen)
+                .count(),
+            1
         );
 
         // trying to get branch from a random/non-existing key returns `KeyNotFound` error
@@ -735,7 +739,7 @@ pub(super) mod tests {
         let mut dag = SectionsDAG::new(pk_gen);
         assert!(dag.insert(&pk_gen, info_a.key, info_a.sig.clone()).is_ok());
         assert!(dag.insert(&pk_gen, info_a.key, info_a.sig).is_ok());
-        assert_lists(dag.keys(), &vec![info_a.key, pk_gen])?;
+        assert_lists(dag.keys(), [info_a.key, pk_gen]);
 
         Ok(())
     }
@@ -761,11 +765,11 @@ pub(super) mod tests {
         assert!(dag
             .insert(&info_a1.key, info_a2.key, info_a2.sig.clone())
             .is_err());
-        assert_lists(dag.keys(), &vec![pk_gen])?;
+        assert_lists(dag.keys(), [pk_gen]);
 
         dag.insert(&pk_gen, info_a1.key, info_a1.sig)?;
         dag.insert(&info_a1.key, info_a2.key, info_a2.sig)?;
-        assert_lists(dag.keys(), &vec![pk_gen, info_a1.key, info_a2.key])?;
+        assert_lists(dag.keys(), [pk_gen, info_a1.key, info_a2.key]);
 
         Ok(())
     }
@@ -824,7 +828,7 @@ pub(super) mod tests {
         // out: Error
         let partial_dag = main_dag.partial_dag(&info_a2.key, &info_a3.key)?;
         assert!(dag_01_err.merge(partial_dag).is_err());
-        assert_lists(dag_01_err.keys(), &vec![pk_gen, info_a1.key])?;
+        assert_lists(dag_01_err.keys(), [pk_gen, info_a1.key]);
 
         Ok(())
     }
@@ -976,8 +980,8 @@ pub(super) mod tests {
         dag.insert(&pk_gen, info_b1.key, info_b1.sig)?;
         dag.insert(&info_b1.key, info_b2.key, info_b2.sig)?;
 
-        assert_lists(dag.get_child_keys(&pk_gen)?, vec![info_a.key, info_b1.key])?;
-        assert_lists(dag.get_child_keys(&info_b1.key)?, vec![info_b2.key])?;
+        assert_lists(dag.get_child_keys(&pk_gen)?, [info_a.key, info_b1.key]);
+        assert_lists(dag.get_child_keys(&info_b1.key)?, [info_b2.key]);
         assert!(dag.get_child_keys(&info_a.key)?.is_empty());
         Ok(())
     }
@@ -994,7 +998,7 @@ pub(super) mod tests {
         sections_dag.insert(&pk_gen, info_b1.key, info_b1.sig)?;
         sections_dag.insert(&info_b1.key, info_b2.key, info_b2.sig)?;
 
-        assert_lists(sections_dag.leaf_keys(), vec![info_a.key, info_b2.key])?;
+        assert_lists(sections_dag.leaf_keys(), [info_a.key, info_b2.key]);
         Ok(())
     }
 
@@ -1013,12 +1017,11 @@ pub(super) mod tests {
 
         assert_lists(
             dag.get_ancestors(&info_a3.key)?,
-            vec![pk_gen, info_a1.key, info_a2.key],
-        )?;
-        assert_lists(dag.get_ancestors(&info_a2.key)?, vec![pk_gen, info_a1.key])?;
-        assert_lists(dag.get_ancestors(&info_a1.key)?, vec![pk_gen])?;
-        let empty: Vec<bls::PublicKey> = Vec::new();
-        assert_lists(dag.get_ancestors(&pk_gen)?, empty)?;
+            [pk_gen, info_a1.key, info_a2.key],
+        );
+        assert_lists(dag.get_ancestors(&info_a2.key)?, [pk_gen, info_a1.key]);
+        assert_lists(dag.get_ancestors(&info_a1.key)?, [pk_gen]);
+        assert_lists(dag.get_ancestors(&pk_gen)?, []);
 
         Ok(())
     }
@@ -1158,9 +1161,7 @@ pub(super) mod tests {
                     leaves.swap_remove(index);
                 }
                 // update the inserted list
-                partial_dag.keys().for_each(|key| {
-                    inserted_keys.insert(*key);
-                });
+                inserted_keys.extend(partial_dag.keys());
 
                 let last_key_sap = map.get(&rand_to).unwrap();
                 list_of_part_dags.push((partial_dag, last_key_sap.clone()));

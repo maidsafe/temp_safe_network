@@ -170,7 +170,7 @@ mod tests {
                 .iter()
                 .map(|item| item.value().clone()),
             nodes_1.clone(),
-        )?;
+        );
 
         // adding node set 2 as MembershipState::Relocated
         let sk_2 = SecretKeySet::random(None).secret_key().clone();
@@ -197,8 +197,8 @@ mod tests {
                 .archive
                 .iter()
                 .map(|item| item.value().clone()),
-            nodes_1.iter().cloned().chain(nodes_2.clone()),
-        )?;
+            nodes_1.iter().chain(&nodes_2).cloned(),
+        );
 
         // adding node set 3
         let sk_3 = SecretKeySet::random(None).secret_key().clone();
@@ -215,12 +215,8 @@ mod tests {
                 .archive
                 .iter()
                 .map(|item| item.value().clone()),
-            nodes_1
-                .iter()
-                .cloned()
-                .chain(nodes_2.clone())
-                .chain(nodes_3.clone()),
-        )?;
+            nodes_1.iter().chain(&nodes_2).chain(&nodes_3).cloned(),
+        );
 
         // adding node set 4
         let sk_4 = SecretKeySet::random(None).secret_key().clone();
@@ -237,12 +233,8 @@ mod tests {
                 .archive
                 .iter()
                 .map(|item| item.value().clone()),
-            nodes_2
-                .iter()
-                .cloned()
-                .chain(nodes_3.clone())
-                .chain(nodes_4),
-        )?;
+            nodes_2.iter().chain(&nodes_3).chain(&nodes_4).cloned(),
+        );
 
         // adding node set 5 as a branch to 3
         // 1 -> 2 -> 3 -> 4
@@ -262,8 +254,8 @@ mod tests {
                 .archive
                 .iter()
                 .map(|item| item.value().clone()),
-            nodes_2.iter().cloned().chain(nodes_3).chain(nodes_5),
-        )?;
+            nodes_2.iter().chain(&nodes_3).chain(&nodes_5).cloned(),
+        );
 
         Ok(())
     }
@@ -300,7 +292,7 @@ mod tests {
                 .iter()
                 .map(|item| item.value().clone()),
             [node_left, node_relocated],
-        )?;
+        );
         assert!(section_peers.members().is_empty());
         Ok(())
     }
@@ -339,7 +331,7 @@ mod tests {
                 .iter()
                 .map(|item| item.value().clone()),
             [node_1, node_2],
-        )?;
+        );
         Ok(())
     }
 
