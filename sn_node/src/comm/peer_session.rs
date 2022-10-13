@@ -185,18 +185,31 @@ impl PeerSessionWorker {
             return Ok(SessionStatus::Ok);
         }
 
-        // we can't spawn this atm as it edits/updates the link
-        // if we can separate out those parts, we could hopefully get this all properly
-        // spawnable.
-        // But right now we have to wait to ensure the link has connection
-        // before spawning the send
-
-        // TODO: this link makes sense?
-        let conn = self
+        // Attempt to get a connection or make one to another node.
+        // if there's no connection here yet, we requeue the job after a wait
+        // incase there's been a delay adding the connection to Comms
+        let conn = match self
             .link
             .get_or_connect(should_establish_new_connection)
             .await
-            .map_err(|_| Error::NoConnectionsForPeer)?;
+        {
+            Ok(conn) => conn,
+            Err(error) => {
+                error!("Error when attempting to send to peer. Job will be reenqueued for another attempt after a small timeout");
+
+                job.connection_retries += 1;
+                job.reporter
+                    .send(SendStatus::TransientError(format!("{error:?}")));
+
+                // we await here in case the connection is fresh and has not yet been added
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                if let Err(e) = self.queue.send(SessionCmd::Send(job)).await {
+                    warn!("Failed to re-enqueue job {id:?} after failed connection retrieval error {e:?}");
+                }
+
+                return Ok(SessionStatus::Ok);
+            }
+        };
 
         debug!("Connection exists for sendjob: {id:?}");
         let queue = self.queue.clone();

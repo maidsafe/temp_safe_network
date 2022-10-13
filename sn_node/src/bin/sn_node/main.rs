@@ -77,17 +77,17 @@ async fn create_runtime_and_node(config: &Config) -> Result<()> {
 
     // local
     //     .run_until(async move {
-            // loops ready to catch any ChurnJoinMiss
-            match run_node(config).await {
-                Ok(_) => {
-                    info!("Node has finished running, no runtime errors were reported");
-                }
-                Err(error) => {
-                    warn!("Node instance finished with an error: {error:?}");
-                }
-            };
-        // })
-        // .await;
+    // loops ready to catch any ChurnJoinMiss
+    match run_node(config).await {
+        Ok(_) => {
+            info!("Node has finished running, no runtime errors were reported");
+        }
+        Err(error) => {
+            warn!("Node instance finished with an error: {error:?}");
+        }
+    };
+    // })
+    // .await;
 
     Ok(())
 }

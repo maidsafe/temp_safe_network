@@ -650,17 +650,28 @@ mod tests {
     async fn ae_checks_register_test() -> Result<()> {
         init_logger();
         let _outer_span = tracing::info_span!("ae_checks_register_test").entered();
-        let client = create_test_client().await.context("test client creation failed")?;
+        let client = create_test_client()
+            .await
+            .context("test client creation failed")?;
 
         let name = xor_name::rand::random();
         let tag = 15000;
         let owner = User::Key(client.public_key());
 
         // store a Register
-        let (address, batch) = client.create_register(name, tag, policy(owner)).await.context("Creating register failed")?;
-        client.publish_register_ops(batch).await.context("publishing reg failed")?;
+        let (address, batch) = client
+            .create_register(name, tag, policy(owner))
+            .await
+            .context("Creating register failed")?;
+        client
+            .publish_register_ops(batch)
+            .await
+            .context("publishing reg failed")?;
 
-        let _register = client.get_register(address).await.context("get reg failed after publish")?;
+        let _register = client
+            .get_register(address)
+            .await
+            .context("get reg failed after publish")?;
 
         Ok(())
     }

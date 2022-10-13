@@ -133,25 +133,35 @@ impl Comm {
         let _handle = tokio::spawn(async move {
             match watcher {
                 Ok(Some(watcher)) => {
-                    let send_was_successful = match Self::is_sent(watcher, msg_id, peer).await {
-                        Ok(result) => result,
-                        Err(error) => match error {
-                            Error::NoConnectionsForPeer => {
-                                // remove the peer link
-                                let perhaps_session = sessions.remove(&peer);
-                                if let Some((_peer, session)) = perhaps_session {
-                                    session.disconnect().await;
-                                }
-                                return Err(Error::NoConnectionsForPeer);
+                    let (send_was_successful, should_remove) =
+                        match Self::is_sent(watcher, msg_id, peer).await {
+                            Ok(result) => result,
+                            Err(error) => {
+                                // match error {
+                                // Error::NoConnectionsForPeer => {
+                                //     // remove the peer link
+                                //     let perhaps_session = sessions.remove(&peer);
+                                //     if let Some((_peer, session)) = perhaps_session {
+                                //         session.disconnect().await;
+                                //     }
+                                //     return Err(Error::NoConnectionsForPeer);
+                                // }
+                                return Err(error);
+                                // }
                             }
-                            _ => return Err(error),
-                        },
-                    };
+                        };
 
                     if send_was_successful {
                         trace!("Msg {msg_id:?} sent to {peer:?}");
                         Ok(())
                     } else {
+                        if should_remove {
+                            // do cleanup of that peer
+                            let perhaps_session = sessions.remove(&peer);
+                            if let Some((_peer, session)) = perhaps_session {
+                                session.disconnect().await;
+                            }
+                        }
                         Err(Error::FailedSend(peer))
                     }
                 }
@@ -185,13 +195,15 @@ impl Comm {
         Ok(())
     }
 
-    async fn is_sent(mut watcher: SendWatcher, msg_id: MsgId, peer: Peer) -> Result<bool> {
+    /// Returns (sent success, should remove)
+    /// Should remove occurs if max retries reached
+    async fn is_sent(mut watcher: SendWatcher, msg_id: MsgId, peer: Peer) -> Result<(bool, bool)> {
         // here we can monitor the sending
         // and we now watch the status of the send
         loop {
             match &mut watcher.await_change().await {
                 SendStatus::Sent => {
-                    return Ok(true);
+                    return Ok((true, false));
                 }
                 SendStatus::Enqueued => {
                     // this block should be unreachable, as Enqueued is the initial state
@@ -208,7 +220,7 @@ impl Comm {
                         peer.addr(),
                         peer.name(),
                     );
-                    return Ok(false);
+                    return Ok((false, false));
                 }
                 SendStatus::TransientError(error) => {
                     // An individual connection could have been lost when we tried to send. This
@@ -228,7 +240,7 @@ impl Comm {
                         peer.addr(),
                         peer.name(),
                     );
-                    return Ok(false);
+                    return Ok((false, true));
                 }
             }
         }
@@ -249,7 +261,10 @@ impl Comm {
     /// Any number of incoming qp2p:Connections can be added.
     /// We will eventually converge to the same one in our comms with the peer.
     async fn add_incoming(&self, peer: &Peer, conn: qp2p::Connection) {
-        debug!("Adding incoming conn to {peer:?} w/ conn_id : {:?}", conn.id());
+        debug!(
+            "Adding incoming conn to {peer:?} w/ conn_id : {:?}",
+            conn.id()
+        );
         if let Some(entry) = self.sessions.get(peer) {
             // peer already exists
             let peer_session = entry.value();

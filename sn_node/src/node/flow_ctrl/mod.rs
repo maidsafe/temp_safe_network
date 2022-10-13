@@ -65,9 +65,10 @@ impl FlowCtrl {
             timestamps: PeriodicChecksTimestamps::now(),
         };
 
-        let _ = tokio::task::spawn(async move {
-            flow_ctrl.process_messages_and_periodic_checks().await
-        });
+        let _ =
+            tokio::task::spawn(
+                async move { flow_ctrl.process_messages_and_periodic_checks().await },
+            );
 
         let cmd_channel = cmd_sender_channel.clone();
         let cmd_channel_for_msgs = cmd_sender_channel.clone();
