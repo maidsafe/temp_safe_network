@@ -249,6 +249,7 @@ impl Comm {
     /// Any number of incoming qp2p:Connections can be added.
     /// We will eventually converge to the same one in our comms with the peer.
     async fn add_incoming(&self, peer: &Peer, conn: qp2p::Connection) {
+        debug!("Adding incoming conn to {peer:?} w/ conn_id : {:?}", conn.id());
         if let Some(entry) = self.sessions.get(peer) {
             // peer already exists
             let peer_session = entry.value();
