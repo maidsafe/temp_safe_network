@@ -124,10 +124,11 @@ impl Comm {
         peer: Peer,
         msg_id: MsgId,
         bytes: UsrMsgBytes,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
         is_msg_for_client: bool,
     ) -> Result<()> {
         let watcher = self
-            .send_to_one(peer, msg_id, bytes, is_msg_for_client)
+            .send_to_one(peer, msg_id, bytes, send_stream, is_msg_for_client)
             .await;
 
         let sessions = self.sessions.clone();
@@ -293,6 +294,7 @@ impl Comm {
         recipient: Peer,
         msg_id: MsgId,
         bytes: UsrMsgBytes,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
         is_msg_for_client: bool,
     ) -> Result<Option<SendWatcher>> {
         let bytes_len = {
@@ -310,7 +312,7 @@ impl Comm {
         if let Some(peer) = self.get_or_create(&recipient).await {
             debug!("Peer session retrieved");
             Ok(Some(
-                peer.send_using_session(msg_id, bytes, is_msg_for_client)
+                peer.send_using_session(msg_id, bytes, send_stream, is_msg_for_client)
                     .await?,
             ))
         } else {
@@ -431,10 +433,22 @@ mod tests {
                 let peer0_msg = new_test_msg(dst(peer0))?;
                 let peer1_msg = new_test_msg(dst(peer1))?;
 
-                comm.send_out_bytes(peer0, peer0_msg.msg_id(), peer0_msg.serialize()?, false)
-                    .await?;
-                comm.send_out_bytes(peer1, peer1_msg.msg_id(), peer1_msg.serialize()?, false)
-                    .await?;
+                comm.send_out_bytes(
+                    peer0,
+                    peer0_msg.msg_id(),
+                    peer0_msg.serialize()?,
+                    None,
+                    false,
+                )
+                .await?;
+                comm.send_out_bytes(
+                    peer1,
+                    peer1_msg.msg_id(),
+                    peer1_msg.serialize()?,
+                    None,
+                    false,
+                )
+                .await?;
 
                 if let Some(bytes) = rx0.recv().await {
                     assert_eq!(WireMsg::from(bytes)?, peer0_msg);
@@ -472,7 +486,7 @@ mod tests {
                 let invalid_peer = get_invalid_peer().await?;
                 let invalid_addr = invalid_peer.addr();
                 let msg = new_test_msg(dst(invalid_peer))?;
-                let result = comm.send_out_bytes(invalid_peer, msg.msg_id(), msg.serialize()?, false).await;
+                let result = comm.send_out_bytes(invalid_peer, msg.msg_id(), msg.serialize()?, None, false).await;
 
                 assert_matches!(result, Err(Error::FailedSend(peer)) => assert_eq!(peer.addr(), invalid_addr));
 
@@ -500,7 +514,7 @@ mod tests {
                 let msg0 = new_test_msg(dst(peer))?;
 
                 send_comm
-                    .send_out_bytes(peer, msg0.msg_id(), msg0.serialize()?, false)
+                    .send_out_bytes(peer, msg0.msg_id(), msg0.serialize()?, None, false)
                     .await?;
 
                 let mut msg0_received = false;
@@ -519,7 +533,7 @@ mod tests {
 
                 let msg1 = new_test_msg(dst(peer))?;
                 send_comm
-                    .send_out_bytes(peer, msg1.msg_id(), msg1.serialize()?, false)
+                    .send_out_bytes(peer, msg1.msg_id(), msg1.serialize()?, None, false)
                     .await?;
 
                 let mut msg1_received = false;
@@ -556,7 +570,7 @@ mod tests {
                 let msg = new_test_msg(dst(peer))?;
                 // Send a message to establish the connection
                 comm1
-                    .send_out_bytes(peer, msg.msg_id(), msg.serialize()?, false)
+                    .send_out_bytes(peer, msg.msg_id(), msg.serialize()?, None, false)
                     .await?;
 
                 assert_matches!(rx0.recv().await, Some(MsgEvent::Received { .. }));

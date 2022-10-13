@@ -80,6 +80,7 @@ mod core {
         },
         UsedSpace,
     };
+    use qp2p::SendStream;
     use sn_dysfunction::{DysfunctionDetection, IssueType};
     #[cfg(feature = "traceroute")]
     use sn_interface::messaging::Entity;
@@ -109,6 +110,7 @@ mod core {
         sync::Arc,
         time::Duration,
     };
+    use tokio::sync::Mutex;
     use uluru::LRUCache;
 
     /// Amount of tokens to be owned by the Genesis DBC.
@@ -184,7 +186,8 @@ mod core {
         pub(crate) capacity: Capacity,
         pub(crate) dysfunction_tracking: DysfunctionDetection,
         /// Cache the request combo,  (OperationId -> An adult xorname), to waiting Clients peers for that combo
-        pub(crate) pending_data_queries: Cache<(OperationId, XorName), BTreeSet<(MsgId, Peer)>>,
+        pub(crate) pending_data_queries:
+            Cache<(OperationId, XorName), BTreeMap<(MsgId, Peer), Option<Arc<Mutex<SendStream>>>>>,
         // Caches
         pub(crate) ae_backoff_cache: AeBackoffCache,
     }

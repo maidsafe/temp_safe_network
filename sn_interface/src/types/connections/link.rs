@@ -145,15 +145,13 @@ impl Link {
             .await
             .map_err(SendToOneError::Connection)?;
 
-        let (mut send_stream, recv_stream) = conn
-            .open_bi()
-            .await
-            .map_err(SendToOneError::Connection)?;
+        let (mut send_stream, recv_stream) =
+            conn.open_bi().await.map_err(SendToOneError::Connection)?;
         send_stream.set_priority(10);
         send_stream
             .send_user_msg(bytes)
             .await
-            .map_err( SendToOneError::Send)?;
+            .map_err(SendToOneError::Send)?;
 
         send_stream.finish().await.or_else(|err| match err {
             qp2p::SendError::StreamLost(qp2p::StreamError::Stopped(_)) => Ok(()),
