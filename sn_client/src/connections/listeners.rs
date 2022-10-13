@@ -198,12 +198,14 @@ impl Session {
         error: Option<ErrorMsg>,
     ) {
         if error.is_some() {
-            debug!("CmdError was received for {correlation_id:?}: {:?}", error);
+            debug!(
+                "CmdError was received for correlation_id {correlation_id:?}: {:?}",
+                error
+            );
         }
 
         if let Some(mut received_acks) = cmds.get_mut(&correlation_id) {
             let acks = received_acks.value_mut();
-
             let _prior = acks.insert((src, error));
         } else {
             let received = DashSet::new();
@@ -246,17 +248,16 @@ impl Session {
                     // ConnectionManager::send_query
 
                     if let Some(entry) = queries.get_mut(&correlation_id) {
-                        debug!("correlation_id: {correlation_id:?} exists in pending queries...");
+                        debug!("$$$$$$ correlation_id: {correlation_id:?} exists in pending queries...");
                         let received = entry.value();
 
                         debug!("inserting response : {response:?}");
                         // we can acutally have many responses per peer if they're different
                         // this could be a fail, and then an Ok aftewards from a different adult.
                         let _prior = received.insert((src_peer.addr(), response));
-
                         debug!("received now looks like: {:?}", received);
                     } else {
-                        debug!("correlation_id: {correlation_id:?} does not exist in pending queries...");
+                        debug!("$$$$$$++ correlation_id: {correlation_id:?} does not exist in pending queries...");
                         let received = DashSet::new();
                         let _prior = received.insert((src_peer.addr(), response));
                         let _prev = queries.insert(correlation_id, Arc::new(received));

@@ -153,6 +153,43 @@ impl Client {
     /// This function is a helper private to this module.
     #[instrument(skip_all, level = "debug", name = "client-api send cmd")]
     pub(crate) async fn send_cmd(&self, cmd: DataCmd) -> Result<(), Error> {
+        /****** TODO: re-enable sendign with retrials ********
         self.send_cmd_with_retry(cmd, true).await
+        *****************************************************/
+
+        let client_pk = self.public_key();
+        let dst_name = cmd.dst_name();
+
+        let debug_cmd = format!("{:?}", cmd);
+
+        let serialised_cmd = {
+            let msg = ClientMsg::Cmd(cmd);
+            WireMsg::serialize_msg_payload(&msg)?
+        };
+        let signature = self.sign(&serialised_cmd);
+
+        let msg_id = MsgId::new();
+
+        let force_new_link = false;
+        debug!("Attempting {:?}, forcing new: {force_new_link}", debug_cmd);
+
+        let res = self
+            .send_signed_cmd(
+                dst_name,
+                client_pk,
+                msg_id,
+                serialised_cmd.clone(),
+                signature.clone(),
+                force_new_link,
+            )
+            .await;
+
+        if res.is_ok() {
+            debug!("{debug_cmd} sent okay: {:?}", res);
+        } else {
+            trace!("Failed response on {debug_cmd} cmd: {:?}", res);
+        }
+
+        res
     }
 }

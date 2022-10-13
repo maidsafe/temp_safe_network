@@ -36,6 +36,8 @@ use tokio::task::JoinHandle;
 use tracing::{debug, error, trace, warn};
 use xor_name::XorName;
 
+const TIME_TO_WAIT_BEFORE_CHECK_REPONSES: u64 = 10_000;
+
 // Number of Elders subset to send queries to
 pub(crate) const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
 
@@ -85,12 +87,15 @@ impl Session {
         wire_msg.append_trace(&mut Traceroute(vec![Entity::Client(client_pk)]));
 
         // Initial check incase we already have enough acks, we can end here
+        /*
+        NOTO: re-enable check, since no retries then no earlier ACKs
         if self
             .we_have_sufficient_acks_for_msg_id(msg_id, elders.clone())
             .await?
         {
             return Ok(());
         }
+        */
 
         // Don't immediately fail if sending to one elder fails. This could prevent further sends
         // and further responses coming in...
@@ -108,27 +113,61 @@ impl Session {
         // This could be further strict to wait for ALL the Acks get received.
         // The period is expected to have AE completed, hence no extra wait is required.
 
-        let mut ack_checks = 0;
-        let max_ack_checks = 10;
-        let interval = Duration::from_millis(50);
+        /*      TODO: re-enable retry loop
 
-        loop {
-            if self
+                let mut ack_checks = 0;
+                let max_ack_checks = 10;
+                let interval = Duration::from_millis(50);
+
+                loop {
+                    ack_checks += 1;
+                    if self
+                        .we_have_sufficient_acks_for_msg_id(msg_id, elders.clone())
+                        .await?
+                    {
+                        return Ok(());
+                    }
+
+                    if ack_checks >= max_ack_checks {
+                        debug!("No enough ACKs received for {:?}", msg_id);
+                        return Err(Error::InsufficientAcksReceived(msg_id));
+                    }
+
+                    trace!("{:?} current ack waiting loop count {}", msg_id, ack_checks,);
+                    tokio::time::sleep(interval).await;
+                }
+        */
+
+        tokio::time::sleep(Duration::from_millis(TIME_TO_WAIT_BEFORE_CHECK_REPONSES)).await;
+
+        let result = self
+            .we_have_sufficient_acks_for_msg_id(msg_id, elders.clone())
+            .await;
+
+        if let Err(ref err) = result {
+            error!(
+                "FIRST ATTEMPT TO GET ACKS for {:?} FAILED, RETRYING ONCE MORE: {:?}",
+                msg_id, err
+            );
+            tokio::time::sleep(Duration::from_millis(
+                2 * TIME_TO_WAIT_BEFORE_CHECK_REPONSES,
+            ))
+            .await;
+
+            let second_result = self
                 .we_have_sufficient_acks_for_msg_id(msg_id, elders.clone())
-                .await?
-            {
-                return Ok(());
+                .await;
+            if let Err(err) = second_result {
+                error!(
+                    "SECOND ATTEMPT TO GET ACKS for {:?} FAILED WITH: {:?}",
+                    msg_id, err
+                );
+            } else {
+                info!("SECOND ATTEMPT TO GET ACKS for {:?} SUCCEEDED!!!", msg_id);
             }
-
-            if ack_checks >= max_ack_checks {
-                return Err(Error::InsufficientAcksReceived(msg_id));
-            }
-
-            ack_checks += 1;
-
-            trace!("{:?} current ack waiting loop count {}", msg_id, ack_checks,);
-            tokio::time::sleep(interval).await;
         }
+
+        result
     }
 
     /// Checks self.pending_cmds for acks for a given msg id.
@@ -137,11 +176,10 @@ impl Session {
         &self,
         msg_id: MsgId,
         elders: Vec<Peer>,
-    ) -> Result<bool> {
-        let mut received_responses_from = BTreeSet::default();
+    ) -> Result<()> {
         let expected_acks = elders.len();
-
         if let Some(acks_we_have) = self.pending_cmds.get(&msg_id) {
+            let mut received_responses_from = BTreeSet::default();
             let acks = acks_we_have.value();
 
             let received_response_count = acks.len();
@@ -186,7 +224,7 @@ impl Session {
             if actual_ack_count >= expected_acks {
                 trace!("Good! We've at or above {expected_acks} expected_acks");
 
-                return Ok(true);
+                return Ok(());
             }
 
             let missing_responses: Vec<Peer> = elders
@@ -197,9 +235,19 @@ impl Session {
 
             warn!("Missing Responses from: {:?}", missing_responses);
 
-            debug!("insufficient acks returned so far: {actual_ack_count}/{expected_acks}");
+            debug!("Insufficient acks returned so far: {actual_ack_count}/{expected_acks}");
+            Err(Error::InsufficientAcksReceived {
+                msg_id,
+                expected: expected_acks,
+                received: actual_ack_count,
+            })
+        } else {
+            Err(Error::InsufficientAcksReceived {
+                msg_id,
+                expected: expected_acks,
+                received: 0,
+            })
         }
-        Ok(false)
     }
 
     #[instrument(
@@ -258,7 +306,6 @@ impl Session {
         #[cfg(feature = "traceroute")]
         wire_msg.append_trace(&mut Traceroute(vec![Entity::Client(client_pk)]));
 
-        debug!("pre send");
         // Here we dont want to check before we resend... in case we're looking for an update
         //
         //
@@ -270,7 +317,6 @@ impl Session {
         if send_response.is_err() {
             trace!("Error when sending query msg out: {send_response:?}");
         }
-        debug!("post send");
 
         // TODO:
         // We are now simply accepting the very first valid response we receive,
@@ -283,26 +329,62 @@ impl Session {
         // from byzantine nodes, however for mutable data (non-Chunk responses) we will
         // have to review the approach.
 
-        let mut response_checks = 0;
+        /*      TODO: re-enable retrying loop
+                let mut response_checks = 0;
 
-        loop {
-            debug!("looping send responses, attempt: #{response_checks} for {msg_id:?}");
-            if let Some(response) = self
+                loop {
+                    response_checks += 1;
+                    debug!("looping send responses, attempt: #{response_checks} for {msg_id:?}");
+                    if let Some(response) = self
+                        .check_query_responses(msg_id, elders.clone(), chunk_addr)
+                        .await?
+                    {
+                        debug!("returning okkkkkkkkkkkkk");
+                        return Ok(response);
+                    }
+
+                    if response_checks >= 2 {
+                        return Err(Error::NoResponse(elders));
+                    }
+
+                    //stop mad looping
+                    tokio::time::sleep(Duration::from_millis(10000)).await;
+                }
+        */
+
+        tokio::time::sleep(Duration::from_millis(TIME_TO_WAIT_BEFORE_CHECK_REPONSES)).await;
+
+        let result = self
+            .check_query_responses(msg_id, elders.clone(), chunk_addr)
+            .await;
+
+        if let Err(ref err) = result {
+            error!(
+                "FIRST ATTEMPT TO GET QUERY RESP for {:?} FAILED, RETRYING ONCE MORE: {:?}",
+                msg_id, err
+            );
+            tokio::time::sleep(Duration::from_millis(
+                2 * TIME_TO_WAIT_BEFORE_CHECK_REPONSES,
+            ))
+            .await;
+
+            let second_result = self
                 .check_query_responses(msg_id, elders.clone(), chunk_addr)
-                .await?
-            {
-                debug!("returning okkkkkkkkkkkkk");
-                return Ok(response);
+                .await;
+            if let Err(err) = second_result {
+                error!(
+                    "SECOND ATTEMPT TO GET QUERY RESP for {:?} FAILED WITH: {:?}",
+                    msg_id, err
+                );
+            } else {
+                info!(
+                    "SECOND ATTEMPT TO GET QUERY RESP for {:?} SUCCEEDED!!!",
+                    msg_id
+                );
             }
-
-            //stop mad looping
-            tokio::time::sleep(Duration::from_millis(50)).await;
-
-            if response_checks > 40 {
-                return Err(Error::NoResponse(elders));
-            }
-            response_checks += 1;
         }
+
+        result
     }
 
     async fn check_query_responses(
@@ -310,7 +392,7 @@ impl Session {
         msg_id: MsgId,
         elders: Vec<Peer>,
         chunk_addr: Option<ChunkAddress>,
-    ) -> Result<Option<QueryResult>> {
+    ) -> Result<QueryResult> {
         let mut discarded_responses: usize = 0;
         let mut error_response = None;
         let mut valid_response = None;
@@ -335,8 +417,7 @@ impl Session {
                             if chunk_addr.name() == chunk.name() {
                                 trace!("Valid Chunk received for {:?}", msg_id);
                                 valid_response = Some(QueryResponse::GetChunk(Ok(chunk)));
-
-                                // return Ok(Some(QueryResponse::GetChunk(Ok(chunk))));
+                                break;
                             } else {
                                 // the Chunk content doesn't match its XorName,
                                 // this is suspicious and it could be a byzantine node
@@ -353,7 +434,7 @@ impl Session {
                     | QueryResponse::GetRegisterOwner(Err(_))
                     | QueryResponse::GetRegisterUserPermissions(Err(_))
                     | QueryResponse::GetChunk(Err(_)) => {
-                        debug!("QueryResponse error received from {peer_address:?} (but may be overridden by a non-error response from another elder): {:#?}", &response);
+                        debug!("####### QueryResponse error #{discarded_responses} for {msg_id:?} received from {peer_address:?} (but may be overridden by a non-error response from another elder): {:#?}", &response);
                         error_response = Some(response);
                         discarded_responses += 1;
                     }
@@ -410,23 +491,23 @@ impl Session {
                 }
             }
         } else {
-            warn!("No listeners found for our msg_id: {:?}", msg_id)
+            warn!("No responses found for our msg_id: {:?}", msg_id)
         }
 
         // we've looped over all responses...
         // if any are valid, lets return it
         if let Some(response) = valid_response {
             debug!("valid response innnn!!! : {:?}", response);
-            return Ok(Some(QueryResult { response }));
+            return Ok(QueryResult { response });
             // otherwise, if we've got an error in
             // we can return that too
         } else if let Some(response) = error_response {
             if discarded_responses > elders_len / 2 {
-                return Ok(Some(QueryResult { response }));
+                return Ok(QueryResult { response });
             }
         }
 
-        Ok(None)
+        Err(Error::NoResponse(elders))
     }
 
     #[instrument(skip_all, level = "debug")]
@@ -556,7 +637,15 @@ impl Session {
         }
 
         let stats = self.network.read().await.known_sections_count();
-        debug!("Client has received updated network knowledge. Current sections known: {:?}. Sap for our startup-query: {:?}", stats, known_sap);
+        info!("******#####****** Client has received updated network knowledge. Current sections known: {:?}. Sap for our startup-query: {:?}", stats, known_sap);
+        match known_sap {
+            None => warn!("******#####****** NO SAP !!!! "),
+            Some(sap) => info!(
+                "******#####****** Current Elders: {}, Members: {}",
+                sap.elder_count(),
+                sap.members().count()
+            ),
+        }
 
         Ok(())
     }
@@ -573,6 +662,14 @@ impl Session {
         } else {
             return Err(Error::NoNetworkKnowledge(dst));
         };
+
+        if elders.len() != 7 {
+            warn!(
+                "******#####****** NO 7 ELDERS for QUERY but {}: {:?}",
+                elders.len(),
+                elders
+            );
+        }
 
         elders.shuffle(&mut OsRng);
 
@@ -606,6 +703,13 @@ impl Session {
             let sap_elders = sap.elders_vec();
             let section_pk = sap.section_key();
             trace!("SAP elders found {:?}", sap_elders);
+            if sap_elders.len() != 7 {
+                warn!(
+                    "******#####****** NO 7 ELDERS for CMD but {}: {:?}",
+                    sap_elders.len(),
+                    sap_elders
+                );
+            }
 
             // Supermajority of elders is expected.
             let targets_count = supermajority(sap_elders.len());
