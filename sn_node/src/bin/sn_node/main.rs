@@ -40,7 +40,7 @@ use tokio::time::{sleep, Duration};
 use tracing::{self, error, info, trace, warn};
 
 const JOIN_TIMEOUT_SEC: u64 = 100;
-const BOOTSTRAP_RETRY_TIME_SEC: u64 = 5;
+const BOOTSTRAP_RETRY_TIME_SEC: u64 = 100;
 
 mod log;
 
