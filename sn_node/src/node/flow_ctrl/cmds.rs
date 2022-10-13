@@ -73,6 +73,7 @@ pub(crate) enum Cmd {
         msg_id: MsgId,
         operation_id: OperationId,
         origin: Peer,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
         target_adult: XorName,
     },
     HandleValidNodeMsg {
@@ -125,6 +126,7 @@ pub(crate) enum Cmd {
         msg: OutgoingMsg,
         msg_id: MsgId,
         recipients: Peers,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")]
         traceroute: Traceroute,
     },
@@ -151,6 +153,7 @@ impl Cmd {
             msg,
             msg_id: MsgId::new(),
             recipients,
+            send_stream: None,
             #[cfg(feature = "traceroute")]
             traceroute,
         }
