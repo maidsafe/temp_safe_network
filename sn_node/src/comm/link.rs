@@ -9,10 +9,10 @@
 use super::MsgListener;
 
 use dashmap::DashMap;
-use qp2p::{Connection, UsrMsgBytes};
-use qp2p::{Endpoint, RetryConfig};
+use qp2p::{Connection, Endpoint, RetryConfig, SendStream, UsrMsgBytes};
 use sn_interface::types::{log_markers::LogMarker, Peer};
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 type ConnId = String;
 
@@ -73,10 +73,29 @@ impl Link {
         bytes: UsrMsgBytes,
         priority: i32,
         retry_config: Option<&RetryConfig>,
-        _should_establish_new_connection: bool,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
+        should_establish_new_connection: bool,
         conn: Connection,
         connections: LinkConnections,
     ) -> Result<(), SendToOneError> {
+        // TODO: Hacky!
+        if let Some(send_stream) = send_stream {
+            trace!("USING BIDI! OH DEAR, FASTEN SEATBELTS");
+            let mut send_stream = send_stream.lock().await;
+            send_stream.set_priority(priority);
+            send_stream
+                .send_user_msg(bytes)
+                .await
+                .map_err(|error| SendToOneError::Send(error))?;
+            send_stream
+                .finish()
+                .await
+                .map_err(|error| SendToOneError::Send(error))?;
+
+            return Ok(());
+        }
+
+        // let conn = self.get_or_connect(should_establish_new_connection).await?;
         trace!(
             "We have {} open connections to node {:?}.",
             connections.len(),
