@@ -10,6 +10,7 @@ use crate::node::{
     messaging::Peers, Cmd, Error, Node, Prefix, Result, MAX_WAITING_PEERS_PER_QUERY,
 };
 
+use qp2p::SendStream;
 use sn_dysfunction::IssueType;
 #[cfg(feature = "traceroute")]
 use sn_interface::messaging::Traceroute;
@@ -25,7 +26,8 @@ use sn_interface::{
 
 use bytes::Bytes;
 use itertools::Itertools;
-use std::{cmp::Ordering, collections::BTreeSet};
+use tokio::sync::Mutex;
+use std::{cmp::Ordering, collections::BTreeSet, sync::Arc};
 use tracing::info;
 use xor_name::XorName;
 
@@ -57,6 +59,7 @@ impl Node {
         msg_id: MsgId,
         auth: AuthorityProof<ServiceAuth>,
         source_client: Peer,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         // We generate the operation id to track the response from the Adult
@@ -87,6 +90,7 @@ impl Node {
         let mut cmds = vec![Cmd::AddToPendingQueries {
             msg_id,
             origin: source_client,
+            send_stream,
             operation_id,
             target_adult: target.name(),
         }];

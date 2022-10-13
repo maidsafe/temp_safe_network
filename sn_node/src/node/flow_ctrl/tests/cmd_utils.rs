@@ -132,6 +132,7 @@ pub(crate) fn wrap_service_msg_for_handling(msg: ServiceMsg, peer: Peer) -> Resu
         msg,
         origin: peer,
         auth: auth_proof,
+        send_stream: None,
         #[cfg(feature = "traceroute")]
         traceroute: Traceroute(Vec::new()),
     })

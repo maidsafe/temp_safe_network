@@ -23,6 +23,7 @@ use sn_interface::{
 use qp2p::UsrMsgBytes;
 
 use bytes::Bytes;
+use std::collections::BTreeMap;
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tokio::sync::{Semaphore, TryAcquireError};
 use tokio::{sync::watch, sync::RwLock};
@@ -78,6 +79,7 @@ impl Dispatcher {
                 msg,
                 msg_id,
                 recipients,
+                send_stream,
                 #[cfg(feature = "traceroute")]
                 traceroute,
             } => {
@@ -99,7 +101,7 @@ impl Dispatcher {
 
                 let tasks = peer_msgs.into_iter().map(|(peer, msg)| {
                     self.comm
-                        .send_out_bytes(peer, msg_id, msg, is_msg_for_client)
+                        .send_out_bytes(peer, msg_id, msg, send_stream.clone(), is_msg_for_client)
                 });
                 let results = futures::future::join_all(tasks).await;
 
@@ -131,8 +133,15 @@ impl Dispatcher {
                 msg_id,
                 operation_id,
                 origin,
+                send_stream,
                 target_adult,
             } => {
+                // let send_stream = send_stream.and_then(|s| {
+                //     let s = Arc::try_unwrap(s).ok()?;
+                //     let s = s.into_inner();
+                //     Some(s)
+                // });
+
                 let mut node = self.node.write().await;
                 // cleanup
                 node.pending_data_queries.remove_expired();
@@ -145,11 +154,11 @@ impl Dispatcher {
                         "Adding to pending data queries for op id: {:?}",
                         operation_id
                     );
-                    let _ = peers.insert((msg_id, origin));
+                    let _ = peers.insert((msg_id, origin), send_stream);
                 } else {
                     let _prior_value = node.pending_data_queries.set(
                         (operation_id, target_adult),
-                        BTreeSet::from([(msg_id, origin)]),
+                        BTreeMap::from([((msg_id, origin), send_stream)]),
                         None,
                     );
                 };
@@ -169,6 +178,7 @@ impl Dispatcher {
                 msg,
                 origin,
                 auth,
+                send_stream,
                 #[cfg(feature = "traceroute")]
                 traceroute,
             } => {
@@ -179,6 +189,7 @@ impl Dispatcher {
                         msg,
                         auth,
                         origin,
+                        send_stream,
                         #[cfg(feature = "traceroute")]
                         traceroute.clone(),
                     )
@@ -222,6 +233,7 @@ impl Dispatcher {
                     msg,
                     auth,
                     origin,
+                    None,
                     #[cfg(feature = "traceroute")]
                     traceroute,
                 )

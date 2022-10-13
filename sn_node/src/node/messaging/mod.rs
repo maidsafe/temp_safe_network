@@ -178,6 +178,7 @@ impl Node {
                     msg,
                     origin,
                     auth,
+                    send_stream,
                     #[cfg(feature = "traceroute")]
                     traceroute: wire_msg.traceroute(),
                 }])

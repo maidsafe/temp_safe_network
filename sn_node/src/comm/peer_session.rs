@@ -6,16 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use std::sync::Arc;
+
 use super::Link;
 
 use crate::node::{Error, Result};
 
 use qp2p::RetryConfig;
+use qp2p::SendStream;
 use qp2p::UsrMsgBytes;
 use sn_interface::messaging::MsgId;
 
 use custom_debug::Debug;
 
+use tokio::sync::Mutex;
 use tokio::sync::mpsc;
 
 // TODO: temporarily disable priority while we transition to channels
@@ -79,6 +83,7 @@ impl PeerSession {
         &self,
         msg_id: MsgId,
         bytes: UsrMsgBytes,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
         is_msg_for_client: bool,
     ) -> Result<SendWatcher> {
         let (watcher, reporter) = status_watching();
@@ -88,6 +93,7 @@ impl PeerSession {
             bytes,
             retries: 0,
             reporter,
+            send_stream,
             is_msg_for_client,
         };
 
@@ -188,6 +194,7 @@ impl PeerSessionWorker {
                 job.bytes.clone(),
                 0,
                 Some(&RetryConfig::default()),
+                job.send_stream.clone(),
                 should_establish_new_connection,
             )
             .await;
@@ -226,6 +233,7 @@ pub(crate) struct SendJob {
     bytes: UsrMsgBytes,
     retries: usize, // TAI: Do we need this if we are using QP2P's retry
     reporter: StatusReporting,
+    send_stream: Option<Arc<Mutex<SendStream>>>,
     pub(crate) is_msg_for_client: bool,
 }
 

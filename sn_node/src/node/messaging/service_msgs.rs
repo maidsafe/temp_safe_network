@@ -11,6 +11,7 @@ use crate::node::messaging::{OutgoingMsg, Peers};
 use crate::node::{flow_ctrl::cmds::Cmd, Error, Node, Result};
 use bytes::Bytes;
 
+use qp2p::SendStream;
 use sn_dbc::{
     Commitment, Hash, IndexedSignatureShare, KeyImage, RingCtTransaction, SpentProof,
     SpentProofContent, SpentProofShare,
@@ -33,8 +34,10 @@ use sn_interface::{
         Keypair, Peer, PublicKey, RegisterCmd, ReplicatedData, SPENTBOOK_TYPE_TAG,
     },
 };
+use tokio::sync::Mutex;
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 use xor_name::XorName;
 
 impl Node {
@@ -49,6 +52,7 @@ impl Node {
         self.send_service_msg(
             the_ack_msg,
             Peers::Single(target),
+            None,
             #[cfg(feature = "traceroute")]
             traceroute,
         )
@@ -70,6 +74,7 @@ impl Node {
         self.send_service_msg(
             the_error_msg,
             Peers::Single(target),
+            None,
             #[cfg(feature = "traceroute")]
             traceroute,
         )
@@ -80,6 +85,7 @@ impl Node {
         &self,
         msg: ServiceMsg,
         recipients: Peers,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")] mut traceroute: Traceroute,
     ) -> Cmd {
         #[cfg(feature = "traceroute")]
@@ -92,6 +98,7 @@ impl Node {
             msg: OutgoingMsg::Service(msg),
             msg_id,
             recipients,
+            send_stream,
             #[cfg(feature = "traceroute")]
             traceroute,
         }
@@ -171,7 +178,7 @@ impl Node {
         }
 
         let mut cmds = vec![];
-        for (correlation_id, peer) in waiting_peers.into_iter() {
+        for ((correlation_id, peer), send_stream) in waiting_peers.into_iter() {
             let msg = ServiceMsg::QueryResponse {
                 response: response.clone(),
                 correlation_id,
@@ -180,6 +187,7 @@ impl Node {
             cmds.push(self.send_service_msg(
                 msg,
                 Peers::Single(peer),
+                send_stream,
                 #[cfg(feature = "traceroute")]
                 traceroute.clone(),
             ));
@@ -199,6 +207,7 @@ impl Node {
         msg: ServiceMsg,
         auth: AuthorityProof<ServiceAuth>,
         origin: Peer,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         if !self.is_elder() {
@@ -262,6 +271,7 @@ impl Node {
                         msg_id,
                         auth,
                         origin,
+                        send_stream,
                         #[cfg(feature = "traceroute")]
                         traceroute,
                     )

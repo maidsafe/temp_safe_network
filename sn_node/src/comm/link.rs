@@ -8,15 +8,17 @@
 
 use super::MsgListener;
 
-use qp2p::UsrMsgBytes;
+use qp2p::{SendStream, UsrMsgBytes};
 use sn_interface::types::{log_markers::LogMarker, Peer};
 
 use priority_queue::DoublePriorityQueue;
 use qp2p::{Endpoint, RetryConfig};
 use std::{
     collections::BTreeMap,
+    sync::Arc,
     time::{Duration, Instant},
 };
+use tokio::sync::Mutex;
 
 type Priority = u64;
 type ConnId = String;
@@ -105,8 +107,26 @@ impl Link {
         bytes: UsrMsgBytes,
         priority: i32,
         retry_config: Option<&RetryConfig>,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
         should_establish_new_connection: bool,
     ) -> Result<(), SendToOneError> {
+        // TODO: Hacky!
+        if let Some(send_stream) = send_stream {
+            trace!("USING BIDI! OH DEAR, FASTEN SEATBELTS");
+            let mut send_stream = send_stream.lock().await;
+            send_stream.set_priority(priority);
+            send_stream
+                .send_user_msg(bytes)
+                .await
+                .map_err(|error| SendToOneError::Send(error))?;
+            send_stream
+                .finish()
+                .await
+                .map_err(|error| SendToOneError::Send(error))?;
+
+            return Ok(());
+        }
+
         let conn = self.get_or_connect(should_establish_new_connection).await?;
         trace!(
             "We have {} open connections to node {:?}.",

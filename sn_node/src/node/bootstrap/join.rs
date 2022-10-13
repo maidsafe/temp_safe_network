@@ -485,7 +485,7 @@ async fn send_messages(
             let msg_id = msg.msg_id();
 
             let bytes = msg.serialize()?;
-            match comm.send_out_bytes(peer, msg_id, bytes, false).await {
+            match comm.send_out_bytes(peer, msg_id, bytes, None, false).await {
                 Ok(()) => trace!("Msg {msg_id:?} sent on {dst:?}"),
                 Err(Error::FailedSend(peer)) => {
                     error!("Failed to send message {msg_id:?} to {peer:?}")

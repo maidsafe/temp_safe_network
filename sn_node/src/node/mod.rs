@@ -85,6 +85,7 @@ mod core {
         },
         UsedSpace,
     };
+    use qp2p::SendStream;
     use sn_dysfunction::{DysfunctionDetection, IssueType};
     #[cfg(feature = "traceroute")]
     use sn_interface::messaging::Entity;
@@ -104,6 +105,7 @@ mod core {
     use ed25519_dalek::Keypair;
     use itertools::Itertools;
     use resource_proof::ResourceProof;
+    use tokio::sync::Mutex;
     use std::{
         collections::{BTreeMap, BTreeSet, HashMap},
         net::SocketAddr,
@@ -185,7 +187,7 @@ mod core {
         pub(crate) capacity: Capacity,
         pub(crate) dysfunction_tracking: DysfunctionDetection,
         /// Cache the request combo,  (OperationId -> An adult xorname), to waiting Clients peers for that combo
-        pub(crate) pending_data_queries: Cache<(OperationId, XorName), BTreeSet<(MsgId, Peer)>>,
+        pub(crate) pending_data_queries: Cache<(OperationId, XorName), BTreeMap<(MsgId, Peer), Option<Arc<Mutex<SendStream>>>>>,
         // Caches
         pub(crate) ae_backoff_cache: AeBackoffCache,
     }
