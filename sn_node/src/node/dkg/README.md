@@ -4,7 +4,7 @@ This post describes how DKG works in the Safe Network. For this implementation, 
 
 ## DkgStart
 
-DKG is triggered by the elders when they notice that the oldest members are not the elders or when a section splits. They do so by sending the candidates a `NodeMsg::DkgStart(DkgSessionId)` message. The `DkgSessionId` contains all the information that makes this DKG session unique.
+DKG is triggered by the elders when they notice that the oldest members are not the elders or when a section splits. They do so by sending the candidates a `NodeMsg::DkgStart(DkgSessionId, SectionSigShare)` message. The `DkgSessionId` contains all the information that makes this DKG session unique, and the `SectionSigShare` is the signature of an elder. Once we receive supermajority of those, we know we can trust this request and start DKG.
 
 ```rust
 pub struct DkgSessionId {
