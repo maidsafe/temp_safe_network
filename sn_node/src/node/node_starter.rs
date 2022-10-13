@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::comm::{Comm, MsgEvent};
+use crate::comm::{Comm, MsgFromPeer};
 use crate::node::{
     cfg::keypair_storage::{get_reward_pk, store_network_keypair, store_new_reward_keypair},
     flow_ctrl::{
@@ -238,7 +238,7 @@ async fn bootstrap_genesis_node(
 async fn bootstrap_normal_node(
     config: &Config,
     comm: &Comm,
-    connection_event_rx: &mut tokio::sync::mpsc::Receiver<MsgEvent>,
+    connection_event_rx: &mut tokio::sync::mpsc::Receiver<MsgFromPeer>,
     join_timeout: Duration,
     event_sender: EventSender,
     used_space: UsedSpace,
@@ -250,20 +250,20 @@ async fn bootstrap_normal_node(
     let section_tree_path = config.network_contacts_file().ok_or_else(|| {
         Error::Configuration("Could not obtain network contacts file path".to_string())
     })?;
-    let network_contacts = SectionTree::from_disk(&section_tree_path).await?;
+    let section_tree = SectionTree::from_disk(&section_tree_path).await?;
     info!(
         "{} Joining as a new node (PID: {}) our socket: {}, network's genesis key: {:?}",
         node_name,
         std::process::id(),
         comm.socket_addr(),
-        network_contacts.genesis_key()
+        section_tree.genesis_key()
     );
     let joining_node = MyNodeInfo::new(keypair, comm.socket_addr());
     let (info, network_knowledge) = join_network(
         joining_node,
         comm,
         connection_event_rx,
-        network_contacts,
+        section_tree,
         join_timeout,
     )
     .await?;

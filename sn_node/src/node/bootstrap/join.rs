@@ -8,14 +8,14 @@
 
 use super::UsedRecipientSaps;
 
-use crate::comm::{Comm, MsgEvent};
+use crate::comm::{Comm, MsgFromPeer};
 use crate::log_sleep;
 use crate::node::{messages::WireMsgUtils, Error, Result};
 
 use sn_interface::{
     messaging::{
         system::{JoinRejectionReason, JoinRequest, JoinResponse, MembershipState, NodeMsg},
-        AuthKind, Dst, MsgType, NodeSig, WireMsg,
+        Dst, MsgType, WireMsg,
     },
     network_knowledge::{MyNodeInfo, NetworkKnowledge, SectionTree},
     types::{keys::ed25519, log_markers::LogMarker, Peer},
@@ -26,10 +26,7 @@ use bls::PublicKey as BlsPublicKey;
 use futures::future;
 
 use std::collections::{BTreeMap, BTreeSet};
-use tokio::{
-    sync::mpsc,
-    time::{Duration, Instant},
-};
+use tokio::{sync::mpsc, time::Duration};
 use tracing::Instrument;
 use xor_name::Prefix;
 
@@ -41,14 +38,14 @@ use xor_name::Prefix;
 pub(crate) async fn join_network(
     node: MyNodeInfo,
     comm: &Comm,
-    incoming_msgs: &mut mpsc::Receiver<MsgEvent>,
-    network_contacts: SectionTree,
+    incoming_msgs: &mut mpsc::Receiver<MsgFromPeer>,
+    section_tree: SectionTree,
     join_timeout: Duration,
 ) -> Result<(MyNodeInfo, NetworkKnowledge)> {
     let (outgoing_msgs_sender, outgoing_msgs_receiver) = mpsc::channel(100);
 
     let span = trace_span!("bootstrap");
-    let joiner = Joiner::new(node, outgoing_msgs_sender, incoming_msgs, network_contacts);
+    let joiner = Joiner::new(node, outgoing_msgs_sender, incoming_msgs, section_tree);
 
     future::join(
         joiner.try_join(join_timeout),
@@ -63,10 +60,10 @@ struct Joiner<'a> {
     // Sender for outgoing messages.
     outgoing_msgs: mpsc::Sender<(WireMsg, Vec<Peer>)>,
     // Receiver for incoming messages.
-    incoming_msgs: &'a mut mpsc::Receiver<MsgEvent>,
+    incoming_msgs: &'a mut mpsc::Receiver<MsgFromPeer>,
     node: MyNodeInfo,
     prefix: Prefix,
-    network_contacts: SectionTree,
+    section_tree: SectionTree,
     backoff: ExponentialBackoff,
     aggregated: bool,
     retry_responses_cache: BTreeMap<Peer, u8>,
@@ -76,8 +73,8 @@ impl<'a> Joiner<'a> {
     fn new(
         node: MyNodeInfo,
         outgoing_msgs: mpsc::Sender<(WireMsg, Vec<Peer>)>,
-        incoming_msgs: &'a mut mpsc::Receiver<MsgEvent>,
-        network_contacts: SectionTree,
+        incoming_msgs: &'a mut mpsc::Receiver<MsgFromPeer>,
+        section_tree: SectionTree,
     ) -> Self {
         let mut backoff = ExponentialBackoff {
             initial_interval: Duration::from_millis(50),
@@ -94,7 +91,7 @@ impl<'a> Joiner<'a> {
             incoming_msgs,
             node,
             prefix: Prefix::default(),
-            network_contacts,
+            section_tree,
             backoff,
             aggregated: false,
             retry_responses_cache: Default::default(),
@@ -109,8 +106,8 @@ impl<'a> Joiner<'a> {
     //    completing the bootstrap.
     async fn try_join(self, join_timeout: Duration) -> Result<(MyNodeInfo, NetworkKnowledge)> {
         trace!(
-            "Bootstrap run, network contacts as we have it: {:?}",
-            self.network_contacts
+            "Bootstrap run, section tree as we have it: {:?}",
+            self.section_tree
         );
 
         tokio::time::timeout(join_timeout, self.join(join_timeout / 10))
@@ -120,7 +117,7 @@ impl<'a> Joiner<'a> {
 
     fn join_target(&self) -> Result<(BlsPublicKey, Vec<Peer>)> {
         let our_name = self.node.name();
-        let sap = self.network_contacts.section_by_name(&our_name)?;
+        let sap = self.section_tree.section_by_name(&our_name)?;
         Ok((sap.section_key(), sap.elders_vec()))
     }
 
@@ -141,13 +138,17 @@ impl<'a> Joiner<'a> {
         // `JoinRequest` again with it.
         let msg = JoinRequest { section_key };
 
-        self.send(msg, &recipients, section_key, false).await?;
+        self.send(NodeMsg::JoinRequest(msg), &recipients, section_key, false)
+            .await?;
 
         // Avoid sending more than one duplicated request (with same SectionKey) to the same peer.
         let mut used_recipient_saps = UsedRecipientSaps::new();
 
         loop {
-            let (response, sender) = self.receive_join_response(response_timeout).await?;
+            let (response, sender) =
+                tokio::time::timeout(response_timeout, self.receive_join_response())
+                    .await
+                    .map_err(|_| Error::JoinTimeout)??;
 
             match response {
                 JoinResponse::Approved {
@@ -181,7 +182,7 @@ impl<'a> Joiner<'a> {
                     // Building our network knowledge instance will validate the section_tree_update
 
                     let network_knowledge =
-                        NetworkKnowledge::new(self.network_contacts, section_tree_update)?;
+                        NetworkKnowledge::new(self.section_tree, section_tree_update)?;
 
                     return Ok((self.node, network_knowledge));
                 }
@@ -211,7 +212,7 @@ impl<'a> Joiner<'a> {
                     }
 
                     // make sure we received a valid and trusted new SAP
-                    let _is_new_sap = match self.network_contacts.update(section_tree_update) {
+                    let _is_new_sap = match self.section_tree.update(section_tree_update) {
                         Ok(updated) => updated,
                         Err(err) => {
                             debug!("Ignoring JoinResponse::Retry with an invalid SAP: {err:?}");
@@ -252,7 +253,13 @@ impl<'a> Joiner<'a> {
                         let msg = JoinRequest { section_key };
                         let new_recipients = signed_sap.elders_vec();
 
-                        self.send(msg, &new_recipients, section_key, true).await?;
+                        self.send(
+                            NodeMsg::JoinRequest(msg),
+                            &new_recipients,
+                            section_key,
+                            true,
+                        )
+                        .await?;
                     }
                 }
                 JoinResponse::Redirect(section_auth) => {
@@ -303,7 +310,13 @@ impl<'a> Joiner<'a> {
 
                     let msg = JoinRequest { section_key };
 
-                    self.send(msg, &new_recipients, section_key, true).await?;
+                    self.send(
+                        NodeMsg::JoinRequest(msg),
+                        &new_recipients,
+                        section_key,
+                        true,
+                    )
+                    .await?;
                 }
                 JoinResponse::Rejected(JoinRejectionReason::JoinsDisallowed) => {
                     error!("Network is set to not taking any new joining node, try join later.");
@@ -361,7 +374,7 @@ impl<'a> Joiner<'a> {
     #[tracing::instrument(skip(self))]
     async fn send(
         &mut self,
-        msg: JoinRequest,
+        msg: NodeMsg,
         recipients: &[Peer],
         section_key: BlsPublicKey,
         should_backoff: bool,
@@ -389,7 +402,7 @@ impl<'a> Joiner<'a> {
                 name: self.node.name(), // we want to target a section where our name fits
                 section_key,
             },
-            NodeMsg::JoinRequest(msg),
+            msg,
             section_key,
         )?;
 
@@ -401,54 +414,23 @@ impl<'a> Joiner<'a> {
         Ok(())
     }
 
-    // TODO: receive JoinResponse from the JoinResponse handler directly,
-    // analogous to the JoinAsRelocated flow.
     #[tracing::instrument(skip(self))]
-    async fn receive_join_response(
-        &mut self,
-        mut response_timeout: Duration,
-    ) -> Result<(JoinResponse, Peer)> {
-        let mut timer = Instant::now();
-
-        // Awaits at most the time left of join_timeout.
-        while let Some(event) = tokio::time::timeout(response_timeout, self.incoming_msgs.recv())
-            .await
-            .map_err(|_| Error::JoinTimeout)?
-        {
-            // Breaks the loop raising an error, if response_timeout time elapses.
-            response_timeout = response_timeout
-                .checked_sub(timer.elapsed())
-                .ok_or(Error::JoinTimeout)?;
-            timer = Instant::now(); // reset timer
-
+    async fn receive_join_response(&mut self) -> Result<(JoinResponse, Peer)> {
+        while let Some(MsgFromPeer { sender, wire_msg }) = self.incoming_msgs.recv().await {
             // We are interested only in `JoinResponse` type of messages
-            let (join_response, sender) = match event {
-                MsgEvent::Received {
-                    sender, wire_msg, ..
-                } => match wire_msg.auth() {
-                    AuthKind::Client(_) => continue,
-                    AuthKind::SectionShare(_) => {
-                        trace!("Bootstrap message discarded: sender: {sender:?} wire_msg: {wire_msg:?}");
-                        continue;
-                    }
-                    AuthKind::Node(NodeSig { .. }) => match wire_msg.into_msg() {
-                        Ok(MsgType::Node {
-                            msg: NodeMsg::JoinResponse(resp),
-                            ..
-                        }) => (*resp, sender),
-                        Ok(MsgType::Client { msg_id, .. } | MsgType::Node { msg_id, .. }) => {
-                            trace!("Bootstrap message discarded: sender: {sender:?} msg_id: {msg_id:?}");
-                            continue;
-                        }
-                        Err(err) => {
-                            debug!("Failed to deserialize message payload: {:?}", err);
-                            continue;
-                        }
-                    },
-                },
-            };
 
-            return Ok((join_response, sender));
+            match wire_msg.into_msg() {
+                Ok(MsgType::Node {
+                    msg: NodeMsg::JoinResponse(resp),
+                    ..
+                }) => return Ok((*resp, sender)),
+                Ok(MsgType::Client { msg_id, .. } | MsgType::Node { msg_id, .. }) => {
+                    trace!("Bootstrap message discarded: sender: {sender:?} msg_id: {msg_id:?}");
+                }
+                Err(err) => {
+                    error!("Failed to deserialize message payload: {:?}", err);
+                }
+            };
         }
 
         error!("NodeMsg sender unexpectedly closed");
@@ -939,7 +921,7 @@ mod tests {
     // test helper
     #[instrument]
     fn send_response(
-        recv_tx: &mpsc::Sender<MsgEvent>,
+        recv_tx: &mpsc::Sender<MsgFromPeer>,
         response: JoinResponse,
         bootstrap_node: &MyNodeInfo,
         section_pk: BlsPublicKey,
@@ -956,7 +938,7 @@ mod tests {
 
         debug!("wire msg built");
 
-        recv_tx.try_send(MsgEvent::Received {
+        recv_tx.try_send(MsgFromPeer {
             sender: bootstrap_node.peer(),
             wire_msg,
         })?;
