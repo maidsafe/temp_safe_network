@@ -70,7 +70,6 @@ impl SectionPeers {
     /// Update a member of our section.
     /// Returns whether anything actually changed.
     /// To maintain commutativity, the only allowed transitions are:
-    /// - Joined -> Joined if the new age is greater than the old age
     /// - Joined -> Left
     /// - Joined -> Relocated
     /// - Relocated <--> Left (should not happen, but needed for consistency)
@@ -271,20 +270,36 @@ mod tests {
 
     #[test]
     fn archived_members_should_not_be_moved_to_members_list() -> Result<()> {
+        let mut rng = thread_rng();
         let section_peers = SectionPeers::default();
         let sk = SecretKeySet::random(None).secret_key().clone();
         let node_left = gen_random_signed_node_states(1, MembershipState::Left, &sk)?[0].clone();
-        assert!(section_peers.update(node_left.clone()));
+        let relocate = RelocateDetails {
+            previous_name: XorName::random(&mut rng),
+            dst: XorName::random(&mut rng),
+            dst_section_key: bls::SecretKey::random().public_key(),
+            age: 10,
+        };
+        let node_relocated =
+            gen_random_signed_node_states(1, MembershipState::Relocated(Box::new(relocate)), &sk)?
+                [0]
+            .clone();
 
-        let node_joined = section_signed(&sk, NodeState::joined(*node_left.peer(), None))?;
-        assert!(!section_peers.update(node_joined));
+        assert!(section_peers.update(node_left.clone()));
+        assert!(section_peers.update(node_relocated.clone()));
+
+        let node_left_joins = section_signed(&sk, NodeState::joined(*node_left.peer(), None))?;
+        let node_relocated_joins =
+            section_signed(&sk, NodeState::joined(*node_relocated.peer(), None))?;
+        assert!(!section_peers.update(node_left_joins));
+        assert!(!section_peers.update(node_relocated_joins));
 
         assert_lists(
             section_peers
                 .archive
                 .iter()
                 .map(|item| item.value().clone()),
-            [node_left],
+            [node_left, node_relocated],
         )?;
         assert!(section_peers.members().is_empty());
         Ok(())

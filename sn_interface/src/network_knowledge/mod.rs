@@ -666,7 +666,7 @@ mod tests {
         test_utils::{gen_addr, prefix, random_sap, section_signed},
         NetworkKnowledge,
     };
-    use crate::{messaging::SectionTreeUpdate, network_knowledge::SectionsDAG, types::Peer};
+    use crate::{network_knowledge::test_utils::gen_section_tree_update, types::Peer};
     use bls::SecretKeySet;
     use eyre::Result;
     use proptest::prelude::*;
@@ -709,13 +709,9 @@ mod tests {
         let (sap1, _, sk_1) = random_sap(prefix("1")?, 0, 0, None);
         let sap1 = section_signed(&sk_1.secret_key(), sap1)?;
         let our_node_name_prefix_1 = sap1.prefix().name();
-        let section_tree_update = {
-            let sig = bincode::serialize(&sap1.section_key())
-                .map(|bytes| sk_gen.secret_key().sign(&bytes))?;
-            let mut proof_chain = knowledge.section_chain();
-            proof_chain.insert(&sk_gen.secret_key().public_key(), sap1.section_key(), sig)?;
-            SectionTreeUpdate::new(sap1.clone(), proof_chain)
-        };
+        let proof_chain = knowledge.section_chain();
+        let section_tree_update =
+            gen_section_tree_update(&sap1, &proof_chain, &sk_gen.secret_key())?;
         assert!(knowledge.update_knowledge_if_valid(
             section_tree_update,
             None,
@@ -726,13 +722,8 @@ mod tests {
         // section with different prefix (0) and our node name doesn't match
         let (sap0, _, sk_0) = random_sap(prefix("0")?, 0, 0, None);
         let sap0 = section_signed(&sk_0.secret_key(), sap0)?;
-        let section_tree_update = {
-            let sig = bincode::serialize(&sap0.section_key())
-                .map(|bytes| sk_gen.secret_key().sign(&bytes))?;
-            let mut proof_chain = SectionsDAG::new(sk_gen.secret_key().public_key());
-            proof_chain.insert(&sk_gen.secret_key().public_key(), sap0.section_key(), sig)?;
-            SectionTreeUpdate::new(sap0, proof_chain)
-        };
+        let section_tree_update =
+            gen_section_tree_update(&sap0, &proof_chain, &sk_gen.secret_key())?;
         // our node is still in prefix1
         assert!(knowledge.update_knowledge_if_valid(
             section_tree_update,

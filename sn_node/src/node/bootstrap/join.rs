@@ -518,22 +518,11 @@ mod tests {
             random_sap(Prefix::default(), elder_count(), 0, None);
 
         let next_section_key = next_sk_set.public_keys().public_key();
-        let section_tree_update = {
-            let mut proof_chain = SectionsDAG::new(genesis_pk);
-
-            let next_sk = next_sk_set.secret_key();
-            let signed_next_sap = section_signed(&next_sk, next_sap.clone())?;
-
-            let sig = bincode::serialize(&next_section_key)
-                .map(|bytes| genesis_sk.sign(&bytes))
-                .expect("failed to serialize public key");
-
-            proof_chain
-                .insert(&genesis_pk, next_section_key, sig)
-                .expect("Failed to update proof chain");
-
-            SectionTreeUpdate::new(signed_next_sap, proof_chain)
-        };
+        let section_tree_update = gen_section_tree_update(
+            &section_signed(&next_sk_set.secret_key(), next_sap.clone())?,
+            &SectionsDAG::new(genesis_pk),
+            &genesis_sk,
+        )?;
 
         // Create the task that executes the body of the test, but don't run it either.
         let others = async {
@@ -876,22 +865,11 @@ mod tests {
             // Send `Retry` with valid update
             let (next_sap, next_elders, next_sk_set) = random_sap(Prefix::default(), 1, 0, None);
             let next_section_key = next_sk_set.public_keys().public_key();
-            let section_tree_update = {
-                let mut proof_chain = SectionsDAG::new(genesis_pk);
-
-                let next_sk = next_sk_set.secret_key();
-                let signed_next_sap = section_signed(&next_sk, next_sap)?;
-
-                let sig = bincode::serialize(&next_section_key)
-                    .map(|bytes| genesis_sk.sign(&bytes))
-                    .expect("failed to serialize public key");
-
-                proof_chain
-                    .insert(&genesis_pk, next_section_key, sig)
-                    .expect("Failed to update proof chain");
-
-                SectionTreeUpdate::new(signed_next_sap, proof_chain)
-            };
+            let section_tree_update = gen_section_tree_update(
+                &section_signed(&next_sk_set.secret_key(), next_sap)?,
+                &SectionsDAG::new(genesis_pk),
+                &genesis_sk,
+            )?;
             let good_elders: Vec<&MyNodeInfo> =
                 next_elders.iter().take(2 * elder_count() / 3).collect_vec();
             for elder in good_elders.iter() {
