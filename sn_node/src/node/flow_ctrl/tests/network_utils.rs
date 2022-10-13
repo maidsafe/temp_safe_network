@@ -230,7 +230,7 @@ impl TestNodeBuilder {
         self,
     ) -> Result<(Dispatcher, NetworkKnowledge, Peer, bls::SecretKeySet)> {
         std::env::set_var("SN_DATA_COPY_COUNT", self.data_copy_count.to_string());
-        let (section, section_key_share, keypair, peer, sk_set) = if let Some(custom_section) =
+        let (mut section, section_key_share, keypair, peer, sk_set) = if let Some(custom_section) =
             self.section
         {
             let first_node = self.first_node.ok_or_else(|| {
@@ -314,7 +314,7 @@ pub(crate) fn create_section(
     other_keys: Option<Vec<bls::SecretKey>>,
     parent_section_tree: Option<SectionTree>,
 ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
-    let (section, section_key_share) =
+    let (mut section, section_key_share) =
         do_create_section(sap, genesis_sk_set, other_keys, parent_section_tree)?;
     for ns in sap.members() {
         let auth_ns = section_signed(&genesis_sk_set.secret_key(), ns.clone())?;
@@ -330,7 +330,7 @@ pub(crate) fn create_section_with_elders(
     sk_set: &SecretKeySet,
     sap: &SectionAuthorityProvider,
 ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
-    let (section, section_key_share) = do_create_section(sap, sk_set, None, None)?;
+    let (mut section, section_key_share) = do_create_section(sap, sk_set, None, None)?;
     for peer in sap.elders() {
         let node_state = NodeState::joined(*peer, None);
         let node_state = section_signed(sk_set.secret_key(), node_state)?;

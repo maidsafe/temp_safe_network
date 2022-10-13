@@ -10,8 +10,7 @@ use crate::{
     messaging::system::{MembershipState, SectionSigned},
     network_knowledge::{errors::Result, NodeState, SectionsDAG},
 };
-use dashmap::{mapref::entry::Entry, DashMap};
-use std::{collections::BTreeSet, sync::Arc};
+use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 use xor_name::{Prefix, XorName};
 
 // Number of Elder churn events before a Left/Relocated member
@@ -24,20 +23,14 @@ const ELDER_CHURN_EVENTS_TO_PRUNE_ARCHIVE: usize = 3;
 /// Container for storing information about (current and archived) members of our section.
 #[derive(Clone, Default, Debug)]
 pub(super) struct SectionPeers {
-    members: Arc<DashMap<XorName, SectionSigned<NodeState>>>,
-    archive: Arc<DashMap<XorName, SectionSigned<NodeState>>>,
+    members: BTreeMap<XorName, SectionSigned<NodeState>>,
+    archive: BTreeMap<XorName, SectionSigned<NodeState>>,
 }
 
 impl SectionPeers {
     /// Returns set of current members, i.e. those with state == `Joined`.
     pub(super) fn members(&self) -> BTreeSet<SectionSigned<NodeState>> {
-        self.members
-            .iter()
-            .map(|entry| {
-                let (_, state) = entry.pair();
-                state.clone()
-            })
-            .collect()
+        self.members.values().cloned().collect()
     }
 
     /// Returns the number of current members.
@@ -60,10 +53,10 @@ impl SectionPeers {
         &self,
         name: &XorName,
     ) -> Option<SectionSigned<NodeState>> {
-        if let Some(member) = self.members.get(name).map(|state| state.value().clone()) {
+        if let Some(member) = self.members.get(name).cloned() {
             Some(member)
         } else {
-            self.archive.get(name).map(|state| state.value().clone())
+            self.archive.get(name).cloned()
         }
     }
 
@@ -73,20 +66,17 @@ impl SectionPeers {
     /// - Joined -> Left
     /// - Joined -> Relocated
     /// - Relocated <--> Left (should not happen, but needed for consistency)
-    pub(super) fn update(&self, new_state: SectionSigned<NodeState>) -> bool {
+    pub(super) fn update(&mut self, new_state: SectionSigned<NodeState>) -> bool {
         let node_name = new_state.name();
-        // do ops on the dashmap _after_ matching, so we can drop any refs to prevent deadlocking
-        let mut should_insert = false;
-        let mut should_remove = false;
 
-        let updating_something = match (self.members.entry(node_name), new_state.state()) {
-            (Entry::Vacant(_entry), MembershipState::Joined) => {
+        match (self.members.entry(node_name), new_state.state()) {
+            (Entry::Vacant(entry), MembershipState::Joined) => {
                 // unless it was already archived, insert it as current member
-                if self.archive.get(&node_name).is_none() {
-                    should_insert = true;
-                    true
-                } else {
+                if self.archive.contains_key(&node_name) {
                     false
+                } else {
+                    entry.insert(new_state);
+                    true
                 }
             }
             (Entry::Vacant(_), MembershipState::Left | MembershipState::Relocated(_)) => {
@@ -95,34 +85,24 @@ impl SectionPeers {
                 true
             }
             (Entry::Occupied(_), MembershipState::Joined) => false,
-            (Entry::Occupied(_entry), MembershipState::Left | MembershipState::Relocated(_)) => {
+            (Entry::Occupied(entry), MembershipState::Left | MembershipState::Relocated(_)) => {
                 //  remove it from our current members, and insert it into our archive
-                should_remove = true;
-                let _prev = self.archive.insert(node_name, new_state.clone());
+                let _ = entry.remove();
+                let _ = self.archive.insert(node_name, new_state);
                 true
             }
-        };
-
-        // now we have dropped the entry ref
-        if should_insert {
-            let _prev = self.members.insert(node_name, new_state);
         }
-        if should_remove {
-            let _prev = self.members.remove(&node_name);
-        }
-
-        updating_something
     }
 
     /// Remove all members whose name does not match `prefix`.
-    pub(super) fn retain(&self, prefix: &Prefix) {
+    pub(super) fn retain(&mut self, prefix: &Prefix) {
         self.members.retain(|name, _| prefix.matches(name))
     }
 
     // Remove any member which Left, or was Relocated, more
     // than ELDER_CHURN_EVENTS_TO_PRUNE_ARCHIVE section keys ago from `last_key`
     pub(super) fn prune_members_archive(
-        &self,
+        &mut self,
         proof_chain: &SectionsDAG,
         last_key: &bls::PublicKey,
     ) -> Result<()> {
@@ -153,7 +133,7 @@ mod tests {
     #[test]
     fn retain_archived_members_of_the_latest_sections_while_pruning() -> Result<()> {
         let mut rng = thread_rng();
-        let section_peers = SectionPeers::default();
+        let mut section_peers = SectionPeers::default();
 
         // adding node set 1
         let sk_1 = SecretKeySet::random(None).secret_key().clone();
@@ -164,13 +144,7 @@ mod tests {
         let mut proof_chain = SectionsDAG::new(sk_1.public_key());
         // 1 should be retained
         section_peers.prune_members_archive(&proof_chain, &sk_1.public_key())?;
-        assert_lists(
-            section_peers
-                .archive
-                .iter()
-                .map(|item| item.value().clone()),
-            nodes_1.clone(),
-        );
+        assert_lists(section_peers.archive.values(), &nodes_1);
 
         // adding node set 2 as MembershipState::Relocated
         let sk_2 = SecretKeySet::random(None).secret_key().clone();
@@ -193,11 +167,8 @@ mod tests {
         // 1 -> 2 should be retained
         section_peers.prune_members_archive(&proof_chain, &sk_2.public_key())?;
         assert_lists(
-            section_peers
-                .archive
-                .iter()
-                .map(|item| item.value().clone()),
-            nodes_1.iter().chain(&nodes_2).cloned(),
+            section_peers.archive.values(),
+            nodes_1.iter().chain(&nodes_2),
         );
 
         // adding node set 3
@@ -211,11 +182,8 @@ mod tests {
         // 1 -> 2 -> 3 should be retained
         section_peers.prune_members_archive(&proof_chain, &sk_3.public_key())?;
         assert_lists(
-            section_peers
-                .archive
-                .iter()
-                .map(|item| item.value().clone()),
-            nodes_1.iter().chain(&nodes_2).chain(&nodes_3).cloned(),
+            section_peers.archive.values(),
+            nodes_1.iter().chain(&nodes_2).chain(&nodes_3),
         );
 
         // adding node set 4
@@ -229,11 +197,8 @@ mod tests {
         //  2 -> 3 -> 4 should be retained
         section_peers.prune_members_archive(&proof_chain, &sk_4.public_key())?;
         assert_lists(
-            section_peers
-                .archive
-                .iter()
-                .map(|item| item.value().clone()),
-            nodes_2.iter().chain(&nodes_3).chain(&nodes_4).cloned(),
+            section_peers.archive.values(),
+            nodes_2.iter().chain(&nodes_3).chain(&nodes_4),
         );
 
         // adding node set 5 as a branch to 3
@@ -250,11 +215,8 @@ mod tests {
         // 2 -> 3 -> 5 should be retained
         section_peers.prune_members_archive(&proof_chain, &sk_5.public_key())?;
         assert_lists(
-            section_peers
-                .archive
-                .iter()
-                .map(|item| item.value().clone()),
-            nodes_2.iter().chain(&nodes_3).chain(&nodes_5).cloned(),
+            section_peers.archive.values(),
+            nodes_2.iter().chain(&nodes_3).chain(&nodes_5),
         );
 
         Ok(())
@@ -263,7 +225,7 @@ mod tests {
     #[test]
     fn archived_members_should_not_be_moved_to_members_list() -> Result<()> {
         let mut rng = thread_rng();
-        let section_peers = SectionPeers::default();
+        let mut section_peers = SectionPeers::default();
         let sk = SecretKeySet::random(None).secret_key().clone();
         let node_left = gen_random_signed_node_states(1, MembershipState::Left, &sk)?[0].clone();
         let relocate = RelocateDetails {
@@ -286,13 +248,7 @@ mod tests {
         assert!(!section_peers.update(node_left_joins));
         assert!(!section_peers.update(node_relocated_joins));
 
-        assert_lists(
-            section_peers
-                .archive
-                .iter()
-                .map(|item| item.value().clone()),
-            [node_left, node_relocated],
-        );
+        assert_lists(section_peers.archive.values(), &[node_left, node_relocated]);
         assert!(section_peers.members().is_empty());
         Ok(())
     }
@@ -300,7 +256,7 @@ mod tests {
     #[test]
     fn members_should_be_archived_if_they_leave_or_relocate() -> Result<()> {
         let mut rng = thread_rng();
-        let section_peers = SectionPeers::default();
+        let mut section_peers = SectionPeers::default();
         let sk = SecretKeySet::random(None).secret_key().clone();
 
         let node_1 = gen_random_signed_node_states(1, MembershipState::Joined, &sk)?[0].clone();
@@ -325,13 +281,7 @@ mod tests {
         assert!(section_peers.update(node_2.clone()));
 
         assert!(section_peers.members().is_empty());
-        assert_lists(
-            section_peers
-                .archive
-                .iter()
-                .map(|item| item.value().clone()),
-            [node_1, node_2],
-        );
+        assert_lists(section_peers.archive.values(), &[node_1, node_2]);
         Ok(())
     }
 

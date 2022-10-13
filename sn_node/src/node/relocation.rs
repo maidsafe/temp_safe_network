@@ -188,7 +188,7 @@ mod tests {
             SectionTreeUpdate::new(signed_sap, SectionsDAG::new(genesis_pk))
         };
 
-        let network_knowledge =
+        let mut network_knowledge =
             NetworkKnowledge::new(SectionTree::new(genesis_pk), section_tree_update)?;
 
         for peer in &peers {
