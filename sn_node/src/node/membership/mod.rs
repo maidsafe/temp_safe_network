@@ -159,6 +159,7 @@ impl Membership {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn last_received_vote_time(&self) -> Option<Instant> {
         self.last_received_vote_time
     }

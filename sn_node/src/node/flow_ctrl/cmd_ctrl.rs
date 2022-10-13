@@ -19,7 +19,6 @@ use crate::node::{
 use priority_queue::PriorityQueue;
 use std::time::SystemTime;
 use std::{sync::Arc, time::Duration};
-use tokio::sync::RwLock;
 
 type Priority = i32;
 
@@ -48,10 +47,6 @@ impl CmdCtrl {
             dispatcher: Arc::new(dispatcher),
             id_counter: 0,
         }
-    }
-
-    pub(crate) fn node(&self) -> Arc<RwLock<crate::node::MyNode>> {
-        self.dispatcher.node()
     }
 
     pub(crate) async fn push(&mut self, cmd: Cmd, parent_id: Option<usize>) {

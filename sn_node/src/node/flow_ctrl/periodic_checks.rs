@@ -6,8 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::FlowCtrl;
-
 use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, Result};
 
 use ed25519_dalek::Signer;
@@ -23,7 +21,7 @@ use sn_interface::{
     types::{ChunkAddress, PublicKey, Signature},
 };
 
-use std::{collections::BTreeSet, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 use tokio::{sync::RwLock, time::Instant};
 
 const PROBE_INTERVAL: Duration = Duration::from_secs(30);
@@ -38,7 +36,8 @@ const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 const ADULT_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(2);
 const ELDER_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(3);
 
-pub(super) struct PeriodicChecksTimestamps {
+pub(super) struct PeriodicChecks {
+    node: Arc<RwLock<MyNode>>,
     last_probe: Instant,
     last_section_probe: Instant,
     last_adult_health_check: Instant,
@@ -50,9 +49,10 @@ pub(super) struct PeriodicChecksTimestamps {
     last_dysfunction_check: Instant,
 }
 
-impl PeriodicChecksTimestamps {
-    pub(super) fn now() -> Self {
+impl PeriodicChecks {
+    pub(super) fn new(node: Arc<RwLock<MyNode>>) -> Self {
         Self {
+            node,
             last_probe: Instant::now(),
             last_section_probe: Instant::now(),
             last_adult_health_check: Instant::now(),
@@ -64,130 +64,115 @@ impl PeriodicChecksTimestamps {
             last_dysfunction_check: Instant::now(),
         }
     }
-}
 
-impl FlowCtrl {
     /// Generate and fire commands for all types of periodic checks
-    pub(super) async fn perform_periodic_checks(&mut self) {
-        self.enqueue_cmds_for_standard_periodic_checks().await;
+    pub(super) async fn periodic_checks_cmds(&mut self) -> Vec<Cmd> {
+        let mut cmds = self.enqueue_cmds_for_standard_periodic_checks().await;
 
         if !self.node.read().await.is_elder() {
-            self.enqueue_cmds_for_adult_periodic_checks().await;
+            cmds.extend(self.enqueue_cmds_for_adult_periodic_checks().await);
 
             // we've pushed what we have as an adult and processed incoming msgs
             // and cmds... so we can return already
-            return;
+            return cmds;
         }
 
-        self.enqueue_cmds_for_elder_periodic_checks().await;
+        cmds.extend(self.enqueue_cmds_for_elder_periodic_checks().await);
+
+        cmds
     }
 
     /// Periodic tasks run for elders and adults alike
-    async fn enqueue_cmds_for_standard_periodic_checks(&mut self) {
+    async fn enqueue_cmds_for_standard_periodic_checks(&mut self) -> Vec<Cmd> {
         let now = Instant::now();
         let mut cmds = vec![];
 
         // happens regardless of if elder or adult
-        if self.timestamps.last_link_cleanup.elapsed() > LINK_CLEANUP_INTERVAL {
-            self.timestamps.last_link_cleanup = now;
+        if self.last_link_cleanup.elapsed() > LINK_CLEANUP_INTERVAL {
+            self.last_link_cleanup = now;
             cmds.push(Cmd::CleanupPeerLinks);
         }
 
         // if we've passed enough time, batch outgoing data
-        if self.timestamps.last_data_batch_check.elapsed() > DATA_BATCH_INTERVAL {
-            self.timestamps.last_data_batch_check = now;
-            if let Some(cmd) = match Self::replicate_queued_data(self.node.clone()).await {
-                Ok(cmd) => cmd,
+        if self.last_data_batch_check.elapsed() > DATA_BATCH_INTERVAL {
+            self.last_data_batch_check = now;
+            match Self::replicate_queued_data(self.node.clone()).await {
+                Ok(None) => {}
+                Ok(Some(cmd)) => cmds.push(cmd),
                 Err(error) => {
                     error!(
                         "Error handling getting cmds for data queued for replication: {error:?}"
                     );
-                    None
                 }
-            } {
-                cmds.push(cmd);
             }
         }
 
-        for cmd in cmds {
-            // dont use sender here incase channel gets full
-            self.fire_and_forget(cmd, None).await;
-        }
+        cmds
     }
 
     /// Periodic tasks run for adults only
-    async fn enqueue_cmds_for_adult_periodic_checks(&mut self) {
+    async fn enqueue_cmds_for_adult_periodic_checks(&mut self) -> Vec<Cmd> {
         let mut cmds = vec![];
 
         // if we've passed enough time, section probe
-        if self.timestamps.last_section_probe.elapsed() > SECTION_PROBE_INTERVAL {
-            self.timestamps.last_section_probe = Instant::now();
+        if self.last_section_probe.elapsed() > SECTION_PROBE_INTERVAL {
+            self.last_section_probe = Instant::now();
             cmds.push(Self::probe_the_section(self.node.clone()).await);
         }
 
-        for cmd in cmds {
-            // dont use sender here incase channel gets full
-            self.fire_and_forget(cmd, None).await;
-        }
+        cmds
     }
 
     /// Periodic tasks run for elders only
-    async fn enqueue_cmds_for_elder_periodic_checks(&mut self) {
+    async fn enqueue_cmds_for_elder_periodic_checks(&mut self) -> Vec<Cmd> {
         let now = Instant::now();
         let mut cmds = vec![];
 
-        if self.timestamps.last_probe.elapsed() > PROBE_INTERVAL {
-            self.timestamps.last_probe = now;
+        if self.last_probe.elapsed() > PROBE_INTERVAL {
+            self.last_probe = now;
             if let Some(cmd) = Self::probe_the_network(self.node.clone()).await {
                 cmds.push(cmd);
             }
         }
 
-        if self.timestamps.last_adult_health_check.elapsed() > ADULT_HEALTH_CHECK_INTERVAL {
-            self.timestamps.last_adult_health_check = now;
-            let health_cmds = match Self::perform_health_checks(self.node.clone()).await {
-                Ok(cmds) => cmds,
+        if self.last_adult_health_check.elapsed() > ADULT_HEALTH_CHECK_INTERVAL {
+            self.last_adult_health_check = now;
+            match Self::perform_health_checks(self.node.clone()).await {
+                Ok(health_cmds) => cmds.extend(health_cmds),
                 Err(error) => {
                     error!("Error handling client msg to perform health check: {error:?}");
-                    vec![]
                 }
-            };
-            cmds.extend(health_cmds);
+            }
         }
 
         // The above health check only queries for chunks
         // here we specifically ask for AE prob msgs and manually
         // track dysfunction
-        if self.timestamps.last_elder_health_check.elapsed() > ELDER_HEALTH_CHECK_INTERVAL {
-            self.timestamps.last_elder_health_check = now;
-            for cmd in Self::health_check_elders_in_section(self.node.clone()).await {
-                cmds.push(cmd);
-            }
+        if self.last_elder_health_check.elapsed() > ELDER_HEALTH_CHECK_INTERVAL {
+            self.last_elder_health_check = now;
+            cmds.extend(Self::health_check_elders_in_section(self.node.clone()).await);
         }
 
-        if self.timestamps.last_vote_check.elapsed() > MISSING_VOTE_INTERVAL {
-            self.timestamps.last_vote_check = now;
+        if self.last_vote_check.elapsed() > MISSING_VOTE_INTERVAL {
+            self.last_vote_check = now;
             if let Some(cmd) = Self::check_for_missed_votes(self.node.clone()).await {
                 cmds.push(cmd);
             };
         }
 
-        if self.timestamps.last_dkg_msg_check.elapsed() > MISSING_DKG_MSG_INTERVAL {
-            self.timestamps.last_dkg_msg_check = now;
+        if self.last_dkg_msg_check.elapsed() > MISSING_DKG_MSG_INTERVAL {
+            self.last_dkg_msg_check = now;
             let dkg_cmds = Self::check_for_missed_dkg_messages(self.node.clone()).await;
             cmds.extend(dkg_cmds);
         }
 
-        if self.timestamps.last_dysfunction_check.elapsed() > DYSFUNCTION_CHECK_INTERVAL {
-            self.timestamps.last_dysfunction_check = now;
+        if self.last_dysfunction_check.elapsed() > DYSFUNCTION_CHECK_INTERVAL {
+            self.last_dysfunction_check = now;
             let dysf_cmds = Self::check_for_dysfunction(self.node.clone()).await;
             cmds.extend(dysf_cmds);
         }
 
-        for cmd in cmds {
-            // dont use sender here incase channel gets full
-            self.fire_and_forget(cmd, None).await;
-        }
+        cmds
     }
 
     /// Initiates and generates all the subsequent Cmds to perform a healthcheck
@@ -386,22 +371,17 @@ impl FlowCtrl {
 
     async fn check_for_dysfunction(node: Arc<RwLock<MyNode>>) -> Vec<Cmd> {
         info!("Performing dysfunction checking");
-        let mut cmds = vec![];
-        let dysfunctional_nodes = node.write().await.get_dysfunctional_node_names();
-        let unresponsive_nodes = match dysfunctional_nodes {
-            Ok(nodes) => nodes,
+        match node.write().await.get_dysfunctional_node_names() {
+            Ok(unresponsive_nodes) if !unresponsive_nodes.is_empty() => {
+                debug!("{:?} : {unresponsive_nodes:?}", LogMarker::ProposeOffline);
+                vec![Cmd::ProposeVoteNodesOffline(unresponsive_nodes)]
+            }
+            Ok(_) => vec![],
             Err(error) => {
                 error!("Error getting dysfunctional nodes: {error}");
-                BTreeSet::default()
+                vec![]
             }
-        };
-
-        if !unresponsive_nodes.is_empty() {
-            debug!("{:?} : {unresponsive_nodes:?}", LogMarker::ProposeOffline);
-            cmds.push(Cmd::ProposeVoteNodesOffline(unresponsive_nodes))
         }
-
-        cmds
     }
 }
 

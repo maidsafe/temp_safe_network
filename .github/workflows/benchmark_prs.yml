@@ -53,7 +53,7 @@ jobs:
         run: cargo criterion -p sn_node --output-format bencher 2>&1 | tee -a output.txt
 
       - name: Build sn_node bins
-        run: cd sn_node && cargo build --release --bins
+        run: cd sn_node && cargo build --release --bins --features="disable-dysfunction-checks"
         timeout-minutes: 60
 
       - name: Build testnet

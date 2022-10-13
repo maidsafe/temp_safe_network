@@ -68,6 +68,8 @@ pub use qp2p::{Config as NetworkConfig, SendStream};
 pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API update
 
 mod core {
+    #[cfg(not(feature = "disable-dysfunction-checks"))]
+    use crate::node::{messaging::Peers, Error};
     use crate::{
         node::{
             bootstrap::JoiningAsRelocated,
@@ -76,9 +78,8 @@ mod core {
             flow_ctrl::{cmds::Cmd, event_channel::EventSender},
             handover::Handover,
             membership::{elder_candidates, try_split_dkg, Membership},
-            messaging::Peers,
-            DataStorage, Elders, Error, Event, MembershipEvent, NodeElderChange, Prefix, Proposal,
-            Result, XorName,
+            DataStorage, Elders, Event, MembershipEvent, NodeElderChange, Prefix, Proposal, Result,
+            XorName,
         },
         UsedSpace,
     };
@@ -298,6 +299,7 @@ mod core {
         ////////////////////////////////////////////////////////////////////////////
 
         /// Generates a random AE probe for _anywhere_ on the network.
+        #[cfg(not(feature = "disable-dysfunction-checks"))]
         pub(crate) fn generate_probe_msg(&self) -> Result<Cmd> {
             // Generate a random address not belonging to our Prefix
             let mut dst = xor_name::rand::random();
@@ -320,6 +322,7 @@ mod core {
         /// Generates a SectionProbeMsg with our current knowledge,
         /// targetting our section elders.
         /// Even if we're up to date, we expect a response.
+        #[cfg(not(feature = "disable-dysfunction-checks"))]
         pub(crate) fn generate_section_probe_msg(&self) -> Cmd {
             let our_section = self.network_knowledge.section_auth();
             let recipients = our_section.elders_set();
@@ -335,6 +338,7 @@ mod core {
         }
 
         /// returns names that are relatively dysfunctional
+        #[cfg(not(feature = "disable-dysfunction-checks"))]
         pub(crate) fn get_dysfunctional_node_names(&mut self) -> Result<BTreeSet<XorName>> {
             self.dysfunction_tracking
                 .get_dysfunctional_nodes()

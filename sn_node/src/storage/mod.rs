@@ -165,6 +165,7 @@ impl DataStorage {
     /// --- System calls ---
 
     // Read data from local store
+    #[allow(dead_code)]
     pub(crate) async fn get_from_local_store(
         &self,
         address: &DataAddress,

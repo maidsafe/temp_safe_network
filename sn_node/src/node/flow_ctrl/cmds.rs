@@ -104,7 +104,7 @@ impl CmdJob {
 /// Modelling a call like this also allows for throttling
 /// and prioritization, which is not something e.g. tokio tasks allow.
 /// In other words, it enables enhanced flow control.
-#[allow(clippy::large_enum_variant)]
+#[allow(clippy::large_enum_variant, dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) enum Cmd {
     /// Cleanup node's PeerLinks, removing any unsused, unconnected peers

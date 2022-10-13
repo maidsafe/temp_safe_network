@@ -11,37 +11,35 @@ pub(crate) mod cmds;
 pub(super) mod dispatcher;
 pub(super) mod event;
 pub(super) mod event_channel;
+#[cfg(not(feature = "disable-dysfunction-checks"))]
 mod periodic_checks;
 #[cfg(test)]
 pub(crate) mod tests;
 
 pub(crate) use cmd_ctrl::CmdCtrl;
 use event_channel::EventSender;
-use periodic_checks::PeriodicChecksTimestamps;
+#[cfg(not(feature = "disable-dysfunction-checks"))]
+use periodic_checks::PeriodicChecks;
 
 use crate::comm::MsgFromPeer;
-use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, Error, Result};
 
 use sn_interface::types::log_markers::LogMarker;
 
-use std::sync::Arc;
-use tokio::sync::{
-    mpsc::{self, error::TryRecvError},
-    RwLock,
-};
+use tokio::sync::mpsc::{self, error::TryRecvError};
 
 const PROCESS_BATCH_COUNT: usize = 5;
 
 /// Listens for incoming msgs and forms Cmds for each,
 /// Periodically triggers other Cmd Processes (eg health checks, dysfunction etc)
 pub(crate) struct FlowCtrl {
-    node: Arc<RwLock<MyNode>>,
     cmd_ctrl: CmdCtrl,
     incoming_msg_events: mpsc::Receiver<MsgFromPeer>,
     incoming_cmds_from_apis: mpsc::Receiver<(Cmd, Option<usize>)>,
     cmd_sender_channel: mpsc::Sender<(Cmd, Option<usize>)>,
     outgoing_node_event_sender: EventSender,
-    timestamps: PeriodicChecksTimestamps,
+    #[cfg(not(feature = "disable-dysfunction-checks"))]
+    periodic_checks: PeriodicChecks,
 }
 
 impl FlowCtrl {
@@ -52,16 +50,18 @@ impl FlowCtrl {
         incoming_msg_events: mpsc::Receiver<MsgFromPeer>,
         outgoing_node_event_sender: EventSender,
     ) -> mpsc::Sender<(Cmd, Option<usize>)> {
-        let node = cmd_ctrl.node();
+        #[cfg(not(feature = "disable-dysfunction-checks"))]
+        let periodic_checks = PeriodicChecks::new(cmd_ctrl.dispatcher.node());
+
         let (cmd_sender_channel, incoming_cmds_from_apis) = mpsc::channel(10_000);
         let flow_ctrl = Self {
             cmd_ctrl,
-            node,
             incoming_msg_events,
             incoming_cmds_from_apis,
             cmd_sender_channel: cmd_sender_channel.clone(),
             outgoing_node_event_sender,
-            timestamps: PeriodicChecksTimestamps::now(),
+            #[cfg(not(feature = "disable-dysfunction-checks"))]
+            periodic_checks,
         };
 
         let _ = tokio::task::spawn_local(async move {
@@ -168,14 +168,21 @@ impl FlowCtrl {
                 }
             }
 
-            self.perform_periodic_checks().await;
+            #[cfg(not(feature = "disable-dysfunction-checks"))]
+            {
+                let cmds = self.periodic_checks.periodic_checks_cmds().await;
+                for cmd in cmds {
+                    // dont use sender here incase channel gets full
+                    self.fire_and_forget(cmd, None).await;
+                }
+            }
         }
 
         error!("Internal processing ended.")
     }
 
     /// Does not await the completion of the cmd.
-    pub(super) async fn fire_and_forget(&mut self, cmd: Cmd, parent_id: Option<usize>) {
+    async fn fire_and_forget(&mut self, cmd: Cmd, parent_id: Option<usize>) {
         self.cmd_ctrl.push(cmd, parent_id).await
     }
 

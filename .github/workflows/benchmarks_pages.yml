@@ -44,7 +44,7 @@ jobs:
         run: sudo apt-get -y install ripgrep
 
       - name: Build sn_node bins
-        run: cd sn_node && cargo build --release --bins
+        run: cd sn_node && cargo build --release --bins --features="disable-dysfunction-checks"
         timeout-minutes: 60
 
       - name: Build testnet

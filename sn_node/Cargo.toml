@@ -29,6 +29,7 @@ traceroute = ["sn_interface/traceroute"]
 tokio-console = ["console-subscriber"]
 otlp = [ "opentelemetry", "opentelemetry-otlp", "opentelemetry-semantic-conventions", "tracing-opentelemetry" ]
 statemap = []
+disable-dysfunction-checks = []
 
 [dependencies]
 backoff = { version = "~0.4.0", features = [ "tokio" ] }

@@ -145,6 +145,7 @@ impl DkgVoter {
         Ok((new_pub_key, key_sig))
     }
 
+    #[cfg(not(feature = "disable-dysfunction-checks"))]
     pub(crate) fn last_received_dkg_message(&self) -> Option<Instant> {
         self.last_received_dkg_msg_time
     }
@@ -331,6 +332,7 @@ impl DkgVoter {
     }
 
     /// Checks a dkg session for termination
+    #[allow(dead_code)]
     pub(crate) fn reached_termination(&self, session_id: &DkgSessionId) -> Result<bool> {
         match self.dkg_states.get(&session_id.hash()) {
             Some(state) => Ok(state.reached_termination()?),
@@ -339,6 +341,7 @@ impl DkgVoter {
     }
 
     /// Get the DKG outome
+    #[allow(dead_code)]
     pub(crate) fn outcome(
         &self,
         session_id: &DkgSessionId,

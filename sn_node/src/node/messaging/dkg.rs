@@ -605,6 +605,7 @@ impl MyNode {
     }
 
     // broadcasts our current known votes
+    #[allow(dead_code)]
     fn gossip_votes(
         &self,
         session_id: DkgSessionId,
@@ -631,6 +632,7 @@ impl MyNode {
     }
 
     // broadcasts our ephemeral key
+    #[allow(dead_code)]
     fn gossip_our_key(
         &self,
         session_id: DkgSessionId,
@@ -690,10 +692,12 @@ impl MyNode {
         vec![cmd]
     }
 
+    #[allow(dead_code)]
     pub(crate) fn had_sap_change_since(&self, session_id: &DkgSessionId) -> bool {
         self.network_knowledge.section_chain_len() != session_id.section_chain_len
     }
 
+    #[allow(dead_code)]
     pub(crate) fn gossip_handover_trigger(&self, session_id: &DkgSessionId) -> Vec<Cmd> {
         match self.dkg_voter.outcome(session_id) {
             Ok(Some((our_id, new_pubs, new_sec))) => {
@@ -724,6 +728,7 @@ impl MyNode {
 
     /// For all the ongoing DKG sessions, sends out all the current known votes to all DKG
     /// participants if we don't have any votes yet, sends out our ephemeral key
+    #[allow(dead_code)]
     pub(crate) fn dkg_gossip_msgs(&self) -> Vec<Cmd> {
         let mut cmds = vec![];
         for (_hash, session_info) in self.dkg_sessions_info.iter() {

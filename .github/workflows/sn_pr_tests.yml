@@ -217,7 +217,7 @@ jobs:
         run: cargo install ripgrep
 
       - name: Build sn bins
-        run: cd sn_node && cargo build --release --bins
+        run: cd sn_node && cargo build --release --bins --features="disable-dysfunction-checks"
         timeout-minutes: 60
 
       - name: Build testnet
@@ -362,7 +362,7 @@ jobs:
         run: cargo install ripgrep
 
       - name: Build sn bins
-        run: cd sn_node && cargo build --release --bins
+        run: cd sn_node && cargo build --release --bins --features="disable-dysfunction-checks"
         timeout-minutes: 60
 
       - name: Build testnet
@@ -540,7 +540,7 @@ jobs:
         run: cargo install ripgrep
 
       - name: Build sn bins
-        run: cd sn_node && cargo build --release --bins
+        run: cd sn_node && cargo build --release --bins --features="disable-dysfunction-checks"
         timeout-minutes: 60
 
       - name: Build testnet
@@ -665,7 +665,7 @@ jobs:
         run: cargo install ripgrep
 
       - name: Build sn bins
-        run: cd sn_node && cargo build --release --bins
+        run: cd sn_node && cargo build --release --bins --features="disable-dysfunction-checks"
         timeout-minutes: 60
 
       - name: Build testnet
