@@ -145,6 +145,7 @@ impl MyNode {
                             Error::CannotHandleQuery(query.clone()),
                             origin,
                             msg_id,
+                            send_stream,
                             #[cfg(feature = "traceroute")]
                             wire_msg.traceroute(),
                         );
@@ -177,6 +178,7 @@ impl MyNode {
                         msg,
                         auth,
                         origin,
+                        send_stream.clone(),
                         #[cfg(feature = "traceroute")]
                         wire_msg.traceroute(),
                     )
@@ -189,6 +191,7 @@ impl MyNode {
                             err,
                             origin,
                             msg_id,
+                            send_stream,
                             #[cfg(feature = "traceroute")]
                             wire_msg.traceroute(),
                         );

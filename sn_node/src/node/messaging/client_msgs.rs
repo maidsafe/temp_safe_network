@@ -11,6 +11,7 @@ use crate::node::messaging::{OutgoingMsg, Peers};
 use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result};
 use bytes::Bytes;
 
+use qp2p::SendStream;
 use sn_dbc::{
     get_public_commitments_from_transaction, Commitment, KeyImage, RingCtTransaction, SpentProof,
     SpentProofShare,
@@ -33,8 +34,10 @@ use sn_interface::{
         Keypair, Peer, PublicKey, RegisterCmd, ReplicatedData, SPENTBOOK_TYPE_TAG,
     },
 };
+use tokio::sync::Mutex;
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 use xor_name::XorName;
 
 impl MyNode {
@@ -49,6 +52,7 @@ impl MyNode {
         self.send_client_msg(
             the_ack_msg,
             Peers::Single(target),
+            None,
             #[cfg(feature = "traceroute")]
             traceroute,
         )
@@ -60,6 +64,7 @@ impl MyNode {
         error: Error,
         target: Peer,
         correlation_id: MsgId,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Cmd {
         let the_error_msg = ClientMsg::CmdError {
@@ -70,6 +75,7 @@ impl MyNode {
         self.send_client_msg(
             the_error_msg,
             Peers::Single(target),
+            send_stream,
             #[cfg(feature = "traceroute")]
             traceroute,
         )
@@ -80,6 +86,7 @@ impl MyNode {
         &self,
         msg: ClientMsg,
         recipients: Peers,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")] mut traceroute: Traceroute,
     ) -> Cmd {
         #[cfg(feature = "traceroute")]
@@ -92,6 +99,7 @@ impl MyNode {
             msg: OutgoingMsg::Client(msg),
             msg_id,
             recipients,
+            send_stream,
             #[cfg(feature = "traceroute")]
             traceroute,
         }
@@ -171,7 +179,7 @@ impl MyNode {
         }
 
         let mut cmds = vec![];
-        for (correlation_id, peer) in waiting_peers.into_iter() {
+        for ((correlation_id, peer), send_stream) in waiting_peers.into_iter() {
             let msg = ClientMsg::QueryResponse {
                 response: response.clone(),
                 correlation_id,
@@ -180,6 +188,7 @@ impl MyNode {
             cmds.push(self.send_client_msg(
                 msg,
                 Peers::Single(peer),
+                send_stream,
                 #[cfg(feature = "traceroute")]
                 traceroute.clone(),
             ));
@@ -199,6 +208,7 @@ impl MyNode {
         msg: ClientMsg,
         auth: AuthorityProof<ClientAuth>,
         origin: Peer,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         if !self.is_elder() {
@@ -262,6 +272,7 @@ impl MyNode {
                         msg_id,
                         auth,
                         origin,
+                        send_stream,
                         #[cfg(feature = "traceroute")]
                         traceroute,
                     )
