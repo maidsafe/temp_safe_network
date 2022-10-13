@@ -194,7 +194,7 @@ impl NetworkKnowledge {
                 create_first_section_authority_provider(&public_key_set, &secret_key_share, peer)?;
             SectionTreeUpdate::new(section_auth, SectionsDAG::new(genesis_key))
         };
-        let network_knowledge = Self::new(SectionTree::new(genesis_key), section_tree_update)?;
+        let mut network_knowledge = Self::new(SectionTree::new(genesis_key), section_tree_update)?;
 
         for peer in network_knowledge.signed_sap.elders() {
             let node_state = NodeState::joined(*peer, None);
@@ -433,7 +433,7 @@ impl NetworkKnowledge {
 
     /// Try to merge this `NetworkKnowledge` members with `peers`.
     /// Checks if we're already up to date before attempting to verify and merge members
-    pub fn merge_members(&self, peers: BTreeSet<SectionSigned<NodeState>>) -> Result<bool> {
+    pub fn merge_members(&mut self, peers: BTreeSet<SectionSigned<NodeState>>) -> Result<bool> {
         let mut there_was_an_update = false;
         let our_current_members = self.section_peers.members();
 
@@ -464,7 +464,7 @@ impl NetworkKnowledge {
     }
 
     /// Update the member. Returns whether it actually updated it.
-    pub fn update_member(&self, node_state: SectionSigned<NodeState>) -> bool {
+    pub fn update_member(&mut self, node_state: SectionSigned<NodeState>) -> bool {
         let node_name = node_state.name();
         trace!(
             "Updating section member state, name: {node_name:?}, new state: {:?}",

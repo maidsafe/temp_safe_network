@@ -205,7 +205,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                 SectionTreeUpdate::new(signed_sap, section_chain)
             };
 
-            let section = NetworkKnowledge::new(SectionTree::new(pk), section_tree_update)?;
+            let mut section = NetworkKnowledge::new(SectionTree::new(pk), section_tree_update)?;
             let mut expected_new_elders = BTreeSet::new();
 
             for peer in section_auth.elders() {
@@ -381,7 +381,8 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
         .run_until(async move {
             let (section_auth, mut nodes, sk_set) = network_utils::create_section_auth();
 
-            let (section, _) = network_utils::create_section(&sk_set, &section_auth, None, None)?;
+            let (mut section, _) =
+                network_utils::create_section(&sk_set, &section_auth, None, None)?;
 
             let existing_peer = network_utils::create_peer(MIN_ADULT_AGE);
             let node_state = NodeState::joined(existing_peer, None);
@@ -655,7 +656,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
                 RelocatedPeerRole::NonElder => recommended_section_size(),
             };
             let (section_auth, mut nodes, sk_set) = random_sap(prefix, elder_count(), 0, None);
-            let (section, section_key_share) =
+            let (mut section, section_key_share) =
                 network_utils::create_section(&sk_set, &section_auth, None, None)?;
 
             let mut adults = section_size - elder_count();
@@ -816,7 +817,7 @@ async fn handle_elders_update() -> Result<()> {
             0,
         );
 
-        let (section0, section_key_share) = network_utils::create_section_with_elders(&sk_set0, &sap0)?;
+        let (mut section0, section_key_share) = network_utils::create_section_with_elders(&sk_set0, &sap0)?;
 
         for peer in [&adult_peer, &promoted_peer] {
             let node_state = NodeState::joined(*peer, None);
@@ -969,7 +970,7 @@ async fn handle_demote_during_split() -> Result<()> {
                 sk_set_v0.public_keys(),
                 0,
             );
-            let (section, section_key_share) =
+            let (mut section, section_key_share) =
                 network_utils::create_section_with_elders(&sk_set_v0, &section_auth_v0)?;
 
             // all peers b are added
