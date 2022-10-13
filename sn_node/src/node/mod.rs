@@ -105,7 +105,6 @@ mod core {
     use ed25519_dalek::Keypair;
     use itertools::Itertools;
     use resource_proof::ResourceProof;
-    use tokio::sync::Mutex;
     use std::{
         collections::{BTreeMap, BTreeSet, HashMap},
         net::SocketAddr,
@@ -113,6 +112,7 @@ mod core {
         sync::Arc,
         time::Duration,
     };
+    use tokio::sync::Mutex;
     use uluru::LRUCache;
 
     /// Amount of tokens to be owned by the Genesis DBC.
@@ -187,7 +187,8 @@ mod core {
         pub(crate) capacity: Capacity,
         pub(crate) dysfunction_tracking: DysfunctionDetection,
         /// Cache the request combo,  (OperationId -> An adult xorname), to waiting Clients peers for that combo
-        pub(crate) pending_data_queries: Cache<(OperationId, XorName), BTreeMap<(MsgId, Peer), Option<Arc<Mutex<SendStream>>>>>,
+        pub(crate) pending_data_queries:
+            Cache<(OperationId, XorName), BTreeMap<(MsgId, Peer), Option<Arc<Mutex<SendStream>>>>>,
         // Caches
         pub(crate) ae_backoff_cache: AeBackoffCache,
     }

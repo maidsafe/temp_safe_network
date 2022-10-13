@@ -31,8 +31,18 @@ pub enum Error {
     #[error("Failed to obtain network contacts to bootstrap to: {0}")]
     NetworkContacts(String),
     /// InsufficientAcksReceived
-    #[error("Did not receive sufficient ACK messages from elders to be sure this cmd passed.")]
-    InsufficientAcksReceived,
+    #[error(
+        "Did not receive sufficient ACK messages from elders to be sure this cmd ({msg_id:?}) \
+        passed, expected: {expected}, received {received}."
+    )]
+    InsufficientAcksReceived {
+        /// Id of the cmd message sent
+        msg_id: MsgId,
+        /// Number of expected ACKs
+        expected: usize,
+        /// Number of received ACKs
+        received: usize,
+    },
     /// Message auth checks failed
     #[error("Message's authority could not be trusted, unknown section key: {0:?}.")]
     UntrustedMessage(PublicKey),

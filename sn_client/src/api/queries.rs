@@ -30,7 +30,38 @@ impl Client {
     /// Queries are automatically retried using exponential backoff if the timeout is hit.
     #[instrument(skip(self), level = "debug")]
     pub async fn send_query(&self, query: DataQueryVariant) -> Result<QueryResult, Error> {
+        /****** TODO: re-enable sendign with retrials ********
         self.send_query_with_retry(query, true).await
+        *****************************************************/
+
+        let query = DataQuery {
+            adult_index: 0,
+            variant: query,
+        };
+        let span = info_span!("Attempting a query");
+        let _ = span.enter();
+
+        let dst = query.variant.dst_name();
+        let msg = ServiceMsg::Query(query.clone());
+        let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
+        let signature = self.keypair.sign(&serialised_query);
+
+        // grab up to date destination section from our local network knowledge
+        let (section_pk, elders) = self.session.get_query_elders(dst).await?;
+
+        // should we force a fresh connection to the nodes?
+        let force_new_link = false;
+        let client_pk = self.public_key();
+
+        self.send_signed_query_to_section(
+            query.clone(),
+            client_pk,
+            serialised_query.clone(),
+            signature.clone(),
+            Some((section_pk, elders.clone())),
+            force_new_link,
+        )
+        .await
     }
 
     /// Send a Query to the network and await a response.

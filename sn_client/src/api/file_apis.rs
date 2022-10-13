@@ -19,10 +19,10 @@ use sn_interface::{
 
 use bincode::deserialize;
 use bytes::Bytes;
-use futures::future::join_all;
+//use futures::future::join_all;
 use itertools::Itertools;
 use self_encryption::{self, ChunkInfo, DataMap, EncryptedChunk};
-use tokio::task;
+//use tokio::task;
 use tracing::trace;
 use xor_name::XorName;
 
@@ -82,6 +82,7 @@ impl Client {
 
     #[instrument(skip(self), level = "trace")]
     pub(crate) async fn get_chunk(&self, name: &XorName) -> Result<Chunk> {
+        /* TODO: re-enable chunks cache
         // first check it's not already in our Chunks' cache
         if let Some(chunk) = self
             .chunks_cache
@@ -92,6 +93,7 @@ impl Client {
             trace!("Chunk retrieved from local cache: {:?}", name);
             return Ok(chunk.clone());
         }
+        */
 
         let query = DataQueryVariant::GetChunk(ChunkAddress(*name));
         let res = self.send_query(query.clone()).await?;
@@ -155,27 +157,33 @@ impl Client {
     /// It does this via repeatedly running `read_bytes` until we hit `query_timeout`.
     #[instrument(skip_all, level = "trace")]
     pub async fn upload_and_verify(&self, bytes: Bytes) -> Result<(XorName, Bytes)> {
+        debug!(">*********************** BYTES UPLOADING STARTING");
         let address = self.upload(bytes).await?;
-
+        debug!(
+            ">*********************** BYTES UPLOADED SUCCESSFULLY: {}",
+            address
+        );
         // each individual `read_bytes` could return earlier than
         // query_timeout with `DataNotFound` eg,
         // but this could just mean that the data has not yet
         // reached adults...
         //
         // and so, we loop until the timeout _over_ our
-        let bytes = tokio::time::timeout(self.query_timeout, async {
-            let mut last_response = self.read_bytes(address).await;
-            while last_response.is_err() {
-                error!(
-                    "Error when attempting to verify bytes were uploaded: {:?}",
-                    last_response
-                );
-                last_response = self.read_bytes(address).await;
-            }
-            last_response
-        })
-        .await
-        .map_err(|_| Error::NoResponsesForUploadValidation)??;
+
+        // TODO: re-enable timeout
+        // let bytes = tokio::time::timeout(self.query_timeout, async {
+        let last_response = self.read_bytes(address).await;
+        if last_response.is_err() {
+            error!(
+                "Error when attempting to verify bytes were uploaded: {:?}",
+                last_response
+            );
+            //last_response = self.read_bytes(address).await;
+        }
+        let bytes = last_response?;
+        //})
+        //.await
+        //.map_err(|_| Error::NoResponsesForUploadValidation)??;
 
         Ok((address, bytes))
     }
@@ -200,6 +208,9 @@ impl Client {
     async fn upload_large(&self, large: LargeFile) -> Result<XorName> {
         let (head_address, all_chunks) = Self::encrypt_large(large)?;
 
+        /*
+        TODO: re-enable concurrently fetching chunks
+
         let tasks = all_chunks.into_iter().map(|chunk| {
             let writer = self.clone();
             task::spawn(async move { writer.send_cmd(DataCmd::StoreChunk(chunk)).await })
@@ -214,6 +225,11 @@ impl Client {
         for res in respones {
             // fail with any issue here
             res?;
+        }
+        */
+
+        for chunk in all_chunks.into_iter() {
+            self.send_cmd(DataCmd::StoreChunk(chunk)).await?;
         }
 
         Ok(head_address)
@@ -271,34 +287,55 @@ impl Client {
     ) -> Result<Vec<EncryptedChunk>> {
         let expected_count = chunks_info.len();
 
-        let tasks = chunks_info.into_iter().map(|chunk_info| {
-            let client = client.clone();
-            task::spawn(async move {
-                match client.get_chunk(&chunk_info.dst_hash).await {
-                    Ok(chunk) => Ok(EncryptedChunk {
-                        index: chunk_info.index,
-                        content: chunk.value().clone(),
-                    }),
-                    Err(err) => {
-                        warn!(
-                            "Reading chunk {} from network, resulted in error {:?}.",
-                            chunk_info.dst_hash, err
-                        );
-                        Err(err)
-                    }
-                }
-            })
-        });
+        /*
+        TODO: re-enable concurrently fetching chunks
 
-        // This swallowing of errors
-        // is basically a compaction into a single
-        // error saying "didn't get all chunks".
-        let encrypted_chunks = join_all(tasks)
-            .await
-            .into_iter()
-            .flatten()
-            .flatten()
-            .collect_vec();
+                let tasks = chunks_info.into_iter().map(|chunk_info| {
+                    let client = client.clone();
+                    task::spawn(async move {
+                        match client.get_chunk(&chunk_info.dst_hash).await {
+                            Ok(chunk) => Ok(EncryptedChunk {
+                                index: chunk_info.index,
+                                content: chunk.value().clone(),
+                            }),
+                            Err(err) => {
+                                warn!(
+                                    "Reading chunk {} from network, resulted in error {:?}.",
+                                    chunk_info.dst_hash, err
+                                );
+                                Err(err)
+                            }
+                        }
+                    })
+                });
+
+                // This swallowing of errors
+                // is basically a compaction into a single
+                // error saying "didn't get all chunks".
+                let encrypted_chunks = join_all(tasks)
+                    .await
+                    .into_iter()
+                    .flatten()
+                    .flatten()
+                    .collect_vec();
+        */
+
+        let mut encrypted_chunks = vec![];
+        for chunk_info in chunks_info.iter() {
+            match client.get_chunk(&chunk_info.dst_hash).await {
+                Ok(chunk) => encrypted_chunks.push(EncryptedChunk {
+                    index: chunk_info.index,
+                    content: chunk.value().clone(),
+                }),
+                Err(err) => {
+                    warn!(
+                        "Reading chunk {} from network, resulted in error {:?}.",
+                        chunk_info.dst_hash, err
+                    );
+                    return Err(err);
+                }
+            }
+        }
 
         if expected_count > encrypted_chunks.len() {
             Err(Error::NotEnoughChunksRetrieved {
@@ -341,7 +378,6 @@ mod tests {
     use bytes::Bytes;
     use eyre::{eyre, Result};
     use futures::future::join_all;
-    use std::time::Duration;
     use tokio::time::Instant;
     use tracing::{instrument::Instrumented, Instrument};
     use xor_name::XorName;
@@ -476,9 +512,6 @@ mod tests {
         debug!("======> Data uploaded");
 
         let concurrent_client_count = 25;
-        // clients already retry to send cmds/queries, so we should not need a
-        // massive retry count here.
-        let retry_count = 10;
         let clients = create_clients(concurrent_client_count).await?;
         assert_eq!(concurrent_client_count, clients.len());
 
@@ -487,29 +520,18 @@ mod tests {
         for client in clients {
             let handle: Instrumented<tokio::task::JoinHandle<Result<()>>> =
                 tokio::spawn(async move {
-                    let mut last_try = true;
-                    // get the data with many retries
-                    for i in 0..retry_count {
-                        match client.read_bytes(address).await {
-                            Ok(_data) => {
-                                last_try = false;
-                                break;
-                            }
-                            Err(_) => {
-                                debug!(
-                                    "client #{:?} failed the data, sleeping..",
-                                    client.public_key()
-                                );
-                                tokio::time::sleep(Duration::from_millis(i * 100)).await;
-                            }
-                        };
+                    match client.read_bytes(address).await {
+                        Ok(_data) => {
+                            debug!("client #{:?} got the data", client.public_key());
+                        }
+                        Err(err) => {
+                            debug!(
+                                "client #{:?} failed to get the data: {:?}",
+                                client.public_key(),
+                                err
+                            );
+                        }
                     }
-                    if last_try {
-                        let _ = client.read_bytes(address).await?;
-                    }
-
-                    debug!("client #{:?} got the data", client.public_key());
-
                     Ok(())
                 })
                 .in_current_span();

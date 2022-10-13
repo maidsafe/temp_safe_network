@@ -19,8 +19,8 @@ use sn_interface::messaging::MsgId;
 
 use custom_debug::Debug;
 
-use tokio::sync::Mutex;
 use tokio::sync::mpsc;
+use tokio::sync::Mutex;
 
 // TODO: temporarily disable priority while we transition to channels
 // type Priority = i32;

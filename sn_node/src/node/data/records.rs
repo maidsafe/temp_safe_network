@@ -26,8 +26,8 @@ use sn_interface::{
 
 use bytes::Bytes;
 use itertools::Itertools;
-use tokio::sync::Mutex;
 use std::{cmp::Ordering, collections::BTreeSet, sync::Arc};
+use tokio::sync::Mutex;
 use tracing::info;
 use xor_name::XorName;
 

@@ -447,10 +447,22 @@ mod tests {
                 let peer0_msg = new_test_msg(dst(peer0))?;
                 let peer1_msg = new_test_msg(dst(peer1))?;
 
-                comm.send_out_bytes(peer0, peer0_msg.msg_id(), peer0_msg.serialize()?, None, false)
-                    .await?;
-                comm.send_out_bytes(peer1, peer1_msg.msg_id(), peer1_msg.serialize()?, None, false)
-                    .await?;
+                comm.send_out_bytes(
+                    peer0,
+                    peer0_msg.msg_id(),
+                    peer0_msg.serialize()?,
+                    None,
+                    false,
+                )
+                .await?;
+                comm.send_out_bytes(
+                    peer1,
+                    peer1_msg.msg_id(),
+                    peer1_msg.serialize()?,
+                    None,
+                    false,
+                )
+                .await?;
 
                 if let Some(bytes) = rx0.recv().await {
                     assert_eq!(WireMsg::from(bytes)?, peer0_msg);
