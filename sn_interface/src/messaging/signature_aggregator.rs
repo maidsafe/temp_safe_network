@@ -68,7 +68,7 @@ impl SignatureAggregator {
         hasher.finalize(&mut hash);
 
         // save the sig share
-        let current_shares = self.map.entry(hash).or_insert(BTreeSet::new());
+        let current_shares = self.map.entry(hash).or_default();
         let _ = current_shares.insert(sig_share.clone());
 
         // try aggregate
