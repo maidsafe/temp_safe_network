@@ -109,6 +109,22 @@ pub fn random_sap_with_key(
     (section_auth, nodes)
 }
 
+/// Generate a `SectionTreeUpdate` where the SAP's section key is appended to the proof chain
+pub fn gen_section_tree_update(
+    sap: &SectionSigned<SectionAuthorityProvider>,
+    proof_chain: &SectionsDAG,
+    parent_sk: &bls::SecretKey,
+) -> Result<SectionTreeUpdate> {
+    let signed_key = section_signed(parent_sk, sap.section_key())?;
+    let mut proof_chain = proof_chain.clone();
+    proof_chain.insert(
+        &parent_sk.public_key(),
+        signed_key.value,
+        signed_key.sig.signature,
+    )?;
+    Ok(SectionTreeUpdate::new(sap.clone(), proof_chain))
+}
+
 // Create signature for the given payload using the given secret key.
 pub fn prove<T: Serialize>(secret_key: &bls::SecretKey, payload: &T) -> Result<SectionSig> {
     let bytes = bincode::serialize(payload).map_err(|_| Error::InvalidPayload)?;

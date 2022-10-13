@@ -447,14 +447,12 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             let members =
                 BTreeSet::from_iter(nodes.iter().map(|n| NodeState::joined(n.peer(), None)));
             let pk1 = sk_set1.secret_key().public_key();
-            let pk1_signature = sk0.sign(bincode::serialize(&pk1)?);
 
-            let mut section_chain = SectionsDAG::new(pk0);
-            assert!(section_chain.insert(&pk0, pk1, pk1_signature).is_ok());
-            let section_tree_update = {
-                let signed_old_sap = section_signed(&sk_set1.secret_key(), old_sap.clone())?;
-                SectionTreeUpdate::new(signed_old_sap, section_chain.clone())
-            };
+            let section_tree_update = gen_section_tree_update(
+                &section_signed(&sk_set1.secret_key(), old_sap.clone())?,
+                &SectionsDAG::new(pk0),
+                &sk0,
+            )?;
             let network_knowledge =
                 NetworkKnowledge::new(SectionTree::new(pk0), section_tree_update)?;
 
@@ -480,8 +478,6 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             let sk_set2 = SecretKeySet::random(None);
             let sk2 = sk_set2.secret_key();
             let pk2 = sk2.public_key();
-            let pk2_signature = sk_set1.secret_key().sign(bincode::serialize(&pk2)?);
-            section_chain.insert(&pk1, pk2, pk2_signature)?;
 
             let old_node = nodes.remove(0);
             let src_section_pk = pk2;
@@ -502,10 +498,11 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
                 0,
             );
             let new_section_elders: BTreeSet<_> = new_sap.names();
-            let section_tree_update = {
-                let signed_new_sap = section_signed(sk2, new_sap.clone())?;
-                SectionTreeUpdate::new(signed_new_sap, section_chain)
-            };
+            let section_tree_update = gen_section_tree_update(
+                &section_signed(sk2, new_sap.clone())?,
+                &node.section_chain(),
+                &sk_set1.secret_key(),
+            )?;
 
             // Create the `Sync` message containing the new `Section`.
             let wire_msg = WireMsg::single_src(
