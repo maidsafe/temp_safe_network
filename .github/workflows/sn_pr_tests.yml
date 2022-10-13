@@ -287,7 +287,7 @@ jobs:
           junit-path: junit.xml
           package: sn_client
           release: true
-          filters: store_and_read
+          #filters: store_and_read
           test-threads: 1
         timeout-minutes: 60
 

@@ -202,10 +202,16 @@ impl Session {
         if let Some(mut received_acks) = cmds.get_mut(&correlation_id) {
             let acks = received_acks.value_mut();
             let _prior = acks.insert((src, error));
+            debug!(
+                "ACK received from {src:?} inserted on NON-empty set for correlation_id {correlation_id:?}",
+            );
         } else {
             let received = DashSet::new();
             let _nonexistent = received.insert((src, error));
             let _non_prior = cmds.insert(correlation_id, Arc::new(received));
+            debug!(
+                "ACK received from {src:?} inserted on empty set for correlation_id {correlation_id:?}",
+            );
         }
     }
 

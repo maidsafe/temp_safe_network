@@ -192,7 +192,10 @@ impl Session {
                     return_error = error.clone();
                 }
 
-                let _preexisting = received_responses_from.insert(*ack_src);
+                let preexisting = received_responses_from.insert(*ack_src);
+                debug!(
+                    "ACK from {ack_src:?} read from set for msg_id {msg_id:?} - preexisting??: {preexisting:?}",
+                );
 
                 if error.is_some() {
                     error!(
@@ -224,6 +227,8 @@ impl Session {
 
                 return Ok(());
             }
+
+            debug!("ACK RECEIVED: {received_responses_from:?}");
 
             let missing_responses: Vec<Peer> = elders
                 .iter()
