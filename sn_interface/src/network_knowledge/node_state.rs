@@ -45,7 +45,7 @@ impl NodeState {
     }
 
     // Creates a `NodeState` in the `Left` state.
-    #[cfg(feature = "test-utils")]
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn left(peer: Peer, previous_name: Option<XorName>) -> Self {
         Self {
             peer,
@@ -55,7 +55,7 @@ impl NodeState {
     }
 
     // Creates a `NodeState` in the `Relocated` state.
-    #[cfg(feature = "test-utils")]
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn relocated(
         peer: Peer,
         previous_name: Option<XorName>,

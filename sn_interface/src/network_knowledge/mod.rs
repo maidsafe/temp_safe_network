@@ -223,9 +223,8 @@ impl NetworkKnowledge {
         Ok(())
     }
 
-    /// If we already have the signed SAP and section chain for the provided key and prefix
-    /// we make them the current SAP and section chain, and if so, this returns 'true'.
-    /// Note this function assumes we already have the key share for the provided section key.
+    /// If we already have the signed SAP for the provided key and prefix, we make it the current SAP, and if so, this
+    /// returns 'true'. Note this function assumes we already have the key share for the provided section key.
     pub fn try_update_current_sap(&mut self, section_key: BlsPublicKey, prefix: &Prefix) -> bool {
         // Let's try to find the signed SAP corresponding to the provided prefix and section key
         match self.section_tree.get_signed(prefix) {
@@ -243,9 +242,7 @@ impl NetworkKnowledge {
                         // Prune list of archived members
                         if let Err(e) = self.section_peers.prune_members_archive(&pc, &section_key)
                         {
-                            error!(
-                                "Error while pruning member archive with last_key: {section_key:?}, err: {e:?}"
-                            );
+                            error!("Error while pruning member archive with last_key: {section_key:?}, err: {e:?}");
                         }
                         // Let's then update our current SAP and section chain
                         let our_prev_prefix = self.prefix();
@@ -664,8 +661,17 @@ fn create_first_sig<T: Serialize>(
 
 #[cfg(test)]
 mod tests {
-    use super::supermajority;
+    use super::{
+        supermajority,
+        test_utils::{gen_addr, prefix, random_sap, section_signed},
+        NetworkKnowledge,
+    };
+    use crate::{network_knowledge::test_utils::gen_section_tree_update, types::Peer};
+    use bls::SecretKeySet;
+    use eyre::Result;
     use proptest::prelude::*;
+    use rand::thread_rng;
+    use xor_name::XorName;
 
     #[test]
     fn supermajority_of_small_group() {
@@ -689,5 +695,44 @@ mod tests {
             assert_eq!(supermajority(n + 1), 2 * a + 1);
             assert_eq!(supermajority(n + 2), 2 * a + 2);
         }
+    }
+
+    #[test]
+    fn signed_sap_field_should_not_be_changed_if_the_update_is_for_a_different_prefix() -> Result<()>
+    {
+        let mut rng = thread_rng();
+        let sk_gen = SecretKeySet::random(0, &mut rng);
+        let peer = Peer::new(XorName::random(&mut rng), gen_addr());
+        let (mut knowledge, _) = NetworkKnowledge::first_node(peer, sk_gen.clone())?;
+
+        // section 1
+        let (sap1, _, sk_1) = random_sap(prefix("1")?, 0, 0, None);
+        let sap1 = section_signed(&sk_1.secret_key(), sap1)?;
+        let our_node_name_prefix_1 = sap1.prefix().name();
+        let proof_chain = knowledge.section_chain();
+        let section_tree_update =
+            gen_section_tree_update(&sap1, &proof_chain, &sk_gen.secret_key())?;
+        assert!(knowledge.update_knowledge_if_valid(
+            section_tree_update,
+            None,
+            &our_node_name_prefix_1
+        )?);
+        assert_eq!(knowledge.signed_sap, sap1);
+
+        // section with different prefix (0) and our node name doesn't match
+        let (sap0, _, sk_0) = random_sap(prefix("0")?, 0, 0, None);
+        let sap0 = section_signed(&sk_0.secret_key(), sap0)?;
+        let section_tree_update =
+            gen_section_tree_update(&sap0, &proof_chain, &sk_gen.secret_key())?;
+        // our node is still in prefix1
+        assert!(knowledge.update_knowledge_if_valid(
+            section_tree_update,
+            None,
+            &our_node_name_prefix_1
+        )?);
+        // sap should not be updated
+        assert_eq!(knowledge.signed_sap, sap1);
+
+        Ok(())
     }
 }
