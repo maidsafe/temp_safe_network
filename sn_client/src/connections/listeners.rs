@@ -151,7 +151,6 @@ impl Session {
             .await
             .get_sections_dag()
             .keys()
-            .cloned()
             .collect();
 
         if !NetworkKnowledge::verify_msg_section_key(&msg_authority, &msg, &known_keys) {

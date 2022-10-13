@@ -1589,13 +1589,13 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
             let genesis_key = genesis_sk_set.public_keys().public_key();
             assert_eq!(
                 genesis_key,
-                *proof_chain_iter
+                proof_chain_iter
                     .next()
                     .ok_or_else(|| eyre!("The proof chain should include the genesis key"))?
             );
             assert_eq!(
                 other_section_key.public_key(),
-                *proof_chain_iter
+                proof_chain_iter
                     .next()
                     .ok_or_else(|| eyre!("The proof chain should include the other section key"))?
             );

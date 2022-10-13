@@ -433,11 +433,7 @@ impl NetworkKnowledge {
 
     /// Return the set of known keys
     pub fn known_keys(&self) -> BTreeSet<bls::PublicKey> {
-        self.section_tree
-            .get_sections_dag()
-            .keys()
-            .cloned()
-            .collect()
+        self.section_tree.get_sections_dag().keys().collect()
     }
 
     /// Try to merge this `NetworkKnowledge` members with `peers`.
