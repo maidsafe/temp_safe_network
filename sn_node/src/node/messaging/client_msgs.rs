@@ -46,13 +46,14 @@ impl MyNode {
         &self,
         target: Peer,
         correlation_id: MsgId,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Cmd {
         let the_ack_msg = ClientMsg::CmdAck { correlation_id };
         self.send_client_msg(
             the_ack_msg,
             Peers::Single(target),
-            None,
+            send_stream,
             #[cfg(feature = "traceroute")]
             traceroute,
         )
@@ -314,6 +315,7 @@ impl MyNode {
         cmds.push(self.send_cmd_ack(
             origin,
             msg_id,
+            send_stream,
             #[cfg(feature = "traceroute")]
             traceroute,
         ));

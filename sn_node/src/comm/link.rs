@@ -74,7 +74,7 @@ impl Link {
         priority: i32,
         retry_config: Option<&RetryConfig>,
         send_stream: Option<Arc<Mutex<SendStream>>>,
-        should_establish_new_connection: bool,
+        _should_establish_new_connection: bool,
         conn: Connection,
         connections: LinkConnections,
     ) -> Result<(), SendToOneError> {
