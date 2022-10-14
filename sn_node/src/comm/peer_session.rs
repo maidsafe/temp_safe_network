@@ -72,7 +72,7 @@ impl PeerSession {
     }
 
     #[instrument(skip(self, bytes))]
-    pub(crate) async fn send_using_session(
+    pub(crate) async fn send_using_session_or_stream(
         &self,
         msg_id: MsgId,
         bytes: UsrMsgBytes,
@@ -133,13 +133,39 @@ impl PeerSessionWorker {
 
             let status = match session_cmd {
                 SessionCmd::Send(job) => {
-                    match self.send(job).await {
-                        Ok(s) => s,
-                        Err(error) => {
-                            error!("session error {error:?}");
-                            // don't breakout here?
-                            // TODO: is this correct?
-                            continue;
+                    if let Some(send_stream) = job.send_stream {
+                        // send response on the stream
+                        debug!("SEND STREAM EXISTSSSS");
+                        let _handle = tokio::spawn(async move {
+                            trace!("USING BIDI! OH DEAR, FASTEN SEATBELTS");
+                            let stream_prio = 10;
+                            let mut send_stream = send_stream.lock().await;
+                            send_stream.set_priority(stream_prio);
+                            if let Err(error) = send_stream.send_user_msg(job.bytes).await {
+                                error!(
+                                    "Could not send msg {:?} over response stream: {error:?}",
+                                    job.msg_id
+                                );
+                            }
+                            if let Err(error) = send_stream.finish().await {
+                                error!(
+                                    "Could not close response stream for {:?}: {error:?}",
+                                    job.msg_id
+                                );
+                            }
+                        });
+
+                        SessionStatus::Ok
+                    } else {
+                        //another
+                        match self.send_over_peer_connection(job).await {
+                            Ok(s) => s,
+                            Err(error) => {
+                                error!("session error {error:?}");
+                                // don't breakout here?
+                                // TODO: is this correct?
+                                continue;
+                            }
                         }
                     }
                 }
@@ -178,7 +204,7 @@ impl PeerSessionWorker {
         info!("Finished peer session shutdown");
     }
 
-    async fn send(&mut self, mut job: SendJob) -> Result<SessionStatus> {
+    async fn send_over_peer_connection(&mut self, mut job: SendJob) -> Result<SessionStatus> {
         let id = job.msg_id;
         let should_establish_new_connection = !job.is_msg_for_client;
         trace!("Performing sendjob: {id:?} , should_establish_new_connection? {should_establish_new_connection}");
@@ -223,12 +249,10 @@ impl PeerSessionWorker {
         let connection_id = conn.id();
 
         let _handle = tokio::spawn(async move {
-            let send_resp = Link::send_with(
+            let send_resp = Link::send_with_connection(
                 job.bytes.clone(),
                 0,
                 Some(&RetryConfig::default()),
-                job.send_stream.clone(),
-                should_establish_new_connection,
                 conn,
                 link_connections,
             )
