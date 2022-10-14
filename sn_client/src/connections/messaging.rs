@@ -645,7 +645,6 @@ impl Session {
         for peer in nodes.clone() {
             let session = self.clone();
             let bytes = bytes.clone();
-            let peer_name = peer.name();
 
             let task_handle = tokio::spawn(async move {
                 let session_clone = session.clone();
@@ -665,7 +664,7 @@ impl Session {
                     Err(SendToOneError::ChaosNoConnection) => Err(Error::ChoasSendFail),
                 };
 
-                (peer_name, result)
+                (peer, result)
             });
 
             tasks.push(task_handle);
@@ -676,7 +675,7 @@ impl Session {
 
         for r in results {
             match r {
-                Ok((peer_name, send_result)) => match send_result {
+                Ok((peer, send_result)) => match send_result {
                     Err(Error::QuicP2pSend {
                         peer,
                         error:
@@ -687,7 +686,7 @@ impl Session {
                     }) => {
                         warn!(
                             "Connection was closed by node {}, reason: {:?}",
-                            peer_name,
+                            peer.name(),
                             String::from_utf8(reason.to_vec())
                         );
                         last_error = Some(Error::QuicP2pSend {
@@ -702,7 +701,7 @@ impl Session {
                         peer,
                         error: SendError::ConnectionLost(error),
                     }) => {
-                        warn!("Connection to {} was lost: {:?}", peer_name, error);
+                        warn!("Connection to {} was lost: {:?}", peer.name(), error);
                         last_error = Some(Error::QuicP2pSend {
                             peer,
                             error: SendError::ConnectionLost(error),
@@ -711,6 +710,7 @@ impl Session {
                         self.peer_links.remove_link_from_peer_links(&peer).await;
                     }
                     Err(error) => {
+                        let peer_name = peer.name();
                         warn!(
                             "Issue during {:?} send to {}: {:?}",
                             msg_id, peer_name, error
@@ -720,7 +720,16 @@ impl Session {
                             self.peer_links.remove_link_from_peer_links(&peer).await;
                         }
                     }
-                    Ok(_) => successful_sends += 1,
+                    Ok(recv_stream) => {
+                        successful_sends += 1;
+                        // let's spawn a task for each bi-stream to listen for responses
+                        Self::spawn_recv_stream_listener_thread(
+                            self.clone(),
+                            msg_id,
+                            peer,
+                            recv_stream,
+                        );
+                    }
                 },
                 Err(join_error) => {
                     warn!("Tokio join error as we send: {:?}", join_error)
