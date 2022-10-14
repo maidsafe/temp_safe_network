@@ -147,6 +147,21 @@ impl Cmd {
         )
     }
 
+    pub(crate) fn send_msg_via_response_stream(
+        msg: OutgoingMsg,
+        recipients: Peers,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
+    ) -> Self {
+        Cmd::SendMsg {
+            msg,
+            msg_id: MsgId::new(),
+            recipients,
+            send_stream,
+            #[cfg(feature = "traceroute")]
+            traceroute: Traceroute(vec![]),
+        }
+    }
+
     pub(crate) fn send_traced_msg(
         msg: OutgoingMsg,
         recipients: Peers,
