@@ -144,6 +144,7 @@ mod core {
     // based on liveness properties (e.g. the timeout should be dynamic based on the responsiveness of
     // the section).
     const DATA_QUERY_TIMEOUT: Duration = Duration::from_secs(30);
+    pub(crate) type OptionalResponseStream = Option<Arc<Mutex<SendStream>>>;
 
     #[derive(Debug, Clone)]
     pub(crate) struct DkgSessionInfo {
@@ -187,7 +188,7 @@ mod core {
         pub(crate) dysfunction_tracking: DysfunctionDetection,
         /// Cache the request combo,  (OperationId -> An adult xorname), to waiting Clients peers for that combo
         pub(crate) pending_data_queries:
-            Cache<(OperationId, XorName), BTreeMap<(MsgId, Peer), Option<Arc<Mutex<SendStream>>>>>,
+            Cache<(OperationId, XorName), BTreeMap<(MsgId, Peer), OptionalResponseStream>>,
         // Caches
         pub(crate) ae_backoff_cache: AeBackoffCache,
     }

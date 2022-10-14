@@ -13,7 +13,9 @@ use crate::node::{
     Error, Event, MembershipEvent, MyNode, Result, StateSnapshot,
 };
 
-use qp2p::UsrMsgBytes;
+use backoff::{backoff::Backoff, ExponentialBackoff};
+use bls::PublicKey as BlsPublicKey;
+use qp2p::{SendStream, UsrMsgBytes};
 #[cfg(feature = "traceroute")]
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
@@ -23,10 +25,8 @@ use sn_interface::{
     },
     types::{log_markers::LogMarker, Peer, PublicKey},
 };
-
-use backoff::{backoff::Backoff, ExponentialBackoff};
-use bls::PublicKey as BlsPublicKey;
-use std::{collections::BTreeSet, time::Duration};
+use std::{collections::BTreeSet, sync::Arc, time::Duration};
+use tokio::sync::Mutex;
 use xor_name::{Prefix, XorName};
 
 impl MyNode {
@@ -343,6 +343,7 @@ impl MyNode {
         dst_section_key: &BlsPublicKey,
         dst_name: XorName,
         sender: &Peer,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
     ) -> Result<Option<Cmd>> {
         // Check if the message has reached the correct section,
         // if not, we'll need to respond with AE
@@ -408,10 +409,19 @@ impl MyNode {
             AntiEntropyKind::Retry { bounced_msg },
         );
 
-        Ok(Some(Cmd::send_msg(
-            OutgoingMsg::Node(ae_msg),
-            Peers::Single(*sender),
-        )))
+        // client response, so send it over stream
+        if send_stream.is_some() {
+            Ok(Some(Cmd::send_msg_via_response_stream(
+                OutgoingMsg::Node(ae_msg),
+                Peers::Single(*sender),
+                send_stream,
+            )))
+        } else {
+            Ok(Some(Cmd::send_msg(
+                OutgoingMsg::Node(ae_msg),
+                Peers::Single(*sender),
+            )))
+        }
     }
 
     // Generate an AE redirect cmd for the given message
