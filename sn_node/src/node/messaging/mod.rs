@@ -81,7 +81,9 @@ impl MyNode {
                 // Check for entropy before we proceed further
                 // Anythign returned here means there's an issue and we should
                 // short-circuit below
-                let ae_cmds = self.apply_ae(&origin, &msg, &wire_msg, &dst).await?;
+                let ae_cmds = self
+                    .apply_ae(&origin, &msg, &wire_msg, &dst, send_stream)
+                    .await?;
 
                 if !ae_cmds.is_empty() {
                     // short circuit and send those AE responses
@@ -146,9 +148,13 @@ impl MyNode {
                 };
 
                 // Then we perform AE checks
-                if let Some(cmd) =
-                    self.check_for_entropy(&wire_msg, &dst.section_key, dst_name, &origin)?
-                {
+                if let Some(cmd) = self.check_for_entropy(
+                    &wire_msg,
+                    &dst.section_key,
+                    dst_name,
+                    &origin,
+                    send_stream.clone(),
+                )? {
                     // short circuit and send those AE responses
                     return Ok(vec![cmd]);
                 }
@@ -192,6 +198,7 @@ impl MyNode {
         msg: &NodeMsg,
         wire_msg: &WireMsg,
         dst: &Dst,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
     ) -> Result<Vec<Cmd>> {
         // Adult nodes don't need to carry out entropy checking,
         // however the message shall always be handled.
@@ -215,9 +222,13 @@ impl MyNode {
                 Ok(vec![])
             }
             _ => {
-                if let Some(ae_cmd) =
-                    self.check_for_entropy(wire_msg, &dst.section_key, dst.name, origin)?
-                {
+                if let Some(ae_cmd) = self.check_for_entropy(
+                    wire_msg,
+                    &dst.section_key,
+                    dst.name,
+                    origin,
+                    send_stream,
+                )? {
                     // we want to log issues with any node repeatedly out of sync here...
                     let cmds = vec![
                         Cmd::TrackNodeIssueInDysfunction {
