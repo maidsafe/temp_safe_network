@@ -27,103 +27,12 @@ use sn_interface::{
 };
 
 use itertools::Itertools;
-use qp2p::{Close, ConnectionError, ConnectionIncoming as IncomingMsgs, SendError};
 use rand::{rngs::OsRng, seq::SliceRandom};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tracing::Instrument;
 
 impl Session {
-    // Listen for incoming msgs on a connection
-    #[instrument(skip_all, level = "debug")]
-    pub(crate) fn spawn_msg_listener_thread(
-        session: Self,
-        peer: Peer,
-        conn: qp2p::Connection,
-        mut incoming_msgs: IncomingMsgs,
-    ) {
-        let mut first = true;
-        let addr = peer.addr();
-        let connection_id = conn.id();
-
-        debug!("Listening for incoming msgs from {:?}", peer);
-
-        let _handle = tokio::spawn(async move {
-            loop {
-                match Self::listen_for_incoming_msg(addr, &mut incoming_msgs).await {
-                    Ok(Some(msg)) => {
-                        if first {
-                            first = false;
-                            session.peer_links.add_incoming(&peer, conn.clone()).await;
-                        }
-
-                        if let Err(err) = Self::handle_msg(msg, peer, session.clone()).await {
-                            error!("Error while handling incoming msg: {:?}. Listening for next msg...", err);
-                        }
-                    },
-                    Ok(None) => {
-
-                        debug!("No more msgs coming in on _this_ listener to {peer:?}");
-                        // once the msg loop breaks, we know this specific connection is closed
-                        break;
-                    }
-                    Err(Error::QuicP2pSend{ peer, error: SendError::ConnectionLost(
-                        ConnectionError::Closed(Close::Application { reason, .. }),
-                    )}) => {
-                        warn!(
-                            "Connection was closed by the node {}: {:?}",peer,
-                            String::from_utf8(reason.to_vec())
-                        );
-
-                        break;
-
-                    },
-                    Err(Error::QuicP2p(qp2p_err)) => {
-                        // TODO: Can we recover here?
-                        info!("Error from Qp2p received, closing listener loop. {:?}", qp2p_err);
-                        break;
-                    },
-                    Err(error) => {
-                        error!("Error while processing incoming msg: {:?}. Listening for next msg...", error);
-                    }
-                }
-            }
-
-            // Are we being heavy handed and removing a peer here
-            // when another link may well exist...?
-
-            // session.peer_links.remove(&peer).await;
-            // once the msg loop breaks, we know the connection is closed
-            trace!("{} to {} (id: {})", LogMarker::ConnectionClosed, addr, connection_id);
-
-        }.instrument(info_span!("Listener for incoming msgs from peer addr {}", ?addr))).in_current_span();
-    }
-
-    #[instrument(skip_all, level = "debug")]
-    pub(crate) async fn listen_for_incoming_msg(
-        src: SocketAddr,
-        incoming_msgs: &mut IncomingMsgs,
-    ) -> Result<Option<MsgType>, Error> {
-        if let Some(bytes) = incoming_msgs.next().await? {
-            trace!("Incoming msg from {:?}", src);
-            let wire_msg = WireMsg::from(bytes)?;
-            let msg_type = wire_msg.into_msg()?;
-
-            #[cfg(feature = "traceroute")]
-            {
-                info!(
-                    "Message {} with the Traceroute received at client:\n {:?}",
-                    msg_type,
-                    wire_msg.traceroute()
-                )
-            }
-
-            Ok(Some(msg_type))
-        } else {
-            Ok(None)
-        }
-    }
-
     #[instrument(skip_all, level = "debug")]
     pub(crate) async fn read_msg_from_recvstream(
         recv_stream: &mut RecvStream,
@@ -169,7 +78,7 @@ impl Session {
                     Err(error) => {
                         error!(
                             "Error while processing incoming msg on bi-stream \
-                            from {addr:?} for {msg_id:?}: {error:?}"
+                            from {addr:?} in response to {msg_id:?}: {error:?}"
                         );
                     }
                 }

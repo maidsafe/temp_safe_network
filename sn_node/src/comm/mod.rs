@@ -141,17 +141,7 @@ impl Comm {
                         match Self::is_sent(watcher, msg_id, peer).await {
                             Ok(result) => result,
                             Err(error) => {
-                                // match error {
-                                // Error::NoConnectionsForPeer => {
-                                //     // remove the peer link
-                                //     let perhaps_session = sessions.remove(&peer);
-                                //     if let Some((_peer, session)) = perhaps_session {
-                                //         session.disconnect().await;
-                                //     }
-                                //     return Err(Error::NoConnectionsForPeer);
-                                // }
                                 return Err(error);
-                                // }
                             }
                         };
 
@@ -312,7 +302,7 @@ impl Comm {
         if let Some(peer) = self.get_or_create(&recipient).await {
             debug!("Peer session retrieved");
             Ok(Some(
-                peer.send_using_session(msg_id, bytes, send_stream, is_msg_for_client)
+                peer.send_using_session_or_stream(msg_id, bytes, send_stream, is_msg_for_client)
                     .await?,
             ))
         } else {
