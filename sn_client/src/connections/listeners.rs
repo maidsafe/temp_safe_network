@@ -15,7 +15,7 @@ use crate::{
 };
 
 use dashmap::DashSet;
-use qp2p::UsrMsgBytes;
+use qp2p::{RecvStream, UsrMsgBytes};
 use sn_interface::{
     at_least_one_correct_elder,
     messaging::{
@@ -124,6 +124,67 @@ impl Session {
         } else {
             Ok(None)
         }
+    }
+
+    #[instrument(skip_all, level = "debug")]
+    pub(crate) async fn read_msg_from_recvstream(
+        recv_stream: &mut RecvStream,
+    ) -> Result<MsgType, Error> {
+        let bytes = recv_stream.next().await?;
+        let wire_msg = WireMsg::from(bytes)?;
+        let msg_type = wire_msg.into_msg()?;
+
+        #[cfg(feature = "traceroute")]
+        {
+            info!(
+                "Message {} with the Traceroute received at client:\n {:?}",
+                msg_type,
+                wire_msg.traceroute()
+            )
+        }
+
+        Ok(msg_type)
+    }
+
+    // Listen for a single incoming msg on stream
+    #[instrument(skip_all, level = "debug")]
+    pub(crate) fn spawn_recv_stream_listener_thread(
+        session: Self,
+        msg_id: MsgId,
+        peer: Peer,
+        mut recv_stream: RecvStream,
+    ) {
+        let addr = peer.addr();
+        debug!("Listening for incoming msgs on bi-stream from {peer:?}");
+
+        let _handle = tokio::spawn(
+            async move {
+                match Self::read_msg_from_recvstream(&mut recv_stream).await {
+                    Ok(msg) => {
+                        if let Err(err) = Self::handle_msg(msg, peer, session.clone()).await {
+                            error!(
+                                "Error while handling incoming msg on bi-stream \
+                                from {addr:?} for {msg_id:?}: {err:?}"
+                            );
+                        }
+                    }
+                    Err(error) => {
+                        error!(
+                            "Error while processing incoming msg on bi-stream \
+                            from {addr:?} for {msg_id:?}: {error:?}"
+                        );
+                    }
+                }
+
+                // TODO: ???? once the msg loop breaks, we know the connection is closed
+                trace!("{} to {}", LogMarker::ConnectionClosed, addr);
+            }
+            .instrument(info_span!(
+                "Listening for incoming msgs on bi-stream from {}",
+                ?addr
+            )),
+        )
+        .in_current_span();
     }
 
     #[instrument(skip_all, level = "debug")]
