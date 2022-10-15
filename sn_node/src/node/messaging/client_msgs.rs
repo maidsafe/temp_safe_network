@@ -150,9 +150,7 @@ impl MyNode {
             sender_name, op_id
         );
 
-        let node_id = XorName::from(sending_node_pk);
-
-        let query_peers = self.pending_data_queries.remove(&(op_id, node_id));
+        let query_peers = self.pending_data_queries.remove(&(op_id, sender_name));
 
         // First check for waiting peers. If no one is waiting, we drop the response
         let waiting_peers = if let Some(peers) = query_peers {

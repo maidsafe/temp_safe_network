@@ -11,27 +11,22 @@ mod messaging;
 
 use crate::Result;
 use sn_interface::{
-    messaging::{
-        data::{Error as ErrorMsg, QueryResponse},
-        MsgId,
-    },
+    messaging::data::{Error as ErrorMsg, QueryResponse},
     network_knowledge::SectionTree,
     types::PeerLinks,
 };
 
-use dashmap::{DashMap, DashSet};
 use qp2p::{Config as QuicP2pConfig, Endpoint};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 
-// Here we dont track the msg_id across the network, but just use it as a local identifier to remove the correct listener
-type PendingQueryResponses = Arc<DashMap<MsgId, Arc<DashSet<(SocketAddr, QueryResponse)>>>>;
-
-type CmdResponse = (SocketAddr, Option<ErrorMsg>);
-
-/// As we receive ACKs, we write the ACKd peer here for checking.
-/// TODO: This could be a mem leak for long running clients.
-type PendingCmdAcks = Arc<DashMap<MsgId, Arc<DashSet<CmdResponse>>>>;
+// Use for internal communication between the bi-stream response listener threads
+// and the thread waiting to aggregate responses
+#[derive(Debug)]
+pub(super) enum MsgResponse {
+    CmdResponse(SocketAddr, Option<ErrorMsg>),
+    QueryResponse(SocketAddr, Box<QueryResponse>),
+}
 
 #[derive(Debug)]
 pub struct QueryResult {
@@ -53,10 +48,6 @@ impl QueryResult {
 pub(super) struct Session {
     // Session endpoint.
     endpoint: Endpoint,
-    // Channels for sending responses to upper layers
-    pending_queries: PendingQueryResponses,
-    // Channels for sending CmdAck to upper layers
-    pending_cmds: PendingCmdAcks,
     /// All elders we know about from AE messages
     pub(super) network: Arc<RwLock<SectionTree>>,
     /// Links to nodes
@@ -75,8 +66,6 @@ impl Session {
         let peer_links = PeerLinks::new(endpoint.clone());
 
         let session = Self {
-            pending_queries: Arc::new(DashMap::default()),
-            pending_cmds: Arc::new(DashMap::default()),
             endpoint,
             network: Arc::new(RwLock::new(network_contacts)),
             peer_links,
