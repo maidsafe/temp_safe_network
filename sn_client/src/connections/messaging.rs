@@ -611,7 +611,7 @@ impl Session {
 
                 let link = session_clone
                     .peer_links
-                    .get_or_create_link(&peer, force_new_link)
+                    .get_or_create_link(&peer, true /*force_new_link*/)
                     .await;
 
                 let result = match link.send_bi(bytes.clone()).await {
