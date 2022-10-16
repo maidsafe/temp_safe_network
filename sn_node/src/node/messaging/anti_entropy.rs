@@ -487,9 +487,9 @@ mod tests {
                 let dst_name = our_prefix.substituted_in(xor_name::rand::random());
                 let dst_section_key = env.node.network_knowledge().section_key();
 
-                let cmd = env
-                    .node
-                    .check_for_entropy(&msg, &dst_section_key, dst_name, &sender)?;
+                let cmd =
+                    env.node
+                        .check_for_entropy(&msg, &dst_section_key, dst_name, &sender, None)?;
 
                 assert!(cmd.is_none());
                 Result::<()>::Ok(())
@@ -568,6 +568,7 @@ mod tests {
                     &dst_section_key,
                     dst_name,
                     &sender,
+                    None,
                 );
 
             let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg: OutgoingMsg::Node(msg), .. })) => {
@@ -597,6 +598,7 @@ mod tests {
                     &dst_section_key,
                     dst_name,
                     &sender,
+                    None,
                 );
 
             let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg: OutgoingMsg::Node(msg), .. })) => {
@@ -637,6 +639,7 @@ mod tests {
                     dst_section_key,
                     dst_name,
                     &sender,
+                    None,
                 )?;
 
             let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg: OutgoingMsg::Node(msg), .. }) => {
@@ -679,6 +682,7 @@ mod tests {
                     dst_section_key,
                     dst_name,
                     &sender,
+                    None,
                 )?;
 
             let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg: OutgoingMsg::Node(msg), .. }) => {

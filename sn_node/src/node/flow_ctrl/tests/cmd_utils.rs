@@ -1,5 +1,4 @@
 use crate::node::{
-    flow_ctrl::cmds::Cmd::HandleValidClientMsg,
     flow_ctrl::dispatcher::Dispatcher,
     messaging::{OutgoingMsg, Peers},
     Cmd,
@@ -113,24 +112,24 @@ pub(crate) async fn run_and_collect_cmds(
     Ok(all_cmds)
 }
 
-pub(crate) fn wrap_client_msg_for_handling(msg: ClientMsg, peer: Peer) -> Result<Cmd> {
-    let payload = WireMsg::serialize_msg_payload(&msg)?;
-    let src_client_keypair = Keypair::new_ed25519();
-    let auth = ClientAuth {
-        public_key: src_client_keypair.public_key(),
-        signature: src_client_keypair.sign(&payload),
-    };
-    let auth_proof = AuthorityProof::verify(auth, &payload)?;
-    Ok(HandleValidClientMsg {
-        msg_id: MsgId::new(),
-        msg,
-        origin: peer,
-        auth: auth_proof,
-        send_stream: None,
-        #[cfg(feature = "traceroute")]
-        traceroute: Traceroute(Vec::new()),
-    })
-}
+// pub(crate) fn wrap_client_msg_for_handling(msg: ClientMsg, peer: Peer) -> Result<Cmd> {
+//     let payload = WireMsg::serialize_msg_payload(&msg)?;
+//     let src_client_keypair = Keypair::new_ed25519();
+//     let auth = ClientAuth {
+//         public_key: src_client_keypair.public_key(),
+//         signature: src_client_keypair.sign(&payload),
+//     };
+//     let auth_proof = AuthorityProof::verify(auth, &payload)?;
+//     Ok(HandleValidClientMsg {
+//         msg_id: MsgId::new(),
+//         msg,
+//         origin: peer,
+//         auth: auth_proof,
+//         send_stream: None,
+//         #[cfg(feature = "traceroute")]
+//         traceroute: Traceroute(Vec::new()),
+//     })
+// }
 
 /// Extend the `Cmd` enum with some utilities for testing.
 ///
