@@ -249,47 +249,19 @@ jobs:
         if: matrix.os != 'windows-latest'
 
       - name: Build all tests before running non ubuntu
-        run: cd sn_client && cargo test --no-run --release
+        run: cargo test --no-run --release -p sn_client
         timeout-minutes: 50
-        if: matrix.os != 'ubuntu-latest'
-
-
-      - name: Build all tests before running on ubuntu
-        run: cd sn_client && cargo test --no-run --release -p sn_client
-        timeout-minutes: 50
-        if: matrix.os == 'ubuntu-latest'
 
       - name: Run client tests
-        uses: maidsafe/cargo-nextest@main
         env:
           RUST_LOG: "sn_client=trace,qp2p=debug"
-        with:
-          test-run-name: e2e-client-${{ matrix.os }}
-          profile: ci
-          junit-path: junit.xml
-          package: sn_client
-          release: true
-          test-threads: 10
+        run: cargo test --release -p sn_client
         timeout-minutes: 25
-
-      - name: Run AE tests
-        uses: maidsafe/cargo-nextest@main
-        with:
-          test-run-name: e2e-ae-${{ matrix.os }}
-          profile: ci
-          junit-path: junit.xml
-          package: sn_client
-          release: true
-          filters: ae_checks
-          test-threads: 2
-        timeout-minutes: 15
-        env:
-          SN_AE_WAIT: 10
 
       - name: Run example app for file API against local network
         timeout-minutes: 10
         shell: bash
-        run: cd sn_client && cargo run --release --example client_files
+        run: cargo run --release --example client_files
 
       - name: Ensure no nodes have left during test runs
         timeout-minutes: 1
