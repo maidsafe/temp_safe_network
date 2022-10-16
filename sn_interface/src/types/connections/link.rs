@@ -59,29 +59,14 @@ impl Link {
         self.insert(conn).await;
     }
 
-    /// Send a message to the peer with default retry configuration.
+    /// Send a message to the peer.
     ///
     /// The message will be sent on a unidirectional QUIC stream, meaning the application is
     /// responsible for correlating any anticipated responses from incoming streams.
     ///
-    /// The priority will be `0` and retry behaviour will be determined by the
-    /// [`RetryConfig`] that was used to construct the [`Endpoint`] this connection
-    /// belongs to. See [`send_with`](Self::send_with) if you want to send a message with specific
-    /// configuration.
-    #[allow(unused)]
-    pub async fn send<F: Fn(Connection, IncomingMsgs)>(
-        &self,
-        bytes: UsrMsgBytes,
-        listen: F,
-    ) -> Result<(), SendToOneError> {
-        self.send_with(bytes, listen).await
-    }
-
-    /// Send a message to the peer using the given configuration.
-    ///
-    /// See [`send`](Self::send) if you want to send with the default configuration.
+    /// The priority will be `0`.
     #[instrument(skip_all)]
-    pub async fn send_with<F: Fn(Connection, IncomingMsgs)>(
+    pub async fn send<F: Fn(Connection, IncomingMsgs)>(
         &self,
         bytes: UsrMsgBytes,
         listen: F,
