@@ -122,6 +122,7 @@ impl CmdCtrl {
                 .await
                 .statemap_log_state(cmd.statemap_state());
 
+            debug!("spawned process for cmd {cmd:?}, node read done");
             match dispatcher.process_cmd(cmd).await {
                 Ok(cmds) => {
                     for cmd in cmds {
