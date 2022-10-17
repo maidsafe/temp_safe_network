@@ -167,9 +167,9 @@ impl FlowCtrl {
 
         if self.timestamps.last_vote_check.elapsed() > MISSING_VOTE_INTERVAL {
             self.timestamps.last_vote_check = now;
-            if let Some(cmd) = Self::check_for_missed_votes(self.node.clone()).await {
+            for cmd in self.check_for_missed_votes().await {
                 cmds.push(cmd);
-            };
+            }
         }
 
         if self.timestamps.last_dkg_msg_check.elapsed() > MISSING_DKG_MSG_INTERVAL {
@@ -283,11 +283,11 @@ impl FlowCtrl {
     }
 
     /// Checks the interval since last vote received during a generation
-    async fn check_for_missed_votes(node: Arc<RwLock<MyNode>>) -> Option<Cmd> {
+    async fn check_for_missed_votes(&self) -> Vec<Cmd> {
         info!("Checking for missed votes");
-        let node = node.read().await;
+        let node = self.node.read().await;
         let membership = &node.membership;
-
+        let mut cmds = vec![];
         if let Some(membership) = &membership {
             let last_received_vote_time = membership.last_received_vote_time();
 
@@ -298,12 +298,15 @@ impl FlowCtrl {
                     if let Some(cmd) = node.membership_gossip_votes().await {
                         trace!("Vote resending cmd");
 
-                        return Some(cmd);
+                        cmds.push(cmd);
                     }
+                    // we may also be behind, so lets request AE incase that is the case!
+                    let msg = NodeMsg::MembershipAE(membership.generation());
+                    cmds.push(node.send_msg_to_our_elders(msg));
                 }
             }
         }
-        None
+        cmds
     }
 
     /// Checks the interval since last dkg vote received
