@@ -212,8 +212,17 @@ jobs:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
 
-      - name: install ripgrep
-        run: cargo install ripgrep
+      - name: install ripgrep ubuntu
+        run: sudo apt-get install ripgrep
+        if: matrix.os == 'ubuntu-latest'
+
+      - name: install ripgrep mac
+        run: brew install ripgrep
+        if: matrix.os == 'macos-latest'
+
+      - name: install ripgrep windows
+        run: choco install ripgrep
+        if: matrix.os == 'windows-latest'
 
       - name: Build sn bins
         run: cd sn_node && cargo build --release --bins
@@ -233,20 +242,10 @@ jobs:
         env:
           RUST_LOG: "sn_node,sn_api,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
 
-      - name: Print Network Log Stats at start
-        shell: bash
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: matrix.os != 'windows-latest'
-
       - name: Wait for all nodes to join
         shell: bash
         run: ./resources/scripts/wait_for_nodes_to_join.sh
         timeout-minutes: 5
-
-      - name: Print Network Log Stats after nodes joined
-        shell: bash
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: matrix.os != 'windows-latest'
 
       - name: Build all tests before running non ubuntu
         run: cargo test --no-run --release -p sn_client
@@ -270,6 +269,7 @@ jobs:
         # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
         run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
 
+
       - name: Are nodes still running...?
         shell: bash
         timeout-minutes: 1
@@ -278,12 +278,6 @@ jobs:
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
-
-      - name: Print Network Log Stats
-        shell: bash
-        continue-on-error: true
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: matrix.os != 'windows-latest'
 
       - name: Generate StateMap
         shell: bash
@@ -338,15 +332,6 @@ jobs:
 
       - name: install ripgrep ubuntu
         run: sudo apt-get install ripgrep
-        if: matrix.os == 'ubuntu-latest'
-
-      - name: install ripgrep mac
-        run: brew install ripgrep
-        if: matrix.os == 'macos-latest'
-
-      - name: install ripgrep windows
-        run: choco install ripgrep
-        if: matrix.os == 'windows-latest'
 
       - name: Build sn bins
         run: cd sn_node && cargo build --release --bins
