@@ -4148,7 +4148,6 @@ dependencies = [
 name = "sn_dysfunction"
 version = "0.14.0"
 dependencies = [
- "dashmap",
  "eyre",
  "itertools",
  "proptest",
@@ -4172,7 +4171,6 @@ dependencies = [
  "cargo-husky",
  "crdts",
  "custom_debug",
- "dashmap",
  "ed25519",
  "ed25519-dalek",
  "eyre",
