@@ -33,7 +33,6 @@ const MAX_SENDJOB_RETRIES: usize = 3;
 #[derive(Debug)]
 enum SessionCmd {
     Send(SendJob),
-    RemoveExpired,
     AddConnection(qp2p::Connection),
     Terminate,
 }
@@ -50,16 +49,6 @@ impl PeerSession {
         let _ = tokio::task::spawn(PeerSessionWorker::new(link, sender.clone()).run(receiver));
 
         PeerSession { channel: sender }
-    }
-
-    /// can we cleanup this session?
-    pub(crate) async fn can_cleanup(&self) -> bool {
-        if let Err(e) = self.channel.send(SessionCmd::RemoveExpired).await {
-            warn!("Error while sending RemoveExpired cmd {e:?}");
-            return true;
-        }
-
-        self.channel.is_closed()
     }
 
     // this must be restricted somehow, we can't allow an unbounded inflow
@@ -95,7 +84,7 @@ impl PeerSession {
             .await
             .map_err(|_| Error::PeerSessionChannel)?;
 
-        trace!("Send job sent: {msg_id:?}");
+        trace!("Send job sent to PeerSessionWorker: {msg_id:?}");
         Ok(watcher)
     }
 
@@ -169,14 +158,6 @@ impl PeerSessionWorker {
                         }
                     }
                 }
-                SessionCmd::RemoveExpired => {
-                    if self.link.is_connected().await {
-                        SessionStatus::Ok
-                    } else {
-                        // close down the session
-                        SessionStatus::Terminating
-                    }
-                }
                 SessionCmd::AddConnection(conn) => {
                     self.link.add(conn).await;
                     SessionStatus::Ok
@@ -207,9 +188,10 @@ impl PeerSessionWorker {
     async fn send_over_peer_connection(&mut self, mut job: SendJob) -> Result<SessionStatus> {
         let id = job.msg_id;
         let should_establish_new_connection = !job.is_msg_for_client;
-        trace!("Performing sendjob: {id:?} , should_establish_new_connection? {should_establish_new_connection}");
+        trace!("Sending to peer over connection: {id:?} , should_establish_new_connection? {should_establish_new_connection}");
 
         if should_establish_new_connection && job.connection_retries > MAX_SENDJOB_RETRIES {
+            debug!("max retries reached... {id:?}");
             job.reporter.send(SendStatus::MaxRetriesReached);
             return Ok(SessionStatus::Ok);
         }
