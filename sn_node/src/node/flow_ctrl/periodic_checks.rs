@@ -310,7 +310,7 @@ impl FlowCtrl {
                 if time.elapsed() >= MISSING_VOTE_INTERVAL {
                     debug!("Vote consensus appears stalled...");
                     if let Some(cmd) = node.membership_gossip_votes().await {
-                        trace!("Vote resending cmd");
+                        trace!("Vote resending cmd: {cmd:?}");
 
                         cmds.push(cmd);
                     }
