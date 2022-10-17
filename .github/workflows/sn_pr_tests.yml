@@ -241,7 +241,7 @@ jobs:
       - name: Wait for all nodes to join
         shell: bash
         run: ./resources/scripts/wait_for_nodes_to_join.sh
-        timeout-minutes: 15
+        timeout-minutes: 5
 
       - name: Print Network Log Stats after nodes joined
         shell: bash
