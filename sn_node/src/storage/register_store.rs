@@ -203,6 +203,9 @@ impl RegisterStore {
 
         let serialized_data = serialise(cmd)?;
         file.write_all(&serialized_data).await?;
+        // Let's sync up OS data to disk to reduce the chances of
+        // concurrent reading failing by reading an empty/incomplete file
+        file.sync_data().await?;
 
         self.used_space.increase(required_space);
 

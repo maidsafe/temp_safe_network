@@ -88,25 +88,32 @@ impl ChunkStorage {
         debug!("Getting chunk {:?}", address);
 
         let file_path = self.chunk_addr_to_filepath(address)?;
-        let bytes = match read(file_path).await {
-            Ok(bytes) => Ok(Bytes::from(bytes)),
+        match read(file_path).await {
+            Ok(bytes) => {
+                let chunk = Chunk::new(Bytes::from(bytes));
+                if chunk.address() != address {
+                    // This can happen if the content read is empty, or incomplete,
+                    // possibly due to an issue with the OS synchronising to disk,
+                    // resulting in a mismatch with recreated address of the Chunk.
+                    Err(Error::ChunkNotFound(*address.name()))
+                } else {
+                    Ok(chunk)
+                }
+            }
             Err(io_error @ io::Error { .. }) if io_error.kind() == ErrorKind::NotFound => {
                 Err(Error::ChunkNotFound(*address.name()))
             }
             Err(other) => Err(other.into()),
-        }?;
-
-        Ok(Chunk::new(bytes))
+        }
     }
 
     // Read chunk from local store and return NodeQueryResponse
     pub(super) async fn get(&self, address: &ChunkAddress) -> NodeQueryResponse {
-        trace!("{:?}", LogMarker::ChunkQueryReceviedAtAdult);
+        trace!("{:?} {address:?}", LogMarker::ChunkQueryReceviedAtAdult);
         NodeQueryResponse::GetChunk(self.get_chunk(address).await.map_err(|error| error.into()))
     }
 
-    /// Store a chunk in the local disk store
-    /// If that chunk was already in the local store, just overwrites it
+    /// Store a chunk in the local disk store unless it is already there
     #[instrument(skip_all)]
     pub(super) async fn store(&self, chunk: &Chunk) -> Result<()> {
         let addr = chunk.address();
@@ -121,15 +128,15 @@ impl ChunkStorage {
             return Err(Error::DataExists(DataAddress::Bytes(*addr)));
         }
 
-        // cheap extra security check for space (prone to race conditions)
+        // Cheap extra security check for space (prone to race conditions)
         // just so we don't go too much overboard
         // should not be triggered as chunks should not be sent to full adults
         if !self.used_space.can_add(chunk.value().len()) {
             return Err(Error::NotEnoughSpace);
         }
 
-        // store the data on disk
-        trace!("{:?}", LogMarker::StoringChunk);
+        // Store the data on disk
+        trace!("{:?} {addr:?}", LogMarker::StoringChunk);
         if let Some(dirs) = filepath.parent() {
             create_dir_all(dirs).await?;
         }
@@ -137,8 +144,12 @@ impl ChunkStorage {
         let mut file = File::create(filepath).await?;
 
         file.write_all(chunk.value()).await?;
+        // Let's sync up OS data to disk to reduce the chances of
+        // concurrent reading failing by reading an empty/incomplete file
+        file.sync_data().await?;
+
         self.used_space.increase(chunk.value().len());
-        trace!("{:?}", LogMarker::StoredNewChunk);
+        trace!("{:?} {addr:?}", LogMarker::StoredNewChunk);
 
         Ok(())
     }
@@ -155,6 +166,7 @@ mod tests {
     use super::*;
     use sn_interface::types::utils::random_bytes;
 
+    use eyre::{eyre, Result};
     use futures::future::join_all;
     use rayon::prelude::*;
     use tempfile::tempdir;
@@ -201,6 +213,36 @@ mod tests {
             .take(7)
             .collect();
         write_and_read_chunks(&chunks, store).await;
+    }
+
+    #[tokio::test]
+    async fn test_read_chunk_empty_file() -> Result<()> {
+        let storage = init_file_store();
+
+        let chunk = Chunk::new(random_bytes(100));
+        let address = chunk.address();
+
+        // create chunk file but with empty content
+        let filepath = storage.chunk_addr_to_filepath(address)?;
+        if let Some(dirs) = filepath.parent() {
+            create_dir_all(dirs).await?;
+        }
+        let mut file = File::create(&filepath).await?;
+        file.write_all(b"").await?;
+
+        // trying to read the chunk shall return ChunkNotFound error since
+        // its content shouldn't match chunk address
+        match storage.get_chunk(address).await {
+            Ok(chunk) => Err(eyre!(
+                "Unexpected Chunk read (size: {}): {chunk:?}",
+                chunk.value().len()
+            )),
+            Err(Error::ChunkNotFound(name)) => {
+                assert_eq!(name, *address.name(), "Wrong Chunk name returned in error");
+                Ok(())
+            }
+            Err(other) => Err(eyre!("Unexpected Error type returned: {other:?}")),
+        }
     }
 
     async fn write_and_read_chunks(chunks: &[Chunk], storage: ChunkStorage) {
