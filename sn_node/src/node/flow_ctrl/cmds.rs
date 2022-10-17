@@ -165,10 +165,11 @@ impl Cmd {
         recipients: Peers,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Self {
-        debug!("Sending msg {msg:?}");
+        let msg_id = MsgId::new();
+        debug!("Sending msg {msg_id:?} {msg:?}");
         Cmd::SendMsg {
             msg,
-            msg_id: MsgId::new(),
+            msg_id,
             recipients,
             send_stream: None,
             #[cfg(feature = "traceroute")]
