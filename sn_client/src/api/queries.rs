@@ -63,7 +63,6 @@ impl Client {
 
         let span = info_span!("Attempting a query");
         let _ = span.enter();
-        let mut attempts = 1;
         let dst = query.variant.dst_name();
         // should we force a fresh connection to the nodes?
         let force_new_link = false;
@@ -88,8 +87,8 @@ impl Client {
             let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
             let signature = self.keypair.sign(&serialised_query);
             debug!(
-                "Attempting {:?} (attempt #{}) will force new: {force_new_link}",
-                query, attempts
+                "Attempting {:?} (adult_index #{}) will force new: {force_new_link}",
+                query, query.adult_index
             );
 
             // grab up to date destination section from our local network knowledge
@@ -106,8 +105,6 @@ impl Client {
                     force_new_link,
                 )
                 .await;
-
-            attempts += 1;
 
             // In the next attempt, try the next adult, further away.
             query.adult_index += 1;
