@@ -192,7 +192,7 @@ jobs:
     name: E2E tests
     runs-on: ${{ matrix.os }}
     strategy:
-      # fail-fast: false
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
