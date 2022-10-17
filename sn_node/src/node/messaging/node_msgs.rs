@@ -79,7 +79,7 @@ impl MyNode {
         comm: &Comm,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
-        trace!("{:?}", LogMarker::NodeMsgToBeHandled);
+        trace!("{:?}: {msg_id:?}", LogMarker::NodeMsgToBeHandled);
 
         #[cfg(feature = "traceroute")]
         {
