@@ -223,9 +223,9 @@ jobs:
         run: cargo build  --release --bin testnet
         timeout-minutes: 60
 
-      - name: Build log_cmds_inspector
-        run: cargo build  --release --bin log_cmds_inspector
-        timeout-minutes: 60
+      # - name: Build log_cmds_inspector
+      #   run: cargo build  --release --bin log_cmds_inspector
+      #   timeout-minutes: 60
 
       - name: Start the network
         run: ./target/release/testnet
@@ -338,8 +338,17 @@ jobs:
   #         cache-on-failure: true
   #         sharedKey: ${{github.run_id}}
 
-  #     - name: install ripgrep ubuntu
-  #       run: sudo apt-get install ripgrep
+      # - name: install ripgrep ubuntu
+      #   run: sudo apt-get install ripgrep
+      #   if: matrix.os == 'ubuntu-latest'
+
+      # - name: install ripgrep mac
+      #   run: brew install ripgrep
+      #   if: matrix.os == 'macos-latest'
+
+      # - name: install ripgrep windows
+      #   run: choco install ripgrep
+      #   if: matrix.os == 'windows-latest'
 
   #     - name: Build sn bins
   #       run: cd sn_node && cargo build --release --bins
