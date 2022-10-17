@@ -64,29 +64,6 @@ impl Comm {
         self.our_endpoint.public_addr()
     }
 
-    pub(crate) async fn cleanup_peers(&self) {
-        debug!("Cleanup peers");
-
-        let mut peers_to_remove = vec![];
-
-        for entry in self.sessions.iter() {
-            let peer = entry.key();
-
-            let session = entry.value();
-            if session.can_cleanup().await {
-                peers_to_remove.push(*peer);
-            }
-        }
-
-        // cleanup any and all conns that are not active section members
-        for peer in peers_to_remove {
-            trace!("Cleaning up peer's sessions: {peer:?}");
-            let _perhaps_peer = self.sessions.remove(&peer);
-        }
-
-        debug!("PeerSessions count post-cleanup: {:?}", self.sessions.len());
-    }
-
     /// Fake function used as replacement for testing only.
     #[cfg(test)]
     pub(crate) async fn is_reachable(&self, _peer: &SocketAddr) -> Result<(), Error> {

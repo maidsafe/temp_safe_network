@@ -32,7 +32,6 @@ const PROBE_INTERVAL: Duration = Duration::from_secs(30);
 const MISSING_VOTE_INTERVAL: Duration = Duration::from_secs(5);
 const MISSING_DKG_MSG_INTERVAL: Duration = Duration::from_secs(5);
 const SECTION_PROBE_INTERVAL: Duration = Duration::from_secs(300);
-const LINK_CLEANUP_INTERVAL: Duration = Duration::from_secs(120);
 const DATA_BATCH_INTERVAL: Duration = Duration::from_millis(50);
 const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 // 30 adult nodes checked per minute., so each node should be queried 10x in 10 mins
@@ -48,7 +47,6 @@ pub(super) struct PeriodicChecksTimestamps {
     last_vote_check: Instant,
     last_dkg_msg_check: Instant,
     last_data_batch_check: Instant,
-    last_link_cleanup: Instant,
     last_dysfunction_check: Instant,
 }
 
@@ -62,7 +60,6 @@ impl PeriodicChecksTimestamps {
             last_vote_check: Instant::now(),
             last_dkg_msg_check: Instant::now(),
             last_data_batch_check: Instant::now(),
-            last_link_cleanup: Instant::now(),
             last_dysfunction_check: Instant::now(),
         }
     }
@@ -88,12 +85,6 @@ impl FlowCtrl {
     async fn enqueue_cmds_for_standard_periodic_checks(&mut self) {
         let now = Instant::now();
         let mut cmds = vec![];
-
-        // happens regardless of if elder or adult
-        if self.timestamps.last_link_cleanup.elapsed() > LINK_CLEANUP_INTERVAL {
-            self.timestamps.last_link_cleanup = now;
-            cmds.push(Cmd::CleanupPeerLinks);
-        }
 
         // if we've passed enough time, batch outgoing data
         if self.timestamps.last_data_batch_check.elapsed() > DATA_BATCH_INTERVAL {

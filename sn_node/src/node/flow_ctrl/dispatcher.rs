@@ -49,10 +49,6 @@ impl Dispatcher {
         trace!("doing actual processing cmd: {cmd:?}");
 
         match cmd {
-            Cmd::CleanupPeerLinks => {
-                self.comm.cleanup_peers().await;
-                Ok(vec![])
-            }
             Cmd::SendMsg {
                 msg,
                 msg_id,

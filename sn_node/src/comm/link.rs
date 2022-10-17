@@ -149,12 +149,6 @@ impl Link {
 
         let _ = self.connections.insert(id, conn);
     }
-
-    /// Are we still connected here  after cleanup
-    /// retruens true if a connection remains
-    pub(crate) async fn is_connected(&mut self) -> bool {
-        !self.connections.is_empty()
-    }
 }
 
 /// Errors that can be returned from `Comm::send_to_one`.
