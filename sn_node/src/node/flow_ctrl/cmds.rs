@@ -56,8 +56,6 @@ pub(crate) struct CmdJob {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub(crate) enum Cmd {
-    /// Cleanup node's PeerLinks, removing any unsused, unconnected peers
-    CleanupPeerLinks,
     /// Validate `wire_msg` from `sender`.
     /// Holding the WireMsg that has been received from the network,
     ValidateMsg {
@@ -176,7 +174,6 @@ impl Cmd {
     pub(crate) fn statemap_state(&self) -> sn_interface::statemap::State {
         use sn_interface::statemap::State;
         match self {
-            Cmd::CleanupPeerLinks => State::Comms,
             Cmd::SendMsg { .. } => State::Comms,
             Cmd::HandleFailedSendToNode { .. } => State::Comms,
             Cmd::ValidateMsg { .. } => State::Validation,
@@ -197,9 +194,6 @@ impl Cmd {
 impl fmt::Display for Cmd {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Cmd::CleanupPeerLinks => {
-                write!(f, "CleanupPeerLinks")
-            }
             #[cfg(not(feature = "test-utils"))]
             Cmd::ValidateMsg { wire_msg, .. } => {
                 write!(f, "ValidateMsg {:?}", wire_msg.msg_id())
