@@ -140,7 +140,6 @@ impl MyNode {
         if let Some(membership) = self.membership.as_ref() {
             match membership.anti_entropy(gen) {
                 Ok(catchup_votes) => {
-
                     debug!("Sending catchup votes to {peer:?}");
                     Some(self.send_system_msg(
                         NodeMsg::MembershipVotes(catchup_votes),
