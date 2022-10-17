@@ -90,11 +90,7 @@ impl FlowCtrl {
     async fn process_messages_and_periodic_checks(mut self) {
         // the internal process loop
         loop {
-            debug!(" ----> Before checks");
-
             self.perform_periodic_checks().await;
-            debug!(" ----> After checks");
-
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }
     }
