@@ -71,14 +71,10 @@ impl PeriodicChecksTimestamps {
 impl FlowCtrl {
     /// Generate and fire commands for all types of periodic checks
     pub(super) async fn perform_periodic_checks(&mut self) {
-        debug!(" ----> starting periodics");
-
         self.enqueue_cmds_for_standard_periodic_checks().await;
-        debug!(" ----> standard periodics done");
 
         if !self.node.read().await.is_elder() {
             self.enqueue_cmds_for_adult_periodic_checks().await;
-            debug!(" ----> adult periodics done");
 
             // we've pushed what we have as an adult and processed incoming msgs
             // and cmds... so we can return already
@@ -86,7 +82,6 @@ impl FlowCtrl {
         }
 
         self.enqueue_cmds_for_elder_periodic_checks().await;
-        debug!(" ----> elder periodics done");
     }
 
     /// Periodic tasks run for elders and adults alike
