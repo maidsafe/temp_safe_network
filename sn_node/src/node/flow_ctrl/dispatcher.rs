@@ -186,6 +186,11 @@ impl Dispatcher {
                     None,
                     &name,
                 )?;
+                // drop the write lock
+                drop(node);
+
+                let node = self.node.read().await;
+
                 debug!("Network knowledge was updated: {updated}");
                 node.handle_valid_client_msg(
                     msg_id,
