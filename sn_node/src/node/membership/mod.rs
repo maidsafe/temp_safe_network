@@ -358,6 +358,7 @@ impl Membership {
         );
         let vote_response = consensus.handle_signed_vote(signed_vote)?;
 
+        debug!("Membership - Vote response: {vote_response:?}");
         let decision = if let Some(decision) = consensus.decision.clone() {
             if is_ongoing_consensus {
                 info!(
