@@ -48,17 +48,17 @@ impl CmdCtrl {
     ) {
         trace!("Processing cmd: {cmd:?}");
 
-        // let cmd_string = cmd.clone().to_string();
-
         trace!("about to spawn for processing cmd: {cmd:?}");
 
         let _ = tokio::task::spawn(async move {
+            debug!("spawned process for cmd {cmd:?}");
             dispatcher
                 .node()
                 .read()
                 .await
                 .statemap_log_state(cmd.statemap_state());
 
+            debug!("spawned process for cmd {cmd:?}, node read done");
             match dispatcher.process_cmd(cmd).await {
                 Ok(cmds) => {
                     for cmd in cmds {
