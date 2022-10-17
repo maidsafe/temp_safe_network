@@ -115,12 +115,6 @@ impl Dispatcher {
                 send_stream,
                 target_adult,
             } => {
-                // let send_stream = send_stream.and_then(|s| {
-                //     let s = Arc::try_unwrap(s).ok()?;
-                //     let s = s.into_inner();
-                //     Some(s)
-                // });
-
                 let mut node = self.node.write().await;
                 // cleanup
                 node.pending_data_queries.remove_expired();
