@@ -10,6 +10,7 @@ use crate::node::flow_ctrl::{cmds::Cmd, dispatcher::Dispatcher};
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use xor_name::XorName;
 
 /// A module for enhanced flow control.
 ///
@@ -29,6 +30,9 @@ pub(crate) struct CmdCtrl {
 
 impl CmdCtrl {
     pub(crate) fn new(dispatcher: Dispatcher) -> Self {
+        #[cfg(feature = "statemap")]
+        sn_interface::statemap::log_metadata();
+
         Self {
             dispatcher: Arc::new(dispatcher),
             id_counter: 0,
@@ -44,21 +48,19 @@ impl CmdCtrl {
         dispatcher: Arc<Dispatcher>,
         cmd: Cmd,
         id: Option<usize>,
+        node_identifier: XorName,
         cmd_process_api: tokio::sync::mpsc::Sender<(Cmd, Option<usize>)>,
     ) {
         trace!("Processing cmd: {cmd:?}");
 
         trace!("about to spawn for processing cmd: {cmd:?}");
-
         let _ = tokio::task::spawn(async move {
-            debug!("spawned process for cmd {cmd:?}");
-            dispatcher
-                .node()
-                .read()
-                .await
-                .statemap_log_state(cmd.statemap_state());
+            debug!("> spawned process for cmd {cmd:?}");
 
-            debug!("spawned process for cmd {cmd:?}, node read done");
+            #[cfg(feature = "statemap")]
+            sn_interface::statemap::log_state(node_identifier.to_string(), cmd.statemap_state());
+
+            debug!("* spawned process for cmd {cmd:?}, node read done");
             match dispatcher.process_cmd(cmd).await {
                 Ok(cmds) => {
                     for cmd in cmds {
@@ -76,11 +78,12 @@ impl CmdCtrl {
                     debug!("Error when processing command: {:?}", error);
                 }
             }
-            dispatcher
-                .node()
-                .read()
-                .await
-                .statemap_log_state(sn_interface::statemap::State::Idle);
+
+            #[cfg(feature = "statemap")]
+            sn_interface::statemap::log_state(
+                node_identifier.to_string(),
+                sn_interface::statemap::State::Idle,
+            );
         });
     }
 }
