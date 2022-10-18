@@ -515,6 +515,15 @@ impl Session {
 
         let stats = self.network.read().await.known_sections_count();
         debug!("Client has received updated network knowledge. Current sections known: {:?}. Sap for our startup-query: {:?}", stats, known_sap);
+        info!("******#####****** Client has received updated network knowledge. Current sections known: {:?}. Sap for our startup-query: {:?}", stats, known_sap);
+        match known_sap {
+            None => warn!("******#####****** NO SAP !!!! "),
+            Some(sap) => info!(
+                "******#####****** Current Elders: {}, Members: {}",
+                sap.elder_count(),
+                sap.members().count()
+            ),
+        }
 
         Ok(())
     }
@@ -531,6 +540,14 @@ impl Session {
         } else {
             return Err(Error::NoNetworkKnowledge(dst));
         };
+
+        if elders.len() != 7 {
+            warn!(
+                "******#####****** NO 7 ELDERS for QUERY but {}: {:?}",
+                elders.len(),
+                elders
+            );
+        }
 
         elders.shuffle(&mut OsRng);
 
@@ -564,6 +581,13 @@ impl Session {
             let sap_elders = sap.elders_vec();
             let section_pk = sap.section_key();
             trace!("SAP elders found {:?}", sap_elders);
+            if sap_elders.len() != 7 {
+                warn!(
+                    "******#####****** NO 7 ELDERS for CMD but {}: {:?}",
+                    sap_elders.len(),
+                    sap_elders
+                );
+            }
 
             // Supermajority of elders is expected.
             let targets_count = supermajority(sap_elders.len());
