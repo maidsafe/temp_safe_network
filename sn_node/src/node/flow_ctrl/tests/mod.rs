@@ -214,7 +214,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                 let _updated = section.update_member(SectionSigned {
                     value: node_state,
                     sig,
-                });
+                })?;
                 if peer.age() == MIN_ADULT_AGE + 1 {
                     let _changed = expected_new_elders.insert(peer);
                 }
@@ -387,7 +387,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
             let existing_peer = network_utils::create_peer(MIN_ADULT_AGE);
             let node_state = NodeState::joined(existing_peer, None);
             let node_state = section_signed(&sk_set.secret_key(), node_state)?;
-            let _updated = section.update_member(node_state);
+            let _updated = section.update_member(node_state)?;
 
             // Pick the elder to remove.
             let auth_peers = section_auth.elders();
@@ -665,13 +665,13 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
                 let non_elder_peer = network_utils::create_peer(MIN_ADULT_AGE);
                 let node_state = NodeState::joined(non_elder_peer, None);
                 let node_state = section_signed(&sk_set.secret_key(), node_state)?;
-                assert!(section.update_member(node_state));
+                assert!(section.update_member(node_state)?);
             }
 
             let non_elder_peer = network_utils::create_peer(MIN_ADULT_AGE - 1);
             let node_state = NodeState::joined(non_elder_peer, None);
             let node_state = section_signed(&sk_set.secret_key(), node_state)?;
-            assert!(section.update_member(node_state));
+            assert!(section.update_member(node_state)?);
             let node = nodes.remove(0);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let comm = network_utils::create_comm().await?;
@@ -822,7 +822,7 @@ async fn handle_elders_update() -> Result<()> {
         for peer in [&adult_peer, &promoted_peer] {
             let node_state = NodeState::joined(*peer, None);
             let node_state = section_signed(sk_set0.secret_key(), node_state)?;
-            assert!(section0.update_member(node_state));
+            assert!(section0.update_member(node_state)?);
         }
 
         let demoted_peer = other_elder_peers.remove(0);
@@ -977,7 +977,7 @@ async fn handle_demote_during_split() -> Result<()> {
             for peer in peers_b.iter().chain(iter::once(&peer_c)).cloned() {
                 let node_state = NodeState::joined(peer, None);
                 let node_state = section_signed(sk_set_v0.secret_key(), node_state)?;
-                assert!(section.update_member(node_state));
+                assert!(section.update_member(node_state)?);
             }
 
             // we make a new full node from info, to see what it does

@@ -464,7 +464,7 @@ impl NetworkKnowledge {
     }
 
     /// Update the member. Returns whether it actually updated it.
-    pub fn update_member(&mut self, node_state: SectionSigned<NodeState>) -> bool {
+    pub fn update_member(&mut self, node_state: SectionSigned<NodeState>) -> Result<bool> {
         let node_name = node_state.name();
         trace!(
             "Updating section member state, name: {node_name:?}, new state: {:?}",
@@ -474,16 +474,15 @@ impl NetworkKnowledge {
         // let's check the node state is properly signed by one of the keys in our chain
         if !node_state.verify(&self.section_chain()) {
             error!(
-                "Can't update section member, name: {node_name:?}, new state: {:?}",
-                node_state.state()
+                "Node {node_name:?} state: {:?} is signed with a SectionKey that we are not aware of..", node_state.state()
             );
-            return false;
+            return Err(Error::KeyNotFound(node_state.sig.public_key));
         }
 
         let updated = self.section_peers.update(node_state);
         trace!("Section member state, name: {node_name:?}, updated: {updated}");
 
-        updated
+        Ok(updated)
     }
 
     /// Returns the members of our section

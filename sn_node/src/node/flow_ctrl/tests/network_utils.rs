@@ -273,7 +273,7 @@ impl TestNodeBuilder {
         if let Some(custom_peer) = self.custom_peer {
             let node_state = NodeState::joined(custom_peer, None);
             let node_state = section_signed(&sk_set.secret_key(), node_state)?;
-            let _updated = section.update_member(node_state);
+            let _updated = section.update_member(node_state)?;
         }
 
         let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
@@ -317,7 +317,7 @@ pub(crate) fn create_section(
         do_create_section(sap, genesis_sk_set, other_keys, parent_section_tree)?;
     for ns in sap.members() {
         let auth_ns = section_signed(&genesis_sk_set.secret_key(), ns.clone())?;
-        let _updated = section.update_member(auth_ns);
+        let _updated = section.update_member(auth_ns)?;
     }
     Ok((section, section_key_share))
 }
@@ -333,7 +333,7 @@ pub(crate) fn create_section_with_elders(
     for peer in sap.elders() {
         let node_state = NodeState::joined(*peer, None);
         let node_state = section_signed(sk_set.secret_key(), node_state)?;
-        let _updated = section.update_member(node_state);
+        let _updated = section.update_member(node_state)?;
     }
     Ok((section, section_key_share))
 }

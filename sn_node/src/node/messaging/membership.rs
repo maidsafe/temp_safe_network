@@ -178,7 +178,7 @@ impl MyNode {
         );
 
         for (new_info, signature) in joining_nodes.iter().cloned() {
-            cmds.extend(self.handle_node_joined(new_info, signature).await);
+            cmds.extend(self.handle_node_joined(new_info, signature).await?);
         }
 
         for (new_info, signature) in leaving_nodes.iter().cloned() {
@@ -224,7 +224,11 @@ impl MyNode {
         Ok(cmds)
     }
 
-    async fn handle_node_joined(&mut self, new_info: NodeState, signature: Signature) -> Vec<Cmd> {
+    async fn handle_node_joined(
+        &mut self,
+        new_info: NodeState,
+        signature: Signature,
+    ) -> Result<Vec<Cmd>> {
         let sig = SectionSig {
             public_key: self.network_knowledge.section_key(),
             signature,
@@ -235,9 +239,9 @@ impl MyNode {
             sig,
         };
 
-        if !self.network_knowledge.update_member(new_info.clone()) {
+        if !self.network_knowledge.update_member(new_info.clone())? {
             info!("ignore Online: {}", new_info.peer());
-            return vec![];
+            return Ok(vec![]);
         }
 
         self.add_new_adult_to_trackers(new_info.name());
@@ -252,7 +256,7 @@ impl MyNode {
         }))
         .await;
 
-        vec![]
+        Ok(vec![])
     }
 
     // Send `NodeApproval` to a joining node which makes it a section member
