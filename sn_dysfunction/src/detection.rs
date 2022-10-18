@@ -6,13 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{error::Result, get_mean_of, std_deviation, DysfunctionDetection, OperationId};
+use crate::{error::Result, /*get_mean_of, std_deviation,*/ DysfunctionDetection, OperationId,};
 
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
+/* TODO: re-enable dysfunctional tracking
 use std::time::Duration;
 static RECENT_ISSUE_DURATION: Duration = Duration::from_secs(60 * 10); // 10 minutes
+
 
 #[cfg(test)]
 static OUTDATED_PENDING_REQUEST_DURATION: Duration = Duration::from_secs(0);
@@ -27,6 +29,7 @@ static AE_PROBE_WEIGHTING: f32 = 150.0;
 
 /// Weighted score value relative to std_deviation, above which we're calling a node dysfunctional
 static DYSFUNCTION_SCORE_THRESHOLD: usize = 500;
+*/
 
 #[derive(Clone, Debug)]
 /// Represents the different type of issues that can be recorded by the Dysfunction Detection
@@ -45,7 +48,7 @@ pub enum IssueType {
     PendingRequestOperation(OperationId),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ScoreResults {
     pub communication_scores: BTreeMap<XorName, f32>,
     pub dkg_scores: BTreeMap<XorName, f32>,
@@ -64,222 +67,231 @@ impl DysfunctionDetection {
     /// These scores can then be used to highlight nodes that have a higher score than some
     /// particular ratio.
     pub fn calculate_scores(&self) -> ScoreResults {
-        let mut communication_scores = BTreeMap::new();
-        let mut knowledge_scores = BTreeMap::new();
-        let mut op_scores = BTreeMap::new();
-        let mut dkg_scores = BTreeMap::new();
-        let mut probe_scores = BTreeMap::new();
+        /* TODO: re-enable dysfunctional tracking
+                        let mut communication_scores = BTreeMap::new();
+                        let mut knowledge_scores = BTreeMap::new();
+                        let mut op_scores = BTreeMap::new();
+                        let mut dkg_scores = BTreeMap::new();
+                        let mut probe_scores = BTreeMap::new();
 
-        for node in &self.nodes {
-            let _ = dkg_scores.insert(
-                *node,
-                self.calculate_node_score_for_type(node, &IssueType::Dkg),
-            );
-            let _ = probe_scores.insert(
-                *node,
-                self.calculate_node_score_for_type(node, &IssueType::AwaitingProbeResponse),
-            );
-            let _ = communication_scores.insert(
-                *node,
-                self.calculate_node_score_for_type(node, &IssueType::Communication),
-            );
-            let _ = knowledge_scores.insert(
-                *node,
-                self.calculate_node_score_for_type(node, &IssueType::Knowledge),
-            );
-            let _ = op_scores.insert(
-                *node,
-                self.calculate_node_score_for_type(
-                    node,
-                    &IssueType::PendingRequestOperation(OperationId::random()),
-                ),
-            );
-        }
+                        for node in &self.nodes {
+                            let _ = dkg_scores.insert(
+                                *node,
+                                self.calculate_node_score_for_type(node, &IssueType::Dkg),
+                            );
+                            let _ = probe_scores.insert(
+                                *node,
+                                self.calculate_node_score_for_type(node, &IssueType::AwaitingProbeResponse),
+                            );
+                            let _ = communication_scores.insert(
+                                *node,
+                                self.calculate_node_score_for_type(node, &IssueType::Communication),
+                            );
+                            let _ = knowledge_scores.insert(
+                                *node,
+                                self.calculate_node_score_for_type(node, &IssueType::Knowledge),
+                            );
+                            let _ = op_scores.insert(
+                                *node,
+                                self.calculate_node_score_for_type(
+                                    node,
+                                    &IssueType::PendingRequestOperation(OperationId::random()),
+                                ),
+                            );
+                        }
 
-        ScoreResults {
-            communication_scores,
-            dkg_scores,
-            knowledge_scores,
-            op_scores,
-            probe_scores,
-        }
+                        ScoreResults {
+                            communication_scores,
+                            dkg_scores,
+                            knowledge_scores,
+                            op_scores,
+                            probe_scores,
+                        }
+        */
+        ScoreResults::default()
     }
 
-    /// get the node's score, relative to the average for all nodes being tracked
-    fn calculate_node_score_for_type(&self, node: &XorName, issue_type: &IssueType) -> f32 {
-        let node_issue_count = self.get_node_issue_count_for_type(node, issue_type);
+    /* TODO: re-enable dysfunctional tracking
+        /// get the node's score, relative to the average for all nodes being tracked
+        fn calculate_node_score_for_type(&self, node: &XorName, issue_type: &IssueType) -> f32 {
+            let node_issue_count = self.get_node_issue_count_for_type(node, issue_type);
 
-        // we can shortcircuit here
-        if node_issue_count == 0 {
-            return 0.0;
-        }
-
-        debug!("node {node} {issue_type:?} count: {:?}", node_issue_count);
-        let mut other_node_counts = Vec::new();
-        for itr in &self.nodes {
-            if itr == node {
-                continue;
+            // we can shortcircuit here
+            if node_issue_count == 0 {
+                return 0.0;
             }
-            other_node_counts.push(self.get_node_issue_count_for_type(itr, issue_type) as f32);
+
+            debug!("node {node} {issue_type:?} count: {:?}", node_issue_count);
+            let mut other_node_counts = Vec::new();
+            for itr in &self.nodes {
+                if itr == node {
+                    continue;
+                }
+                other_node_counts.push(self.get_node_issue_count_for_type(itr, issue_type) as f32);
+            }
+            let average = get_mean_of(&other_node_counts).unwrap_or(1.0);
+
+            node_issue_count.saturating_sub(average as usize) as f32
         }
-        let average = get_mean_of(&other_node_counts).unwrap_or(1.0);
 
-        node_issue_count.saturating_sub(average as usize) as f32
-    }
+        fn get_node_issue_count_for_type(&self, node: &XorName, issue_type: &IssueType) -> usize {
+            match issue_type {
+                IssueType::Communication => {
+                    if let Some(issues) = self.communication_issues.get(node) {
+                        issues.len()
+                    } else {
+                        0
+                    }
+                }
+                IssueType::Dkg => {
+                    if let Some(issues) = self.dkg_issues.get(node) {
+                        issues.len()
+                    } else {
+                        0
+                    }
+                }
+                IssueType::AwaitingProbeResponse => {
+                    if let Some(issues) = self.probe_issues.get(node) {
+                        issues.len()
+                    } else {
+                        0
+                    }
+                }
+                IssueType::Knowledge => {
+                    if let Some(issues) = self.knowledge_issues.get(node) {
+                        issues.len()
+                    } else {
+                        0
+                    }
+                }
+                IssueType::PendingRequestOperation(_) => {
+                    if let Some(issues) = self.unfulfilled_ops.get(node) {
+                        // To avoid the case that the check get carried out just after
+                        // burst of messages get inserted, only those issues has sat a
+                        // while will be considered as outdated.
+                        let count = issues
+                            .iter()
+                            .filter(|(_, time)| time.elapsed() > OUTDATED_PENDING_REQUEST_DURATION)
+                            .count();
 
-    fn get_node_issue_count_for_type(&self, node: &XorName, issue_type: &IssueType) -> usize {
-        match issue_type {
-            IssueType::Communication => {
-                if let Some(issues) = self.communication_issues.get(node) {
-                    issues.len()
-                } else {
-                    0
+                        count
+                    } else {
+                        0
+                    }
                 }
             }
-            IssueType::Dkg => {
-                if let Some(issues) = self.dkg_issues.get(node) {
-                    issues.len()
-                } else {
-                    0
-                }
+        }
+
+        /// get scores mapped by name, to score and z-score, which is std dev's from the mean
+        fn get_weighted_scores(&self) -> BTreeMap<XorName, usize> {
+            trace!("Getting weighted scores");
+            let scores = self.calculate_scores();
+            let ops_scores = scores.op_scores;
+            let conn_scores = scores.communication_scores;
+            let dkg_scores = scores.dkg_scores;
+            let knowledge_scores = scores.knowledge_scores;
+            let probe_scores = scores.probe_scores;
+
+            let mut pre_standardised_scores = BTreeMap::default();
+            let mut scores_only = vec![];
+            // now we loop to get the scores per xorname, so we can then avg etc
+            for (name, score) in ops_scores {
+                let ops_score = score * OP_WEIGHTING;
+
+                let node_conn_score = *conn_scores.get(&name).unwrap_or(&1.0);
+                let node_conn_score = node_conn_score * CONN_WEIGHTING;
+
+                let node_dkg_score = *dkg_scores.get(&name).unwrap_or(&1.0);
+                let node_dkg_score = node_dkg_score * DKG_WEIGHTING;
+
+                let node_knowledge_score = *knowledge_scores.get(&name).unwrap_or(&1.0);
+                let node_knowledge_score = node_knowledge_score * KNOWLEDGE_WEIGHTING;
+
+                let node_probe_score = *probe_scores.get(&name).unwrap_or(&1.0);
+                let node_probe_score = node_probe_score * AE_PROBE_WEIGHTING;
+
+                let final_score = ops_score
+                    + node_conn_score
+                    + node_knowledge_score
+                    + node_dkg_score
+                    + node_probe_score;
+                debug!(
+                    "Node {name} has a final score of {final_score} |
+                    (Conns score({node_conn_score}), Dkg score({node_dkg_score}), |
+                    Knowledge score({node_knowledge_score}), Ops score({score})), AeProbe score ({node_probe_score})"
+                );
+
+                scores_only.push(final_score);
+                let _prev = pre_standardised_scores.insert(name, final_score as usize);
             }
-            IssueType::AwaitingProbeResponse => {
-                if let Some(issues) = self.probe_issues.get(node) {
-                    issues.len()
-                } else {
-                    0
-                }
+
+            let mean = get_mean_of(&scores_only);
+            let std_dev = std_deviation(&scores_only).unwrap_or(0.0);
+
+            trace!("avg weighted score across all nodes: {mean:?}");
+            trace!("std dev: {std_dev:?}");
+
+            // now we store the z-score
+            let mut final_scores = BTreeMap::default();
+
+            for (name, score) in pre_standardised_scores {
+                let zscore = score.saturating_sub(std_dev as usize);
+
+                debug!("Final Z-score for {name} is {zscore:?}");
+
+                let _existed = final_scores.insert(name, zscore);
             }
-            IssueType::Knowledge => {
-                if let Some(issues) = self.knowledge_issues.get(node) {
-                    issues.len()
-                } else {
-                    0
-                }
+
+            final_scores
+        }
+
+        fn cleanup_time_sensistive_checks(&mut self) -> Result<()> {
+            for issues in &mut self.communication_issues.values_mut() {
+                issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
             }
-            IssueType::PendingRequestOperation(_) => {
-                if let Some(issues) = self.unfulfilled_ops.get(node) {
-                    // To avoid the case that the check get carried out just after
-                    // burst of messages get inserted, only those issues has sat a
-                    // while will be considered as outdated.
-                    let count = issues
-                        .iter()
-                        .filter(|(_, time)| time.elapsed() > OUTDATED_PENDING_REQUEST_DURATION)
-                        .count();
 
-                    count
-                } else {
-                    0
-                }
+            for issues in &mut self.probe_issues.values_mut() {
+                issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
             }
+
+            for issues in &mut self.knowledge_issues.values_mut() {
+                issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
+            }
+
+            for issues in &mut self.dkg_issues.values_mut() {
+                issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
+            }
+
+            Ok(())
         }
-    }
-
-    /// get scores mapped by name, to score and z-score, which is std dev's from the mean
-    fn get_weighted_scores(&self) -> BTreeMap<XorName, usize> {
-        trace!("Getting weighted scores");
-        let scores = self.calculate_scores();
-        let ops_scores = scores.op_scores;
-        let conn_scores = scores.communication_scores;
-        let dkg_scores = scores.dkg_scores;
-        let knowledge_scores = scores.knowledge_scores;
-        let probe_scores = scores.probe_scores;
-
-        let mut pre_standardised_scores = BTreeMap::default();
-        let mut scores_only = vec![];
-        // now we loop to get the scores per xorname, so we can then avg etc
-        for (name, score) in ops_scores {
-            let ops_score = score * OP_WEIGHTING;
-
-            let node_conn_score = *conn_scores.get(&name).unwrap_or(&1.0);
-            let node_conn_score = node_conn_score * CONN_WEIGHTING;
-
-            let node_dkg_score = *dkg_scores.get(&name).unwrap_or(&1.0);
-            let node_dkg_score = node_dkg_score * DKG_WEIGHTING;
-
-            let node_knowledge_score = *knowledge_scores.get(&name).unwrap_or(&1.0);
-            let node_knowledge_score = node_knowledge_score * KNOWLEDGE_WEIGHTING;
-
-            let node_probe_score = *probe_scores.get(&name).unwrap_or(&1.0);
-            let node_probe_score = node_probe_score * AE_PROBE_WEIGHTING;
-
-            let final_score = ops_score
-                + node_conn_score
-                + node_knowledge_score
-                + node_dkg_score
-                + node_probe_score;
-            debug!(
-                "Node {name} has a final score of {final_score} |
-                (Conns score({node_conn_score}), Dkg score({node_dkg_score}), |
-                Knowledge score({node_knowledge_score}), Ops score({score})), AeProbe score ({node_probe_score})"
-            );
-
-            scores_only.push(final_score);
-            let _prev = pre_standardised_scores.insert(name, final_score as usize);
-        }
-
-        let mean = get_mean_of(&scores_only);
-        let std_dev = std_deviation(&scores_only).unwrap_or(0.0);
-
-        trace!("avg weighted score across all nodes: {mean:?}");
-        trace!("std dev: {std_dev:?}");
-
-        // now we store the z-score
-        let mut final_scores = BTreeMap::default();
-
-        for (name, score) in pre_standardised_scores {
-            let zscore = score.saturating_sub(std_dev as usize);
-
-            debug!("Final Z-score for {name} is {zscore:?}");
-
-            let _existed = final_scores.insert(name, zscore);
-        }
-
-        final_scores
-    }
-
-    fn cleanup_time_sensistive_checks(&mut self) -> Result<()> {
-        for issues in &mut self.communication_issues.values_mut() {
-            issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
-        }
-
-        for issues in &mut self.probe_issues.values_mut() {
-            issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
-        }
-
-        for issues in &mut self.knowledge_issues.values_mut() {
-            issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
-        }
-
-        for issues in &mut self.dkg_issues.values_mut() {
-            issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
-        }
-
-        Ok(())
-    }
-
+    */
     /// Get a list of nodes whose score is  DYSFUNCTION_SCORE_THRESHOLD
     /// TODO: order these to act upon _most_ dysfunctional first
     /// (the nodes must all `ProposeOffline` over a dysfunctional node and then _immediately_ vote it off. So any other membershipn changes in flight could block this.
     /// thus, we need to be callling this function often until nodes are removed.)
     pub fn get_dysfunctional_nodes(&mut self) -> Result<BTreeSet<XorName>> {
-        self.cleanup_time_sensistive_checks()?;
+        /* TODO: re-enable dysfunctional tracking
+                self.cleanup_time_sensistive_checks()?;
 
-        let mut dysfunctional_nodes = BTreeSet::new();
+                let mut dysfunctional_nodes = BTreeSet::new();
 
-        let final_scores = self.get_weighted_scores();
+                let final_scores = self.get_weighted_scores();
 
-        for (name, node_score) in final_scores {
-            // if our weighted score is higher than this, then we're having a bad time
-            if node_score > DYSFUNCTION_SCORE_THRESHOLD {
-                info!("DysfunctionDetection: Adding {name} as dysfuncitonal node");
-                let _existed = dysfunctional_nodes.insert(name);
-            }
-        }
+                for (name, node_score) in final_scores {
+                    // if our weighted score is higher than this, then we're having a bad time
+                    if node_score > DYSFUNCTION_SCORE_THRESHOLD {
+                        info!("DysfunctionDetection: Adding {name} as dysfuncitonal node");
+                        let _existed = dysfunctional_nodes.insert(name);
+                    }
+                }
 
-        Ok(dysfunctional_nodes)
+                Ok(dysfunctional_nodes)
+        */
+        Ok(BTreeSet::new())
     }
 }
+
+/* TODO: re-enable dysfunctional tracking
 
 #[cfg(test)]
 mod tests {
@@ -1103,3 +1115,4 @@ mod knowledge_tests {
         Ok(())
     }
 }
+*/
