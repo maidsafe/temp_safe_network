@@ -10,6 +10,7 @@ use crate::node::flow_ctrl::{cmds::Cmd, dispatcher::Dispatcher};
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use xor_name::XorName;
 
 /// A module for enhanced flow control.
 ///
@@ -47,12 +48,13 @@ impl CmdCtrl {
         dispatcher: Arc<Dispatcher>,
         cmd: Cmd,
         id: Option<usize>,
+        node_identifier: XorName,
         cmd_process_api: tokio::sync::mpsc::Sender<(Cmd, Option<usize>)>,
     ) {
-        let node_identifier = dispatcher.node().read().await.name();
         trace!("about to spawn for processing cmd: {cmd:?}");
-        let dispatcher = dispatcher.clone();
         let _ = tokio::task::spawn(async move {
+            debug!("> spawned process for cmd {cmd:?}");
+
             #[cfg(feature = "statemap")]
             sn_interface::statemap::log_state(node_identifier.to_string(), cmd.statemap_state());
 
