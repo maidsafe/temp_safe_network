@@ -43,6 +43,7 @@ impl FlowCtrl {
     ) -> mpsc::Sender<(Cmd, Option<usize>)> {
         let dispatcher = cmd_ctrl.dispatcher.clone();
         let node = cmd_ctrl.node();
+        let node_for_cmds = node.clone();
         let (cmd_sender_channel, mut incoming_cmds_from_apis) = mpsc::channel(10_000);
         let flow_ctrl = Self {
             node,
@@ -60,8 +61,20 @@ impl FlowCtrl {
 
         // start a new thread to kick off incoming cmds
         let _ = tokio::task::spawn(async move {
+            // do one read to get a stable identifier for statemap naming.
+            // this is NOT the node's current name. It's the initial name... but will not change
+            // for the entire statemap
+            let node_identifier = node_for_cmds.read().await.info().name();
+
             while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
-                CmdCtrl::process_cmd_job(dispatcher.clone(), cmd, cmd_id, cmd_channel.clone()).await
+                CmdCtrl::process_cmd_job(
+                    dispatcher.clone(),
+                    cmd,
+                    cmd_id,
+                    node_identifier,
+                    cmd_channel.clone(),
+                )
+                .await
             }
         });
 
