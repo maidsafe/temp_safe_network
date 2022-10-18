@@ -302,7 +302,10 @@ impl Membership {
             &self.consensus.votes,
             &self.consensus.processed_votes_cache,
         ) {
-            error!("Attempted invalid proposal: {e:?}");
+            error!(
+                "Attempted invalid proposal: {e:?}. (Genereation for attempted proposal is: {:?})",
+                self.gen + 1
+            );
             return Err(Error::InvalidProposal);
         }
 
