@@ -363,12 +363,24 @@ impl MyNode {
                         kind: AntiEntropyKind::Redirect { bounced_msg },
                     };
 
-                    trace!("{}", LogMarker::AeSendRedirect);
+                    trace!(
+                        "{} entropy found. {sender:?} should be updated",
+                        LogMarker::AeSendRedirect
+                    );
 
-                    return Ok(Some(Cmd::send_msg(
-                        OutgoingMsg::Node(ae_msg),
-                        Peers::Single(*sender),
-                    )));
+                    // client response, so send it over stream
+                    if send_stream.is_some() {
+                        return Ok(Some(Cmd::send_msg_via_response_stream(
+                            OutgoingMsg::Node(ae_msg),
+                            Peers::Single(*sender),
+                            send_stream,
+                        )));
+                    } else {
+                        return Ok(Some(Cmd::send_msg(
+                            OutgoingMsg::Node(ae_msg),
+                            Peers::Single(*sender),
+                        )));
+                    }
                 }
                 None => {
                     warn!("Our SectionTree is empty");
@@ -426,7 +438,10 @@ impl MyNode {
         sender: Peer,
         bounced_msg: UsrMsgBytes,
     ) -> Result<Cmd> {
-        trace!("{} in ae_redirect ", LogMarker::AeSendRedirect);
+        trace!(
+            "{} in ae_redirect to elders for {sender:?} ",
+            LogMarker::AeSendRedirect
+        );
 
         let ae_msg = self.generate_ae_msg(None, AntiEntropyKind::Redirect { bounced_msg });
 
