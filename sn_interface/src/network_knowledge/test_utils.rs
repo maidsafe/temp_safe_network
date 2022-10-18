@@ -93,7 +93,7 @@ pub fn random_sap(
 
 /// Generate a random `SectionAuthorityProvider` for testing.
 ///
-/// The same as `random_sap`, but instead the secret key is provided. This can be useful for
+/// Same as `random_sap`, but instead the secret key is provided. This can be useful for
 /// creating a section to share the same genesis key as another one.
 pub fn random_sap_with_key(
     prefix: Prefix,
@@ -107,6 +107,32 @@ pub fn random_sap_with_key(
     let section_auth =
         SectionAuthorityProvider::new(elders, prefix, members, sk_set.public_keys(), 0);
     (section_auth, nodes)
+}
+
+/// Generate a random `NetworkKnowledge` for testing.
+///
+/// Uses `random_sap_with_key` to generate SAP; section_peer list is updated with the `NodeState` as well
+pub fn gen_network_knowledge_with_key(
+    prefix: Prefix,
+    elder_count: usize,
+    adult_count: usize,
+    sk_set: &bls::SecretKeySet,
+) -> Result<(NetworkKnowledge, Vec<MyNodeInfo>)> {
+    let pk_set = sk_set.public_keys();
+    let (sap, node_infos) = random_sap_with_key(prefix, elder_count, adult_count, sk_set);
+    let signed_sap = section_signed(&sk_set.secret_key(), sap)?;
+    let section_tree_update =
+        SectionTreeUpdate::new(signed_sap, SectionsDAG::new(pk_set.public_key()));
+    let mut network_knowledge =
+        NetworkKnowledge::new(SectionTree::new(pk_set.public_key()), section_tree_update)?;
+
+    // update the sap members
+    for peer in network_knowledge.signed_sap.elders() {
+        let node_state = NodeState::joined(*peer, None);
+        let signed_state = section_signed(&sk_set.secret_key(), node_state)?;
+        let _changed = network_knowledge.section_peers.update(signed_state);
+    }
+    Ok((network_knowledge, node_infos))
 }
 
 /// Generate a `SectionTreeUpdate` where the SAP's section key is appended to the proof chain
