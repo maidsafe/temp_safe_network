@@ -254,7 +254,7 @@ jobs:
       - name: Run client tests
         env:
           RUST_LOG: "sn_client=trace,qp2p=debug"
-        run: cargo test --release -p sn_client
+        run: cargo test --release -p sn_client -- --test-threads=1
         timeout-minutes: 25
 
       - name: Run example app for file API against local network

@@ -7,22 +7,23 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::comm::Comm;
-use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Error, MyNode, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, /*Error,*/ MyNode, Result};
 
 use sn_interface::{
-    elder_count,
+    //elder_count,
     messaging::system::{
         JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest,
         JoinResponse, NodeMsg,
     },
     network_knowledge::{
-        MembershipState, NodeState, SectionAuthUtils, SectionTreeUpdate, FIRST_SECTION_MAX_AGE,
-        MIN_ADULT_AGE,
+        MembershipState, NodeState, SectionAuthUtils,
+        SectionTreeUpdate, /*, FIRST_SECTION_MAX_AGE,
+                          MIN_ADULT_AGE,*/
     },
     types::{log_markers::LogMarker, Peer},
 };
 
-const FIRST_SECTION_MIN_ELDER_AGE: u8 = 82;
+//const FIRST_SECTION_MIN_ELDER_AGE: u8 = 82;
 
 // Message handling
 impl MyNode {
@@ -115,7 +116,9 @@ impl MyNode {
         // During the first section, nodes shall use ranged age to avoid too many nodes getting
         // relocated at the same time. After the first section splits, nodes shall only
         // start with an age of MIN_ADULT_AGE
+        Ok((false, peer.age()))
 
+        /* TODO: re-enable age checks
         if let Some(membership) = &self.membership {
             let current_section_size = membership.current_section_members().len();
             let our_prefix = self.network_knowledge.prefix();
@@ -157,6 +160,7 @@ impl MyNode {
             error!("No membership found, cannot guage age of joining nodes.");
             Err(Error::NoMembershipFound)
         }
+        */
     }
 
     pub(crate) async fn handle_join_as_relocated_request(
