@@ -1,5 +1,4 @@
 use crate::node::{
-    flow_ctrl::cmds::Cmd::HandleValidClientMsg,
     flow_ctrl::dispatcher::Dispatcher,
     messaging::{OutgoingMsg, Peers},
     Cmd,
@@ -7,13 +6,14 @@ use crate::node::{
 use assert_matches::assert_matches;
 use eyre::eyre;
 use eyre::Result;
+use qp2p::SendStream;
 #[cfg(feature = "traceroute")]
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         data::{ClientMsg, Error as MessagingDataError},
         serialisation::WireMsg,
-        system::{JoinResponse, MembershipState, NodeCmd, NodeMsg, OperationId, RelocateDetails},
+        system::{JoinResponse, NodeCmd, NodeMsg, OperationId},
         AuthorityProof, ClientAuth, MsgId, MsgType,
     },
     network_knowledge::{
@@ -22,6 +22,8 @@ use sn_interface::{
     types::{Keypair, Peer, ReplicatedData, SecretKeySet},
 };
 use std::collections::BTreeSet;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 pub(crate) struct HandleOnlineStatus {
     pub(crate) node_approval_sent: bool,
@@ -112,7 +114,53 @@ pub(crate) async fn run_and_collect_cmds(
     Ok(all_cmds)
 }
 
-pub(crate) fn wrap_client_msg_for_handling(msg: ClientMsg, peer: Peer) -> Result<Cmd> {
+pub(crate) async fn run_node_handle_client_msg_and_collect_cmds(
+    msg: ClientMsg,
+    peer: Peer,
+    dispatcher: &Dispatcher,
+) -> crate::node::error::Result<Vec<Cmd>> {
+    let mut all_cmds = vec![];
+
+    let node = dispatcher.node();
+    let the_node = node.read().await;
+
+    let (msg_id, msg, auth) = get_client_msg_parts_for_handling(msg)?;
+
+    let mut cmds = the_node
+        .handle_valid_client_msg(
+            msg_id,
+            msg,
+            auth,
+            peer,
+            None,
+            #[cfg(feature = "traceroute")]
+            Traceroute(Vec::new()),
+        )
+        .await?;
+
+    // drop any read locks on the node here
+    // we may have commands editing the node, requiring a write lock
+    // coming after
+    drop(the_node);
+
+    while !cmds.is_empty() {
+        all_cmds.extend(cmds.clone());
+        let mut new_cmds = vec![];
+        for cmd in cmds {
+            if !matches!(cmd, Cmd::SendMsg { .. }) {
+                new_cmds.extend(dispatcher.process_cmd(cmd).await?);
+            }
+        }
+
+        cmds = new_cmds;
+    }
+
+    Ok(all_cmds)
+}
+
+pub(crate) fn get_client_msg_parts_for_handling(
+    msg: ClientMsg,
+) -> crate::node::error::Result<(MsgId, ClientMsg, AuthorityProof<ClientAuth>)> {
     let payload = WireMsg::serialize_msg_payload(&msg)?;
     let src_client_keypair = Keypair::new_ed25519();
     let auth = ClientAuth {
@@ -120,15 +168,8 @@ pub(crate) fn wrap_client_msg_for_handling(msg: ClientMsg, peer: Peer) -> Result
         signature: src_client_keypair.sign(&payload),
     };
     let auth_proof = AuthorityProof::verify(auth, &payload)?;
-    Ok(HandleValidClientMsg {
-        msg_id: MsgId::new(),
-        msg,
-        origin: peer,
-        auth: auth_proof,
-        send_stream: None,
-        #[cfg(feature = "traceroute")]
-        traceroute: Traceroute(Vec::new()),
-    })
+
+    Ok((MsgId::new(), msg, auth_proof))
 }
 
 /// Extend the `Cmd` enum with some utilities for testing.
