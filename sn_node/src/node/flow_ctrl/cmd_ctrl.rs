@@ -43,6 +43,9 @@ pub(crate) struct CmdCtrl {
 
 impl CmdCtrl {
     pub(crate) fn new(dispatcher: Dispatcher) -> Self {
+        #[cfg(feature = "statemap")]
+        sn_interface::statemap::log_metadata();
+
         Self {
             cmd_queue: PriorityQueue::new(),
             dispatcher: Arc::new(dispatcher),
@@ -99,6 +102,8 @@ impl CmdCtrl {
 
         let id = job.id();
         let cmd = job.clone().into_cmd();
+        let node = self.node();
+        let node_identifier = node.read().await.name();
 
         let cmd_string = cmd.clone().to_string();
         let priority = job.priority();
@@ -116,13 +121,10 @@ impl CmdCtrl {
 
         let dispatcher = self.dispatcher.clone();
         let _ = tokio::task::spawn_local(async move {
-            dispatcher
-                .node()
-                .read()
-                .await
-                .statemap_log_state(cmd.statemap_state());
+            #[cfg(feature = "statemap")]
+            sn_interface::statemap::log_state(node_identifier.to_string(), cmd.statemap_state());
 
-            debug!("spawned process for cmd {cmd:?}, node read done");
+            debug!("* spawned process for cmd {cmd:?}, node read done");
             match dispatcher.process_cmd(cmd).await {
                 Ok(cmds) => {
                     for cmd in cmds {
@@ -157,11 +159,12 @@ impl CmdCtrl {
                         .await;
                 }
             }
-            dispatcher
-                .node()
-                .read()
-                .await
-                .statemap_log_state(sn_interface::statemap::State::Idle);
+
+            #[cfg(feature = "statemap")]
+            sn_interface::statemap::log_state(
+                node_identifier.to_string(),
+                sn_interface::statemap::State::Idle,
+            );
         });
     }
 }
