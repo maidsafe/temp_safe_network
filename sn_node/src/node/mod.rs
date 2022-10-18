@@ -27,7 +27,6 @@ mod node_starter;
 mod node_test_api;
 mod proposal;
 mod relocation;
-mod statemap;
 
 use self::{
     bootstrap::join_network,
@@ -274,8 +273,6 @@ mod core {
                 ae_backoff_cache: AeBackoffCache::default(),
                 membership,
             };
-
-            node.statemap_log_metadata();
 
             // Write the section tree to this node's root storage directory
             node.write_section_tree().await;
