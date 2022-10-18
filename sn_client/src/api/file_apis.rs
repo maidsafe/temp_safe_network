@@ -172,13 +172,21 @@ impl Client {
 
         // TODO: re-enable timeout
         // let bytes = tokio::time::timeout(self.query_timeout, async {
-        let last_response = self.read_bytes(address).await;
+        let mut last_response = self.read_bytes(address).await;
         if last_response.is_err() {
             error!(
                 "Error when attempting to verify bytes were uploaded: {:?}",
                 last_response
             );
-            //last_response = self.read_bytes(address).await;
+            error!(
+                ">*********************** RETRYING VERIFICATION that bytes were uploaded: {}",
+                address
+            );
+
+            // DELAY BEFORE RECHECKING OTHERWISE CHUNK NOT FOUND ISSUE
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+            last_response = self.read_bytes(address).await;
         }
         let bytes = last_response?;
         //})

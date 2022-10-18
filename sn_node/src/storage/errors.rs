@@ -32,6 +32,12 @@ pub enum Error {
     /// Chunk not found.
     #[error("Chunk not found: {0:?}")]
     ChunkNotFound(XorName),
+    /// Chunk empty found.
+    #[error("Chunk empty found: {0:?}")]
+    ChunkEmptyFound(XorName),
+    /// Checking stored chunk.
+    #[error("Failed checking stored chunk: {0}")]
+    CheckingStoredChunk(String),
     /// Data already exists for this node
     #[error("Data already exists at this node: {0:?}")]
     DataExists(DataAddress),

@@ -92,10 +92,15 @@ impl ChunkStorage {
             Ok(bytes) => {
                 let chunk = Chunk::new(Bytes::from(bytes));
                 if chunk.address() != address {
+                    trace!(
+                        ">>>>> Mismatch {address:?} vs {:?}, len {}",
+                        chunk.address(),
+                        chunk.value().len()
+                    );
                     // This can happen if the content read is empty, or incomplete,
                     // possibly due to an issue with the OS synchronising to disk,
                     // resulting in a mismatch with recreated address of the Chunk.
-                    Err(Error::ChunkNotFound(*address.name()))
+                    Err(Error::ChunkEmptyFound(*address.name()))
                 } else {
                     Ok(chunk)
                 }
@@ -141,7 +146,7 @@ impl ChunkStorage {
             create_dir_all(dirs).await?;
         }
 
-        let mut file = File::create(filepath).await?;
+        let mut file = File::create(&filepath).await?;
 
         file.write_all(chunk.value()).await?;
         // Let's sync up OS data to disk to reduce the chances of
@@ -150,6 +155,17 @@ impl ChunkStorage {
 
         self.used_space.increase(chunk.value().len());
         trace!("{:?} {addr:?}", LogMarker::StoredNewChunk);
+
+        /**** FOR TESTING ****/
+        if let Err(err) = self.get_chunk(addr).await {
+            let msg = format!(
+                ">>>>> STORED OK cannot read: {addr:?} => {}: {err:?}",
+                filepath.display()
+            );
+            trace!("{}", msg);
+            return Err(Error::CheckingStoredChunk(msg));
+        }
+        /**** FOR TESTING ****/
 
         Ok(())
     }
