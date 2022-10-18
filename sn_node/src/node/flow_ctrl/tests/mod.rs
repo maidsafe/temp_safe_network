@@ -25,7 +25,10 @@ use crate::{
     storage::UsedSpace,
 };
 
-use cmd_utils::{handle_online_cmd, run_and_collect_cmds, wrap_client_msg_for_handling};
+use cmd_utils::{
+    get_client_msg_parts_for_handling, handle_online_cmd, run_and_collect_cmds,
+    run_node_handle_client_msg_and_collect_cmds,
+};
 use sn_consensus::Decision;
 use sn_dbc::{Hash, OwnerOnce, SpentProofShare, TransactionBuilder};
 #[cfg(feature = "traceroute")]
@@ -1104,17 +1107,15 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
             let (key_image, tx, spent_proofs, spent_transactions) =
                 dbc_utils::get_genesis_dbc_spend_info(&sk_set)?;
 
-            let cmds = run_and_collect_cmds(
-                wrap_client_msg_for_handling(
-                    ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
-                        key_image,
-                        tx: tx.clone(),
-                        spent_proofs,
-                        spent_transactions,
-                        network_knowledge: None,
-                    })),
-                    peer,
-                )?,
+            let cmds = run_node_handle_client_msg_and_collect_cmds(
+                ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                    key_image,
+                    tx: tx.clone(),
+                    spent_proofs,
+                    spent_transactions,
+                    network_knowledge: None,
+                })),
+                peer,
                 &dispatcher,
             )
             .await?;
@@ -1171,40 +1172,30 @@ async fn spentbook_spend_spent_proof_with_invalid_pk_should_return_spentbook_err
                 })
                 .collect();
 
-            let result = run_and_collect_cmds(
-                wrap_client_msg_for_handling(
-                    ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
-                        key_image,
-                        tx,
-                        spent_proofs,
-                        spent_transactions,
-                        network_knowledge: None,
-                    })),
-                    peer,
-                )?,
+            let result = run_node_handle_client_msg_and_collect_cmds(
+                ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                    key_image,
+                    tx,
+                    spent_proofs,
+                    spent_transactions,
+                    network_knowledge: None,
+                })),
+                peer,
                 &dispatcher,
             )
             .await;
 
-            let cmds = result.map_err(|err| {
-                eyre!(
-                    "A cmd to send the error to the client was expected for this case: {:?}",
-                    err
-                )
-            })?;
-
-            assert_eq!(cmds.len(), 1);
-            let cmd_err = cmds[0].get_error()?;
-            assert_eq!(
-                cmd_err,
-                MessagingDataError::InvalidOperation(format!(
-                    "Failed to perform operation: SpentbookError(\"Spent proof \
-                    signature {:?} is invalid\")",
-                    pk
-                )),
-                "A different error was expected for this case: {:?}",
-                cmd_err
-            );
+            if let Err(error) = result {
+                assert_eq!(
+                    error.to_string(),
+                    Error::SpentbookError(format!("Spent proof signature {:?} is invalid", pk))
+                        .to_string(),
+                    "A different error was expected for this case: {:?}",
+                    error
+                );
+            } else {
+                bail!("We expected an error to be returned");
+            }
             Ok(())
         })
         .await
@@ -1230,37 +1221,33 @@ async fn spentbook_spend_spent_proof_with_key_not_in_section_chain_should_return
             let (key_image, tx, spent_proofs, spent_transactions) =
                 dbc_utils::get_genesis_dbc_spend_info(&sk_set)?;
 
-            let result = run_and_collect_cmds(
-                wrap_client_msg_for_handling(
-                    ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
-                        key_image,
-                        tx,
-                        spent_proofs,
-                        spent_transactions,
-                        network_knowledge: None,
-                    })),
-                    peer,
-                )?,
+            let result = run_node_handle_client_msg_and_collect_cmds(
+                ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                    key_image,
+                    tx,
+                    spent_proofs,
+                    spent_transactions,
+                    network_knowledge: None,
+                })),
+                peer,
                 &dispatcher,
             )
             .await;
 
-            let cmds = result.map_err(|err| {
-                eyre!(
-                    "A cmd to send the error to the client was expected for this case: {:?}",
-                    err
-                )
-            })?;
+            assert!(result.is_err(), "expected an error to be returned");
 
-            assert_eq!(cmds.len(), 1);
-            let cmd_err = cmds[0].get_error()?;
             let section_key = sk_set.public_keys().public_key();
-            assert_eq!(
-                cmd_err,
-                MessagingDataError::SpentProofUnknownSectionKey(section_key),
-                "A different error was expected for this case: {:?}",
-                cmd_err
-            );
+
+            if let Err(cmd_err) = result {
+                assert_eq!(
+                    cmd_err.to_string(),
+                    Error::SpentProofUnknownSectionKey(section_key).to_string(),
+                    "A different error was expected for this case: {:?}",
+                    cmd_err
+                );
+            } else {
+                bail!("We expected an error to be returned");
+            }
             Ok(())
         })
         .await
@@ -1301,40 +1288,36 @@ async fn spentbook_spend_spent_proofs_do_not_relate_to_input_dbcs_should_return_
             let new_dbc2_sk = bls::SecretKey::random();
             let new_dbc2 = reissue_dbc(&new_dbc, 5, &new_dbc2_sk, &sap, &keys_provider)?;
 
-            let result = run_and_collect_cmds(
-                wrap_client_msg_for_handling(
-                    ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
-                        key_image: new_dbc2_sk.public_key(),
-                        tx: new_dbc2.transaction.clone(),
-                        spent_proofs: genesis_dbc.spent_proofs.clone(),
-                        spent_transactions: genesis_dbc.spent_transactions.clone(),
-                        network_knowledge: None,
-                    })),
-                    peer,
-                )?,
+            let result = run_node_handle_client_msg_and_collect_cmds(
+                ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                    key_image: new_dbc2_sk.public_key(),
+                    tx: new_dbc2.transaction.clone(),
+                    spent_proofs: genesis_dbc.spent_proofs.clone(),
+                    spent_transactions: genesis_dbc.spent_transactions.clone(),
+                    network_knowledge: None,
+                })),
+                peer,
                 &dispatcher,
             )
             .await;
 
-            let cmds = result.map_err(|err| {
-                eyre!(
-                    "A cmd to send the error to the client was expected for this case: {:?}",
-                    err
-                )
-            })?;
+            assert!(result.is_err(), "expected an error to be returned");
 
-            assert_eq!(cmds.len(), 1);
-            let cmd_err = cmds[0].get_error()?;
-            assert_eq!(
-                cmd_err,
-                MessagingDataError::InvalidOperation(
-                    "Failed to perform operation: DbcError(CommitmentsInputLenMismatch \
-                    { current: 0, expected: 1 })"
-                        .to_string()
-                ),
-                "A different error was expected for this case: {:?}",
-                cmd_err
-            );
+            if let Err(cmd_err) = result {
+                assert_eq!(
+                    cmd_err.to_string(),
+                    Error::DbcError(sn_dbc::Error::CommitmentsInputLenMismatch {
+                        current: 0,
+                        expected: 1
+                    })
+                    .to_string(),
+                    "A different error was expected for this case: {:?}",
+                    cmd_err
+                );
+            } else {
+                bail!("We expected an error to be returned");
+            }
+
             Ok(())
         })
         .await
@@ -1370,40 +1353,35 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
             let new_dbc2 =
                 dbc_utils::reissue_invalid_dbc_with_no_inputs(&new_dbc, 5, &new_dbc2_sk)?;
 
-            let result = run_and_collect_cmds(
-                wrap_client_msg_for_handling(
-                    ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
-                        key_image: new_dbc2_sk.public_key(),
-                        tx: new_dbc2.transaction.clone(),
-                        spent_proofs: new_dbc.spent_proofs.clone(),
-                        spent_transactions: new_dbc.spent_transactions.clone(),
-                        network_knowledge: None,
-                    })),
-                    peer,
-                )?,
+            let result = run_node_handle_client_msg_and_collect_cmds(
+                ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                    key_image: new_dbc2_sk.public_key(),
+                    tx: new_dbc2.transaction.clone(),
+                    spent_proofs: new_dbc.spent_proofs.clone(),
+                    spent_transactions: new_dbc.spent_transactions.clone(),
+                    network_knowledge: None,
+                })),
+                peer,
                 &dispatcher,
             )
             .await;
 
-            let cmds = result.map_err(|err| {
-                eyre!(
-                    "A cmd to send the error to the client was expected for this case: {:?}",
-                    err
-                )
-            })?;
+            assert!(result.is_err(), "expected an error to be returned");
 
-            assert_eq!(cmds.len(), 1);
-            let cmd_err = cmds[0].get_error()?;
-            assert_eq!(
-                cmd_err,
-                MessagingDataError::InvalidOperation(
-                    "Failed to perform operation: SpentbookError(\"The DBC \
-                            transaction must have at least one input\")"
-                        .to_string()
-                ),
-                "A different error was expected for this case: {:?}",
-                cmd_err
-            );
+            if let Err(cmd_err) = result {
+                assert_eq!(
+                    cmd_err.to_string(),
+                    Error::SpentbookError(
+                        "The DBC transaction must have at least one input".to_string()
+                    )
+                    .to_string(),
+                    "A different error was expected for this case: {:?}",
+                    cmd_err
+                );
+            } else {
+                bail!("We expected an error to be returned");
+            }
+
             Ok(())
         })
         .await
@@ -1438,40 +1416,36 @@ async fn spentbook_spend_with_random_key_image_should_return_spentbook_error() -
             let new_dbc2 = reissue_dbc(&new_dbc, 5, &new_dbc2_sk, &sap, &keys_provider)?;
 
             let pk = bls::SecretKey::random().public_key();
-            let result = run_and_collect_cmds(
-                wrap_client_msg_for_handling(
-                    ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
-                        key_image: pk,
-                        tx: new_dbc2.transaction.clone(),
-                        spent_proofs: new_dbc.spent_proofs.clone(),
-                        spent_transactions: new_dbc.spent_transactions.clone(),
-                        network_knowledge: None,
-                    })),
-                    peer,
-                )?,
+            let result = run_node_handle_client_msg_and_collect_cmds(
+                ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                    key_image: pk,
+                    tx: new_dbc2.transaction.clone(),
+                    spent_proofs: new_dbc.spent_proofs.clone(),
+                    spent_transactions: new_dbc.spent_transactions.clone(),
+                    network_knowledge: None,
+                })),
+                peer,
                 &dispatcher,
             )
             .await;
 
-            let cmds = result.map_err(|err| {
-                eyre!(
-                    "A cmd to send the error to the client was expected for this case: {:?}",
-                    err
-                )
-            })?;
+            assert!(result.is_err(), "expected an error to be returned");
 
-            assert_eq!(cmds.len(), 1);
-            let cmd_err = cmds[0].get_error()?;
-            assert_eq!(
-                cmd_err,
-                MessagingDataError::InvalidOperation(format!(
-                    "Failed to perform operation: SpentbookError(\"There are no \
-                            commitments for the given key image {:?}\")",
-                    pk
-                )),
-                "A different error was expected for this case: {:?}",
-                cmd_err
-            );
+            if let Err(cmd_err) = result {
+                assert_eq!(
+                    cmd_err.to_string(),
+                    Error::SpentbookError(format!(
+                        "There are no commitments for the given key image {:?}",
+                        pk
+                    ))
+                    .to_string(),
+                    "A different error was expected for this case: {:?}",
+                    cmd_err
+                );
+            } else {
+                bail!("We expected an error to be returned");
+            }
+
             Ok(())
         })
         .await
@@ -1553,17 +1527,16 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
             let proof_chain = other_section.section_chain();
             let (key_image, tx) =
                 get_input_dbc_spend_info(&new_dbc2, 2, &bls::SecretKey::random())?;
-            let cmds = run_and_collect_cmds(
-                wrap_client_msg_for_handling(
-                    ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
-                        key_image,
-                        tx,
-                        spent_proofs: new_dbc2.spent_proofs,
-                        spent_transactions: new_dbc2.spent_transactions,
-                        network_knowledge: Some((proof_chain, sap)),
-                    })),
-                    peer,
-                )?,
+
+            let cmds = run_node_handle_client_msg_and_collect_cmds(
+                ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                    key_image,
+                    tx,
+                    spent_proofs: new_dbc2.spent_proofs,
+                    spent_transactions: new_dbc2.spent_transactions,
+                    network_knowledge: Some((proof_chain, sap)),
+                })),
+                peer,
                 &dispatcher,
             )
             .await?;
@@ -1602,5 +1575,7 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
 
             Result::<()>::Ok(())
         })
-        .await
+        .await?;
+
+    Ok(())
 }
