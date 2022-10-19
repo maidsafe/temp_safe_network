@@ -22,7 +22,7 @@ use bytes::Bytes;
 use futures::future::join_all;
 use itertools::Itertools;
 use self_encryption::{self, ChunkInfo, DataMap, EncryptedChunk};
-use tokio::task;
+use tokio::{task, time::sleep};
 use tracing::trace;
 use xor_name::XorName;
 
@@ -141,43 +141,16 @@ impl Client {
     /// form of immutable chunks, without any batching.
     #[instrument(skip(self, bytes), level = "debug")]
     pub async fn upload(&self, bytes: Bytes) -> Result<XorName> {
-        if let Ok(file) = LargeFile::new(bytes.clone()) {
-            self.upload_large(file).await
-        } else {
-            let file = SmallFile::new(bytes)?;
-            self.upload_small(file).await
-        }
+        self.upload_bytes(bytes, false).await
     }
 
     /// Directly writes [`Bytes`] to the network in the
     /// form of immutable chunks, without any batching.
     /// It also attempts to verify that all the data was uploaded to the network before returning.
-    /// It does this via repeatedly running `read_bytes` until we hit `query_timeout`.
+    /// It does this via running `read_bytes` with each chunk with `query_timeout` set.
     #[instrument(skip_all, level = "trace")]
-    pub async fn upload_and_verify(&self, bytes: Bytes) -> Result<(XorName, Bytes)> {
-        let address = self.upload(bytes).await?;
-
-        // each individual `read_bytes` could return earlier than
-        // query_timeout with `DataNotFound` eg,
-        // but this could just mean that the data has not yet
-        // reached adults...
-        //
-        // and so, we loop until the timeout _over_ our
-        let bytes = tokio::time::timeout(self.query_timeout, async {
-            let mut last_response = self.read_bytes(address).await;
-            while last_response.is_err() {
-                error!(
-                    "Error when attempting to verify bytes were uploaded: {:?}",
-                    last_response
-                );
-                last_response = self.read_bytes(address).await;
-            }
-            last_response
-        })
-        .await
-        .map_err(|_| Error::NoResponsesForUploadValidation)??;
-
-        Ok((address, bytes))
+    pub async fn upload_and_verify(&self, bytes: Bytes) -> Result<XorName> {
+        self.upload_bytes(bytes, true).await
     }
 
     /// Calculates a LargeFile's/SmallFile's address from self encrypted chunks,
@@ -194,15 +167,36 @@ impl Client {
         }
     }
 
+    // --------------------------------------------
+    // ---------- Private helpers -----------------
+    // --------------------------------------------
+
+    #[instrument(skip(self, bytes), level = "trace")]
+    async fn upload_bytes(&self, bytes: Bytes, verify: bool) -> Result<XorName> {
+        if let Ok(file) = LargeFile::new(bytes.clone()) {
+            self.upload_large(file, verify).await
+        } else {
+            let file = SmallFile::new(bytes)?;
+            self.upload_small(file, verify).await
+        }
+    }
+
     /// Directly writes a [`LargeFile`] to the network in the
     /// form of immutable self encrypted chunks, without any batching.
     #[instrument(skip_all, level = "trace")]
-    async fn upload_large(&self, large: LargeFile) -> Result<XorName> {
+    async fn upload_large(&self, large: LargeFile, verify: bool) -> Result<XorName> {
         let (head_address, all_chunks) = Self::encrypt_large(large)?;
 
         let tasks = all_chunks.into_iter().map(|chunk| {
-            let writer = self.clone();
-            task::spawn(async move { writer.send_cmd(DataCmd::StoreChunk(chunk)).await })
+            let client_clone = self.clone();
+            task::spawn(async move {
+                let chunk_addr = *chunk.address().name();
+                client_clone.send_cmd(DataCmd::StoreChunk(chunk)).await?;
+                if verify {
+                    client_clone.verify_chunk_is_stored(chunk_addr).await?;
+                }
+                Ok::<(), Error>(())
+            })
         });
 
         let respones = join_all(tasks)
@@ -222,16 +216,41 @@ impl Client {
     /// Directly writes a [`SmallFile`] to the network in the
     /// form of a single chunk, without any batching.
     #[instrument(skip_all, level = "trace")]
-    async fn upload_small(&self, small: SmallFile) -> Result<XorName> {
+    async fn upload_small(&self, small: SmallFile, verify: bool) -> Result<XorName> {
         let chunk = Self::package_small(small)?;
         let address = *chunk.name();
         self.send_cmd(DataCmd::StoreChunk(chunk)).await?;
+
+        if verify {
+            self.verify_chunk_is_stored(address).await?;
+        }
+
         Ok(address)
     }
 
-    // --------------------------------------------
-    // ---------- Private helpers -----------------
-    // --------------------------------------------
+    // Verify a chunk is stored at provided address
+    async fn verify_chunk_is_stored(&self, address: XorName) -> Result<()> {
+        // `read_bytes` could return earlier than query_timeout
+        // with `DataNotFound` eg, but this could just mean that the data has not yet
+        // reached adults...and so, we retry once but within the timeout limit set
+        let _bytes = tokio::time::timeout(self.query_timeout, async {
+            let mut response = self.read_bytes(address).await;
+            if response.is_err() {
+                error!(
+                    "Error when attempting to verify chunk was stored at {:?}: {:?}",
+                    address, response
+                );
+
+                sleep(self.max_backoff_interval).await;
+                response = self.read_bytes(address).await;
+            }
+            response
+        })
+        .await
+        .map_err(|_| Error::ChunkUploadValidationTimeout(address))??;
+
+        Ok(())
+    }
 
     // Gets and decrypts chunks from the network using nothing else but the data map,
     // then returns the raw data.
@@ -270,7 +289,6 @@ impl Client {
         chunks_info: Vec<ChunkInfo>,
     ) -> Result<Vec<EncryptedChunk>> {
         let expected_count = chunks_info.len();
-
         let tasks = chunks_info.into_iter().map(|chunk_info| {
             let client = client.clone();
             task::spawn(async move {
@@ -342,7 +360,6 @@ mod tests {
     use bytes::Bytes;
     use eyre::{eyre, Result};
     use futures::future::join_all;
-    use std::time::Duration;
     use tokio::time::Instant;
     use tracing::{instrument::Instrumented, Instrument};
     use xor_name::XorName;
@@ -377,14 +394,14 @@ mod tests {
         let file = LargeFile::new(random_bytes(MIN_ENCRYPTABLE_BYTES))?;
 
         // Store file (also verifies that the file is stored)
-        let (address, read_data) = client.upload_and_verify(file.bytes()).await?;
-
+        let address = client.upload_and_verify(file.bytes()).await?;
+        let read_data = client.read_bytes(address).await?;
         compare(file.bytes(), read_data)?;
 
         // Test storing file with the same value.
         // Should not conflict and should return same address
         let reupload_address = client
-            .upload_large(file.clone())
+            .upload_large(file.clone(), false)
             .instrument(tracing::info_span!(
                 "checking no conflict on same private upload"
             ))
@@ -404,7 +421,7 @@ mod tests {
         let size = 2 * MIN_ENCRYPTABLE_BYTES;
         let file = LargeFile::new(random_bytes(size))?;
 
-        let (address, _) = client.upload_and_verify(file.bytes()).await?;
+        let address = client.upload_and_verify(file.bytes()).await?;
 
         let pos = 512;
         let read_data = read_from_pos(&file, address, pos, usize::MAX, &client).await?;
@@ -429,7 +446,7 @@ mod tests {
                 let len = size / divisor;
                 let file = LargeFile::new(random_bytes(size))?;
 
-                let (address, _) = client.upload_and_verify(file.bytes()).await?;
+                let address = client.upload_and_verify(file.bytes()).await?;
 
                 // Read first part
                 let read_data_1 = {
@@ -467,17 +484,12 @@ mod tests {
         let bytes = random_bytes(5 * 1024 * 1024);
         let file = LargeFile::new(bytes)?;
 
-        // Store file (also verifies that the file is stored)
-        let (address, read_data) = uploader.upload_and_verify(file.bytes()).await?;
-
-        compare(file.bytes(), read_data)?;
+        // Store file (also verifies that the chunks are stored)
+        let address = uploader.upload_and_verify(file.bytes()).await?;
 
         debug!("======> Data uploaded");
 
         let concurrent_client_count = 25;
-        // clients already retry to send cmds/queries, so we should not need a
-        // massive retry count here.
-        let retry_count = 10;
         let clients = create_clients(concurrent_client_count).await?;
         assert_eq!(concurrent_client_count, clients.len());
 
@@ -486,29 +498,18 @@ mod tests {
         for client in clients {
             let handle: Instrumented<tokio::task::JoinHandle<Result<()>>> =
                 tokio::spawn(async move {
-                    let mut last_try = true;
-                    // get the data with many retries
-                    for i in 0..retry_count {
-                        match client.read_bytes(address).await {
-                            Ok(_data) => {
-                                last_try = false;
-                                break;
-                            }
-                            Err(_) => {
-                                debug!(
-                                    "client #{:?} failed the data, sleeping..",
-                                    client.public_key()
-                                );
-                                tokio::time::sleep(Duration::from_millis(i * 100)).await;
-                            }
-                        };
+                    match client.read_bytes(address).await {
+                        Ok(_data) => {
+                            debug!("client #{:?} got the data", client.public_key());
+                        }
+                        Err(err) => {
+                            debug!(
+                                "client #{:?} failed to get the data: {:?}",
+                                client.public_key(),
+                                err
+                            );
+                        }
                     }
-                    if last_try {
-                        let _ = client.read_bytes(address).await?;
-                    }
-
-                    debug!("client #{:?} got the data", client.public_key());
-
                     Ok(())
                 })
                 .in_current_span();
@@ -652,6 +653,7 @@ mod tests {
         let client = create_test_client().await?;
         store_and_read(&client, 40 * 1024 * 1024).await
     }
+
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
     async fn store_and_read_100mb() -> Result<()> {
@@ -675,7 +677,7 @@ mod tests {
             .map(|(i, client)| {
                 tokio::spawn(async move {
                     let file = LargeFile::new(random_bytes(MIN_ENCRYPTABLE_BYTES))?;
-                    let _ = client.upload_large(file).await?;
+                    let _ = client.upload_large(file, false).await?;
                     println!("Iter: {}", i);
                     let res: Result<()> = Ok(());
                     res
@@ -708,7 +710,7 @@ mod tests {
         for i in 0..1000_usize {
             let file = LargeFile::new(random_bytes(MIN_ENCRYPTABLE_BYTES))?;
             let now = Instant::now();
-            let _ = client.upload_large(file).await?;
+            let _ = client.upload_large(file, false).await?;
             let elapsed = now.elapsed();
             println!("Iter: {}, in {} millis", i, elapsed.as_millis());
         }
@@ -726,11 +728,12 @@ mod tests {
         // we'll also test we can calculate address offline using `calculate_address` API
         let expected_address = Client::calculate_address(bytes.clone())?;
 
-        // we use upload_and_verify since it uploads and also confirms it was uploaded
-        let (address, read_data) = client.upload_and_verify(bytes.clone()).await?;
+        // we use upload_and_verify since it uploads and also confirms chunks were uploaded
+        let address = client.upload_and_verify(bytes.clone()).await?;
         assert_eq!(address, expected_address);
 
         // then the content should be what we stored
+        let read_data = client.read_bytes(address).await?;
         compare(bytes, read_data)?;
 
         Ok(())
