@@ -112,7 +112,10 @@ impl<'a> Joiner<'a> {
 
         tokio::time::timeout(join_timeout, self.join(join_timeout / 10))
             .await
-            .map_err(|_| Error::JoinTimeout)?
+            .map_err(|e| {
+                error!("Failed join: {:?}", e);
+                Error::JoinTimeout
+            })?
     }
 
     fn join_target(&self) -> Result<(BlsPublicKey, Vec<Peer>)> {
@@ -148,7 +151,10 @@ impl<'a> Joiner<'a> {
             let (response, sender) =
                 tokio::time::timeout(response_timeout, self.receive_join_response())
                     .await
-                    .map_err(|_| Error::JoinTimeout)??;
+                    .map_err(|e| {
+                        error!("Failed to receive join response: {:?}", e);
+                        Error::JoinTimeout
+                    })??;
 
             match response {
                 JoinResponse::Approved {
@@ -433,8 +439,7 @@ impl<'a> Joiner<'a> {
         }
 
         error!("NodeMsg sender unexpectedly closed");
-        // TODO: consider more specific error here (e.g. `BootstrapInterrupted`)
-        Err(Error::InvalidState)
+        Err(Error::BootstrapConnectionClosed)
     }
 }
 

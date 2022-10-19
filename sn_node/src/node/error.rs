@@ -29,6 +29,8 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Debug, Error)]
 #[allow(missing_docs)]
 pub enum Error {
+    #[error("The bootstrap connection unexpectedly closed")]
+    BootstrapConnectionClosed,
     /// This should not be possible as the channel is stored in node, and used to process child commands
     #[error("No more Cmds will be received or processed. CmdChannel senders have been dropped. ")]
     CmdCtrlChannelDropped,
