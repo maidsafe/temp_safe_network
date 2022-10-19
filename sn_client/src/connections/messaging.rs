@@ -55,7 +55,6 @@ impl Session {
         dst_address: XorName,
         auth: ClientAuth,
         payload: Bytes,
-        msg_id: MsgId,
         force_new_link: bool,
         #[cfg(feature = "traceroute")] client_pk: PublicKey,
     ) -> Result<()> {
@@ -64,6 +63,7 @@ impl Session {
         let (section_pk, elders) = self.get_cmd_elders(dst_address).await?;
 
         let elders_len = elders.len();
+        let msg_id = MsgId::new();
 
         debug!(
             "Sending cmd w/id {msg_id:?}, from {}, to {elders_len} Elders w/ dst: {dst_address:?}",
@@ -195,7 +195,6 @@ impl Session {
         query: DataQuery,
         auth: ClientAuth,
         payload: Bytes,
-        msg_id: MsgId,
         dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
         force_new_link: bool,
         #[cfg(feature = "traceroute")] client_pk: PublicKey,
@@ -217,6 +216,7 @@ impl Session {
         };
 
         let elders_len = elders.len();
+        let msg_id = MsgId::new();
 
         debug!(
             "Sending query message {:?}, from {}, {:?} to the {} Elders closest to data name: {:?}",
@@ -515,6 +515,15 @@ impl Session {
 
         let stats = self.network.read().await.known_sections_count();
         debug!("Client has received updated network knowledge. Current sections known: {:?}. Sap for our startup-query: {:?}", stats, known_sap);
+        info!("******#####****** Client has received updated network knowledge. Current sections known: {:?}. Sap for our startup-query: {:?}", stats, known_sap);
+        match known_sap {
+            None => warn!("******#####****** NO SAP !!!! "),
+            Some(sap) => info!(
+                "******#####****** Current Elders: {}, Members: {}",
+                sap.elder_count(),
+                sap.members().count()
+            ),
+        }
 
         Ok(())
     }
@@ -531,6 +540,14 @@ impl Session {
         } else {
             return Err(Error::NoNetworkKnowledge(dst));
         };
+
+        if elders.len() != 7 {
+            warn!(
+                "******#####****** NO 7 ELDERS for QUERY but {}: {:?}",
+                elders.len(),
+                elders
+            );
+        }
 
         elders.shuffle(&mut OsRng);
 
@@ -564,6 +581,13 @@ impl Session {
             let sap_elders = sap.elders_vec();
             let section_pk = sap.section_key();
             trace!("SAP elders found {:?}", sap_elders);
+            if sap_elders.len() != 7 {
+                warn!(
+                    "******#####****** NO 7 ELDERS for CMD but {}: {:?}",
+                    sap_elders.len(),
+                    sap_elders
+                );
+            }
 
             // Supermajority of elders is expected.
             let targets_count = supermajority(sap_elders.len());
