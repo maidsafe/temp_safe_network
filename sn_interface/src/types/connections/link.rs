@@ -9,9 +9,11 @@
 use super::Peer;
 
 use crate::types::log_markers::LogMarker;
-use qp2p::{RecvStream, UsrMsgBytes};
+use qp2p::{Connection, ConnectionIncoming as IncomingMsgs, Endpoint, RecvStream, UsrMsgBytes};
 
-use qp2p::{Connection, ConnectionIncoming as IncomingMsgs, Endpoint};
+// Required for docs
+#[allow(unused_imports)]
+use qp2p::RetryConfig;
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::sync::RwLock;
 use xor_name::XorName;
@@ -63,6 +65,7 @@ impl Link {
     ///
     /// The message will be sent on a unidirectional QUIC stream, meaning the application is
     /// responsible for correlating any anticipated responses from incoming streams.
+    ///
     ///
     /// The priority will be `0` and retry behaviour will be determined by the
     /// [`RetryConfig`] that was used to construct the [`Endpoint`] this connection
@@ -120,10 +123,7 @@ impl Link {
         }
 
         match conn.send_with(bytes, default_priority, None).await {
-            Ok(()) => {
-                // self.remove_expired().await;
-                Ok(())
-            }
+            Ok(()) => Ok(()),
             Err(error) => {
                 // clean up failing connections at once, no nead to leak it outside of here
                 // next send (e.g. when retrying) will use/create a new connection
@@ -132,7 +132,6 @@ impl Link {
                 {
                     let _ = self.connections.write().await.remove(id);
                 }
-                // conn.close(Some(format!("{:?}", error)));
                 Err(SendToOneError::Send(error))
             }
         }
@@ -190,29 +189,6 @@ impl Link {
         !self.connections.read().await.is_empty()
     }
 
-    // async fn read_conn<F: Fn(Connection, IncomingMsgs)>(
-    //     &self,
-    //     id: ConnId,
-    //     listen: F,
-    // ) -> Result<Connection, SendToOneError> {
-    //     debug!("reading existing conn");
-
-    //     let res = { self.connections.read().await.get(&id).cloned() };
-    //     match res {
-    //         Some(item) => {
-    //             self.touch(item.conn.id()).await;
-    //             Ok(item.conn)
-    //         }
-    //         None => {
-    //             debug!(
-    //                 "reading existing conn failed... so we're making a new one... to {:?}",
-    //                 self.peer
-    //             );
-    //             self.create_connection(listen).await
-    //         }
-    //     }
-    // }
-
     async fn create_connection<F: Fn(Connection, IncomingMsgs)>(
         &self,
         listen: F,
@@ -244,31 +220,6 @@ impl Link {
             let _ = self.connections.write().await.insert(id.clone(), conn);
         }
     }
-
-    // /// Remove expired connections.
-    // async fn remove_expired(&self) {
-    //     let mut expired_ids = vec![];
-    //     {
-    //         let read_items = self.connections.read().await;
-    //         for (id, conn) in read_items.iter() {
-    //             if conn.expired().await {
-    //                 expired_ids.push(id.clone());
-    //             }
-    //         }
-    //     }
-
-    //     for id in expired_ids {
-    //         {
-    //             let _ = self.queue.write().await.remove(&id);
-    //         }
-    //         // within braces as to not hold a lock to our data during subsequent call to the cleanup fn
-    //         // let _removed = { self.connections.write().await.remove(&id) };
-    //         // if let Some(item) = removed {
-    //         //     trace!("Connection expired: {}", item.conn.id());
-    //         //     // item.conn.close(Some("Connection expired.".to_string()));
-    //         // }
-    //     }
-    // }
 }
 
 /// Errors that can be returned from `Comm::send_to_one`.
