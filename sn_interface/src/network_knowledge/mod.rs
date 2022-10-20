@@ -467,15 +467,15 @@ impl NetworkKnowledge {
     pub fn update_member(&mut self, node_state: SectionSigned<NodeState>) -> bool {
         let node_name = node_state.name();
         trace!(
-            "Updating section member state, name: {node_name:?}, new state: {:?}",
-            node_state.state()
+            "Updating section member state, name: {node_name:?}, new state: {:?} and signed by {:?}",
+            node_state.state(), node_state.sig.public_key
         );
 
         // let's check the node state is properly signed by one of the keys in our chain
         if !node_state.verify(&self.section_chain()) {
             error!(
-                "Can't update section member, name: {node_name:?}, new state: {:?}",
-                node_state.state()
+                "Can't update section member, name: {node_name:?}, new state: {:?}\nOur section dag {:?}",
+                node_state.state(), self.section_tree().get_sections_dag()
             );
             return false;
         }

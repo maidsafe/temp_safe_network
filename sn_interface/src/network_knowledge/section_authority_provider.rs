@@ -45,10 +45,18 @@ impl<T: Serialize> SectionAuthUtils<T> for SectionSigned<T> {
     }
 
     fn self_verify(&self) -> bool {
-        // verify_sig(&self.sig, &self.value)
-        bincode::serialize(&self.value)
+        if bincode::serialize(&self.value)
             .map(|bytes| self.sig.verify(&bytes))
-            .unwrap_or(false)
+            .is_err()
+        {
+            error!(
+                "Self verify failed! Payload was singed by {:?}",
+                self.sig.public_key
+            );
+            false
+        } else {
+            true
+        }
     }
 }
 
