@@ -37,8 +37,12 @@ impl MyNodeInfo {
         Peer::new(self.name(), self.addr)
     }
 
+    pub fn id(&self) -> PublicKey {
+        PublicKey::from(self.keypair.public)
+    }
+
     pub fn name(&self) -> XorName {
-        XorName::from(PublicKey::from(self.keypair.public))
+        XorName::from(self.id())
     }
 
     pub fn public_key(&self) -> PublicKey {

@@ -53,9 +53,6 @@ pub use self::{
     node_test_api::NodeTestApi,
 };
 
-pub use crate::storage::DataStorage;
-
-// pub(crate) use self::monitoring::RateLimits;
 #[cfg(test)]
 pub(crate) use relocation::{check as relocation_check, ChurnId};
 
@@ -68,19 +65,15 @@ pub use qp2p::{Config as NetworkConfig, SendStream};
 pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API update
 
 mod core {
-    use crate::{
-        node::{
-            bootstrap::JoiningAsRelocated,
-            data::Capacity,
-            dkg::DkgVoter,
-            flow_ctrl::{cmds::Cmd, event_channel::EventSender},
-            handover::Handover,
-            membership::{elder_candidates, try_split_dkg, Membership},
-            messaging::Peers,
-            DataStorage, Elders, Error, Event, MembershipEvent, NodeElderChange, Prefix, Proposal,
-            Result, XorName,
-        },
-        UsedSpace,
+    use crate::node::{
+        bootstrap::JoiningAsRelocated,
+        data::Capacity,
+        dkg::DkgVoter,
+        flow_ctrl::{cmds::Cmd, event_channel::EventSender},
+        handover::Handover,
+        membership::{elder_candidates, try_split_dkg, Membership},
+        messaging::Peers,
+        Elders, Error, Event, MembershipEvent, NodeElderChange, Prefix, Proposal, Result, XorName,
     };
     use sn_dysfunction::{DysfunctionDetection, IssueType};
     #[cfg(feature = "traceroute")]
@@ -97,7 +90,7 @@ mod core {
             supermajority, MyNodeInfo, NetworkKnowledge, NodeState, SectionAuthorityProvider,
             SectionKeyShare, SectionKeysProvider,
         },
-        types::{keys::ed25519::Digest256, log_markers::LogMarker, Cache, DataAddress, Peer},
+        types::{keys::ed25519::Digest256, log_markers::LogMarker, Cache, Peer},
     };
 
     use backoff::ExponentialBackoff;
@@ -156,12 +149,7 @@ mod core {
         pub(crate) addr: SocketAddr, // does this change? if so... when? only at node start atm?
         pub(crate) event_sender: EventSender,
         root_storage_dir: PathBuf,
-        pub(crate) data_storage: DataStorage, // Adult only before cache
         pub(crate) keypair: Arc<Keypair>,
-        /// queue up all batch data to be replicated (as a result of churn events atm)
-        // TODO: This can probably be reworked into the general per peer msg queue, but as
-        // we need to pull data first before we form the WireMsg, we won't do that just now
-        pub(crate) pending_data_to_replicate_to_peers: BTreeMap<DataAddress, BTreeSet<Peer>>,
         // Network resources
         pub(crate) section_keys_provider: SectionKeysProvider,
         pub(crate) network_knowledge: NetworkKnowledge,
@@ -197,7 +185,6 @@ mod core {
             network_knowledge: NetworkKnowledge,
             section_key_share: Option<SectionKeyShare>,
             event_sender: EventSender,
-            used_space: UsedSpace,
             root_storage_dir: PathBuf,
         ) -> Result<Self> {
             let membership = if let Some(key) = section_key_share.clone() {
@@ -222,8 +209,6 @@ mod core {
             };
 
             let section_keys_provider = SectionKeysProvider::new(section_key_share.clone());
-
-            let data_storage = DataStorage::new(&root_storage_dir, used_space.clone())?;
 
             info!("Creating DysfunctionDetection checks");
             let node_dysfunction_detector = DysfunctionDetection::new(
@@ -266,11 +251,9 @@ mod core {
                 event_sender,
                 handover_voting: handover,
                 joins_allowed: true,
-                data_storage,
                 capacity: Capacity::default(),
                 dysfunction_tracking: node_dysfunction_detector,
                 pending_data_queries: Cache::with_expiry_duration(DATA_QUERY_TIMEOUT),
-                pending_data_to_replicate_to_peers: BTreeMap::new(),
                 ae_backoff_cache: AeBackoffCache::default(),
                 membership,
             };
@@ -372,11 +355,11 @@ mod core {
                 section_key: self.network_knowledge.section_key(),
                 prefix: self.network_knowledge.prefix(),
                 elders: self.network_knowledge().section_auth().names(),
-                members: self
+                adults: self
                     .network_knowledge()
-                    .members()
-                    .into_iter()
-                    .map(|p| p.name())
+                    .adults()
+                    .iter()
+                    .map(Peer::name)
                     .collect(),
             }
         }
@@ -532,19 +515,37 @@ mod core {
             Ok(())
         }
 
-        /// Updates various state if elders changed.
-        pub(crate) async fn update_on_elder_change(
+        /// Updates various state if there was a member change.
+        pub(crate) async fn update_on_member_change(
             &mut self,
             old: &StateSnapshot,
         ) -> Result<Vec<Cmd>> {
             let new = self.state_snapshot();
 
-            if new.section_key == old.section_key {
-                // there was no change
-                return Ok(vec![]);
+            let mut cmds = vec![];
+
+            {
+                // check if any adult changes
+                let current: BTreeSet<XorName> = self
+                    .network_knowledge()
+                    .adults()
+                    .iter()
+                    .map(Peer::name)
+                    .collect();
+                let added: BTreeSet<_> = current.difference(&old.adults).copied().collect();
+                let removed: BTreeSet<_> = old.adults.difference(&current).copied().collect();
+                let adults_changed = !added.is_empty() || !removed.is_empty();
+
+                if adults_changed {
+                    cmds.push(Cmd::HandleAdultsChanged);
+                }
             }
 
-            let mut cmds = vec![];
+            // check if any elder changes
+            if new.section_key == old.section_key {
+                // there was no change
+                return Ok(cmds);
+            }
 
             // clean up DKG sessions 2 generations older than current
             // `session_id.section_chain_len + 2 < current_chain_len`
@@ -781,6 +782,12 @@ mod core {
         pub(crate) section_key: bls::PublicKey,
         pub(crate) prefix: Prefix,
         pub(crate) elders: BTreeSet<XorName>,
-        pub(crate) members: BTreeSet<XorName>,
+        pub(crate) adults: BTreeSet<XorName>,
+    }
+
+    impl StateSnapshot {
+        pub(crate) fn contains_member(&self, xor_name: &XorName) -> bool {
+            self.elders.contains(xor_name) || self.adults.contains(xor_name)
+        }
     }
 }

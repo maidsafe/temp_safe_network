@@ -18,7 +18,7 @@ use sn_interface::{
     messaging::{
         data::{DataQuery, MetadataExchange, StorageLevel},
         system::{NodeCmd, NodeMsg, NodeQuery},
-        AuthorityProof, ClientAuth, EndUser, MsgId,
+        AuthorityProof, ClientAuth, MsgId,
     },
     types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData},
 };
@@ -108,7 +108,6 @@ impl MyNode {
         let msg = NodeMsg::NodeQuery(NodeQuery::Data {
             query: query.variant,
             auth: auth.into_inner(),
-            origin: EndUser(source_client.name()),
             correlation_id: msg_id,
         });
 

@@ -166,7 +166,7 @@ impl Cmd {
                     },
                     _ => Err(eyre!("An NodeMsg::NodeCmd variant was expected")),
                 },
-                _ => Err(eyre!("An OutgoingMsg::System variant was expected")),
+                _ => Err(eyre!("An OutgoingMsg::Node variant was expected")),
             },
             _ => Err(eyre!("A Cmd::SendMsg variant was expected")),
         }

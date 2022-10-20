@@ -7,21 +7,20 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::comm::{Comm, MsgFromPeer};
+use crate::data::{Data, UsedSpace};
 use crate::node::{
     cfg::keypair_storage::{get_reward_pk, store_network_keypair, store_new_reward_keypair},
     flow_ctrl::{
         cmds::Cmd,
         dispatcher::Dispatcher,
         event::{Elders, Event, MembershipEvent, NodeElderChange},
-        event_channel,
-        event_channel::EventReceiver,
+        event_channel::{self, EventReceiver, EventSender},
         CmdCtrl, FlowCtrl,
     },
     join_network,
     logging::{log_ctx::LogCtx, run_system_logger},
     Config, Error, MyNode, Result,
 };
-use crate::UsedSpace;
 
 use sn_interface::{
     network_knowledge::{MyNodeInfo, SectionTree, MIN_ADULT_AGE},
@@ -35,8 +34,6 @@ use tokio::{
     sync::{mpsc, RwLock},
 };
 use xor_name::Prefix;
-
-use super::flow_ctrl::event_channel::EventSender;
 
 // Filename for storing the content of the genesis DBC.
 // The Genesis DBC is generated and owned by the genesis PK of the network's section chain,
@@ -153,7 +150,7 @@ async fn bootstrap_node(
     .await?;
 
     let node = if config.is_first() {
-        bootstrap_genesis_node(&comm, used_space, root_storage_dir, event_sender.clone()).await?
+        bootstrap_genesis_node(&comm, root_storage_dir, event_sender.clone()).await?
     } else {
         bootstrap_normal_node(
             config,
@@ -161,14 +158,14 @@ async fn bootstrap_node(
             &mut connection_event_rx,
             join_timeout,
             event_sender.clone(),
-            used_space,
             root_storage_dir,
         )
         .await?
     };
 
+    let data = Data::new(root_storage_dir, used_space)?;
     let node = Arc::new(RwLock::new(node));
-    let cmd_ctrl = CmdCtrl::new(Dispatcher::new(node.clone(), comm));
+    let cmd_ctrl = CmdCtrl::new(Dispatcher::new(node.clone(), comm, data));
     let cmd_channel = FlowCtrl::start(cmd_ctrl, connection_event_rx, event_sender);
 
     Ok((node, cmd_channel, event_receiver))
@@ -176,7 +173,6 @@ async fn bootstrap_node(
 
 async fn bootstrap_genesis_node(
     comm: &Comm,
-    used_space: UsedSpace,
     root_storage_dir: &Path,
     event_sender: EventSender,
 ) -> Result<MyNode> {
@@ -197,7 +193,6 @@ async fn bootstrap_genesis_node(
         comm.socket_addr(),
         Arc::new(keypair),
         event_sender,
-        used_space.clone(),
         root_storage_dir.to_path_buf(),
         genesis_sk_set,
     )
@@ -241,7 +236,6 @@ async fn bootstrap_normal_node(
     connection_event_rx: &mut tokio::sync::mpsc::Receiver<MsgFromPeer>,
     join_timeout: Duration,
     event_sender: EventSender,
-    used_space: UsedSpace,
     root_storage_dir: &Path,
 ) -> Result<MyNode> {
     let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE);
@@ -273,7 +267,6 @@ async fn bootstrap_normal_node(
         network_knowledge,
         None,
         event_sender,
-        used_space.clone(),
         root_storage_dir.to_path_buf(),
     )
     .await?;

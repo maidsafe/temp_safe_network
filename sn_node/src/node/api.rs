@@ -6,12 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{
-    node::{
-        flow_ctrl::{cmds::Cmd, event_channel::EventSender},
-        Error, Event, MyNode, Result, GENESIS_DBC_AMOUNT,
-    },
-    UsedSpace,
+use crate::node::{
+    flow_ctrl::{cmds::Cmd, event_channel::EventSender},
+    Error, Event, MyNode, Result, GENESIS_DBC_AMOUNT,
 };
 
 use sn_interface::{
@@ -36,7 +33,6 @@ impl MyNode {
         our_addr: SocketAddr,
         keypair: Arc<Keypair>,
         event_sender: EventSender,
-        used_space: UsedSpace,
         root_storage_dir: PathBuf,
         genesis_sk_set: bls::SecretKeySet,
     ) -> Result<(Self, Dbc)> {
@@ -57,7 +53,6 @@ impl MyNode {
             network_knowledge,
             Some(section_key_share),
             event_sender,
-            used_space,
             root_storage_dir,
         )
         .await?;

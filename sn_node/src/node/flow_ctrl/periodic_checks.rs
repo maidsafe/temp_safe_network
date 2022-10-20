@@ -8,7 +8,7 @@
 
 use super::FlowCtrl;
 
-use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, MyNode, Result};
 
 use ed25519_dalek::Signer;
 #[cfg(feature = "traceroute")]
@@ -16,7 +16,7 @@ use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         data::{ClientMsg, DataQuery, DataQueryVariant},
-        system::{NodeCmd, NodeMsg},
+        system::NodeMsg,
         AuthorityProof, ClientAuth, MsgId, WireMsg,
     },
     types::log_markers::LogMarker,
@@ -96,17 +96,7 @@ impl FlowCtrl {
         // if we've passed enough time, batch outgoing data
         if self.timestamps.last_data_batch_check.elapsed() > DATA_BATCH_INTERVAL {
             self.timestamps.last_data_batch_check = now;
-            if let Some(cmd) = match Self::replicate_queued_data(self.node.clone()).await {
-                Ok(cmd) => cmd,
-                Err(error) => {
-                    error!(
-                        "Error handling getting cmds for data queued for replication: {error:?}"
-                    );
-                    None
-                }
-            } {
-                cmds.push(cmd);
-            }
+            cmds.push(Cmd::Data(crate::data::Cmd::PopReplicationQueue));
         }
 
         for cmd in cmds {
@@ -328,63 +318,6 @@ impl FlowCtrl {
             }
         }
         vec![]
-    }
-
-    /// Periodically loop over any pending data batches and queue up `send_msg` for those
-    async fn replicate_queued_data(node: Arc<RwLock<MyNode>>) -> Result<Option<Cmd>> {
-        use rand::seq::IteratorRandom;
-        let mut rng = rand::rngs::OsRng;
-        let data_queued = {
-            let node = node.read().await;
-            // choose a data to replicate at random
-            let data_queued = node
-                .pending_data_to_replicate_to_peers
-                .iter()
-                .choose(&mut rng)
-                .map(|(address, _)| *address);
-
-            data_queued
-        };
-
-        if let Some(address) = data_queued {
-            trace!("Data found in queue to send out");
-
-            let target_peer = {
-                // careful now, if we're holding any ref into the read above we'll lock here.
-                let mut node = node.write().await;
-                node.pending_data_to_replicate_to_peers.remove(&address)
-            };
-
-            if let Some(data_recipients) = target_peer {
-                debug!("Data queued to be replicated");
-
-                if data_recipients.is_empty() {
-                    return Ok(None);
-                }
-
-                let data_to_send = node
-                    .read()
-                    .await
-                    .data_storage
-                    .get_from_local_store(&address)
-                    .await?;
-
-                debug!(
-                    "{:?} Data {:?} to: {:?}",
-                    LogMarker::SendingMissingReplicatedData,
-                    address,
-                    data_recipients,
-                );
-
-                let msg = NodeMsg::NodeCmd(NodeCmd::ReplicateData(vec![data_to_send]));
-                let node = node.read().await;
-                return Ok(Some(
-                    node.send_system_msg(msg, Peers::Multiple(data_recipients)),
-                ));
-            }
-        }
-
-        Ok(None)
     }
 
     async fn check_for_dysfunction(node: Arc<RwLock<MyNode>>) -> Vec<Cmd> {

@@ -8,7 +8,7 @@
 
 use crate::messaging::{
     data::{DataQueryVariant, MetadataExchange, OperationId, QueryResponse, Result, StorageLevel},
-    ClientAuth, EndUser, MsgId,
+    ClientAuth, MsgId,
 };
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register, User},
@@ -35,8 +35,9 @@ pub enum NodeCmd {
     },
     /// Tells an Adult to store a replica of the data
     ReplicateData(Vec<ReplicatedData>),
-    /// Tells an Adult to fetch and replicate data from the sender
-    SendAnyMissingRelevantData(Vec<DataAddress>),
+    /// Tells an Adult to return data that the requesting Adult should have but doesn't.
+    /// It includes the data addresses that the requesting Adult currently has.
+    ReturnMissingData(Vec<DataAddress>),
     /// Sent to all promoted nodes (also sibling if any) after
     /// a completed transition to a new constellation.
     ReceiveMetadata {
@@ -69,10 +70,8 @@ pub enum NodeQuery {
     Data {
         /// The query
         query: DataQueryVariant,
-        /// Client signature
+        /// Client signature (the user that has initiated this query)
         auth: ClientAuth,
-        /// The user that has initiated this query
-        origin: EndUser,
         /// The correlation id that recorded in Elders for this query
         correlation_id: MsgId,
     },

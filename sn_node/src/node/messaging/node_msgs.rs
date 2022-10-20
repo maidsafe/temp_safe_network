@@ -14,7 +14,6 @@ use crate::{
         Error, Event, MembershipEvent, MyNode, Proposal as CoreProposal, Result,
         MIN_LEVEL_WHEN_FULL,
     },
-    storage::Error as StorageError,
 };
 
 use bytes::Bytes;
@@ -31,13 +30,11 @@ use sn_interface::{
     network_knowledge::NetworkKnowledge,
     types::{log_markers::LogMarker, Keypair, Peer, PublicKey},
 };
-use xor_name::XorName;
 
 impl MyNode {
     /// Send a (`NodeMsg`) message to all Elders in our section
     pub(crate) fn send_msg_to_our_elders(&self, msg: NodeMsg) -> Cmd {
-        let sap = self.network_knowledge.section_auth();
-        let recipients = sap.elders_set();
+        let recipients = self.network_knowledge.elders();
         self.send_system_msg(msg, Peers::Multiple(recipients))
     }
 
@@ -407,62 +404,28 @@ impl MyNode {
                 let node_keypair = Keypair::Ed25519(self.keypair.clone());
 
                 for data in data_collection {
-                    // We are an adult here, so just store away!
-                    // This may return a DatabaseFull error... but we should have reported storage increase
-                    // well before this
-                    match self
-                        .data_storage
-                        .store(&data, section_pk, node_keypair.clone())
-                        .await
-                    {
-                        Ok(level_report) => {
-                            info!("Storage level report: {:?}", level_report);
-                            cmds.extend(self.record_storage_level_if_any(
-                                level_report,
-                                #[cfg(feature = "traceroute")]
-                                traceroute.clone(),
-                            )?);
-
-                            #[cfg(feature = "traceroute")]
-                            info!("End of message flow. Trace: {:?}", traceroute);
-                        }
-                        Err(StorageError::NotEnoughSpace) => {
-                            // storage full
-                            error!("Not enough space to store more data");
-                            let node_id = PublicKey::from(self.keypair.public);
-                            let msg = NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
-                                node_id,
-                                data,
-                                full: true,
-                            });
-
-                            cmds.push(self.send_msg_to_our_elders(msg))
-                        }
-                        Err(error) => {
-                            // the rest seem to be non-problematic errors.. (?)
-                            error!("Problem storing data, but it was ignored: {error}");
-                        }
-                    }
+                    cmds.push(Cmd::Data(crate::data::Cmd::Store {
+                        data,
+                        section_pk,
+                        node_keypair: node_keypair.clone(),
+                    }))
                 }
 
                 Ok(cmds)
             }
-            NodeMsg::NodeCmd(NodeCmd::SendAnyMissingRelevantData(known_data_addresses)) => {
+            NodeMsg::NodeCmd(NodeCmd::ReturnMissingData(known_data_addresses)) => {
                 info!(
                     "{:?} MsgId: {:?}",
                     LogMarker::RequestForAnyMissingData,
                     msg_id
                 );
-                Ok(self
-                    .get_missing_data_for_node(sender, known_data_addresses)
-                    .await
-                    .into_iter()
-                    .collect())
+                Ok(vec![
+                    self.get_missing_data_for_node(sender, known_data_addresses)
+                ])
             }
             NodeMsg::NodeQuery(NodeQuery::Data {
                 query,
                 auth,
-                origin,
                 correlation_id,
             }) => {
                 // A request from EndUser - via elders - for locally stored data
@@ -470,20 +433,15 @@ impl MyNode {
                     "Handle NodeQuery with msg_id {:?} and correlation_id {:?}",
                     msg_id, correlation_id,
                 );
-                // There is no point in verifying a sig from a sender A or B here.
-                // Send back response to the sending elder
-                Ok(vec![
-                    self.handle_data_query_at_adult(
-                        correlation_id,
-                        &query,
-                        auth,
-                        origin,
-                        sender,
-                        #[cfg(feature = "traceroute")]
-                        traceroute,
-                    )
-                    .await,
-                ])
+                // Response is later sent back to the requesting elder
+                Ok(vec![Cmd::Data(crate::data::Cmd::HandleQuery {
+                    query,
+                    auth, // There is no point in verifying a sig from a sender A or B here, but the auth is included anyway for now..
+                    requesting_elder: sender,
+                    correlation_id,
+                    #[cfg(feature = "traceroute")]
+                    traceroute,
+                })])
             }
             NodeMsg::NodeQueryResponse {
                 response,
@@ -513,7 +471,7 @@ impl MyNode {
                     NodeMsgAuthority::Node(auth) => {
                         let sending_nodes_pk = PublicKey::from(auth.into_inner().node_ed_pk);
                         Ok(self
-                            .handle_data_query_response_at_elder(
+                            .handle_query_response_at_elder(
                                 correlation_id,
                                 response,
                                 user,
@@ -530,37 +488,6 @@ impl MyNode {
                 }
             }
         }
-    }
-
-    fn record_storage_level_if_any(
-        &self,
-        level: Option<StorageLevel>,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
-    ) -> Result<Vec<Cmd>> {
-        let mut cmds = vec![];
-        if let Some(level) = level {
-            info!("Storage has now passed {} % used.", 10 * level.value());
-            let node_id = PublicKey::from(self.keypair.public);
-            let node_xorname = XorName::from(node_id);
-
-            // we ask the section to record the new level reached
-            let msg = NodeMsg::NodeCmd(NodeCmd::RecordStorageLevel {
-                section: node_xorname,
-                node_id,
-                level,
-            });
-
-            let dst = Peers::Multiple(self.network_knowledge.elders());
-
-            cmds.push(Cmd::send_traced_msg(
-                OutgoingMsg::Node(msg),
-                dst,
-                #[cfg(feature = "traceroute")]
-                traceroute,
-            ));
-        }
-
-        Ok(cmds)
     }
 
     // Converts the provided NodeMsgAuthority to be a `Section` message

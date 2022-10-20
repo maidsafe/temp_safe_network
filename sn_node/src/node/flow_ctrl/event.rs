@@ -29,20 +29,12 @@ use xor_name::{Prefix, XorName};
 #[derive(custom_debug::Debug)]
 pub enum Event {
     ///
-    Data(DataEvent),
-    ///
     Messaging(MessagingEvent),
     ///
     Membership(MembershipEvent),
     ///
     CmdProcessing(CmdProcessEvent),
 }
-
-/// Informing on data related changes.
-///
-/// Currently not used.
-#[derive(Debug)]
-pub enum DataEvent {}
 
 /// Informing on incoming msgs.
 ///
@@ -187,7 +179,6 @@ pub enum MembershipEvent {
 impl std::fmt::Display for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Data(e) => write!(f, "{:?}", e),
             Self::Messaging(e) => write!(f, "{:?}", e),
             Self::Membership(e) => write!(f, "{:?}", e),
             Self::CmdProcessing(e) => write!(f, "{}", e),
