@@ -25,7 +25,6 @@ use sn_interface::{
     types::{DataAddress, Peer},
 };
 
-use bytes::Bytes;
 use custom_debug::Debug;
 use std::{collections::BTreeSet, fmt, time::SystemTime};
 
@@ -126,8 +125,6 @@ pub(crate) enum Cmd {
         msg: NodeMsg,
         origin: Peer,
         msg_authority: NodeMsgAuthority,
-        #[debug(skip)]
-        wire_msg_payload: Bytes,
         #[cfg(feature = "traceroute")]
         traceroute: Traceroute,
     },

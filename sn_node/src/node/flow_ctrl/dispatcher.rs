@@ -207,31 +207,21 @@ impl Dispatcher {
                 msg_id,
                 msg,
                 msg_authority,
-                wire_msg_payload,
                 #[cfg(feature = "traceroute")]
                 traceroute,
             } => {
-                debug!("init of handling valid msg {:?}", msg_id);
+                debug!("handling valid msg {:?}", msg_id);
                 let mut node = self.node.write().await;
-
-                if let Some(msg_authority) = node
-                    .aggregate_system_msg(msg_id, msg_authority, wire_msg_payload)
-                    .await
-                {
-                    debug!("handling valid msg {:?}", msg_id);
-                    node.handle_valid_system_msg(
-                        msg_id,
-                        msg_authority,
-                        msg,
-                        origin,
-                        &self.comm,
-                        #[cfg(feature = "traceroute")]
-                        traceroute.clone(),
-                    )
-                    .await
-                } else {
-                    Ok(vec![])
-                }
+                node.handle_valid_system_msg(
+                    msg_id,
+                    msg_authority,
+                    msg,
+                    origin,
+                    &self.comm,
+                    #[cfg(feature = "traceroute")]
+                    traceroute.clone(),
+                )
+                .await
             }
             Cmd::HandleAgreement { proposal, sig } => {
                 let mut node = self.node.write().await;

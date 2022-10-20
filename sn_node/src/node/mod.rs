@@ -164,8 +164,7 @@ mod core {
         // Network resources
         pub(crate) section_keys_provider: SectionKeysProvider,
         pub(crate) network_knowledge: NetworkKnowledge,
-        // Signature aggregators
-        pub(crate) message_aggregator: SignatureAggregator,
+        // Proposal aggregators
         pub(crate) proposal_aggregator: SignatureAggregator,
         // DKG/Split/Churn modules
         pub(crate) dkg_start_aggregator: SignatureAggregator,
@@ -258,7 +257,6 @@ mod core {
                 dkg_sessions_info: HashMap::default(),
                 proposal_aggregator: SignatureAggregator::default(),
                 pending_split_sections: Default::default(),
-                message_aggregator: SignatureAggregator::default(),
                 dkg_start_aggregator: SignatureAggregator::default(),
                 dkg_voter: DkgVoter::default(),
                 relocate_state: None,
