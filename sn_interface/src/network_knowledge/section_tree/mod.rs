@@ -461,11 +461,8 @@ impl SectionTreeUpdate {
 
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils {
-    use super::{SectionTree, SectionTreeUpdate};
-    use crate::{
-        messaging::system::SectionSigned, network_knowledge::SectionsDAG,
-        test_utils::section_signed, SectionAuthorityProvider,
-    };
+    use super::{SectionTree, SectionTreeUpdate, SectionsDAG};
+    use crate::{messaging::system::SectionSigned, test_utils::TestKeys, SectionAuthorityProvider};
     use eyre::Result;
 
     pub struct TestSectionTree {}
@@ -477,37 +474,37 @@ pub mod test_utils {
 
             (tree, genesis_sk)
         }
-    }
 
-    /// Generate a `SectionTreeUpdate` where the SAP's section key is appended to the proof chain
-    pub fn get_section_tree_update(
-        sap: &SectionSigned<SectionAuthorityProvider>,
-        proof_chain: &SectionsDAG,
-        parent_sk: &bls::SecretKey,
-    ) -> Result<SectionTreeUpdate> {
-        let signed_key = section_signed(parent_sk, sap.section_key())?;
-        let mut proof_chain = proof_chain.clone();
-        proof_chain.insert(
-            &parent_sk.public_key(),
-            signed_key.value,
-            signed_key.sig.signature,
-        )?;
-        Ok(SectionTreeUpdate::new(sap.clone(), proof_chain))
-    }
-
-    /// Generate a proof chain from the provided `genesis_key` followed by all keys provided in `other_keys`
-    pub fn gen_proof_chain(
-        genesis_key: &bls::SecretKey,
-        other_keys: &Vec<bls::SecretKey>,
-    ) -> Result<SectionsDAG> {
-        let mut proof_chain = SectionsDAG::new(genesis_key.public_key());
-        let mut parent = genesis_key.clone();
-        for key in other_keys {
-            let sig = parent.sign(key.public_key().to_bytes());
-            proof_chain.insert(&parent.public_key(), key.public_key(), sig)?;
-            parent = key.clone();
+        /// Generate a `SectionTreeUpdate` where the SAP's section key is appended to the proof chain
+        pub fn get_section_tree_update(
+            sap: &SectionSigned<SectionAuthorityProvider>,
+            proof_chain: &SectionsDAG,
+            parent_sk: &bls::SecretKey,
+        ) -> Result<SectionTreeUpdate> {
+            let signed_key = TestKeys::get_section_signed(parent_sk, sap.section_key())?;
+            let mut proof_chain = proof_chain.clone();
+            proof_chain.insert(
+                &parent_sk.public_key(),
+                signed_key.value,
+                signed_key.sig.signature,
+            )?;
+            Ok(SectionTreeUpdate::new(sap.clone(), proof_chain))
         }
-        Ok(proof_chain)
+
+        /// Generate a proof chain from the provided `genesis_key` followed by all keys provided in `other_keys`
+        pub fn gen_proof_chain(
+            genesis_key: &bls::SecretKey,
+            other_keys: &Vec<bls::SecretKey>,
+        ) -> Result<SectionsDAG> {
+            let mut proof_chain = SectionsDAG::new(genesis_key.public_key());
+            let mut parent = genesis_key.clone();
+            for key in other_keys {
+                let sig = parent.sign(key.public_key().to_bytes());
+                proof_chain.insert(&parent.public_key(), key.public_key(), sig)?;
+                parent = key.clone();
+            }
+            Ok(proof_chain)
+        }
     }
 }
 

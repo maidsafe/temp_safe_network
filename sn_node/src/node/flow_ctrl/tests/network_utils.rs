@@ -238,7 +238,7 @@ impl TestNodeBuilder {
                 let sk_set = self.genesis_sk_set.ok_or_else(|| {
                     eyre!("The secret key set must be supplied when providing a custom section")
                 })?;
-                let section_key_share = create_section_key_share(&sk_set, 0);
+                let section_key_share = TestKeys::get_section_key_share(&sk_set, 0);
                 (
                     custom_section,
                     section_key_share,
@@ -276,7 +276,7 @@ impl TestNodeBuilder {
 
         if let Some(custom_peer) = self.custom_peer {
             let node_state = NodeState::joined(custom_peer, None);
-            let node_state = section_signed(&sk_set.secret_key(), node_state)?;
+            let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state)?;
             let _updated = section.update_member(node_state);
         }
 
@@ -320,7 +320,7 @@ pub(crate) fn create_section(
     let (mut section, section_key_share) =
         do_create_section(sap, genesis_sk_set, other_keys, parent_section_tree)?;
     for ns in sap.members() {
-        let auth_ns = section_signed(&genesis_sk_set.secret_key(), ns.clone())?;
+        let auth_ns = TestKeys::get_section_signed(&genesis_sk_set.secret_key(), ns.clone())?;
         let _updated = section.update_member(auth_ns);
     }
     Ok((section, section_key_share))
@@ -336,21 +336,10 @@ pub(crate) fn create_section_with_elders(
     let (mut section, section_key_share) = do_create_section(sap, sk_set, None, None)?;
     for peer in sap.elders() {
         let node_state = NodeState::joined(*peer, None);
-        let node_state = section_signed(&sk_set.secret_key(), node_state)?;
+        let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state)?;
         let _updated = section.update_member(node_state);
     }
     Ok((section, section_key_share))
-}
-
-pub(crate) fn create_section_key_share(
-    sk_set: &bls::SecretKeySet,
-    index: usize,
-) -> SectionKeyShare {
-    SectionKeyShare {
-        public_key_set: sk_set.public_keys(),
-        index,
-        secret_key_share: sk_set.secret_key_share(index),
-    }
 }
 
 pub(crate) fn create_section_auth() -> (SectionAuthorityProvider, Vec<MyNodeInfo>, bls::SecretKeySet)
@@ -429,7 +418,7 @@ fn do_create_section(
         (section_chain, genesis_ks.secret_key(), 0)
     };
 
-    let signed_sap = section_signed(&last_sk, section_auth.clone())?;
+    let signed_sap = TestKeys::get_section_signed(&last_sk, section_auth.clone())?;
     let section_tree_update = SectionTreeUpdate::new(signed_sap, section_chain);
     let section_tree = if let Some(parent_section_tree) = parent_section_tree {
         parent_section_tree
@@ -439,7 +428,7 @@ fn do_create_section(
     let section = NetworkKnowledge::new(section_tree, section_tree_update)?;
 
     let sks = bls::SecretKeySet::from_bytes(last_sk.to_bytes().to_vec())?;
-    let section_key_share = create_section_key_share(&sks, share_index);
+    let section_key_share = TestKeys::get_section_key_share(&sks, share_index);
     Ok((section, section_key_share))
 }
 

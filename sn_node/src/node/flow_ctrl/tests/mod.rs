@@ -47,7 +47,7 @@ use sn_interface::{
         MIN_ADULT_AGE,
     },
     test_utils::*,
-    types::{keyed_signed, keys::ed25519, Peer, PublicKey, ReplicatedData},
+    types::{keys::ed25519, Peer, PublicKey, ReplicatedData},
 };
 
 use assert_matches::assert_matches;
@@ -107,7 +107,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
                 Some(relocated_node_old_name),
                 relocate_details,
             );
-            let relocate_proof = section_signed(&sk_set.secret_key(), node_state)?;
+            let relocate_proof = TestKeys::get_section_signed(&sk_set.secret_key(), node_state)?;
 
             let signature_over_new_name =
                 ed25519::sign(&relocated_node.name().0, &relocated_node_old_keypair);
@@ -200,7 +200,8 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                 0,
             );
             let section_tree_update = {
-                let signed_sap = section_signed(&sk_set.secret_key(), section_auth.clone())?;
+                let signed_sap =
+                    TestKeys::get_section_signed(&sk_set.secret_key(), section_auth.clone())?;
                 SectionTreeUpdate::new(signed_sap, section_chain)
             };
 
@@ -209,7 +210,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
 
             for peer in section_auth.elders() {
                 let node_state = NodeState::joined(*peer, None);
-                let sig = prove(&sk_set.secret_key(), &node_state)?;
+                let sig = TestKeys::get_section_sig(&sk_set.secret_key(), &node_state)?;
                 let _updated = section.update_member(SectionSigned {
                     value: node_state,
                     sig,
@@ -356,7 +357,10 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
 
             let node_state = NodeState::left(existing_peer, None);
             let proposal = Proposal::VoteNodeOffline(node_state.clone());
-            let sig = keyed_signed(&sk_set.secret_key(), &proposal.as_signable_bytes()?);
+            let sig = TestKeys::get_section_sig_bytes(
+                &sk_set.secret_key(),
+                &proposal.as_signable_bytes()?,
+            );
 
             let _cmds =
                 run_and_collect_cmds(Cmd::HandleAgreement { proposal, sig }, &dispatcher).await?;
@@ -385,7 +389,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
 
             let existing_peer = network_utils::create_peer(MIN_ADULT_AGE);
             let node_state = NodeState::joined(existing_peer, None);
-            let node_state = section_signed(&sk_set.secret_key(), node_state)?;
+            let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state)?;
             let _updated = section.update_member(node_state);
 
             // Pick the elder to remove.
@@ -405,7 +409,10 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
                     .await?;
             // Handle agreement on the Offline proposal
             let proposal = Proposal::VoteNodeOffline(remove_node_state.clone());
-            let sig = keyed_signed(&sk_set.secret_key(), &proposal.as_signable_bytes()?);
+            let sig = TestKeys::get_section_sig_bytes(
+                &sk_set.secret_key(),
+                &proposal.as_signable_bytes()?,
+            );
 
             let _cmds =
                 run_and_collect_cmds(Cmd::HandleAgreement { proposal, sig }, &dispatcher).await?;
@@ -448,8 +455,8 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
                 BTreeSet::from_iter(nodes.iter().map(|n| NodeState::joined(n.peer(), None)));
             let pk1 = sk_set1.secret_key().public_key();
 
-            let section_tree_update = gen_section_tree_update(
-                &section_signed(&sk_set1.secret_key(), old_sap.clone())?,
+            let section_tree_update = TestSectionTree::get_section_tree_update(
+                &TestKeys::get_section_signed(&sk_set1.secret_key(), old_sap.clone())?,
                 &SectionsDAG::new(pk0),
                 &sk0,
             )?;
@@ -459,7 +466,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             // Create our node
             let (event_sender, mut event_receiver) =
                 event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE);
-            let section_key_share = network_utils::create_section_key_share(&sk_set1, 0);
+            let section_key_share = TestKeys::get_section_key_share(&sk_set1, 0);
             let node = nodes.remove(0);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let comm = network_utils::create_comm().await?;
@@ -497,8 +504,8 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
                 0,
             );
             let new_section_elders: BTreeSet<_> = new_sap.names();
-            let section_tree_update = gen_section_tree_update(
-                &section_signed(&sk2, new_sap.clone())?,
+            let section_tree_update = TestSectionTree::get_section_tree_update(
+                &TestKeys::get_section_signed(&sk2, new_sap.clone())?,
                 &node.section_chain(),
                 &sk_set1.secret_key(),
             )?;
@@ -521,7 +528,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             // Simulate DKG round finished succesfully by adding
             // the new section key share to our cache
             node.section_keys_provider
-                .insert(network_utils::create_section_key_share(&sk_set2, 0));
+                .insert(TestKeys::get_section_key_share(&sk_set2, 0));
 
             let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
@@ -660,13 +667,13 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
                 adults -= 1;
                 let non_elder_peer = network_utils::create_peer(MIN_ADULT_AGE);
                 let node_state = NodeState::joined(non_elder_peer, None);
-                let node_state = section_signed(&sk_set.secret_key(), node_state)?;
+                let node_state =  TestKeys::get_section_signed(&sk_set.secret_key(), node_state)?;
                 assert!(section.update_member(node_state));
             }
 
             let non_elder_peer = network_utils::create_peer(MIN_ADULT_AGE - 1);
             let node_state = NodeState::joined(non_elder_peer, None);
-            let node_state = section_signed(&sk_set.secret_key(), node_state)?;
+            let node_state =  TestKeys::get_section_signed(&sk_set.secret_key(), node_state)?;
             assert!(section.update_member(node_state));
             let node = nodes.remove(0);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
@@ -803,7 +810,6 @@ async fn handle_elders_update() -> Result<()> {
         );
 
         let sk_set0 = bls::SecretKeySet::random(0, &mut thread_rng());
-        let pk0 = sk_set0.secret_key().public_key();
 
         let sap0 = SectionAuthorityProvider::new(
             iter::once(info.peer()).chain(other_elder_peers.clone()),
@@ -817,7 +823,7 @@ async fn handle_elders_update() -> Result<()> {
 
         for peer in [&adult_peer, &promoted_peer] {
             let node_state = NodeState::joined(*peer, None);
-            let node_state = section_signed(&sk_set0.secret_key(), node_state)?;
+            let node_state =  TestKeys::get_section_signed(&sk_set0.secret_key(), node_state)?;
             assert!(section0.update_member(node_state));
         }
 
@@ -839,13 +845,9 @@ async fn handle_elders_update() -> Result<()> {
         );
         let elder_names1: BTreeSet<_> = sap1.names();
 
-        let signed_sap1 = section_signed(&sk_set1.secret_key(), sap1)?;
+        let signed_sap1 =  TestKeys::get_section_signed(&sk_set1.secret_key(), sap1)?;
         let proposal = Proposal::NewElders(signed_sap1.clone());
-        let signature = sk_set0.secret_key().sign(&proposal.as_signable_bytes()?);
-        let sig = SectionSig {
-            signature,
-            public_key: pk0,
-        };
+        let sig = TestKeys::get_section_sig_bytes(&sk_set0.secret_key(), &proposal.as_signable_bytes()?);
 
         let (event_sender, mut event_receiver) = event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE);
         let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
@@ -864,7 +866,7 @@ async fn handle_elders_update() -> Result<()> {
         // Simulate DKG round finished successfully by adding
         // the new section key share to our cache
         node.section_keys_provider
-            .insert(network_utils::create_section_key_share(&sk_set1, 0));
+            .insert(TestKeys::get_section_key_share(&sk_set1, 0));
 
         let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
@@ -972,7 +974,7 @@ async fn handle_demote_during_split() -> Result<()> {
             // all peers b are added
             for peer in peers_b.iter().chain(iter::once(&peer_c)).cloned() {
                 let node_state = NodeState::joined(peer, None);
-                let node_state = section_signed(&sk_set_v0.secret_key(), node_state)?;
+                let node_state = TestKeys::get_section_signed(&sk_set_v0.secret_key(), node_state)?;
                 assert!(section.update_member(node_state));
             }
 
@@ -998,10 +1000,10 @@ async fn handle_demote_during_split() -> Result<()> {
             // key share to our cache (according to which split section we'll belong to).
             if prefix0.matches(&node_name) {
                 node.section_keys_provider
-                    .insert(network_utils::create_section_key_share(&sk_set_v1_p0, 0));
+                    .insert(TestKeys::get_section_key_share(&sk_set_v1_p0, 0));
             } else {
                 node.section_keys_provider
-                    .insert(network_utils::create_section_key_share(&sk_set_v1_p1, 0));
+                    .insert(TestKeys::get_section_key_share(&sk_set_v1_p1, 0));
             }
 
             let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
@@ -1010,11 +1012,10 @@ async fn handle_demote_during_split() -> Result<()> {
             let create_our_elders_cmd =
                 |signed_sap: SectionSigned<SectionAuthorityProvider>| -> Result<_> {
                     let proposal = Proposal::NewElders(signed_sap.clone());
-                    let signature = sk_set_v0.secret_key().sign(&proposal.as_signable_bytes()?);
-                    let sig = SectionSig {
-                        signature,
-                        public_key: sk_set_v0.public_keys().public_key(),
-                    };
+                    let sig = TestKeys::get_section_sig_bytes(
+                        &sk_set_v0.secret_key(),
+                        &proposal.as_signable_bytes()?,
+                    );
 
                     Ok(Cmd::HandleNewEldersAgreement {
                         new_elders: signed_sap,
@@ -1031,7 +1032,8 @@ async fn handle_demote_during_split() -> Result<()> {
                 0,
             );
 
-            let signed_sap = section_signed(&sk_set_v1_p0.secret_key(), section_auth)?;
+            let signed_sap =
+                TestKeys::get_section_signed(&sk_set_v1_p0.secret_key(), section_auth)?;
             let cmd = create_our_elders_cmd(signed_sap)?;
             let mut cmds = run_and_collect_cmds(cmd, &dispatcher).await?;
 
@@ -1044,7 +1046,8 @@ async fn handle_demote_during_split() -> Result<()> {
                 0,
             );
 
-            let signed_sap = section_signed(&sk_set_v1_p1.secret_key(), section_auth)?;
+            let signed_sap =
+                TestKeys::get_section_signed(&sk_set_v1_p1.secret_key(), section_auth)?;
             let cmd = create_our_elders_cmd(signed_sap)?;
 
             let new_cmds = run_and_collect_cmds(cmd, &dispatcher).await?;

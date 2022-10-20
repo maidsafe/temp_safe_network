@@ -1,16 +1,14 @@
 use super::{
-    NetworkKnowledge, NodeState, SectionAuthUtils, SectionKeysProvider, SectionTree,
-    SectionTreeUpdate, SectionsDAG,
+    NetworkKnowledge, NodeState, SectionKeysProvider, SectionTree, SectionTreeUpdate, SectionsDAG,
 };
 use crate::{
-    messaging::system::{SectionSig, SectionSigned},
+    messaging::system::SectionSigned,
     network_knowledge::{section_keys::build_spent_proof_share, Error, MyNodeInfo, MIN_ADULT_AGE},
-    test_utils::TestSAP,
+    test_utils::{TestKeys, TestSAP},
     SectionAuthorityProvider,
 };
 use eyre::{eyre, Result};
 use itertools::Itertools;
-use serde::Serialize;
 use sn_consensus::{Ballot, Consensus, Decision, Proposition, Vote, VoteResponse};
 use sn_dbc::{
     get_public_commitments_from_transaction, Commitment, Dbc, Owner, OwnerOnce, RingCtTransaction,
@@ -73,7 +71,7 @@ pub fn gen_network_knowledge_with_key(
 ) -> Result<(NetworkKnowledge, Vec<MyNodeInfo>)> {
     let pk_set = sk_set.public_keys();
     let (sap, node_infos) = TestSAP::random_sap_with_key(prefix, elder_count, adult_count, sk_set);
-    let signed_sap = section_signed(&sk_set.secret_key(), sap)?;
+    let signed_sap = TestKeys::get_section_signed(&sk_set.secret_key(), sap)?;
     let section_tree_update =
         SectionTreeUpdate::new(signed_sap, SectionsDAG::new(pk_set.public_key()));
     let mut network_knowledge =
@@ -82,7 +80,7 @@ pub fn gen_network_knowledge_with_key(
     // update the sap members
     for peer in network_knowledge.signed_sap.elders() {
         let node_state = NodeState::joined(*peer, None);
-        let signed_state = section_signed(&sk_set.secret_key(), node_state)?;
+        let signed_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state)?;
         let _changed = network_knowledge.section_peers.update(signed_state);
     }
     Ok((network_knowledge, node_infos))
@@ -94,7 +92,7 @@ pub fn gen_section_tree_update(
     proof_chain: &SectionsDAG,
     parent_sk: &bls::SecretKey,
 ) -> Result<SectionTreeUpdate> {
-    let signed_key = section_signed(parent_sk, sap.section_key())?;
+    let signed_key = TestKeys::get_section_signed(parent_sk, sap.section_key())?;
     let mut proof_chain = proof_chain.clone();
     proof_chain.insert(
         &parent_sk.public_key(),
@@ -102,15 +100,6 @@ pub fn gen_section_tree_update(
         signed_key.sig.signature,
     )?;
     Ok(SectionTreeUpdate::new(sap.clone(), proof_chain))
-}
-
-// Create signature for the given payload using the given secret key.
-pub fn prove<T: Serialize>(secret_key: &bls::SecretKey, payload: &T) -> Result<SectionSig> {
-    let bytes = bincode::serialize(payload).map_err(|_| Error::InvalidPayload)?;
-    Ok(SectionSig {
-        public_key: secret_key.public_key(),
-        signature: secret_key.sign(&bytes),
-    })
 }
 
 pub fn section_decision<P: Proposition>(
@@ -158,15 +147,6 @@ pub fn section_decision<P: Proposition>(
         .clone()
         .ok_or_else(|| eyre!("A decision was expected to be found for this particular node"))?;
     Ok(decision)
-}
-
-// Wrap the given payload in `SectionSigned`
-pub fn section_signed<T: Serialize>(
-    secret_key: &bls::SecretKey,
-    payload: T,
-) -> Result<SectionSigned<T>> {
-    let sig = prove(secret_key, &payload)?;
-    Ok(SectionSigned::new(payload, sig))
 }
 
 struct FakeProofKeyVerifier {}

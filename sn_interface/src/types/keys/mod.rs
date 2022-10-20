@@ -18,3 +18,67 @@ pub(super) mod node_keypairs;
 pub(crate) mod public_key;
 pub(super) mod secret_key;
 pub(super) mod signature;
+
+#[cfg(any(test, feature = "test-utils"))]
+pub mod test_utils {
+    use crate::{
+        messaging::system::{SectionSig, SectionSigned},
+        network_knowledge::{SectionAuthUtils, SectionKeyShare},
+        types::{errors::Result, utils::serialise},
+    };
+    use serde::Serialize;
+
+    /// bls key related test utilities
+    pub struct TestKeys {}
+
+    impl TestKeys {
+        /// Create `bls::Signature` for the given payload using the provided `bls::SecretKey`
+        pub fn sign<T: Serialize>(
+            secret_key: &bls::SecretKey,
+            payload: &T,
+        ) -> Result<bls::Signature> {
+            let bytes = serialise(payload)?;
+            Ok(Self::sign_bytes(secret_key, &bytes))
+        }
+        /// Create `bls::Signature` for the given bytes using the provided `bls::SecretKey`
+        pub fn sign_bytes(secret_key: &bls::SecretKey, bytes: &[u8]) -> bls::Signature {
+            secret_key.sign(bytes)
+        }
+
+        /// Create `SectionSig` for the given bytes using the provided `bls::SecretKey`
+        pub fn get_section_sig_bytes(secret_key: &bls::SecretKey, bytes: &[u8]) -> SectionSig {
+            SectionSig {
+                public_key: secret_key.public_key(),
+                signature: Self::sign_bytes(secret_key, bytes),
+            }
+        }
+
+        /// Create `SectionSig` for the given payload using the provided `bls::SecretKey`
+        pub fn get_section_sig<T: Serialize>(
+            secret_key: &bls::SecretKey,
+            payload: &T,
+        ) -> Result<SectionSig> {
+            let bytes = serialise(payload)?;
+            Ok(Self::get_section_sig_bytes(secret_key, &bytes))
+        }
+
+        /// Create signature for the given payload using the provided `bls::SecretKey` and
+        /// wrap them using `SectionSigned`
+        pub fn get_section_signed<T: Serialize>(
+            secret_key: &bls::SecretKey,
+            payload: T,
+        ) -> Result<SectionSigned<T>> {
+            let sig = Self::get_section_sig(secret_key, &payload)?;
+            Ok(SectionSigned::new(payload, sig))
+        }
+
+        /// Generate a `SectionKeyShare` from the `bls::SecretKeySet` and given index
+        pub fn get_section_key_share(sk_set: &bls::SecretKeySet, index: usize) -> SectionKeyShare {
+            SectionKeyShare {
+                public_key_set: sk_set.public_keys(),
+                index,
+                secret_key_share: sk_set.secret_key_share(index),
+            }
+        }
+    }
+}

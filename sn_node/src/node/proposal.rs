@@ -62,7 +62,7 @@ impl Proposal {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sn_interface::test_utils::TestSAP;
+    use sn_interface::test_utils::{TestKeys, TestSAP};
 
     use eyre::Result;
     use serde::Serialize;
@@ -79,8 +79,7 @@ mod tests {
         // Proposal::NewElders
         let new_sk = bls::SecretKey::random();
         let new_pk = new_sk.public_key();
-        let section_signed_auth =
-            sn_interface::network_knowledge::test_utils::section_signed(&new_sk, section_auth)?;
+        let section_signed_auth = TestKeys::get_section_signed(&new_sk, section_auth)?;
         let proposal = Proposal::NewElders(section_signed_auth);
         verify_serialize_for_signing(&proposal, &new_pk)?;
 

@@ -438,14 +438,15 @@ mod tests {
     };
     use crate::UsedSpace;
     use sn_interface::{
-        messaging::system::SectionSigned, network_knowledge::SectionAuthorityProvider,
+        messaging::{system::SectionSigned, MsgKind},
+        network_knowledge::SectionAuthorityProvider,
     };
 
     use sn_interface::{
         elder_count,
-        messaging::{Dst, MsgId, MsgKind},
+        messaging::{Dst, MsgId},
         network_knowledge::{MyNodeInfo, SectionKeyShare, SectionKeysProvider, SectionsDAG},
-        test_utils::{gen_addr, section_signed, TestSAP},
+        test_utils::{gen_addr, TestKeys, TestSAP},
         types::keys::ed25519,
     };
 
@@ -647,7 +648,7 @@ mod tests {
                 TestSAP::random_sap(prefix0, elder_count(), 0, None);
             let info = nodes.remove(0);
             let sap_sk = secret_key_set.secret_key();
-            let signed_sap = section_signed(&sap_sk, sap)?;
+            let signed_sap = TestKeys::get_section_signed(&sap_sk, sap)?;
 
             let (proof_chain, genesis_sk_set) = create_proof_chain(signed_sap.section_key())
                 .context("failed to create section chain")?;
@@ -681,12 +682,11 @@ mod tests {
             let (other_sap, _, secret_key_set) =
                 TestSAP::random_sap(prefix1, elder_count(), 0, None);
             let other_sap_sk = secret_key_set.secret_key();
-            let other_sap = section_signed(&other_sap_sk, other_sap)?;
+            let other_sap = TestKeys::get_section_signed(&other_sap_sk, other_sap)?;
             // generate a proof chain for this other SAP
             let mut proof_chain = SectionsDAG::new(genesis_pk);
-            let signature = bincode::serialize(&other_sap_sk.public_key())
-                .map(|bytes| genesis_sk_set.secret_key().sign(&bytes))?;
-            proof_chain.insert(&genesis_pk, other_sap_sk.public_key(), signature)?;
+            let sig = TestKeys::sign(&genesis_sk_set.secret_key(), &other_sap_sk.public_key())?;
+            proof_chain.insert(&genesis_pk, other_sap_sk.public_key(), sig)?;
 
             Ok(Self {
                 node,
@@ -736,15 +736,11 @@ mod tests {
         // insert random second section key
         let second_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
         let second_pk = second_sk_set.public_keys().public_key();
-        let sig = genesis_sk_set
-            .secret_key()
-            .sign(&bincode::serialize(&second_pk)?);
+        let sig = TestKeys::sign(&genesis_sk_set.secret_key(), &second_pk)?;
         proof_chain.insert(&genesis_pk, second_pk, sig)?;
 
         // insert third key which is provided `last_key`
-        let last_sig = second_sk_set
-            .secret_key()
-            .sign(&bincode::serialize(&last_key)?);
+        let last_sig = TestKeys::sign(&second_sk_set.secret_key(), &last_key)?;
         proof_chain.insert(&second_pk, last_key, last_sig)?;
 
         Ok((proof_chain, genesis_sk_set))

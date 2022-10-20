@@ -198,7 +198,7 @@ pub mod test_utils {
     use crate::{
         messaging::system::SectionSigned,
         network_knowledge::{MyNodeInfo, NodeState, SectionAuthorityProvider},
-        test_utils::{gen_sorted_nodes, section_signed},
+        test_utils::{gen_sorted_nodes, TestKeys},
     };
     use eyre::{Context, Result};
     use rand::RngCore;
@@ -211,7 +211,7 @@ pub mod test_utils {
             prefix: Prefix,
         ) -> Result<(SectionSigned<SectionAuthorityProvider>, bls::SecretKey)> {
             let (section_auth, _, secret_key_set) = Self::random_sap(prefix, 5, 0, None);
-            let sap = section_signed(&secret_key_set.secret_key(), section_auth)
+            let sap = TestKeys::get_section_signed(&secret_key_set.secret_key(), section_auth)
                 .context(format!("Failed to generate SAP for prefix {:?}", prefix))?;
             Ok((sap, secret_key_set.secret_key()))
         }

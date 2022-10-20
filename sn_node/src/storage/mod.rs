@@ -253,17 +253,18 @@ fn list_files_in(path: &Path) -> Vec<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::{DataStorage, Error, UsedSpace};
-
     use sn_interface::{
         init_logger,
         messaging::{
             data::{CreateRegister, DataQueryVariant, SignedRegisterCreate},
             system::NodeQueryResponse,
         },
+        test_utils::TestKeys,
         types::{
             register::{Policy, User},
             utils::random_bytes,
             Chunk, ChunkAddress, DataAddress, Keypair, PublicKey, RegisterCmd, ReplicatedData,
+            SectionSig,
         },
     };
 
@@ -368,16 +369,9 @@ mod tests {
         Ok(())
     }
 
-    use sn_interface::messaging::system::SectionSig;
     fn section_sig() -> SectionSig {
         let sk = bls::SecretKey::random();
-        let public_key = sk.public_key();
-        let data = "hello".to_string();
-        let signature = sk.sign(&data);
-        SectionSig {
-            public_key,
-            signature,
-        }
+        TestKeys::get_section_sig_bytes(&sk, "hello".as_bytes())
     }
 
     #[tokio::test]

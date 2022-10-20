@@ -452,7 +452,7 @@ mod tests {
             gen_addr(),
         );
 
-        let signed_genesis_sap = section_signed(&genesis_sk, genesis_sap.clone())?;
+        let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone())?;
         let mut tree = SectionTree::new(genesis_pk);
         assert!(tree.insert_without_chain(signed_genesis_sap));
 
@@ -466,7 +466,7 @@ mod tests {
 
         let next_section_key = next_sk_set.public_keys().public_key();
         let section_tree_update = gen_section_tree_update(
-            &section_signed(&next_sk_set.secret_key(), next_sap.clone())?,
+            &TestKeys::get_section_signed(&next_sk_set.secret_key(), next_sap.clone())?,
             &SectionsDAG::new(genesis_pk),
             &genesis_sk,
         )?;
@@ -559,7 +559,7 @@ mod tests {
             gen_addr(),
         );
 
-        let signed_genesis_sap = section_signed(&genesis_sk, genesis_sap.clone())?;
+        let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone())?;
         let mut tree = SectionTree::new(genesis_pk);
         assert!(tree.insert_without_chain(signed_genesis_sap));
 
@@ -637,7 +637,7 @@ mod tests {
             gen_addr(),
         );
 
-        let signed_genesis_sap = section_signed(&genesis_sk, genesis_sap.clone())?;
+        let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone())?;
         let mut tree = SectionTree::new(genesis_pk);
         assert!(tree.insert_without_chain(signed_genesis_sap));
 
@@ -715,7 +715,7 @@ mod tests {
             gen_addr(),
         );
 
-        let signed_genesis_sap = section_signed(&genesis_sk, genesis_sap.clone())?;
+        let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone())?;
         let mut tree = SectionTree::new(genesis_pk);
         assert!(tree.insert_without_chain(signed_genesis_sap));
 
@@ -773,7 +773,7 @@ mod tests {
         let genesis_sk = genesis_sk_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
 
-        let signed_genesis_sap = section_signed(&genesis_sk, genesis_sap.clone())?;
+        let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone())?;
         let mut tree = SectionTree::new(genesis_pk);
         assert!(tree.insert_without_chain(signed_genesis_sap.clone()));
 
@@ -812,7 +812,7 @@ mod tests {
                 TestSAP::random_sap(Prefix::default(), 1, 0, None);
             let next_section_key = next_sk_set.public_keys().public_key();
             let section_tree_update = gen_section_tree_update(
-                &section_signed(&next_sk_set.secret_key(), next_sap)?,
+                &TestKeys::get_section_signed(&next_sk_set.secret_key(), next_sap)?,
                 &SectionsDAG::new(genesis_pk),
                 &genesis_sk,
             )?;

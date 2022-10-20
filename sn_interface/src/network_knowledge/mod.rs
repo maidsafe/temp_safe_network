@@ -607,7 +607,7 @@ fn create_first_sig<T: Serialize>(
 mod tests {
     use super::{supermajority, NetworkKnowledge};
     use crate::{
-        test_utils::{gen_addr, gen_section_tree_update, prefix, section_signed, TestSAP},
+        test_utils::{gen_addr, gen_section_tree_update, prefix, TestKeys, TestSAP},
         types::Peer,
     };
     use bls::SecretKeySet;
@@ -650,7 +650,7 @@ mod tests {
 
         // section 1
         let (sap1, _, sk_1) = TestSAP::random_sap(prefix("1")?, 0, 0, None);
-        let sap1 = section_signed(&sk_1.secret_key(), sap1)?;
+        let sap1 = TestKeys::get_section_signed(&sk_1.secret_key(), sap1)?;
         let our_node_name_prefix_1 = sap1.prefix().name();
         let proof_chain = knowledge.section_chain();
         let section_tree_update =
@@ -664,7 +664,7 @@ mod tests {
 
         // section with different prefix (0) and our node name doesn't match
         let (sap0, _, sk_0) = TestSAP::random_sap(prefix("0")?, 0, 0, None);
-        let sap0 = section_signed(&sk_0.secret_key(), sap0)?;
+        let sap0 = TestKeys::get_section_signed(&sk_0.secret_key(), sap0)?;
         let section_tree_update =
             gen_section_tree_update(&sap0, &proof_chain, &sk_gen.secret_key())?;
         // our node is still in prefix1

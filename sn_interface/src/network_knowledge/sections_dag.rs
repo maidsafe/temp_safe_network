@@ -492,7 +492,7 @@ pub(super) mod tests {
     use super::{Error, SectionInfo, SectionsDAG};
     use crate::{
         messaging::system::SectionSigned,
-        test_utils::{assert_lists, prefix, section_signed, TestSAP},
+        test_utils::{assert_lists, prefix, TestKeys, TestSAP},
         SectionAuthorityProvider,
     };
     use crdts::CmRDT;
@@ -1077,15 +1077,9 @@ pub(super) mod tests {
 
     fn gen_signed_keypair(parent_sk: &bls::SecretKey) -> (bls::SecretKey, SectionInfo) {
         let (sk, pk) = gen_keypair();
-        let sig = sign(parent_sk, &pk);
+        let sig = TestKeys::sign(parent_sk, &pk).expect("Failed to sign public key");
         let info = SectionInfo { key: pk, sig };
         (sk, info)
-    }
-
-    fn sign(signing_sk: &bls::SecretKey, pk_to_sign: &bls::PublicKey) -> bls::Signature {
-        bincode::serialize(pk_to_sign)
-            .map(|bytes| signing_sk.sign(&bytes))
-            .expect("failed to serialize public key")
     }
 
     // Generate an arbitrary sized `SectionsDAG` and a list of partial_dags which inserted in
@@ -1183,7 +1177,7 @@ pub(super) mod tests {
         let (sap_gen, _, sk_gen) =
             TestSAP::random_sap_with_rng(&mut rng, Prefix::default(), 0, 0, None);
         let sk_gen = sk_gen.secret_key();
-        let sap_gen = section_signed(&sk_gen, sap_gen)?;
+        let sap_gen = TestKeys::get_section_signed(&sk_gen, sap_gen)?;
         let pk_gen = sap_gen.public_key_set().public_key();
 
         let mut dag = SectionsDAG::new(pk_gen);
@@ -1210,9 +1204,9 @@ pub(super) mod tests {
             dag: &mut SectionsDAG,
         ) -> Result<()> {
             let (sap, _, sk_set) = TestSAP::random_sap_with_rng(rng, prefix, 0, 0, None);
-            let sap = section_signed(&sk_set.secret_key(), sap)?;
+            let sap = TestKeys::get_section_signed(&sk_set.secret_key(), sap)?;
             let key = sap.public_key_set().public_key();
-            let sig = sign(parent_sk, &key);
+            let sig = TestKeys::sign(parent_sk, &key).expect("Failed to sign public key");
             dag.insert(&parent_sk.public_key(), sap.section_key(), sig)?;
             sections_map.insert(sap.section_key(), (sk_set.secret_key(), sap));
             Ok(())

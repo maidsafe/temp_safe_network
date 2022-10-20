@@ -249,10 +249,8 @@ mod tests {
     use sn_interface::{
         elder_count,
         messaging::system::{JoinAsRelocatedResponse, NodeMsg},
-        network_knowledge::{
-            test_utils::{gen_addr, section_signed},
-            MyNodeInfo, NodeState, SectionAuthorityProvider, MIN_ADULT_AGE,
-        },
+        network_knowledge::{MyNodeInfo, NodeState, SectionAuthorityProvider, MIN_ADULT_AGE},
+        test_utils::{gen_addr, TestKeys},
         types::{keys::ed25519, Peer},
     };
     use std::{collections::BTreeSet, net::SocketAddr};
@@ -268,7 +266,8 @@ mod tests {
             gen_addr(),
         );
         let node_state = NodeState::joined(node.peer(), None);
-        let signed_node_state = section_signed(&from_sk_set.secret_key(), node_state)?;
+        let signed_node_state =
+            TestKeys::get_section_signed(&from_sk_set.secret_key(), node_state)?;
         // to_sap
         let (to_sap, _) = generate_sap();
 
@@ -315,7 +314,8 @@ mod tests {
                 gen_addr(),
             );
             let node_state = NodeState::joined(node.peer(), None);
-            let signed_node_state = section_signed(&from_sk_set.secret_key(), node_state)?;
+            let signed_node_state =
+                TestKeys::get_section_signed(&from_sk_set.secret_key(), node_state)?;
             // to_sap
             let (to_sap, to_sk_set) = generate_sap();
 
@@ -380,7 +380,8 @@ mod tests {
                 gen_addr(),
             );
             let node_state = NodeState::joined(node.peer(), None);
-            let signed_node_state = section_signed(&from_sk_set.secret_key(), node_state)?;
+            let signed_node_state =
+                TestKeys::get_section_signed(&from_sk_set.secret_key(), node_state)?;
             // to_sap
             let (to_sap, to_sk_set) = generate_sap();
 
