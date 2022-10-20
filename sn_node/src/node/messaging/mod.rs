@@ -58,8 +58,6 @@ impl MyNode {
     pub(crate) async fn validate_msg(&self, origin: Peer, wire_msg: WireMsg) -> Result<Vec<Cmd>> {
         // Deserialize the payload of the incoming message
         let msg_id = wire_msg.msg_id();
-        // payload needed for aggregation
-        let wire_msg_payload = wire_msg.payload.clone();
 
         let msg_type = match wire_msg.into_msg() {
             Ok(msg_type) => msg_type,
@@ -106,7 +104,6 @@ impl MyNode {
                     msg_id,
                     msg,
                     msg_authority,
-                    wire_msg_payload,
                     #[cfg(feature = "traceroute")]
                     traceroute,
                 }])
