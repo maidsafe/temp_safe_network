@@ -248,6 +248,7 @@ impl MyNode {
             session_id: session_id.clone(),
             authority: AuthorityProof(section_sig),
         };
+        let section_auth = session_info.authority.clone();
         let _existing = self
             .dkg_sessions_info
             .insert(session_id.hash(), session_info);
@@ -271,14 +272,6 @@ impl MyNode {
 
         // assert people can check key
         assert!(check_ephemeral_dkg_key(&session_id, our_name, ephemeral_pub_key, sig).is_ok());
-
-        // get original auth (as proof for those who missed the original DkgStart msg)
-        let section_auth = self
-            .dkg_sessions_info
-            .get(&session_id.hash())
-            .ok_or(Error::InvalidState)?
-            .authority
-            .clone();
 
         // broadcast signed pub key
         trace!(
