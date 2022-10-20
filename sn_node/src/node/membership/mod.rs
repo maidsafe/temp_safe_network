@@ -313,7 +313,7 @@ impl Membership {
         let mut msgs = self
             .history
             .iter() // history is a BTreeSet, .iter() is ordered by generation
-            .filter(|(gen, _)| **gen > from_gen)
+            .filter(|(gen, _)| **gen >= from_gen)
             .map(|(gen, (decision, c))| {
                 Ok(c.build_super_majority_vote(
                     decision.votes.clone(),
