@@ -152,7 +152,10 @@ pub fn init_logger() {
 
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils {
-    pub use crate::network_knowledge::{
-        section_authority_provider::test_utils::*, section_tree_test_utils::*, test_utils::*,
+    pub use crate::{
+        network_knowledge::{
+            section_authority_provider::test_utils::*, section_tree_test_utils::*, test_utils::*,
+        },
+        types::keys::test_utils::*,
     };
 }

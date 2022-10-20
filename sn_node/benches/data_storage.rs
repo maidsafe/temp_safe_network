@@ -8,9 +8,10 @@
 
 use sn_interface::{
     messaging::data::{CreateRegister, SignedRegisterCreate},
+    test_utils::TestKeys,
     types::{
         register::{Policy, User},
-        Chunk, Keypair, PublicKey, RegisterCmd, ReplicatedData,
+        Chunk, Keypair, PublicKey, RegisterCmd, ReplicatedData, SectionSig,
     },
 };
 use sn_node::{
@@ -212,17 +213,9 @@ fn bench_data_storage_reads(c: &mut Criterion) -> Result<()> {
     Ok(())
 }
 
-fn section_sig() -> sn_interface::messaging::SectionSig {
-    use sn_interface::messaging::system::SectionSig;
-
+fn section_sig() -> SectionSig {
     let sk = bls::SecretKey::random();
-    let public_key = sk.public_key();
-    let data = "hello".to_string();
-    let signature = sk.sign(&data);
-    SectionSig {
-        public_key,
-        signature,
-    }
+    TestKeys::get_section_sig_bytes(&sk, "hello".as_bytes())
 }
 
 fn custom_criterion() -> Criterion {
