@@ -55,7 +55,6 @@ impl Session {
         dst_address: XorName,
         auth: ClientAuth,
         payload: Bytes,
-        msg_id: MsgId,
         force_new_link: bool,
         #[cfg(feature = "traceroute")] client_pk: PublicKey,
     ) -> Result<()> {
@@ -64,6 +63,7 @@ impl Session {
         let (section_pk, elders) = self.get_cmd_elders(dst_address).await?;
 
         let elders_len = elders.len();
+        let msg_id = MsgId::new();
 
         debug!(
             "Sending cmd w/id {msg_id:?}, from {}, to {elders_len} Elders w/ dst: {dst_address:?}",
@@ -195,7 +195,6 @@ impl Session {
         query: DataQuery,
         auth: ClientAuth,
         payload: Bytes,
-        msg_id: MsgId,
         dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
         force_new_link: bool,
         #[cfg(feature = "traceroute")] client_pk: PublicKey,
@@ -217,6 +216,7 @@ impl Session {
         };
 
         let elders_len = elders.len();
+        let msg_id = MsgId::new();
 
         debug!(
             "Sending query message {:?}, from {}, {:?} to the {} Elders closest to data name: {:?}",

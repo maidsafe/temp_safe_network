@@ -17,10 +17,18 @@ const TEST_ENV_GENESIS_DBC_PATH: &str = "TEST_ENV_GENESIS_DBC_PATH";
 const DEFAULT_TEST_GENESIS_DBC_PATH: &str =
     ".safe/node/local-test-network/sn-node-genesis/genesis_dbc";
 
-/// Create a test client without providing any specific keypair, DBC owner, `bootstrap_config`, or
-/// timeout.
+/// Create a test client without providing any specific keypair,
+/// DBC owner, `bootstrap_config`, or timeout.
 pub async fn create_test_client() -> Result<Client> {
     create_test_client_with(None, None, None).await
+}
+
+/// Try to create a test client without providing any specific keypair,
+/// DBC owner, `bootstrap_config`, or timeout, and panicking if an error occured.
+pub async fn try_create_test_client() -> Client {
+    create_test_client_with(None, None, None)
+        .await
+        .expect("Couldn't create the test Client instance")
 }
 
 /// Create a test client optionally providing keypair and/or `bootstrap_config`
