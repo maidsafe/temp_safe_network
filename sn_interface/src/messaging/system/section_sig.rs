@@ -86,19 +86,14 @@ impl SectionSigShare {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::test_utils::TestKeys;
     use bls::SecretKey;
 
     #[test]
     fn verify_keyed_sig() {
         let sk = SecretKey::random();
-        let public_key = sk.public_key();
-        let data = "hello".to_string();
-        let signature = sk.sign(&data);
-        let sig = SectionSig {
-            public_key,
-            signature,
-        };
+        let data = "hello";
+        let sig = TestKeys::get_section_sig_bytes(&sk, data.as_bytes());
         assert!(sig.verify(data.as_bytes()));
     }
 }

@@ -227,7 +227,7 @@ pub mod test_utils {
     use crate::{
         messaging::system::SectionSigned,
         network_knowledge::{MyNodeInfo, NodeState, SectionAuthorityProvider},
-        test_utils::{gen_sorted_nodes, section_signed},
+        test_utils::{gen_sorted_nodes, TestKeys},
     };
     use rand::RngCore;
     use xor_name::Prefix;
@@ -239,7 +239,7 @@ pub mod test_utils {
             prefix: Prefix,
         ) -> (SectionSigned<SectionAuthorityProvider>, bls::SecretKey) {
             let (section_auth, _, secret_key_set) = Self::random_sap(prefix, 5, 0, None);
-            let sap = section_signed(&secret_key_set.secret_key(), section_auth);
+            let sap = TestKeys::get_section_signed(&secret_key_set.secret_key(), section_auth);
             (sap, secret_key_set.secret_key())
         }
 

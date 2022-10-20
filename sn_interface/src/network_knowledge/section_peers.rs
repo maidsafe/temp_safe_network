@@ -120,10 +120,8 @@ mod tests {
     use super::{SectionPeers, SectionsDAG};
     use crate::{
         messaging::system::SectionSigned,
-        network_knowledge::{
-            test_utils::{assert_lists, gen_addr, section_signed},
-            MembershipState, NodeState, RelocateDetails,
-        },
+        network_knowledge::{MembershipState, NodeState, RelocateDetails},
+        test_utils::{assert_lists, gen_addr, TestKeys},
         types::Peer,
     };
     use eyre::Result;
@@ -159,7 +157,7 @@ mod tests {
         nodes_2.iter().for_each(|node| {
             section_peers.update(node.clone());
         });
-        let sig = bincode::serialize(&sk_2.public_key()).map(|bytes| sk_1.sign(&bytes))?;
+        let sig = TestKeys::sign(&sk_1, &sk_2.public_key());
         proof_chain.insert(&sk_1.public_key(), sk_2.public_key(), sig)?;
         // 1 -> 2 should be retained
         section_peers.prune_members_archive(&proof_chain, &sk_2.public_key())?;
@@ -174,7 +172,7 @@ mod tests {
         nodes_3.iter().for_each(|node| {
             section_peers.update(node.clone());
         });
-        let sig = bincode::serialize(&sk_3.public_key()).map(|bytes| sk_2.sign(&bytes))?;
+        let sig = TestKeys::sign(&sk_2, &sk_3.public_key());
         proof_chain.insert(&sk_2.public_key(), sk_3.public_key(), sig)?;
         // 1 -> 2 -> 3 should be retained
         section_peers.prune_members_archive(&proof_chain, &sk_3.public_key())?;
@@ -189,7 +187,7 @@ mod tests {
         nodes_4.iter().for_each(|node| {
             section_peers.update(node.clone());
         });
-        let sig = bincode::serialize(&sk_4.public_key()).map(|bytes| sk_3.sign(&bytes))?;
+        let sig = TestKeys::sign(&sk_3, &sk_4.public_key());
         proof_chain.insert(&sk_3.public_key(), sk_4.public_key(), sig)?;
         //  2 -> 3 -> 4 should be retained
         section_peers.prune_members_archive(&proof_chain, &sk_4.public_key())?;
@@ -207,7 +205,7 @@ mod tests {
         nodes_5.iter().for_each(|node| {
             section_peers.update(node.clone());
         });
-        let sig = bincode::serialize(&sk_5.public_key()).map(|bytes| sk_3.sign(&bytes))?;
+        let sig = TestKeys::sign(&sk_3, &sk_5.public_key());
         proof_chain.insert(&sk_3.public_key(), sk_5.public_key(), sig)?;
         // 2 -> 3 -> 5 should be retained
         section_peers.prune_members_archive(&proof_chain, &sk_5.public_key())?;
@@ -239,9 +237,10 @@ mod tests {
         assert!(section_peers.update(node_left.clone()));
         assert!(section_peers.update(node_relocated.clone()));
 
-        let node_left_joins = section_signed(&sk, NodeState::joined(*node_left.peer(), None));
+        let node_left_joins =
+            TestKeys::get_section_signed(&sk, NodeState::joined(*node_left.peer(), None));
         let node_relocated_joins =
-            section_signed(&sk, NodeState::joined(*node_relocated.peer(), None));
+            TestKeys::get_section_signed(&sk, NodeState::joined(*node_relocated.peer(), None));
         assert!(!section_peers.update(node_left_joins));
         assert!(!section_peers.update(node_relocated_joins));
 
@@ -270,9 +269,9 @@ mod tests {
         assert!(section_peers.update(node_2.clone()));
 
         let node_1 = NodeState::left(*node_1.peer(), Some(node_1.name()));
-        let node_1 = section_signed(&sk, node_1);
+        let node_1 = TestKeys::get_section_signed(&sk, node_1);
         let node_2 = NodeState::left(*node_2.peer(), Some(node_2.name()));
-        let node_2 = section_signed(&sk, node_2);
+        let node_2 = TestKeys::get_section_signed(&sk, node_2);
         assert!(section_peers.update(node_1.clone()));
         assert!(section_peers.update(node_2.clone()));
 
@@ -300,7 +299,7 @@ mod tests {
                     NodeState::relocated(peer, None, (**details).clone())
                 }
             };
-            let sig = section_signed(secret_key, node_state);
+            let sig = TestKeys::get_section_signed(secret_key, node_state);
             signed_node_states.push(sig);
         }
         signed_node_states

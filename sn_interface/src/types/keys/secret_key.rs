@@ -84,16 +84,3 @@ impl Display for SecretKey {
         Debug::fmt(self, formatter)
     }
 }
-
-#[cfg(any(test, feature = "test-utils"))]
-pub(crate) mod test_utils {
-    use crate::messaging::system::SectionSig;
-
-    /// Create signature for the given bytes using the given secret key.
-    pub fn keyed_signed(secret_key: &bls::SecretKey, bytes: &[u8]) -> SectionSig {
-        SectionSig {
-            public_key: secret_key.public_key(),
-            signature: secret_key.sign(bytes),
-        }
-    }
-}
