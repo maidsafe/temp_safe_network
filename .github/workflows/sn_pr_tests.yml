@@ -204,7 +204,7 @@ jobs:
       #   timeout-minutes: 60
 
       - name: Start the network
-        run: ./target/release/testnet
+        run: ./target/release/testnet --interval 30000
         id: section-startup
         env:
           RUST_LOG: "sn_node,sn_api,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
@@ -221,8 +221,8 @@ jobs:
       - name: Run client tests
         env:
           RUST_LOG: "sn_client=trace,qp2p=debug"
-        run: cargo test --release -p sn_client
-        timeout-minutes: 25
+        run: cargo test --release -p sn_client -- --test-threads=1
+        timeout-minutes: 50
 
       - name: Run example app for file API against local network
         timeout-minutes: 10
@@ -275,7 +275,9 @@ jobs:
         continue-on-error: true
 
   e2e-split:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    #if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    # disabled temporarily since `self-hosted-ubuntu` runner not available for NodeRefactorBranch branch
+    if: false
     name: E2E tests w/ full network
     runs-on: self-hosted-ubuntu
     env:
@@ -367,13 +369,13 @@ jobs:
       - name: Run client tests
         env:
           RUST_LOG: "sn_client=trace,qp2p=debug"
-        run: cargo test --release -p sn_client
+        run: cargo test --release -p sn_client -- --test-threads=1
         timeout-minutes: 25
 
       - name: Run example app for file API against local network
         timeout-minutes: 10
         shell: bash
-        run: cargo run  --release --example client_files
+        run: cargo run --release --example client_files
 
       - name: Ensure no nodes have left during test runs
         timeout-minutes: 1
@@ -463,7 +465,7 @@ jobs:
   #       timeout-minutes: 60
 
   #     - name: Build testnet
-  #       run: cargo build  --release --bin testnet
+  #       run: cargo build  --release --bin testnet --interval 30000
   #       timeout-minutes: 60
 
   #     - name: Build log_cmds_inspector
@@ -597,7 +599,7 @@ jobs:
   #       timeout-minutes: 60
 
   #     - name: Start the network
-  #       run: ./target/release/testnet
+  #       run: ./target/release/testnet --interval 30000
   #       id: section-startup
   #       env:
   #         RUST_LOG: "sn_node,sn_api,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
