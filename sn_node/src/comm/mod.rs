@@ -429,6 +429,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "Re-enable this when we've feedback from sends off thread"]
     async fn failed_send() -> Result<()> {
         // Construct a local task set that can run `!Send` futures.
         let local = tokio::task::LocalSet::new();
