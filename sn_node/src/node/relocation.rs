@@ -127,13 +127,13 @@ mod tests {
             test_utils::section_signed, SectionAuthorityProvider, SectionTreeUpdate, SectionsDAG,
             MIN_ADULT_AGE,
         },
-        types::{Peer, SecretKeySet},
+        types::Peer,
     };
 
     use eyre::Result;
     use itertools::Itertools;
     use proptest::{collection::SizeRange, prelude::*};
-    use rand::{rngs::SmallRng, Rng, SeedableRng};
+    use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
     use sn_interface::network_knowledge::SectionTree;
     use std::net::SocketAddr;
     use xor_name::{Prefix, XOR_NAME_LEN};
@@ -164,7 +164,7 @@ mod tests {
     }
 
     fn proptest_actions_impl(peers: Vec<Peer>, signature_trailing_zeros: u8) -> Result<()> {
-        let sk_set = SecretKeySet::random(None);
+        let sk_set = bls::SecretKeySet::random(0, &mut thread_rng());
         let sk = sk_set.secret_key();
         let genesis_pk = sk.public_key();
 
@@ -183,7 +183,7 @@ mod tests {
             0,
         );
         let section_tree_update = {
-            let signed_sap = section_signed(sk, section_auth)?;
+            let signed_sap = section_signed(&sk, section_auth)?;
             SectionTreeUpdate::new(signed_sap, SectionsDAG::new(genesis_pk))
         };
 
@@ -192,7 +192,7 @@ mod tests {
 
         for peer in &peers {
             let info = NodeState::joined(*peer, None);
-            let info = section_signed(sk, info)?;
+            let info = section_signed(&sk, info)?;
 
             assert!(network_knowledge.update_member(info));
         }

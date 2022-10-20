@@ -19,7 +19,7 @@ use sn_interface::{
         test_utils::*, MyNodeInfo, NetworkKnowledge, NodeState, SectionAuthorityProvider,
         SectionKeyShare, SectionTree, SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
     },
-    types::{keys::ed25519, Peer, SecretKeySet},
+    types::{keys::ed25519, Peer},
 };
 use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
@@ -296,7 +296,7 @@ impl TestNodeBuilder {
 
 pub(crate) fn create_section_with_key(
     prefix: Prefix,
-    sk_set: &SecretKeySet,
+    sk_set: &bls::SecretKeySet,
 ) -> Result<(NetworkKnowledge, SectionAuthorityProvider)> {
     let (sap, _) = random_sap_with_key(prefix, elder_count(), 0, sk_set);
     let (section, _) = create_section(sk_set, &sap, None, None)?;
@@ -326,13 +326,13 @@ pub(crate) fn create_section(
 ///
 /// Some tests require the condition where only the elders were marked as joined members.
 pub(crate) fn create_section_with_elders(
-    sk_set: &SecretKeySet,
+    sk_set: &bls::SecretKeySet,
     sap: &SectionAuthorityProvider,
 ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
     let (mut section, section_key_share) = do_create_section(sap, sk_set, None, None)?;
     for peer in sap.elders() {
         let node_state = NodeState::joined(*peer, None);
-        let node_state = section_signed(sk_set.secret_key(), node_state)?;
+        let node_state = section_signed(&sk_set.secret_key(), node_state)?;
         let _updated = section.update_member(node_state);
     }
     Ok((section, section_key_share))

@@ -19,7 +19,7 @@ use sn_interface::{
     network_knowledge::{
         test_utils::*, MembershipState, NodeState, RelocateDetails, SectionAuthorityProvider,
     },
-    types::{Keypair, Peer, ReplicatedData, SecretKeySet},
+    types::{Keypair, Peer, ReplicatedData},
 };
 use std::collections::BTreeSet;
 

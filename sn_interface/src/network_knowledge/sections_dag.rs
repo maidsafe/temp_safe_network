@@ -495,13 +495,12 @@ pub(super) mod tests {
         network_knowledge::test_utils::{
             assert_lists, prefix, random_sap_with_rng, section_signed,
         },
-        types::SecretKeySet,
         SectionAuthorityProvider,
     };
     use crdts::CmRDT;
     use eyre::{eyre, Result};
     use proptest::prelude::{any, proptest, ProptestConfig, Strategy};
-    use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
+    use rand::{rngs::StdRng, thread_rng, Rng, RngCore, SeedableRng};
     use std::collections::{BTreeMap, BTreeSet};
     use xor_name::Prefix;
 
@@ -1073,7 +1072,7 @@ pub(super) mod tests {
 
     // Test helpers
     fn gen_keypair() -> (bls::SecretKey, bls::PublicKey) {
-        let sk_set = SecretKeySet::random(None);
+        let sk_set = bls::SecretKeySet::random(0, &mut thread_rng());
         let sk = sk_set.secret_key();
         (sk.clone(), sk.public_key())
     }

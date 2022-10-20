@@ -124,7 +124,7 @@ mod tests {
             test_utils::{assert_lists, gen_addr, section_signed},
             MembershipState, NodeState, RelocateDetails,
         },
-        types::{Peer, SecretKeySet},
+        types::Peer,
     };
     use eyre::Result;
     use rand::thread_rng;
@@ -136,7 +136,7 @@ mod tests {
         let mut section_peers = SectionPeers::default();
 
         // adding node set 1
-        let sk_1 = SecretKeySet::random(None).secret_key().clone();
+        let sk_1 = bls::SecretKeySet::random(0, &mut thread_rng()).secret_key();
         let nodes_1 = gen_random_signed_node_states(1, MembershipState::Left, &sk_1)?;
         nodes_1.iter().for_each(|node| {
             section_peers.update(node.clone());
@@ -147,7 +147,7 @@ mod tests {
         assert_lists(section_peers.archive.values(), &nodes_1);
 
         // adding node set 2 as MembershipState::Relocated
-        let sk_2 = SecretKeySet::random(None).secret_key().clone();
+        let sk_2 = bls::SecretKeySet::random(0, &mut thread_rng()).secret_key();
         let relocate = RelocateDetails {
             previous_name: XorName::random(&mut rng),
             dst: XorName::random(&mut rng),
@@ -172,7 +172,7 @@ mod tests {
         );
 
         // adding node set 3
-        let sk_3 = SecretKeySet::random(None).secret_key().clone();
+        let sk_3 = bls::SecretKeySet::random(0, &mut thread_rng()).secret_key();
         let nodes_3 = gen_random_signed_node_states(1, MembershipState::Left, &sk_3)?;
         nodes_3.iter().for_each(|node| {
             section_peers.update(node.clone());
@@ -187,7 +187,7 @@ mod tests {
         );
 
         // adding node set 4
-        let sk_4 = SecretKeySet::random(None).secret_key().clone();
+        let sk_4 = bls::SecretKeySet::random(0, &mut thread_rng()).secret_key();
         let nodes_4 = gen_random_signed_node_states(1, MembershipState::Left, &sk_4)?;
         nodes_4.iter().for_each(|node| {
             section_peers.update(node.clone());
@@ -205,7 +205,7 @@ mod tests {
         // 1 -> 2 -> 3 -> 4
         //              |
         //              -> 5
-        let sk_5 = SecretKeySet::random(None).secret_key().clone();
+        let sk_5 = bls::SecretKeySet::random(0, &mut thread_rng()).secret_key();
         let nodes_5 = gen_random_signed_node_states(1, MembershipState::Left, &sk_5)?;
         nodes_5.iter().for_each(|node| {
             section_peers.update(node.clone());
@@ -226,7 +226,7 @@ mod tests {
     fn archived_members_should_not_be_moved_to_members_list() -> Result<()> {
         let mut rng = thread_rng();
         let mut section_peers = SectionPeers::default();
-        let sk = SecretKeySet::random(None).secret_key().clone();
+        let sk = bls::SecretKeySet::random(0, &mut thread_rng()).secret_key();
         let node_left = gen_random_signed_node_states(1, MembershipState::Left, &sk)?[0].clone();
         let relocate = RelocateDetails {
             previous_name: XorName::random(&mut rng),
@@ -257,7 +257,7 @@ mod tests {
     fn members_should_be_archived_if_they_leave_or_relocate() -> Result<()> {
         let mut rng = thread_rng();
         let mut section_peers = SectionPeers::default();
-        let sk = SecretKeySet::random(None).secret_key().clone();
+        let sk = bls::SecretKeySet::random(0, &mut thread_rng()).secret_key();
 
         let node_1 = gen_random_signed_node_states(1, MembershipState::Joined, &sk)?[0].clone();
         let relocate = RelocateDetails {

@@ -46,7 +46,7 @@ use sn_interface::{
         SectionAuthorityProvider, SectionKeyShare, SectionKeysProvider, SectionTree,
         SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
     },
-    types::{keyed_signed, keys::ed25519, Peer, PublicKey, ReplicatedData, SecretKeySet},
+    types::{keyed_signed, keys::ed25519, Peer, PublicKey, ReplicatedData},
 };
 
 use assert_matches::assert_matches;
@@ -54,7 +54,7 @@ use bls::Signature;
 use ed25519_dalek::Signer;
 use eyre::{bail, eyre, Context, Result};
 use itertools::Itertools;
-use rand::{distributions::Alphanumeric, rngs::OsRng, Rng};
+use rand::{distributions::Alphanumeric, rngs::OsRng, thread_rng, Rng};
 use resource_proof::ResourceProof as ChallengeSolver;
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
@@ -182,7 +182,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let local = tokio::task::LocalSet::new();
     local
         .run_until(async move {
-            let sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
+            let sk_set = bls::SecretKeySet::random(0, &mut thread_rng());
             let pk = sk_set.secret_key().public_key();
             let section_chain = SectionsDAG::new(pk);
 
@@ -474,7 +474,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             .await?;
 
             // Create new `Section` as a successor to the previous one.
-            let sk_set2 = SecretKeySet::random(None);
+            let sk_set2 = bls::SecretKeySet::random(0, &mut thread_rng());
             let sk2 = sk_set2.secret_key();
             let pk2 = sk2.public_key();
 
@@ -497,7 +497,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             );
             let new_section_elders: BTreeSet<_> = new_sap.names();
             let section_tree_update = gen_section_tree_update(
-                &section_signed(sk2, new_sap.clone())?,
+                &section_signed(&sk2, new_sap.clone())?,
                 &node.section_chain(),
                 &sk_set1.secret_key(),
             )?;
@@ -740,7 +740,7 @@ async fn msg_to_self() -> Result<()> {
         .await?;
         let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
 
-        let genesis_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
+        let genesis_sk_set = bls::SecretKeySet::random(0, &mut thread_rng());
         let (node, _) = MyNode::first_node(
             comm.socket_addr(),
             info.keypair.clone(),
@@ -801,7 +801,7 @@ async fn handle_elders_update() -> Result<()> {
                 .map(|p| NodeState::joined(p, None)),
         );
 
-        let sk_set0 = SecretKeySet::random(None);
+        let sk_set0 = bls::SecretKeySet::random(0, &mut thread_rng());
         let pk0 = sk_set0.secret_key().public_key();
 
         let sap0 = SectionAuthorityProvider::new(
@@ -816,13 +816,13 @@ async fn handle_elders_update() -> Result<()> {
 
         for peer in [&adult_peer, &promoted_peer] {
             let node_state = NodeState::joined(*peer, None);
-            let node_state = section_signed(sk_set0.secret_key(), node_state)?;
+            let node_state = section_signed(&sk_set0.secret_key(), node_state)?;
             assert!(section0.update_member(node_state));
         }
 
         let demoted_peer = other_elder_peers.remove(0);
 
-        let sk_set1 = SecretKeySet::random(None);
+        let sk_set1 = bls::SecretKeySet::random(0, &mut thread_rng());
 
         let pk1 = sk_set1.secret_key().public_key();
         // Create `HandleAgreement` cmd for an `NewElders` proposal. This will demote one of the
@@ -838,7 +838,7 @@ async fn handle_elders_update() -> Result<()> {
         );
         let elder_names1: BTreeSet<_> = sap1.names();
 
-        let signed_sap1 = section_signed(sk_set1.secret_key(), sap1)?;
+        let signed_sap1 = section_signed(&sk_set1.secret_key(), sap1)?;
         let proposal = Proposal::NewElders(signed_sap1.clone());
         let signature = sk_set0.secret_key().sign(&proposal.as_signable_bytes()?);
         let sig = SectionSig {
@@ -957,7 +957,7 @@ async fn handle_demote_during_split() -> Result<()> {
             );
 
             // Create the pre-split section
-            let sk_set_v0 = SecretKeySet::random(None);
+            let sk_set_v0 = bls::SecretKeySet::random(0, &mut thread_rng());
             let section_auth_v0 = SectionAuthorityProvider::new(
                 iter::once(info.peer()).chain(peers_a.iter().cloned()),
                 Prefix::default(),
@@ -971,7 +971,7 @@ async fn handle_demote_during_split() -> Result<()> {
             // all peers b are added
             for peer in peers_b.iter().chain(iter::once(&peer_c)).cloned() {
                 let node_state = NodeState::joined(peer, None);
-                let node_state = section_signed(sk_set_v0.secret_key(), node_state)?;
+                let node_state = section_signed(&sk_set_v0.secret_key(), node_state)?;
                 assert!(section.update_member(node_state));
             }
 
@@ -990,8 +990,8 @@ async fn handle_demote_during_split() -> Result<()> {
             )
             .await?;
 
-            let sk_set_v1_p0 = SecretKeySet::random(None);
-            let sk_set_v1_p1 = SecretKeySet::random(None);
+            let sk_set_v1_p0 = bls::SecretKeySet::random(0, &mut thread_rng());
+            let sk_set_v1_p1 = bls::SecretKeySet::random(0, &mut thread_rng());
 
             // Simulate DKG round finished succesfully by adding the new section
             // key share to our cache (according to which split section we'll belong to).
@@ -1030,7 +1030,7 @@ async fn handle_demote_during_split() -> Result<()> {
                 0,
             );
 
-            let signed_sap = section_signed(sk_set_v1_p0.secret_key(), section_auth)?;
+            let signed_sap = section_signed(&sk_set_v1_p0.secret_key(), section_auth)?;
             let cmd = create_our_elders_cmd(signed_sap)?;
             let mut cmds = run_and_collect_cmds(cmd, &dispatcher).await?;
 
@@ -1043,7 +1043,7 @@ async fn handle_demote_during_split() -> Result<()> {
                 0,
             );
 
-            let signed_sap = section_signed(sk_set_v1_p1.secret_key(), section_auth)?;
+            let signed_sap = section_signed(&sk_set_v1_p1.secret_key(), section_auth)?;
             let cmd = create_our_elders_cmd(signed_sap)?;
 
             let new_cmds = run_and_collect_cmds(cmd, &dispatcher).await?;
@@ -1222,7 +1222,7 @@ async fn spentbook_spend_spent_proof_with_key_not_in_section_chain_should_return
                     .build()
                     .await?;
 
-            let sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
+            let sk_set = bls::SecretKeySet::random(0, &mut thread_rng());
             let (key_image, tx, spent_proofs, spent_transactions) =
                 dbc_utils::get_genesis_dbc_spend_info(&sk_set)?;
 
