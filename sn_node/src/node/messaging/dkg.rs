@@ -803,21 +803,20 @@ mod tests {
     use eyre::{eyre, Result};
     use rand::{rngs::StdRng, RngCore, SeedableRng};
     use sn_interface::{
+        init_logger,
         messaging::{
             signature_aggregator::SignatureAggregator,
             system::{DkgSessionId, NodeMsg},
-            AuthKind, AuthorityProof, MsgId, NodeMsgAuthority, Traceroute,
+            MsgId, Traceroute,
         },
-        network_knowledge::{
-            test_utils::{gen_network_knowledge_with_key, gen_sorted_nodes},
-            SectionKeyShare, SectionKeysProvider,
-        },
-        types::{keys::ed25519::gen_keypair, Peer},
+        network_knowledge::{test_utils::gen_network_knowledge_with_key, SectionKeyShare},
+        types::Peer,
     };
     use std::{
         collections::{BTreeMap, BTreeSet},
         sync::Arc,
     };
+    use tokio::sync::RwLock;
     use xor_name::Prefix;
 
     #[tokio::test]
@@ -825,13 +824,14 @@ mod tests {
         let loc = tokio::task::LocalSet::new();
         loc.run_until(async {
             let mut rng = rand::thread_rng();
-            generate_working_nodes(5, &mut rng).await;
+            let _gg = generate_working_nodes(5, &mut rng).await;
         })
         .await;
     }
 
     #[tokio::test]
     async fn simulate_dkg_round() -> Result<()> {
+        init_logger();
         // Construct a local task set that can run `!Send` futures.
         let loc = tokio::task::LocalSet::new();
 
@@ -861,7 +861,7 @@ mod tests {
                 .map(|(node, comm)| {
                     let peer = Peer::new(node.name(), node.addr);
                     let mock = MyNodeInstance {
-                        node,
+                        node: Arc::new(RwLock::new(node)),
                         comm,
                         msg_queue: Vec::new(),
                     };
@@ -870,21 +870,29 @@ mod tests {
                 .collect::<BTreeMap<_, _>>();
 
             // let a random node start dkg
-            let random_node = &mut node_instances
-                .values_mut()
+            let random_node = node_instances
+                .values()
                 .next()
                 .ok_or_else(|| eyre!("Have atleast 1 node"))?
-                .node;
-            let original_tree = random_node.network_knowledge().section_tree().clone();
-            let cmds = random_node.send_dkg_start(session_id)?;
+                .node
+                .clone();
+            let original_tree = random_node
+                .read()
+                .await
+                .network_knowledge()
+                .section_tree()
+                .clone();
+            let cmds = random_node.write().await.send_dkg_start(session_id)?;
 
             // random node should process cmds => assuming they are SendMsgs for now
             let mut msgs_to_other_nodes = Vec::new();
             for cmd in cmds {
                 let msg = random_node
+                    .read()
+                    .await
                     .mock_process_send_msg(cmd)?
                     .ok_or_else(|| eyre!("send_dkg_start will send msgs to other nodes"))?;
-                println!("random_node cmd output: {}", msg.0 .2);
+                println!("random_node cmd output: {}", msg.0 .1);
                 msgs_to_other_nodes.push(msg);
             }
             // add the msgs to the recipients queue
@@ -906,38 +914,42 @@ mod tests {
                 // let the nodes process the 1. SystemMsg -> 2. Process Cmd from prev step -> 3. add the system msg to queue
                 let mut msgs_to_other_nodes = Vec::new();
                 for mock_node in node_instances.values_mut() {
-                    let node = &mut mock_node.node;
+                    let node = mock_node.node.clone();
                     let comm = &mock_node.comm;
-                    println!("\n\n NODE: {}", node.name());
-                    while let Some((msg_id, msg_authority, msg, sender)) = mock_node.msg_queue.pop()
-                    {
-                        let cmds = node
-                            .handle_valid_system_msg(
-                                msg_id,
-                                msg_authority,
-                                msg,
-                                sender,
-                                comm,
-                                traceroute.clone(),
-                            )
-                            .await?;
+                    println!("\n\n NODE: {}", node.read().await.name());
+                    while let Some((msg_id, msg, sender)) = mock_node.msg_queue.pop() {
+                        let cmds = MyNode::handle_valid_system_msg(
+                            node.clone(),
+                            msg_id,
+                            msg,
+                            sender,
+                            comm,
+                            traceroute.clone(),
+                        )
+                        .await?;
 
                         for cmd in cmds {
                             println!("Got cmd {}", cmd);
-                            if let Some(new_msgs) = node.mock_process_send_msg(cmd.clone())? {
+                            if let Some(new_msgs) =
+                                node.write().await.mock_process_send_msg(cmd.clone())?
+                            {
                                 println!("Cmd output {}", new_msgs.0 .2);
                                 msgs_to_other_nodes.push(new_msgs);
                             } else {
-                                let cmds = node.mock_process_dkg_outcome(cmd).await?;
+                                let cmds = node.write().await.mock_process_dkg_outcome(cmd).await?;
                                 for cmd in cmds {
-                                    let mut new_msgs =
-                                        node.mock_process_send_msg(cmd.clone())?.ok_or_else(
-                                            || eyre!("dkg_outcome will send msgs to other nodes"),
-                                        )?;
+                                    let mut new_msgs = node
+                                        .read()
+                                        .await
+                                        .mock_process_send_msg(cmd.clone())?
+                                        .ok_or_else(|| {
+                                            eyre!("dkg_outcome will send msgs to other nodes")
+                                        })?;
 
                                     // if no recepients, lets handle it (because we get a proposal here, not sure what to do wwith it)
                                     if new_msgs.1.is_empty() {
-                                        new_msgs.1 = vec![Peer::new(node.name(), node.addr)];
+                                        let n = node.read().await;
+                                        new_msgs.1 = vec![Peer::new(n.name(), n.addr)];
                                     }
                                     println!("Cmd output after dkg outcome {}", new_msgs.0 .2);
                                     msgs_to_other_nodes.push(new_msgs);
@@ -972,7 +984,7 @@ mod tests {
             let _agg = SignatureAggregator::default();
             println!("\n\n{original_tree:?}");
             for node in node_instances.values() {
-                let key_share = node.node.key_share()?;
+                let key_share = node.node.read().await.key_share()?;
                 let _ = pub_key_set.insert(key_share.public_key_set);
 
                 // agg.try_aggregate("msg".as_bytes(), key_share.secret_key_share.sign("msg"))?;
@@ -1001,10 +1013,6 @@ mod tests {
         let mut comms = Vec::new();
         let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
 
-        // node infos for all the elders
-        // the key used by the node to sign NodeMsgs
-        let gen_keypair = gen_keypair(&Prefix::default().range_inclusive(), 255);
-        //  Used to derive genesis_key i.e., the first section's key
         let gen_section_key_set = {
             // sk_share for each elder
             let poly = bls::poly::Poly::random(elders, rng);
@@ -1012,48 +1020,14 @@ mod tests {
         };
 
         let (network_knowledge, node_infos) =
-            gen_network_knowledge_with_key(Prefix::default(), elders, 4, &gen_section_key_set)?;
-
-        for node in node_infos {
-            println!("{:?}", node.age());
-        }
-
-        let node_infos = gen_sorted_nodes(&Prefix::default(), elders, true);
-        for node in &node_infos {
-            println!("ggg: {:?}", node.age());
-        }
-
-        let gen_comm = create_comm().await?;
-
-        let (mut gen_node, _) = MyNode::first_node(
-            gen_comm.socket_addr(),
-            Arc::new(gen_keypair),
-            event_channel::new(1).0,
-            UsedSpace::new(max_capacity),
-            root_storage_dir.clone(),
-            // 0 threshold initially, swapping out with a
-            SecretKeySet::random(0, rng),
-        )
-        .await?;
-        // genesis gets a sk_share
-        let gen_section_key_share = SectionKeyShare {
-            public_key_set: gen_section_key_set.public_keys(),
-            index: 0,
-            secret_key_share: gen_section_key_set.secret_key_share(0),
-        };
-        gen_node.section_keys_provider = SectionKeysProvider::new(Some(gen_section_key_share));
-
-        let network_knowledge = gen_node.network_knowledge.clone();
-        comms.push(gen_comm);
-        nodes.push(gen_node);
+            gen_network_knowledge_with_key(Prefix::default(), elders, 0, &gen_section_key_set)?;
 
         for (idx, info) in node_infos.into_iter().enumerate() {
             let comm = create_comm().await?;
             let section_key_share = SectionKeyShare {
                 public_key_set: gen_section_key_set.public_keys(),
-                index: 0,
-                // +1 since we gave one to genesis node
-                secret_key_share: gen_section_key_set.secret_key_share(idx + 1),
+                index: idx,
+                secret_key_share: gen_section_key_set.secret_key_share(idx),
             };
             let node = MyNode::new(
                 comm.socket_addr(),
@@ -1071,10 +1045,10 @@ mod tests {
         Ok((nodes, comms))
     }
 
-    type MockSystemMsg = (MsgId, NodeMsgAuthority, NodeMsg, Peer);
+    type MockSystemMsg = (MsgId, NodeMsg, Peer);
 
     struct MyNodeInstance {
-        node: MyNode,
+        node: Arc<RwLock<MyNode>>,
         comm: Comm,
         msg_queue: Vec<MockSystemMsg>,
     }
@@ -1088,23 +1062,15 @@ mod tests {
                     recipients,
                     ..
                 } => {
-                    let (auth, payload) = self.sign_msg(msg.clone())?;
                     if let OutgoingMsg::Node(msg) = msg {
-                        if let AuthKind::Node(auth) = auth {
-                            let auth = AuthorityProof::verify(auth, payload)?;
-                            let node_auth = NodeMsgAuthority::Node(auth);
-                            let current_node = Peer::new(self.name(), self.addr);
+                        let current_node = Peer::new(self.name(), self.addr);
 
-                            let recipients = match recipients {
-                                Peers::Single(peer) => vec![peer],
-                                Peers::Multiple(peers) => peers.into_iter().collect(),
-                            };
-                            let mock_system_msg: MockSystemMsg =
-                                (msg_id, node_auth, msg, current_node);
-                            Ok(Some((mock_system_msg, recipients)))
-                        } else {
-                            Err(eyre!("Should be Authkind::Node"))
-                        }
+                        let recipients = match recipients {
+                            Peers::Single(peer) => vec![peer],
+                            Peers::Multiple(peers) => peers.into_iter().collect(),
+                        };
+                        let mock_system_msg: MockSystemMsg = (msg_id, msg, current_node);
+                        Ok(Some((mock_system_msg, recipients)))
                     } else {
                         Err(eyre!("Should be OutgoingMsg::Node"))
                     }

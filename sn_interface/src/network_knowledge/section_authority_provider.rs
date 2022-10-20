@@ -192,3 +192,86 @@ impl SectionAuthorityProvider {
         self.public_key_set.public_key()
     }
 }
+
+#[cfg(any(test, feature = "test-utils"))]
+pub mod test_utils {
+    use crate::{
+        messaging::system::SectionSigned,
+        network_knowledge::{MyNodeInfo, NodeState, SectionAuthorityProvider},
+        test_utils::{gen_sorted_nodes, section_signed},
+    };
+    use eyre::{Context, Result};
+    use rand::RngCore;
+    use xor_name::Prefix;
+
+    pub struct TestSAP {}
+
+    impl TestSAP {
+        pub fn gen_section_auth(
+            prefix: Prefix,
+        ) -> Result<(SectionSigned<SectionAuthorityProvider>, bls::SecretKey)> {
+            let (section_auth, _, secret_key_set) = Self::random_sap(prefix, 5, 0, None);
+            let sap = section_signed(&secret_key_set.secret_key(), section_auth)
+                .context(format!("Failed to generate SAP for prefix {:?}", prefix))?;
+            Ok((sap, secret_key_set.secret_key()))
+        }
+
+        /// Generate a random `SectionAuthorityProvider` for testing.
+        ///
+        /// The total number of members in the section will be `elder_count` + `adult_count`. A lot of
+        /// tests don't require adults in the section, so zero is an acceptable value for
+        /// `adult_count`.
+        ///
+        /// An optional `sk_threshold_size` can be passed to specify the threshold when the secret key
+        /// set is generated for the section key. Some tests require a low threshold.
+        pub fn random_sap_with_rng<R: RngCore>(
+            rng: &mut R,
+            prefix: Prefix,
+            elder_count: usize,
+            adult_count: usize,
+            sk_threshold_size: Option<usize>,
+        ) -> (SectionAuthorityProvider, Vec<MyNodeInfo>, bls::SecretKeySet) {
+            let nodes = gen_sorted_nodes(&prefix, elder_count + adult_count, false);
+            let elders = nodes.iter().map(MyNodeInfo::peer).take(elder_count);
+            let members = nodes.iter().map(|i| NodeState::joined(i.peer(), None));
+            let poly = bls::poly::Poly::random(sk_threshold_size.unwrap_or(0), rng);
+            let sks = bls::SecretKeySet::from(poly);
+            let section_auth =
+                SectionAuthorityProvider::new(elders, prefix, members, sks.public_keys(), 0);
+            (section_auth, nodes, sks)
+        }
+
+        pub fn random_sap(
+            prefix: Prefix,
+            elder_count: usize,
+            adult_count: usize,
+            sk_threshold_size: Option<usize>,
+        ) -> (SectionAuthorityProvider, Vec<MyNodeInfo>, bls::SecretKeySet) {
+            Self::random_sap_with_rng(
+                &mut rand::thread_rng(),
+                prefix,
+                elder_count,
+                adult_count,
+                sk_threshold_size,
+            )
+        }
+
+        /// Generate a random `SectionAuthorityProvider` for testing.
+        ///
+        /// Same as `random_sap`, but instead the secret key is provided. This can be useful for
+        /// creating a section to share the same genesis key as another one.
+        pub fn random_sap_with_key(
+            prefix: Prefix,
+            elder_count: usize,
+            adult_count: usize,
+            sk_set: &bls::SecretKeySet,
+        ) -> (SectionAuthorityProvider, Vec<MyNodeInfo>) {
+            let nodes = gen_sorted_nodes(&prefix, elder_count + adult_count, false);
+            let elders = nodes.iter().map(MyNodeInfo::peer).take(elder_count);
+            let members = nodes.iter().map(|i| NodeState::joined(i.peer(), None));
+            let section_auth =
+                SectionAuthorityProvider::new(elders, prefix, members, sk_set.public_keys(), 0);
+            (section_auth, nodes)
+        }
+    }
+}

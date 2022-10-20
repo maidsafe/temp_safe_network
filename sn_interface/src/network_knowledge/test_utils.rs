@@ -1,17 +1,27 @@
-use super::*;
-use crate::messaging::system::{SectionSig, SectionSigned};
-use crate::network_knowledge::section_keys::build_spent_proof_share;
-use crate::network_knowledge::{Error, MyNodeInfo, MIN_ADULT_AGE};
+use super::{
+    NetworkKnowledge, NodeState, SectionAuthUtils, SectionKeysProvider, SectionTree,
+    SectionTreeUpdate, SectionsDAG,
+};
+use crate::{
+    messaging::system::{SectionSig, SectionSigned},
+    network_knowledge::{section_keys::build_spent_proof_share, Error, MyNodeInfo, MIN_ADULT_AGE},
+    test_utils::TestSAP,
+    SectionAuthorityProvider,
+};
 use eyre::{eyre, Result};
 use itertools::Itertools;
-use rand::RngCore;
 use serde::Serialize;
 use sn_consensus::{Ballot, Consensus, Decision, Proposition, Vote, VoteResponse};
 use sn_dbc::{
     get_public_commitments_from_transaction, Commitment, Dbc, Owner, OwnerOnce, RingCtTransaction,
     Token, TransactionBuilder,
 };
-use std::{cell::Cell, collections::BTreeMap, fmt, net::SocketAddr};
+use std::{
+    cell::Cell,
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+    net::SocketAddr,
+};
 use xor_name::Prefix;
 
 // Parse `Prefix` from string
@@ -52,63 +62,6 @@ pub fn gen_sorted_nodes(prefix: &Prefix, count: usize, age_diff: bool) -> Vec<My
         .collect()
 }
 
-/// Generate a random `SectionAuthorityProvider` for testing.
-///
-/// The total number of members in the section will be `elder_count` + `adult_count`. A lot of
-/// tests don't require adults in the section, so zero is an acceptable value for
-/// `adult_count`.
-///
-/// An optional `sk_threshold_size` can be passed to specify the threshold when the secret key
-/// set is generated for the section key. Some tests require a low threshold.
-pub fn random_sap_with_rng<R: RngCore>(
-    rng: &mut R,
-    prefix: Prefix,
-    elder_count: usize,
-    adult_count: usize,
-    sk_threshold_size: Option<usize>,
-) -> (SectionAuthorityProvider, Vec<MyNodeInfo>, bls::SecretKeySet) {
-    let nodes = gen_sorted_nodes(&prefix, elder_count + adult_count, false);
-    let elders = nodes.iter().map(MyNodeInfo::peer).take(elder_count);
-    let members = nodes.iter().map(|i| NodeState::joined(i.peer(), None));
-    let poly = bls::poly::Poly::random(sk_threshold_size.unwrap_or(0), rng);
-    let sks = bls::SecretKeySet::from(poly);
-    let section_auth = SectionAuthorityProvider::new(elders, prefix, members, sks.public_keys(), 0);
-    (section_auth, nodes, sks)
-}
-
-pub fn random_sap(
-    prefix: Prefix,
-    elder_count: usize,
-    adult_count: usize,
-    sk_threshold_size: Option<usize>,
-) -> (SectionAuthorityProvider, Vec<MyNodeInfo>, bls::SecretKeySet) {
-    random_sap_with_rng(
-        &mut rand::thread_rng(),
-        prefix,
-        elder_count,
-        adult_count,
-        sk_threshold_size,
-    )
-}
-
-/// Generate a random `SectionAuthorityProvider` for testing.
-///
-/// Same as `random_sap`, but instead the secret key is provided. This can be useful for
-/// creating a section to share the same genesis key as another one.
-pub fn random_sap_with_key(
-    prefix: Prefix,
-    elder_count: usize,
-    adult_count: usize,
-    sk_set: &bls::SecretKeySet,
-) -> (SectionAuthorityProvider, Vec<MyNodeInfo>) {
-    let nodes = gen_sorted_nodes(&prefix, elder_count + adult_count, false);
-    let elders = nodes.iter().map(MyNodeInfo::peer).take(elder_count);
-    let members = nodes.iter().map(|i| NodeState::joined(i.peer(), None));
-    let section_auth =
-        SectionAuthorityProvider::new(elders, prefix, members, sk_set.public_keys(), 0);
-    (section_auth, nodes)
-}
-
 /// Generate a random `NetworkKnowledge` for testing.
 ///
 /// Uses `random_sap_with_key` to generate SAP; section_peer list is updated with the `NodeState` as well
@@ -119,7 +72,7 @@ pub fn gen_network_knowledge_with_key(
     sk_set: &bls::SecretKeySet,
 ) -> Result<(NetworkKnowledge, Vec<MyNodeInfo>)> {
     let pk_set = sk_set.public_keys();
-    let (sap, node_infos) = random_sap_with_key(prefix, elder_count, adult_count, sk_set);
+    let (sap, node_infos) = TestSAP::random_sap_with_key(prefix, elder_count, adult_count, sk_set);
     let signed_sap = section_signed(&sk_set.secret_key(), sap)?;
     let section_tree_update =
         SectionTreeUpdate::new(signed_sap, SectionsDAG::new(pk_set.public_key()));

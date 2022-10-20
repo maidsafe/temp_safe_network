@@ -444,10 +444,8 @@ mod tests {
     use sn_interface::{
         elder_count,
         messaging::{Dst, MsgId, MsgKind},
-        network_knowledge::{
-            test_utils::{gen_addr, random_sap, section_signed},
-            MyNodeInfo, SectionKeyShare, SectionKeysProvider, SectionsDAG,
-        },
+        network_knowledge::{MyNodeInfo, SectionKeyShare, SectionKeysProvider, SectionsDAG},
+        test_utils::{gen_addr, section_signed, TestSAP},
         types::keys::ed25519,
     };
 
@@ -645,7 +643,8 @@ mod tests {
             let prefix1 = Prefix::default().pushed(true);
 
             // generate a SAP for prefix0
-            let (sap, mut nodes, secret_key_set) = random_sap(prefix0, elder_count(), 0, None);
+            let (sap, mut nodes, secret_key_set) =
+                TestSAP::random_sap(prefix0, elder_count(), 0, None);
             let info = nodes.remove(0);
             let sap_sk = secret_key_set.secret_key();
             let signed_sap = section_signed(&sap_sk, sap)?;
@@ -679,7 +678,8 @@ mod tests {
             let _ = node.update_network_knowledge(section_tree_update, None)?;
 
             // generate other SAP for prefix1
-            let (other_sap, _, secret_key_set) = random_sap(prefix1, elder_count(), 0, None);
+            let (other_sap, _, secret_key_set) =
+                TestSAP::random_sap(prefix1, elder_count(), 0, None);
             let other_sap_sk = secret_key_set.secret_key();
             let other_sap = section_signed(&other_sap_sk, other_sap)?;
             // generate a proof chain for this other SAP

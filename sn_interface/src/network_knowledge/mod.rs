@@ -14,9 +14,10 @@ pub mod section_keys;
 mod section_peers;
 mod section_tree;
 mod sections_dag;
-
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils;
+#[cfg(any(test, feature = "test-utils"))]
+pub use section_tree::test_utils as section_tree_test_utils;
 
 pub use self::{
     errors::{Error, Result},
@@ -604,12 +605,11 @@ fn create_first_sig<T: Serialize>(
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        supermajority,
-        test_utils::{gen_addr, prefix, random_sap, section_signed},
-        NetworkKnowledge,
+    use super::{supermajority, NetworkKnowledge};
+    use crate::{
+        test_utils::{gen_addr, gen_section_tree_update, prefix, section_signed, TestSAP},
+        types::Peer,
     };
-    use crate::{network_knowledge::test_utils::gen_section_tree_update, types::Peer};
     use bls::SecretKeySet;
     use eyre::Result;
     use proptest::prelude::*;
@@ -649,7 +649,7 @@ mod tests {
         let (mut knowledge, _) = NetworkKnowledge::first_node(peer, sk_gen.clone())?;
 
         // section 1
-        let (sap1, _, sk_1) = random_sap(prefix("1")?, 0, 0, None);
+        let (sap1, _, sk_1) = TestSAP::random_sap(prefix("1")?, 0, 0, None);
         let sap1 = section_signed(&sk_1.secret_key(), sap1)?;
         let our_node_name_prefix_1 = sap1.prefix().name();
         let proof_chain = knowledge.section_chain();
@@ -663,7 +663,7 @@ mod tests {
         assert_eq!(knowledge.signed_sap, sap1);
 
         // section with different prefix (0) and our node name doesn't match
-        let (sap0, _, sk_0) = random_sap(prefix("0")?, 0, 0, None);
+        let (sap0, _, sk_0) = TestSAP::random_sap(prefix("0")?, 0, 0, None);
         let sap0 = section_signed(&sk_0.secret_key(), sap0)?;
         let section_tree_update =
             gen_section_tree_update(&sap0, &proof_chain, &sk_gen.secret_key())?;

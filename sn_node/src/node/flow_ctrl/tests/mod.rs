@@ -41,11 +41,12 @@ use sn_interface::{
         Dst, MsgId, MsgType, WireMsg,
     },
     network_knowledge::{
-        recommended_section_size, supermajority, test_utils::*, Error as NetworkKnowledgeError,
-        MembershipState, MyNodeInfo, NetworkKnowledge, NodeState, RelocateDetails,
-        SectionAuthorityProvider, SectionKeyShare, SectionKeysProvider, SectionTree,
-        SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
+        recommended_section_size, supermajority, Error as NetworkKnowledgeError, MembershipState,
+        MyNodeInfo, NetworkKnowledge, NodeState, RelocateDetails, SectionAuthorityProvider,
+        SectionKeyShare, SectionKeysProvider, SectionTree, SectionTreeUpdate, SectionsDAG,
+        MIN_ADULT_AGE,
     },
+    test_utils::*,
     types::{keyed_signed, keys::ed25519, Peer, PublicKey, ReplicatedData},
 };
 
@@ -650,7 +651,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
                 RelocatedPeerRole::Elder => elder_count(),
                 RelocatedPeerRole::NonElder => recommended_section_size(),
             };
-            let (section_auth, mut nodes, sk_set) = random_sap(prefix, elder_count(), 0, None);
+            let (section_auth, mut nodes, sk_set) = TestSAP::random_sap(prefix, elder_count(), 0, None);
             let (mut section, section_key_share) =
                 network_utils::create_section(&sk_set, &section_auth, None, None)?;
 

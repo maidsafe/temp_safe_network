@@ -149,3 +149,10 @@ pub fn init_logger() {
             .unwrap_or_else(|_| println!("Error initializing logger"));
     });
 }
+
+#[cfg(any(test, feature = "test-utils"))]
+pub mod test_utils {
+    pub use crate::network_knowledge::{
+        section_authority_provider::test_utils::*, section_tree_test_utils::*, test_utils::*,
+    };
+}

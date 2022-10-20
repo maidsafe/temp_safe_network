@@ -62,7 +62,7 @@ impl Proposal {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sn_interface::network_knowledge::test_utils::random_sap;
+    use sn_interface::test_utils::TestSAP;
 
     use eyre::Result;
     use serde::Serialize;
@@ -72,7 +72,7 @@ mod tests {
     #[test]
     fn serialize_for_signing() -> Result<()> {
         // Proposal::SectionInfo
-        let (section_auth, _, _) = random_sap(Prefix::default(), 4, 0, None);
+        let (section_auth, _, _) = TestSAP::random_sap(Prefix::default(), 4, 0, None);
         let proposal = Proposal::SectionInfo(section_auth.clone());
         verify_serialize_for_signing(&proposal, &section_auth)?;
 

@@ -492,9 +492,7 @@ pub(super) mod tests {
     use super::{Error, SectionInfo, SectionsDAG};
     use crate::{
         messaging::system::SectionSigned,
-        network_knowledge::test_utils::{
-            assert_lists, prefix, random_sap_with_rng, section_signed,
-        },
+        test_utils::{assert_lists, prefix, section_signed, TestSAP},
         SectionAuthorityProvider,
     };
     use crdts::CmRDT;
@@ -1182,7 +1180,8 @@ pub(super) mod tests {
             None => StdRng::from_entropy(),
         };
 
-        let (sap_gen, _, sk_gen) = random_sap_with_rng(&mut rng, Prefix::default(), 0, 0, None);
+        let (sap_gen, _, sk_gen) =
+            TestSAP::random_sap_with_rng(&mut rng, Prefix::default(), 0, 0, None);
         let sk_gen = sk_gen.secret_key();
         let sap_gen = section_signed(&sk_gen, sap_gen)?;
         let pk_gen = sap_gen.public_key_set().public_key();
@@ -1210,7 +1209,7 @@ pub(super) mod tests {
             >,
             dag: &mut SectionsDAG,
         ) -> Result<()> {
-            let (sap, _, sk_set) = random_sap_with_rng(rng, prefix, 0, 0, None);
+            let (sap, _, sk_set) = TestSAP::random_sap_with_rng(rng, prefix, 0, 0, None);
             let sap = section_signed(&sk_set.secret_key(), sap)?;
             let key = sap.public_key_set().public_key();
             let sig = sign(parent_sk, &key);
