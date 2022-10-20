@@ -15,13 +15,14 @@ use sn_interface::{
     data_copy_count,
     messaging::{
         data::{ClientMsg, DataQuery, DataQueryVariant},
-        ClientAuth, MsgId, WireMsg,
+        ClientAuth, WireMsg,
     },
     types::{Peer, PublicKey, Signature},
 };
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bytes::Bytes;
+use tokio::time::sleep;
 use tracing::{debug, info_span};
 
 impl Client {
@@ -77,8 +78,6 @@ impl Client {
             ..Default::default()
         };
 
-        let msg_id = MsgId::new();
-
         // this seems needed for custom settings to take effect
         backoff.reset();
 
@@ -87,8 +86,8 @@ impl Client {
             let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
             let signature = self.keypair.sign(&serialised_query);
             debug!(
-                "Attempting {:?} (adult_index #{}) will force new: {force_new_link}",
-                query, query.adult_index
+                "Attempting {query:?} (adult_index #{}) will force new: {force_new_link}",
+                query.adult_index
             );
 
             // grab up to date destination section from our local network knowledge
@@ -99,7 +98,6 @@ impl Client {
                     query.clone(),
                     client_pk,
                     serialised_query.clone(),
-                    msg_id,
                     signature.clone(),
                     Some((section_pk, elders.clone())),
                     force_new_link,
@@ -110,14 +108,8 @@ impl Client {
             query.adult_index += 1;
             // There should not be more than a certain amount of adults holding copies of the data. Retry the closest adult again.
             if query.adult_index >= data_copy_count() {
-                query.adult_index = 0;
-
-                // force_new_link = true;
-
-                if !retry {
-                    // we dont want to retry beyond data_copy_count adults so
-                    return res;
-                }
+                // we dont want to retry beyond data_copy_count adults so
+                return res;
             }
 
             if let Some(delay) = backoff.next_backoff() {
@@ -135,7 +127,7 @@ impl Client {
                 }
 
                 debug!("Sleeping before trying query again: {delay:?} sleep for {query:?}");
-                tokio::time::sleep(delay).await;
+                sleep(delay).await;
             } else {
                 warn!("Finished trying and last response to {query:?} is {res:?}");
                 // we're done trying
@@ -152,7 +144,6 @@ impl Client {
         query: DataQuery,
         client_pk: PublicKey,
         serialised_query: Bytes,
-        msg_id: MsgId,
         signature: Signature,
     ) -> Result<QueryResult, Error> {
         debug!("Sending Query: {:?}", query);
@@ -160,7 +151,6 @@ impl Client {
             query,
             client_pk,
             serialised_query,
-            msg_id,
             signature,
             None,
             false,
@@ -176,7 +166,6 @@ impl Client {
         query: DataQuery,
         client_pk: PublicKey,
         serialised_query: Bytes,
-        msg_id: MsgId,
         signature: Signature,
         dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
         force_new_link: bool,
@@ -191,7 +180,6 @@ impl Client {
                 query,
                 auth,
                 serialised_query,
-                msg_id,
                 dst_section_info,
                 force_new_link,
                 #[cfg(feature = "traceroute")]

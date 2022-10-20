@@ -8,7 +8,7 @@
 
 use sn_interface::{
     messaging::{
-        data::{DataQuery, DataQueryVariant, Error as ErrorMsg, QueryResponse},
+        data::{DataQueryVariant, Error as ErrorMsg, QueryResponse},
         Error as MessagingError, MsgId,
     },
     types::{Error as DtError, Peer},
@@ -110,25 +110,15 @@ pub enum Error {
         /// Maximum number of bytes for a `SmallFile`
         maximum: usize,
     },
-    /// Failed to obtain any response
-    #[error("No responses were returned for file upload validation")]
-    NoResponsesForUploadValidation,
+    /// Timeout occurred when trying to verify chunk was uploaded
+    #[error("Timeout occurred when trying to verify chunk at xorname address {0} was uploaded")]
+    ChunkUploadValidationTimeout(XorName),
     /// Failed to obtain a response from Elders.
     #[error("Failed to obtain any response from: {0:?}")]
     NoResponse(Vec<Peer>),
-    /// Failed to obtain a response from Elders even after retrying.
-    #[error(
-        "Failed to obtain any response, even after {attempts} attempts, for query: {query:?}. \
-        Error in last attempt: {last_error}"
-    )]
-    NoResponseAfterRetrying {
-        /// Number of attempts made
-        attempts: usize,
-        /// Query sent to Elders
-        query: DataQuery,
-        /// Source of error in last attempt
-        last_error: Box<Self>,
-    },
+    /// Timeout when awaiting command ACK from Elders.
+    #[error("Timeout when awaiting command ACK from Elders for data address {0}")]
+    CmdAckValidationTimeout(XorName),
     /// No operation Id could be found
     #[error("Could not retrieve the operation id of a query or response")]
     UnknownOperationId,
