@@ -107,85 +107,52 @@ jobs:
         # See https://doc.rust-lang.org/rustdoc/lints.html for lints that are 'warning' by default.
         run: RUSTDOCFLAGS="--deny=warnings" cargo doc --no-deps
 
-  # unit:
-  #   if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-  #   name: Unit Tests
-  #   runs-on: ${{ matrix.os }}
-  #   strategy:
-  #     matrix:
-  #       os: [ubuntu-latest, windows-latest, macos-latest]
-  #   steps:
-  #     - uses: actions/checkout@v2
+  unit:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Unit Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v2
 
-  #     - name: Install Rust
-  #       id: toolchain
-  #       uses: actions-rs/toolchain@v1
-  #       with:
-  #         profile: minimal
-  #         toolchain: stable
-  #         override: true
+      - name: Install Rust
+        id: toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
 
-  #     - uses: Swatinem/rust-cache@v1
-  #       continue-on-error: true
-  #       with:
-  #         cache-on-failure: true
-  #         sharedKey: ${{github.run_id}}-unit
+      - uses: Swatinem/rust-cache@v1
+        continue-on-error: true
+        with:
+          cache-on-failure: true
+          sharedKey: ${{github.run_id}}-unit
 
-  #     - name: Build interface tests before running
-  #       run: cd sn_interface && cargo test --no-run --release
-  #       timeout-minutes: 50
+      - name: Build tests before running
+        run: cargo test --no-run --release
+        timeout-minutes: 50
 
-  #     - name: Run sn_interface tests
-  #       timeout-minutes: 25
-  #       uses: maidsafe/cargo-nextest@main
-  #       with:
-  #         test-run-name: unit-tests-${{ matrix.os }}
-  #         profile: ci
-  #         junit-path: junit.xml
-  #         package: sn_interface
-  #         release: true
+      - name: Run sn_interface tests
+        timeout-minutes: 25
+        run: cargo test --release -p sn_interface
 
-  #     - name: Build dysfunction tests before running
-  #       run: cd sn_dysfunction && cargo test --no-run --release
-  #       timeout-minutes: 50
+      - name: Run sn_interface tests
+        timeout-minutes: 25
+        run: cargo test --release -p sn_interface
 
-  #     - name: Run sn_dysfunction unit tests
-  #       timeout-minutes: 15
-  #       uses: maidsafe/cargo-nextest@main
-  #       with:
-  #         test-run-name: dysfunction-unit-tests-${{ matrix.os }}
-  #         profile: ci
-  #         junit-path: junit.xml
-  #         package: sn_dysfunction
-  #         release: true
-  #     - name: Build node tests before running
-  #       run: cd sn_node && cargo test --no-run --release
-  #       timeout-minutes: 50
+      - name: Run sn_dysfunction tests
+        timeout-minutes: 15
+        run: cargo test --release -p sn_dysfunction
+      - name: Run sn_node tests
+        timeout-minutes: 20
+        run: cargo test --release -p sn_node
 
-  #     - name: Run node unit tests
-  #       timeout-minutes: 20
-  #       uses: maidsafe/cargo-nextest@main
-  #       with:
-  #         test-run-name: unit-tests-${{ matrix.os }}
-  #         profile: ci
-  #         junit-path: junit.xml
-  #         package: sn_node
-  #         release: true
-
-  #     - name: Build cli tests before running
-  #       run: cd sn_cli && cargo test --no-run --release
-  #       timeout-minutes: 50
-
-  #     - name: Run CLI unit tests
-  #       uses: maidsafe/cargo-nextest@main
-  #       timeout-minutes: 25
-  #       with:
-  #         test-run-name: cli-unit-tests-${{ matrix.os }}
-  #         profile: ci
-  #         junit-path: junit.xml
-  #         package: sn_cli
-  #         bin: safe
-  #         release: true
+      - name: Run sn_cli tests
+        timeout-minutes: 25
+        run: cargo test --release -p sn_cli --bin safe
 
   e2e:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
