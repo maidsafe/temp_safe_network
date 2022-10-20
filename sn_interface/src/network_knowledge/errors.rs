@@ -41,8 +41,6 @@ pub enum Error {
     UntrustedSectionAuthProvider(String),
     #[error("The genesis key of the provided SectionTree is invalid: {0:?}")]
     InvalidGenesisKey(bls::PublicKey),
-    #[error("The node is not in a state to handle the action.")]
-    InvalidState,
     #[error("A signature share is invalid.")]
     InvalidSignatureShare,
     #[error("A node has invalid relocation details")]

@@ -56,8 +56,6 @@ pub enum Error {
     CannotConnectEndpoint(#[from] qp2p::EndpointError),
     #[error("Address not reachable: {0}")]
     AddressNotReachable(#[from] qp2p::RpcError),
-    #[error("The node is not in a state to handle the action.")]
-    InvalidState,
     #[error("Invalid dkg participant; not part of our section.")]
     InvalidDkgParticipant,
     #[error("Content of a received message is inconsistent.")]
