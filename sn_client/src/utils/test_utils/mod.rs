@@ -13,6 +13,7 @@ pub mod test_client;
 #[cfg(test)]
 pub use test_client::{
     create_test_client, create_test_client_with, get_dbc_owner_from_secret_key_hex,
+    try_create_test_client,
 };
 
 #[cfg(any(test, feature = "test-utils"))]
