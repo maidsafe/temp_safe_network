@@ -45,7 +45,7 @@ use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
 #[cfg(any(test, feature = "test-utils"))]
-pub use keys::secret_key::test_utils::{keyed_signed, SecretKeySet};
+pub use keys::secret_key::test_utils::keyed_signed;
 
 // TODO: temporary type tag for spentbook since its underlying data type is
 // still not implemented, it uses a Public Register for now.

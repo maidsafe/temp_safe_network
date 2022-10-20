@@ -88,49 +88,6 @@ impl Display for SecretKey {
 #[cfg(any(test, feature = "test-utils"))]
 pub(crate) mod test_utils {
     use crate::messaging::system::SectionSig;
-    use crate::network_knowledge::{elder_count, supermajority};
-    use rand::RngCore;
-    use std::ops::Deref;
-
-    fn threshold() -> usize {
-        supermajority(elder_count()) - 1
-    }
-
-    // Wrapper for `bls::SecretKeySet` that also allows to retrieve the corresponding `bls::SecretKey`.
-    // Note: `bls::SecretKeySet` does have a `secret_key` method, but it's test-only and not available
-    // for the consumers of the crate.
-    #[derive(Clone)]
-    pub struct SecretKeySet {
-        set: bls::SecretKeySet,
-        key: bls::SecretKey,
-    }
-
-    impl SecretKeySet {
-        pub fn random(threshold_size: Option<usize>) -> Self {
-            Self::random_with_rng(&mut rand::thread_rng(), threshold_size)
-        }
-
-        pub fn random_with_rng<R: RngCore>(rng: &mut R, threshold_size: Option<usize>) -> Self {
-            let threshold_size = threshold_size.unwrap_or_else(threshold);
-            let poly = bls::poly::Poly::random(threshold_size, rng);
-            let key = bls::SecretKey::from_mut(&mut poly.evaluate(0));
-            let set = bls::SecretKeySet::from(poly);
-
-            Self { set, key }
-        }
-
-        pub fn secret_key(&self) -> &bls::SecretKey {
-            &self.key
-        }
-    }
-
-    impl Deref for SecretKeySet {
-        type Target = bls::SecretKeySet;
-
-        fn deref(&self) -> &Self::Target {
-            &self.set
-        }
-    }
 
     /// Create signature for the given bytes using the given secret key.
     pub fn keyed_signed(secret_key: &bls::SecretKey, bytes: &[u8]) -> SectionSig {
