@@ -16,9 +16,10 @@ use sn_consensus::Decision;
 use sn_interface::{
     elder_count,
     network_knowledge::{
-        test_utils::*, MyNodeInfo, NetworkKnowledge, NodeState, SectionAuthorityProvider,
-        SectionKeyShare, SectionTree, SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
+        MyNodeInfo, NetworkKnowledge, NodeState, SectionAuthorityProvider, SectionKeyShare,
+        SectionTree, SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
     },
+    test_utils::*,
     types::{keys::ed25519, Peer},
 };
 use std::net::{Ipv4Addr, SocketAddr};
@@ -194,7 +195,7 @@ impl TestNodeBuilder {
             bls::SecretKeySet::random(self.section_sk_threshold, &mut rand::thread_rng())
         };
 
-        let (sap, _) = random_sap_with_key(
+        let (sap, _) = TestSAP::random_sap_with_key(
             self.prefix,
             self.elder_count,
             self.adult_count,
@@ -229,46 +230,49 @@ impl TestNodeBuilder {
         self,
     ) -> Result<(Dispatcher, NetworkKnowledge, Peer, bls::SecretKeySet)> {
         std::env::set_var("SN_DATA_COPY_COUNT", self.data_copy_count.to_string());
-        let (mut section, section_key_share, keypair, peer, sk_set) = if let Some(custom_section) =
-            self.section
-        {
-            let first_node = self.first_node.ok_or_else(|| {
-                eyre!("The first node must be provided when providing a custom section")
-            })?;
-            let sk_set = self.genesis_sk_set.ok_or_else(|| {
-                eyre!("The secret key set must be supplied when providing a custom section")
-            })?;
-            let section_key_share = create_section_key_share(&sk_set, 0);
-            (
-                custom_section,
-                section_key_share,
-                first_node.keypair.clone(),
-                first_node.peer(),
-                sk_set,
-            )
-        } else {
-            let (sap, mut nodes, sk_set) = if let Some(sk_set) = self.genesis_sk_set {
-                let (sap, nodes) =
-                    random_sap_with_key(self.prefix, self.elder_count, self.adult_count, &sk_set);
-                (sap, nodes, sk_set)
-            } else {
-                random_sap(
-                    self.prefix,
-                    self.elder_count,
-                    self.adult_count,
-                    Some(self.section_sk_threshold),
+        let (mut section, section_key_share, keypair, peer, sk_set) =
+            if let Some(custom_section) = self.section {
+                let first_node = self.first_node.ok_or_else(|| {
+                    eyre!("The first node must be provided when providing a custom section")
+                })?;
+                let sk_set = self.genesis_sk_set.ok_or_else(|| {
+                    eyre!("The secret key set must be supplied when providing a custom section")
+                })?;
+                let section_key_share = create_section_key_share(&sk_set, 0);
+                (
+                    custom_section,
+                    section_key_share,
+                    first_node.keypair.clone(),
+                    first_node.peer(),
+                    sk_set,
                 )
+            } else {
+                let (sap, mut nodes, sk_set) = if let Some(sk_set) = self.genesis_sk_set {
+                    let (sap, nodes) = TestSAP::random_sap_with_key(
+                        self.prefix,
+                        self.elder_count,
+                        self.adult_count,
+                        &sk_set,
+                    );
+                    (sap, nodes, sk_set)
+                } else {
+                    TestSAP::random_sap(
+                        self.prefix,
+                        self.elder_count,
+                        self.adult_count,
+                        Some(self.section_sk_threshold),
+                    )
+                };
+                let (section, section_key_share) = create_section(
+                    &sk_set,
+                    &sap,
+                    self.other_section_keys,
+                    self.parent_section_tree,
+                )?;
+                let node = nodes.remove(0);
+                let keypair = node.keypair.clone();
+                (section, section_key_share, keypair, node.peer(), sk_set)
             };
-            let (section, section_key_share) = create_section(
-                &sk_set,
-                &sap,
-                self.other_section_keys,
-                self.parent_section_tree,
-            )?;
-            let node = nodes.remove(0);
-            let keypair = node.keypair.clone();
-            (section, section_key_share, keypair, node.peer(), sk_set)
-        };
 
         if let Some(custom_peer) = self.custom_peer {
             let node_state = NodeState::joined(custom_peer, None);
@@ -298,7 +302,7 @@ pub(crate) fn create_section_with_key(
     prefix: Prefix,
     sk_set: &bls::SecretKeySet,
 ) -> Result<(NetworkKnowledge, SectionAuthorityProvider)> {
-    let (sap, _) = random_sap_with_key(prefix, elder_count(), 0, sk_set);
+    let (sap, _) = TestSAP::random_sap_with_key(prefix, elder_count(), 0, sk_set);
     let (section, _) = create_section(sk_set, &sap, None, None)?;
     Ok((section, sap))
 }
@@ -352,7 +356,7 @@ pub(crate) fn create_section_key_share(
 pub(crate) fn create_section_auth() -> (SectionAuthorityProvider, Vec<MyNodeInfo>, bls::SecretKeySet)
 {
     let (section_auth, elders, secret_key_set) =
-        random_sap(Prefix::default(), elder_count(), 0, None);
+        TestSAP::random_sap(Prefix::default(), elder_count(), 0, None);
     (section_auth, elders, secret_key_set)
 }
 
