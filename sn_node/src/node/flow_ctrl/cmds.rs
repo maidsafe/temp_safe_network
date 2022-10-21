@@ -19,7 +19,7 @@ use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         data::ClientMsg,
-        system::{NodeMsg, OperationId, SectionSig, SectionSigned},
+        system::{NodeMsg, SectionSig, SectionSigned},
         AuthorityProof, ClientAuth, MsgId, WireMsg,
     },
     network_knowledge::{NodeState, SectionAuthorityProvider, SectionKeyShare, SectionsDAG},
@@ -65,19 +65,11 @@ pub(crate) enum Cmd {
     },
     /// Log a Node's Punishment, this pulls dysfunction and write locks out of some functions
     TrackNodeIssueInDysfunction { name: XorName, issue: IssueType },
-    /// Adds peer to set of recipients of an already pending query,
-    /// or adds a pending query if it didn't already exist.
-    AddToPendingQueries {
-        msg_id: MsgId,
-        operation_id: OperationId,
-        origin: Peer,
-        send_stream: Option<Arc<Mutex<SendStream>>>,
-        target_adult: XorName,
-    },
     HandleValidNodeMsg {
         msg_id: MsgId,
         msg: NodeMsg,
         origin: Peer,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")]
         traceroute: Traceroute,
     },
@@ -87,6 +79,7 @@ pub(crate) enum Cmd {
         msg_id: MsgId,
         msg: ClientMsg,
         origin: Peer,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
         /// Requester's authority over this message
         auth: AuthorityProof<ClientAuth>,
         #[cfg(feature = "traceroute")]
@@ -182,7 +175,6 @@ impl Cmd {
             Cmd::HandleValidNodeMsg { msg, .. } => msg.statemap_states(),
             Cmd::UpdateNetworkAndHandleValidClientMsg { .. } => State::ClientMsg,
             Cmd::TrackNodeIssueInDysfunction { .. } => State::Dysfunction,
-            Cmd::AddToPendingQueries { .. } => State::Dysfunction,
             Cmd::HandleAgreement { .. } => State::Agreement,
             Cmd::HandleMembershipDecision(_) => State::Membership,
             Cmd::ProposeVoteNodesOffline(_) => State::Membership,
@@ -228,7 +220,6 @@ impl fmt::Display for Cmd {
                 write!(f, "TrackNodeIssueInDysfunction {:?}, {:?}", name, issue)
             }
             Cmd::ProposeVoteNodesOffline(_) => write!(f, "ProposeOffline"),
-            Cmd::AddToPendingQueries { .. } => write!(f, "AddToPendingQueries"),
         }
     }
 }

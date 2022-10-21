@@ -279,7 +279,7 @@ impl TestNodeBuilder {
         let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
         let comm = create_comm().await?;
         let node = MyNode::new(
-            comm.socket_addr(),
+            comm,
             keypair,
             section.clone(),
             Some(section_key_share),
@@ -289,7 +289,7 @@ impl TestNodeBuilder {
         )
         .await?;
         let node = Arc::new(RwLock::new(node));
-        let dispatcher = Dispatcher::new(node, comm);
+        let dispatcher = Dispatcher::new(node);
         Ok((dispatcher, section, peer, sk_set))
     }
 }
