@@ -211,8 +211,8 @@ impl Dispatcher {
                 traceroute,
             } => {
                 debug!("handling valid msg {:?}", msg_id);
-                let mut node = self.node.write().await;
-                node.handle_valid_system_msg(
+                MyNode::handle_valid_system_msg(
+                    self.node.clone(),
                     msg_id,
                     msg_authority,
                     msg,
