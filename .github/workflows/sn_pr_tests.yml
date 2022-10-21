@@ -132,28 +132,37 @@ jobs:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}-unit
 
-      - name: Build tests before running
-        run: cargo test --no-run --release
+      - name: Build sn_interface tests before running
+        run: cd sn_interface &&  cargo test --no-run --release
         timeout-minutes: 50
 
       - name: Run sn_interface tests
         timeout-minutes: 25
-        run: cargo test --release -p sn_interface
+        run: cd sn_interface && cargo test --release
 
-      - name: Run sn_interface tests
-        timeout-minutes: 25
-        run: cargo test --release -p sn_interface
+      - name: Build sn_dysfunction tests before running
+        run: cd sn_dysfunction &&  cargo test --no-run --release
+        timeout-minutes: 50
 
       - name: Run sn_dysfunction tests
         timeout-minutes: 15
-        run: cargo test --release -p sn_dysfunction
+        run: cd sn_dysfunction && cargo test --release
+
+      - name: Build sn_node tests before running
+        run: cd sn_node && cargo test --no-run --release
+        timeout-minutes: 50
+
       - name: Run sn_node tests
         timeout-minutes: 20
-        run: cargo test --release -p sn_node
+        run: cd sn_node && cargo test --release
+
+      - name: Build sn_cli tests before running
+        run: cd sn_cli && cargo test --no-run --release
+        timeout-minutes: 50
 
       - name: Run sn_cli tests
         timeout-minutes: 25
-        run: cargo test --release -p sn_cli --bin safe
+        run: cd sn_cli && cargo test --release -p sn_cli --bin safe
 
   e2e:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -197,7 +206,7 @@ jobs:
         timeout-minutes: 60
 
       - name: Build testnet
-        run: cargo build  --release --bin testnet
+        run: cd testnet && cargo build  --release --bin testnet
         timeout-minutes: 60
 
       # - name: Build log_cmds_inspector
@@ -316,7 +325,7 @@ jobs:
   #       timeout-minutes: 60
 
   #     - name: Build testnet
-  #       run: cargo build  --release --bin testnet
+  #       run: cd testnet && cargo build  --release --bin testnet
   #       timeout-minutes: 60
 
   #     # - name: Build log_cmds_inspector
@@ -484,7 +493,7 @@ jobs:
         timeout-minutes: 60
 
       - name: Build testnet
-        run: cargo build --release --bin testnet
+        run: cd testnet && cargo build --release --bin testnet
         timeout-minutes: 60
 
       - name: Start the network
@@ -496,7 +505,7 @@ jobs:
       - name: Wait for all nodes to join
         shell: bash
         run: ./resources/scripts/wait_for_nodes_to_join.sh
-        timeout-minutes: 15
+        timeout-minutes: 5
 
       - name: Build all tests before running
         run: cd sn_api && cargo test --no-run --release
@@ -505,7 +514,7 @@ jobs:
       - name: Run API tests
         env:
           RUST_LOG: "sn_client=trace"
-        run: cd sn_api && cargo test --release sn_api -- --test-threads=1
+        run: cd sn_api && cargo test --release -- --test-threads=1
         timeout-minutes: 80
 
       - name: Are nodes still running...?
@@ -556,6 +565,7 @@ jobs:
   #   name: Run CLI tests
   #   runs-on: ${{ matrix.os }}
   #   strategy:
+  #     fail-fast: false
   #     matrix:
   #       os: [ubuntu-latest, windows-latest, macos-latest]
   #   steps:
@@ -575,19 +585,24 @@ jobs:
   #         cache-on-failure: true
   #         sharedKey: ${{github.run_id}}
 
-  #     - name: install ripgrep
-  #       run: cargo install ripgrep
+  #     - name: install ripgrep ubuntu
+  #       run: sudo apt-get install ripgrep
+  #       if: matrix.os == 'ubuntu-latest'
+
+  #     - name: install ripgrep mac
+  #       run: brew install ripgrep
+  #       if: matrix.os == 'macos-latest'
+
+  #     - name: install ripgrep windows
+  #       run: choco install ripgrep
+  #       if: matrix.os == 'windows-latest'
 
   #     - name: Build sn bins
   #       run: cd sn_node && cargo build --release --bins
   #       timeout-minutes: 60
 
   #     - name: Build testnet
-  #       run: cargo build  --release --bin testnet
-  #       timeout-minutes: 60
-
-  #     - name: Build log_cmds_inspector
-  #       run: cargo build  --release --bin log_cmds_inspector
+  #       run: cd testnet && cargo build  --release --bin testnet
   #       timeout-minutes: 60
 
   #     - name: Start the network
@@ -596,15 +611,10 @@ jobs:
   #       env:
   #         RUST_LOG: "sn_node,sn_api,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
 
-  #     - name: Print Network Log Stats at start
-  #       shell: bash
-  #       run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-  #       if: matrix.os != 'windows-latest'
-
   #     - name: Wait for all nodes to join
   #       shell: bash
   #       run: ./resources/scripts/wait_for_nodes_to_join.sh
-  #       timeout-minutes: 15
+  #       timeout-minutes: 5
 
   #     - name: Generate keys for test run
   #       run: cargo run --package sn_cli --release -- keys create --for-cli
@@ -614,16 +624,9 @@ jobs:
   #       timeout-minutes: 50
 
   #     - name: Run CLI tests
-  #       uses: maidsafe/cargo-nextest@main
+  #       run: cd sn_cli && cargo test --release
   #       env:
   #         RUST_LOG: "sn_client=trace"
-  #       with:
-  #         test-run-name: cli-${{ matrix.os }}
-  #         profile: ci
-  #         junit-path: junit.xml
-  #         package: sn_cli
-  #         release: true
-  #
   #       timeout-minutes: 50
 
   #     - name: Are nodes still running...?
@@ -654,12 +657,6 @@ jobs:
   #         name: statemap_cli_${{matrix.os}}.svg
   #         path: safe_statemap.svg
   #       continue-on-error: true
-
-  #     - name: Print Network Log Stats
-  #       shell: bash
-  #       continue-on-error: true
-  #       run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-  #       if: steps.section-startup.outcome == 'success'
 
   #     - name: Tar log files
   #       shell: bash
