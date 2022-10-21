@@ -21,28 +21,31 @@ use sn_interface::{
     },
     types::{log_markers::LogMarker, Peer},
 };
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 const FIRST_SECTION_MIN_ELDER_AGE: u8 = 82;
 
 // Message handling
 impl MyNode {
     pub(crate) async fn handle_join_request(
-        &mut self,
+        node: Arc<RwLock<MyNode>>,
         peer: Peer,
         join_request: JoinRequest,
         comm: &Comm,
     ) -> Result<Option<Cmd>> {
         debug!("Received {:?} from {}", join_request, peer);
 
+        let read_locked_node = node.read().await;
         let provided_section_key = join_request.section_key();
 
-        let our_section_key = self.network_knowledge.section_key();
+        let our_section_key = read_locked_node.network_knowledge.section_key();
         let section_key_matches = provided_section_key == our_section_key;
 
         // Ignore `JoinRequest` if we are not elder, unless the join request
         // is outdated in which case we'll reply with `JoinResponse::Retry`
         // with the up-to-date info.
-        if self.is_not_elder() && section_key_matches {
+        if read_locked_node.is_not_elder() && section_key_matches {
             // Note: We don't bounce this message because the current bounce-resend
             // mechanism wouldn't preserve the original SocketAddr which is needed for
             // properly handling this message.
@@ -51,27 +54,31 @@ impl MyNode {
             return Ok(None);
         }
 
-        let our_prefix = self.network_knowledge.prefix();
+        let our_prefix = read_locked_node.network_knowledge.prefix();
         if !our_prefix.matches(&peer.name()) {
             debug!("Redirecting JoinRequest from {peer} - name doesn't match our prefix {our_prefix:?}.");
-            let retry_sap = self.matching_section(&peer.name())?;
+            let retry_sap = read_locked_node.matching_section(&peer.name())?;
             let msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Redirect(retry_sap)));
             trace!("Sending {:?} to {}", msg, peer);
             trace!("{}", LogMarker::SendJoinRedirected);
-            return Ok(Some(self.send_system_msg(msg, Peers::Single(peer))));
+            return Ok(Some(
+                read_locked_node.send_system_msg(msg, Peers::Single(peer)),
+            ));
         }
 
-        if !self.joins_allowed {
+        if !read_locked_node.joins_allowed {
             debug!("Rejecting JoinRequest from {peer} - joins currently not allowed.");
             let msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Rejected(
                 JoinRejectionReason::JoinsDisallowed,
             )));
             trace!("{}", LogMarker::SendJoinsDisallowed);
             trace!("Sending {:?} to {}", msg, peer);
-            return Ok(Some(self.send_system_msg(msg, Peers::Single(peer))));
+            return Ok(Some(
+                read_locked_node.send_system_msg(msg, Peers::Single(peer)),
+            ));
         }
 
-        let (is_age_invalid, expected_age) = self.verify_joining_node_age(&peer)?;
+        let (is_age_invalid, expected_age) = read_locked_node.verify_joining_node_age(&peer)?;
 
         trace!("our_prefix {our_prefix:?} expected_age {expected_age:?} is_age_invalid {is_age_invalid:?}");
 
@@ -86,14 +93,16 @@ impl MyNode {
         }
 
         if !section_key_matches || is_age_invalid {
-            let signed_sap = self.network_knowledge.signed_sap();
-            let proof_chain = self.network_knowledge.section_chain();
+            let signed_sap = read_locked_node.network_knowledge.signed_sap();
+            let proof_chain = read_locked_node.network_knowledge.section_chain();
             let msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Retry {
                 section_tree_update: SectionTreeUpdate::new(signed_sap, proof_chain),
                 expected_age,
             }));
             trace!("Sending {:?} to {}", msg, peer);
-            return Ok(Some(self.send_system_msg(msg, Peers::Single(peer))));
+            return Ok(Some(
+                read_locked_node.send_system_msg(msg, Peers::Single(peer)),
+            ));
         }
 
         // Do reachability check only for the initial join request
@@ -103,11 +112,16 @@ impl MyNode {
             )));
             trace!("{}", LogMarker::SendJoinRejected);
             trace!("Sending {:?} to {}", msg, peer);
-            Ok(Some(self.send_system_msg(msg, Peers::Single(peer))))
+            Ok(Some(
+                read_locked_node.send_system_msg(msg, Peers::Single(peer)),
+            ))
         } else {
+            drop(read_locked_node);
+
+            let mut node = node.write().await;
             // It's reachable, let's then propose membership
             let node_state = NodeState::joined(peer, None);
-            Ok(self.propose_membership_change(node_state))
+            Ok(node.propose_membership_change(node_state))
         }
     }
 

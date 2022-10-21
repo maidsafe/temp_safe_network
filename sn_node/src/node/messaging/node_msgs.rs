@@ -230,12 +230,8 @@ impl MyNode {
                     .collect())
             }
             NodeMsg::JoinRequest(join_request) => {
-                // TODO: move lock acquisition inside, only a small portion
-                // needs a write lock...
-                let mut node = node.write().await;
-
                 trace!("Handling msg {:?}: JoinRequest from {}", msg_id, sender);
-                node.handle_join_request(sender, join_request, comm)
+                MyNode::handle_join_request(node, sender, join_request, comm)
                     .await
                     .map(|c| c.into_iter().collect())
             }
