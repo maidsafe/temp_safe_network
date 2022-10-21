@@ -136,7 +136,7 @@ pub(crate) async fn run_node_handle_client_msg_and_collect_cmds(
             #[cfg(feature = "traceroute")]
             Traceroute(Vec::new()),
         )
-        .await;
+        .await?;
 
     // drop any read locks on the node here
     // we may have commands editing the node, requiring a write lock

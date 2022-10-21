@@ -19,7 +19,7 @@ mod relocation;
 mod serialize;
 mod update_section;
 
-use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result, DATA_QUERY_LIMIT};
+use crate::node::{flow_ctrl::cmds::Cmd, MyNode, Result};
 
 use qp2p::SendStream;
 use sn_interface::{
@@ -82,7 +82,7 @@ impl MyNode {
                 // Anythign returned here means there's an issue and we should
                 // short-circuit below
                 let ae_cmds = self
-                    .apply_ae(&origin, &msg, &wire_msg, &dst, send_stream)
+                    .apply_ae(&origin, &msg, &wire_msg, &dst, send_stream.clone())
                     .await?;
 
                 if !ae_cmds.is_empty() {
@@ -98,6 +98,7 @@ impl MyNode {
                     origin,
                     msg_id,
                     msg,
+                    send_stream,
                     #[cfg(feature = "traceroute")]
                     traceroute,
                 }])
@@ -108,6 +109,10 @@ impl MyNode {
                 dst,
                 auth,
             } => {
+                if send_stream.is_none() {
+                    debug!("ERRRRRRRRRRRRRR no client response stream!?>???????");
+                }
+                debug!("tahats a client....");
                 if self.is_not_elder() {
                     trace!("Redirecting from Adult to section Elders");
                     return Ok(vec![
@@ -115,26 +120,28 @@ impl MyNode {
                     ]);
                 }
 
+                debug!("client smg, stream exists: {:?}", send_stream.is_some());
+
                 // We shall perform AE checks only if this is a query coming from the client,
                 // if it's otherwise a response for a client we shall skip drop it.
                 let dst_name = match &msg {
                     ClientMsg::Cmd(cmd) => cmd.dst_name(),
-                    ClientMsg::Query(query)
-                        if self.pending_data_queries.len() > DATA_QUERY_LIMIT =>
-                    {
-                        // we have a query, and we have too many on the go....
-                        warn!("Pending queries length exceeded, dropping query {msg:?}");
-                        let cmd = self.query_error_response(
-                            Error::CannotHandleQuery(query.clone()),
-                            &query.variant,
-                            origin,
-                            msg_id,
-                            send_stream,
-                            #[cfg(feature = "traceroute")]
-                            wire_msg.traceroute(),
-                        );
-                        return Ok(vec![cmd]);
-                    }
+                    // ClientMsg::Query(query)
+                    //     if self.pending_data_queries.len() > DATA_QUERY_LIMIT =>
+                    // {
+                    //     // we have a query, and we have too many on the go....
+                    //     warn!("Pending queries length exceeded, dropping query {msg:?}");
+                    //     let cmd = self.query_error_response(
+                    //         Error::CannotHandleQuery(query.clone()),
+                    //         &query.variant,
+                    //         origin,
+                    //         msg_id,
+                    //         send_stream,
+                    //         #[cfg(feature = "traceroute")]
+                    //         wire_msg.traceroute(),
+                    //     );
+                    //     return Ok(vec![cmd]);
+                    // }
                     ClientMsg::Query(query) => query.variant.dst_name(),
                     other => {
                         error!(
@@ -160,17 +167,16 @@ impl MyNode {
                     return Ok(vec![cmd]);
                 }
 
-                Ok(self
-                    .handle_valid_client_msg(
-                        msg_id,
-                        msg,
-                        auth,
-                        origin,
-                        send_stream.clone(),
-                        #[cfg(feature = "traceroute")]
-                        wire_msg.traceroute(),
-                    )
-                    .await)
+                self.handle_valid_client_msg(
+                    msg_id,
+                    msg,
+                    auth,
+                    origin,
+                    send_stream.clone(),
+                    #[cfg(feature = "traceroute")]
+                    wire_msg.traceroute(),
+                )
+                .await
             }
         }
     }

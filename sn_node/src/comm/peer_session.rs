@@ -40,15 +40,20 @@ enum SessionCmd {
 #[derive(Clone)]
 pub(crate) struct PeerSession {
     channel: mpsc::Sender<SessionCmd>,
+    link: Link,
 }
 
 impl PeerSession {
     pub(crate) fn new(link: Link) -> PeerSession {
         let (sender, receiver) = mpsc::channel(1000);
 
-        let _ = tokio::task::spawn(PeerSessionWorker::new(link, sender.clone()).run(receiver));
+        let _ =
+            tokio::task::spawn(PeerSessionWorker::new(link.clone(), sender.clone()).run(receiver));
 
-        PeerSession { channel: sender }
+        PeerSession {
+            channel: sender,
+            link,
+        }
     }
 
     // this must be restricted somehow, we can't allow an unbounded inflow
@@ -60,13 +65,25 @@ impl PeerSession {
         }
     }
 
+    /// Sends out a UsrMsg on a bidi connection and awaits response bytes
+    /// As such this may be long running if response is returned slowly.
+    pub(crate) async fn send_with_bi_return_response(
+        &self,
+        bytes: UsrMsgBytes,
+    ) -> Result<UsrMsgBytes> {
+        // TODO: make a real error here
+        self.link
+            .send_bi(bytes)
+            .await
+            .map_err(|_e| Error::CmdSendError)
+    }
+
     #[instrument(skip(self, bytes))]
     pub(crate) async fn send_using_session_or_stream(
         &self,
         msg_id: MsgId,
         bytes: UsrMsgBytes,
         send_stream: Option<Arc<Mutex<SendStream>>>,
-        is_msg_for_client: bool,
     ) -> Result<SendWatcher> {
         let (watcher, reporter) = status_watching();
 
@@ -76,7 +93,6 @@ impl PeerSession {
             connection_retries: 0,
             reporter,
             send_stream,
-            is_msg_for_client,
         };
 
         self.channel
@@ -147,6 +163,7 @@ impl PeerSessionWorker {
                         SessionStatus::Ok
                     } else {
                         //another
+                        debug!("sending fresh msg flow over a connection");
                         match self.send_over_peer_connection(job).await {
                             Ok(s) => s,
                             Err(error) => {
@@ -159,7 +176,7 @@ impl PeerSessionWorker {
                     }
                 }
                 SessionCmd::AddConnection(conn) => {
-                    self.link.add(conn).await;
+                    self.link.add(conn);
                     SessionStatus::Ok
                 }
                 SessionCmd::Terminate => SessionStatus::Terminating,
@@ -187,15 +204,17 @@ impl PeerSessionWorker {
 
     async fn send_over_peer_connection(&mut self, mut job: SendJob) -> Result<SessionStatus> {
         let id = job.msg_id;
-        let should_establish_new_connection = !job.is_msg_for_client;
-        trace!("Sending to peer over connection: {id:?} , should_establish_new_connection? {should_establish_new_connection}");
+        trace!("Sending to peer over connection: {id:?}");
 
-        if should_establish_new_connection && job.connection_retries > MAX_SENDJOB_RETRIES {
+        if job.connection_retries > MAX_SENDJOB_RETRIES {
             debug!("max retries reached... {id:?}");
             job.reporter.send(SendStatus::MaxRetriesReached);
             return Ok(SessionStatus::Ok);
         }
 
+        debug!("....");
+
+        debug!("We have a connection for sendjob: {id:?}");
         let queue = self.queue.clone();
         let link_connections = self.link.connections.clone();
         let conns_count = self.link.connections.len();
@@ -207,7 +226,7 @@ impl PeerSessionWorker {
             // Attempt to get a connection or make one to another node.
             // if there's no connection here yet, we requeue the job after a wait
             // incase there's been a delay adding the connection to Comms
-            let conn = match link.get_or_connect(should_establish_new_connection).await {
+            let conn = match link.get_or_connect().await {
                 Ok(conn) => conn,
                 Err(error) => {
                     error!("Error when attempting to send to peer. Job will be reenqueued for another attempt after a small timeout");
@@ -227,7 +246,6 @@ impl PeerSessionWorker {
             };
 
             let connection_id = conn.id();
-            debug!("Connection exists for sendjob: {id:?}, and has conn_id: {connection_id:?}");
 
             let send_resp = Link::send_with_connection(
                 job.bytes.clone(),
@@ -245,6 +263,7 @@ impl PeerSessionWorker {
                 Err(err) => {
                     if err.is_local_close() {
                         debug!("Peer linked dropped when trying to send {:?}. But link has {:?} connections", id, conns_count );
+                        error!("the error on send :{err:?}");
                         // we can retry if we've more connections!
                         if conns_count <= 1 {
                             debug!(
@@ -265,6 +284,8 @@ impl PeerSessionWorker {
                     if let Err(e) = queue.send(SessionCmd::Send(job)).await {
                         warn!("Failed to re-enqueue job {id:?} after transient error {e:?}");
                     }
+
+                    // Ok(())
                 }
             }
         });
@@ -281,7 +302,6 @@ pub(crate) struct SendJob {
     connection_retries: usize, // TAI: Do we need this if we are using QP2P's retry
     reporter: StatusReporting,
     send_stream: Option<Arc<Mutex<SendStream>>>,
-    pub(crate) is_msg_for_client: bool,
 }
 
 impl PartialEq for SendJob {

@@ -661,7 +661,7 @@ mod tests {
 
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let (mut node, _) = MyNode::first_node(
-                create_comm().await?.socket_addr(),
+                create_comm().await?,
                 info.keypair.clone(),
                 event_channel::new(1).0,
                 UsedSpace::new(max_capacity),

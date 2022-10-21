@@ -52,7 +52,7 @@ impl Link {
         conn: Connection,
     ) -> Self {
         let mut instance = Self::new(peer, endpoint, listener);
-        instance.insert(conn).await;
+        instance.insert(conn);
         instance
     }
 
@@ -60,8 +60,8 @@ impl Link {
         &self.peer
     }
 
-    pub(crate) async fn add(&mut self, conn: Connection) {
-        self.insert(conn).await;
+    pub(crate) fn add(&mut self, conn: Connection) {
+        self.insert(conn);
     }
 
     /// Send a message to the peer using the given configuration.
@@ -104,27 +104,52 @@ impl Link {
         }
     }
 
-    pub(crate) async fn get_or_connect(
-        &mut self,
-        should_establish_new_connection: bool,
-    ) -> Result<Connection, SendToOneError> {
+    /// Send a message using a bi-di stream and await response
+    pub(crate) async fn send_bi(&self, bytes: UsrMsgBytes) -> Result<UsrMsgBytes, SendToOneError> {
+        debug!("Sending via a bi stream");
+        // TODO: pull this conn from link..
+        let (conn, _) = self
+            .endpoint
+            .connect_to(&self.peer.addr())
+            .await
+            .map_err(SendToOneError::Connection)?;
+
+        debug!("connnnection got");
+        let (mut send_stream, mut recv_stream) =
+            conn.open_bi().await.map_err(SendToOneError::Connection)?;
+        send_stream.set_priority(10);
+        send_stream
+            .send_user_msg(bytes)
+            .await
+            .map_err(SendToOneError::Send)?;
+
+        send_stream.finish().await.or_else(|err| match err {
+            qp2p::SendError::StreamLost(qp2p::StreamError::Stopped(_)) => Ok(()),
+            _ => Err(SendToOneError::Send(err)),
+        })?;
+
+        recv_stream.next().await.map_err(SendToOneError::Recv)
+    }
+
+    pub(crate) async fn get_or_connect(&mut self) -> Result<Connection, SendToOneError> {
         if self.connections.is_empty() {
-            if should_establish_new_connection {
-                self.create_connection().await
-            } else {
-                Err(SendToOneError::NoConnection)
-            }
+            debug!("attempting to create a connection");
+            self.create_connection().await
         } else {
+            trace!("Grabbing a connection from link..");
             // let mut fastest_conn = None;
             if let Some(conn) = self.connections.iter().next() {
                 return Ok(conn.value().clone());
             }
+
+            error!("No connection existed in connections, even though it's marked as non-empty");
             // This should not be possible to hit...
             Err(SendToOneError::NoConnection)
         }
     }
 
     async fn create_connection(&mut self) -> Result<Connection, SendToOneError> {
+        debug!("create conn attempt");
         let (conn, incoming_msgs) = self
             .endpoint
             .connect_to(&self.peer.addr())
@@ -138,17 +163,19 @@ impl Link {
             conn.id()
         );
 
-        self.insert(conn.clone()).await;
+        self.insert(conn.clone());
 
         self.listener.listen(conn.clone(), incoming_msgs);
 
         Ok(conn)
     }
 
-    async fn insert(&mut self, conn: Connection) {
+    fn insert(&mut self, conn: Connection) {
         let id = conn.id();
+        debug!("Inserting connection into link store: {id:?}");
 
-        let _ = self.connections.insert(id, conn);
+        let _ = self.connections.insert(id.clone(), conn);
+        debug!("Connection INSERTED into link store: {id:?}");
     }
 }
 
@@ -157,8 +184,10 @@ impl Link {
 pub(crate) enum SendToOneError {
     ///
     Connection(qp2p::ConnectionError),
-    ///
+    /// Qp2p send error
     Send(qp2p::SendError),
+    /// Qp2p recv error
+    Recv(qp2p::RecvError),
     /// No Connection Exists to send on, as required by should_establish_new_connection
     NoConnection,
 }

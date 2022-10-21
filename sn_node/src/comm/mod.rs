@@ -17,7 +17,7 @@ use self::{
 };
 
 use crate::node::{Error, Result};
-use qp2p::{SendStream, UsrMsgBytes};
+use qp2p::{Connection, SendStream, UsrMsgBytes};
 
 use sn_interface::{
     messaging::{MsgId, WireMsg},
@@ -102,7 +102,6 @@ impl Comm {
         msg_id: MsgId,
         bytes: UsrMsgBytes,
         send_stream: Option<Arc<Mutex<SendStream>>>,
-        is_msg_for_client: bool,
     ) -> Result<()> {
         let stream_info = if let Some(stream) = &send_stream {
             format!(" on {}", stream.lock().await.id())
@@ -110,9 +109,7 @@ impl Comm {
             "".to_string()
         };
 
-        let watcher = self
-            .send_to_one(peer, msg_id, bytes, send_stream, is_msg_for_client)
-            .await;
+        let watcher = self.send_to_one(peer, msg_id, bytes, send_stream).await;
 
         let sessions = self.sessions.clone();
 
@@ -165,6 +162,25 @@ impl Comm {
         });
 
         Ok(())
+    }
+
+    // TODO: can we not serialize w/ client query response from adult and just pass through?
+    #[tracing::instrument(skip(self, bytes))]
+    pub(crate) async fn send_out_bytes_to_peer_and_return_response(
+        &self,
+        peer: Peer,
+        msg_id: MsgId,
+        bytes: UsrMsgBytes,
+    ) -> Result<WireMsg> {
+        if let Some(peer) = self.get_or_create(&peer).await {
+            debug!("Peer session retrieved");
+            let adult_response_bytes = peer.send_with_bi_return_response(bytes).await?;
+            WireMsg::from(adult_response_bytes).map_err(|_| Error::InvalidMessage)
+        } else {
+            debug!("No client conn exists or could be created to send this msg on.... {msg_id:?}");
+            // TODO: real error here....
+            Err(Error::PeerSessionChannel)
+        }
     }
 
     /// Returns (sent success, should remove)
@@ -232,7 +248,7 @@ impl Comm {
 
     /// Any number of incoming qp2p:Connections can be added.
     /// We will eventually converge to the same one in our comms with the peer.
-    async fn add_incoming(&self, peer: &Peer, conn: qp2p::Connection) {
+    async fn add_incoming(&self, peer: &Peer, conn: Connection) {
         debug!(
             "Adding incoming conn to {peer:?} w/ conn_id : {:?}",
             conn.id()
@@ -263,7 +279,6 @@ impl Comm {
         msg_id: MsgId,
         bytes: UsrMsgBytes,
         send_stream: Option<Arc<Mutex<SendStream>>>,
-        is_msg_for_client: bool,
     ) -> Result<Option<SendWatcher>> {
         let bytes_len = {
             let (h, d, p) = bytes.clone();
@@ -271,7 +286,7 @@ impl Comm {
         };
 
         trace!(
-            "Sending message (client?: {is_msg_for_client}) ({} bytes) w/ {:?} to {:?}",
+            "Sending message bytes ({} bytes) w/ {:?} to {:?}",
             bytes_len,
             msg_id,
             recipient
@@ -280,7 +295,7 @@ impl Comm {
         if let Some(peer) = self.get_or_create(&recipient).await {
             debug!("Peer session retrieved");
             Ok(Some(
-                peer.send_using_session_or_stream(msg_id, bytes, send_stream, is_msg_for_client)
+                peer.send_using_session_or_stream(msg_id, bytes, send_stream)
                     .await?,
             ))
         } else {
@@ -391,22 +406,10 @@ mod tests {
                 let peer0_msg = new_test_msg(dst(peer0))?;
                 let peer1_msg = new_test_msg(dst(peer1))?;
 
-                comm.send_out_bytes(
-                    peer0,
-                    peer0_msg.msg_id(),
-                    peer0_msg.serialize()?,
-                    None,
-                    false,
-                )
-                .await?;
-                comm.send_out_bytes(
-                    peer1,
-                    peer1_msg.msg_id(),
-                    peer1_msg.serialize()?,
-                    None,
-                    false,
-                )
-                .await?;
+                comm.send_out_bytes(peer0, peer0_msg.msg_id(), peer0_msg.serialize()?, None)
+                    .await?;
+                comm.send_out_bytes(peer1, peer1_msg.msg_id(), peer1_msg.serialize()?, None)
+                    .await?;
 
                 if let Some(bytes) = rx0.recv().await {
                     assert_eq!(WireMsg::from(bytes)?, peer0_msg);
@@ -445,7 +448,7 @@ mod tests {
                 let invalid_peer = get_invalid_peer().await?;
                 let invalid_addr = invalid_peer.addr();
                 let msg = new_test_msg(dst(invalid_peer))?;
-                let result = comm.send_out_bytes(invalid_peer, msg.msg_id(), msg.serialize()?, None, false).await;
+                let result = comm.send_out_bytes(invalid_peer, msg.msg_id(), msg.serialize()?, None).await;
 
                 assert_matches!(result, Err(Error::FailedSend(peer)) => assert_eq!(peer.addr(), invalid_addr));
 
@@ -473,7 +476,7 @@ mod tests {
                 let msg0 = new_test_msg(dst(peer))?;
 
                 send_comm
-                    .send_out_bytes(peer, msg0.msg_id(), msg0.serialize()?, None, false)
+                    .send_out_bytes(peer, msg0.msg_id(), msg0.serialize()?, None)
                     .await?;
 
                 let mut msg0_received = false;
@@ -492,7 +495,7 @@ mod tests {
 
                 let msg1 = new_test_msg(dst(peer))?;
                 send_comm
-                    .send_out_bytes(peer, msg1.msg_id(), msg1.serialize()?, None, false)
+                    .send_out_bytes(peer, msg1.msg_id(), msg1.serialize()?, None)
                     .await?;
 
                 let mut msg1_received = false;
@@ -529,7 +532,7 @@ mod tests {
                 let msg = new_test_msg(dst(peer))?;
                 // Send a message to establish the connection
                 comm1
-                    .send_out_bytes(peer, msg.msg_id(), msg.serialize()?, None, false)
+                    .send_out_bytes(peer, msg.msg_id(), msg.serialize()?, None)
                     .await?;
 
                 assert_matches!(rx0.recv().await, Some(MsgFromPeer { .. }));

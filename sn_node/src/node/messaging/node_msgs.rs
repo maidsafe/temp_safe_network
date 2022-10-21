@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    comm::Comm,
     node::{
         flow_ctrl::cmds::Cmd,
         messaging::{OutgoingMsg, Peers},
@@ -16,10 +15,7 @@ use crate::{
     storage::Error as StorageError,
 };
 
-use std::collections::BTreeSet;
-use std::sync::Arc;
-use tokio::sync::RwLock;
-
+use qp2p::SendStream;
 #[cfg(feature = "traceroute")]
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
@@ -31,6 +27,9 @@ use sn_interface::{
     network_knowledge::NetworkKnowledge,
     types::{log_markers::LogMarker, Keypair, Peer, PublicKey},
 };
+use std::collections::BTreeSet;
+use std::sync::Arc;
+use tokio::sync::{Mutex, RwLock};
 use xor_name::XorName;
 
 impl MyNode {
@@ -74,7 +73,7 @@ impl MyNode {
         msg_id: MsgId,
         msg: NodeMsg,
         sender: Peer,
-        comm: &Comm,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         trace!("{:?}: {msg_id:?}", LogMarker::NodeMsgToBeHandled);
@@ -234,7 +233,6 @@ impl MyNode {
             }
             NodeMsg::JoinAsRelocatedRequest(join_request) => {
                 trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
-
                 if node.read().await.is_not_elder()
                     && join_request.section_key == node.read().await.network_knowledge.section_key()
                 {
@@ -242,7 +240,7 @@ impl MyNode {
                 }
 
                 Ok(
-                    MyNode::handle_join_as_relocated_request(node, sender, *join_request, comm)
+                    MyNode::handle_join_as_relocated_request(node, sender, *join_request)
                         .await
                         .into_iter()
                         .collect(),
@@ -467,43 +465,29 @@ impl MyNode {
                     "Handle NodeQuery with msg_id {:?}, operation_id {}",
                     msg_id, operation_id
                 );
-                // There is no point in verifying a sig from a sender A or B here.
-                // Send back response to the sending elder
-                Ok(vec![
-                    node.handle_data_query_at_adult(
-                        operation_id,
-                        &query,
-                        auth,
-                        sender,
-                        #[cfg(feature = "traceroute")]
-                        traceroute,
-                    )
-                    .await,
-                ])
-            }
-            NodeMsg::NodeQueryResponse {
-                response,
-                operation_id,
-            } => {
-                let mut node = node.write().await;
 
-                debug!(
-                    "{:?}: op_id {}, sender: {sender} origin msg_id: {msg_id:?}",
+                node.handle_data_query_at_adult(
+                    operation_id,
+                    &query,
+                    auth,
+                    sender,
+                    send_stream,
+                    #[cfg(feature = "traceroute")]
+                    traceroute,
+                )
+                .await?;
+                Ok(vec![])
+            }
+            // TODO: refactor msging to lose this type.
+            NodeMsg::NodeQueryResponse { operation_id, .. } => {
+                error!(
+                    "This should no longer be seen aside from in a response stream! We have an issue here... This msg will not be handled.{:?}: op_id {}, sender: {sender} origin msg_id: {msg_id:?}",
                     LogMarker::ChunkQueryResponseReceviedFromAdult,
                     operation_id
                 );
 
-                Ok(node
-                    .handle_data_query_response_at_elder(
-                        operation_id,
-                        response,
-                        sender.name(),
-                        #[cfg(feature = "traceroute")]
-                        traceroute,
-                    )
-                    .await
-                    .into_iter()
-                    .collect())
+                //empty vec for now
+                Ok(vec![])
             }
         }
     }
