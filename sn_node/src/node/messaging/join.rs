@@ -174,27 +174,27 @@ impl MyNode {
     }
 
     pub(crate) async fn handle_join_as_relocated_request(
-        &mut self,
+        node: Arc<RwLock<MyNode>>,
         peer: Peer,
         join_request: JoinAsRelocatedRequest,
         comm: &Comm,
     ) -> Option<Cmd> {
         debug!("Received JoinAsRelocatedRequest {join_request:?} from {peer}",);
-
-        let our_prefix = self.network_knowledge.prefix();
+        let read_locked_node = node.read().await;
+        let our_prefix = read_locked_node.network_knowledge.prefix();
         if !our_prefix.matches(&peer.name())
-            || join_request.section_key != self.network_knowledge.section_key()
+            || join_request.section_key != read_locked_node.network_knowledge.section_key()
         {
             debug!("JoinAsRelocatedRequest from {peer} - name doesn't match our prefix {our_prefix:?}.");
 
             let msg = NodeMsg::JoinAsRelocatedResponse(Box::new(JoinAsRelocatedResponse::Retry(
-                self.network_knowledge.section_auth(),
+                read_locked_node.network_knowledge.section_auth(),
             )));
 
             trace!("{} b", LogMarker::SendJoinAsRelocatedResponse);
 
             trace!("Sending {msg:?} to {peer}");
-            return Some(self.send_system_msg(msg, Peers::Single(peer)));
+            return Some(read_locked_node.send_system_msg(msg, Peers::Single(peer)));
         }
 
         let state = join_request.relocate_proof.value.state();
@@ -204,7 +204,7 @@ impl MyNode {
                 debug!("Ignoring JoinAsRelocatedRequest from {peer} - invalid sig.");
                 return None;
             }
-            let known_keys = self.network_knowledge.known_keys();
+            let known_keys = read_locked_node.network_knowledge.known_keys();
             if !known_keys.contains(&join_request.relocate_proof.sig.public_key) {
                 debug!("Ignoring JoinAsRelocatedRequest from {peer} - untrusted src.");
                 return None;
@@ -229,9 +229,13 @@ impl MyNode {
             trace!("{}", LogMarker::SendJoinAsRelocatedResponse);
 
             trace!("Sending {:?} to {}", msg, peer);
-            return Some(self.send_system_msg(msg, Peers::Single(peer)));
+            return Some(read_locked_node.send_system_msg(msg, Peers::Single(peer)));
         };
 
-        self.propose_membership_change(join_request.relocate_proof.value)
+        drop(read_locked_node);
+
+        node.write()
+            .await
+            .propose_membership_change(join_request.relocate_proof.value)
     }
 }
