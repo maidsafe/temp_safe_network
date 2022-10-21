@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::comm::Comm;
 use crate::node::{
     messaging::{OutgoingMsg, Peers},
     Cmd, Error, MyNode, Result,
@@ -23,21 +22,17 @@ use sn_interface::{
 use qp2p::UsrMsgBytes;
 
 use bytes::Bytes;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    sync::Arc,
-};
+use std::{collections::BTreeSet, sync::Arc};
 use tokio::sync::RwLock;
 
 // Cmd Dispatcher.
 pub(crate) struct Dispatcher {
     node: Arc<RwLock<MyNode>>,
-    comm: Comm,
 }
 
 impl Dispatcher {
-    pub(crate) fn new(node: Arc<RwLock<MyNode>>, comm: Comm) -> Self {
-        Self { node, comm }
+    pub(crate) fn new(node: Arc<RwLock<MyNode>>) -> Self {
+        Self { node }
     }
 
     pub(crate) fn node(&self) -> Arc<RwLock<MyNode>> {
@@ -73,15 +68,11 @@ impl Dispatcher {
                     )?
                 };
 
-                let tasks = peer_msgs.into_iter().map(|(peer, msg)| {
-                    self.comm.send_out_bytes(
-                        peer,
-                        msg_id,
-                        msg,
-                        send_stream.clone(),
-                        is_msg_for_client,
-                    )
-                });
+                let comm = self.node.read().await.comm.clone();
+
+                let tasks = peer_msgs
+                    .into_iter()
+                    .map(|(peer, msg)| comm.send_out_bytes(peer, msg_id, msg, send_stream.clone()));
                 let results = futures::future::join_all(tasks).await;
 
                 // Any failed sends are tracked via Cmd::HandlePeerFailedSend, which will log dysfunction for any peers
@@ -108,47 +99,14 @@ impl Dispatcher {
                 node.log_node_issue(name, issue);
                 Ok(vec![])
             }
-            Cmd::AddToPendingQueries {
-                msg_id,
-                operation_id,
-                origin,
-                send_stream,
-                target_adult,
-            } => {
-                let mut node = self.node.write().await;
-                // cleanup
-                node.pending_data_queries.remove_expired();
-
-                trace!(
-                    "Adding to pending data queries for op id {:?}, target Adult: {:?}",
-                    operation_id,
-                    target_adult
-                );
-                if let Some(peers) = node
-                    .pending_data_queries
-                    .get_mut(&(operation_id, origin.name()))
-                {
-                    trace!(
-                        "Adding to pending data queries for op id: {:?}",
-                        operation_id
-                    );
-                    let _ = peers.insert((msg_id, origin), send_stream);
-                } else {
-                    let _prior_value = node.pending_data_queries.set(
-                        (operation_id, target_adult),
-                        BTreeMap::from([((msg_id, origin), send_stream)]),
-                        None,
-                    );
-                }
-
-                Ok(vec![])
-            }
             Cmd::ValidateMsg {
                 origin,
                 wire_msg,
                 send_stream,
             } => {
+                debug!("validatinge msg: {:?}", wire_msg.msg_id());
                 let node = self.node.read().await;
+                debug!("got node read lock for: {:?}", wire_msg.msg_id());
                 node.validate_msg(origin, wire_msg, send_stream).await
             }
             Cmd::UpdateNetworkAndHandleValidClientMsg {
@@ -158,6 +116,7 @@ impl Dispatcher {
                 msg,
                 origin,
                 auth,
+                send_stream,
                 #[cfg(feature = "traceroute")]
                 traceroute,
             } => {
@@ -175,22 +134,22 @@ impl Dispatcher {
                 let node = self.node.read().await;
 
                 debug!("Network knowledge was updated: {updated}");
-                Ok(node
-                    .handle_valid_client_msg(
-                        msg_id,
-                        msg,
-                        auth,
-                        origin,
-                        None,
-                        #[cfg(feature = "traceroute")]
-                        traceroute,
-                    )
-                    .await)
+                node.handle_valid_client_msg(
+                    msg_id,
+                    msg,
+                    auth,
+                    origin,
+                    send_stream,
+                    #[cfg(feature = "traceroute")]
+                    traceroute,
+                )
+                .await
             }
             Cmd::HandleValidNodeMsg {
                 origin,
                 msg_id,
                 msg,
+                send_stream,
                 #[cfg(feature = "traceroute")]
                 traceroute,
             } => {
@@ -200,7 +159,7 @@ impl Dispatcher {
                     msg_id,
                     msg,
                     origin,
-                    &self.comm,
+                    send_stream,
                     #[cfg(feature = "traceroute")]
                     traceroute.clone(),
                 )

@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::comm::Comm;
 use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, Result};
 
 use sn_interface::{
@@ -124,10 +123,10 @@ impl MyNode {
         node: Arc<RwLock<MyNode>>,
         peer: Peer,
         join_request: JoinAsRelocatedRequest,
-        comm: &Comm,
     ) -> Option<Cmd> {
         debug!("Received JoinAsRelocatedRequest {join_request:?} from {peer}",);
         let read_locked_node = node.read().await;
+        let comm = read_locked_node.comm.clone();
         let our_prefix = read_locked_node.network_knowledge.prefix();
         if !our_prefix.matches(&peer.name())
             || join_request.section_key != read_locked_node.network_knowledge.section_key()

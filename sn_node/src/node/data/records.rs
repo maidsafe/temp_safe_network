@@ -6,26 +6,23 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{
-    messaging::Peers, Cmd, Error, MyNode, Prefix, Result, MAX_WAITING_PEERS_PER_QUERY,
-};
-
-use qp2p::SendStream;
-use sn_dysfunction::IssueType;
-#[cfg(feature = "traceroute")]
-use sn_interface::messaging::Traceroute;
-use sn_interface::{
-    data_copy_count,
-    messaging::{
-        data::{DataQuery, MetadataExchange, StorageLevel},
-        system::{NodeCmd, NodeMsg, NodeQuery, OperationId},
-        AuthorityProof, ClientAuth, MsgId,
-    },
-    types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData},
-};
+use crate::node::{messaging::Peers, Cmd, Error, MyNode, Prefix, Result};
 
 use bytes::Bytes;
 use itertools::Itertools;
+use qp2p::SendStream;
+use sn_dysfunction::IssueType;
+#[cfg(feature = "traceroute")]
+use sn_interface::messaging::{MsgType, Traceroute, WireMsg};
+use sn_interface::{
+    data_copy_count,
+    messaging::{
+        data::{ClientMsg, DataQuery, MetadataExchange, StorageLevel},
+        system::{NodeCmd, NodeMsg, NodeQuery, OperationId},
+        AuthorityProof, ClientAuth, Dst, MsgId, MsgKind,
+    },
+    types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData},
+};
 use std::{cmp::Ordering, collections::BTreeSet, sync::Arc};
 use tokio::sync::Mutex;
 use tracing::info;
@@ -53,15 +50,16 @@ impl MyNode {
         )
     }
 
-    pub(crate) async fn read_data_from_adults(
+    /// Find target adult, sends a bidi msg, awaiting response, and then sends this on to the client
+    pub(crate) async fn read_data_from_adults_and_respond_to_client(
         &self,
         query: DataQuery,
         msg_id: MsgId,
         auth: AuthorityProof<ClientAuth>,
         source_client: Peer,
-        send_stream: Option<Arc<Mutex<SendStream>>>,
+        client_response_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
-    ) -> Vec<Cmd> {
+    ) -> Result<Vec<Cmd>> {
         // We generate the operation id to track the response from the Adult
         // by using the query msg id, which shall be unique per query.
         let operation_id = OperationId::from(&Bytes::copy_from_slice(msg_id.as_ref()));
@@ -85,66 +83,157 @@ impl MyNode {
                 expected: query.adult_index as u8 + 1,
                 found: targets.len() as u8,
             };
-            let cmd = self.query_error_response(
+
+            self.query_error_response(
                 error,
                 &query.variant,
                 source_client,
                 msg_id,
-                send_stream,
+                client_response_stream,
                 #[cfg(feature = "traceroute")]
                 traceroute,
-            );
-            return vec![cmd];
+            )
+            .await?;
+            // TODO: do error processing
+            return Ok(vec![]);
         };
 
-        let mut cmds = vec![Cmd::AddToPendingQueries {
-            msg_id,
-            origin: source_client,
-            send_stream: send_stream.clone(),
-            operation_id,
-            target_adult: target.name(),
-        }];
-
-        if let Some(peers) = self
-            .pending_data_queries
-            .get(&(operation_id, target.name()))
-        {
-            if peers.len() > MAX_WAITING_PEERS_PER_QUERY {
-                warn!("Dropping query from {source_client:?}, there are more than {MAX_WAITING_PEERS_PER_QUERY} waiting already");
-                let cmd = self.query_error_response(
-                    Error::CannotHandleQuery(query.clone()),
-                    &query.variant,
-                    source_client,
-                    msg_id,
-                    send_stream,
-                    #[cfg(feature = "traceroute")]
-                    traceroute,
-                );
-                return vec![cmd];
-            }
-        }
-
-        // we only add a pending request when we're actually sending out requests to new adults
-        trace!("Adding pending req for {target:?}, {operation_id:?}, in dysfunction tracking, req origin {source_client:?}");
-        cmds.push(Cmd::TrackNodeIssueInDysfunction {
-            name: target.name(),
-            issue: IssueType::PendingRequestOperation(operation_id),
-        });
-
+        // Form a msg to our adult
         let msg = NodeMsg::NodeQuery(NodeQuery::Data {
             query: query.variant,
             auth: auth.into_inner(),
             operation_id,
         });
 
-        cmds.push(self.trace_system_msg(
-            msg,
-            Peers::Single(target),
+        let (kind, payload) = self.serialize_node_msg(msg)?;
+
+        let (bytes_to_adult, msg_id) = self.form_usr_msg_bytes_to_node(
+            payload,
+            kind,
+            target,
+            #[cfg(feature = "traceroute")]
+            traceroute.clone(),
+        )?;
+
+        // TODO: how to determine this time?
+        // TODO: don't use arbitrary time here. (But 3s is very realistic here under normal load)
+        let response = match tokio::time::timeout(tokio::time::Duration::from_secs(3), async {
+            self.comm
+                .send_out_bytes_to_peer_and_return_response(target, msg_id, bytes_to_adult)
+                .await
+        })
+        .await
+        {
+            Ok(resp) => resp,
+            Err(_elapsed) => {
+                error!("No response before arbitrary timeout. Marking adult as dysfunctional");
+                return Ok(vec![Cmd::TrackNodeIssueInDysfunction {
+                    name: target.name(),
+                    // TODO: no need for op id tracking here, this can be a simple counter
+                    issue: IssueType::PendingRequestOperation(operation_id),
+                }]);
+            }
+        }?;
+
+        if let MsgType::Node {
+            msg: NodeMsg::NodeQueryResponse { response, .. },
+            ..
+        } = response.into_msg()?
+        {
+            let client_msg = ClientMsg::QueryResponse {
+                response,
+                correlation_id: msg_id,
+            };
+
+            let (kind, payload) = self.serialize_sign_client_msg(client_msg)?;
+
+            if let Some(stream) = client_response_stream {
+                self.send_msg_on_stream(payload, kind, stream, target, msg_id, traceroute)
+                    .await?
+            } else {
+                warn!("No send stream to respond to client on! (This is likely due to the msg originating at the elder as a healthcheck");
+            }
+        }
+
+        // Everything went okay, so no further cmds to handle
+        Ok(vec![])
+    }
+
+    /// Send an OutgoingMsg on a given stream
+    pub(crate) async fn send_msg_on_stream(
+        &self,
+        payload: Bytes,
+        kind: MsgKind,
+        send_stream: Arc<Mutex<SendStream>>,
+        source_peer: Peer,
+        original_msg_id: MsgId,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
+    ) -> Result<()> {
+        // TODO why do we need dst here?
+        let (bytes, _new_msg_id) = self.form_usr_msg_bytes_to_node(
+            payload,
+            kind,
+            source_peer,
             #[cfg(feature = "traceroute")]
             traceroute,
-        ));
+        )?;
+        trace!("USING BIDI to send to client! OH DEAR, FASTEN SEATBELTS");
+        let stream_prio = 10;
+        let mut send_stream = send_stream.lock().await;
 
-        cmds
+        debug!("stream locked");
+        send_stream.set_priority(stream_prio);
+        if let Err(error) = send_stream.send_user_msg(bytes).await {
+            error!(
+                        "Could not send query response {original_msg_id:?} to client {source_peer:?} over response stream: {error:?}",
+
+                    );
+        }
+        if let Err(error) = send_stream.finish().await {
+            error!(
+                        "Could not close response stream for {original_msg_id:?} to client {source_peer:?}: {error:?}",
+                    );
+        }
+
+        debug!("sent");
+
+        Ok(())
+    }
+
+    pub(crate) fn form_usr_msg_bytes_to_node(
+        &self,
+        payload: Bytes,
+        kind: MsgKind,
+        target: Peer,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
+    ) -> Result<(qp2p::UsrMsgBytes, MsgId)> {
+        let msg_id = MsgId::new();
+        // we first generate the XorName
+        let dst = Dst {
+            name: target.name(),
+            section_key: self.network_knowledge().section_key(),
+        };
+
+        #[allow(unused_mut)]
+        let mut wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
+
+        // TODO: do we still need traceroute now?
+        #[cfg(feature = "traceroute")]
+        {
+            let mut traceroute = traceroute;
+            traceroute.0.push(self.identity());
+            wire_msg.append_trace(&mut traceroute);
+        }
+
+        #[cfg(feature = "test-utils")]
+        let wire_msg = wire_msg.set_payload_debug(msg);
+
+        Ok((
+            wire_msg
+                .serialize_and_cache_bytes()
+                .map_err(|_| Error::InvalidMessage)?,
+            msg_id,
+        ))
     }
 
     pub(crate) fn get_metadata_of(&self, prefix: &Prefix) -> MetadataExchange {
