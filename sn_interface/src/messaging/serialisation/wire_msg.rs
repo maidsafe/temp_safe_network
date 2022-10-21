@@ -9,7 +9,7 @@
 use super::wire_msg_header::WireMsgHeader;
 use crate::messaging::{
     data::ClientMsg, system::NodeMsg, AuthKind, AuthorityProof, ClientAuth, Dst, Error, MsgId,
-    MsgType, NodeMsgAuthority, Result,
+    MsgType, Result,
 };
 use bytes::Bytes;
 use custom_debug::Debug;
@@ -251,17 +251,14 @@ impl WireMsg {
                     msg,
                 })
             }
-            AuthKind::Node(node_signed) => {
+            // NB TODO remove this enum
+            AuthKind::Node(_) => {
                 let msg: NodeMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Node signed message payload as Msgpack: {}", err))
                 })?;
 
                 Ok(MsgType::Node {
                     msg_id: self.header.msg_envelope.msg_id,
-                    msg_authority: NodeMsgAuthority::Node(AuthorityProof::verify(
-                        node_signed,
-                        &self.payload,
-                    )?),
                     dst: self.dst,
                     msg,
                 })
@@ -373,7 +370,7 @@ mod tests {
         let payload = WireMsg::serialize_msg_payload(&msg)?;
         let node_auth = NodeSig::authorize(src_section_pk, &src_node_keypair, &payload);
 
-        let auth = AuthKind::Node(node_auth.clone().into_inner());
+        let auth = AuthKind::Node(node_auth.into_inner());
 
         let wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
         let serialized = wire_msg.serialize()?;
@@ -391,7 +388,6 @@ mod tests {
             deserialized.into_msg()?,
             MsgType::Node {
                 msg_id: wire_msg.msg_id(),
-                msg_authority: NodeMsgAuthority::Node(node_auth),
                 dst,
                 msg,
             }

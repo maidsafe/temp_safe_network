@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Session;
-use std::collections::BTreeSet;
 
 use crate::{
     connections::{messaging::NUM_OF_ELDERS_SUBSET_FOR_QUERIES, PendingCmdAcks},
@@ -20,9 +19,9 @@ use sn_interface::{
     messaging::{
         data::{ClientMsg, Error as ErrorMsg},
         system::{AntiEntropyKind, NodeMsg},
-        AuthKind, AuthorityProof, ClientAuth, Dst, MsgId, MsgType, NodeMsgAuthority, WireMsg,
+        AuthKind, AuthorityProof, ClientAuth, Dst, MsgId, MsgType, WireMsg,
     },
-    network_knowledge::{NetworkKnowledge, SectionAuthorityProvider, SectionTreeUpdate},
+    network_knowledge::{SectionAuthorityProvider, SectionTreeUpdate},
     types::{log_markers::LogMarker, Peer},
 };
 
@@ -127,37 +126,11 @@ impl Session {
             MsgType::Client { msg_id, msg, .. } => {
                 Self::handle_client_msg(session, msg_id, msg, src_peer)
             }
-            MsgType::Node {
-                msg, msg_authority, ..
-            } => {
-                session
-                    .handle_system_msg(msg, msg_authority, src_peer)
-                    .await
-            }
+            MsgType::Node { msg, .. } => session.handle_system_msg(msg, src_peer).await,
         }
     }
 
-    async fn handle_system_msg(
-        &mut self,
-        msg: NodeMsg,
-        msg_authority: NodeMsgAuthority,
-        sender: Peer,
-    ) -> Result<(), Error> {
-        // Check that the message can be trusted w.r.t. our known keys
-        let known_keys: BTreeSet<_> = self
-            .network
-            .read()
-            .await
-            .get_sections_dag()
-            .keys()
-            .collect();
-
-        if !NetworkKnowledge::verify_msg_section_key(&msg_authority, &msg, &known_keys) {
-            warn!("Message with unknown section key has been dropped, from {sender:?}: {msg:?} ");
-            let pk = msg_authority.src_public_key();
-            return Err(Error::UntrustedMessage(pk));
-        }
-
+    async fn handle_system_msg(&mut self, msg: NodeMsg, sender: Peer) -> Result<(), Error> {
         match msg {
             NodeMsg::AntiEntropy {
                 section_tree_update,

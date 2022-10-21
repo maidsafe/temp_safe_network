@@ -206,7 +206,6 @@ impl Dispatcher {
                 origin,
                 msg_id,
                 msg,
-                msg_authority,
                 #[cfg(feature = "traceroute")]
                 traceroute,
             } => {
@@ -214,7 +213,6 @@ impl Dispatcher {
                 MyNode::handle_valid_system_msg(
                     self.node.clone(),
                     msg_id,
-                    msg_authority,
                     msg,
                     origin,
                     &self.comm,

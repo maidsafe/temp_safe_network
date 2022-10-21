@@ -50,7 +50,7 @@ pub use self::{
     errors::{Error, Result},
     msg_id::{MsgId, MESSAGE_ID_LEN},
     msg_type::MsgType,
-    serialisation::{NodeMsgAuthority, WireMsg},
+    serialisation::WireMsg,
 };
 
 use serde::{Deserialize, Serialize};

@@ -197,7 +197,7 @@ impl MyNode {
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         let snapshot = self.state_snapshot();
-        let section_auth = section_tree_update.signed_sap.value.clone();
+        let sap = section_tree_update.signed_sap.value.clone();
 
         let members = if let AntiEntropyKind::Update { members } = kind.clone() {
             Some(members)
@@ -219,7 +219,7 @@ impl MyNode {
 
         if updated {
             self.write_section_tree().await;
-            let prefix = section_auth.prefix();
+            let prefix = sap.prefix();
             info!("SectionTree written to disk with update for prefix {prefix:?}");
 
             // check if we've been kicked out of the section
@@ -245,9 +245,9 @@ impl MyNode {
             AntiEntropyKind::Redirect { bounced_msg } => {
                 // We choose the Elder closest to the dst section key,
                 // just to pick one of them in an arbitrary but deterministic fashion.
-                let target_name = XorName::from(PublicKey::Bls(section_auth.section_key()));
+                let target_name = XorName::from(PublicKey::Bls(sap.section_key()));
 
-                let chosen_dst_elder = if let Some(dst) = section_auth
+                let chosen_dst_elder = if let Some(dst) = sap
                     .elders()
                     .max_by(|lhs, rhs| target_name.cmp_distance(&lhs.name(), &rhs.name()))
                 {
@@ -273,8 +273,8 @@ impl MyNode {
 
         // If the new SAP's section key is the same as the section key set when the
         // bounced message was originally sent, we just drop it.
-        if dst.section_key == section_auth.section_key() {
-            error!("Dropping bounced msg ({sender:?}) received in AE-Retry from {msg_id:?} as suggested new dst section key is the same as previously sent: {:?}", section_auth.section_key());
+        if dst.section_key == sap.section_key() {
+            error!("Dropping bounced msg ({sender:?}) received in AE-Retry from {msg_id:?} as suggested new dst section key is the same as previously sent: {:?}", sap.section_key());
             return Ok(cmds);
         }
 
@@ -443,10 +443,10 @@ mod tests {
 
     use sn_interface::{
         elder_count,
-        messaging::{AuthKind, AuthorityProof, Dst, MsgId, NodeMsgAuthority, NodeSig},
+        messaging::{AuthKind, Dst, MsgId, NodeSig},
         network_knowledge::{
             test_utils::{gen_addr, random_sap, section_signed},
-            MyNodeInfo, NetworkKnowledge, SectionKeyShare, SectionKeysProvider, SectionsDAG,
+            MyNodeInfo, SectionKeyShare, SectionKeysProvider, SectionsDAG,
         },
         types::keys::ed25519,
     };
@@ -454,7 +454,6 @@ mod tests {
     use assert_matches::assert_matches;
     use bls::SecretKey;
     use eyre::{Context, Result};
-    use std::collections::BTreeSet;
     use xor_name::Prefix;
 
     #[tokio::test]
@@ -478,51 +477,6 @@ mod tests {
                     .check_for_entropy(&msg, &dst_section_key, dst_name, &sender)?;
 
                 assert!(cmd.is_none());
-                Result::<()>::Ok(())
-            })
-            .await
-    }
-
-    #[tokio::test]
-    async fn ae_update_msg_to_be_trusted() -> Result<()> {
-        // Construct a local task set that can run `!Send` futures.
-        let local = tokio::task::LocalSet::new();
-
-        // Run the local task set.
-        local
-            .run_until(async move {
-                let env = Env::new().await?;
-                let known_key = *env.node.network_knowledge().genesis_key();
-                let known_keys = BTreeSet::from([known_key]);
-
-                // This proof_chain already contains other_pk
-                let proof_chain = env.proof_chain.clone();
-                let (msg, msg_authority) = env.create_update_msg(proof_chain)?;
-
-                // AeUpdate message shall get pass through.
-                assert!(NetworkKnowledge::verify_msg_section_key(
-                    &msg_authority,
-                    &msg,
-                    &known_keys
-                ));
-
-                // AeUpdate message contains corrupted proof_chain shall get rejected.
-                let other_env = Env::new().await?;
-                let (corrupted_msg, _msg_authority) =
-                    env.create_update_msg(other_env.proof_chain)?;
-                assert!(!NetworkKnowledge::verify_msg_section_key(
-                    &msg_authority,
-                    &corrupted_msg,
-                    &known_keys
-                ));
-
-                // Other messages shall get rejected.
-                let other_msg = NodeMsg::AntiEntropyProbe(known_key);
-                assert!(!NetworkKnowledge::verify_msg_section_key(
-                    &msg_authority,
-                    &other_msg,
-                    &known_keys
-                ));
                 Result::<()>::Ok(())
             })
             .await
@@ -691,11 +645,10 @@ mod tests {
             let prefix1 = Prefix::default().pushed(true);
 
             // generate a SAP for prefix0
-            let (section_auth, mut nodes, secret_key_set) =
-                random_sap(prefix0, elder_count(), 0, None);
+            let (sap, mut nodes, secret_key_set) = random_sap(prefix0, elder_count(), 0, None);
             let info = nodes.remove(0);
             let sap_sk = secret_key_set.secret_key();
-            let signed_sap = section_signed(&sap_sk, section_auth)?;
+            let signed_sap = section_signed(&sap_sk, sap)?;
 
             let (proof_chain, genesis_sk_set) = create_proof_chain(signed_sap.section_key())
                 .context("failed to create section chain")?;
@@ -767,25 +720,6 @@ mod tests {
             let auth = AuthKind::Node(node_auth.into_inner());
 
             Ok(WireMsg::new_msg(msg_id, payload, auth, dst))
-        }
-
-        fn create_update_msg(
-            &self,
-            proof_chain: SectionsDAG,
-        ) -> Result<(NodeMsg, NodeMsgAuthority)> {
-            let section_tree_update =
-                SectionTreeUpdate::new(self.other_signed_sap.clone(), proof_chain);
-            let payload_msg = NodeMsg::AntiEntropy {
-                section_tree_update,
-                kind: AntiEntropyKind::Update {
-                    members: BTreeSet::new(),
-                },
-            };
-
-            let auth_proof = AuthorityProof(self.other_signed_sap.sig.clone());
-            let node_auth = NodeMsgAuthority::Section(auth_proof);
-
-            Ok((payload_msg, node_auth))
         }
     }
 
