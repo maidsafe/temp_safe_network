@@ -18,6 +18,8 @@ use crate::{
 };
 
 use std::collections::BTreeSet;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 #[cfg(feature = "traceroute")]
 use sn_interface::messaging::Traceroute;
@@ -70,7 +72,7 @@ impl MyNode {
     // passed all signature checks and msg verifications
     #[allow(clippy::too_many_arguments)]
     pub(crate) async fn handle_valid_system_msg(
-        &mut self,
+        node: Arc<RwLock<MyNode>>,
         msg_id: MsgId,
         msg_authority: NodeMsgAuthority,
         msg: NodeMsg,
@@ -92,16 +94,19 @@ impl MyNode {
 
         match msg {
             NodeMsg::Relocate(node_state) => {
+                let mut node = node.write().await;
+
                 trace!("Handling msg: Relocate from {}: {:?}", sender, msg_id);
-                Ok(self
+                Ok(node
                     .handle_relocate(node_state)
                     .await?
                     .into_iter()
                     .collect())
             }
             NodeMsg::JoinAsRelocatedResponse(join_response) => {
+                let mut node = node.write().await;
                 trace!("Handling msg: JoinAsRelocatedResponse from {}", sender);
-                if let Some(ref mut joining_as_relocated) = self.relocate_state {
+                if let Some(ref mut joining_as_relocated) = node.relocate_state {
                     if let Some(cmd) =
                         joining_as_relocated.handle_join_response(*join_response, sender.addr())?
                     {
@@ -121,7 +126,8 @@ impl MyNode {
                 kind,
             } => {
                 trace!("Handling msg: AE from {sender}: {msg_id:?}");
-                self.handle_anti_entropy_msg(
+                let mut node = node.write().await;
+                node.handle_anti_entropy_msg(
                     section_tree_update,
                     kind,
                     sender,
@@ -134,8 +140,9 @@ impl MyNode {
             // We always respond to probe msgs if we're an elder as health checks use this to see if a node is alive
             // and repsonsive, as well as being a method of keeping nodes up to date.
             NodeMsg::AntiEntropyProbe(section_key) => {
+                let node = node.read().await;
                 let mut cmds = vec![];
-                if !self.is_elder() {
+                if !node.is_elder() {
                     // early return here as we do not get health checks as adults,
                     // normal AE rules should have applied
                     return Ok(cmds);
@@ -144,11 +151,12 @@ impl MyNode {
                 trace!("Received Probe message from {}: {:?}", sender, msg_id);
                 let mut recipients = BTreeSet::new();
                 let _existed = recipients.insert(sender);
-                cmds.push(self.send_ae_update_to_nodes(recipients, section_key));
+                cmds.push(node.send_ae_update_to_nodes(recipients, section_key));
                 Ok(cmds)
             }
             // The AcceptedOnlineShare for relocation will be received here.
             NodeMsg::JoinResponse(join_response) => {
+                let mut node = node.write().await;
                 match *join_response {
                     JoinResponse::Approved {
                         section_tree_update,
@@ -160,10 +168,10 @@ impl MyNode {
                         );
                         info!("Relocation: Successfully aggregated ApprovalShares for joining the network");
 
-                        if let Some(ref mut joining_as_relocated) = self.relocate_state {
+                        if let Some(ref mut joining_as_relocated) = node.relocate_state {
                             let new_node = joining_as_relocated.node.clone();
                             let new_name = new_node.name();
-                            let previous_name = self.info().name();
+                            let previous_name = node.info().name();
                             let new_keypair = new_node.keypair.clone();
 
                             info!(
@@ -174,7 +182,7 @@ impl MyNode {
                             let recipients: Vec<_> =
                                 section_tree_update.signed_sap.elders().cloned().collect();
 
-                            let section_tree = self.network_knowledge.section_tree().clone();
+                            let section_tree = node.network_knowledge.section_tree().clone();
                             let new_network_knowledge =
                                 NetworkKnowledge::new(section_tree, section_tree_update)?;
 
@@ -183,14 +191,14 @@ impl MyNode {
                             //       As the sending of the JoinRequest as notification
                             //       may require the `node` to be switched to new already.
 
-                            self.relocate(new_keypair.clone(), new_network_knowledge)?;
+                            node.relocate(new_keypair.clone(), new_network_knowledge)?;
 
                             trace!(
                                 "Relocation: Sending aggregated JoinRequest to {:?}",
                                 recipients
                             );
 
-                            self.send_event(Event::Membership(MembershipEvent::Relocated {
+                            node.send_event(Event::Membership(MembershipEvent::Relocated {
                                 previous_name,
                                 new_keypair,
                             }))
@@ -198,7 +206,7 @@ impl MyNode {
 
                             trace!("{}", LogMarker::RelocateEnd);
                         } else {
-                            warn!("Relocation:  self.relocate_state is not in Progress");
+                            warn!("Relocation:  node.relocate_state is not in Progress");
                         }
 
                         Ok(vec![])
@@ -209,44 +217,61 @@ impl MyNode {
                     }
                 }
             }
-            NodeMsg::HandoverVotes(votes) => self.handle_handover_msg(sender, votes).await,
-            NodeMsg::HandoverAE(gen) => Ok(self
-                .handle_handover_anti_entropy(sender, gen)
-                .into_iter()
-                .collect()),
+            NodeMsg::HandoverVotes(votes) => {
+                let mut node = node.write().await;
+
+                node.handle_handover_msg(sender, votes).await
+            }
+            NodeMsg::HandoverAE(gen) => {
+                let node = node.read().await;
+                Ok(node
+                    .handle_handover_anti_entropy(sender, gen)
+                    .into_iter()
+                    .collect())
+            }
             NodeMsg::JoinRequest(join_request) => {
+                // TODO: move lock acquisition inside, only a small portion
+                // needs a write lock...
+                let mut node = node.write().await;
+
                 trace!("Handling msg {:?}: JoinRequest from {}", msg_id, sender);
-                self.handle_join_request(sender, join_request, comm)
+                node.handle_join_request(sender, join_request, comm)
                     .await
                     .map(|c| c.into_iter().collect())
             }
             NodeMsg::JoinAsRelocatedRequest(join_request) => {
                 trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
-                if self.is_not_elder()
-                    && join_request.section_key == self.network_knowledge.section_key()
+                let mut node = node.write().await;
+                if node.is_not_elder()
+                    && join_request.section_key == node.network_knowledge.section_key()
                 {
                     return Ok(vec![]);
                 }
-                Ok(self
+                Ok(node
                     .handle_join_as_relocated_request(sender, *join_request, comm)
                     .await
                     .into_iter()
                     .collect())
             }
             NodeMsg::MembershipVotes(votes) => {
+                let mut node = node.write().await;
                 let mut cmds = vec![];
-                cmds.extend(self.handle_membership_votes(sender, votes)?);
+                cmds.extend(node.handle_membership_votes(sender, votes)?);
                 Ok(cmds)
             }
-            NodeMsg::MembershipAE(gen) => Ok(self
-                .handle_membership_anti_entropy(sender, gen)
-                .into_iter()
-                .collect()),
+            NodeMsg::MembershipAE(gen) => {
+                let node = node.read().await;
+                Ok(node
+                    .handle_membership_anti_entropy(sender, gen)
+                    .into_iter()
+                    .collect())
+            }
             NodeMsg::Propose {
                 proposal,
                 sig_share,
             } => {
-                if self.is_not_elder() {
+                let mut node = node.write().await;
+                if node.is_not_elder() {
                     trace!("Adult handling a Propose msg from {}: {:?}", sender, msg_id);
                 }
 
@@ -266,13 +291,13 @@ impl MyNode {
                     ProposalMsg::JoinsAllowed(allowed) => CoreProposal::JoinsAllowed(allowed),
                 };
 
-                MyNode::handle_proposal(
+                node.handle_proposal(
                     msg_id,
                     core_proposal,
                     sig_share,
                     sender,
-                    &self.network_knowledge,
-                    &mut self.proposal_aggregator,
+                    // &node.network_knowledge,
+                    // &mut node.proposal_aggregator,
                 )
             }
             NodeMsg::DkgStart(session_id, elder_sig) => {
@@ -283,8 +308,10 @@ impl MyNode {
                     session_id.elders.len(),
                     sender
                 );
-                self.log_dkg_session(&sender.name());
-                self.handle_dkg_start(session_id, elder_sig)
+
+                let mut node = node.write().await;
+                node.log_dkg_session(&sender.name());
+                node.handle_dkg_start(session_id, elder_sig)
             }
             NodeMsg::DkgEphemeralPubKey {
                 session_id,
@@ -298,7 +325,8 @@ impl MyNode {
                     session_id.sh(),
                     sender
                 );
-                self.handle_dkg_ephemeral_pubkey(&session_id, section_auth, pub_key, sig, sender)
+                let mut node = node.write().await;
+                node.handle_dkg_ephemeral_pubkey(&session_id, section_auth, pub_key, sig, sender)
             }
             NodeMsg::DkgVotes {
                 session_id,
@@ -312,24 +340,28 @@ impl MyNode {
                     sender,
                     votes
                 );
-                self.log_dkg_session(&sender.name());
-                self.handle_dkg_votes(&session_id, pub_keys, votes, sender)
+                let mut node = node.write().await;
+                node.log_dkg_session(&sender.name());
+                node.handle_dkg_votes(&session_id, pub_keys, votes, sender)
             }
             NodeMsg::DkgAE(session_id) => {
+                let node = node.read().await;
                 trace!("Handling msg: DkgAE s{} from {}", session_id.sh(), sender);
-                self.handle_dkg_anti_entropy(session_id, sender)
+                node.handle_dkg_anti_entropy(session_id, sender)
             }
             NodeMsg::NodeCmd(NodeCmd::RecordStorageLevel { node_id, level, .. }) => {
-                let changed = self.set_storage_level(&node_id, level);
+                let mut node = node.write().await;
+                let changed = node.set_storage_level(&node_id, level);
                 if changed && level.value() == MIN_LEVEL_WHEN_FULL {
                     // ..then we accept a new node in place of the full node
-                    self.joins_allowed = true;
+                    node.joins_allowed = true;
                 }
                 Ok(vec![])
             }
             NodeMsg::NodeCmd(NodeCmd::ReceiveMetadata { metadata }) => {
+                let mut node = node.write().await;
                 info!("Processing received MetadataExchange packet: {:?}", msg_id);
-                self.set_adult_levels(metadata);
+                node.set_adult_levels(metadata);
                 Ok(vec![])
             }
             NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
@@ -337,27 +369,28 @@ impl MyNode {
                 data,
                 full,
             }) => {
+                let mut node = node.write().await;
                 info!(
                     "Processing CouldNotStoreData event with MsgId: {:?}",
                     msg_id
                 );
-                if self.is_not_elder() {
+                if node.is_not_elder() {
                     error!("Received unexpected message while Adult");
                     return Ok(vec![]);
                 }
 
                 if full {
                     let changed =
-                        self.set_storage_level(&node_id, StorageLevel::from(StorageLevel::MAX)?);
+                        node.set_storage_level(&node_id, StorageLevel::from(StorageLevel::MAX)?);
                     if changed {
                         // ..then we accept a new node in place of the full node
-                        self.joins_allowed = true;
+                        node.joins_allowed = true;
                     }
                 }
 
-                let targets = self.target_data_holders(data.name());
+                let targets = node.target_data_holders(data.name());
 
-                Ok(vec![self.replicate_data(
+                Ok(vec![node.replicate_data(
                     data,
                     targets,
                     #[cfg(feature = "traceroute")]
@@ -365,30 +398,32 @@ impl MyNode {
                 )])
             }
             NodeMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)) => {
+                let mut node = node.write().await;
+
                 info!("ReplicateData MsgId: {:?}", msg_id);
 
-                if self.is_elder() {
+                if node.is_elder() {
                     error!("Received unexpected message while Elder");
                     return Ok(vec![]);
                 }
 
                 let mut cmds = vec![];
 
-                let section_pk = PublicKey::Bls(self.network_knowledge.section_key());
-                let node_keypair = Keypair::Ed25519(self.keypair.clone());
+                let section_pk = PublicKey::Bls(node.network_knowledge.section_key());
+                let node_keypair = Keypair::Ed25519(node.keypair.clone());
 
                 for data in data_collection {
                     // We are an adult here, so just store away!
                     // This may return a DatabaseFull error... but we should have reported storage increase
                     // well before this
-                    match self
+                    match node
                         .data_storage
                         .store(&data, section_pk, node_keypair.clone())
                         .await
                     {
                         Ok(level_report) => {
                             info!("Storage level report: {:?}", level_report);
-                            cmds.extend(self.record_storage_level_if_any(
+                            cmds.extend(node.record_storage_level_if_any(
                                 level_report,
                                 #[cfg(feature = "traceroute")]
                                 traceroute.clone(),
@@ -400,14 +435,14 @@ impl MyNode {
                         Err(StorageError::NotEnoughSpace) => {
                             // storage full
                             error!("Not enough space to store more data");
-                            let node_id = PublicKey::from(self.keypair.public);
+                            let node_id = PublicKey::from(node.keypair.public);
                             let msg = NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
                                 node_id,
                                 data,
                                 full: true,
                             });
 
-                            cmds.push(self.send_msg_to_our_elders(msg))
+                            cmds.push(node.send_msg_to_our_elders(msg))
                         }
                         Err(error) => {
                             // the rest seem to be non-problematic errors.. (?)
@@ -419,12 +454,14 @@ impl MyNode {
                 Ok(cmds)
             }
             NodeMsg::NodeCmd(NodeCmd::SendAnyMissingRelevantData(known_data_addresses)) => {
+                let node = node.read().await;
+
                 info!(
                     "{:?} MsgId: {:?}",
                     LogMarker::RequestForAnyMissingData,
                     msg_id
                 );
-                Ok(self
+                Ok(node
                     .get_missing_data_for_node(sender, known_data_addresses)
                     .await
                     .into_iter()
@@ -436,6 +473,8 @@ impl MyNode {
                 origin,
                 correlation_id,
             }) => {
+                let node = node.read().await;
+
                 // A request from EndUser - via elders - for locally stored data
                 debug!(
                     "Handle NodeQuery with msg_id {:?} and correlation_id {:?}",
@@ -444,7 +483,7 @@ impl MyNode {
                 // There is no point in verifying a sig from a sender A or B here.
                 // Send back response to the sending elder
                 Ok(vec![
-                    self.handle_data_query_at_adult(
+                    node.handle_data_query_at_adult(
                         correlation_id,
                         &query,
                         auth,
@@ -461,6 +500,8 @@ impl MyNode {
                 correlation_id,
                 user,
             } => {
+                let mut node = node.write().await;
+
                 let op_id = if let Ok(op_id) = response.operation_id() {
                     op_id
                 } else {
@@ -483,7 +524,7 @@ impl MyNode {
                 match msg_authority {
                     NodeMsgAuthority::Node(auth) => {
                         let sending_nodes_pk = PublicKey::from(auth.into_inner().node_ed_pk);
-                        Ok(self
+                        Ok(node
                             .handle_data_query_response_at_elder(
                                 correlation_id,
                                 response,

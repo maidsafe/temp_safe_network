@@ -10,8 +10,8 @@ use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, Proposal, Resu
 use sn_interface::messaging::system::SectionSigShare;
 
 use sn_interface::{
-    messaging::{signature_aggregator::SignatureAggregator, system::NodeMsg, MsgId},
-    network_knowledge::{NetworkKnowledge, SectionKeyShare},
+    messaging::{system::NodeMsg, MsgId},
+    network_knowledge::SectionKeyShare,
     types::Peer,
 };
 
@@ -69,13 +69,11 @@ impl MyNode {
         // handle ourselves if we should
         for peer in recipients.clone() {
             if peer.name() == our_name {
-                cmds.extend(MyNode::handle_proposal(
+                cmds.extend(self.handle_proposal(
                     msg_id,
                     proposal.clone(),
                     sig_share.clone(),
                     peer,
-                    &self.network_knowledge,
-                    &mut self.proposal_aggregator,
                 )?)
             }
         }
@@ -92,24 +90,21 @@ impl MyNode {
     }
 
     pub(crate) fn handle_proposal(
+        &mut self,
         msg_id: MsgId,
         proposal: Proposal,
         sig_share: SectionSigShare,
         sender: Peer,
-        network_knowledge: &NetworkKnowledge,
-        proposal_aggregator: &mut SignatureAggregator,
     ) -> Result<Vec<Cmd>> {
         let sig_share_pk = &sig_share.public_key_set.public_key();
-
+        let our_prefix = self.network_knowledge.prefix();
         // Any other proposal than SectionInfo needs to be signed by a known section key.
         if let Proposal::SectionInfo(sap) = &proposal {
             let section_auth = sap;
             // TODO: do we want to drop older generations too?
 
-            if section_auth.prefix() == network_knowledge.prefix()
-                || section_auth
-                    .prefix()
-                    .is_extension_of(&network_knowledge.prefix())
+            if section_auth.prefix() == our_prefix
+                || section_auth.prefix().is_extension_of(&our_prefix)
             {
                 // This `SectionInfo` is proposed by the DKG participants and
                 // it's signed by the new key created by the DKG so we don't
@@ -126,7 +121,7 @@ impl MyNode {
         } else {
             // Proposal from other section shall be ignored.
             // TODO: check this is for our prefix , or a child prefix, otherwise just drop it
-            if !network_knowledge.prefix().matches(&sender.name()) {
+            if !our_prefix.matches(&sender.name()) {
                 trace!(
                     "Ignore proposal {:?} from other section, src {}: {:?}",
                     proposal,
@@ -138,7 +133,7 @@ impl MyNode {
 
             // Let's now verify the section key in the msg authority is trusted
             // based on our current knowledge of the network and sections chains.
-            if !network_knowledge.has_chain_key(sig_share_pk) {
+            if !self.network_knowledge.has_chain_key(sig_share_pk) {
                 warn!(
                     "Dropped Propose msg ({:?}) with untrusted sig share from {}: {:?}",
                     msg_id, sender, proposal
@@ -155,7 +150,10 @@ impl MyNode {
                 sender, msg_id, error
             ),
             Ok(serialised_proposal) => {
-                match proposal_aggregator.try_aggregate(&serialised_proposal, sig_share) {
+                match self
+                    .proposal_aggregator
+                    .try_aggregate(&serialised_proposal, sig_share)
+                {
                     Ok(Some(sig)) => match proposal {
                         Proposal::NewElders(new_elders) => {
                             cmds.push(Cmd::HandleNewEldersAgreement { new_elders, sig })
