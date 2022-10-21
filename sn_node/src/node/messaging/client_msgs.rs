@@ -31,7 +31,7 @@ use sn_interface::{
     types::{
         log_markers::LogMarker,
         register::{Permissions, Policy, Register, User},
-        Keypair, Peer, PublicKey, RegisterCmd, ReplicatedData, SPENTBOOK_TYPE_TAG,
+        Keypair, Peer, RegisterCmd, ReplicatedData, SPENTBOOK_TYPE_TAG,
     },
 };
 
@@ -133,17 +133,16 @@ impl MyNode {
         correlation_id: MsgId,
         response: NodeQueryResponse,
         user: EndUser,
-        sending_node_pk: PublicKey,
+        sender_name: XorName,
         op_id: OperationId,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Option<Cmd> {
         debug!(
             "Handling data read @ elders, received from {:?}, op id: {:?}",
-            sending_node_pk, op_id
+            sender_name, op_id
         );
 
-        let node_id = XorName::from(sending_node_pk);
-        let query_peers = self.pending_data_queries.remove(&(op_id, node_id));
+        let query_peers = self.pending_data_queries.remove(&(op_id, sender_name));
         // Clear expired queries from the cache.
         self.pending_data_queries.remove_expired();
 
@@ -157,14 +156,14 @@ impl MyNode {
         } else {
             warn!(
                 "Dropping chunk query response from Adult {}. We might have already forwarded this chunk to the requesting client or the client connection cache has expired: {}",
-                sending_node_pk, user.0
+                sender_name, user.0
             );
             return None;
         };
 
         let pending_removed = self
             .dysfunction_tracking
-            .request_operation_fulfilled(&node_id, op_id);
+            .request_operation_fulfilled(&sender_name, op_id);
 
         if !pending_removed {
             trace!("Ignoring un-expected response");

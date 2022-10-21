@@ -8,9 +8,7 @@
 
 use crate::messaging::Dst;
 
-use super::{
-    data::ClientMsg, system::NodeMsg, AuthorityProof, ClientAuth, MsgId, NodeMsgAuthority,
-};
+use super::{data::ClientMsg, system::NodeMsg, AuthorityProof, ClientAuth, MsgId};
 use std::fmt::{Display, Formatter};
 
 // highest priority, since we must sort out membership first of all
@@ -54,8 +52,6 @@ pub enum MsgType {
     Node {
         /// Message ID
         msg_id: MsgId,
-        /// Node authority over this message
-        msg_authority: NodeMsgAuthority,
         /// Message dst
         dst: Dst,
         /// the message

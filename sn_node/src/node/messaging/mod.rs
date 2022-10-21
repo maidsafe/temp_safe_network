@@ -71,21 +71,7 @@ impl MyNode {
         };
 
         match msg_type {
-            MsgType::Node {
-                msg_id,
-                msg_authority,
-                dst,
-                msg,
-            } => {
-                // Verify that the section key in the msg authority is trusted
-                if !self.verify_section_key(&msg_authority, &msg).await {
-                    warn!(
-                        "Untrusted message ({:?}) dropped from {:?}: {:?} ",
-                        msg_id, origin, msg
-                    );
-                    return Ok(vec![]);
-                };
-
+            MsgType::Node { msg_id, dst, msg } => {
                 // Check for entropy before we proceed further
                 // Anythign returned here means there's an issue and we should
                 // short-circuit below
@@ -103,7 +89,6 @@ impl MyNode {
                     origin,
                     msg_id,
                     msg,
-                    msg_authority,
                     #[cfg(feature = "traceroute")]
                     traceroute,
                 }])

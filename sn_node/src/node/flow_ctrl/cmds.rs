@@ -19,7 +19,7 @@ use sn_interface::{
     messaging::{
         data::{ClientMsg, OperationId},
         system::{NodeMsg, SectionSig, SectionSigned},
-        AuthorityProof, ClientAuth, MsgId, NodeMsgAuthority, WireMsg,
+        AuthorityProof, ClientAuth, MsgId, WireMsg,
     },
     network_knowledge::{NodeState, SectionAuthorityProvider, SectionKeyShare, SectionsDAG},
     types::{DataAddress, Peer},
@@ -124,7 +124,6 @@ pub(crate) enum Cmd {
         msg_id: MsgId,
         msg: NodeMsg,
         origin: Peer,
-        msg_authority: NodeMsgAuthority,
         #[cfg(feature = "traceroute")]
         traceroute: Traceroute,
     },

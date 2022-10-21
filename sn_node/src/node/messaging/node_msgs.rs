@@ -11,8 +11,7 @@ use crate::{
     node::{
         flow_ctrl::cmds::Cmd,
         messaging::{OutgoingMsg, Peers},
-        Error, Event, MembershipEvent, MyNode, Proposal as CoreProposal, Result,
-        MIN_LEVEL_WHEN_FULL,
+        Event, MembershipEvent, MyNode, Proposal as CoreProposal, Result, MIN_LEVEL_WHEN_FULL,
     },
     storage::Error as StorageError,
 };
@@ -27,7 +26,7 @@ use sn_interface::{
     messaging::{
         data::StorageLevel,
         system::{JoinResponse, NodeCmd, NodeEvent, NodeMsg, NodeQuery, Proposal as ProposalMsg},
-        MsgId, NodeMsgAuthority,
+        MsgId,
     },
     network_knowledge::NetworkKnowledge,
     types::{log_markers::LogMarker, Keypair, Peer, PublicKey},
@@ -74,7 +73,6 @@ impl MyNode {
     pub(crate) async fn handle_valid_system_msg(
         node: Arc<RwLock<MyNode>>,
         msg_id: MsgId,
-        msg_authority: NodeMsgAuthority,
         msg: NodeMsg,
         sender: Peer,
         comm: &Comm,
@@ -512,25 +510,19 @@ impl MyNode {
                     LogMarker::ChunkQueryResponseReceviedFromAdult,
                 );
 
-                match msg_authority {
-                    NodeMsgAuthority::Node(auth) => {
-                        let sending_nodes_pk = PublicKey::from(auth.into_inner().node_ed_pk);
-                        Ok(node
-                            .handle_data_query_response_at_elder(
-                                correlation_id,
-                                response,
-                                user,
-                                sending_nodes_pk,
-                                op_id,
-                                #[cfg(feature = "traceroute")]
-                                traceroute,
-                            )
-                            .await
-                            .into_iter()
-                            .collect())
-                    }
-                    _ => Err(Error::InvalidQueryResponseAuthority),
-                }
+                Ok(node
+                    .handle_data_query_response_at_elder(
+                        correlation_id,
+                        response,
+                        user,
+                        sender.name(),
+                        op_id,
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
+                    )
+                    .await
+                    .into_iter()
+                    .collect())
             }
         }
     }
