@@ -316,9 +316,11 @@ impl MyNode {
                 }
                 Some(next_wait)
             } else {
-                // TODO: we've done all backoffs and are _still_ getting messages?
-                // we should probably penalise the node here.
-                None
+                // The `ae_backoff_cache` is `uluru::LRUCache` which doesn't carry out
+                // time based pruning. Which means the backoff actually got disabled once
+                // the total backoff got elapsed. So here a reset shall be carried out.
+                backoff.reset();
+                backoff.next_backoff()
             };
 
             if let Some(sleep_time) = sleep_time {
