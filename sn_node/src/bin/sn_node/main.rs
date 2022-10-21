@@ -184,6 +184,8 @@ async fn run_node(config: &Config) -> Result<()> {
                 );
             }
         }
+        // The sleep shall only need to be carried out when being asked to join later?
+        // For the case of a timed_out, a retry can be carried out immediately?
         sleep(bootstrap_retry_duration).await;
     };
 
