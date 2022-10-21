@@ -237,17 +237,19 @@ impl MyNode {
             }
             NodeMsg::JoinAsRelocatedRequest(join_request) => {
                 trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
-                let mut node = node.write().await;
-                if node.is_not_elder()
-                    && join_request.section_key == node.network_knowledge.section_key()
+
+                if node.read().await.is_not_elder()
+                    && join_request.section_key == node.read().await.network_knowledge.section_key()
                 {
                     return Ok(vec![]);
                 }
-                Ok(node
-                    .handle_join_as_relocated_request(sender, *join_request, comm)
-                    .await
-                    .into_iter()
-                    .collect())
+
+                Ok(
+                    MyNode::handle_join_as_relocated_request(node, sender, *join_request, comm)
+                        .await
+                        .into_iter()
+                        .collect(),
+                )
             }
             NodeMsg::MembershipVotes(votes) => {
                 let mut node = node.write().await;
@@ -287,14 +289,7 @@ impl MyNode {
                     ProposalMsg::JoinsAllowed(allowed) => CoreProposal::JoinsAllowed(allowed),
                 };
 
-                node.handle_proposal(
-                    msg_id,
-                    core_proposal,
-                    sig_share,
-                    sender,
-                    // &node.network_knowledge,
-                    // &mut node.proposal_aggregator,
-                )
+                node.handle_proposal(msg_id, core_proposal, sig_share, sender)
             }
             NodeMsg::DkgStart(session_id, elder_sig) => {
                 trace!(
