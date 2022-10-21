@@ -22,8 +22,7 @@ mod update_section;
 use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result, DATA_QUERY_LIMIT};
 
 use sn_interface::{
-    messaging::{data::ClientMsg, system::NodeMsg, Dst, MsgType, NodeMsgAuthority, WireMsg},
-    network_knowledge::NetworkKnowledge,
+    messaging::{data::ClientMsg, system::NodeMsg, Dst, MsgType, WireMsg},
     types::Peer,
 };
 
@@ -155,14 +154,6 @@ impl MyNode {
                 }])
             }
         }
-    }
-
-    /// Verifies that the section key in the msg authority is trusted
-    /// based on our current knowledge of the network and sections chains.
-    #[instrument(skip_all)]
-    async fn verify_section_key(&self, msg_authority: &NodeMsgAuthority, msg: &NodeMsg) -> bool {
-        let known_keys = self.network_knowledge.known_keys();
-        NetworkKnowledge::verify_msg_section_key(msg_authority, msg, &known_keys)
     }
 
     /// Check if the origin needs to be updated on network structure/members.

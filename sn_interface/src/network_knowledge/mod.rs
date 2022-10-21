@@ -31,7 +31,7 @@ pub use self::{
 use crate::{
     messaging::{
         system::{NodeMsg, SectionPeers as SectionPeersMsg, SectionSig, SectionSigned},
-        Dst, NodeMsgAuthority,
+        Dst,
     },
     types::Peer,
 };
@@ -572,47 +572,6 @@ impl NetworkKnowledge {
 
     pub fn anti_entropy_probe(&self) -> NodeMsg {
         NodeMsg::AntiEntropyProbe(self.section_key())
-    }
-
-    /// Checks messages signed by a section or elder (section bls share)
-    /// making sure that we either know the key or that the message is valid AE if we don't
-    /// For messages signed by a Node (ed key), this check doesn't apply, so we return true
-    pub fn verify_msg_section_key(
-        msg_authority: &NodeMsgAuthority,
-        msg: &NodeMsg,
-        known_keys: &BTreeSet<BlsPublicKey>,
-    ) -> bool {
-        let is_from_unknown_section = match &msg_authority {
-            NodeMsgAuthority::Node(_) => false,
-            NodeMsgAuthority::BlsShare(bls_share_auth) => {
-                !known_keys.contains(&bls_share_auth.public_key_set.public_key())
-            }
-            NodeMsgAuthority::Section(section_auth) => {
-                !known_keys.contains(&section_auth.public_key)
-            }
-        };
-
-        if is_from_unknown_section {
-            // In case the incoming message itself is trying to update our knowledge,
-            // it shall be allowed.
-            if let NodeMsg::AntiEntropy {
-                section_tree_update,
-                ..
-            } = &msg
-            {
-                // The attached chain shall contains a key known to us.
-                // Use the following check instead of calling SectionsDAG::check_trust as it requires us to construct
-                // a SectionsDAG
-                if !known_keys.contains(section_tree_update.proof_chain.genesis_key()) {
-                    return false;
-                } else {
-                    trace!("Allows AntiEntropyUpdate msg({msg:?}) ahead of our knowledge");
-                }
-            } else {
-                return false;
-            }
-        }
-        true
     }
 }
 
