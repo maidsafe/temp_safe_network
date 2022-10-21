@@ -30,9 +30,7 @@ mod relocation;
 
 use self::{
     bootstrap::join_network,
-    core::{
-        MyNode, StateSnapshot, DATA_QUERY_LIMIT, GENESIS_DBC_AMOUNT, MAX_WAITING_PEERS_PER_QUERY,
-    },
+    core::{MyNode, StateSnapshot, GENESIS_DBC_AMOUNT},
     data::MIN_LEVEL_WHEN_FULL,
     flow_ctrl::{cmds::Cmd, event::Elders},
     node_starter::CmdChannel,
@@ -48,7 +46,6 @@ pub use self::{
     node_starter::{new_test_api, start_node},
     node_test_api::NodeTestApi,
 };
-
 pub use crate::storage::DataStorage;
 
 // pub(crate) use self::monitoring::RateLimits;
@@ -64,6 +61,7 @@ pub use qp2p::{Config as NetworkConfig, SendStream};
 pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API update
 
 mod core {
+    use crate::comm::Comm;
     use crate::{
         node::{
             bootstrap::JoiningAsRelocated,
@@ -78,7 +76,6 @@ mod core {
         },
         UsedSpace,
     };
-    use qp2p::SendStream;
     use sn_dysfunction::{DysfunctionDetection, IssueType};
     #[cfg(feature = "traceroute")]
     use sn_interface::messaging::Entity;
@@ -86,14 +83,14 @@ mod core {
     use sn_interface::{
         messaging::{
             signature_aggregator::SignatureAggregator,
-            system::{DkgSessionId, OperationId, SectionSigned},
-            AuthorityProof, MsgId, SectionSig,
+            system::{DkgSessionId, SectionSigned},
+            AuthorityProof, SectionSig,
         },
         network_knowledge::{
             supermajority, MyNodeInfo, NetworkKnowledge, NodeState, SectionAuthorityProvider,
             SectionKeyShare, SectionKeysProvider,
         },
-        types::{keys::ed25519::Digest256, log_markers::LogMarker, Cache, DataAddress, Peer},
+        types::{keys::ed25519::Digest256, log_markers::LogMarker, DataAddress, Peer},
     };
 
     use ed25519_dalek::Keypair;
@@ -105,9 +102,7 @@ mod core {
         net::SocketAddr,
         path::PathBuf,
         sync::Arc,
-        time::Duration,
     };
-    use tokio::sync::Mutex;
 
     /// Amount of tokens to be owned by the Genesis DBC.
     /// At the inception of the Network a total supply of 4,525,524,120 whole tokens will be created.
@@ -115,27 +110,8 @@ mod core {
     /// thus creating a total of 4,525,524,120,000,000,000 available units.
     pub(crate) const GENESIS_DBC_AMOUNT: u64 = 4_525_524_120 * u64::pow(10, 9);
 
-    // This prevents pending query limit unbound growth
-    // One insert per OpId/Adult.
-    pub(crate) const DATA_QUERY_LIMIT: usize = 10_000;
-    // per query we can have this many peers, so the total peers waiting can be QUERY_LIMIT * MAX_WAITING_PEERS_PER_QUERY
-    // It's worth noting that nodes clean up all connections every two mins, so this max can only last that long.
-    // (and yes, some clients may unfortunately be disconnected quickly)
-    pub(crate) const MAX_WAITING_PEERS_PER_QUERY: usize = 100;
-
     // File name where to cache this node's section tree (stored at this node's set root storage dir)
     const SECTION_TREE_FILE_NAME: &str = "section_tree";
-
-    // How long to hold on to correlated `Peer`s for data queries. Since data queries are forwarded
-    // from elders (with whom the client is connected) to adults (who hold the data), the elder handling
-    // the query cannot reply immediately. For now, they stash a reference to the client `Peer` in
-    // `Core::pending_data_queries`, which is a cache with duration-based expiry.
-    // TODO: The value chosen here is shorter than the default client timeout (see
-    // `use sn_client::SN_CLIENT_QUERY_TIMEOUT`), but the timeout is configurable. Ideally this would be
-    // based on liveness properties (e.g. the timeout should be dynamic based on the responsiveness of
-    // the section).
-    const DATA_QUERY_TIMEOUT: Duration = Duration::from_secs(30);
-    pub(crate) type OptionalResponseStream = Option<Arc<Mutex<SendStream>>>;
 
     #[derive(Debug, Clone)]
     pub(crate) struct DkgSessionInfo {
@@ -144,6 +120,7 @@ mod core {
     }
 
     pub(crate) struct MyNode {
+        pub(crate) comm: Comm,
         pub(crate) addr: SocketAddr, // does this change? if so... when? only at node start atm?
         pub(crate) event_sender: EventSender,
         root_storage_dir: PathBuf,
@@ -173,15 +150,12 @@ mod core {
         // Trackers
         pub(crate) capacity: Capacity,
         pub(crate) dysfunction_tracking: DysfunctionDetection,
-        /// Cache the request combo,  (OperationId -> An adult xorname), to waiting Clients peers for that combo
-        pub(crate) pending_data_queries:
-            Cache<(OperationId, XorName), BTreeMap<(MsgId, Peer), OptionalResponseStream>>,
     }
 
     impl MyNode {
         #[allow(clippy::too_many_arguments)]
         pub(crate) async fn new(
-            addr: SocketAddr,
+            comm: Comm,
             keypair: Arc<Keypair>,
             network_knowledge: NetworkKnowledge,
             section_key_share: Option<SectionKeyShare>,
@@ -189,6 +163,7 @@ mod core {
             used_space: UsedSpace,
             root_storage_dir: PathBuf,
         ) -> Result<Self> {
+            let addr = comm.socket_addr();
             let membership = if let Some(key) = section_key_share.clone() {
                 let n_elders = network_knowledge.signed_sap().elder_count();
 
@@ -240,6 +215,7 @@ mod core {
             };
 
             let node = Self {
+                comm,
                 addr,
                 keypair,
                 network_knowledge,
@@ -257,7 +233,6 @@ mod core {
                 data_storage,
                 capacity: Capacity::default(),
                 dysfunction_tracking: node_dysfunction_detector,
-                pending_data_queries: Cache::with_expiry_duration(DATA_QUERY_TIMEOUT),
                 pending_data_to_replicate_to_peers: BTreeMap::new(),
                 membership,
             };

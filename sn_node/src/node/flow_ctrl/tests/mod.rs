@@ -470,7 +470,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let comm = network_utils::create_comm().await?;
             let mut node = MyNode::new(
-                comm.socket_addr(),
+                comm,
                 node.keypair.clone(),
                 network_knowledge,
                 Some(section_key_share),
@@ -529,7 +529,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             node.section_keys_provider
                 .insert(network_utils::create_section_key_share(&sk_set2, 0));
 
-            let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
+            let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)));
 
             let _cmds = run_and_collect_cmds(
                 Cmd::ValidateMsg {
@@ -680,7 +680,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let comm = network_utils::create_comm().await?;
             let node = MyNode::new(
-                comm.socket_addr(),
+                comm,
                 node.keypair.clone(),
                 section,
                 Some(section_key_share),
@@ -689,7 +689,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
                 root_storage_dir,
             )
             .await?;
-            let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
+            let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)));
 
             let relocated_peer = match relocated_peer_role {
                 RelocatedPeerRole::Elder => *section_auth.elders().nth(1).expect("too few elders"),
@@ -751,7 +751,7 @@ async fn msg_to_self() -> Result<()> {
 
         let genesis_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
         let (node, _) = MyNode::first_node(
-            comm.socket_addr(),
+            comm,
             info.keypair.clone(),
             event_sender,
             UsedSpace::new(max_capacity),
@@ -760,7 +760,7 @@ async fn msg_to_self() -> Result<()> {
         )
         .await?;
         let info = node.info();
-        let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
+        let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)));
 
         let node_msg = NodeMsg::NodeCmd(NodeCmd::ReplicateData(vec![]));
 
@@ -859,7 +859,7 @@ async fn handle_elders_update() -> Result<()> {
         let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
         let comm = network_utils::create_comm().await?;
         let mut node = MyNode::new(
-            comm.socket_addr(),
+            comm,
             info.keypair.clone(),
             section0.clone(),
             Some(section_key_share),
@@ -874,7 +874,7 @@ async fn handle_elders_update() -> Result<()> {
         node.section_keys_provider
             .insert(network_utils::create_section_key_share(&sk_set1, 0));
 
-        let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
+        let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)));
 
         let cmds = run_and_collect_cmds(Cmd::HandleNewEldersAgreement { new_elders: signed_sap1, sig }, &dispatcher).await?;
 
@@ -989,7 +989,7 @@ async fn handle_demote_during_split() -> Result<()> {
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let comm = network_utils::create_comm().await?;
             let mut node = MyNode::new(
-                comm.socket_addr(),
+                comm,
                 info.keypair.clone(),
                 section,
                 Some(section_key_share),
@@ -1012,7 +1012,7 @@ async fn handle_demote_during_split() -> Result<()> {
                     .insert(network_utils::create_section_key_share(&sk_set_v1_p1, 0));
             }
 
-            let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
+            let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)));
 
             // Create agreement on `OurElder` for both sub-sections
             let create_our_elders_cmd =

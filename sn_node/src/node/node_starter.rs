@@ -153,11 +153,11 @@ async fn bootstrap_node(
     .await?;
 
     let node = if config.is_first() {
-        bootstrap_genesis_node(&comm, used_space, root_storage_dir, event_sender.clone()).await?
+        bootstrap_genesis_node(comm, used_space, root_storage_dir, event_sender.clone()).await?
     } else {
         bootstrap_normal_node(
             config,
-            &comm,
+            comm,
             &mut connection_event_rx,
             join_timeout,
             event_sender.clone(),
@@ -168,14 +168,14 @@ async fn bootstrap_node(
     };
 
     let node = Arc::new(RwLock::new(node));
-    let cmd_ctrl = CmdCtrl::new(Dispatcher::new(node.clone(), comm));
+    let cmd_ctrl = CmdCtrl::new(Dispatcher::new(node.clone()));
     let cmd_channel = FlowCtrl::start(cmd_ctrl, connection_event_rx);
 
     Ok((node, cmd_channel, event_receiver))
 }
 
 async fn bootstrap_genesis_node(
-    comm: &Comm,
+    comm: Comm,
     used_space: UsedSpace,
     root_storage_dir: &Path,
     event_sender: EventSender,
@@ -194,7 +194,7 @@ async fn bootstrap_genesis_node(
     // as well as the owner of the genesis DBC minted by this first node of the network.
     let genesis_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
     let (node, genesis_dbc) = MyNode::first_node(
-        comm.socket_addr(),
+        comm,
         Arc::new(keypair),
         event_sender,
         used_space.clone(),
@@ -237,7 +237,7 @@ async fn bootstrap_genesis_node(
 
 async fn bootstrap_normal_node(
     config: &Config,
-    comm: &Comm,
+    comm: Comm,
     connection_event_rx: &mut tokio::sync::mpsc::Receiver<MsgFromPeer>,
     join_timeout: Duration,
     event_sender: EventSender,
@@ -261,14 +261,14 @@ async fn bootstrap_normal_node(
     let joining_node = MyNodeInfo::new(keypair, comm.socket_addr());
     let (info, network_knowledge) = join_network(
         joining_node,
-        comm,
+        &comm,
         connection_event_rx,
         section_tree,
         join_timeout,
     )
     .await?;
     let node = MyNode::new(
-        comm.socket_addr(),
+        comm,
         info.keypair.clone(),
         network_knowledge,
         None,
