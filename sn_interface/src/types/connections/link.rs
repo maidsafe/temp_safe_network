@@ -90,7 +90,7 @@ impl Link {
         listen: F,
     ) -> Result<(), SendToOneError> {
         let default_priority = 10;
-        let conn = self.get_or_connect(listen).await?;
+        let conn = self.get_or_connect_with_listener(listen).await?;
         trace!(
             "We have {} open connections to peer {}.",
             self.connections.read().await.len(),
@@ -138,11 +138,7 @@ impl Link {
     }
 
     pub async fn send_bi(&self, bytes: UsrMsgBytes) -> Result<RecvStream, SendToOneError> {
-        let (conn, _) = self
-            .endpoint
-            .connect_to(&self.peer.addr())
-            .await
-            .map_err(SendToOneError::Connection)?;
+        let conn = self.get_or_connect().await?;
 
         let (mut send_stream, recv_stream) =
             conn.open_bi().await.map_err(SendToOneError::Connection)?;
@@ -160,7 +156,8 @@ impl Link {
         Ok(recv_stream)
     }
 
-    async fn get_or_connect<F: Fn(Connection, IncomingMsgs)>(
+    // gets a conn or creates one with a listener func
+    async fn get_or_connect_with_listener<F: Fn(Connection, IncomingMsgs)>(
         &self,
         listen: F,
     ) -> Result<Connection, SendToOneError> {
@@ -170,7 +167,7 @@ impl Link {
             // will access only after the first one finished creating a new connection
             // thus will find a connection here:
             debug!("creating conn with {:?}", self.peer);
-            self.create_connection(listen).await
+            self.create_connection_with_listener(listen).await
         } else {
             // let x = self.connections.read().await.iter().enumerate().filter(|(i, _)| i == 0).map(|(_,conn)|conn);
             if let Some((_id, conn)) = self.connections.read().await.iter().next() {
@@ -179,7 +176,28 @@ impl Link {
 
             // we should never hit here...
             // but if we do, we'll try making a conn
-            self.create_connection(listen).await
+            self.create_connection_with_listener(listen).await
+        }
+    }
+
+    // Get a connection or create a fresh one
+    async fn get_or_connect(&self) -> Result<Connection, SendToOneError> {
+        if self.connections.read().await.is_empty() {
+            // read again
+            // first caller will find none again, but the subsequent callers
+            // will access only after the first one finished creating a new connection
+            // thus will find a connection here:
+            debug!("creating conn with {:?}", self.peer);
+            self.create_connection().await
+        } else {
+            // let x = self.connections.read().await.iter().enumerate().filter(|(i, _)| i == 0).map(|(_,conn)|conn);
+            if let Some((_id, conn)) = self.connections.read().await.iter().next() {
+                return Ok(conn.clone());
+            }
+
+            // we should never hit here...
+            // but if we do, we'll try making a conn
+            self.create_connection().await
         }
     }
 
@@ -189,7 +207,7 @@ impl Link {
         !self.connections.read().await.is_empty()
     }
 
-    async fn create_connection<F: Fn(Connection, IncomingMsgs)>(
+    async fn create_connection_with_listener<F: Fn(Connection, IncomingMsgs)>(
         &self,
         listen: F,
     ) -> Result<Connection, SendToOneError> {
@@ -209,6 +227,26 @@ impl Link {
         self.insert(conn.clone()).await;
 
         listen(conn.clone(), incoming_msgs);
+
+        Ok(conn)
+    }
+
+    /// Uses qp2p to create a connection and stores it on Self
+    async fn create_connection(&self) -> Result<Connection, SendToOneError> {
+        let (conn, _incoming_msgs) = self
+            .endpoint
+            .connect_to(&self.peer.addr())
+            .await
+            .map_err(SendToOneError::Connection)?;
+
+        trace!(
+            "{} to {} (id: {})",
+            LogMarker::ConnectionOpened,
+            conn.remote_address(),
+            conn.id()
+        );
+
+        self.insert(conn.clone()).await;
 
         Ok(conn)
     }
