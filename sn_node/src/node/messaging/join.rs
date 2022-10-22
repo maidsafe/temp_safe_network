@@ -34,9 +34,12 @@ impl MyNode {
         join_request: JoinRequest,
         comm: &Comm,
     ) -> Result<Option<Cmd>> {
-        debug!("Received {:?} from {}", join_request, peer);
+        debug!("Handling join. Received {:?} from {}", join_request, peer);
 
         let read_locked_node = node.read().await;
+
+        debug!("Handling join. node read for {join_request:?}");
+
         let provided_section_key = join_request.section_key();
 
         let our_section_key = read_locked_node.network_knowledge.section_key();
@@ -105,6 +108,9 @@ impl MyNode {
             ));
         }
 
+        // drop node read lock before reachability check
+        drop(read_locked_node);
+
         // Do reachability check only for the initial join request
         if comm.is_reachable(&peer.addr()).await.is_err() {
             let msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Rejected(
@@ -112,12 +118,12 @@ impl MyNode {
             )));
             trace!("{}", LogMarker::SendJoinRejected);
             trace!("Sending {:?} to {}", msg, peer);
+
+            let read_locked_node = node.read().await;
             Ok(Some(
                 read_locked_node.send_system_msg(msg, Peers::Single(peer)),
             ))
         } else {
-            drop(read_locked_node);
-
             let mut node = node.write().await;
             // It's reachable, let's then propose membership
             let node_state = NodeState::joined(peer, None);
@@ -221,18 +227,20 @@ impl MyNode {
             return None;
         }
 
+        // drop read lock before we do reachability check
+        drop(read_locked_node);
+
         // Finally do reachability check
         if comm.is_reachable(&peer.addr()).await.is_err() {
             let msg = NodeMsg::JoinAsRelocatedResponse(Box::new(
                 JoinAsRelocatedResponse::NodeNotReachable(peer.addr()),
             ));
             trace!("{}", LogMarker::SendJoinAsRelocatedResponse);
+            let read_locked_node = node.read().await;
 
             trace!("Sending {:?} to {}", msg, peer);
             return Some(read_locked_node.send_system_msg(msg, Peers::Single(peer)));
         };
-
-        drop(read_locked_node);
 
         node.write()
             .await
