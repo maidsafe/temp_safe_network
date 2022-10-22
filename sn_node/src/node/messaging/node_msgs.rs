@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    comm::Comm,
     node::{
         flow_ctrl::cmds::Cmd,
         messaging::{OutgoingMsg, Peers},
@@ -74,7 +73,6 @@ impl MyNode {
         msg_id: MsgId,
         msg: NodeMsg,
         sender: Peer,
-        comm: &Comm,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         trace!("{:?}: {msg_id:?}", LogMarker::NodeMsgToBeHandled);
@@ -228,7 +226,7 @@ impl MyNode {
             }
             NodeMsg::JoinRequest(join_request) => {
                 trace!("Handling msg {:?}: JoinRequest from {}", msg_id, sender);
-                MyNode::handle_join_request(node, sender, join_request, comm)
+                MyNode::handle_join_request(node, sender, join_request)
                     .await
                     .map(|c| c.into_iter().collect())
             }
@@ -242,7 +240,7 @@ impl MyNode {
                 }
 
                 Ok(
-                    MyNode::handle_join_as_relocated_request(node, sender, *join_request, comm)
+                    MyNode::handle_join_as_relocated_request(node, sender, *join_request)
                         .await
                         .into_iter()
                         .collect(),

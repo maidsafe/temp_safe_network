@@ -64,37 +64,6 @@ impl Comm {
         self.our_endpoint.public_addr()
     }
 
-    /// Fake function used as replacement for testing only.
-    #[cfg(test)]
-    pub(crate) async fn is_reachable(&self, _peer: &SocketAddr) -> Result<(), Error> {
-        Ok(())
-    }
-
-    /// Tests whether the peer is reachable.
-    #[cfg(not(test))]
-    pub(crate) async fn is_reachable(&self, peer: &SocketAddr) -> Result<(), Error> {
-        let qp2p_config = qp2p::Config {
-            forward_port: false,
-            ..Default::default()
-        };
-
-        let connectivity_endpoint =
-            Endpoint::new_client((self.our_endpoint.local_addr().ip(), 0), qp2p_config)?;
-
-        let result = connectivity_endpoint
-            .is_reachable(peer)
-            .await
-            .map_err(|err| {
-                info!("Peer {} is NOT externally reachable: {:?}", peer, err);
-                err.into()
-            })
-            .map(|()| {
-                info!("Peer {} is externally reachable.", peer);
-            });
-        connectivity_endpoint.close();
-        result
-    }
-
     #[tracing::instrument(skip(self, bytes))]
     pub(crate) async fn send_out_bytes(
         &self,
