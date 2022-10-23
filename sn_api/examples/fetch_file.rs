@@ -17,6 +17,7 @@ use std::{env::args, net::SocketAddr};
 async fn main() -> Result<()> {
     env_logger::init();
 
+    let x = Safe::default();
     // Skip executable name form args
     let mut args_received = args();
     args_received.next();
