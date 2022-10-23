@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1666310826735,
+  "lastUpdate": 1666566993842,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -27508,6 +27508,150 @@ window.BENCHMARK_DATA = {
             "name": "generating keys",
             "value": 4567770,
             "range": "± 235246",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "293741+willief@users.noreply.github.com",
+            "name": "Southside",
+            "username": "willief"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "d6734004a57557c67d25089957c8471f59644bbe",
+          "message": "Add port 16685\n\nfixes GRPC server 16685 connection refused issues with the  jaeger all-in-one image   https://github.com/jaegertracing/jaeger/issues/3852",
+          "timestamp": "2022-10-24T07:10:03+09:00",
+          "tree_id": "b200ea1b010565e72df9482d316ec6b691fad588",
+          "url": "https://github.com/maidsafe/safe_network/commit/d6734004a57557c67d25089957c8471f59644bbe"
+        },
+        "date": 1666566992781,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 5290608,
+            "range": "± 234675",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 1927143845,
+            "range": "± 205990638",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 1988486698,
+            "range": "± 12574453",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 2205802017,
+            "range": "± 102383694",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 468510063,
+            "range": "± 6665674",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 487194430,
+            "range": "± 4341948",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 673829388,
+            "range": "± 13895979",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 40309492,
+            "range": "± 15915019",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2013266158,
+            "range": "± 299449343",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 7470875795,
+            "range": "± 924586201",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 203131991,
+            "range": "± 25013156",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1893959557,
+            "range": "± 216912072",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 8068550085,
+            "range": "± 1056005726",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 42184805,
+            "range": "± 1506642",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 412619558,
+            "range": "± 18104368",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1576327523,
+            "range": "± 34226281",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 10911105,
+            "range": "± 273670",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 95567282,
+            "range": "± 3998039",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 329876193,
+            "range": "± 3176323",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "generating keys",
+            "value": 4534022,
+            "range": "± 217310",
             "unit": "ns/iter"
           }
         ]
