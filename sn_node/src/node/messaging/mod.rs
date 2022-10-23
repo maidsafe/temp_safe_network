@@ -140,8 +140,9 @@ impl MyNode {
                     {
                         // we have a query, and we have too many on the go....
                         warn!("Pending queries length exceeded, dropping query {msg:?}");
-                        let cmd = self.cmd_error_response(
+                        let cmd = self.query_error_response(
                             Error::CannotHandleQuery(query.clone()),
+                            &query.variant,
                             origin,
                             msg_id,
                             send_stream,
@@ -175,7 +176,7 @@ impl MyNode {
                     return Ok(vec![cmd]);
                 }
 
-                match self
+                Ok(self
                     .handle_valid_client_msg(
                         msg_id,
                         msg,
@@ -185,22 +186,7 @@ impl MyNode {
                         #[cfg(feature = "traceroute")]
                         wire_msg.traceroute(),
                     )
-                    .await
-                {
-                    Ok(cmds) => Ok(cmds),
-                    Err(err) => {
-                        debug!("Will send error response back to client");
-                        let cmd = self.cmd_error_response(
-                            err,
-                            origin,
-                            msg_id,
-                            send_stream,
-                            #[cfg(feature = "traceroute")]
-                            wire_msg.traceroute(),
-                        );
-                        Ok(vec![cmd])
-                    }
-                }
+                    .await)
             }
         }
     }

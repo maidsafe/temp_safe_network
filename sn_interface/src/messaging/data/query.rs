@@ -50,15 +50,15 @@ pub enum DataQueryVariant {
 impl DataQueryVariant {
     /// Creates a Response containing an error, with the Response variant corresponding to the
     /// Request variant.
-    pub fn error(&self, error: Error) -> QueryResponse {
+    pub fn to_error_response(&self, error: Error) -> QueryResponse {
         use DataQueryVariant::*;
         match self {
             #[cfg(feature = "chunks")]
             GetChunk(_) => QueryResponse::GetChunk(Err(error)),
             #[cfg(feature = "registers")]
-            Register(q) => q.error(error),
+            Register(q) => q.to_error_response(error),
             #[cfg(feature = "spentbook")]
-            Spentbook(q) => q.error(error),
+            Spentbook(q) => q.to_error_response(error),
         }
     }
 

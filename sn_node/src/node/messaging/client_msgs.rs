@@ -18,16 +18,17 @@ use sn_dbc::{
 };
 #[cfg(feature = "traceroute")]
 use sn_interface::messaging::Traceroute;
-use sn_interface::network_knowledge::section_keys::build_spent_proof_share;
 use sn_interface::{
     data_copy_count,
     messaging::{
         data::{
-            ClientMsg, DataCmd, DataQueryVariant, EditRegister, SignedRegisterEdit, SpentbookCmd,
+            ClientMsg, CmdResponse, DataCmd, DataQueryVariant, EditRegister, SignedRegisterEdit,
+            SpentbookCmd,
         },
         system::{NodeMsg, NodeQueryResponse, OperationId},
         AuthorityProof, ClientAuth, MsgId,
     },
+    network_knowledge::section_keys::build_spent_proof_share,
     types::{
         log_markers::LogMarker,
         register::{Permissions, Policy, Register, User},
@@ -41,7 +42,7 @@ use std::sync::Arc;
 use xor_name::XorName;
 
 impl MyNode {
-    /// Forms a `CmdAck` msg to send back to the client
+    /// Forms a `ACK` msg to send back to the client
     pub(crate) fn send_cmd_ack(
         &self,
         target: Peer,
@@ -49,9 +50,37 @@ impl MyNode {
         send_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Cmd {
-        let the_ack_msg = ClientMsg::CmdAck { correlation_id };
+        // NB: temp use of `CmdResponse::StoreChunk(Ok(()))` before that is handled at Adult.
+        let the_ack_msg = ClientMsg::CmdResponse {
+            response: CmdResponse::StoreChunk(Ok(())),
+            correlation_id,
+        };
         self.send_client_msg(
             the_ack_msg,
+            Peers::Single(target),
+            send_stream,
+            #[cfg(feature = "traceroute")]
+            traceroute,
+        )
+    }
+
+    /// Forms a `QueryError` msg to send back to the client
+    pub(crate) fn query_error_response(
+        &self,
+        error: Error,
+        query: &DataQueryVariant,
+        target: Peer,
+        correlation_id: MsgId,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
+    ) -> Cmd {
+        let the_error_msg = ClientMsg::QueryResponse {
+            response: query.to_error_response(error.into()),
+            correlation_id,
+        };
+
+        self.send_client_msg(
+            the_error_msg,
             Peers::Single(target),
             send_stream,
             #[cfg(feature = "traceroute")]
@@ -62,14 +91,15 @@ impl MyNode {
     /// Forms a `CmdError` msg to send back to the client
     pub(crate) fn cmd_error_response(
         &self,
+        cmd: DataCmd,
         error: Error,
         target: Peer,
         correlation_id: MsgId,
         send_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Cmd {
-        let the_error_msg = ClientMsg::CmdError {
-            error: error.into(),
+        let the_error_msg = ClientMsg::CmdResponse {
+            response: cmd.to_error_response(error.into()),
             correlation_id,
         };
 
@@ -211,25 +241,50 @@ impl MyNode {
         origin: Peer,
         send_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
-    ) -> Result<Vec<Cmd>> {
+    ) -> Vec<Cmd> {
         if !self.is_elder() {
-            return Ok(vec![]);
+            return vec![];
         }
 
         trace!("{:?} {:?}", LogMarker::ClientMsgToBeHandled, msg);
 
+        let cmd = match msg {
+            ClientMsg::Cmd(cmd) => cmd,
+            ClientMsg::Query(query) => {
+                return self
+                    .read_data_from_adults(
+                        query,
+                        msg_id,
+                        auth,
+                        origin,
+                        send_stream,
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
+                    )
+                    .await;
+            }
+            _ => {
+                warn!(
+                    "!!!! Unexpected ClientMsg received, and it was not handled: {:?}",
+                    msg
+                );
+                return vec![];
+            }
+        };
+
         // extract the data from the request
-        let data = match msg {
+        let data_result = match cmd.clone() {
             // These reads/writes are for adult nodes...
-            ClientMsg::Cmd(DataCmd::Register(cmd)) => ReplicatedData::RegisterWrite(cmd),
-            ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
-                key_image,
-                tx,
-                spent_proofs,
-                spent_transactions,
-                network_knowledge,
-            })) => {
-                info!("Processing spend request for key image: {:?}", key_image);
+            DataCmd::StoreChunk(chunk) => Ok(ReplicatedData::Chunk(chunk)),
+            DataCmd::Register(cmd) => Ok(ReplicatedData::RegisterWrite(cmd)),
+            DataCmd::Spentbook(cmd) => {
+                let SpentbookCmd::Spend {
+                    network_knowledge,
+                    key_image,
+                    tx,
+                    spent_proofs,
+                    spent_transactions,
+                } = cmd.clone();
                 if let Some((proof_chain, signed_sap)) = network_knowledge {
                     debug!(
                         "Received updated network knowledge with the request. Will return new command \
@@ -254,37 +309,26 @@ impl MyNode {
                         #[cfg(feature = "traceroute")]
                         traceroute,
                     };
-                    return Ok(vec![update_command]);
+                    return vec![update_command];
                 }
-                let spent_proof_share = self.gen_spent_proof_share(
-                    &key_image,
-                    &tx,
-                    &spent_proofs,
-                    &spent_transactions,
-                )?;
-                let reg_cmd = self.gen_register_cmd(&key_image, &spent_proof_share)?;
-                ReplicatedData::SpentbookWrite(reg_cmd)
+                self.extract_contents_as_replicated_data(cmd)
             }
-            ClientMsg::Cmd(DataCmd::StoreChunk(chunk)) => ReplicatedData::Chunk(chunk),
-            ClientMsg::Query(query) => {
-                return self
-                    .read_data_from_adults(
-                        query,
-                        msg_id,
-                        auth,
-                        origin,
-                        send_stream,
-                        #[cfg(feature = "traceroute")]
-                        traceroute,
-                    )
-                    .await;
-            }
-            _ => {
-                warn!(
-                    "!!!! Unexpected ClientMsg received, and it was not handled: {:?}",
-                    msg
+        };
+
+        let data = match data_result {
+            Ok(data) => data,
+            Err(error) => {
+                debug!("Will send error response back to client");
+                let cmd = self.cmd_error_response(
+                    cmd,
+                    error,
+                    origin,
+                    msg_id,
+                    send_stream,
+                    #[cfg(feature = "traceroute")]
+                    traceroute,
                 );
-                return Ok(vec![]);
+                return vec![cmd];
             }
         };
 
@@ -296,11 +340,23 @@ impl MyNode {
         // make sure the expected replication factor is achieved
         if data_copy_count() > targets.len() {
             error!("InsufficientAdults for storing data reliably");
-            return Err(Error::InsufficientAdults {
+            let error = Error::InsufficientAdults {
                 prefix: self.network_knowledge().prefix(),
                 expected: data_copy_count() as u8,
                 found: targets.len() as u8,
-            });
+            };
+
+            debug!("Will send error response back to client");
+            let cmd = self.cmd_error_response(
+                cmd,
+                error,
+                origin,
+                msg_id,
+                send_stream,
+                #[cfg(feature = "traceroute")]
+                traceroute,
+            );
+            return vec![cmd];
         }
 
         // the replication msg sent to adults
@@ -320,7 +376,25 @@ impl MyNode {
             traceroute,
         ));
 
-        Ok(cmds)
+        cmds
+    }
+
+    // helper to extract the contents of the cmd as ReplicatedData
+    fn extract_contents_as_replicated_data(&self, cmd: SpentbookCmd) -> Result<ReplicatedData> {
+        let SpentbookCmd::Spend {
+            key_image,
+            tx,
+            spent_proofs,
+            spent_transactions,
+            ..
+        } = cmd;
+
+        info!("Processing spend request for key image: {:?}", key_image);
+
+        let spent_proof_share =
+            self.gen_spent_proof_share(&key_image, &tx, &spent_proofs, &spent_transactions)?;
+        let reg_cmd = self.gen_register_cmd(&key_image, &spent_proof_share)?;
+        Ok(ReplicatedData::SpentbookWrite(reg_cmd))
     }
 
     /// Generate a spent proof share from the information provided by the client.
