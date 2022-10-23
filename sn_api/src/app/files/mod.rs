@@ -51,10 +51,9 @@ impl Safe {
     ///
     /// ```no_run
     /// # use sn_api::Safe;
-    /// # let mut safe = Safe::default();
     /// # let rt = tokio::runtime::Runtime::new().unwrap();
     /// # rt.block_on(async {
-    ///     safe.connect(None, None, None).await.unwrap();
+    ///     let mut safe = Safe::connected(None, None, None, None).await.unwrap();
     ///     let xorurl = safe.files_container_create().await.unwrap();
     ///     assert!(xorurl.contains("safe://"))
     /// # });
@@ -74,10 +73,9 @@ impl Safe {
     ///
     /// ```no_run
     /// # use sn_api::Safe;
-    /// # let mut safe = Safe::default();
     /// # let rt = tokio::runtime::Runtime::new().unwrap();
     /// # rt.block_on(async {
-    ///     safe.connect(None, None, None).await.unwrap();
+    ///     let mut safe = Safe::connected(None, None, None, None).await.unwrap();
     ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create_from("./testdata", None, true, true).await.unwrap();
     ///     assert!(xorurl.contains("safe://"))
     /// # });
@@ -138,10 +136,9 @@ impl Safe {
     ///
     /// ```no_run
     /// # use sn_api::Safe;
-    /// # let mut safe = Safe::default();
     /// # let rt = tokio::runtime::Runtime::new().unwrap();
     /// # rt.block_on(async {
-    /// #   safe.connect(None, None, None).await.unwrap();
+    /// #   let safe = Safe::connected(None, None, None, None).await.unwrap();
     ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create_from("./testdata", None, true, true).await.unwrap();
     ///     let (version, files_map) = safe.files_container_get(&xorurl).await.unwrap().unwrap();
     ///     println!("FilesContainer fetched is at version: {}", version);
@@ -222,15 +219,16 @@ impl Safe {
     ///
     /// ```no_run
     /// # use sn_api::Safe;
-    /// # let mut safe = Safe::default();
     /// # let rt = tokio::runtime::Runtime::new().unwrap();
     /// # rt.block_on(async {
-    /// #   safe.connect(None, None, None).await.unwrap();
+    /// #   let safe = Safe::connected(None, None, None, None).await.unwrap();
     ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create_from("./testdata", None, true, false).await.unwrap();
-    ///     let (version, new_processed_files, new_files_map) = safe.files_container_sync("./testdata", &xorurl, true, true, false, false).await.unwrap();
-    ///     println!("FilesContainer synced up is at version: {}", version);
-    ///     println!("The local files that were synced up are: {:?}", new_processed_files);
-    ///     println!("The FilesMap of the updated FilesContainer now is: {:?}", new_files_map);
+    ///     let (optional_version_map, new_processed_files) = safe.files_container_sync("./testdata", &xorurl, true, true, false, false).await.unwrap();
+    ///     if let Some((version, new_files_map)) = optional_version_map {
+    ///         println!("FilesContainer is now at version: {}", version);
+    ///         println!("The local files that were synced up are: {:?}", new_processed_files);
+    ///         println!("The FilesMap of the updated FilesContainer now is: {:?}", new_files_map);
+    ///     }
     /// # });
     /// ```
     #[allow(clippy::too_many_arguments)]
@@ -309,16 +307,17 @@ impl Safe {
     ///
     /// ```no_run
     /// # use sn_api::Safe;
-    /// # let mut safe = Safe::default();
     /// # let rt = tokio::runtime::Runtime::new().unwrap();
     /// # rt.block_on(async {
-    /// #   safe.connect(None, None, None).await.unwrap();
+    /// #   let safe = Safe::connected(None, None, None, None).await.unwrap();
     ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create_from("./testdata", None, true, true).await.unwrap();
     ///     let new_file_name = format!("{}/new_name_test.md", xorurl);
-    ///     let (version, new_processed_files, new_files_map) = safe.files_container_add("./testdata/test.md", &new_file_name, false, false, true).await.unwrap();
-    ///     println!("FilesContainer is now at version: {}", version);
-    ///     println!("The local files that were synced up are: {:?}", new_processed_files);
-    ///     println!("The FilesMap of the updated FilesContainer now is: {:?}", new_files_map);
+    ///     let (optional_version_map, new_processed_files) = safe.files_container_add("./testdata/test.md", &new_file_name, false, false, true).await.unwrap();
+    ///     if let Some((version, new_files_map)) = optional_version_map {
+    ///         println!("FilesContainer is now at version: {}", version);
+    ///         println!("The local files that were synced up are: {:?}", new_processed_files);
+    ///         println!("The FilesMap of the updated FilesContainer now is: {:?}", new_files_map);
+    ///     }
     /// # });
     /// ```
     pub async fn files_container_add(
@@ -380,16 +379,18 @@ impl Safe {
     ///
     /// ```no_run
     /// # use sn_api::Safe;
-    /// # let mut safe = Safe::default();
+    /// # use bytes::Bytes;
     /// # let rt = tokio::runtime::Runtime::new().unwrap();
     /// # rt.block_on(async {
-    /// #   safe.connect(None, None, None).await.unwrap();
+    /// #   let safe = Safe::connected(None, None, None, None).await.unwrap();
     ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create_from("./testdata", None, true, true).await.unwrap();
     ///     let new_file_name = format!("{}/new_name_test.md", xorurl);
-    ///     let (version, new_processed_files, new_files_map) = safe.files_container_add_from_raw(b"0123456789", &new_file_name, false, false).await.unwrap();
-    ///     println!("FilesContainer is now at version: {}", version);
-    ///     println!("The local files that were synced up are: {:?}", new_processed_files);
-    ///     println!("The FilesMap of the updated FilesContainer now is: {:?}", new_files_map);
+    ///     let (optional_version_map, new_processed_files) = safe.files_container_add_from_raw(Bytes::from("0123456789"), &new_file_name, false, false).await.unwrap();
+    ///     if let Some((version, new_files_map)) = optional_version_map {
+    ///         println!("FilesContainer is now at version: {}", version);
+    ///         println!("The local files that were synced up are: {:?}", new_processed_files);
+    ///         println!("The FilesMap of the updated FilesContainer now is: {:?}", new_files_map);
+    ///     }
     /// # });
     /// ```
     pub async fn files_container_add_from_raw(
@@ -426,10 +427,9 @@ impl Safe {
     ///
     /// ```no_run
     /// # use sn_api::Safe;
-    /// # let mut safe = Safe::default();
     /// # let rt = tokio::runtime::Runtime::new().unwrap();
     /// # rt.block_on(async {
-    /// #   safe.connect(None, None, None).await.unwrap();
+    /// #   let safe = Safe::connected(None, None, None, None).await.unwrap();
     ///     let (xorurl, processed_files, files_map) = safe.files_container_create_from("./testdata/", None, true, true).await.unwrap();
     ///     let remote_file_path = format!("{}/test.md", xorurl);
     ///     let (version, new_processed_files, new_files_map) = safe.files_container_remove_path(&remote_file_path, false, false).await.unwrap();
@@ -589,12 +589,12 @@ impl Safe {
     /// ## Example
     /// ```no_run
     /// # use sn_api::Safe;
-    /// # let mut safe = Safe::default();
+    /// # use bytes::Bytes;
     /// # let rt = tokio::runtime::Runtime::new().unwrap();
     /// # rt.block_on(async {
-    /// #   safe.connect(None, None, None).await.unwrap();
-    ///     let data = b"Something super good";
-    ///     let xorurl = safe.store_data(data, Some("text/plain")).await.unwrap();
+    /// #   let safe = Safe::connected(None, None, None, None).await.unwrap();
+    ///     let data = Bytes::from("Something super good");
+    ///     let xorurl = safe.store_bytes(data.clone(), Some("text/plain")).await.unwrap();
     ///     let received_data = safe.files_get(&xorurl, None).await.unwrap();
     ///     assert_eq!(received_data, data);
     /// # });
@@ -636,12 +636,12 @@ impl Safe {
     /// ## Example
     /// ```no_run
     /// # use sn_api::Safe;
-    /// # let mut safe = Safe::default();
+    /// # use bytes::Bytes;
     /// # let rt = tokio::runtime::Runtime::new().unwrap();
     /// # rt.block_on(async {
-    /// #   safe.connect(None, None, None).await.unwrap();
-    ///     let data = b"Something super good";
-    ///     let xorurl = safe.files_store(data, None).await.unwrap();
+    /// #   let safe = Safe::connected(None, None, None, None).await.unwrap();
+    ///     let data = Bytes::from("Something super good");
+    ///     let xorurl = safe.store_bytes(data.clone(), None).await.unwrap();
     ///     let received_data = safe.files_get(&xorurl, None).await.unwrap();
     ///     assert_eq!(received_data, data);
     /// # });
@@ -1308,7 +1308,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_files_store() -> Result<()> {
+    async fn test_store_bytes() -> Result<()> {
         let safe = new_safe_instance().await?;
         let random_content: String = thread_rng()
             .sample_iter(&Alphanumeric)

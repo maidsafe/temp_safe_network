@@ -23,7 +23,7 @@ pub const NRS_MAP_TYPE_TAG: u64 = 1_500;
 
 impl Safe {
     /// # Creates a `nrs_map_container` for a chosen top name
-    /// ```
+    /// ```ignore
     /// safe://<subName>.<topName>/path/to/whatever?var=value
     ///        |-----------------|
     ///            Public Name
@@ -53,7 +53,7 @@ impl Safe {
     /// # Associates a public name to a link
     /// The top name of the input public name needs to be registered first with `nrs_create`
     ///
-    /// ```no_run
+    /// ```ignore
     /// safe://<subName>.<topName>/path/to/whatever?var=value
     ///        |-----------------|
     ///            Public Name
@@ -117,7 +117,7 @@ impl Safe {
 
     /// # Removes a public name
     /// The top name of the input public name needs to be registered first with `nrs_create`
-    /// ```no_run
+    /// ```ignore
     /// safe://<subName>.<topName>/path/to/whatever?var=value
     ///        |-----------------|
     ///            Public Name
@@ -151,7 +151,7 @@ impl Safe {
     /// # Gets a public name's associated link
     /// If no version is specified, returns the latest.
     /// The top name of the input public name needs to be registered first with `nrs_create`
-    /// ```no_run
+    /// ```ignore
     /// safe://<subName>.<topName>/path/to/whatever?var=value
     ///        |-----------------|
     ///            Public Name
