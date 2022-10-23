@@ -65,7 +65,7 @@ impl Client {
                     return Ok(());
                 }
                 Err(err) => match err {
-                    Error::ErrorCmd {
+                    Error::CmdError {
                         source: NetworkDataError::SpentProofUnknownSectionKey(unknown_section_key),
                         ..
                     } => {

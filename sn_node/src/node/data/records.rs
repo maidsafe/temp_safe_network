@@ -61,7 +61,7 @@ impl MyNode {
         source_client: Peer,
         send_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
-    ) -> Result<Vec<Cmd>> {
+    ) -> Vec<Cmd> {
         // We generate the operation id to track the response from the Adult
         // by using the query msg id, which shall be unique per query.
         let operation_id = OperationId::from(&Bytes::copy_from_slice(msg_id.as_ref()));
@@ -80,11 +80,21 @@ impl MyNode {
             *peer
         } else {
             debug!("No targets found for {msg_id:?}");
-            return Err(Error::InsufficientAdults {
+            let error = Error::InsufficientAdults {
                 prefix: self.network_knowledge().prefix(),
                 expected: query.adult_index as u8 + 1,
                 found: targets.len() as u8,
-            });
+            };
+            let cmd = self.query_error_response(
+                error,
+                &query.variant,
+                source_client,
+                msg_id,
+                send_stream,
+                #[cfg(feature = "traceroute")]
+                traceroute,
+            );
+            return vec![cmd];
         };
 
         let mut cmds = vec![Cmd::AddToPendingQueries {
@@ -101,15 +111,16 @@ impl MyNode {
         {
             if peers.len() > MAX_WAITING_PEERS_PER_QUERY {
                 warn!("Dropping query from {source_client:?}, there are more than {MAX_WAITING_PEERS_PER_QUERY} waiting already");
-                let cmd = self.cmd_error_response(
-                    Error::CannotHandleQuery(query),
+                let cmd = self.query_error_response(
+                    Error::CannotHandleQuery(query.clone()),
+                    &query.variant,
                     source_client,
                     msg_id,
                     send_stream,
                     #[cfg(feature = "traceroute")]
                     traceroute,
                 );
-                return Ok(vec![cmd]);
+                return vec![cmd];
             }
         }
 
@@ -133,7 +144,7 @@ impl MyNode {
             traceroute,
         ));
 
-        Ok(cmds)
+        cmds
     }
 
     pub(crate) fn get_metadata_of(&self, prefix: &Prefix) -> MetadataExchange {

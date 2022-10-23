@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{Error, QueryResponse};
+use super::{CmdResponse, Error, QueryResponse};
 
 use crate::messaging::{ClientAuth, SectionSig};
 #[allow(unused_imports)] // needed by rustdocs links
@@ -88,6 +88,17 @@ pub enum RegisterCmd {
     Edit(SignedRegisterEdit),
 }
 
+impl RegisterCmd {
+    /// Creates a Response containing an error, with the Response variant corresponding to the
+    /// Request variant.
+    pub fn to_error_response(&self, error: Error) -> CmdResponse {
+        match self {
+            Self::Create { .. } => CmdResponse::CreateRegister(Err(error)),
+            Self::Edit(_) => CmdResponse::EditRegister(Err(error)),
+        }
+    }
+}
+
 ///
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
@@ -163,7 +174,7 @@ impl SignedRegisterEdit {
 impl RegisterQuery {
     /// Creates a Response containing an error, with the Response variant corresponding to the
     /// Request variant.
-    pub fn error(&self, error: Error) -> QueryResponse {
+    pub fn to_error_response(&self, error: Error) -> QueryResponse {
         match self {
             Self::Get(_) => QueryResponse::GetRegister(Err(error)),
             Self::Read(_) => QueryResponse::ReadRegister(Err(error)),

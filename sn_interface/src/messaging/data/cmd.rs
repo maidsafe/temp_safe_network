@@ -6,8 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{RegisterCmd, SpentbookCmd};
-use crate::types::{Chunk, DataAddress};
+use super::{Error, RegisterCmd, SpentbookCmd};
+use crate::{
+    messaging::data::CmdResponse,
+    types::{Chunk, DataAddress},
+};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
@@ -55,6 +58,20 @@ impl DataCmd {
             Register(c) => c.name(), // TODO: c.dst_id(), as to not co-locate private and public and different tags of same name.
             #[cfg(feature = "spentbook")]
             Spentbook(c) => c.name(),
+        }
+    }
+
+    /// Creates a Response containing an error, with the Response variant corresponding to the
+    /// Request variant.
+    pub fn to_error_response(&self, error: Error) -> CmdResponse {
+        use DataCmd::*;
+        match self {
+            #[cfg(feature = "chunks")]
+            StoreChunk(_) => CmdResponse::StoreChunk(Err(error)),
+            #[cfg(feature = "registers")]
+            Register(c) => c.to_error_response(error),
+            #[cfg(feature = "spentbook")]
+            Spentbook(c) => c.to_error_response(error),
         }
     }
 }

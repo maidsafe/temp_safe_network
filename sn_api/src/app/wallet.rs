@@ -1214,7 +1214,7 @@ mod tests {
 
         // It shall detect no spent proofs for this TX, thus fail to reissue
         match safe.wallet_reissue(&wallet_xorurl, "0.1", None).await {
-            Err(Error::ClientError(ClientError::ErrorCmd {
+            Err(Error::ClientError(ClientError::CmdError {
                 source: ErrorMsg::InvalidOperation(msg),
                 ..
             })) => {

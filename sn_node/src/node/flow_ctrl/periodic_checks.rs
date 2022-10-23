@@ -226,16 +226,17 @@ impl FlowCtrl {
         let auth = auth(&node, &msg)?;
 
         // generate the cmds, and ensure we go through dysfunction tracking
-        node.handle_valid_client_msg(
-            msg_id,
-            msg,
-            auth,
-            origin,
-            None,
-            #[cfg(feature = "traceroute")]
-            Traceroute(vec![]),
-        )
-        .await
+        Ok(node
+            .handle_valid_client_msg(
+                msg_id,
+                msg,
+                auth,
+                origin,
+                None,
+                #[cfg(feature = "traceroute")]
+                Traceroute(vec![]),
+            )
+            .await)
     }
 
     /// Generates a probe msg, which goes to a random section in order to

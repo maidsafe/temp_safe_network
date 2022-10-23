@@ -176,22 +176,15 @@ impl Session {
                 let resp = MsgResponse::QueryResponse(src_addr, Box::new(response));
                 (resp, correlation_id)
             }
-            ClientMsg::CmdError {
-                error,
+            ClientMsg::CmdResponse {
+                response,
                 correlation_id,
             } => {
-                debug!("CmdError was received for correlation_id {correlation_id:?}: {error:?}");
-
-                let resp = MsgResponse::CmdResponse(src_addr, Some(error));
-                (resp, correlation_id)
-            }
-            ClientMsg::CmdAck { correlation_id } => {
-                debug!(
-                    "CmdAck was received with id {msg_id:?} regarding correlation_id \
-                    {correlation_id:?} from {src_addr:?}"
+                trace!(
+                    "ClientMsg with id {msg_id:?} is CmdResponse regarding correlation_id \
+                    {correlation_id:?} with response {response:?}"
                 );
-
-                let resp = MsgResponse::CmdResponse(src_addr, None);
+                let resp = MsgResponse::CmdResponse(src_addr, Box::new(response));
                 (resp, correlation_id)
             }
             _ => {

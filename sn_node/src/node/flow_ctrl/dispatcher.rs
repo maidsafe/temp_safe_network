@@ -151,7 +151,6 @@ impl Dispatcher {
                 let node = self.node.read().await;
                 node.validate_msg(origin, wire_msg, send_stream).await
             }
-
             Cmd::UpdateNetworkAndHandleValidClientMsg {
                 proof_chain,
                 signed_sap,
@@ -176,16 +175,17 @@ impl Dispatcher {
                 let node = self.node.read().await;
 
                 debug!("Network knowledge was updated: {updated}");
-                node.handle_valid_client_msg(
-                    msg_id,
-                    msg,
-                    auth,
-                    origin,
-                    None,
-                    #[cfg(feature = "traceroute")]
-                    traceroute,
-                )
-                .await
+                Ok(node
+                    .handle_valid_client_msg(
+                        msg_id,
+                        msg,
+                        auth,
+                        origin,
+                        None,
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
+                    )
+                    .await)
             }
             Cmd::HandleValidNodeMsg {
                 origin,

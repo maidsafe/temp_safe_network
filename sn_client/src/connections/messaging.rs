@@ -112,74 +112,71 @@ impl Session {
         mut resp_rx: mpsc::Receiver<MsgResponse>,
     ) -> Result<()> {
         let expected_acks = elders.len();
-        let mut received_responses_from = BTreeSet::default();
-        let mut return_error = None;
-        let mut error_count = 0;
-        let mut actual_ack_count = 0;
+        let mut received_acks = BTreeSet::default();
+        let mut received_errors = BTreeSet::default();
 
         while let Some(msg_resp) = resp_rx.recv().await {
-            let (ack_src, error) = match msg_resp {
-                MsgResponse::CmdResponse(ack_src, error) => (ack_src, error),
+            let (src, result) = match msg_resp {
+                MsgResponse::CmdResponse(src, response) => (src, response.result().clone()),
                 MsgResponse::QueryResponse(src, resp) => {
                     debug!("Ignoring unexpected query response received from {src:?} when awaiting a CmdAck: {resp:?}");
                     continue;
                 }
             };
-
-            let preexisting = !received_responses_from.insert(ack_src);
-            let received_response_count = received_responses_from.len();
-            debug!(
-                "ACK from {ack_src:?} read from set for msg_id {msg_id:?} - preexisting??: {preexisting:?}",
-            );
-
-            if let Some(ref err) = error {
-                error_count += 1;
-                error!(
-                    "received error response {:?} of cmd {:?} from {:?}, so far {} respones and {} of them are errors",
-                    err, msg_id, ack_src, received_response_count, error_count
-                );
-
-                if return_error.is_none() {
-                    return_error = error.clone();
-                }
-
-                // exit if too many errors:
-                if error_count >= expected_acks {
-                    error!(
-                        "Received majority of error response for cmd {:?}: {:?}",
-                        msg_id, return_error
+            match result {
+                Ok(()) => {
+                    let preexisting = !received_acks.insert(src) || received_errors.contains(&src);
+                    debug!(
+                        "ACK from {src:?} read from set for msg_id {msg_id:?} - preexisting??: {preexisting:?}",
                     );
 
-                    if let Some(source) = return_error {
-                        return Err(Error::ErrorCmd { source, msg_id });
+                    if received_acks.len() >= expected_acks {
+                        trace!("Good! We've at or above {expected_acks} expected_acks");
+                        return Ok(());
+                    }
+                }
+                Err(error) => {
+                    let _ = received_errors.insert(src);
+                    error!(
+                        "received error {:?} of cmd {:?} from {:?}, so far {} respones and {} of them are errors",
+                        error, msg_id, src, received_acks.len() + received_errors.len(), received_errors.len()
+                    );
+
+                    // exit if too many errors:
+                    if received_errors.len() >= expected_acks {
+                        error!(
+                            "Received majority of error response for cmd {:?}: {:?}",
+                            msg_id, error
+                        );
+                        return Err(Error::CmdError {
+                            source: error,
+                            msg_id,
+                        });
                     }
                 }
             }
-
-            actual_ack_count = received_response_count - error_count;
-
-            if actual_ack_count >= expected_acks {
-                trace!("Good! We've at or above {expected_acks} expected_acks");
-
-                return Ok(());
-            }
         }
 
-        debug!("ACK received from: {received_responses_from:?}");
+        debug!("ACKs received from: {received_acks:?}");
+        debug!("CmdErrors received from: {received_errors:?}");
 
         let missing_responses: Vec<Peer> = elders
             .iter()
             .cloned()
-            .filter(|p| !received_responses_from.contains(&p.addr()))
+            .filter(|p| !received_acks.contains(&p.addr()))
+            .filter(|p| !received_errors.contains(&p.addr()))
             .collect();
 
         error!("Missing Responses from: {:?}", missing_responses);
 
-        debug!("Insufficient acks returned: {actual_ack_count}/{expected_acks}");
+        debug!(
+            "Insufficient acks returned: {}/{expected_acks}",
+            received_acks.len()
+        );
         Err(Error::InsufficientAcksReceived {
             msg_id,
             expected: expected_acks,
-            received: actual_ack_count,
+            received: received_acks.len(),
         })
     }
 

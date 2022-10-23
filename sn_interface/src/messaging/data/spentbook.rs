@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{Error, QueryResponse};
+use super::{CmdResponse, Error, QueryResponse};
 
 use crate::messaging::system::SectionSigned;
 use crate::network_knowledge::{SectionAuthorityProvider, SectionsDAG};
@@ -45,10 +45,20 @@ pub enum SpentbookCmd {
     },
 }
 
+impl SpentbookCmd {
+    /// Creates a Response containing an error, with the Response variant corresponding to the
+    /// Request variant.
+    pub fn to_error_response(&self, error: Error) -> CmdResponse {
+        match self {
+            Self::Spend { .. } => CmdResponse::SpendKey(Err(error)),
+        }
+    }
+}
+
 impl SpentbookQuery {
     /// Creates a Response containing an error, with the Response variant corresponding to the
     /// Request variant.
-    pub fn error(&self, error: Error) -> QueryResponse {
+    pub fn to_error_response(&self, error: Error) -> QueryResponse {
         match self {
             Self::SpentProofShares(_) => QueryResponse::SpentProofShares(Err(error)),
         }
