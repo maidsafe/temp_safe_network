@@ -56,6 +56,15 @@ pub enum ClientMsg {
     /// the eventually consistent nature of the network, it may be necessary to continually retry
     /// operations that depend on the effects of mutations.
     Cmd(DataCmd),
+    /// The response to a cmd, containing the cmd result (i.e. ACK or Error).
+    CmdResponse {
+        /// The result of the cmd.
+        response: CmdResponse,
+        /// ID of causing [`Cmd`] message.
+        ///
+        /// [`Cmd`]: Self::Cmd
+        correlation_id: MsgId,
+    },
     /// A read-only operation.
     ///
     /// Senders should eventually receive either a corresponding [`QueryResponse`] or an error in
@@ -67,25 +76,6 @@ pub enum ClientMsg {
         /// The result of the query.
         response: QueryResponse,
         /// ID of the query message.
-        correlation_id: MsgId,
-    },
-    /// An error response to a [`Cmd`].
-    ///
-    /// [`Cmd`]: Self::Cmd
-    CmdError {
-        /// The error.
-        error: Error,
-        /// ID of causing [`Cmd`] message.
-        ///
-        /// [`Cmd`]: Self::Cmd
-        correlation_id: MsgId,
-    },
-    /// CmdAck will be sent back to the client when the handling on the
-    /// receiving Elder has been succeeded.
-    CmdAck {
-        /// ID of causing [`Cmd`] message.
-        ///
-        /// [`Cmd`]: Self::Cmd
         correlation_id: MsgId,
     },
 }
@@ -108,10 +98,9 @@ impl Display for ClientMsg {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::Cmd(cmd) => write!(f, "ClientMsg::Cmd({:?})", cmd),
-            Self::CmdAck { correlation_id } => {
-                write!(f, "ClientMsg::CmdAck({:?})", correlation_id)
+            Self::CmdResponse { response, .. } => {
+                write!(f, "ClientMsg::CmdResponse({:?})", response)
             }
-            Self::CmdError { error, .. } => write!(f, "ClientMsg::CmdError({:?})", error),
             Self::Query(query) => write!(f, "ClientMsg::Query({:?})", query),
             Self::QueryResponse { response, .. } => {
                 write!(f, "ClientMsg::QueryResponse({:?})", response)
@@ -121,7 +110,6 @@ impl Display for ClientMsg {
 }
 
 /// The response to a query, containing the query result.
-/// Response operation id should match query `operation_id`
 #[allow(clippy::large_enum_variant, clippy::type_complexity)]
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug, Hash)]
 pub enum QueryResponse {
@@ -193,6 +181,47 @@ impl QueryResponse {
                 | GetRegisterUserPermissions(Err(Error::NoSuchEntry))
                 | SpentProofShares(Err(Error::DataNotFound(_)))
         )
+    }
+}
+
+/// The response to a query, containing the query result.
+#[allow(clippy::large_enum_variant, clippy::type_complexity)]
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug, Hash)]
+pub enum CmdResponse {
+    //
+    // ===== Chunk =====
+    //
+    /// Response to DataCmd::StoreChunk
+    StoreChunk(Result<()>),
+    //
+    // ===== Register Data =====
+    //
+    /// Response to RegisterCmd::Create.
+    CreateRegister(Result<()>),
+    /// Response to RegisterCmd::Edit.
+    EditRegister(Result<()>),
+    //
+    // ===== Spentbook Data =====
+    //
+    /// Response to SpentbookCmd::Spend.
+    SpendKey(Result<()>),
+}
+
+impl CmdResponse {
+    /// Returns true if the result returned is a success or not
+    pub fn is_success(&self) -> bool {
+        self.result().is_ok()
+    }
+
+    /// Returns the result
+    pub fn result(&self) -> &Result<()> {
+        use CmdResponse::*;
+        match self {
+            StoreChunk(result)
+            | CreateRegister(result)
+            | EditRegister(result)
+            | SpendKey(result) => result,
+        }
     }
 }
 
