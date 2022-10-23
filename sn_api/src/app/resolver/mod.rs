@@ -54,10 +54,9 @@ impl Safe {
     /// ```no_run
     /// # use sn_api::{Safe, resolver::SafeData};
     /// # use std::collections::BTreeMap;
-    /// # let mut safe = Safe::default();
     /// # let rt = tokio::runtime::Runtime::new().unwrap();
     /// # rt.block_on(async {
-    /// #   safe.connect(None, None, None).await.unwrap();
+    /// #   let safe = Safe::connected(None, None, None, None).await.unwrap();
     ///     let (xorurl, _, _) = safe.files_container_create_from("./testdata/", None, true, false).await.unwrap();
     ///
     ///     let safe_data = safe.fetch( &format!( "{}/test.md", &xorurl.replace("?v=0", "") ), None ).await.unwrap();
@@ -105,8 +104,7 @@ impl Safe {
     /// # use std::collections::BTreeMap;
     /// # let rt = tokio::runtime::Runtime::new().unwrap();
     /// # rt.block_on(async {
-    /// #   let mut safe = Safe::default();
-    /// #   safe.connect(None, None, None).await.unwrap();
+    /// #   let mut safe = Safe::connected(None, None, None, None).await.unwrap();
     ///     let (container_xorurl, _, _) = safe.files_container_create_from("./testdata/", None, true, false).await.unwrap();
     ///
     ///     let inspected_content = safe.inspect( &format!( "{}/test.md", &container_xorurl.replace("?v=0", "") ) ).await.unwrap();
