@@ -136,7 +136,7 @@ pub(crate) async fn run_node_handle_client_msg_and_collect_cmds(
             #[cfg(feature = "traceroute")]
             Traceroute(Vec::new()),
         )
-        .await?;
+        .await;
 
     // drop any read locks on the node here
     // we may have commands editing the node, requiring a write lock
@@ -230,8 +230,11 @@ impl Cmd {
         match self {
             Cmd::SendMsg { msg, .. } => match msg {
                 OutgoingMsg::Client(client_msg) => match client_msg {
-                    ClientMsg::CmdError { error, .. } => Ok(error.clone()),
-                    _ => Err(eyre!("A ClientMsg::CmdError variant was expected")),
+                    ClientMsg::CmdResponse { response, .. } => match response.result() {
+                        Ok(_) => Err(eyre!("A CmdResponse error was expected")),
+                        Err(error) => Ok(error.clone()),
+                    },
+                    _ => Err(eyre!("A ClientMsg::CmdResponse variant was expected")),
                 },
                 _ => Err(eyre!("A OutgoingMsg::Client variant was expected")),
             },

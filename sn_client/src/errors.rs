@@ -141,7 +141,7 @@ pub enum Error {
     },
     /// Error response received for a client cmd sent to the network
     #[error("Error received from the network: {source:?} for cmd: {msg_id:?}")]
-    ErrorCmd {
+    CmdError {
         /// The source of an error msg
         source: ErrorMsg,
         /// MsgId of the cmd

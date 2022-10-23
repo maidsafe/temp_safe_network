@@ -11,7 +11,7 @@ mod messaging;
 
 use crate::Result;
 use sn_interface::{
-    messaging::data::{Error as ErrorMsg, QueryResponse},
+    messaging::data::{CmdResponse, QueryResponse},
     network_knowledge::SectionTree,
     types::PeerLinks,
 };
@@ -24,7 +24,7 @@ use tokio::sync::RwLock;
 // and the thread waiting to aggregate responses
 #[derive(Debug)]
 pub(super) enum MsgResponse {
-    CmdResponse(SocketAddr, Option<ErrorMsg>),
+    CmdResponse(SocketAddr, Box<CmdResponse>),
     QueryResponse(SocketAddr, Box<QueryResponse>),
 }
 
