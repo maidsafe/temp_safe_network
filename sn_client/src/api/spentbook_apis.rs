@@ -37,7 +37,7 @@ impl Client {
     ///
     /// When the request is resubmitted, it gets sent along with a proof chain and a signed SAP
     /// that the section can use to update itself.
-    #[instrument(skip(self), level = "debug")]
+    #[instrument(skip(self, tx, spent_proofs, spent_transactions), level = "debug")]
     pub async fn spend_dbc(
         &self,
         key_image: KeyImage,
