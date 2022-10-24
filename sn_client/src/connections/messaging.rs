@@ -12,7 +12,7 @@ use crate::{Error, Result};
 
 #[cfg(feature = "traceroute")]
 use sn_interface::{
-    messaging::{Entity, Traceroute},
+    messaging::{Entity, Traceroute, MsgKind},
     types::PublicKey,
 };
 
