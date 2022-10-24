@@ -42,6 +42,7 @@ fn node_install_should_install_the_latest_version() -> Result<()> {
 }
 
 #[test]
+#[ignore = "reenable when aws setup once more"]
 fn node_install_should_install_a_specific_version() -> Result<()> {
     let temp_dir = assert_fs::TempDir::new()?;
     let safe_dir = temp_dir.child(".safe");
@@ -66,6 +67,7 @@ fn node_install_should_install_a_specific_version() -> Result<()> {
 }
 
 #[test]
+#[ignore = "reenable when aws setup once more"]
 fn node_install_should_install_to_a_specific_location() -> Result<()> {
     let temp_dir = assert_fs::TempDir::new()?;
     let safe_dir = temp_dir.child(".safe");
