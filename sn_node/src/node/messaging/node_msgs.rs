@@ -228,7 +228,7 @@ impl MyNode {
             }
             NodeMsg::JoinRequest(join_request) => {
                 trace!("Handling msg {:?}: JoinRequest from {}", msg_id, sender);
-                MyNode::handle_join_request(node, sender, join_request, comm)
+                MyNode::handle_join_request(node, sender, join_request)
                     .await
                     .map(|c| c.into_iter().collect())
             }
