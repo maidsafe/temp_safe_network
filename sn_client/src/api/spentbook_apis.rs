@@ -22,6 +22,9 @@ use sn_interface::{
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
+// Maximum number of attempts when retrying a spend DBC operation with updated network knowledge.
+const MAX_SPEND_DBC_ATTEMPS: u8 = 5;
+
 impl Client {
     //----------------------
     // Write Operations
@@ -37,7 +40,7 @@ impl Client {
     ///
     /// When the request is resubmitted, it gets sent along with a proof chain and a signed SAP
     /// that the section can use to update itself.
-    #[instrument(skip(self), level = "debug")]
+    #[instrument(skip(self, tx, spent_proofs, spent_transactions), level = "debug")]
     pub async fn spend_dbc(
         &self,
         key_image: KeyImage,
@@ -45,61 +48,51 @@ impl Client {
         spent_proofs: BTreeSet<SpentProof>,
         spent_transactions: BTreeSet<RingCtTransaction>,
     ) -> Result<(), Error> {
-        let mut cmd = SpentbookCmd::Spend {
-            key_image,
-            tx: tx.clone(),
-            spent_proofs: spent_proofs.clone(),
-            spent_transactions: spent_transactions.clone(),
-            network_knowledge: None,
-        };
+        let mut network_knowledge = None;
         let mut attempts = 1;
-        debug!("Attempting DBC spend request.");
+
         debug!(
-            "Will reattempt if spent proof was signed with a section key that is unknown to the \
-            processing section."
+            "Attempting DBC spend request. Will reattempt if spent proof was signed \
+            with a section key that is unknown to the processing section."
         );
         loop {
+            let cmd = SpentbookCmd::Spend {
+                key_image,
+                tx: tx.clone(),
+                spent_proofs: spent_proofs.clone(),
+                spent_transactions: spent_transactions.clone(),
+                network_knowledge,
+            };
+
             let result = self.send_cmd(DataCmd::Spentbook(cmd)).await;
-            match result {
-                Ok(()) => {
-                    return Ok(());
+
+            if let Err(Error::CmdError {
+                source: NetworkDataError::SpentProofUnknownSectionKey(unknown_section_key),
+                ..
+            }) = result
+            {
+                debug!(
+                    "Encountered unknown section key during spend request. \
+                        Will obtain updated network knowledge and retry. \
+                        Attempts made: {attempts}"
+                );
+                if attempts >= MAX_SPEND_DBC_ATTEMPS {
+                    error!("DBC spend request failed after {attempts} attempts");
+                    return Err(Error::DbcSpendRetryAttemptsExceeded(attempts));
                 }
-                Err(err) => match err {
-                    Error::CmdError {
-                        source: NetworkDataError::SpentProofUnknownSectionKey(unknown_section_key),
-                        ..
-                    } => {
-                        debug!("Encountered unknown section key during spend request.");
-                        debug!(
-                            "Will obtain updated network knowledge and retry. \
-                            Attempts made: {attempts}"
-                        );
-                        attempts += 1;
-                        if attempts > 5 {
-                            error!("DBC spend request failed after 5 retry attempts");
-                            return Err(Error::DbcSpendRetryAttemptsExceeded);
-                        }
-                        let network = self.session.network.read().await;
-                        let (proof_chain, _) = network
-                            .get_sections_dag()
-                            .single_branch_dag_for_key(&unknown_section_key)
-                            .map_err(|_| Error::SectionsDagKeyNotFound(unknown_section_key))?;
-                        let signed_sap = network
-                            .get_signed_by_key(&unknown_section_key)
-                            .ok_or(Error::SignedSapNotFound(unknown_section_key))?;
-                        cmd = SpentbookCmd::Spend {
-                            key_image,
-                            tx: tx.clone(),
-                            spent_proofs: spent_proofs.clone(),
-                            spent_transactions: spent_transactions.clone(),
-                            network_knowledge: Some((proof_chain, signed_sap.clone())),
-                        };
-                        continue;
-                    }
-                    _ => {
-                        return Err(err);
-                    }
-                },
+                let network = self.session.network.read().await;
+                let (proof_chain, _) = network
+                    .get_sections_dag()
+                    .single_branch_dag_for_key(&unknown_section_key)
+                    .map_err(|_| Error::SectionsDagKeyNotFound(unknown_section_key))?;
+                let signed_sap = network
+                    .get_signed_by_key(&unknown_section_key)
+                    .ok_or(Error::SignedSapNotFound(unknown_section_key))?;
+
+                network_knowledge = Some((proof_chain, signed_sap.clone()));
+                attempts += 1;
+            } else {
+                return result;
             }
         }
     }
