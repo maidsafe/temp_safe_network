@@ -260,7 +260,6 @@ fn section_sig() -> sn_interface::messaging::SectionSig {
 #[cfg(test)]
 mod tests {
     use crate::{
-        retry_loop_for_pattern,
         utils::test_utils::{create_test_client, init_logger},
         Error,
     };
@@ -280,7 +279,17 @@ mod tests {
         collections::{BTreeMap, BTreeSet},
         time::Instant,
     };
+    use tokio::time::{sleep, Duration};
     use tracing::Instrument;
+
+    // Helper function used by all tests to always wait the same amount of time
+    // before trying to query for published Register ops. The amount of secs shall
+    // be based or directly determined by how much we are stressing the testnet, e.g. if we
+    // are using many test-threads we may need to sleep for a longer period of time.
+    async fn delay_before_we_query_pubished_data() {
+        let duration = Duration::from_secs(1);
+        sleep(duration).await;
+    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_register_batching() -> Result<()> {
@@ -288,7 +297,6 @@ mod tests {
         let _outer_span = tracing::info_span!("test__register_batching").entered();
 
         let client = create_test_client().await?;
-        let one_sec = tokio::time::Duration::from_secs(1);
         let name = xor_name::rand::random();
         let tag = 15000;
         let owner = User::Key(client.public_key());
@@ -304,7 +312,7 @@ mod tests {
 
         // publish that batch to the network
         client.publish_register_ops(batch).await?;
-        tokio::time::sleep(one_sec).await;
+        delay_before_we_query_pubished_data().await;
 
         // check they're both there
         let register1 = client.get_register(address).await?;
@@ -333,12 +341,10 @@ mod tests {
         let network_assert_delay: u64 = std::env::var("NETWORK_ASSERT_DELAY")
             .unwrap_or_else(|_| "3".to_string())
             .parse()?;
-
-        let client = create_test_client().await?;
-
-        let delay = tokio::time::Duration::from_secs(network_assert_delay);
+        let delay = Duration::from_secs(network_assert_delay);
         debug!("Running network asserts with delay of {:?}", delay);
 
+        let client = create_test_client().await?;
         let name = xor_name::rand::random();
         let tag = 15000;
         let owner = User::Key(client.public_key());
@@ -347,8 +353,8 @@ mod tests {
         let (_address, batch) = client.create_register(name, tag, policy(owner)).await?;
         client.publish_register_ops(batch).await?;
 
-        // small delay to ensure logs have written
-        tokio::time::sleep(delay).await;
+        // small delay to ensure logs have written by the nodes
+        sleep(delay).await;
 
         // All elders should have been written to
         the_logs.assert_count(LogMarker::RegisterWrite, 7)?;
@@ -407,9 +413,7 @@ mod tests {
         // store a Register
         let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
         client.publish_register_ops(batch).await?;
-
-        let delay = tokio::time::Duration::from_secs(1);
-        tokio::time::sleep(delay).await;
+        delay_before_we_query_pubished_data().await;
 
         let register = client.get_register(address).await?;
 
@@ -421,8 +425,8 @@ mod tests {
         // store a second Register
         let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
         client.publish_register_ops(batch).await?;
+        delay_before_we_query_pubished_data().await;
 
-        tokio::time::sleep(delay).await;
         let register = client.get_register(address).await?;
 
         assert_eq!(*register.name(), name);
@@ -451,8 +455,8 @@ mod tests {
             .publish_register_ops(batch)
             .await
             .context("publish ops failed")?;
+        delay_before_we_query_pubished_data().await;
 
-        // keep retrying until ok
         let permissions = client
             .get_register_permissions_for_user(address, owner)
             .instrument(tracing::info_span!("get owner perms"))
@@ -494,6 +498,7 @@ mod tests {
 
         let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
         client.publish_register_ops(batch).await?;
+        delay_before_we_query_pubished_data().await;
 
         let value_1 = random_register_entry();
 
@@ -556,9 +561,10 @@ mod tests {
             .write_to_local_register(address, value_1.clone(), BTreeSet::new())
             .await?;
         client.publish_register_ops(batch).await?;
+        delay_before_we_query_pubished_data().await;
 
         // now check last entry
-        let hashes = retry_loop_for_pattern!(client.read_register(address), Ok(hashes) if !hashes.is_empty())?;
+        let hashes = client.read_register(address).await?;
 
         assert_eq!(1, hashes.len());
         let current = hashes.iter().next();
@@ -578,16 +584,14 @@ mod tests {
         assert!(batch.len() == 1);
 
         client.publish_register_ops(batch).await?;
+        delay_before_we_query_pubished_data().await;
 
         // and then lets check all entries are returned
-        // NB: these will not be ordered according to insertion order, but according to the hashes of the values.
-        let hashes =
-            retry_loop_for_pattern!(client.read_register(address), Ok(hashes) if hashes.len() > 1)?;
+        // NB: these will not be ordered according to insertion order,
+        // but according to the hashes of the values.
+        let hashes = client.read_register(address).await?;
 
         assert_eq!(2, hashes.len());
-
-        let delay = tokio::time::Duration::from_secs(1);
-        tokio::time::sleep(delay).await;
 
         // get_register_entry
         let retrieved_value_1 = client
@@ -595,8 +599,6 @@ mod tests {
             .instrument(tracing::info_span!("get_value_1"))
             .await?;
         assert_eq!(retrieved_value_1, value_1);
-
-        tokio::time::sleep(delay).await;
 
         let retrieved_value_2 = client
             .get_register_entry(address, value2_hash)
@@ -637,6 +639,7 @@ mod tests {
 
         let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
         client.publish_register_ops(batch).await?;
+        delay_before_we_query_pubished_data().await;
 
         // Assert that the data is stored.
         let current_owner = client.get_register_owner(address).await?;
@@ -667,6 +670,7 @@ mod tests {
             .publish_register_ops(batch)
             .await
             .context("publishing reg failed")?;
+        delay_before_we_query_pubished_data().await;
 
         let _register = client
             .get_register(address)
