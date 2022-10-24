@@ -32,7 +32,6 @@ impl MyNode {
         node: Arc<RwLock<MyNode>>,
         peer: Peer,
         join_request: JoinRequest,
-        comm: &Comm,
     ) -> Result<Option<Cmd>> {
         debug!("Handling join. Received {:?} from {}", join_request, peer);
 
@@ -108,27 +107,10 @@ impl MyNode {
             ));
         }
 
-        // drop node read lock before reachability check
-        drop(read_locked_node);
-
-        // Do reachability check only for the initial join request
-        if comm.is_reachable(&peer.addr()).await.is_err() {
-            let msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Rejected(
-                JoinRejectionReason::NodeNotReachable(peer.addr()),
-            )));
-            trace!("{}", LogMarker::SendJoinRejected);
-            trace!("Sending {:?} to {}", msg, peer);
-
-            let read_locked_node = node.read().await;
-            Ok(Some(
-                read_locked_node.send_system_msg(msg, Peers::Single(peer)),
-            ))
-        } else {
-            let mut node = node.write().await;
-            // It's reachable, let's then propose membership
-            let node_state = NodeState::joined(peer, None);
-            Ok(node.propose_membership_change(node_state))
-        }
+        let mut node = node.write().await;
+        // It's reachable, let's then propose membership
+        let node_state = NodeState::joined(peer, None);
+        Ok(node.propose_membership_change(node_state))
     }
 
     pub(crate) fn verify_joining_node_age(&self, peer: &Peer) -> Result<(bool, u8)> {
