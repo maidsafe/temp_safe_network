@@ -58,7 +58,7 @@ impl Session {
         resp_tx: mpsc::Sender<MsgResponse>,
     ) {
         let addr = peer.addr();
-        debug!("Waiting for incoming msg on bi-stream from {peer:?}");
+        debug!("Waiting for response msg on bi-stream from {peer:?} for {msg_id:?}");
 
         let _handle = tokio::spawn(async move {
             match Self::read_msg_from_recvstream(&mut recv_stream).await {
@@ -86,22 +86,6 @@ impl Session {
         })
         .in_current_span();
     }
-
-    // #[instrument(skip_all, level = "debug")]
-    // pub(crate) async fn handle_msg(
-    //     msg: MsgType,
-    //     src_peer: Peer,
-    //     mut session: Self,
-    //     resp_tx: mpsc::Sender<MsgResponse>,
-
-    // ) -> Result<(), Error> {
-    //     match msg.clone() {
-    //         MsgType::Client { msg_id, msg, .. } => {
-    //             Self::handle_client_msg(msg_id, msg, src_peer.addr(), resp_tx).await
-    //         }
-    //         MsgType::Node { msg, .. } => session.handle_system_msg(msg, src_peer, resp_tx).await?,
-    //     }
-    // }
 
     async fn handle_system_msg(
         &mut self,

@@ -24,20 +24,6 @@ pub use sn_interface::init_logger;
 
 #[cfg(test)]
 #[macro_export]
-/// Helper for tests to retry an operation awaiting for a successful response result
-macro_rules! retry_loop {
-    ($async_func:expr) => {
-        loop {
-            match $async_func.await {
-                Ok(val) => break val,
-                Err(_) => tokio::time::sleep(std::time::Duration::from_secs(2)).await,
-            }
-        }
-    };
-}
-
-#[cfg(test)]
-#[macro_export]
 /// Helper for tests to retry an operation awaiting for a specific result
 macro_rules! retry_loop_for_pattern {
     ($async_func:expr, $pattern:pat $(if $cond:expr)?) => {
@@ -47,8 +33,8 @@ macro_rules! retry_loop_for_pattern {
                 $pattern $(if $cond)? => break result,
                 Ok(_) | Err(_) => {
                     debug!("waiting before retying.....");
-                    tokio::time::sleep(std::time::Duration::from_secs(2)).await}
-                    ,
+                    tokio::time::sleep(std::time::Duration::from_secs(2)).await
+                }
             }
         }
     };
