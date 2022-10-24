@@ -342,7 +342,7 @@ pub mod util {
     pub fn parse_files_put_or_sync_output(output: &str) -> Result<(String, ProcessedFiles)> {
         serde_json::from_str(output).map_err(|_| {
             eyre!(
-                "Failed to parse output of `safe files put/sync`: {}",
+                "Failed to parse output of `safe files put/sync` (Perhaps RUST_LOG is polluting output?): {}",
                 output
             )
         })
@@ -352,27 +352,31 @@ pub mod util {
         output: &str,
     ) -> Result<(String, SafeUrl, (String, String, String))> {
         serde_json::from_str(output)
-            .map_err(|_| eyre!("Failed to parse output of `safe nrs register`: {}", output))
+            .map_err(|_| eyre!("Failed to parse output of `safe nrs register` (Perhaps RUST_LOG is polluting output?): {}", output))
     }
 
     pub fn parse_wallet_create_output(output: &str) -> Result<String> {
         serde_json::from_str(output)
-            .map_err(|_| eyre!("Failed to parse output of `safe wallet create`: {}", output))
+            .map_err(|_| eyre!("Failed to parse output of `safe wallet create` (Perhaps RUST_LOG is polluting output?): {}", output))
     }
 
     pub fn parse_xorurl_output(output: &str) -> Result<Vec<(String, String)>> {
         serde_json::from_str(output)
-            .map_err(|_| eyre!("Failed to parse output of `safe xorurl`: {}", output))
+            .map_err(|_| eyre!("Failed to parse output of `safe xorurl` (Perhaps RUST_LOG is polluting output?): {}", output))
     }
 
     pub fn parse_dog_output(output: &str) -> Result<(String, Vec<SafeData>)> {
-        serde_json::from_str(output)
-            .map_err(|_| eyre!("Failed to parse output of `safe dog`: {}", output))
+        serde_json::from_str(output).map_err(|_| {
+            eyre!(
+                "Failed to parse output of `safe dog` (Perhaps RUST_LOG is polluting output?): {}",
+                output
+            )
+        })
     }
 
     pub fn parse_keys_create_output(output: &str) -> Result<(String, String)> {
         serde_json::from_str(output)
-            .map_err(|_| eyre!("Failed to parse output of `safe keys create`: {}", output))
+            .map_err(|_| eyre!("Failed to parse output of `safe keys create` (Perhaps RUST_LOG is polluting output?): {}", output))
     }
 
     /// Runs safe with the arguments specified, with the option to assert on the exit code.
