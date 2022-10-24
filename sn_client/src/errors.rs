@@ -32,7 +32,7 @@ pub enum Error {
     NetworkContacts(String),
     /// InsufficientAcksReceived
     #[error(
-        "Did not receive sufficient ACK messages from elders to be sure this cmd ({msg_id:?}) \
+        "Did not receive sufficient ACK messages from Elders to be sure this cmd ({msg_id:?}) \
         passed, expected: {expected}, received {received}."
     )]
     InsufficientAcksReceived {
@@ -43,9 +43,6 @@ pub enum Error {
         /// Number of received ACKs
         received: usize,
     },
-    /// Message auth checks failed
-    #[error("Message's authority could not be trusted, unknown section key: {0:?}.")]
-    UntrustedMessage(PublicKey),
     /// Initial network contact failed
     #[error("Initial network contact probe failed. Attempted contacts: {0:?}")]
     NetworkContact(Vec<Peer>),
@@ -119,9 +116,6 @@ pub enum Error {
     /// Timeout when awaiting command ACK from Elders.
     #[error("Timeout when awaiting command ACK from Elders for data address {0}")]
     CmdAckValidationTimeout(XorName),
-    /// No operation Id could be found
-    #[error("Could not retrieve the operation id of a query or response")]
-    UnknownOperationId,
     /// Unexpected query response received
     #[error("Unexpected response received for {query:?}. Received: {response:?}")]
     UnexpectedQueryResponse {
@@ -201,8 +195,8 @@ pub enum Error {
     #[error("A signed section authority provider was not found for section key {0:?}")]
     SignedSapNotFound(PublicKey),
     /// Occurs if a DBC spend command eventually fails after a number of retry attempts.
-    #[error("The DBC spend request failed after several retry attempts")]
-    DbcSpendRetryAttemptsExceeded,
+    #[error("The DBC spend request failed after {0} attempts")]
+    DbcSpendRetryAttemptsExceeded(u8),
     /// Occurs if a section key is not found when searching the sections DAG.
     #[error("Section key {0:?} was not found in the sections DAG")]
     SectionsDagKeyNotFound(PublicKey),

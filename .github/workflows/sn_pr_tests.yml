@@ -28,7 +28,7 @@ jobs:
       - cargo-deny
       - e2e
       - api
-      # - cli
+      - cli
       # - e2e-split
       - unit
       - checks
@@ -134,7 +134,7 @@ jobs:
           sharedKey: ${{github.run_id}}-unit
 
       - name: Build sn_interface tests before running
-        run: cd sn_interface &&  cargo test --no-run --release
+        run: cd sn_interface && cargo test --no-run --release
         timeout-minutes: 50
 
       - name: Run sn_interface tests
@@ -142,7 +142,7 @@ jobs:
         run: cd sn_interface && cargo test --release
 
       - name: Build sn_dysfunction tests before running
-        run: cd sn_dysfunction &&  cargo test --no-run --release
+        run: cd sn_dysfunction && cargo test --no-run --release
         timeout-minutes: 50
 
       - name: Run sn_dysfunction tests
@@ -207,7 +207,7 @@ jobs:
         timeout-minutes: 60
 
       - name: Build testnet
-        run: cd testnet && cargo build  --release --bin testnet
+        run: cd testnet && cargo build --release --bin testnet
         timeout-minutes: 60
 
       # - name: Build log_cmds_inspector
@@ -218,7 +218,7 @@ jobs:
         run: ./target/release/testnet --interval 30000
         id: section-startup
         env:
-          RUST_LOG: "sn_node,sn_api,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
+          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
 
       - name: Wait for all nodes to join
         shell: bash
@@ -603,14 +603,14 @@ jobs:
         timeout-minutes: 60
 
       - name: Build testnet
-        run: cd testnet && cargo build  --release --bin testnet
+        run: cd testnet && cargo build --release --bin testnet
         timeout-minutes: 60
 
       - name: Start the network
         run: ./target/release/testnet --interval 30000
         id: section-startup
         env:
-          RUST_LOG: "sn_node,sn_api,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
+          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
 
       - name: Wait for all nodes to join
         shell: bash
