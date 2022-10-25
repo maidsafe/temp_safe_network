@@ -447,7 +447,6 @@ impl MyNode {
 mod tests {
     use super::*;
 
-    use crate::flow_ctrl::tests::network_utils::create_comm;
     use crate::integration::event_channel;
     use crate::node::{cfg::create_test_max_capacity_and_root_storage, MIN_ADULT_AGE};
     use sn_interface::{
@@ -674,7 +673,7 @@ mod tests {
 
             let (_, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let (mut node, _) = MyNode::first_node(
-                create_comm().await?.socket_addr(),
+                (std::net::Ipv4Addr::LOCALHOST, 0).into(),
                 info.keypair.clone(),
                 event_channel::new(1).0,
                 root_storage_dir,
