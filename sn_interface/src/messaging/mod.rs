@@ -34,7 +34,7 @@ mod msg_id;
 // Message types
 mod msg_type;
 // Types of messages and corresponding source authorities
-mod auth_kind;
+mod msg_kind;
 // Msg dst
 mod dst;
 
@@ -42,13 +42,13 @@ mod dst;
 pub use self::serialisation::{Entity, Traceroute};
 
 pub use self::{
-    auth_kind::AuthKind,
     authority::{
         AuthorityProof, ClientAuth, NodeSig, SectionSig, SectionSigShare, VerifyAuthority,
     },
     dst::Dst,
     errors::{Error, Result},
     msg_id::{MsgId, MESSAGE_ID_LEN},
+    msg_kind::MsgKind,
     msg_type::MsgType,
     serialisation::WireMsg,
 };

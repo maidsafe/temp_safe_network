@@ -334,7 +334,7 @@ mod tests {
     use sn_interface::{
         messaging::{
             data::{ClientMsg, DataQuery, DataQueryVariant},
-            AuthKind, ClientAuth, Dst, MsgId,
+            ClientAuth, Dst, MsgId, MsgKind,
         },
         types::{ChunkAddress, Keypair, Peer},
     };
@@ -529,7 +529,7 @@ mod tests {
         Ok(WireMsg::new_msg(
             MsgId::new(),
             payload,
-            AuthKind::Client(auth),
+            MsgKind::Client(auth),
             dst,
         ))
     }

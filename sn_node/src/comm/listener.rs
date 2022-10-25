@@ -9,7 +9,7 @@
 use super::MsgFromPeer;
 
 use sn_interface::{
-    messaging::{AuthKind, WireMsg},
+    messaging::{MsgKind, WireMsg},
     types::{log_markers::LogMarker, Peer},
 };
 
@@ -66,11 +66,9 @@ impl MsgListener {
                         }
                     };
 
-                    let src_name = match wire_msg.auth() {
-                        AuthKind::Client(auth) => auth.public_key.into(),
-                        AuthKind::Node(auth) => {
-                            sn_interface::types::PublicKey::Ed25519(auth.node_ed_pk).into()
-                        }
+                    let src_name = match wire_msg.kind() {
+                        MsgKind::Client(auth) => auth.public_key.into(),
+                        MsgKind::Node(name) => *name,
                     };
 
                     if first {

@@ -443,7 +443,7 @@ mod tests {
 
     use sn_interface::{
         elder_count,
-        messaging::{AuthKind, Dst, MsgId, NodeSig},
+        messaging::{Dst, MsgId, MsgKind},
         network_knowledge::{
             test_utils::{gen_addr, random_sap, section_signed},
             MyNodeInfo, SectionKeyShare, SectionKeysProvider, SectionsDAG,
@@ -716,10 +716,13 @@ mod tests {
             };
 
             let msg_id = MsgId::new();
-            let node_auth = NodeSig::authorize(src_section_pk, &sender.keypair, &payload);
-            let auth = AuthKind::Node(node_auth.into_inner());
 
-            Ok(WireMsg::new_msg(msg_id, payload, auth, dst))
+            Ok(WireMsg::new_msg(
+                msg_id,
+                payload,
+                MsgKind::Node(sender.name()),
+                dst,
+            ))
         }
     }
 

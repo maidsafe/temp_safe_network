@@ -15,7 +15,7 @@ use crate::node::{
 #[cfg(feature = "traceroute")]
 use sn_interface::{messaging::Entity, messaging::Traceroute};
 use sn_interface::{
-    messaging::{AuthKind, Dst, MsgId, WireMsg},
+    messaging::{Dst, MsgId, MsgKind, WireMsg},
     network_knowledge::SectionTreeUpdate,
     types::Peer,
 };
@@ -279,7 +279,7 @@ impl Dispatcher {
     }
 }
 
-// Serializes and signs the msg,
+// Serializes and signs the msg if it's a Client message,
 // and produces one [`WireMsg`] instance per recipient -
 // the last step before passing it over to comms module.
 fn into_msg_bytes(
@@ -289,7 +289,10 @@ fn into_msg_bytes(
     recipients: Peers,
     #[cfg(feature = "traceroute")] traceroute: Traceroute,
 ) -> Result<Vec<(Peer, UsrMsgBytes)>> {
-    let (auth, payload) = node.sign_msg(msg)?;
+    let (kind, payload) = match msg {
+        OutgoingMsg::Node(msg) => node.serialize_node_msg(msg)?,
+        OutgoingMsg::Client(msg) => node.serialize_sign_client_msg(msg)?,
+    };
     let recipients = match recipients {
         Peers::Single(peer) => vec![peer],
         Peers::Multiple(peers) => peers.into_iter().collect(),
@@ -309,7 +312,7 @@ fn into_msg_bytes(
     let mut initial_wire_msg = wire_msg(
         msg_id,
         payload,
-        auth,
+        kind,
         dst,
         #[cfg(feature = "traceroute")]
         trace,
@@ -343,7 +346,7 @@ struct Trace {
 fn wire_msg(
     msg_id: MsgId,
     payload: Bytes,
-    auth: AuthKind,
+    auth: MsgKind,
     dst: Dst,
     #[cfg(feature = "traceroute")] trace: Trace,
 ) -> WireMsg {
