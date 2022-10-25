@@ -10,32 +10,36 @@ use super::{
     dispatcher::Dispatcher,
     logging::{log_ctx::LogCtx, run_system_logger},
     node_test_api::NodeTestApi,
-    CmdCtrl, FlowCtrl,
+    CmdCtrl, Error, FlowCtrl, Result,
 };
 
-use crate::comm::{Comm, MsgFromPeer};
 use crate::data::{Data, UsedSpace};
 use crate::integration::{
     cmds::Cmd,
     event::{Elders, Event, MembershipEvent, NodeElderChange},
     event_channel::{self, EventReceiver, EventSender},
+    MsgFromPeer,
 };
 use crate::node::{
     cfg::keypair_storage::{get_reward_pk, store_network_keypair, store_new_reward_keypair},
-    join_network, Config, Error, MyNode, Result,
+    Config, MyNode,
 };
+use crate::{comm::Comm, node::Joiner};
 
 use sn_interface::{
-    network_knowledge::{MyNodeInfo, SectionTree, MIN_ADULT_AGE},
-    types::{keys::ed25519, log_markers::LogMarker, PublicKey as TypesPublicKey},
+    messaging::WireMsg,
+    network_knowledge::{MyNodeInfo, NetworkKnowledge, SectionTree, MIN_ADULT_AGE},
+    types::{keys::ed25519, log_markers::LogMarker, Peer, PublicKey as TypesPublicKey},
 };
 
+use futures::future;
 use rand_07::rngs::OsRng;
 use std::{collections::BTreeSet, path::Path, sync::Arc, time::Duration};
 use tokio::{
     fs,
     sync::{mpsc, RwLock},
 };
+use tracing::Instrument;
 use xor_name::Prefix;
 
 // Filename for storing the content of the genesis DBC.
@@ -203,7 +207,11 @@ async fn bootstrap_genesis_node(
 
     // Write the genesis DBC to disk
     let path = root_storage_dir.join(GENESIS_DBC_FILENAME);
-    fs::write(path, genesis_dbc.to_hex()?).await?;
+    fs::write(
+        path,
+        genesis_dbc.to_hex().map_err(crate::node::Error::DbcError)?,
+    )
+    .await?;
 
     let network_knowledge = node.network_knowledge();
 
@@ -276,4 +284,59 @@ async fn bootstrap_normal_node(
     info!("{} Joined the network!", node.info().name());
     info!("Our AGE: {}", node.info().age());
     Ok(node)
+}
+
+/// Join the network as new node.
+///
+/// NOTE: It's not guaranteed this function ever returns. This can happen due to messages being
+/// lost in transit or other reasons. It's the responsibility of the caller to handle this case,
+/// for example by using a timeout.
+async fn join_network(
+    node: MyNodeInfo,
+    comm: &Comm,
+    incoming_msgs: &mut mpsc::Receiver<MsgFromPeer>,
+    section_tree: SectionTree,
+    join_timeout: Duration,
+) -> Result<(MyNodeInfo, NetworkKnowledge)> {
+    let (outgoing_msgs_sender, outgoing_msgs_receiver) = mpsc::channel(100);
+
+    let span = trace_span!("bootstrap");
+    let joiner = Joiner::new(node, outgoing_msgs_sender, incoming_msgs, section_tree);
+
+    future::join(
+        try_join(joiner, join_timeout),
+        send_messages(outgoing_msgs_receiver, comm),
+    )
+    .instrument(span)
+    .await
+    .0
+}
+
+async fn try_join(
+    joiner: Joiner<'_>,
+    join_timeout: Duration,
+) -> Result<(MyNodeInfo, NetworkKnowledge)> {
+    joiner.try_join(join_timeout).await.map_err(Error::Node)
+}
+
+// Keep reading messages from `rx` and send them using `comm`.
+async fn send_messages(
+    mut outgoing_msgs: mpsc::Receiver<(WireMsg, Vec<Peer>)>,
+    comm: &Comm,
+) -> Result<()> {
+    while let Some((msg, peers)) = outgoing_msgs.recv().await {
+        for peer in peers {
+            let dst = *msg.dst();
+            let msg_id = msg.msg_id();
+
+            let bytes = msg.serialize()?;
+            match comm.send_out_bytes(peer, msg_id, bytes, None, false).await {
+                Ok(()) => trace!("Msg {msg_id:?} sent on {dst:?}"),
+                Err(error) => {
+                    warn!("Error in comms when sending msg {msg_id:?} to peer {peer:?}: {error}")
+                }
+            }
+        }
+    }
+    Ok(())
 }

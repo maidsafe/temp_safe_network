@@ -6,10 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::{Error, Result};
+
 use crate::comm::Comm;
 use crate::data::{Data, Event as DataEvent};
 use crate::integration::{Cmd, OutgoingMsg, Peers};
-use crate::node::{Error, MyNode, Result};
+use crate::node::MyNode;
 
 #[cfg(feature = "traceroute")]
 use sn_interface::{messaging::Entity, messaging::Traceroute};
@@ -96,7 +98,7 @@ impl Dispatcher {
                 let cmds = results
                     .into_iter()
                     .filter_map(|result| match result {
-                        Err(Error::FailedSend(peer)) => {
+                        Err(crate::comm::Error::FailedSend(peer)) => {
                             if is_msg_for_client {
                                 warn!("Client msg send failed to: {peer}, for {msg_id:?}");
                                 None
@@ -156,7 +158,9 @@ impl Dispatcher {
                 send_stream,
             } => {
                 let node = self.node.read().await;
-                node.validate_msg(origin, wire_msg, send_stream).await
+                node.validate_msg(origin, wire_msg, send_stream)
+                    .await
+                    .map_err(Error::Node)
             }
             Cmd::UpdateNetworkAndHandleValidClientMsg {
                 proof_chain,
@@ -212,20 +216,26 @@ impl Dispatcher {
                     traceroute.clone(),
                 )
                 .await
+                .map_err(Error::Node)
             }
             Cmd::HandleAgreement { proposal, sig } => {
                 let mut node = self.node.write().await;
                 node.handle_general_agreements(proposal, sig)
                     .await
                     .map(|c| c.into_iter().collect())
+                    .map_err(Error::Node)
             }
             Cmd::HandleMembershipDecision(decision) => {
                 let mut node = self.node.write().await;
-                node.handle_membership_decision(decision).await
+                node.handle_membership_decision(decision)
+                    .await
+                    .map_err(Error::Node)
             }
             Cmd::HandleNewEldersAgreement { new_elders, sig } => {
                 let mut node = self.node.write().await;
-                node.handle_new_elders_agreement(new_elders, sig).await
+                node.handle_new_elders_agreement(new_elders, sig)
+                    .await
+                    .map_err(Error::Node)
             }
             Cmd::HandleFailedSendToNode { peer, msg_id } => {
                 warn!("Message sending failed to {peer}, for {msg_id:?}");
@@ -238,7 +248,9 @@ impl Dispatcher {
                 outcome,
             } => {
                 let mut node = self.node.write().await;
-                node.handle_dkg_outcome(section_auth, outcome).await
+                node.handle_dkg_outcome(section_auth, outcome)
+                    .await
+                    .map_err(Error::Node)
             }
             Cmd::HandleAdultsChanged => {
                 // Only trigger data completion request when there is an adult change.
@@ -248,7 +260,7 @@ impl Dispatcher {
             }
             Cmd::ProposeVoteNodesOffline(names) => {
                 let mut node = self.node.write().await;
-                node.cast_offline_proposals(&names)
+                node.cast_offline_proposals(&names).map_err(Error::Node)
             }
         }
     }

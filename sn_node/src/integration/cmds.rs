@@ -8,8 +8,6 @@
 
 use super::{OutgoingMsg, Peers};
 
-use crate::node::XorName;
-
 use qp2p::SendStream;
 use sn_consensus::Decision;
 use sn_dysfunction::IssueType;
@@ -28,6 +26,7 @@ use sn_interface::{
 use custom_debug::Debug;
 use std::{collections::BTreeSet, fmt, sync::Arc};
 use tokio::sync::Mutex;
+use xor_name::XorName;
 
 /// Commands for a node.
 ///

@@ -6,9 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+//! Implementation of the comm module for the SAFE Network.
+
+mod error;
 mod link;
 mod listener;
 mod peer_session;
+
+pub use self::error::{Error, Result};
 
 use self::{
     link::Link,
@@ -16,16 +21,13 @@ use self::{
     peer_session::{PeerSession, SendStatus, SendWatcher},
 };
 
-use crate::node::{Error, Result};
-use qp2p::{SendStream, UsrMsgBytes};
+use crate::integration::MsgFromPeer;
 
-use sn_interface::{
-    messaging::{MsgId, WireMsg},
-    types::Peer,
-};
+use sn_interface::{messaging::MsgId, types::Peer};
+
+use qp2p::{Endpoint, IncomingConnections, SendStream, UsrMsgBytes};
 
 use dashmap::DashMap;
-use qp2p::{Endpoint, IncomingConnections};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     sync::{
@@ -346,13 +348,6 @@ fn listen_for_incoming_msgs(
     });
 }
 
-#[derive(Debug)]
-pub(crate) struct MsgFromPeer {
-    pub(crate) sender: Peer,
-    pub(crate) wire_msg: WireMsg,
-    pub(crate) send_stream: Option<Arc<Mutex<SendStream>>>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -360,7 +355,7 @@ mod tests {
     use sn_interface::{
         messaging::{
             data::{ClientMsg, DataQuery, DataQueryVariant},
-            ClientAuth, Dst, MsgId, MsgKind,
+            ClientAuth, Dst, MsgId, MsgKind, WireMsg,
         },
         types::{ChunkAddress, Keypair, Peer},
     };

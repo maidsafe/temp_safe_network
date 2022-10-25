@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::flow_ctrl::dispatcher::Dispatcher;
+use crate::flow_ctrl::{dispatcher::Dispatcher, Error};
 use crate::integration::{Cmd, OutgoingMsg, Peers};
 
 use qp2p::SendStream;
@@ -102,7 +102,7 @@ pub(crate) async fn handle_online_cmd(
 pub(crate) async fn run_and_collect_cmds(
     cmd: Cmd,
     dispatcher: &Dispatcher,
-) -> crate::node::error::Result<Vec<Cmd>> {
+) -> crate::flow_ctrl::Result<Vec<Cmd>> {
     let mut all_cmds = vec![];
 
     let mut cmds = dispatcher.process_cmd(cmd).await?;
@@ -125,7 +125,7 @@ pub(crate) async fn run_node_handle_client_msg_and_collect_cmds(
     msg: ClientMsg,
     peer: Peer,
     dispatcher: &Dispatcher,
-) -> crate::node::error::Result<Vec<Cmd>> {
+) -> crate::flow_ctrl::Result<Vec<Cmd>> {
     let mut all_cmds = vec![];
 
     let node = dispatcher.node();

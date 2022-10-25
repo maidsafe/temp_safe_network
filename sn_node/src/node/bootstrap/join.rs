@@ -8,7 +8,7 @@
 
 use super::UsedRecipientSaps;
 
-use crate::comm::{Comm, MsgFromPeer};
+use crate::integration::MsgFromPeer;
 use crate::log_sleep;
 use crate::node::{messages::WireMsgUtils, Error, Result};
 
@@ -23,40 +23,11 @@ use sn_interface::{
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
-use futures::future;
-
 use std::collections::{BTreeMap, BTreeSet};
 use tokio::{sync::mpsc, time::Duration};
-use tracing::Instrument;
 use xor_name::Prefix;
 
-/// Join the network as new node.
-///
-/// NOTE: It's not guaranteed this function ever returns. This can happen due to messages being
-/// lost in transit or other reasons. It's the responsibility of the caller to handle this case,
-/// for example by using a timeout.
-pub(crate) async fn join_network(
-    node: MyNodeInfo,
-    comm: &Comm,
-    incoming_msgs: &mut mpsc::Receiver<MsgFromPeer>,
-    section_tree: SectionTree,
-    join_timeout: Duration,
-) -> Result<(MyNodeInfo, NetworkKnowledge)> {
-    let (outgoing_msgs_sender, outgoing_msgs_receiver) = mpsc::channel(100);
-
-    let span = trace_span!("bootstrap");
-    let joiner = Joiner::new(node, outgoing_msgs_sender, incoming_msgs, section_tree);
-
-    future::join(
-        joiner.try_join(join_timeout),
-        send_messages(outgoing_msgs_receiver, comm),
-    )
-    .instrument(span)
-    .await
-    .0
-}
-
-struct Joiner<'a> {
+pub(crate) struct Joiner<'a> {
     // Sender for outgoing messages.
     outgoing_msgs: mpsc::Sender<(WireMsg, Vec<Peer>)>,
     // Receiver for incoming messages.
@@ -70,7 +41,7 @@ struct Joiner<'a> {
 }
 
 impl<'a> Joiner<'a> {
-    fn new(
+    pub(crate) fn new(
         node: MyNodeInfo,
         outgoing_msgs: mpsc::Sender<(WireMsg, Vec<Peer>)>,
         incoming_msgs: &'a mut mpsc::Receiver<MsgFromPeer>,
@@ -104,7 +75,10 @@ impl<'a> Joiner<'a> {
     // - `ResourceChallenge`: carry out resource proof calculation.
     // - `Approval`: returns the initial `Section` value to use by this node,
     //    completing the bootstrap.
-    async fn try_join(self, join_timeout: Duration) -> Result<(MyNodeInfo, NetworkKnowledge)> {
+    pub(crate) async fn try_join(
+        self,
+        join_timeout: Duration,
+    ) -> Result<(MyNodeInfo, NetworkKnowledge)> {
         trace!(
             "Bootstrap run, section tree as we have it: {:?}",
             self.section_tree
@@ -445,28 +419,6 @@ impl<'a> Joiner<'a> {
         error!("NodeMsg sender unexpectedly closed");
         Err(Error::BootstrapConnectionClosed)
     }
-}
-
-// Keep reading messages from `rx` and send them using `comm`.
-async fn send_messages(
-    mut outgoing_msgs: mpsc::Receiver<(WireMsg, Vec<Peer>)>,
-    comm: &Comm,
-) -> Result<()> {
-    while let Some((msg, peers)) = outgoing_msgs.recv().await {
-        for peer in peers {
-            let dst = *msg.dst();
-            let msg_id = msg.msg_id();
-
-            let bytes = msg.serialize()?;
-            match comm.send_out_bytes(peer, msg_id, bytes, None, false).await {
-                Ok(()) => trace!("Msg {msg_id:?} sent on {dst:?}"),
-                Err(error) => {
-                    warn!("Error in comms when sending msg {msg_id:?} to peer {peer:?}: {error}")
-                }
-            }
-        }
-    }
-    Ok(())
 }
 
 #[cfg(test)]

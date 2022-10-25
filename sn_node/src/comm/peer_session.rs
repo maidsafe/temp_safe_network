@@ -6,21 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::sync::Arc;
+use super::{Error, Link, Result};
 
-use super::Link;
-
-use crate::node::{Error, Result};
-
-use qp2p::RetryConfig;
-use qp2p::SendStream;
-use qp2p::UsrMsgBytes;
+use qp2p::{RetryConfig, SendStream, UsrMsgBytes};
 use sn_interface::messaging::MsgId;
 
 use custom_debug::Debug;
-
-use tokio::sync::mpsc;
-use tokio::sync::Mutex;
+use std::sync::Arc;
+use tokio::sync::{mpsc, Mutex};
 
 // TODO: temporarily disable priority while we transition to channels
 // type Priority = i32;

@@ -26,7 +26,8 @@ mod relocation;
 
 use self::data::MIN_LEVEL_WHEN_FULL;
 
-pub(crate) use self::bootstrap::join_network;
+pub(crate) use self::bootstrap::Joiner;
+
 #[cfg(test)]
 pub(crate) use self::{
     api::gen_genesis_dbc,

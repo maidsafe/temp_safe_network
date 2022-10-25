@@ -42,8 +42,7 @@
 #[macro_use]
 extern crate tracing;
 
-mod comm;
-
+pub mod comm;
 pub mod data;
 pub mod flow_ctrl;
 pub mod integration;

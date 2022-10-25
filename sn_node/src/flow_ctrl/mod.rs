@@ -10,6 +10,7 @@
 
 pub(crate) mod cmd_ctrl;
 pub(super) mod dispatcher;
+mod error;
 mod logging;
 pub(crate) mod node_starter;
 mod node_test_api;
@@ -20,15 +21,17 @@ pub(crate) mod tests;
 pub(crate) use cmd_ctrl::CmdCtrl;
 
 pub use self::{
+    error::{Error, Result},
     node_starter::{new_test_api, start_node},
     node_test_api::NodeTestApi,
 };
 
+pub use qp2p::Config as NetworkConfig;
+
 use periodic_checks::PeriodicChecksTimestamps;
 
-use crate::comm::MsgFromPeer;
-use crate::integration::Cmd;
-use crate::node::{MyNode, Result};
+use crate::integration::{Cmd, MsgFromPeer};
+use crate::node::MyNode;
 
 use sn_interface::types::log_markers::LogMarker;
 

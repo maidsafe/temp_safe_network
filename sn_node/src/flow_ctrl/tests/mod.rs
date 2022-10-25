@@ -12,13 +12,13 @@ pub(crate) mod dbc_utils;
 pub(crate) mod network_utils;
 
 use crate::{
-    comm::{Comm, MsgFromPeer},
+    comm::Comm,
     data::{Data, UsedSpace},
-    flow_ctrl::dispatcher::Dispatcher,
-    integration::{event_channel, Cmd, Event, MembershipEvent, OutgoingMsg, Peers},
+    flow_ctrl::{dispatcher::Dispatcher, Error},
+    integration::{event_channel, Cmd, Event, MembershipEvent, MsgFromPeer, OutgoingMsg, Peers},
     node::{
-        as_signable_bytes, cfg::create_test_max_capacity_and_root_storage, gen_genesis_dbc, Error,
-        MyNode, Result as RoutingResult, WireMsgUtils,
+        as_signable_bytes, cfg::create_test_max_capacity_and_root_storage, gen_genesis_dbc,
+        Error as NodeError, MyNode, WireMsgUtils,
     },
 };
 
@@ -603,9 +603,9 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
                     &dispatcher,
                 )
                 .await,
-                Err(Error::NetworkKnowledge(
+                Err(Error::Node(NodeError::NetworkKnowledge(
                     NetworkKnowledgeError::UntrustedProofChain(_)
-                ))
+                )))
             ));
 
             assert_eq!(
@@ -1197,7 +1197,7 @@ async fn spentbook_spend_spent_proof_with_invalid_pk_should_return_spentbook_err
                         if let Some(error) = result.err() {
                             assert_eq!(
                                 error.to_string(),
-                                MessagingDataError::from(Error::SpentbookError(format!(
+                                MessagingDataError::from(NodeError::SpentbookError(format!(
                                     "Spent proof signature {:?} is invalid",
                                     pk
                                 )))
@@ -1267,7 +1267,7 @@ async fn spentbook_spend_spent_proof_with_key_not_in_section_chain_should_return
                         if let Some(error) = result.err() {
                             assert_eq!(
                                 error.to_string(),
-                                Error::SpentProofUnknownSectionKey(section_key).to_string(),
+                                NodeError::SpentProofUnknownSectionKey(section_key).to_string(),
                                 "A different error was expected for this case: {:?}",
                                 error
                             );
@@ -1346,7 +1346,7 @@ async fn spentbook_spend_spent_proofs_do_not_relate_to_input_dbcs_should_return_
                         if let Some(error) = result.err() {
                             assert_eq!(
                                 error.to_string(),
-                                MessagingDataError::from(Error::DbcError(
+                                MessagingDataError::from(NodeError::DbcError(
                                     sn_dbc::Error::CommitmentsInputLenMismatch {
                                         current: 0,
                                         expected: 1
@@ -1426,7 +1426,7 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
                         if let Some(error) = result.err() {
                             assert_eq!(
                                 error.to_string(),
-                                MessagingDataError::from(Error::SpentbookError(
+                                MessagingDataError::from(NodeError::SpentbookError(
                                     "The DBC transaction must have at least one input".to_string()
                                 ))
                                 .to_string(),
@@ -1502,7 +1502,7 @@ async fn spentbook_spend_with_random_key_image_should_return_spentbook_error() -
                         if let Some(error) = result.err() {
                             assert_eq!(
                                 error.to_string(),
-                                MessagingDataError::from(Error::SpentbookError(format!(
+                                MessagingDataError::from(NodeError::SpentbookError(format!(
                                     "There are no commitments for the given key image {:?}",
                                     pk
                                 )))

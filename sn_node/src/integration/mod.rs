@@ -18,12 +18,14 @@ pub use self::{
     event_channel::EventReceiver,
 };
 
+use qp2p::SendStream;
 use sn_interface::{
-    messaging::{data::ClientMsg, system::NodeMsg},
+    messaging::{data::ClientMsg, system::NodeMsg, WireMsg},
     types::Peer,
 };
 
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, sync::Arc};
+use tokio::sync::Mutex;
 
 /// Msg to be sent from a node.
 #[derive(Debug, Clone)]
@@ -42,4 +44,11 @@ pub enum Peers {
     Single(Peer),
     /// Multiple peers.
     Multiple(BTreeSet<Peer>),
+}
+
+#[derive(Debug)]
+pub(crate) struct MsgFromPeer {
+    pub(crate) sender: Peer,
+    pub(crate) wire_msg: WireMsg,
+    pub(crate) send_stream: Option<Arc<Mutex<SendStream>>>,
 }

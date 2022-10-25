@@ -28,8 +28,8 @@
     clippy::unwrap_used
 )]
 
-use sn_node::integration::{Event, MembershipEvent};
-use sn_node::node::{Config, Error as NodeError};
+use sn_node::flow_ctrl::Error;
+use sn_node::node::{Config, Error as NodeError, Event, MembershipEvent};
 use sn_node::start_node;
 
 use clap::{CommandFactory, Parser};
@@ -136,7 +136,9 @@ async fn run_node(config: &Config) -> Result<()> {
     let (_node, mut event_stream) = loop {
         match start_node(config, join_timeout).await {
             Ok(result) => break result,
-            Err(NodeError::CannotConnectEndpoint(qp2p::EndpointError::Upnp(error))) => {
+            Err(Error::Comm(sn_node::comm::Error::CannotConnectEndpoint(
+                qp2p::EndpointError::Upnp(error),
+            ))) => {
                 return Err(error).suggestion(
                     "You can disable port forwarding by supplying --skip-auto-port-forwarding. Without port\n\
                     forwarding, your machine must be publicly reachable by the given\n\
@@ -149,11 +151,11 @@ async fn run_node(config: &Config) -> Result<()> {
                         .header("Disable port forwarding or change your router settings"),
                 );
             }
-            Err(NodeError::TryJoinLater) => {
+            Err(Error::Node(NodeError::TryJoinLater)) => {
                 println!("{}", log);
                 info!("{}", log);
             }
-            Err(NodeError::NodeNotReachable(addr)) => {
+            Err(Error::Node(NodeError::NodeNotReachable(addr))) => {
                 let err_msg = format!(
                     "Unfortunately we are unable to establish a connection to your machine ({}) either through a \
                     public IP address, or via IGD on your router. Please ensure that IGD is enabled on your router - \
@@ -166,7 +168,7 @@ async fn run_node(config: &Config) -> Result<()> {
                 error!("{}", err_msg);
                 exit(1);
             }
-            Err(NodeError::JoinTimeout) => {
+            Err(Error::Node(NodeError::JoinTimeout)) => {
                 let message = format!("(PID: {our_pid}): Encountered a timeout while trying to join the network. Retrying after {BOOTSTRAP_RETRY_TIME_SEC} seconds.");
                 println!("{}", &message);
                 error!("{}", &message);

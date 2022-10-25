@@ -14,7 +14,7 @@ use sn_dbc::Error as DbcError;
 use sn_interface::{
     messaging::data::{DataQuery, Error as ErrorMsg},
     messaging::system::DkgSessionId,
-    types::{convert_dt_error_to_error_msg, DataAddress, Peer},
+    types::{convert_dt_error_to_error_msg, DataAddress},
 };
 
 use ed25519::Signature;
@@ -31,9 +31,6 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 pub enum Error {
     #[error("The bootstrap connection unexpectedly closed")]
     BootstrapConnectionClosed,
-    /// This Peer SendJob could not be sent. We should remove this peer
-    #[error("Peer channel errored")]
-    PeerSessionChannel,
     /// This peer has no connections, and none will be created
     #[error("Peer link has no connections ")]
     NoConnectionsForPeer,
@@ -58,10 +55,6 @@ pub enum Error {
     UntrustedSectionAuthProvider(String),
     #[error("Could not connect to any bootstrap contact")]
     BootstrapFailed,
-    #[error("Cannot connect to the endpoint: {0}")]
-    CannotConnectEndpoint(#[from] qp2p::EndpointError),
-    #[error("Address not reachable: {0}")]
-    AddressNotReachable(#[from] qp2p::RpcError),
     #[error("Invalid dkg participant; not part of our section.")]
     InvalidDkgParticipant,
     #[error("Content of a received message is inconsistent.")]
@@ -70,8 +63,6 @@ pub enum Error {
     InvalidSignatureShare,
     #[error("The secret key share is missing for public key {0:?}")]
     MissingSecretKeyShare(bls::PublicKey),
-    #[error("Failed to send a message to {0}")]
-    FailedSend(Peer),
     #[error("Messaging protocol error: {0}")]
     Messaging(#[from] sn_interface::messaging::Error),
     #[error("Membership error: {0}")]
@@ -88,9 +79,6 @@ pub enum Error {
     /// Join occured during section churn and new elders missed it, need to re-join the network
     #[error("Node was removed from the section")]
     RemovedFromSection,
-    /// Database error.
-    #[error("Database error:: {0}")]
-    Database(#[from] crate::data::Error),
     /// Insufficient number of Adults found to perform data operation
     #[error(
         "Not enough Adults available at section {prefix:?}. Expected {expected}, found {found}."
@@ -214,24 +202,6 @@ pub enum Error {
     CannotHandleQuery(DataQuery),
     #[error("BLS error: {0}")]
     BlsError(#[from] bls::Error),
-}
-
-impl From<qp2p::ClientEndpointError> for Error {
-    fn from(error: qp2p::ClientEndpointError) -> Self {
-        let endpoint_err = match error {
-            qp2p::ClientEndpointError::Config(error) => qp2p::EndpointError::Config(error),
-            qp2p::ClientEndpointError::Socket(error) => qp2p::EndpointError::Socket(error),
-            qp2p::ClientEndpointError::Io(error) => qp2p::EndpointError::IoError(error),
-        };
-
-        Self::CannotConnectEndpoint(endpoint_err)
-    }
-}
-
-impl From<qp2p::SendError> for Error {
-    fn from(error: qp2p::SendError) -> Self {
-        Self::AddressNotReachable(qp2p::RpcError::Send(error))
-    }
 }
 
 // Convert node error to messaging error message for sending over the network.

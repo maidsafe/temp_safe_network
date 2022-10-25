@@ -9,8 +9,7 @@
 mod join;
 mod relocate;
 
-pub(crate) use join::join_network;
-pub(crate) use relocate::JoiningAsRelocated;
+pub(crate) use self::{join::Joiner, relocate::JoiningAsRelocated};
 
 use bls::PublicKey as BlsPublicKey;
 use std::{collections::HashSet, net::SocketAddr};
