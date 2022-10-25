@@ -7,21 +7,20 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::NodeState;
-
-use crate::messaging::system::DkgSessionId;
-use crate::messaging::system::{SectionSig, SectionSigned};
-use crate::types::Peer;
-use sn_consensus::Generation;
-use xor_name::{Prefix, XorName};
-
-use crate::network_knowledge::SectionsDAG;
+use crate::{
+    messaging::system::{DkgSessionId, SectionSig, SectionSigned},
+    network_knowledge::SectionsDAG,
+    types::Peer,
+};
 use bls::{PublicKey, PublicKeySet};
 use serde::{Deserialize, Serialize};
+use sn_consensus::Generation;
 use std::{
     collections::BTreeSet,
-    fmt::{self, Display, Formatter},
+    fmt::{self, Debug, Display, Formatter},
     net::SocketAddr,
 };
+use xor_name::{Prefix, XorName};
 
 ///
 pub trait SectionAuthUtils<T: Serialize> {
@@ -56,7 +55,7 @@ impl<T: Serialize> SectionAuthUtils<T> for SectionSigned<T> {
 ///
 /// A new `SectionAuthorityProvider` is created whenever the elders change, due to an elder being
 /// added or removed, or the section splitting or merging.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct SectionAuthorityProvider {
     /// The section prefix. It matches all the members' names.
     prefix: Prefix,
@@ -81,21 +80,51 @@ pub enum SapCandidate {
     ),
 }
 
+impl Debug for SectionAuthorityProvider {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        #[derive(Debug)]
+        enum PeerStatus {
+            Elder,
+            Member,
+        }
+        let elders: BTreeSet<_> = self.elders.iter().map(|peer| peer.name()).collect();
+        let mut elder_count = 0;
+        let mut peers: Vec<_> = self
+            .members()
+            .map(|peer| {
+                let status = if elders.contains(&peer.name()) {
+                    elder_count += 1;
+                    PeerStatus::Elder
+                } else {
+                    PeerStatus::Member
+                };
+                (peer, status)
+            })
+            .collect();
+        peers.sort_by_key(|(_, is_elder)| !matches!(is_elder, PeerStatus::Elder));
+
+        let mut f = f.debug_struct(format!("SAP {:?}", self.prefix).as_str());
+        let f = f
+            .field("elders", &elders.len())
+            .field("members", &self.members.len())
+            .field("gen", &self.membership_gen);
+        // something went wrong, some `elders` are not part of the `members` list.
+        if elder_count != elders.len() {
+            f.field(
+                "elders (error: some elders are not part of members)",
+                &elders,
+            )
+            .field("members", &self.members().collect::<Vec<_>>())
+            .finish()
+        } else {
+            f.field("peers", &peers).finish()
+        }
+    }
+}
+
 impl Display for SectionAuthorityProvider {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let elders_info: Vec<_> = self
-            .elders
-            .iter()
-            .map(|peer| (peer.addr(), peer.name()))
-            .collect();
-        write!(
-            f,
-            "Sap {:?}  elder len:{} gen:{} contains: {{{:?}}})",
-            self.prefix,
-            self.elders.len(),
-            self.membership_gen,
-            elders_info,
-        )
+        Debug::fmt(self, f)
     }
 }
 
