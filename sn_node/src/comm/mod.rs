@@ -345,14 +345,6 @@ fn listen_for_incoming_msgs(
     });
 }
 
-impl Drop for Comm {
-    fn drop(&mut self) {
-        // Close all existing connections and stop accepting new ones.
-        // FIXME: this may be broken – `Comm` is clone, so this will break any clones?
-        self.our_endpoint.close();
-    }
-}
-
 #[derive(Debug)]
 pub(crate) struct MsgFromPeer {
     pub(crate) sender: Peer,
