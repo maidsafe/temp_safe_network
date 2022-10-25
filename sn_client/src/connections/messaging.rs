@@ -19,7 +19,7 @@ use sn_interface::{
 use sn_interface::{
     messaging::{
         data::{DataQuery, DataQueryVariant, QueryResponse},
-        ClientAuth, Dst, MsgId, WireMsg,
+        ClientAuth, Dst, MsgId, MsgKind, WireMsg,
     },
     network_knowledge::supermajority,
     types::{ChunkAddress, Peer, SendToOneError},
