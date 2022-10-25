@@ -163,7 +163,7 @@ jobs:
 
       - name: Run sn_cli tests
         timeout-minutes: 25
-        run: cd sn_cli && cargo test --release -p sn_cli --bin safe
+        run: cd sn_cli && cargo test --release --bin safe
 
   e2e:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -232,7 +232,7 @@ jobs:
       - name: Run client tests
         env:
           RUST_LOG: "sn_client=trace,qp2p=debug"
-        run: cd sn_client && cargo test -- --test-threads=1
+        run: cd sn_client && cargo test --release -- --test-threads=1
         timeout-minutes: 50
 
       - name: Run example app for file API against local network
