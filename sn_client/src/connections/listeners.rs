@@ -19,7 +19,7 @@ use sn_interface::{
     messaging::{
         data::{ClientMsg, Error as ErrorMsg},
         system::{AntiEntropyKind, NodeMsg},
-        AuthKind, AuthorityProof, ClientAuth, Dst, MsgId, MsgType, WireMsg,
+        AuthorityProof, ClientAuth, Dst, MsgId, MsgKind, MsgType, WireMsg,
     },
     network_knowledge::{SectionAuthorityProvider, SectionTreeUpdate},
     types::{log_markers::LogMarker, Peer},
@@ -295,7 +295,7 @@ impl Session {
             if let Some(elder) = target_elder {
                 let payload = WireMsg::serialize_msg_payload(&service_msg)?;
                 let wire_msg =
-                    WireMsg::new_msg(msg_id, payload, AuthKind::Client(auth.into_inner()), dst);
+                    WireMsg::new_msg(msg_id, payload, MsgKind::Client(auth.into_inner()), dst);
 
                 debug!("Resending original message on AE-Redirect with updated details. Expecting an AE-Retry next");
 

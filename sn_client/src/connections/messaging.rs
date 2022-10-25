@@ -19,7 +19,7 @@ use sn_interface::{
 use sn_interface::{
     messaging::{
         data::{DataQuery, DataQueryVariant, QueryResponse},
-        AuthKind, ClientAuth, Dst, MsgId, WireMsg,
+        ClientAuth, Dst, MsgId, MsgKind, WireMsg,
     },
     network_knowledge::supermajority,
     types::{Peer, SendToOneError},
@@ -79,10 +79,10 @@ impl Session {
             section_key: section_pk,
         };
 
-        let auth = AuthKind::Client(auth);
+        let kind = MsgKind::Client(auth);
 
         #[allow(unused_mut)]
-        let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
+        let mut wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
         #[cfg(feature = "traceroute")]
         wire_msg.append_trace(&mut Traceroute(vec![Entity::Client(client_pk)]));
@@ -218,10 +218,10 @@ impl Session {
             name: dst,
             section_key: section_pk,
         };
-        let auth = AuthKind::Client(auth);
+        let kind = MsgKind::Client(auth);
 
         #[allow(unused_mut)]
-        let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
+        let mut wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
         #[cfg(feature = "traceroute")]
         wire_msg.append_trace(&mut Traceroute(vec![Entity::Client(client_pk)]));
@@ -346,8 +346,8 @@ impl Session {
             name: dst_address,
             section_key: section_pk,
         };
-        let auth = AuthKind::Client(auth);
-        let wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
+        let kind = MsgKind::Client(auth);
+        let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
         let initial_contacts = nodes
             .clone()

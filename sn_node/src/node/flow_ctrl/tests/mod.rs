@@ -123,7 +123,6 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
                     relocate_proof,
                     signature_over_new_name,
                 })),
-                section_key,
             )?;
 
             let _ = run_and_collect_cmds(
@@ -481,7 +480,6 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             let pk2 = sk2.public_key();
 
             let old_node = nodes.remove(0);
-            let src_section_pk = pk2;
 
             // Create the new `SectionAuthorityProvider` by replacing the last peer with a new one.
             let new_peer = network_utils::create_peer(MIN_ADULT_AGE);
@@ -518,7 +516,6 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
                         members: BTreeSet::default(),
                     },
                 },
-                src_section_pk,
             )?;
 
             // Simulate DKG round finished succesfully by adding
@@ -590,7 +587,6 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
                 },
                 node_msg.clone(),
                 // we use the nonsense here
-                bogus_section_pk,
             )?;
 
             assert!(matches!(

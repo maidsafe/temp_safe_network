@@ -16,7 +16,7 @@ mod membership;
 mod node_msgs;
 mod proposal;
 mod relocation;
-mod signing;
+mod serialize;
 mod update_section;
 
 use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result, DATA_QUERY_LIMIT};

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{AuthKind, Error, MsgId, Result};
+use crate::messaging::{Error, MsgId, MsgKind, Result};
 use bincode::{
     config::{BigEndian, FixintEncoding, WithOtherEndian, WithOtherIntEncoding},
     Options,
@@ -42,7 +42,7 @@ pub struct WireMsgHeader {
 #[derive(CustomDebug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct MsgEnvelope {
     pub msg_id: MsgId,
-    pub auth: AuthKind,
+    pub kind: MsgKind,
     #[cfg(feature = "traceroute")]
     // Remove if necessary to debug from WireMsg
     #[debug(skip)]
@@ -82,7 +82,7 @@ impl WireMsgHeader {
     // Instantiate a WireMsgHeader as per current supported version.
     pub fn new(
         msg_id: MsgId,
-        auth: AuthKind,
+        auth: MsgKind,
         // dst: Dst,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Self {
@@ -91,7 +91,7 @@ impl WireMsgHeader {
             version: MESSAGING_PROTO_VERSION,
             msg_envelope: MsgEnvelope {
                 msg_id,
-                auth,
+                kind: auth,
                 // dst,
                 #[cfg(feature = "traceroute")]
                 traceroute,

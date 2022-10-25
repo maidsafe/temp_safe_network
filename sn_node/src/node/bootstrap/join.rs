@@ -408,7 +408,6 @@ impl<'a> Joiner<'a> {
                 section_key,
             },
             msg,
-            section_key,
         )?;
 
         let _res = self
@@ -914,7 +913,6 @@ mod tests {
                 section_key: section_pk,
             },
             NodeMsg::JoinResponse(Box::new(response)),
-            section_pk,
         )?;
 
         debug!("wire msg built");

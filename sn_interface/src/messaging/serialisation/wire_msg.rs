@@ -8,7 +8,7 @@
 
 use super::wire_msg_header::WireMsgHeader;
 use crate::messaging::{
-    data::ClientMsg, system::NodeMsg, AuthKind, AuthorityProof, ClientAuth, Dst, Error, MsgId,
+    data::ClientMsg, system::NodeMsg, AuthorityProof, ClientAuth, Dst, Error, MsgId, MsgKind,
     MsgType, Result,
 };
 use bytes::Bytes;
@@ -132,7 +132,7 @@ impl WireMsg {
     }
 
     /// Creates a new `WireMsg` with the provided serialized payload and `MsgKind`.
-    pub fn new_msg(msg_id: MsgId, payload: Bytes, auth: AuthKind, dst: Dst) -> Self {
+    pub fn new_msg(msg_id: MsgId, payload: Bytes, auth: MsgKind, dst: Dst) -> Self {
         Self {
             header: WireMsgHeader::new(
                 msg_id,
@@ -235,9 +235,9 @@ impl WireMsg {
 
     /// Deserialize the payload from this `WireMsg` returning a `MsgType` instance.
     pub fn into_msg(&self) -> Result<MsgType> {
-        match self.header.msg_envelope.auth.clone() {
+        match self.header.msg_envelope.kind.clone() {
             #[cfg(any(feature = "chunks", feature = "registers"))]
-            AuthKind::Client(auth) => {
+            MsgKind::Client(auth) => {
                 let msg: ClientMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Data message payload as Msgpack: {}", err))
                 })?;
@@ -251,8 +251,7 @@ impl WireMsg {
                     msg,
                 })
             }
-            // NB TODO remove this enum
-            AuthKind::Node(_) => {
+            MsgKind::Node(_) => {
                 let msg: NodeMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Node signed message payload as Msgpack: {}", err))
                 })?;
@@ -272,22 +271,13 @@ impl WireMsg {
     }
 
     /// Return the auth of this message
-    pub fn auth(&self) -> &AuthKind {
-        &self.header.msg_envelope.auth
+    pub fn kind(&self) -> &MsgKind {
+        &self.header.msg_envelope.kind
     }
 
     /// Return the destination section `PublicKey` for this message
     pub fn dst_section_key(&self) -> bls::PublicKey {
         self.dst.section_key
-    }
-
-    /// Return the source section `PublicKey` for this
-    /// message if it's a `NodeMsg`
-    pub fn src_section_pk(&self) -> Option<bls::PublicKey> {
-        match &self.header.msg_envelope.auth {
-            AuthKind::Node(node_signed) => Some(node_signed.section_pk),
-            _ => None,
-        }
     }
 
     /// Return the dst of this msg
@@ -339,20 +329,15 @@ mod tests {
         messaging::{
             data::{ClientMsg, DataQuery, DataQueryVariant, StorageLevel},
             system::{NodeCmd, NodeMsg},
-            AuthorityProof, ClientAuth, MsgId, NodeSig,
+            AuthorityProof, ClientAuth, MsgId,
         },
         types::{ChunkAddress, Keypair},
     };
     use bls::SecretKey;
     use eyre::Result;
-    use rand_07::rngs::OsRng;
 
     #[test]
     fn serialisation_node_msg() -> Result<()> {
-        let src_section_pk = SecretKey::random().public_key();
-        let mut rng = OsRng;
-        let src_node_keypair = ed25519_dalek::Keypair::generate(&mut rng);
-
         let dst = Dst {
             name: xor_name::rand::random(),
             section_key: SecretKey::random().public_key(),
@@ -368,11 +353,8 @@ mod tests {
         });
 
         let payload = WireMsg::serialize_msg_payload(&msg)?;
-        let node_auth = NodeSig::authorize(src_section_pk, &src_node_keypair, &payload);
-
-        let auth = AuthKind::Node(node_auth.into_inner());
-
-        let wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
+        let kind = MsgKind::Node(Default::default());
+        let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
         let serialized = wire_msg.serialize()?;
 
         // test deserialisation of header
@@ -381,7 +363,6 @@ mod tests {
         assert_eq!(deserialized.msg_id(), wire_msg.msg_id());
         assert_eq!(deserialized.dst(), &dst);
         assert_eq!(deserialized.dst_section_key(), dst.section_key);
-        assert_eq!(deserialized.src_section_pk(), Some(src_section_pk));
 
         // test deserialisation of payload
         assert_eq!(
@@ -418,10 +399,9 @@ mod tests {
             signature: src_client_keypair.sign(&payload),
         };
         let auth_proof = AuthorityProof::verify(auth.clone(), &payload)?;
+        let kind = MsgKind::Client(auth);
 
-        let auth = AuthKind::Client(auth);
-
-        let wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
+        let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
         let serialized = wire_msg.serialize()?;
 
         // test deserialisation of header
@@ -430,7 +410,6 @@ mod tests {
         assert_eq!(deserialized.msg_id(), wire_msg.msg_id());
         assert_eq!(deserialized.dst(), &dst);
         assert_eq!(deserialized.dst_section_key(), dst.section_key);
-        assert_eq!(deserialized.src_section_pk(), None);
 
         // test deserialisation of payload
         assert_eq!(
