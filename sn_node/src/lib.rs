@@ -45,10 +45,12 @@ extern crate tracing;
 mod comm;
 
 pub mod data;
+pub mod flow_ctrl;
+pub mod integration;
+pub mod node;
 
 pub use data::UsedSpace;
-
-pub mod node;
+pub use flow_ctrl::start_node;
 
 #[macro_export]
 /// Help macro to log a sleep with unique id, meanwhile retain the info of LOC.

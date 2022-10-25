@@ -6,10 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{
-    messaging::{OutgoingMsg, Peers},
-    Proposal, XorName,
-};
+use super::{OutgoingMsg, Peers};
+
+use crate::node::XorName;
 
 use qp2p::SendStream;
 use sn_consensus::Decision;
@@ -19,7 +18,7 @@ use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         data::ClientMsg,
-        system::{NodeMsg, OperationId, SectionSig, SectionSigned},
+        system::{NodeMsg, OperationId, Proposal, SectionSig, SectionSigned},
         AuthorityProof, ClientAuth, MsgId, WireMsg,
     },
     network_knowledge::{NodeState, SectionAuthorityProvider, SectionKeyShare, SectionsDAG},
@@ -27,24 +26,8 @@ use sn_interface::{
 };
 
 use custom_debug::Debug;
-use std::sync::Arc;
-use std::{collections::BTreeSet, fmt, time::SystemTime};
+use std::{collections::BTreeSet, fmt, sync::Arc};
 use tokio::sync::Mutex;
-
-/// A struct for the job of controlling the flow
-/// of a [`Cmd`] in the system.
-///
-/// An id is assigned to it, its parent id (if any),
-/// a priority by which it is ordered in the queue
-/// among other pending cmd jobs, and the time the
-/// job was instantiated.
-#[derive(Debug, Clone)]
-pub(crate) struct CmdJob {
-    id: usize,
-    parent_id: Option<usize>,
-    cmd: Cmd,
-    created_at: SystemTime,
-}
 
 /// Commands for a node.
 ///
@@ -61,19 +44,32 @@ pub(crate) enum Cmd {
     /// Validate `wire_msg` from `sender`.
     /// Holding the WireMsg that has been received from the network,
     ValidateMsg {
+        /// The sender of the msg.
         origin: Peer,
+        /// The msg.
         wire_msg: WireMsg,
+        /// The stream the msg was sent on.
         send_stream: Option<Arc<Mutex<SendStream>>>,
     },
     /// Log a Node's Punishment, this pulls dysfunction and write locks out of some functions
-    TrackNodeIssueInDysfunction { name: XorName, issue: IssueType },
+    TrackNodeIssueInDysfunction {
+        /// The name of the node.
+        name: XorName,
+        /// The issue to track.
+        issue: IssueType,
+    },
     /// Adds peer to set of recipients of an already pending query,
     /// or adds a pending query if it didn't already exist.
     AddToPendingQueries {
+        /// Id of the msg.
         msg_id: MsgId,
+        /// The id of the operation.
         operation_id: OperationId,
+        /// The sender of the msg.
         origin: Peer,
+        /// The stream the msg was sent on.
         send_stream: Option<Arc<Mutex<SendStream>>>,
+        /// The name of the intended recipient adult .
         target_adult: XorName,
     },
     HandleValidNodeMsg {

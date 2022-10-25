@@ -6,19 +6,21 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::integration::{Cmd, Peers};
+use crate::node::proposal::as_signable_bytes;
 use crate::node::{
-    flow_ctrl::cmds::Cmd,
     handover::{Error as HandoverError, Handover},
     membership::{elder_candidates, try_split_dkg},
-    messaging::Peers,
-    Error, MyNode, NodeMsg, Peer, Proposal, Result,
+    Error, MyNode, Result,
 };
+
 use sn_consensus::{Generation, SignedVote, VoteResponse};
 use sn_interface::{
-    messaging::system::SectionSigned,
+    messaging::system::{NodeMsg, Proposal, SectionSigned},
     network_knowledge::{NodeState, SapCandidate, SectionAuthorityProvider},
-    types::log_markers::LogMarker,
+    types::{log_markers::LogMarker, Peer},
 };
+
 use std::collections::{BTreeMap, BTreeSet};
 use tracing::warn;
 use xor_name::{Prefix, XorName};
@@ -128,7 +130,7 @@ impl MyNode {
     /// Verifies the SAP signature and checks that the signature's public key matches the
     /// signature of the SAP, because SAP candidates are signed by the candidate section key
     fn check_sap_sig(&self, sap: &SectionSigned<SectionAuthorityProvider>) -> Result<()> {
-        let sap_bytes = Proposal::SectionInfo(sap.value.clone()).as_signable_bytes()?;
+        let sap_bytes = as_signable_bytes(&Proposal::SectionInfo(sap.value.clone()))?;
         if !sap.sig.verify(&sap_bytes) {
             return Err(Error::InvalidSignature);
         }

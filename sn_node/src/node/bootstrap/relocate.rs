@@ -8,11 +8,8 @@
 
 use super::UsedRecipientSaps;
 
-use crate::node::{
-    flow_ctrl::cmds::Cmd,
-    messaging::{OutgoingMsg, Peers},
-    Error, Result,
-};
+use crate::integration::{Cmd, OutgoingMsg, Peers};
+use crate::node::{Error, Result};
 
 use sn_interface::{
     messaging::system::{JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeMsg, SectionSigned},
@@ -239,11 +236,7 @@ impl JoiningAsRelocated {
 
 #[cfg(test)]
 mod tests {
-    use super::JoiningAsRelocated;
-    use crate::node::{
-        messaging::{OutgoingMsg, Peers},
-        Cmd,
-    };
+    use super::{Cmd, JoiningAsRelocated, OutgoingMsg, Peers};
     use color_eyre::Result;
     use eyre::eyre;
     use sn_interface::{

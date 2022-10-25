@@ -7,8 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{NodeState, SectionSig};
-use crate::types::keys::ed25519::Digest256;
-use crate::{network_knowledge::SectionAuthorityProvider, types::Peer};
+use crate::{
+    network_knowledge::SectionAuthorityProvider,
+    types::{keys::ed25519::Digest256, Peer},
+};
+
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use sn_consensus::Generation;
@@ -35,6 +38,7 @@ pub struct DkgSessionId {
     /// The membership generation this SAP was instantiated at
     pub membership_gen: Generation,
 }
+
 impl DkgSessionId {
     pub fn new(
         prefix: Prefix,

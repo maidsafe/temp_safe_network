@@ -6,11 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, Proposal, Result};
-use sn_interface::messaging::system::SectionSigShare;
+use crate::integration::{Cmd, Peers};
+use crate::node::proposal::as_signable_bytes;
+use crate::node::{MyNode, Result};
 
 use sn_interface::{
-    messaging::{system::NodeMsg, MsgId},
+    messaging::{
+        system::{NodeMsg, Proposal, SectionSigShare},
+        MsgId,
+    },
     network_knowledge::SectionKeyShare,
     types::Peer,
 };
@@ -50,7 +54,8 @@ impl MyNode {
     ) -> Result<Vec<Cmd>> {
         trace!("Propose {proposal:?}, key_share: {key_share:?}, aggregators: {recipients:?}");
 
-        let sig_share = proposal.sign_with_key_share(
+        let sig_share = sign_with_key_share(
+            &proposal,
             key_share.public_key_set.clone(),
             key_share.index,
             &key_share.secret_key_share,
@@ -58,7 +63,7 @@ impl MyNode {
 
         // Broadcast the proposal to the rest of the section elders.
         let msg = NodeMsg::Propose {
-            proposal: proposal.clone().into_msg(),
+            proposal: proposal.clone(),
             sig_share: sig_share.clone(),
         };
 
@@ -138,7 +143,7 @@ impl MyNode {
 
         let mut cmds = vec![];
 
-        match proposal.as_signable_bytes() {
+        match as_signable_bytes(&proposal) {
             Err(error) => error!(
                 "Failed to serialise proposal from {}, {:?}: {:?}",
                 sender, msg_id, error
@@ -173,4 +178,19 @@ impl MyNode {
 
         Ok(cmds)
     }
+}
+
+/// Create `SigShare` for this proposal.
+fn sign_with_key_share(
+    proposal: &Proposal,
+    public_key_set: bls::PublicKeySet,
+    index: usize,
+    secret_key_share: &bls::SecretKeyShare,
+) -> Result<SectionSigShare> {
+    Ok(SectionSigShare::new(
+        public_key_set,
+        index,
+        secret_key_share,
+        &as_signable_bytes(proposal)?,
+    ))
 }

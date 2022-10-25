@@ -6,14 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{flow_ctrl::cmds::Cmd, MyNode, Proposal, Result};
+use crate::integration::Cmd;
+use crate::node::{MyNode, Result};
+
 use sn_interface::{
-    messaging::system::{SectionSig, SectionSigned},
+    messaging::system::{Proposal, SectionSig, SectionSigned},
     network_knowledge::{
         NodeState, SapCandidate, SectionAuthUtils, SectionAuthorityProvider, SectionTreeUpdate,
     },
     types::log_markers::LogMarker,
 };
+
 use std::collections::BTreeSet;
 
 // Agreement

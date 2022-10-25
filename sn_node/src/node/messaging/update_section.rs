@@ -6,7 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, MyNode};
+use crate::integration::{Cmd, Peers};
+use crate::node::MyNode;
 
 use sn_interface::{
     data_copy_count,

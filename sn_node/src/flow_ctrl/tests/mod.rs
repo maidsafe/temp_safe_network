@@ -14,14 +14,11 @@ pub(crate) mod network_utils;
 use crate::{
     comm::{Comm, MsgFromPeer},
     data::{Data, UsedSpace},
+    flow_ctrl::dispatcher::Dispatcher,
+    integration::{event_channel, Cmd, Event, MembershipEvent, OutgoingMsg, Peers},
     node::{
-        api::gen_genesis_dbc,
-        cfg::create_test_max_capacity_and_root_storage,
-        core::MyNode,
-        flow_ctrl::{dispatcher::Dispatcher, event_channel},
-        messages::WireMsgUtils,
-        messaging::{OutgoingMsg, Peers},
-        Cmd, Error, Event, MembershipEvent, Proposal, Result as RoutingResult,
+        as_signable_bytes, cfg::create_test_max_capacity_and_root_storage, gen_genesis_dbc, Error,
+        MyNode, Result as RoutingResult, WireMsgUtils,
     },
 };
 
@@ -41,7 +38,7 @@ use sn_interface::{
         },
         system::{
             AntiEntropyKind, JoinAsRelocatedRequest, JoinRequest, JoinResponse, NodeCmd, NodeMsg,
-            SectionSig, SectionSigned,
+            Proposal, SectionSig, SectionSigned,
         },
         Dst, MsgId, MsgType, WireMsg,
     },
@@ -362,7 +359,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
 
             let node_state = NodeState::left(existing_peer, None);
             let proposal = Proposal::VoteNodeOffline(node_state.clone());
-            let sig = keyed_signed(&sk_set.secret_key(), &proposal.as_signable_bytes()?);
+            let sig = keyed_signed(&sk_set.secret_key(), &as_signable_bytes(&proposal)?);
 
             let _cmds =
                 run_and_collect_cmds(Cmd::HandleAgreement { proposal, sig }, &dispatcher).await?;
@@ -411,7 +408,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
                     .await?;
             // Handle agreement on the Offline proposal
             let proposal = Proposal::VoteNodeOffline(remove_node_state.clone());
-            let sig = keyed_signed(&sk_set.secret_key(), &proposal.as_signable_bytes()?);
+            let sig = keyed_signed(&sk_set.secret_key(), &as_signable_bytes(&proposal)?);
 
             let _cmds =
                 run_and_collect_cmds(Cmd::HandleAgreement { proposal, sig }, &dispatcher).await?;
@@ -849,7 +846,7 @@ async fn handle_elders_update() -> Result<()> {
 
         let signed_sap1 = section_signed(sk_set1.secret_key(), sap1)?;
         let proposal = Proposal::NewElders(signed_sap1.clone());
-        let signature = sk_set0.secret_key().sign(&proposal.as_signable_bytes()?);
+        let signature = sk_set0.secret_key().sign(&as_signable_bytes(&proposal)?);
         let sig = SectionSig {
             signature,
             public_key: pk0,
@@ -1018,7 +1015,7 @@ async fn handle_demote_during_split() -> Result<()> {
             let create_our_elders_cmd =
                 |signed_sap: SectionSigned<SectionAuthorityProvider>| -> Result<_> {
                     let proposal = Proposal::NewElders(signed_sap.clone());
-                    let signature = sk_set_v0.secret_key().sign(&proposal.as_signable_bytes()?);
+                    let signature = sk_set_v0.secret_key().sign(&as_signable_bytes(&proposal)?);
                     let sig = SectionSig {
                         signature,
                         public_key: sk_set_v0.public_keys().public_key(),

@@ -6,16 +6,16 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::integration::{Cmd, Event, MembershipEvent};
 use crate::node::{
     bootstrap::JoiningAsRelocated,
-    flow_ctrl::cmds::Cmd,
     relocation::{find_nodes_to_relocate, ChurnId},
-    Event, MembershipEvent, MyNode, Proposal, Result,
+    MyNode, Result,
 };
 
 use sn_interface::{
     elder_count,
-    messaging::system::SectionSigned,
+    messaging::system::{Proposal, SectionSigned},
     network_knowledge::{MembershipState, NodeState},
     types::log_markers::LogMarker,
 };

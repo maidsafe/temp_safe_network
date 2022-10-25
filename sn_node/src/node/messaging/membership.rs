@@ -6,12 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{
-    flow_ctrl::cmds::Cmd, membership, messaging::Peers, relocation::ChurnId, Event,
-    MembershipEvent, MyNode, Result,
-};
+use crate::integration::{Cmd, Peers};
+use crate::node::{membership, relocation::ChurnId, Event, MembershipEvent, MyNode, Result};
 
-use bls::Signature;
 use sn_consensus::{Decision, Generation, SignedVote, VoteResponse};
 use sn_interface::{
     messaging::system::{JoinResponse, NodeMsg, SectionSig, SectionSigned},
@@ -19,6 +16,7 @@ use sn_interface::{
     types::{log_markers::LogMarker, Peer},
 };
 
+use bls::Signature;
 use std::{collections::BTreeSet, vec};
 
 // Message handling

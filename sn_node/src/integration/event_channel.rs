@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::Event;
+use super::Event;
 use tokio::sync::mpsc;
 
 pub(crate) fn new(channel_size: usize) -> (EventSender, EventReceiver) {

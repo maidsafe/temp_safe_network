@@ -1,18 +1,23 @@
+// Copyright 2022 MaidSafe.net limited.
+//
+// This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
+// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied. Please review the Licences for the specific language governing
+// permissions and limitations relating to use of the SAFE Network Software.
+
 use crate::comm::Comm;
 use crate::data::{Data, UsedSpace};
+use crate::flow_ctrl::dispatcher::Dispatcher;
+use crate::integration::{
+    event_channel,
+    event_channel::{EventReceiver, EventSender},
+    Event,
+};
 use crate::node::{
-    cfg::create_test_max_capacity_and_root_storage,
-    flow_ctrl::{
-        dispatcher::Dispatcher,
-        event_channel,
-        event_channel::{EventReceiver, EventSender},
-    },
-    relocation_check, ChurnId, Event, MyNode,
+    cfg::create_test_max_capacity_and_root_storage, relocation_check, ChurnId, MyNode,
 };
 
-use bls::Signature;
-use ed25519_dalek::Keypair;
-use eyre::{bail, eyre, Context, Result};
 use sn_consensus::Decision;
 use sn_interface::{
     elder_count,
@@ -22,8 +27,14 @@ use sn_interface::{
     },
     types::{keys::ed25519, Peer, SecretKeySet},
 };
-use std::net::{Ipv4Addr, SocketAddr};
-use std::sync::Arc;
+
+use bls::Signature;
+use ed25519_dalek::Keypair;
+use eyre::{bail, eyre, Context, Result};
+use std::{
+    net::{Ipv4Addr, SocketAddr},
+    sync::Arc,
+};
 use tokio::sync::{mpsc, RwLock};
 use xor_name::Prefix;
 

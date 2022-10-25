@@ -6,10 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{
-    flow_ctrl::{cmds::Cmd, event_channel::EventSender},
-    Error, Event, MyNode, Result, GENESIS_DBC_AMOUNT,
-};
+use crate::integration::{event_channel::EventSender, Cmd, Event};
+use crate::node::{Error, MyNode, Result, GENESIS_DBC_AMOUNT};
 
 use sn_interface::{
     network_knowledge::{

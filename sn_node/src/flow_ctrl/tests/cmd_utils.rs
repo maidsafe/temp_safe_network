@@ -1,11 +1,14 @@
-use crate::node::{
-    flow_ctrl::dispatcher::Dispatcher,
-    messaging::{OutgoingMsg, Peers},
-    Cmd,
-};
-use assert_matches::assert_matches;
-use eyre::eyre;
-use eyre::Result;
+// Copyright 2022 MaidSafe.net limited.
+//
+// This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
+// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied. Please review the Licences for the specific language governing
+// permissions and limitations relating to use of the SAFE Network Software.
+
+use crate::flow_ctrl::dispatcher::Dispatcher;
+use crate::integration::{Cmd, OutgoingMsg, Peers};
+
 use qp2p::SendStream;
 #[cfg(feature = "traceroute")]
 use sn_interface::messaging::Traceroute;
@@ -21,6 +24,10 @@ use sn_interface::{
     },
     types::{Keypair, Peer, ReplicatedData, SecretKeySet},
 };
+
+use assert_matches::assert_matches;
+use eyre::eyre;
+use eyre::Result;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 use tokio::sync::Mutex;

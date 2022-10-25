@@ -7,7 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::comm::Comm;
-use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Error, MyNode, Result};
+use crate::integration::{Cmd, Peers};
+use crate::node::{Error, MyNode, Result};
 
 use sn_interface::{
     elder_count,
@@ -21,6 +22,7 @@ use sn_interface::{
     },
     types::{log_markers::LogMarker, Peer},
 };
+
 use std::sync::Arc;
 use tokio::sync::RwLock;
 

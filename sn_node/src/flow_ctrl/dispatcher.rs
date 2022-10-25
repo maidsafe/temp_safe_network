@@ -8,10 +8,8 @@
 
 use crate::comm::Comm;
 use crate::data::{Data, Event as DataEvent};
-use crate::node::{
-    messaging::{OutgoingMsg, Peers},
-    Cmd, Error, MyNode, Result,
-};
+use crate::integration::{Cmd, OutgoingMsg, Peers};
+use crate::node::{Error, MyNode, Result};
 
 #[cfg(feature = "traceroute")]
 use sn_interface::{messaging::Entity, messaging::Traceroute};

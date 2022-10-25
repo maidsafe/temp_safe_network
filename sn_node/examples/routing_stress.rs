@@ -12,9 +12,10 @@ use sn_interface::{
     messaging::system::{NodeCmd, NodeMsg},
     types::Cache,
 };
+use sn_node::flow_ctrl::{new_test_api, NodeTestApi as NodeApi};
 use sn_node::node::{
-    cfg::create_test_max_capacity_and_root_storage, new_test_api, Config, Event as RoutingEvent,
-    MembershipEvent, MessagingEvent, NodeElderChange, NodeTestApi as NodeApi,
+    cfg::create_test_max_capacity_and_root_storage, Config, Event as RoutingEvent, MembershipEvent,
+    MessagingEvent, NodeElderChange,
 };
 
 use bls::PublicKey;

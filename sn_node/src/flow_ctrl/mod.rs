@@ -6,20 +6,29 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+//! Implementation of the module flow control for the SAFE Network.
+
 pub(crate) mod cmd_ctrl;
-pub(crate) mod cmds;
 pub(super) mod dispatcher;
-pub(super) mod event;
-pub(super) mod event_channel;
+mod logging;
+pub(crate) mod node_starter;
+mod node_test_api;
 mod periodic_checks;
 #[cfg(test)]
 pub(crate) mod tests;
 
 pub(crate) use cmd_ctrl::CmdCtrl;
+
+pub use self::{
+    node_starter::{new_test_api, start_node},
+    node_test_api::NodeTestApi,
+};
+
 use periodic_checks::PeriodicChecksTimestamps;
 
 use crate::comm::MsgFromPeer;
-use crate::node::{flow_ctrl::cmds::Cmd, MyNode, Result};
+use crate::integration::Cmd;
+use crate::node::{MyNode, Result};
 
 use sn_interface::types::log_markers::LogMarker;
 

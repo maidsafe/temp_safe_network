@@ -6,9 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{
-    messaging::Peers, Cmd, Error, MyNode, Prefix, Result, MAX_WAITING_PEERS_PER_QUERY,
-};
+use crate::integration::{Cmd, Peers};
+use crate::node::{Error, MyNode, Prefix, Result, MAX_WAITING_PEERS_PER_QUERY};
 
 use qp2p::SendStream;
 use sn_dysfunction::IssueType;

@@ -6,22 +6,21 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{CmdChannel, Error, MyNode, Peer, Result};
+use super::node_starter::CmdChannel;
+
+use crate::integration::{Cmd, OutgoingMsg, Peers};
+use crate::node::{Error, MyNode, Result};
 
 use sn_interface::{
     messaging::system::NodeMsg,
     network_knowledge::{SectionAuthorityProvider, SectionsDAG},
+    types::Peer,
 };
 
 use ed25519_dalek::PublicKey;
 use std::{collections::BTreeSet, net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 use xor_name::{Prefix, XorName};
-
-use super::{
-    flow_ctrl::cmds::Cmd,
-    messaging::{OutgoingMsg, Peers},
-};
 
 /// Test interface for sending and receiving messages to and from other nodes.
 ///

@@ -6,20 +6,23 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::{
+    dispatcher::Dispatcher,
+    logging::{log_ctx::LogCtx, run_system_logger},
+    node_test_api::NodeTestApi,
+    CmdCtrl, FlowCtrl,
+};
+
 use crate::comm::{Comm, MsgFromPeer};
 use crate::data::{Data, UsedSpace};
+use crate::integration::{
+    cmds::Cmd,
+    event::{Elders, Event, MembershipEvent, NodeElderChange},
+    event_channel::{self, EventReceiver, EventSender},
+};
 use crate::node::{
     cfg::keypair_storage::{get_reward_pk, store_network_keypair, store_new_reward_keypair},
-    flow_ctrl::{
-        cmds::Cmd,
-        dispatcher::Dispatcher,
-        event::{Elders, Event, MembershipEvent, NodeElderChange},
-        event_channel::{self, EventReceiver, EventSender},
-        CmdCtrl, FlowCtrl,
-    },
-    join_network,
-    logging::{log_ctx::LogCtx, run_system_logger},
-    Config, Error, MyNode, Result,
+    join_network, Config, Error, MyNode, Result,
 };
 
 use sn_interface::{
@@ -52,9 +55,9 @@ pub(crate) type CmdChannel = mpsc::Sender<(Cmd, Option<usize>)>;
 pub async fn new_test_api(
     config: &Config,
     join_timeout: Duration,
-) -> Result<(super::NodeTestApi, EventReceiver)> {
+) -> Result<(NodeTestApi, EventReceiver)> {
     let (node, cmd_channel, event_receiver) = new_node(config, join_timeout).await?;
-    Ok((super::NodeTestApi::new(node, cmd_channel), event_receiver))
+    Ok((NodeTestApi::new(node, cmd_channel), event_receiver))
 }
 
 /// A reference held to the node to keep it running.

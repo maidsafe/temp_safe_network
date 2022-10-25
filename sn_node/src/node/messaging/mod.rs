@@ -19,7 +19,8 @@ mod relocation;
 mod serialize;
 mod update_section;
 
-use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result, DATA_QUERY_LIMIT};
+use crate::integration::Cmd;
+use crate::node::{Error, MyNode, Result, DATA_QUERY_LIMIT};
 
 use qp2p::SendStream;
 use sn_interface::{
@@ -27,31 +28,8 @@ use sn_interface::{
     types::Peer,
 };
 
-use std::{collections::BTreeSet, sync::Arc};
+use std::sync::Arc;
 use tokio::sync::Mutex;
-
-#[derive(Debug, Clone)]
-#[allow(clippy::large_enum_variant)]
-pub(crate) enum OutgoingMsg {
-    Node(NodeMsg),
-    Client(ClientMsg),
-}
-
-#[derive(Debug, Clone)]
-pub(crate) enum Peers {
-    Single(Peer),
-    Multiple(BTreeSet<Peer>),
-}
-
-impl Peers {
-    #[allow(unused)]
-    pub(crate) fn get(&self) -> BTreeSet<Peer> {
-        match self {
-            Self::Single(peer) => BTreeSet::from([*peer]),
-            Self::Multiple(peers) => peers.clone(),
-        }
-    }
-}
 
 // Message handling
 impl MyNode {

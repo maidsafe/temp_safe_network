@@ -6,17 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::integration::{Cmd, Peers};
 use crate::node::{
-    core::DkgSessionInfo,
     dkg::{check_ephemeral_dkg_key, DkgPubKeys},
-    flow_ctrl::cmds::Cmd,
-    messaging::Peers,
-    Error, MyNode, Proposal, Result,
+    DkgSessionInfo, Error, MyNode, Result,
 };
 
 use sn_interface::{
     messaging::{
-        system::{DkgSessionId, NodeMsg, SectionSigShare},
+        system::{DkgSessionId, NodeMsg, Proposal, SectionSigShare},
         AuthorityProof, SectionSig,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare},

@@ -28,7 +28,9 @@
     clippy::unwrap_used
 )]
 
-use sn_node::node::{start_node, Config, Error as NodeError, Event, MembershipEvent};
+use sn_node::integration::{Event, MembershipEvent};
+use sn_node::node::{Config, Error as NodeError};
+use sn_node::start_node;
 
 use clap::{CommandFactory, Parser};
 use clap_complete::{generate, Shell};

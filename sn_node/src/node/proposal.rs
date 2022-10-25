@@ -8,55 +8,15 @@
 
 use crate::node::Result;
 
-use sn_interface::{
-    messaging::system::{Proposal as ProposalMsg, SectionSigShare, SectionSigned},
-    network_knowledge::{NodeState, SectionAuthorityProvider},
-};
+use sn_interface::messaging::system::Proposal;
 
-#[allow(clippy::large_enum_variant)]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) enum Proposal {
-    VoteNodeOffline(NodeState),
-    SectionInfo(SectionAuthorityProvider),
-    NewElders(SectionSigned<SectionAuthorityProvider>),
-    JoinsAllowed(bool),
-}
-
-impl Proposal {
-    /// Create `SigShare` for this proposal.
-    pub(crate) fn sign_with_key_share(
-        &self,
-        public_key_set: bls::PublicKeySet,
-        index: usize,
-        secret_key_share: &bls::SecretKeyShare,
-    ) -> Result<SectionSigShare> {
-        Ok(SectionSigShare::new(
-            public_key_set,
-            index,
-            secret_key_share,
-            &self.as_signable_bytes()?,
-        ))
-    }
-
-    pub(crate) fn as_signable_bytes(&self) -> Result<Vec<u8>> {
-        Ok(match self {
-            Self::VoteNodeOffline(node_state) => bincode::serialize(node_state),
-            Self::SectionInfo(sap) => bincode::serialize(sap),
-            Self::NewElders(info) => bincode::serialize(&info.sig.public_key), // the pub key of the new elders
-            Self::JoinsAllowed(joins_allowed) => bincode::serialize(&joins_allowed),
-        }?)
-    }
-
-    // Add conversion methods to/from `messaging::...::Proposal`
-    // We prefer this over `From<...>` to make it easier to read the conversion.
-    pub(crate) fn into_msg(self) -> ProposalMsg {
-        match self {
-            Self::VoteNodeOffline(node_state) => ProposalMsg::VoteNodeOffline(node_state),
-            Self::SectionInfo(sap) => ProposalMsg::SectionInfo(sap),
-            Self::NewElders(sap) => ProposalMsg::NewElders(sap),
-            Self::JoinsAllowed(allowed) => ProposalMsg::JoinsAllowed(allowed),
-        }
-    }
+pub(crate) fn as_signable_bytes(proposal: &Proposal) -> Result<Vec<u8>> {
+    Ok(match proposal {
+        Proposal::VoteNodeOffline(node_state) => bincode::serialize(node_state),
+        Proposal::SectionInfo(sap) => bincode::serialize(sap),
+        Proposal::NewElders(info) => bincode::serialize(&info.sig.public_key), // the pub key of the new elders
+        Proposal::JoinsAllowed(joins_allowed) => bincode::serialize(&joins_allowed),
+    }?)
 }
 
 #[cfg(test)]
@@ -92,7 +52,7 @@ mod tests {
     where
         T: Serialize + Debug,
     {
-        let actual = proposal.as_signable_bytes()?;
+        let actual = as_signable_bytes(proposal)?;
         let expected = bincode::serialize(should_serialize_as)?;
 
         assert_eq!(

@@ -6,12 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::integration::{Cmd, OutgoingMsg, Peers};
 use crate::log_sleep;
-use crate::node::{
-    flow_ctrl::cmds::Cmd,
-    messaging::{OutgoingMsg, Peers},
-    Error, Event, MembershipEvent, MyNode, Result, StateSnapshot,
-};
+use crate::node::{Error, Event, MembershipEvent, MyNode, Result, StateSnapshot};
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
@@ -450,11 +447,9 @@ impl MyNode {
 mod tests {
     use super::*;
 
-    use crate::node::{
-        cfg::create_test_max_capacity_and_root_storage,
-        flow_ctrl::{event_channel, tests::network_utils::create_comm},
-        MIN_ADULT_AGE,
-    };
+    use crate::flow_ctrl::tests::network_utils::create_comm;
+    use crate::integration::event_channel;
+    use crate::node::{cfg::create_test_max_capacity_and_root_storage, MIN_ADULT_AGE};
     use sn_interface::{
         messaging::system::SectionSigned, network_knowledge::SectionAuthorityProvider,
     };

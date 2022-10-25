@@ -6,9 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::FlowCtrl;
+use super::{node_starter::CmdChannel, FlowCtrl};
 
-use crate::node::{flow_ctrl::cmds::Cmd, node_starter::CmdChannel, MyNode, Result};
+use crate::integration::Cmd;
+use crate::node::{MyNode, Result};
 
 use ed25519_dalek::Signer;
 #[cfg(feature = "traceroute")]

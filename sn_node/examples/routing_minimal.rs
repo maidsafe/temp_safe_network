@@ -33,9 +33,10 @@
 //! command-line option for more details.
 //!
 
+use sn_node::flow_ctrl::{new_test_api, NodeTestApi as NodeApi};
 use sn_node::node::{
-    cfg::create_test_max_capacity_and_root_storage, new_test_api, Config, Event, EventReceiver,
-    MembershipEvent, MessagingEvent, NodeTestApi as NodeApi,
+    cfg::create_test_max_capacity_and_root_storage, Config, Event, EventReceiver, MembershipEvent,
+    MessagingEvent,
 };
 
 use clap::Parser;

@@ -8,11 +8,8 @@
 
 use crate::{
     comm::Comm,
-    node::{
-        flow_ctrl::cmds::Cmd,
-        messaging::{OutgoingMsg, Peers},
-        Event, MembershipEvent, MyNode, Proposal as CoreProposal, Result, MIN_LEVEL_WHEN_FULL,
-    },
+    integration::{Cmd, Event, MembershipEvent, OutgoingMsg, Peers},
+    node::{MyNode, Result, MIN_LEVEL_WHEN_FULL},
 };
 
 use std::collections::BTreeSet;
@@ -24,7 +21,7 @@ use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         data::StorageLevel,
-        system::{JoinResponse, NodeCmd, NodeEvent, NodeMsg, NodeQuery, Proposal as ProposalMsg},
+        system::{JoinResponse, NodeCmd, NodeEvent, NodeMsg, NodeQuery},
         MsgId,
     },
     network_knowledge::NetworkKnowledge,
@@ -273,17 +270,7 @@ impl MyNode {
                     msg_id
                 );
 
-                // lets convert our message into a usable proposal for core
-                let core_proposal = match proposal {
-                    ProposalMsg::VoteNodeOffline(node_state) => {
-                        CoreProposal::VoteNodeOffline(node_state)
-                    }
-                    ProposalMsg::SectionInfo(sap) => CoreProposal::SectionInfo(sap),
-                    ProposalMsg::NewElders(sap) => CoreProposal::NewElders(sap),
-                    ProposalMsg::JoinsAllowed(allowed) => CoreProposal::JoinsAllowed(allowed),
-                };
-
-                node.handle_proposal(msg_id, core_proposal, sig_share, sender)
+                node.handle_proposal(msg_id, proposal, sig_share, sender)
             }
             NodeMsg::DkgStart(session_id, elder_sig) => {
                 trace!(
