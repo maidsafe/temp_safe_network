@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::comm::Comm;
 use crate::integration::{Cmd, Peers};
 use crate::node::{Error, MyNode, Result};
 
@@ -103,7 +102,9 @@ impl MyNode {
             return Ok(Some(node.send_system_msg(msg, Peers::Single(peer))));
         }
 
-        // It's reachable, let's then propose membership
+        // reachability checks are skipped, because that is covered in other ways
+
+        // we propose membership
         let node_state = NodeState::joined(peer, None);
         Ok(node.propose_membership_change(node_state))
     }
@@ -160,7 +161,6 @@ impl MyNode {
         node: Arc<RwLock<MyNode>>,
         peer: Peer,
         join_request: JoinAsRelocatedRequest,
-        comm: &Comm,
     ) -> Option<Cmd> {
         debug!("Received JoinAsRelocatedRequest {join_request:?} from {peer}",);
         let read_locked_node = node.read().await;
@@ -207,18 +207,9 @@ impl MyNode {
         // drop read lock before we do reachability check
         drop(read_locked_node);
 
-        // Finally do reachability check
-        if comm.is_reachable(&peer.addr()).await.is_err() {
-            let msg = NodeMsg::JoinAsRelocatedResponse(Box::new(
-                JoinAsRelocatedResponse::NodeNotReachable(peer.addr()),
-            ));
-            trace!("{}", LogMarker::SendJoinAsRelocatedResponse);
-            let read_locked_node = node.read().await;
+        // reachability checks are skipped, because that is covered in other ways
 
-            trace!("Sending {:?} to {}", msg, peer);
-            return Some(read_locked_node.send_system_msg(msg, Peers::Single(peer)));
-        };
-
+        // we propose membership
         node.write()
             .await
             .propose_membership_change(join_request.relocate_proof.value)

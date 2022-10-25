@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    comm::Comm,
     integration::{Cmd, Event, MembershipEvent, OutgoingMsg, Peers},
     node::{MyNode, Result, MIN_LEVEL_WHEN_FULL},
 };
@@ -68,7 +67,6 @@ impl MyNode {
         msg_id: MsgId,
         msg: NodeMsg,
         sender: Peer,
-        comm: &Comm,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         trace!("{:?}: {msg_id:?}", LogMarker::NodeMsgToBeHandled);
@@ -236,7 +234,7 @@ impl MyNode {
                 }
 
                 Ok(
-                    MyNode::handle_join_as_relocated_request(node, sender, *join_request, comm)
+                    MyNode::handle_join_as_relocated_request(node, sender, *join_request)
                         .await
                         .into_iter()
                         .collect(),

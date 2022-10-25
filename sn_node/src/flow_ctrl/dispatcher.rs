@@ -211,7 +211,6 @@ impl Dispatcher {
                     msg_id,
                     msg,
                     origin,
-                    &self.comm,
                     #[cfg(feature = "traceroute")]
                     traceroute.clone(),
                 )
