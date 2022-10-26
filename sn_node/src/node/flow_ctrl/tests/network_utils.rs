@@ -348,8 +348,7 @@ pub(crate) fn create_section_with_elders(
     sk_set: &bls::SecretKeySet,
     sap: &SectionAuthorityProvider,
 ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
-    let (mut section, section_key_share) =
-        TestNetworkKnowledge::do_create_section(sap, sk_set, None, None)?;
+    let (mut section, section_key_share) = do_create_section(sap, sk_set, None, None)?;
     for peer in sap.elders() {
         let node_state = NodeState::joined(*peer, None);
         let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state)?;
