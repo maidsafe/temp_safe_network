@@ -155,6 +155,7 @@ pub mod test_utils {
     pub use crate::{
         network_knowledge::{
             section_authority_provider::test_utils::*, section_tree_test_utils::*, test_utils::*,
+            test_utils_nw::*,
         },
         types::keys::test_utils::*,
     };
