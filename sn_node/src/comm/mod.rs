@@ -104,6 +104,12 @@ impl Comm {
         send_stream: Option<Arc<Mutex<SendStream>>>,
         is_msg_for_client: bool,
     ) -> Result<()> {
+        let stream_info = if let Some(stream) = &send_stream {
+            format!(" on {}", stream.lock().await.id())
+        } else {
+            "".to_string()
+        };
+
         let watcher = self
             .send_to_one(peer, msg_id, bytes, send_stream, is_msg_for_client)
             .await;
@@ -115,15 +121,10 @@ impl Comm {
             match watcher {
                 Ok(Some(watcher)) => {
                     let (send_was_successful, should_remove) =
-                        match Self::is_sent(watcher, msg_id, peer).await {
-                            Ok(result) => result,
-                            Err(error) => {
-                                return Err(error);
-                            }
-                        };
+                        Self::is_sent(watcher, msg_id, peer).await?;
 
                     if send_was_successful {
-                        trace!("Msg {msg_id:?} sent to {peer:?}");
+                        trace!("Msg {msg_id:?} sent to {peer:?}{stream_info}");
                         Ok(())
                     } else {
                         if should_remove {
@@ -152,7 +153,7 @@ impl Comm {
 
                     let _peer = sessions.remove(&peer);
                     error!(
-                            "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed as we have disconnected from the peer. (Error is: {})",
+                            "Sending message (msg_id: {:?}) to {:?} (name {:?}){stream_info} failed as we have disconnected from the peer. (Error is: {})",
                             msg_id,
                             peer.addr(),
                             peer.name(),

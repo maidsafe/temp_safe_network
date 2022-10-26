@@ -57,11 +57,20 @@ impl MsgListener {
         while let Some(result) = incoming_msgs.next_with_stream().await.transpose() {
             match result {
                 Ok((msg_bytes, send_stream)) => {
+                    let stream_info = if let Some(stream) = &send_stream {
+                        format!(" on {}", stream.lock().await.id())
+                    } else {
+                        "".to_string()
+                    };
+
                     let wire_msg = match WireMsg::from(msg_bytes) {
                         Ok(wire_msg) => wire_msg,
                         Err(error) => {
                             // TODO: should perhaps rather drop this connection.. as it is a spam vector
-                            debug!("Failed to deserialize message: {:?}", error);
+                            debug!(
+                                "Failed to deserialize message received{stream_info}: {:?}",
+                                error
+                            );
                             continue;
                         }
                     };
@@ -82,7 +91,10 @@ impl MsgListener {
                             .await;
                     }
 
-                    debug!("MsgEvent received from: {src_name:?} was: {:?}", wire_msg);
+                    debug!(
+                        "MsgEvent received from: {src_name:?}{stream_info} was: {:?}",
+                        wire_msg
+                    );
 
                     if let Err(error) = self
                         .receive_msg

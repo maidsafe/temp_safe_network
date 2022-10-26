@@ -21,21 +21,3 @@ pub use test_client::read_genesis_dbc_from_first_node;
 
 #[cfg(test)]
 pub use sn_interface::init_logger;
-
-#[cfg(test)]
-#[macro_export]
-/// Helper for tests to retry an operation awaiting for a specific result
-macro_rules! retry_loop_for_pattern {
-    ($async_func:expr, $pattern:pat $(if $cond:expr)?) => {
-        loop {
-            let result = $async_func.await;
-            match &result {
-                $pattern $(if $cond)? => break result,
-                Ok(_) | Err(_) => {
-                    debug!("waiting before retying.....");
-                    tokio::time::sleep(std::time::Duration::from_secs(2)).await
-                }
-            }
-        }
-    };
-}
