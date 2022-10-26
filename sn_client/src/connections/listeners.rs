@@ -58,7 +58,8 @@ impl Session {
         resp_tx: mpsc::Sender<MsgResponse>,
     ) {
         let addr = peer.addr();
-        debug!("Waiting for response msg on bi-stream from {peer:?} for {msg_id:?}");
+        let stream_id = recv_stream.id();
+        debug!("Waiting for response msg on {stream_id} from {peer:?} for {msg_id:?}");
 
         let _handle = tokio::spawn(async move {
             match Self::read_msg_from_recvstream(&mut recv_stream).await {
@@ -68,14 +69,14 @@ impl Session {
                 Ok(MsgType::Node { msg, .. }) => {
                     if let Err(err) = session.handle_system_msg(msg, peer, resp_tx).await {
                         error!(
-                            "Error while handling incoming system msg on bi-stream \
+                            "Error while handling incoming system msg on {stream_id} \
                             from {addr:?} for {msg_id:?}: {err:?}"
                         );
                     }
                 }
                 Err(error) => {
                     error!(
-                        "Error while processing incoming msg on bi-stream \
+                        "Error while processing incoming msg on {stream_id} \
                         from {addr:?} in response to {msg_id:?}: {error:?}"
                     );
                 }
