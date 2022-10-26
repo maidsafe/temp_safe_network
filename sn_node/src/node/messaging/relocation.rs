@@ -59,7 +59,7 @@ impl MyNode {
         Ok(cmds)
     }
 
-    pub(crate) async fn handle_relocate(
+    pub(crate) fn handle_relocate(
         &mut self,
         relocate_proof: SectionSigned<NodeState>,
     ) -> Result<Option<Cmd>> {
@@ -94,10 +94,17 @@ impl MyNode {
             }
             None => {
                 trace!("{}", LogMarker::RelocateStart);
-                self.send_event(Event::Membership(MembershipEvent::RelocationStarted {
-                    previous_name: node.name(),
-                }))
-                .await;
+
+                // move off thread to keep fn sync
+                let event_sender = self.event_sender.clone();
+                let previous_name = node.name();
+                let _handle = tokio::spawn(async move {
+                    event_sender
+                        .send(Event::Membership(MembershipEvent::RelocationStarted {
+                            previous_name,
+                        }))
+                        .await;
+                });
             }
         }
 

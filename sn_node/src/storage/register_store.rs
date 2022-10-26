@@ -74,6 +74,7 @@ impl RegisterStore {
     }
 
     pub(super) async fn list_all_reg_addrs(&self) -> Vec<RegisterAddress> {
+        trace!("Listening all register addrs");
         let iter = list_files_in(&self.file_store_path)
             .into_iter()
             .filter_map(|e| e.parent().map(|parent| (parent.to_path_buf(), e.clone())));
@@ -90,6 +91,7 @@ impl RegisterStore {
             }
         }
 
+        trace!("Listening all register addrs done");
         addrs.into_iter().map(|(_, addr)| addr).collect()
     }
 
