@@ -488,7 +488,7 @@ impl SectionsDAG {
 }
 
 #[cfg(test)]
-pub(super) mod tests {
+pub(crate) mod tests {
     use super::{Error, SectionInfo, SectionsDAG};
     use crate::{
         messaging::system::SectionSigned,
@@ -1162,7 +1162,7 @@ pub(super) mod tests {
     }
 
     // Generate a random `SectionsDAG` and the SAP for each of the section key
-    pub(super) fn gen_random_sections_dag(
+    fn gen_random_sections_dag(
         seed: Option<u64>,
         n_sections: usize,
     ) -> Result<(
