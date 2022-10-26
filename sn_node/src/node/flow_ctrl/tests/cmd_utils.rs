@@ -6,12 +6,11 @@ use crate::node::{
 use assert_matches::assert_matches;
 use eyre::eyre;
 use eyre::Result;
-use qp2p::SendStream;
 use sn_interface::{
     messaging::{
-        data::{ClientMsg, Error as MessagingDataError},
+        data::ClientMsg,
         serialisation::WireMsg,
-        system::{JoinResponse, NodeCmd, NodeMsg, OperationId},
+        system::{JoinResponse, NodeCmd, NodeMsg},
         AuthorityProof, ClientAuth, MsgId,
     },
     network_knowledge::{
@@ -20,8 +19,6 @@ use sn_interface::{
     types::{Keypair, Peer, ReplicatedData},
 };
 use std::collections::BTreeSet;
-use std::sync::Arc;
-use tokio::sync::Mutex;
 
 pub(crate) struct HandleOnlineStatus {
     pub(crate) node_approval_sent: bool,
