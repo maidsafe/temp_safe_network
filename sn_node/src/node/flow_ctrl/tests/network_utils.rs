@@ -1,17 +1,10 @@
 use crate::comm::Comm;
 use crate::node::{
     cfg::create_test_max_capacity_and_root_storage,
-    flow_ctrl::{
-        dispatcher::Dispatcher,
-        event_channel,
-        event_channel::{EventReceiver, EventSender},
-    },
+    flow_ctrl::{dispatcher::Dispatcher, event_channel, event_channel::EventSender},
     relocation_check, ChurnId, MyNode,
 };
 use crate::storage::UsedSpace;
-use bls::Signature;
-use ed25519_dalek::Keypair;
-use eyre::{bail, eyre, Context, Result};
 use sn_consensus::Decision;
 use sn_interface::{
     elder_count,
@@ -22,7 +15,10 @@ use sn_interface::{
     test_utils::*,
     types::{keys::ed25519, Peer},
 };
-use std::net::{Ipv4Addr, SocketAddr};
+
+use bls::Signature;
+use eyre::{eyre, Result};
+use std::net::Ipv4Addr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use xor_name::Prefix;
@@ -32,7 +28,7 @@ pub(crate) static TEST_EVENT_CHANNEL_SIZE: usize = 20;
 /// Utility for constructing a Node with a mock network section.
 ///
 /// The purpose is to reduce test setup verbosity when unit testing things like message handlers.
-pub(crate) struct TestNodeBuilder {
+pub(crate) struct TestNodeBuilder<'a> {
     pub(crate) prefix: Prefix,
     pub(crate) elder_count: usize,
     pub(crate) adult_count: usize,
@@ -46,9 +42,10 @@ pub(crate) struct TestNodeBuilder {
     pub(crate) custom_peer: Option<Peer>,
     pub(crate) other_section_keys: Option<Vec<bls::SecretKey>>,
     pub(crate) parent_section_tree: Option<SectionTree>,
+    pub(crate) elder_age_pattern: Option<&'a [u8]>,
 }
 
-impl TestNodeBuilder {
+impl<'a> TestNodeBuilder<'a> {
     /// Create an instance of the builder.
     ///
     /// At the minimum a prefix for the section and an elder count value are required.
@@ -58,7 +55,7 @@ impl TestNodeBuilder {
     ///
     /// To supply different values for these, use the `adult_count` and `section_sk_threshold`
     /// functions to set them.
-    pub(crate) fn new(prefix: Prefix, elder_count: usize) -> TestNodeBuilder {
+    pub(crate) fn new(prefix: Prefix, elder_count: usize) -> TestNodeBuilder<'a> {
         let supermajority = 1 + elder_count * 2 / 3;
         let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
         Self {
@@ -75,11 +72,12 @@ impl TestNodeBuilder {
             custom_peer: None,
             other_section_keys: None,
             parent_section_tree: None,
+            elder_age_pattern: None,
         }
     }
 
     /// Provide a the genesis key set for the section to be created with.
-    pub(crate) fn genesis_sk_set(mut self, sk_set: bls::SecretKeySet) -> TestNodeBuilder {
+    pub(crate) fn genesis_sk_set(mut self, sk_set: bls::SecretKeySet) -> TestNodeBuilder<'a> {
         self.genesis_sk_set = Some(sk_set);
         self
     }
@@ -87,7 +85,10 @@ impl TestNodeBuilder {
     /// Provide other keys for the section chain.
     ///
     /// This list should *not* include the genesis key.
-    pub(crate) fn other_section_keys(mut self, other_keys: Vec<bls::SecretKey>) -> TestNodeBuilder {
+    pub(crate) fn other_section_keys(
+        mut self,
+        other_keys: Vec<bls::SecretKey>,
+    ) -> TestNodeBuilder<'a> {
         self.other_section_keys = Some(other_keys);
         self
     }
@@ -98,7 +99,7 @@ impl TestNodeBuilder {
     pub(crate) fn parent_section_tree(
         mut self,
         parent_section_tree: SectionTree,
-    ) -> TestNodeBuilder {
+    ) -> TestNodeBuilder<'a> {
         self.parent_section_tree = Some(parent_section_tree);
         self
     }
@@ -108,7 +109,7 @@ impl TestNodeBuilder {
     /// The default is 0.
     ///
     /// The total members for the section will be `elder_count` + `adult_count`.
-    pub(crate) fn adult_count(mut self, count: usize) -> TestNodeBuilder {
+    pub(crate) fn adult_count(mut self, count: usize) -> TestNodeBuilder<'a> {
         self.adult_count = count;
         self
     }
@@ -118,7 +119,7 @@ impl TestNodeBuilder {
     /// The default is the supermajority of the elder count, minus one.
     ///
     /// It will sometimes be necessary to set this value to 0.
-    pub(crate) fn section_sk_threshold(mut self, threshold: usize) -> TestNodeBuilder {
+    pub(crate) fn section_sk_threshold(mut self, threshold: usize) -> TestNodeBuilder<'a> {
         self.section_sk_threshold = threshold;
         self
     }
@@ -133,7 +134,7 @@ impl TestNodeBuilder {
     ///
     /// In your test, it may be desirable to control the amount of commands that would be
     /// generated.
-    pub(crate) fn data_copy_count(mut self, count: usize) -> TestNodeBuilder {
+    pub(crate) fn data_copy_count(mut self, count: usize) -> TestNodeBuilder<'a> {
         self.data_copy_count = count;
         self
     }
@@ -143,7 +144,7 @@ impl TestNodeBuilder {
     /// The event sender and receiver is a pair. If you need to access the receiver in the test,
     /// create the pair in the test setup and then pass the sender in here and then access the
     /// receiver as needed.
-    pub(crate) fn event_sender(mut self, event_sender: EventSender) -> TestNodeBuilder {
+    pub(crate) fn event_sender(mut self, event_sender: EventSender) -> TestNodeBuilder<'a> {
         self.node_event_sender = event_sender;
         self
     }
@@ -160,7 +161,7 @@ impl TestNodeBuilder {
         section: NetworkKnowledge,
         sk_set: bls::SecretKeySet,
         first_node: MyNodeInfo,
-    ) -> TestNodeBuilder {
+    ) -> TestNodeBuilder<'a> {
         self.section = Some(section);
         self.genesis_sk_set = Some(sk_set);
         self.first_node = Some(first_node);
@@ -170,8 +171,19 @@ impl TestNodeBuilder {
     /// Specify a single custom peer in the section.
     ///
     /// This may have a different age than other members in the section.
-    pub(crate) fn custom_peer(mut self, peer: Peer) -> TestNodeBuilder {
+    pub(crate) fn custom_peer(mut self, peer: Peer) -> TestNodeBuilder<'a> {
         self.custom_peer = Some(peer);
+        self
+    }
+
+    /// Specify a `age_pattern` to create elders with specific ages.
+    ///
+    /// If None = elder's age is set to `MIN_ADULT_AGE`
+    /// If age_pattern.len() == elder, then apply the respective ages to each node
+    /// If age_pattern.len() < elder, then the last element's value is taken as the age for the remaining nodes.
+    /// If age_pattern.len() > elder, then the extra elements after `count` are ignored.
+    pub(crate) fn elder_age_pattern(mut self, elder_age_pattern: &'a [u8]) -> TestNodeBuilder<'a> {
+        self.elder_age_pattern = Some(elder_age_pattern);
         self
     }
 
@@ -200,6 +212,7 @@ impl TestNodeBuilder {
             self.elder_count,
             self.adult_count,
             &section_key_set,
+            self.elder_age_pattern,
         );
         let genesis_key_set = if let Some(ref genesis_sk_set) = self.genesis_sk_set {
             genesis_sk_set.clone()
@@ -253,6 +266,7 @@ impl TestNodeBuilder {
                         self.elder_count,
                         self.adult_count,
                         &sk_set,
+                        self.elder_age_pattern,
                     );
                     (sap, nodes, sk_set)
                 } else {
@@ -260,6 +274,7 @@ impl TestNodeBuilder {
                         self.prefix,
                         self.elder_count,
                         self.adult_count,
+                        self.elder_age_pattern,
                         Some(self.section_sk_threshold),
                     )
                 };
@@ -302,7 +317,7 @@ pub(crate) fn create_section_with_key(
     prefix: Prefix,
     sk_set: &bls::SecretKeySet,
 ) -> Result<(NetworkKnowledge, SectionAuthorityProvider)> {
-    let (sap, _) = TestSAP::random_sap_with_key(prefix, elder_count(), 0, sk_set);
+    let (sap, _) = TestSAP::random_sap_with_key(prefix, elder_count(), 0, sk_set, None);
     let (section, _) = create_section(sk_set, &sap, None, None)?;
     Ok((section, sap))
 }

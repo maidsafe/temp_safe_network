@@ -1,18 +1,11 @@
-use crate::node::{api::gen_genesis_dbc, flow_ctrl::dispatcher::Dispatcher};
+use crate::node::api::gen_genesis_dbc;
 use eyre::{eyre, Result};
 use sn_dbc::{
-    get_public_commitments_from_transaction, Commitment, Dbc, Hash, IndexedSignatureShare,
-    KeyImage, Owner, OwnerOnce, PublicKey, RingCtTransaction, Signature, SpentProof,
-    SpentProofContent, SpentProofShare, Token, TransactionBuilder,
+    Dbc, KeyImage, Owner, OwnerOnce, RingCtTransaction, SpentProof, SpentProofShare, Token,
+    TransactionBuilder,
 };
-use sn_interface::network_knowledge::section_keys::build_spent_proof_share;
-use sn_interface::{
-    messaging::data::{ClientMsg, DataCmd, RegisterCmd, SpentbookCmd},
-    network_knowledge::{SectionAuthorityProvider, SectionKeysProvider},
-    types::{Peer, ReplicatedData},
-};
+use sn_interface::{messaging::data::RegisterCmd, types::ReplicatedData};
 use std::collections::BTreeSet;
-use std::str::FromStr;
 
 /// Get the spent proof share that's packaged inside the data that's to be replicated to the adults
 /// in the section.

@@ -34,15 +34,37 @@ pub fn gen_addr() -> SocketAddr {
     ([192, 0, 2, 0], port).into()
 }
 
-// Create `count` Nodes sorted by their names.
-// The `age_diff` flag is used to trigger nodes being generated with different age pattern.
-// The test of `handle_agreement_on_online_of_elder_candidate` requires most nodes to be with
-// age of MIN_AGE + 2 and one node with age of MIN_ADULT_AGE.
-pub fn gen_sorted_nodes(prefix: &Prefix, count: usize, age_diff: bool) -> Vec<MyNodeInfo> {
-    (0..count)
-        .map(|index| {
-            let age = if age_diff && index < count - 1 {
-                MIN_ADULT_AGE + 1
+/// Create `elder+adult` Nodes sorted by their names.
+///
+/// Optionally provide `age_pattern` to create elders with specific ages.
+/// If None = elder's age is set to `MIN_ADULT_AGE`
+/// If age_pattern.len() == elder, then apply the respective ages to each node
+/// If age_pattern.len() < elder, then the last element's value is taken as the age for the remaining nodes.
+/// If age_pattern.len() > elder, then the extra elements after `count` are ignored.
+pub fn gen_sorted_nodes(
+    prefix: &Prefix,
+    elder: usize,
+    adult: usize,
+    elder_age_pattern: Option<&[u8]>,
+) -> Vec<MyNodeInfo> {
+    let pattern = if let Some(user_pattern) = elder_age_pattern {
+        if user_pattern.is_empty() {
+            None
+        } else if user_pattern.len() < elder {
+            let last_element = user_pattern[user_pattern.len() - 1];
+            let mut pattern = vec![last_element; elder - user_pattern.len()];
+            pattern.extend_from_slice(user_pattern);
+            Some(pattern)
+        } else {
+            Some(Vec::from(user_pattern))
+        }
+    } else {
+        None
+    };
+    (0..elder)
+        .map(|idx| {
+            let age = if let Some(pattern) = &pattern {
+                pattern[idx]
             } else {
                 MIN_ADULT_AGE
             };
@@ -51,6 +73,12 @@ pub fn gen_sorted_nodes(prefix: &Prefix, count: usize, age_diff: bool) -> Vec<My
                 gen_addr(),
             )
         })
+        .chain((0..adult).map(|_| {
+            MyNodeInfo::new(
+                crate::types::keys::ed25519::gen_keypair(&prefix.range_inclusive(), MIN_ADULT_AGE),
+                gen_addr(),
+            )
+        }))
         .sorted_by_key(|node| node.name())
         .collect()
 }

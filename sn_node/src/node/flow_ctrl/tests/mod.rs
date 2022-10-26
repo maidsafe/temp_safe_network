@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-#![allow(dead_code, unused_imports)]
+#![allow(dead_code)]
 pub(crate) mod cmd_utils;
 pub(crate) mod dbc_utils;
 pub(crate) mod network_utils;
@@ -20,56 +20,38 @@ use crate::{
         flow_ctrl::{dispatcher::Dispatcher, event_channel},
         messages::WireMsgUtils,
         messaging::{OutgoingMsg, Peers},
-        Cmd, Error, Event, MembershipEvent, Proposal, Result as RoutingResult,
+        Cmd, Error, Event, MembershipEvent, Proposal,
     },
     storage::UsedSpace,
 };
-
 use cmd_utils::{handle_online_cmd, run_and_collect_cmds, wrap_client_msg_for_handling};
-use sn_consensus::Decision;
-use sn_dbc::{Hash, OwnerOnce, SpentProofShare, TransactionBuilder};
-#[cfg(feature = "traceroute")]
-use sn_interface::messaging::Traceroute;
+use sn_dbc::Hash;
 use sn_interface::{
     elder_count, init_logger,
     messaging::{
-        data::{ClientMsg, DataCmd, Error as MessagingDataError, RegisterCmd, SpentbookCmd},
-        system::{
-            AntiEntropyKind, JoinAsRelocatedRequest, JoinRequest, JoinResponse, NodeCmd, NodeMsg,
-            SectionSig, SectionSigned,
-        },
-        Dst, MsgId, MsgType, WireMsg,
+        data::{ClientMsg, DataCmd, Error as MessagingDataError, SpentbookCmd},
+        system::{AntiEntropyKind, JoinAsRelocatedRequest, NodeCmd, NodeMsg, SectionSigned},
+        Dst, MsgType, WireMsg,
     },
     network_knowledge::{
         recommended_section_size, supermajority, Error as NetworkKnowledgeError, MembershipState,
         MyNodeInfo, NetworkKnowledge, NodeState, RelocateDetails, SectionAuthorityProvider,
-        SectionKeyShare, SectionKeysProvider, SectionTree, SectionTreeUpdate, SectionsDAG,
-        MIN_ADULT_AGE,
+        SectionKeysProvider, SectionTree, SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
     },
     test_utils::*,
-    types::{keys::ed25519, Peer, PublicKey, ReplicatedData},
+    types::{keys::ed25519, PublicKey, ReplicatedData},
 };
 
 use assert_matches::assert_matches;
-use bls::Signature;
-use ed25519_dalek::Signer;
-use eyre::{bail, eyre, Context, Result};
-use itertools::Itertools;
-use rand::{distributions::Alphanumeric, rngs::OsRng, thread_rng, Rng};
-use resource_proof::ResourceProof as ChallengeSolver;
+use eyre::{eyre, Result};
+use rand::thread_rng;
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
     iter,
     net::Ipv4Addr,
-    ops::Deref,
-    path::Path,
     sync::Arc,
 };
-use tempfile::tempdir;
-use tokio::{
-    sync::{mpsc, RwLock},
-    time::{timeout, Duration},
-};
+use tokio::sync::{mpsc, RwLock};
 use xor_name::{Prefix, XorName};
 
 #[tokio::test]
@@ -188,7 +170,8 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             let section_chain = SectionsDAG::new(pk);
 
             // Creates nodes where everybody has age 6 except one has 5.
-            let mut nodes: Vec<_> = gen_sorted_nodes(&Prefix::default(), elder_count(), true);
+            let mut nodes: Vec<_> =
+                gen_sorted_nodes(&Prefix::default(), elder_count(), 0, Some(&[6, 5]));
 
             let elders = nodes.iter().map(MyNodeInfo::peer);
             let members = nodes.iter().map(|n| NodeState::joined(n.peer(), None));
@@ -383,7 +366,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     local
         .run_until(async move {
             let (section_auth, mut nodes, sk_set) =
-                TestSAP::random_sap(Prefix::default(), elder_count(), 0, None);
+                TestSAP::random_sap(Prefix::default(), elder_count(), 0, None, None);
 
             let (mut section, _) =
                 network_utils::create_section(&sk_set, &section_auth, None, None)?;
@@ -432,12 +415,6 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
         .await
 }
 
-#[derive(PartialEq)]
-enum UntrustedMessageSource {
-    Peer,
-    Accumulation,
-}
-
 #[tokio::test]
 async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     // The setup here is too complex for the TestNodeBuilder.
@@ -452,7 +429,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             let pk0 = sk0.public_key();
 
             let (old_sap, mut nodes, sk_set1) =
-                TestSAP::random_sap(Prefix::default(), elder_count(), 0, None);
+                TestSAP::random_sap(Prefix::default(), elder_count(), 0, None, None);
             let members =
                 BTreeSet::from_iter(nodes.iter().map(|n| NodeState::joined(n.peer(), None)));
             let pk1 = sk_set1.secret_key().public_key();
@@ -660,7 +637,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
                 RelocatedPeerRole::Elder => elder_count(),
                 RelocatedPeerRole::NonElder => recommended_section_size(),
             };
-            let (section_auth, mut nodes, sk_set) = TestSAP::random_sap(prefix, elder_count(), 0, None);
+            let (section_auth, mut nodes, sk_set) = TestSAP::random_sap(prefix, elder_count(), 0, None, None);
             let (mut section, section_key_share) =
                 network_utils::create_section(&sk_set, &section_auth, None, None)?;
 

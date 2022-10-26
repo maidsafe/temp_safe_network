@@ -630,7 +630,7 @@ pub mod test_utils_nw {
         ) -> Result<(NetworkKnowledge, Vec<MyNodeInfo>)> {
             let pk_set = sk_set.public_keys();
             let (sap, node_infos) =
-                TestSAP::random_sap_with_key(prefix, elder_count, adult_count, sk_set);
+                TestSAP::random_sap_with_key(prefix, elder_count, adult_count, sk_set, None);
             let signed_sap = TestKeys::get_section_signed(&sk_set.secret_key(), sap)?;
             let section_tree_update =
                 super::SectionTreeUpdate::new(signed_sap, SectionsDAG::new(pk_set.public_key()));
@@ -730,7 +730,7 @@ mod tests {
         let (mut knowledge, _) = NetworkKnowledge::first_node(peer, sk_gen.clone())?;
 
         // section 1
-        let (sap1, _, sk_1) = TestSAP::random_sap(prefix("1")?, 0, 0, None);
+        let (sap1, _, sk_1) = TestSAP::random_sap(prefix("1")?, 0, 0, None, None);
         let sap1 = TestKeys::get_section_signed(&sk_1.secret_key(), sap1)?;
         let our_node_name_prefix_1 = sap1.prefix().name();
         let proof_chain = knowledge.section_chain();
@@ -744,7 +744,7 @@ mod tests {
         assert_eq!(knowledge.signed_sap, sap1);
 
         // section with different prefix (0) and our node name doesn't match
-        let (sap0, _, sk_0) = TestSAP::random_sap(prefix("0")?, 0, 0, None);
+        let (sap0, _, sk_0) = TestSAP::random_sap(prefix("0")?, 0, 0, None, None);
         let sap0 = TestKeys::get_section_signed(&sk_0.secret_key(), sap0)?;
         let section_tree_update =
             TestSectionTree::get_section_tree_update(&sap0, &proof_chain, &sk_gen.secret_key())?;

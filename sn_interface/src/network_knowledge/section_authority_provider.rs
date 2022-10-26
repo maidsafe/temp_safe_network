@@ -208,24 +208,29 @@ pub mod test_utils {
     pub struct TestSAP {}
 
     impl TestSAP {
-        /// Generate a random `SectionAuthorityProvider` for testing.
+        /// Generate a random `SectionAuthorityProvider` for testing with the `SectionKeySet` created using the rng.
         ///
         /// The total number of members in the section will be `elder_count` + `adult_count`. A lot of
         /// tests don't require adults in the section, so zero is an acceptable value for
         /// `adult_count`.
         ///
-        /// The rng is used to generate the `SecretKeySet`
+        /// Optionally provide `age_pattern` to create elders with specific ages.
+        /// If None = elder's age is set to `MIN_ADULT_AGE`
+        /// If age_pattern.len() == elder, then apply the respective ages to each node
+        /// If age_pattern.len() < elder, then the last element's value is taken as the age for the remaining nodes.
+        /// If age_pattern.len() > elder, then the extra elements after `count` are ignored.
         ///
-        /// An optional `sk_threshold_size` can be passed to specify the threshold when the secret key
+        /// Also an optional `sk_threshold_size` can be passed to specify the threshold when the secret key
         /// set is generated for the section key. Some tests require a low threshold.
         pub fn random_sap_with_rng<R: RngCore>(
             rng: &mut R,
             prefix: Prefix,
             elder_count: usize,
             adult_count: usize,
+            elder_age_pattern: Option<&[u8]>,
             sk_threshold_size: Option<usize>,
         ) -> (SectionAuthorityProvider, Vec<MyNodeInfo>, bls::SecretKeySet) {
-            let nodes = gen_sorted_nodes(&prefix, elder_count + adult_count, false);
+            let nodes = gen_sorted_nodes(&prefix, elder_count, adult_count, elder_age_pattern);
             let elders = nodes.iter().map(MyNodeInfo::peer).take(elder_count);
             let members = nodes.iter().map(|i| NodeState::joined(i.peer(), None));
             let poly = bls::poly::Poly::random(sk_threshold_size.unwrap_or(0), rng);
@@ -242,6 +247,7 @@ pub mod test_utils {
             prefix: Prefix,
             elder_count: usize,
             adult_count: usize,
+            elder_age_pattern: Option<&[u8]>,
             sk_threshold_size: Option<usize>,
         ) -> (SectionAuthorityProvider, Vec<MyNodeInfo>, bls::SecretKeySet) {
             Self::random_sap_with_rng(
@@ -249,6 +255,7 @@ pub mod test_utils {
                 prefix,
                 elder_count,
                 adult_count,
+                elder_age_pattern,
                 sk_threshold_size,
             )
         }
@@ -262,8 +269,9 @@ pub mod test_utils {
             elder_count: usize,
             adult_count: usize,
             sk_set: &bls::SecretKeySet,
+            elder_age_pattern: Option<&[u8]>,
         ) -> (SectionAuthorityProvider, Vec<MyNodeInfo>) {
-            let nodes = gen_sorted_nodes(&prefix, elder_count + adult_count, false);
+            let nodes = gen_sorted_nodes(&prefix, elder_count, adult_count, elder_age_pattern);
             let elders = nodes.iter().map(MyNodeInfo::peer).take(elder_count);
             let members = nodes.iter().map(|i| NodeState::joined(i.peer(), None));
             let section_auth =
@@ -283,7 +291,7 @@ pub mod test_utils {
             bls::SecretKey,
         )> {
             let (section_auth, nodes, secret_key_set) =
-                Self::random_sap(prefix, elder_count, adult_count, sk_threshold_size);
+                Self::random_sap(prefix, elder_count, adult_count, None, sk_threshold_size);
             let signed_sap =
                 TestKeys::get_section_signed(&secret_key_set.secret_key(), section_auth)?;
 

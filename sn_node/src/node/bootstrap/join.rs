@@ -443,7 +443,7 @@ mod tests {
         let (recv_tx, mut recv_rx) = mpsc::channel(10);
 
         let (genesis_sap, _genesis_nodes, genesis_sk_set) =
-            TestSAP::random_sap(Prefix::default(), elder_count(), 0, None);
+            TestSAP::random_sap(Prefix::default(), elder_count(), 0, None, None);
         let genesis_sk = genesis_sk_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
 
@@ -462,7 +462,7 @@ mod tests {
         let bootstrap = async move { state.try_join(join_timeout).await.map_err(Error::from) };
 
         let (next_sap, next_elders, next_sk_set) =
-            TestSAP::random_sap(Prefix::default(), elder_count(), 0, None);
+            TestSAP::random_sap(Prefix::default(), elder_count(), 0, None, None);
 
         let next_section_key = next_sk_set.public_keys().public_key();
         let section_tree_update = TestSectionTree::get_section_tree_update(
@@ -550,7 +550,7 @@ mod tests {
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
         let (genesis_sap, genesis_nodes, genesis_sk_set) =
-            TestSAP::random_sap(Prefix::default(), elder_count(), 0, None);
+            TestSAP::random_sap(Prefix::default(), elder_count(), 0, None, None);
         let genesis_sk = genesis_sk_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
 
@@ -579,7 +579,8 @@ mod tests {
                     assert_matches!(msg, NodeMsg::JoinRequest{..}));
 
             // Send JoinResponse::Redirect
-            let (new_sap, _, _) = TestSAP::random_sap(Prefix::default(), elder_count(), 0, None);
+            let (new_sap, _, _) =
+                TestSAP::random_sap(Prefix::default(), elder_count(), 0, None, None);
 
             send_response(
                 &recv_tx,
@@ -628,7 +629,7 @@ mod tests {
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
         let (genesis_sap, genesis_nodes, genesis_sk_set) =
-            TestSAP::random_sap(Prefix::default(), elder_count(), 0, None);
+            TestSAP::random_sap(Prefix::default(), elder_count(), 0, None, None);
         let genesis_sk = genesis_sk_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
 
@@ -654,7 +655,7 @@ mod tests {
             assert_matches!(msg, NodeMsg::JoinRequest{..}));
 
             let (new_sap, _, new_sk_set) =
-                TestSAP::random_sap(Prefix::default(), elder_count(), 0, None);
+                TestSAP::random_sap(Prefix::default(), elder_count(), 0, None, None);
             let new_pk_set = new_sk_set.public_keys();
 
             send_response(
@@ -706,7 +707,7 @@ mod tests {
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
         let (genesis_sap, genesis_nodes, genesis_sk_set) =
-            TestSAP::random_sap(Prefix::default(), elder_count(), 0, None);
+            TestSAP::random_sap(Prefix::default(), elder_count(), 0, None, None);
         let genesis_sk = genesis_sk_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
 
@@ -769,7 +770,7 @@ mod tests {
         let bad_prefix = Prefix::default().pushed(!first_bit);
 
         let (genesis_sap, genesis_nodes, genesis_sk_set) =
-            TestSAP::random_sap(Prefix::default(), 1, 0, None);
+            TestSAP::random_sap(Prefix::default(), 1, 0, None, None);
         let genesis_sk = genesis_sk_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
 
@@ -792,7 +793,7 @@ mod tests {
 
             // Send `Retry` with bad prefix
             let bad_section_tree_update = {
-                let (bad_sap, _, _) = TestSAP::random_sap(bad_prefix, 1, 0, None);
+                let (bad_sap, _, _) = TestSAP::random_sap(bad_prefix, 1, 0, None, None);
                 let mut bad_signed_sap = signed_genesis_sap.clone();
                 bad_signed_sap.value = bad_sap;
                 SectionTreeUpdate::new(bad_signed_sap, proof_chain.clone())
@@ -809,7 +810,7 @@ mod tests {
 
             // Send `Retry` with valid update
             let (next_sap, next_elders, next_sk_set) =
-                TestSAP::random_sap(Prefix::default(), 1, 0, None);
+                TestSAP::random_sap(Prefix::default(), 1, 0, None, None);
             let next_section_key = next_sk_set.public_keys().public_key();
             let section_tree_update = TestSectionTree::get_section_tree_update(
                 &TestKeys::get_section_signed(&next_sk_set.secret_key(), next_sap)?,

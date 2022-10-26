@@ -645,7 +645,7 @@ mod tests {
 
             // generate a SAP for prefix0
             let (sap, mut nodes, secret_key_set) =
-                TestSAP::random_sap(prefix0, elder_count(), 0, None);
+                TestSAP::random_sap(prefix0, elder_count(), 0, None, None);
             let info = nodes.remove(0);
             let sap_sk = secret_key_set.secret_key();
             let signed_sap = TestKeys::get_section_signed(&sap_sk, sap)?;
@@ -680,7 +680,7 @@ mod tests {
 
             // generate other SAP for prefix1
             let (other_sap, _, secret_key_set) =
-                TestSAP::random_sap(prefix1, elder_count(), 0, None);
+                TestSAP::random_sap(prefix1, elder_count(), 0, None, None);
             let other_sap_sk = secret_key_set.secret_key();
             let other_sap = TestKeys::get_section_signed(&other_sap_sk, other_sap)?;
             // generate a proof chain for this other SAP
