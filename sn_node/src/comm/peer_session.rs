@@ -196,41 +196,39 @@ impl PeerSessionWorker {
             return Ok(SessionStatus::Ok);
         }
 
-        // Attempt to get a connection or make one to another node.
-        // if there's no connection here yet, we requeue the job after a wait
-        // incase there's been a delay adding the connection to Comms
-        let conn = match self
-            .link
-            .get_or_connect(should_establish_new_connection)
-            .await
-        {
-            Ok(conn) => conn,
-            Err(error) => {
-                error!("Error when attempting to send to peer. Job will be reenqueued for another attempt after a small timeout");
-
-                job.connection_retries += 1;
-                job.reporter
-                    .send(SendStatus::TransientError(format!("{error:?}")));
-
-                // we await here in case the connection is fresh and has not yet been added
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                if let Err(e) = self.queue.send(SessionCmd::Send(job)).await {
-                    warn!("Failed to re-enqueue job {id:?} after failed connection retrieval error {e:?}");
-                }
-
-                return Ok(SessionStatus::Ok);
-            }
-        };
-
-        debug!("Connection exists for sendjob: {id:?}");
         let queue = self.queue.clone();
         let link_connections = self.link.connections.clone();
         let conns_count = self.link.connections.len();
         let the_peer = *self.link.peer();
 
-        let connection_id = conn.id();
+        let mut link = self.link.clone();
 
         let _handle = tokio::spawn(async move {
+            // Attempt to get a connection or make one to another node.
+            // if there's no connection here yet, we requeue the job after a wait
+            // incase there's been a delay adding the connection to Comms
+            let conn = match link.get_or_connect(should_establish_new_connection).await {
+                Ok(conn) => conn,
+                Err(error) => {
+                    error!("Error when attempting to send to peer. Job will be reenqueued for another attempt after a small timeout");
+
+                    job.connection_retries += 1;
+                    job.reporter
+                        .send(SendStatus::TransientError(format!("{error:?}")));
+
+                    // we await here in case the connection is fresh and has not yet been added
+                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                    if let Err(e) = queue.send(SessionCmd::Send(job)).await {
+                        warn!("Failed to re-enqueue job {id:?} after failed connection retrieval error {e:?}");
+                    }
+
+                    return;
+                }
+            };
+
+            let connection_id = conn.id();
+            debug!("Connection exists for sendjob: {id:?}, and has conn_id: {connection_id:?}");
+
             let send_resp = Link::send_with_connection(
                 job.bytes.clone(),
                 0,
