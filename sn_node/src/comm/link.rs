@@ -25,6 +25,7 @@ type ConnId = String;
 /// comms initiation between the peers, and so on.
 /// Unused connections will expire, so the Link is cheap to keep around.
 /// The Link is kept around as long as the peer is deemed worth to keep contact with.
+#[derive(Clone)]
 pub(crate) struct Link {
     peer: Peer,
     endpoint: Endpoint,
