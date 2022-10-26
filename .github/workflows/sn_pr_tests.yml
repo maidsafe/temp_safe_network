@@ -498,7 +498,7 @@ jobs:
         timeout-minutes: 60
 
       - name: Start the network
-        run: ./target/release/testnet --interval 3000
+        run: ./target/release/testnet --interval 30000
         id: section-startup
         env:
           RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
