@@ -22,7 +22,7 @@ use sn_interface::{
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bytes::Bytes;
-use tokio::time::sleep;
+//use tokio::time::sleep;
 use tracing::{debug, info_span};
 
 impl Client {
@@ -127,8 +127,10 @@ impl Client {
 
                 // In the next attempt, try the next adult, further away.
                 query.adult_index += 1;
-                debug!("Sleeping before trying query again: {delay:?} sleep for {query:?}");
-                sleep(delay).await;
+                debug!(
+                    ">>>>> NO Sleeping before trying query again: {delay:?} sleep for {query:?}"
+                );
+                //sleep(delay).await;
             } else {
                 warn!("Finished trying and last response to {query:?} is {res:?}");
                 // we're done trying
