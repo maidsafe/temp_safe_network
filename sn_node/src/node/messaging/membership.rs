@@ -159,7 +159,7 @@ impl MyNode {
         }
     }
 
-    pub(crate) async fn handle_membership_decision(
+    pub(crate) fn handle_membership_decision(
         &mut self,
         decision: Decision<NodeState>,
     ) -> Result<Vec<Cmd>> {
@@ -179,7 +179,7 @@ impl MyNode {
         );
 
         for (new_info, signature) in joining_nodes.iter().cloned() {
-            cmds.extend(self.handle_node_joined(new_info, signature).await);
+            cmds.extend(self.handle_node_joined(new_info, signature));
         }
 
         for (new_info, signature) in leaving_nodes.iter().cloned() {
@@ -225,7 +225,7 @@ impl MyNode {
         Ok(cmds)
     }
 
-    async fn handle_node_joined(&mut self, new_info: NodeState, signature: Signature) -> Vec<Cmd> {
+    fn handle_node_joined(&mut self, new_info: NodeState, signature: Signature) -> Vec<Cmd> {
         let sig = SectionSig {
             public_key: self.network_knowledge.section_key(),
             signature,
@@ -245,13 +245,19 @@ impl MyNode {
 
         info!("handle Online: {}", new_info.peer());
 
-        // still used for testing
-        self.send_event(Event::Membership(MembershipEvent::MemberJoined {
-            name: new_info.name(),
-            previous_name: new_info.previous_name(),
-            age: new_info.age(),
-        }))
-        .await;
+        // move this off thread to make the containing func sync
+        let event_sender = self.event_sender.clone();
+
+        let _handle = tokio::spawn(async move {
+            // still used for testing
+            event_sender
+                .send(Event::Membership(MembershipEvent::MemberJoined {
+                    name: new_info.name(),
+                    previous_name: new_info.previous_name(),
+                    age: new_info.age(),
+                }))
+                .await;
+        });
 
         vec![]
     }
