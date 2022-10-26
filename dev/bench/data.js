@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1666710420679,
+  "lastUpdate": 1666784474523,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -27796,6 +27796,150 @@ window.BENCHMARK_DATA = {
             "name": "generating keys",
             "value": 4383381,
             "range": "± 249551",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "c61d3c92531c04a188f724869d36c4492fb3d161",
+          "message": "Merge #1711\n\n1711: Removing done TODOs r=dirvine a=grumbach\n\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\n\nCo-authored-by: grumbach <anselmega@gmail.com>",
+          "timestamp": "2022-10-26T09:28:56Z",
+          "tree_id": "a78d27f9be47f4ae28276142d54b7df2df87d780",
+          "url": "https://github.com/maidsafe/safe_network/commit/c61d3c92531c04a188f724869d36c4492fb3d161"
+        },
+        "date": 1666784473390,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 5229606,
+            "range": "± 101893",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 1938369357,
+            "range": "± 97043217",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 2045608468,
+            "range": "± 2485459155",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 2232121629,
+            "range": "± 3318754542",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10188566740,
+            "range": "± 6127641",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 493043651,
+            "range": "± 6378469",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 637862182,
+            "range": "± 26045919",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 41088548,
+            "range": "± 11116953",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 1701524638,
+            "range": "± 262284154",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 8260844259,
+            "range": "± 1350271371",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 318738020,
+            "range": "± 27465911",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 2862472202,
+            "range": "± 516850775",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 7065490119,
+            "range": "± 763032058",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 41814016,
+            "range": "± 980692",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 406452379,
+            "range": "± 5832659",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1569623901,
+            "range": "± 26088331",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 10692899,
+            "range": "± 175853",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 97138094,
+            "range": "± 4241077",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 334779196,
+            "range": "± 2933575",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "generating keys",
+            "value": 4483590,
+            "range": "± 138261",
             "unit": "ns/iter"
           }
         ]
