@@ -47,13 +47,21 @@ pub(crate) async fn join_network(
     let span = trace_span!("bootstrap");
     let joiner = Joiner::new(node, outgoing_msgs_sender, incoming_msgs, section_tree);
 
-    future::join(
+    let (res, _) = future::join(
         joiner.try_join(join_timeout),
         send_messages(outgoing_msgs_receiver, comm),
     )
     .instrument(span)
-    .await
-    .0
+    .await;
+
+    match res {
+        Ok(node) => Ok(node),
+        Err(error) => {
+            // We need to manually closing endpoint or listeners will persist
+            comm.our_endpoint.close();
+            Err(error)
+        }
+    }
 }
 
 struct Joiner<'a> {
@@ -217,7 +225,7 @@ impl<'a> Joiner<'a> {
                     let _is_new_sap = match self.section_tree.update(section_tree_update) {
                         Ok(updated) => updated,
                         Err(err) => {
-                            debug!("Ignoring JoinResponse::Retry with an invalid SAP: {err:?}");
+                            debug!("Ignoring section tree updated in JoinResponse::Retry with an invalid or known SAP: {err:?}");
                             continue;
                         }
                     };

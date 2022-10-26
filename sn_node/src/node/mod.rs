@@ -210,7 +210,7 @@ mod core {
 
             let section_keys_provider = SectionKeysProvider::new(section_key_share.clone());
 
-            let data_storage = DataStorage::new(&root_storage_dir, used_space.clone())?;
+            let data_storage = DataStorage::new(&root_storage_dir, used_space)?;
 
             info!("Creating DysfunctionDetection checks");
             let node_dysfunction_detector = DysfunctionDetection::new(
@@ -261,7 +261,7 @@ mod core {
             };
 
             // Write the section tree to this node's root storage directory
-            node.write_section_tree().await;
+            node.write_section_tree();
 
             Ok(node)
         }
@@ -516,10 +516,7 @@ mod core {
         }
 
         /// Updates various state if elders changed.
-        pub(crate) async fn update_on_elder_change(
-            &mut self,
-            old: &StateSnapshot,
-        ) -> Result<Vec<Cmd>> {
+        pub(crate) fn update_on_elder_change(&mut self, old: &StateSnapshot) -> Result<Vec<Cmd>> {
             let new = self.state_snapshot();
 
             if new.section_key == old.section_key {
@@ -675,9 +672,13 @@ mod core {
                 );
             };
 
-            for event in events {
-                self.send_event(event).await
-            }
+            // push this off thread to make containing func sync
+            let event_sender = self.event_sender.clone();
+            let _handle = tokio::spawn(async move {
+                for event in events {
+                    event_sender.send(event).await
+                }
+            });
 
             Ok(cmds)
         }
@@ -733,7 +734,7 @@ mod core {
             };
         }
 
-        pub(crate) async fn write_section_tree(&self) {
+        pub(crate) fn write_section_tree(&self) {
             let section_tree = self.network_knowledge.section_tree().clone();
             let path = self.root_storage_dir.clone().join(SECTION_TREE_FILE_NAME);
 

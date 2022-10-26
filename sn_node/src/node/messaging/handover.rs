@@ -54,10 +54,7 @@ impl MyNode {
     /// Broadcast the decision of the terminated handover consensus by proposing the NewElders SAP
     /// for signature by the current elders
     #[instrument(skip(self), level = "trace")]
-    pub(crate) async fn broadcast_handover_decision(
-        &mut self,
-        candidates_sap: SapCandidate,
-    ) -> Vec<Cmd> {
+    pub(crate) fn broadcast_handover_decision(&mut self, candidates_sap: SapCandidate) -> Vec<Cmd> {
         match candidates_sap {
             SapCandidate::ElderHandover(sap) => self.propose_new_elders(sap).unwrap_or_else(|e| {
                 error!("Failed to propose new elders: {}", e);
@@ -91,7 +88,7 @@ impl MyNode {
 
     /// helper to handle a handover vote
     #[instrument(skip(self), level = "trace")]
-    async fn handle_vote(
+    fn handle_vote(
         &self,
         handover_state: &mut Handover,
         signed_vote: SignedVote<SapCandidate>,
@@ -276,7 +273,7 @@ impl MyNode {
         Ok(())
     }
 
-    async fn handle_handover_vote(
+    fn handle_handover_vote(
         &mut self,
         peer: Peer,
         signed_vote: SignedVote<SapCandidate>,
@@ -286,7 +283,7 @@ impl MyNode {
         match &self.handover_voting {
             Some(handover_state) => {
                 let mut state = handover_state.clone();
-                let mut cmds = self.handle_vote(&mut state, signed_vote, peer).await?;
+                let mut cmds = self.handle_vote(&mut state, signed_vote, peer)?;
 
                 // check for unsuccessful termination
                 state.handle_empty_set_decision();
@@ -299,7 +296,7 @@ impl MyNode {
                         candidates_sap
                     );
 
-                    let bcast_cmds = self.broadcast_handover_decision(candidates_sap).await;
+                    let bcast_cmds = self.broadcast_handover_decision(candidates_sap);
                     cmds.extend(bcast_cmds);
                 }
                 self.handover_voting = Some(state);
@@ -312,7 +309,7 @@ impl MyNode {
         }
     }
 
-    pub(crate) async fn handle_handover_msg(
+    pub(crate) fn handle_handover_msg(
         &mut self,
         peer: Peer,
         signed_votes: Vec<SignedVote<SapCandidate>>,
@@ -322,7 +319,7 @@ impl MyNode {
         let mut cmds = vec![];
 
         for vote in signed_votes {
-            match self.handle_handover_vote(peer, vote).await {
+            match self.handle_handover_vote(peer, vote) {
                 Ok(vec) => {
                     cmds.extend(vec);
                 }

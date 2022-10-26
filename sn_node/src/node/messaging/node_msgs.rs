@@ -94,11 +94,7 @@ impl MyNode {
                 let mut node = node.write().await;
 
                 trace!("Handling msg: Relocate from {}: {:?}", sender, msg_id);
-                Ok(node
-                    .handle_relocate(node_state)
-                    .await?
-                    .into_iter()
-                    .collect())
+                Ok(node.handle_relocate(node_state)?.into_iter().collect())
             }
             NodeMsg::JoinAsRelocatedResponse(join_response) => {
                 let mut node = node.write().await;
@@ -124,6 +120,8 @@ impl MyNode {
             } => {
                 trace!("Handling msg: AE from {sender}: {msg_id:?}");
                 let mut node = node.write().await;
+                // as we've data storage reqs inside here for reorganisation, we have async calls to
+                // the fs
                 node.handle_anti_entropy_msg(
                     section_tree_update,
                     kind,
@@ -169,7 +167,7 @@ impl MyNode {
                             let new_node = joining_as_relocated.node.clone();
                             let new_name = new_node.name();
                             let previous_name = node.info().name();
-                            let new_keypair = new_node.keypair.clone();
+                            let new_keypair = new_node.keypair;
 
                             info!(
                                 "Relocation: switching from {:?} to {:?}",
@@ -195,11 +193,16 @@ impl MyNode {
                                 recipients
                             );
 
-                            node.send_event(Event::Membership(MembershipEvent::Relocated {
-                                previous_name,
-                                new_keypair,
-                            }))
-                            .await;
+                            // move off thread to keep fn sync
+                            let event_sender = node.event_sender.clone();
+                            let _handle = tokio::spawn(async move {
+                                event_sender
+                                    .send(Event::Membership(MembershipEvent::Relocated {
+                                        previous_name,
+                                        new_keypair,
+                                    }))
+                                    .await;
+                            });
 
                             trace!("{}", LogMarker::RelocateEnd);
                         } else {
@@ -217,7 +220,7 @@ impl MyNode {
             NodeMsg::HandoverVotes(votes) => {
                 let mut node = node.write().await;
 
-                node.handle_handover_msg(sender, votes).await
+                node.handle_handover_msg(sender, votes)
             }
             NodeMsg::HandoverAE(gen) => {
                 let node = node.read().await;
@@ -242,6 +245,7 @@ impl MyNode {
                 }
 
                 Ok(
+                    // here we're async over the reachability check. but no locks are held over this.
                     MyNode::handle_join_as_relocated_request(node, sender, *join_request, comm)
                         .await
                         .into_iter()
@@ -386,21 +390,25 @@ impl MyNode {
                 )])
             }
             NodeMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)) => {
-                let mut node = node.write().await;
+                let node_read_lock = node.read().await;
 
                 info!("ReplicateData MsgId: {:?}", msg_id);
 
-                if node.is_elder() {
+                if node_read_lock.is_elder() {
                     error!("Received unexpected message while Elder");
                     return Ok(vec![]);
                 }
 
                 let mut cmds = vec![];
 
-                let section_pk = PublicKey::Bls(node.network_knowledge.section_key());
-                let node_keypair = Keypair::Ed25519(node.keypair.clone());
-
+                let section_pk = PublicKey::Bls(node_read_lock.network_knowledge.section_key());
+                let node_keypair = Keypair::Ed25519(node_read_lock.keypair.clone());
+                // ensure we drop the read lock as it's not needed
+                drop(node_read_lock);
                 for data in data_collection {
+                    // grab the write lock each time in the loop to not hold it over large data sets
+                    let mut node = node.write().await;
+
                     // We are an adult here, so just store away!
                     // This may return a DatabaseFull error... but we should have reported storage increase
                     // well before this
