@@ -12,12 +12,11 @@ mod register_store;
 mod registers;
 mod used_space;
 
+pub use chunks::ChunkStorage;
+pub use registers::RegisterStorage;
 pub use used_space::UsedSpace;
 
 pub(crate) use errors::{Error, Result};
-
-use chunks::ChunkStorage;
-use registers::RegisterStorage;
 
 use sn_dbc::SpentProofShare;
 use sn_interface::{
@@ -31,20 +30,23 @@ use sn_interface::{
     },
 };
 
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::atomic::{AtomicU8, Ordering},
+};
 use walkdir::WalkDir;
 use xor_name::XorName;
 
 const BIT_TREE_DEPTH: usize = 20;
 
 /// Operations on data.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 // exposed as pub due to benches
 pub struct DataStorage {
     chunks: ChunkStorage,
     registers: RegisterStorage,
     used_space: UsedSpace,
-    last_recorded_level: StorageLevel,
+    storage_level: AtomicU8,
 }
 
 impl DataStorage {
@@ -54,14 +56,14 @@ impl DataStorage {
             chunks: ChunkStorage::new(path, used_space.clone())?,
             registers: RegisterStorage::new(path, used_space.clone())?,
             used_space,
-            last_recorded_level: StorageLevel::zero(),
+            storage_level: AtomicU8::new(0),
         })
     }
 
     /// Store data in the local store
     #[instrument(skip(self))]
     pub async fn store(
-        &mut self,
+        &self,
         data: &ReplicatedData,
         section_pk: PublicKey,
         node_keypair: Keypair,
@@ -84,18 +86,25 @@ impl DataStorage {
             ReplicatedData::SpentbookLog(data) => self.registers.update(data).await?,
         };
 
+        let storage_level = StorageLevel::from(self.storage_level.load(Ordering::Relaxed))?;
+
         // check if we've filled another approx. 10%-points of our storage
         // if so, update the recorded level
-        let last_recorded_level = self.last_recorded_level;
-        if let Ok(next_level) = last_recorded_level.next() {
-            // used_space_ratio is a heavy task that's why we don't do it all the time
+        if let Ok(next_level) = storage_level.next() {
             let used_space_ratio = self.used_space.ratio();
             let used_space_level = 10.0 * used_space_ratio;
             // every level represents 10 percentage points
             if used_space_level as u8 >= next_level.value() {
                 debug!("Next level for storage has been reached");
-                self.last_recorded_level = next_level;
-                return Ok(Some(next_level));
+                match self.storage_level.compare_exchange(
+                    storage_level.value(),
+                    next_level.value(),
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                ) {
+                    Result::<u8, u8>::Ok(_) => return Ok(Some(next_level)),
+                    Result::<u8, u8>::Err(_) => return Ok(None),
+                }
             }
         }
 
@@ -195,7 +204,7 @@ impl DataStorage {
         }
     }
 
-    /// Retrieve all ReplicatedDataAddresses of stored data
+    /// Retrieve all addresses of stored data
     pub async fn data_addrs(&self) -> Vec<DataAddress> {
         // TODO: Parallelize this below loops
         self.chunks
@@ -336,7 +345,7 @@ mod tests {
         let used_space = UsedSpace::new(usize::MAX);
 
         // Create instance
-        let mut storage = DataStorage::new(path, used_space)?;
+        let storage = DataStorage::new(path, used_space)?;
 
         // 5mb random data chunk
         let bytes = random_bytes(5 * 1024 * 1024);
@@ -382,7 +391,7 @@ mod tests {
         let used_space = UsedSpace::new(usize::MAX);
 
         // Create instance
-        let mut storage = DataStorage::new(path, used_space)?;
+        let storage = DataStorage::new(path, used_space)?;
 
         // create reg cmd
 

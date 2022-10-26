@@ -207,15 +207,7 @@ impl MyNode {
 
         let updated = self.update_network_knowledge(section_tree_update, members)?;
 
-        // always run this, only changes will trigger events
-        let mut cmds = self.update_on_elder_change(&snapshot).await?;
-
-        // Only trigger reorganize data when there is a membership change happens.
-        if updated && self.is_not_elder() {
-            // only done if adult, since as an elder we dont want to get any more
-            // data for our name (elders will eventually be caching data in general)
-            cmds.push(self.ask_for_any_new_data().await);
-        }
+        let mut cmds = self.update_on_member_change(&snapshot).await?;
 
         if updated {
             self.write_section_tree().await;
@@ -223,8 +215,8 @@ impl MyNode {
             info!("SectionTree written to disk with update for prefix {prefix:?}");
 
             // check if we've been kicked out of the section
-            if snapshot.members.contains(&self.name())
-                && !self.state_snapshot().members.contains(&self.name())
+            if snapshot.contains_member(&self.name())
+                && !self.state_snapshot().contains_member(&self.name())
             {
                 error!("Detected that we've been removed from the section");
                 self.send_event(Event::Membership(MembershipEvent::RemovedFromSection))
@@ -436,7 +428,6 @@ mod tests {
         flow_ctrl::{event_channel, tests::network_utils::create_comm},
         MIN_ADULT_AGE,
     };
-    use crate::UsedSpace;
     use sn_interface::{
         messaging::system::SectionSigned, network_knowledge::SectionAuthorityProvider,
     };
@@ -659,12 +650,11 @@ mod tests {
             let genesis_pk = genesis_sk_set.public_keys().public_key();
             assert_eq!(genesis_pk, *proof_chain.genesis_key());
 
-            let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
+            let (_, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let (mut node, _) = MyNode::first_node(
                 create_comm().await?.socket_addr(),
                 info.keypair.clone(),
                 event_channel::new(1).0,
-                UsedSpace::new(max_capacity),
                 root_storage_dir,
                 genesis_sk_set.clone(),
             )

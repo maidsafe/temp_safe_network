@@ -6,9 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{list_files_in, prefix_tree_path, Error, Result};
-
-use crate::UsedSpace;
+use super::{list_files_in, prefix_tree_path, Error, Result, UsedSpace};
 
 use sn_interface::{
     messaging::data::SignedRegisterCreate,

@@ -23,7 +23,7 @@ use sn_interface::{
         AuthorityProof, ClientAuth, MsgId, WireMsg,
     },
     network_knowledge::{NodeState, SectionAuthorityProvider, SectionKeyShare, SectionsDAG},
-    types::{DataAddress, Peer},
+    types::Peer,
 };
 
 use custom_debug::Debug;
@@ -56,6 +56,8 @@ pub(crate) struct CmdJob {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub(crate) enum Cmd {
+    /// Data cmds
+    Data(crate::data::Cmd),
     /// Validate `wire_msg` from `sender`.
     /// Holding the WireMsg that has been received from the network,
     ValidateMsg {
@@ -92,6 +94,8 @@ pub(crate) enum Cmd {
         #[cfg(feature = "traceroute")]
         traceroute: Traceroute,
     },
+    /// Handle the event of adults changed.
+    HandleAdultsChanged,
     /// Handle peer that's been detected as lost.
     HandleFailedSendToNode { peer: Peer, msg_id: MsgId },
     /// Handle agreement on a proposal.
@@ -108,15 +112,6 @@ pub(crate) enum Cmd {
     HandleDkgOutcome {
         section_auth: SectionAuthorityProvider,
         outcome: SectionKeyShare,
-    },
-    /// Send the batch of data messages in a throttled/controlled fashion to the given `recipients`.
-    /// chunks addresses are provided, so that we only retrieve the data right before we send it,
-    /// hopefully reducing memory impact or data replication
-    EnqueueDataForReplication {
-        // throttle_duration: Duration,
-        recipient: Peer,
-        /// Batches of DataAddress to be sent together
-        data_batch: Vec<DataAddress>,
     },
     /// Performs serialisation and signing and sends the msg.
     SendMsg {
@@ -184,11 +179,12 @@ impl Cmd {
             Cmd::TrackNodeIssueInDysfunction { .. } => State::Dysfunction,
             Cmd::AddToPendingQueries { .. } => State::Dysfunction,
             Cmd::HandleAgreement { .. } => State::Agreement,
+            Cmd::HandleAdultsChanged => State::Membership,
             Cmd::HandleMembershipDecision(_) => State::Membership,
             Cmd::ProposeVoteNodesOffline(_) => State::Membership,
             Cmd::HandleNewEldersAgreement { .. } => State::Handover,
             Cmd::HandleDkgOutcome { .. } => State::Dkg,
-            Cmd::EnqueueDataForReplication { .. } => State::Replication,
+            Cmd::Data(_) => State::Data,
         }
     }
 }
@@ -196,6 +192,7 @@ impl Cmd {
 impl fmt::Display for Cmd {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Cmd::Data(cmd) => write!(f, "Data({:?})", cmd),
             #[cfg(not(feature = "test-utils"))]
             Cmd::ValidateMsg { wire_msg, .. } => {
                 write!(f, "ValidateMsg {:?}", wire_msg.msg_id())
@@ -218,12 +215,12 @@ impl fmt::Display for Cmd {
             Cmd::HandleFailedSendToNode { peer, msg_id } => {
                 write!(f, "HandlePeerFailedSend({:?}, {:?})", peer.name(), msg_id)
             }
+            Cmd::HandleAdultsChanged => write!(f, "HandleAdultsChanged"),
             Cmd::HandleAgreement { .. } => write!(f, "HandleAgreement"),
             Cmd::HandleNewEldersAgreement { .. } => write!(f, "HandleNewEldersAgreement"),
             Cmd::HandleMembershipDecision(_) => write!(f, "HandleMembershipDecision"),
             Cmd::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
             Cmd::SendMsg { .. } => write!(f, "SendMsg"),
-            Cmd::EnqueueDataForReplication { .. } => write!(f, "ThrottledSendBatchMsgs"),
             Cmd::TrackNodeIssueInDysfunction { name, issue } => {
                 write!(f, "TrackNodeIssueInDysfunction {:?}, {:?}", name, issue)
             }
