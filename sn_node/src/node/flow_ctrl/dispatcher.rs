@@ -209,16 +209,15 @@ impl Dispatcher {
             Cmd::HandleAgreement { proposal, sig } => {
                 let mut node = self.node.write().await;
                 node.handle_general_agreements(proposal, sig)
-                    .await
                     .map(|c| c.into_iter().collect())
             }
             Cmd::HandleMembershipDecision(decision) => {
                 let mut node = self.node.write().await;
-                node.handle_membership_decision(decision).await
+                node.handle_membership_decision(decision)
             }
             Cmd::HandleNewEldersAgreement { new_elders, sig } => {
                 let mut node = self.node.write().await;
-                node.handle_new_elders_agreement(new_elders, sig).await
+                node.handle_new_elders_agreement(new_elders, sig)
             }
             Cmd::HandleFailedSendToNode { peer, msg_id } => {
                 warn!("Message sending failed to {peer}, for {msg_id:?}");
@@ -231,7 +230,7 @@ impl Dispatcher {
                 outcome,
             } => {
                 let mut node = self.node.write().await;
-                node.handle_dkg_outcome(section_auth, outcome).await
+                node.handle_dkg_outcome(section_auth, outcome)
             }
             Cmd::EnqueueDataForReplication {
                 // throttle_duration,

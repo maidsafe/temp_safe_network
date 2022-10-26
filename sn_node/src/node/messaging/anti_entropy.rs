@@ -208,7 +208,7 @@ impl MyNode {
         let updated = self.update_network_knowledge(section_tree_update, members)?;
 
         // always run this, only changes will trigger events
-        let mut cmds = self.update_on_elder_change(&snapshot).await?;
+        let mut cmds = self.update_on_elder_change(&snapshot)?;
 
         // Only trigger reorganize data when there is a membership change happens.
         if updated && self.is_not_elder() {
@@ -218,7 +218,7 @@ impl MyNode {
         }
 
         if updated {
-            self.write_section_tree().await;
+            self.write_section_tree();
             let prefix = sap.prefix();
             info!("SectionTree written to disk with update for prefix {prefix:?}");
 

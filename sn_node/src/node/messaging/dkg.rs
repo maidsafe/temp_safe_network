@@ -751,7 +751,7 @@ impl MyNode {
         cmds
     }
 
-    pub(crate) async fn handle_dkg_outcome(
+    pub(crate) fn handle_dkg_outcome(
         &mut self,
         sap: SectionAuthorityProvider,
         key_share: SectionKeyShare,
@@ -776,7 +776,7 @@ impl MyNode {
             .network_knowledge
             .try_update_current_sap(key_share_pk, &sap.prefix())
         {
-            self.update_on_elder_change(&snapshot).await
+            self.update_on_elder_change(&snapshot)
         } else {
             // This proposal is sent to the current set of elders to be aggregated
             // and section signed.
