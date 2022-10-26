@@ -31,7 +31,7 @@ const CHUNKS_STORE_DIR_NAME: &str = "chunks";
 
 /// Operations on data chunks.
 #[derive(Clone, Debug)]
-pub(super) struct ChunkStorage {
+pub struct ChunkStorage {
     file_store_path: PathBuf,
     used_space: UsedSpace,
 }
@@ -42,14 +42,15 @@ impl ChunkStorage {
     /// If the location specified already contains a `ChunkStorage`, it is simply used
     ///
     /// Used space of the dir is tracked
-    pub(super) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
+    pub fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         Ok(Self {
             file_store_path: path.join(CHUNKS_STORE_DIR_NAME),
             used_space,
         })
     }
 
-    pub(super) fn addrs(&self) -> Vec<ChunkAddress> {
+    /// Get all addresses of stored data
+    pub fn addrs(&self) -> Vec<ChunkAddress> {
         list_files_in(&self.file_store_path)
             .iter()
             .filter_map(|filepath| Self::chunk_filepath_to_address(filepath).ok())
@@ -115,7 +116,7 @@ impl ChunkStorage {
 
     /// Store a chunk in the local disk store unless it is already there
     #[instrument(skip_all)]
-    pub(super) async fn store(&self, chunk: &Chunk) -> Result<()> {
+    pub async fn store(&self, chunk: &Chunk) -> Result<()> {
         let addr = chunk.address();
         let filepath = self.chunk_addr_to_filepath(addr)?;
 

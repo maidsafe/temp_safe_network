@@ -6,10 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::messaging::{OutgoingMsg, Peers};
-
-use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result};
-use bytes::Bytes;
+use crate::node::{
+    flow_ctrl::cmds::Cmd,
+    messaging::{OutgoingMsg, Peers},
+    Error, MyNode, Result,
+};
 
 use qp2p::SendStream;
 use sn_dbc::{
@@ -35,10 +36,13 @@ use sn_interface::{
         Keypair, Peer, RegisterCmd, ReplicatedData, SPENTBOOK_TYPE_TAG,
     },
 };
-use tokio::sync::Mutex;
 
-use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Arc;
+use bytes::Bytes;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
+use tokio::sync::Mutex;
 use xor_name::XorName;
 
 impl MyNode {
@@ -136,27 +140,19 @@ impl MyNode {
         }
     }
 
-    /// Handle data query
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) async fn handle_data_query_at_adult(
+    /// Send query response back to the relaying elder.
+    pub(crate) async fn send_query_reponse(
         &self,
-        operation_id: OperationId,
-        query: &DataQueryVariant,
-        auth: ClientAuth,
+        response: NodeQueryResponse,
         requesting_elder: Peer,
+        operation_id: OperationId,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Cmd {
-        let response = self
-            .data_storage
-            .query(query, User::Key(auth.public_key))
-            .await;
-
         trace!("data query response at adult is: {:?}", response);
         let msg = NodeMsg::NodeQueryResponse {
             response,
             operation_id,
         };
-
         self.trace_system_msg(
             msg,
             Peers::Single(requesting_elder),
@@ -168,7 +164,7 @@ impl MyNode {
     /// Handle data read
     /// Records response in liveness tracking
     /// Forms a response to send to the requester
-    pub(crate) async fn handle_data_query_response_at_elder(
+    pub(crate) async fn handle_query_response_at_elder(
         &mut self,
         op_id: OperationId,
         response: NodeQueryResponse,

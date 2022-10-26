@@ -8,7 +8,7 @@
 
 use super::{
     register_store::{RegisterStore, StoredRegister},
-    Error, Result,
+    Error, Result, UsedSpace,
 };
 
 use sn_interface::{
@@ -27,7 +27,6 @@ use sn_interface::{
     },
 };
 
-use crate::UsedSpace;
 use bincode::serialize;
 use std::{
     collections::BTreeMap,
@@ -41,13 +40,13 @@ const REGISTER_STORE_DIR_NAME: &str = "register";
 
 /// Operations over the Register data type and its storage.
 #[derive(Debug, Clone)]
-pub(super) struct RegisterStorage {
+pub struct RegisterStorage {
     file_store: RegisterStore,
 }
 
 impl RegisterStorage {
     /// Create new `RegisterStorage`
-    pub(super) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
+    pub fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         let file_store = RegisterStore::new(path.join(REGISTER_STORE_DIR_NAME), used_space)?;
         Ok(Self { file_store })
     }
@@ -58,7 +57,8 @@ impl RegisterStorage {
         self.file_store.delete_data(address).await
     }
 
-    pub(super) async fn addrs(&self) -> Vec<RegisterAddress> {
+    /// Get all addresses of stored data
+    pub async fn addrs(&self) -> Vec<RegisterAddress> {
         self.file_store.list_all_reg_addrs().await
     }
 
@@ -104,7 +104,7 @@ impl RegisterStorage {
 
     /// --- Writing ---
 
-    pub(super) async fn write(&self, cmd: &RegisterCmd) -> Result<()> {
+    pub async fn write(&self, cmd: &RegisterCmd) -> Result<()> {
         info!("Writing register cmd: {:?}", cmd);
         // Let's first try to load and reconstruct the replica of targetted Register
         // we have in local storage, to then try to apply the new command onto it.

@@ -13,6 +13,7 @@ pub(crate) mod network_utils;
 
 use crate::{
     comm::{Comm, MsgFromPeer},
+    data::{Data, UsedSpace},
     node::{
         api::gen_genesis_dbc,
         cfg::create_test_max_capacity_and_root_storage,
@@ -22,7 +23,6 @@ use crate::{
         messaging::{OutgoingMsg, Peers},
         Cmd, Error, Event, MembershipEvent, Proposal, Result as RoutingResult,
     },
-    storage::UsedSpace,
 };
 
 use cmd_utils::{
@@ -475,8 +475,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
                 network_knowledge,
                 Some(section_key_share),
                 event_sender,
-                UsedSpace::new(max_capacity),
-                root_storage_dir,
+                root_storage_dir.clone(),
             )
             .await?;
 
@@ -529,7 +528,8 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             node.section_keys_provider
                 .insert(network_utils::create_section_key_share(&sk_set2, 0));
 
-            let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
+            let data = Data::new(root_storage_dir.as_path(), UsedSpace::new(max_capacity))?;
+            let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm, data);
 
             let _cmds = run_and_collect_cmds(
                 Cmd::ValidateMsg {
@@ -685,11 +685,11 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
                 section,
                 Some(section_key_share),
                 event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE).0,
-                UsedSpace::new(max_capacity),
-                root_storage_dir,
+                root_storage_dir.clone(),
             )
             .await?;
-            let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
+            let data = Data::new(root_storage_dir.as_path(), UsedSpace::new(max_capacity))?;
+            let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm, data);
 
             let relocated_peer = match relocated_peer_role {
                 RelocatedPeerRole::Elder => *section_auth.elders().nth(1).expect("too few elders"),
@@ -754,13 +754,13 @@ async fn msg_to_self() -> Result<()> {
             comm.socket_addr(),
             info.keypair.clone(),
             event_sender,
-            UsedSpace::new(max_capacity),
-            root_storage_dir,
+            root_storage_dir.clone(),
             genesis_sk_set,
         )
         .await?;
         let info = node.info();
-        let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
+        let data = Data::new(root_storage_dir.as_path(), UsedSpace::new(max_capacity))?;
+        let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm, data);
 
         let node_msg = NodeMsg::NodeCmd(NodeCmd::ReplicateData(vec![]));
 
@@ -864,8 +864,7 @@ async fn handle_elders_update() -> Result<()> {
             section0.clone(),
             Some(section_key_share),
             event_sender,
-            UsedSpace::new(max_capacity),
-            root_storage_dir,
+            root_storage_dir.clone(),
         )
         .await?;
 
@@ -874,7 +873,8 @@ async fn handle_elders_update() -> Result<()> {
         node.section_keys_provider
             .insert(network_utils::create_section_key_share(&sk_set1, 0));
 
-        let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
+        let data = Data::new(root_storage_dir.as_path(), UsedSpace::new(max_capacity))?;
+        let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm, data);
 
         let cmds = run_and_collect_cmds(Cmd::HandleNewEldersAgreement { new_elders: signed_sap1, sig }, &dispatcher).await?;
 
@@ -994,8 +994,7 @@ async fn handle_demote_during_split() -> Result<()> {
                 section,
                 Some(section_key_share),
                 event_sender,
-                UsedSpace::new(max_capacity),
-                root_storage_dir,
+                root_storage_dir.clone(),
             )
             .await?;
 
@@ -1012,7 +1011,8 @@ async fn handle_demote_during_split() -> Result<()> {
                     .insert(network_utils::create_section_key_share(&sk_set_v1_p1, 0));
             }
 
-            let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
+            let data = Data::new(root_storage_dir.as_path(), UsedSpace::new(max_capacity))?;
+            let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm, data);
 
             // Create agreement on `OurElder` for both sub-sections
             let create_our_elders_cmd =

@@ -11,7 +11,7 @@ use crate::messaging::{
     data::{DataQueryVariant, MetadataExchange, QueryResponse, StorageLevel},
     ClientAuth,
 };
-use crate::types::{DataAddress, PublicKey, ReplicatedData};
+use crate::types::{DataAddress, ReplicatedData};
 
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
@@ -22,17 +22,16 @@ use xor_name::XorName;
 pub enum NodeCmd {
     /// Notify Elders on nearing max capacity
     RecordStorageLevel {
-        /// Node Id
-        node_id: PublicKey,
-        /// Section to which the message needs to be sent to. (NB: this is the section of the node id).
-        section: XorName,
+        /// Node name
+        node_name: XorName,
         /// The storage level reported by the node.
         level: StorageLevel,
     },
     /// Tells an Adult to store a replica of the data
     ReplicateData(Vec<ReplicatedData>),
-    /// Tells an Adult to fetch and replicate data from the sender
-    SendAnyMissingRelevantData(Vec<DataAddress>),
+    /// Tells an Adult to return data that the requesting Adult should have but doesn't.
+    /// It includes the data addresses that the requesting Adult currently has.
+    ReturnMissingData(Vec<DataAddress>),
     /// Sent to all promoted nodes (also sibling if any) after
     /// a completed transition to a new constellation.
     ReceiveMetadata {
@@ -48,8 +47,8 @@ pub enum NodeEvent {
     #[cfg(any(feature = "chunks", feature = "registers"))]
     /// Sent by a full Adult, and tells the Elders to store a chunk at some other Adult in the section
     CouldNotStoreData {
-        /// Node Id
-        node_id: PublicKey,
+        /// Node name
+        node_name: XorName,
         /// The data that the Adult couldn't store
         data: ReplicatedData,
         /// Whether store failed due to full
@@ -65,7 +64,7 @@ pub enum NodeQuery {
     Data {
         /// The query
         query: DataQueryVariant,
-        /// Client signature
+        /// Client signature (the user that has initiated this query)
         auth: ClientAuth,
         /// The operation id that recorded in Elders for this query
         operation_id: OperationId,

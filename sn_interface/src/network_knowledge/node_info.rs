@@ -38,7 +38,7 @@ impl MyNodeInfo {
     }
 
     pub fn name(&self) -> XorName {
-        XorName::from(PublicKey::from(self.keypair.public))
+        XorName::from(self.public_key())
     }
 
     pub fn public_key(&self) -> PublicKey {

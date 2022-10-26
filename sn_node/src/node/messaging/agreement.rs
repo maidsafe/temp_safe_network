@@ -166,6 +166,6 @@ impl MyNode {
             self.network_knowledge.section_tree()
         );
 
-        self.update_on_elder_change(&snapshot).await
+        self.update_on_member_change(&snapshot).await
     }
 }

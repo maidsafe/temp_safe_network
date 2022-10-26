@@ -90,7 +90,7 @@ pub enum Error {
     RemovedFromSection,
     /// Database error.
     #[error("Database error:: {0}")]
-    Database(#[from] crate::storage::Error),
+    Database(#[from] crate::data::Error),
     /// Insufficient number of Adults found to perform data operation
     #[error(
         "Not enough Adults available at section {prefix:?}. Expected {expected}, found {found}."

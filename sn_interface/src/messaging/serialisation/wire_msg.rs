@@ -347,8 +347,7 @@ mod tests {
         let pk = crate::types::PublicKey::Bls(dst.section_key);
 
         let msg = NodeMsg::NodeCmd(NodeCmd::RecordStorageLevel {
-            node_id: pk,
-            section: pk.into(),
+            node_name: pk.into(),
             level: StorageLevel::zero(),
         });
 

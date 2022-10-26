@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::comm::Comm;
+use crate::data::{Data, Event as DataEvent};
 use crate::node::{
     messaging::{OutgoingMsg, Peers},
     Cmd, Error, MyNode, Result,
@@ -15,29 +16,30 @@ use crate::node::{
 #[cfg(feature = "traceroute")]
 use sn_interface::{messaging::Entity, messaging::Traceroute};
 use sn_interface::{
-    messaging::{Dst, MsgId, MsgKind, WireMsg},
+    messaging::{
+        system::{NodeCmd, NodeEvent, NodeMsg},
+        Dst, MsgId, MsgKind, WireMsg,
+    },
     network_knowledge::SectionTreeUpdate,
-    types::Peer,
+    types::{log_markers::LogMarker, Peer},
 };
 
 use qp2p::UsrMsgBytes;
 
 use bytes::Bytes;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    sync::Arc,
-};
+use std::{collections::BTreeMap, sync::Arc};
 use tokio::sync::RwLock;
 
 // Cmd Dispatcher.
 pub(crate) struct Dispatcher {
     node: Arc<RwLock<MyNode>>,
     comm: Comm,
+    data: Data,
 }
 
 impl Dispatcher {
-    pub(crate) fn new(node: Arc<RwLock<MyNode>>, comm: Comm) -> Self {
-        Self { node, comm }
+    pub(crate) fn new(node: Arc<RwLock<MyNode>>, comm: Comm, data: Data) -> Self {
+        Self { node, comm, data }
     }
 
     pub(crate) fn node(&self) -> Arc<RwLock<MyNode>> {
@@ -49,6 +51,13 @@ impl Dispatcher {
         trace!("doing actual processing cmd: {cmd:?}");
 
         match cmd {
+            Cmd::Data(cmd) => {
+                if let Some(event) = self.data.handle(cmd).await? {
+                    Ok(self.process_data_event(event).await.into_iter().collect())
+                } else {
+                    Ok(vec![])
+                }
+            }
             Cmd::SendMsg {
                 msg,
                 msg_id,
@@ -233,32 +242,85 @@ impl Dispatcher {
                 let mut node = self.node.write().await;
                 node.handle_dkg_outcome(section_auth, outcome).await
             }
-            Cmd::EnqueueDataForReplication {
-                // throttle_duration,
-                recipient,
-                data_batch,
-            } => {
-                // we should queue this
-                for data in data_batch {
-                    trace!("data being enqueued for replication {:?}", data);
-                    let mut node = self.node.write().await;
-                    if let Some(peers_set) = node.pending_data_to_replicate_to_peers.get_mut(&data)
-                    {
-                        debug!("data already queued, adding peer");
-                        let _existed = peers_set.insert(recipient);
-                    } else {
-                        let mut peers_set = BTreeSet::new();
-                        let _existed = peers_set.insert(recipient);
-                        let _existed = node
-                            .pending_data_to_replicate_to_peers
-                            .insert(data, peers_set);
-                    };
-                }
-                Ok(vec![])
+            Cmd::HandleAdultsChanged => {
+                // Only trigger data completion request when there is an adult change.
+                let currently_held_data = self.data.keys().await;
+                let node = self.node.read().await;
+                Ok(vec![node.ask_peers_for_data(currently_held_data)])
             }
             Cmd::ProposeVoteNodesOffline(names) => {
                 let mut node = self.node.write().await;
                 node.cast_offline_proposals(&names)
+            }
+        }
+    }
+
+    async fn process_data_event(&self, event: DataEvent) -> Option<Cmd> {
+        match event {
+            DataEvent::QueryResponseProduced {
+                response,
+                requesting_elder,
+                operation_id,
+                #[cfg(feature = "traceroute")]
+                traceroute,
+            } => {
+                let node = self.node.read().await;
+                let cmd = node
+                    .send_query_reponse(
+                        response,
+                        requesting_elder,
+                        operation_id,
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
+                    )
+                    .await;
+                Some(cmd)
+            }
+            DataEvent::StorageFailed { error, data, .. } => {
+                if let Some(data) = data {
+                    error!("Not enough space to store more data");
+                    let node = self.node.read().await;
+                    let node_name = node.info().name();
+                    let msg = NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
+                        node_name,
+                        data,
+                        full: true,
+                    });
+                    Some(node.send_msg_to_our_elders(msg))
+                } else {
+                    // these seem to be non-problematic errors and are ignored
+                    error!("Problem storing data, but it was ignored: {error}");
+                    None
+                }
+            }
+            DataEvent::ReplicationQueuePopped { data, recipients } => {
+                debug!(
+                    "{:?} Data {:?} to: {:?}",
+                    LogMarker::SendingMissingReplicatedData,
+                    data.address(),
+                    recipients,
+                );
+                let msg = NodeMsg::NodeCmd(NodeCmd::ReplicateData(vec![data]));
+                Some(Cmd::send_msg(
+                    OutgoingMsg::Node(msg),
+                    Peers::Multiple(recipients),
+                ))
+            }
+            DataEvent::StorageLevelIncreased(level) => {
+                info!("Storage has now passed {} % used.", 10 * level.value());
+                let (node_name, elders) = {
+                    let node = self.node.read().await;
+                    let elders = node.network_knowledge.elders();
+                    (node.name(), elders)
+                };
+
+                // we ask the section to record the new level reached
+                let msg = NodeMsg::NodeCmd(NodeCmd::RecordStorageLevel { node_name, level });
+
+                Some(Cmd::send_msg(
+                    OutgoingMsg::Node(msg),
+                    Peers::Multiple(elders),
+                ))
             }
         }
     }

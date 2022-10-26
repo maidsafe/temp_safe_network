@@ -21,7 +21,7 @@ use sn_interface::{
         system::{NodeCmd, NodeMsg, NodeQuery, OperationId},
         AuthorityProof, ClientAuth, MsgId,
     },
-    types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData},
+    types::{log_markers::LogMarker, Peer, ReplicatedData},
 };
 
 use bytes::Bytes;
@@ -177,11 +177,9 @@ impl MyNode {
 
     /// Set storage level of a given node.
     /// Returns whether the level changed or not.
-    pub(crate) fn set_storage_level(&mut self, node_id: &PublicKey, level: StorageLevel) -> bool {
+    pub(crate) fn set_storage_level(&mut self, node_name: XorName, level: StorageLevel) -> bool {
         info!("Setting new storage level..");
-        let changed = self
-            .capacity
-            .set_adult_level(XorName::from(*node_id), level);
+        let changed = self.capacity.set_adult_level(node_name, level);
         let avg_usage = self.capacity.avg_usage();
         info!(
             "Avg storage usage among Adults is between {}-{} %",

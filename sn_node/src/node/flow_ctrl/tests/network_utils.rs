@@ -1,4 +1,5 @@
 use crate::comm::Comm;
+use crate::data::{Data, UsedSpace};
 use crate::node::{
     cfg::create_test_max_capacity_and_root_storage,
     flow_ctrl::{
@@ -6,9 +7,9 @@ use crate::node::{
         event_channel,
         event_channel::{EventReceiver, EventSender},
     },
-    relocation_check, ChurnId, MyNode,
+    relocation_check, ChurnId, Event, MyNode,
 };
-use crate::storage::UsedSpace;
+
 use bls::Signature;
 use ed25519_dalek::Keypair;
 use eyre::{bail, eyre, Context, Result};
@@ -284,12 +285,12 @@ impl TestNodeBuilder {
             section.clone(),
             Some(section_key_share),
             self.node_event_sender,
-            UsedSpace::new(max_capacity),
-            root_storage_dir,
+            root_storage_dir.clone(),
         )
         .await?;
         let node = Arc::new(RwLock::new(node));
-        let dispatcher = Dispatcher::new(node, comm);
+        let data = Data::new(root_storage_dir.as_path(), UsedSpace::new(max_capacity))?;
+        let dispatcher = Dispatcher::new(node, comm, data);
         Ok((dispatcher, section, peer, sk_set))
     }
 }
