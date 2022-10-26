@@ -124,8 +124,6 @@ impl<'a> Joiner<'a> {
         Ok((sap.section_key(), sap.elders_vec()))
     }
 
-
-
     #[tracing::instrument(skip(self))]
     async fn join(mut self, response_timeout: Duration) -> Result<(MyNodeInfo, NetworkKnowledge)> {
         let (target_section_key, recipients) = self.join_target()?;
