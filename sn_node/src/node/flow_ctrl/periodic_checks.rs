@@ -373,9 +373,13 @@ impl FlowCtrl {
             trace!("Data found in queue to send out");
 
             let target_peer = {
+                debug!("[NODELOCK] periodic");
+
                 // careful now, if we're holding any ref into the read above we'll lock here.
                 let mut node = node.write().await;
-                node.pending_data_to_replicate_to_peers.remove(&address)
+                let x = node.pending_data_to_replicate_to_peers.remove(&address);
+                debug!("[NODELOCK] done");
+                x
             };
 
             if let Some(data_recipients) = target_peer {
@@ -413,7 +417,11 @@ impl FlowCtrl {
     async fn check_for_dysfunction(node: Arc<RwLock<MyNode>>) -> Vec<Cmd> {
         info!("Performing dysfunction checking");
         let mut cmds = vec![];
+
+        debug!("[NODELOCK] periodic dysf");
+
         let dysfunctional_nodes = node.write().await.get_dysfunctional_node_names();
+        debug!("[NODELOCK] periodic dysf done");
         let unresponsive_nodes = match dysfunctional_nodes {
             Ok(nodes) => nodes,
             Err(error) => {

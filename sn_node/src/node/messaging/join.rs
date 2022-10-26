@@ -33,11 +33,14 @@ impl MyNode {
         peer: Peer,
         join_request: JoinRequest,
     ) -> Result<Option<Cmd>> {
-        debug!("Handling join. Received {:?} from {}", join_request, peer);
+        debug!(
+            "[NODELOCK] Handling join. Received {:?} from {}",
+            join_request, peer
+        );
 
         let node_read_lock = node.read().await;
 
-        debug!("Handling join. node read for {join_request:?}");
+        debug!("[NODELOCK acquired]Handling join. node read for {join_request:?}");
 
         let provided_section_key = join_request.section_key();
 
@@ -112,9 +115,15 @@ impl MyNode {
 
         // drop readlock and get write lock
         drop(node_read_lock);
+        debug!("[NODELOCK] join write");
+
         let mut node = node.write().await;
 
-        Ok(node.propose_membership_change(node_state))
+        debug!("[NODELOCK] join write");
+        let x = node.propose_membership_change(node_state);
+        debug!("[NODELOCK] join write done");
+
+        Ok(x)
     }
 
     pub(crate) fn verify_joining_node_age(&self, peer: &Peer) -> Result<(bool, u8)> {

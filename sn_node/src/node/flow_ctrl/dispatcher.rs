@@ -104,8 +104,11 @@ impl Dispatcher {
                 Ok(cmds)
             }
             Cmd::TrackNodeIssueInDysfunction { name, issue } => {
+                debug!("[NODELOCK] dys");
                 let mut node = self.node.write().await;
+                debug!("[NODELOCK dysf acquired]");
                 node.log_node_issue(name, issue);
+                debug!("[NODELOCK dysf work done]");
                 Ok(vec![])
             }
             Cmd::AddToPendingQueries {
@@ -115,7 +118,9 @@ impl Dispatcher {
                 send_stream,
                 target_adult,
             } => {
+                debug!("[NODELOCK] pending Qs");
                 let mut node = self.node.write().await;
+                debug!("[NODELOCK] acquired Qs");
                 // cleanup
                 node.pending_data_queries.remove_expired();
 
@@ -141,6 +146,7 @@ impl Dispatcher {
                     );
                 }
 
+                debug!("[NODELOCK] work done Qs");
                 Ok(vec![])
             }
             Cmd::ValidateMsg {
@@ -162,6 +168,7 @@ impl Dispatcher {
                 traceroute,
             } => {
                 debug!("Updating network knowledge before handling message");
+                debug!("[NODELOCK] update and handle client..");
                 let mut node = self.node.write().await;
                 let name = node.name();
                 let updated = node.network_knowledge.update_knowledge_if_valid(
@@ -171,6 +178,7 @@ impl Dispatcher {
                 )?;
                 // drop the write lock
                 drop(node);
+                debug!("[NODELOCK] update and handle write done");
 
                 let node = self.node.read().await;
 
@@ -194,8 +202,8 @@ impl Dispatcher {
                 #[cfg(feature = "traceroute")]
                 traceroute,
             } => {
-                debug!("handling valid msg {:?}", msg_id);
-                MyNode::handle_valid_system_msg(
+                debug!("[NODE LOCK] handling valid msg (maybe locks) {:?}", msg_id);
+                let x = MyNode::handle_valid_system_msg(
                     self.node.clone(),
                     msg_id,
                     msg,
@@ -204,33 +212,56 @@ impl Dispatcher {
                     #[cfg(feature = "traceroute")]
                     traceroute.clone(),
                 )
-                .await
+                .await;
+                debug!("[NODE LOCK] valid msg handled and lock releases");
+                x
             }
             Cmd::HandleAgreement { proposal, sig } => {
+                debug!("[NODELOCK] agreement");
                 let mut node = self.node.write().await;
-                node.handle_general_agreements(proposal, sig)
-                    .map(|c| c.into_iter().collect())
+                debug!("[NODELOCK] agreement got");
+                let x = node
+                    .handle_general_agreements(proposal, sig)
+                    .map(|c| c.into_iter().collect());
+
+                debug!("[NODELOCK]agreement done");
+                x
             }
             Cmd::HandleMembershipDecision(decision) => {
+                debug!("[NODELOCK] membership ");
                 let mut node = self.node.write().await;
-                node.handle_membership_decision(decision)
+                debug!("[NODELOCK] membership got");
+                let x = node.handle_membership_decision(decision);
+                debug!("[NODELOCK] membership done");
+                x
             }
             Cmd::HandleNewEldersAgreement { new_elders, sig } => {
+                debug!("[NODELOCK] new elders ");
                 let mut node = self.node.write().await;
-                node.handle_new_elders_agreement(new_elders, sig)
+                debug!("[NODELOCK] new elders got ");
+                let x = node.handle_new_elders_agreement(new_elders, sig);
+                debug!("[NODELOCK] new elders done ");
+                x
             }
             Cmd::HandleFailedSendToNode { peer, msg_id } => {
                 warn!("Message sending failed to {peer}, for {msg_id:?}");
+                debug!("[NODELOCK] failed send ");
                 let mut node = self.node.write().await;
+                debug!("[NODELOCK] failed send got ");
                 node.handle_failed_send(&peer.addr());
+                debug!("[NODELOCK] failed send done ");
                 Ok(vec![])
             }
             Cmd::HandleDkgOutcome {
                 section_auth,
                 outcome,
             } => {
+                debug!("[NODELOCK] dkg outcome");
                 let mut node = self.node.write().await;
-                node.handle_dkg_outcome(section_auth, outcome)
+                debug!("[NODELOCK] dkg got");
+                let x = node.handle_dkg_outcome(section_auth, outcome);
+                debug!("[NODELOCK] dkg done");
+                x
             }
             Cmd::EnqueueDataForReplication {
                 // throttle_duration,
@@ -239,7 +270,7 @@ impl Dispatcher {
             } => {
                 // we should queue this
                 for data in data_batch {
-                    trace!("data being enqueued for replication {:?}", data);
+                    trace!("[NODELOCK] data being enqueued for replication {:?}", data);
                     let mut node = self.node.write().await;
                     if let Some(peers_set) = node.pending_data_to_replicate_to_peers.get_mut(&data)
                     {
@@ -252,12 +283,18 @@ impl Dispatcher {
                             .pending_data_to_replicate_to_peers
                             .insert(data, peers_set);
                     };
+
+                    debug!("[NODELOCK] data repl lock done");
                 }
                 Ok(vec![])
             }
             Cmd::ProposeVoteNodesOffline(names) => {
+                debug!("[NODELOCK] votes");
                 let mut node = self.node.write().await;
-                node.cast_offline_proposals(&names)
+                debug!("[NODELOCK] votes got");
+                let x = node.cast_offline_proposals(&names);
+                debug!("[NODELOCK] votes done");
+                x
             }
         }
     }
