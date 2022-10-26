@@ -100,17 +100,12 @@ impl MyNode {
         let our_prefix = self.network_knowledge.prefix();
         // Any other proposal than SectionInfo needs to be signed by a known section key.
         if let Proposal::SectionInfo(sap) = &proposal {
-            let section_auth = sap;
-            // TODO: do we want to drop older generations too?
-
-            if section_auth.prefix() == our_prefix
-                || section_auth.prefix().is_extension_of(&our_prefix)
-            {
+            if sap.prefix() == our_prefix || sap.prefix().is_extension_of(&our_prefix) {
                 // This `SectionInfo` is proposed by the DKG participants and
                 // it's signed by the new key created by the DKG so we don't
                 // know it yet. We only require the src_name of the
                 // proposal to be one of the DKG participants.
-                if !section_auth.contains_elder(&sender.name()) {
+                if !sap.contains_elder(&sender.name()) {
                     trace!(
                         "Ignoring proposal from src not being a DKG participant: {:?}",
                         proposal
@@ -119,8 +114,7 @@ impl MyNode {
                 }
             }
         } else {
-            // Proposal from other section shall be ignored.
-            // TODO: check this is for our prefix , or a child prefix, otherwise just drop it
+            // Proposal from other sections shall be ignored.
             if !our_prefix.matches(&sender.name()) {
                 trace!(
                     "Ignore proposal {:?} from other section, src {}: {:?}",
@@ -161,7 +155,6 @@ impl MyNode {
                         _ => cmds.push(Cmd::HandleAgreement { proposal, sig }),
                     },
                     Ok(None) => {
-                        // we add elders too fast in initial....
                         trace!(
                         "Proposal from {} inserted in aggregator, not enough sig shares yet: {proposal:?} {:?}",
                         sender,

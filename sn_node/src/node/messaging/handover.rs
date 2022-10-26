@@ -59,13 +59,10 @@ impl MyNode {
         candidates_sap: SapCandidate,
     ) -> Vec<Cmd> {
         match candidates_sap {
-            SapCandidate::ElderHandover(sap) => {
-                // NB TODO make sure this error has to be swallowed
-                self.propose_new_elders(sap).unwrap_or_else(|e| {
-                    error!("Failed to propose new elders: {}", e);
-                    vec![]
-                })
-            }
+            SapCandidate::ElderHandover(sap) => self.propose_new_elders(sap).unwrap_or_else(|e| {
+                error!("Failed to propose new elders: {}", e);
+                vec![]
+            }),
             SapCandidate::SectionSplit(sap1, sap2) => {
                 let mut prop1 = self.propose_new_elders(sap1).unwrap_or_else(|e| {
                     error!("Failed to propose new elders: {}", e);
