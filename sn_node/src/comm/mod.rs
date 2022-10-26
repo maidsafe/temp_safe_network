@@ -38,7 +38,7 @@ use tokio::{
 // Communication component of the node to interact with other nodes.
 #[derive(Clone)]
 pub(crate) struct Comm {
-    our_endpoint: Endpoint,
+    pub(crate) our_endpoint: Endpoint,
     msg_listener: MsgListener,
     sessions: Arc<DashMap<Peer, PeerSession>>,
 }
@@ -306,7 +306,7 @@ fn setup_comms(
 
 #[tracing::instrument(skip_all)]
 fn setup(our_endpoint: Endpoint, receive_msg: Sender<MsgFromPeer>) -> (Comm, MsgListener) {
-    let (add_connection, conn_receiver) = mpsc::channel(100);
+    let (add_connection, conn_receiver) = mpsc::channel(10_000);
 
     let msg_listener = MsgListener::new(add_connection, receive_msg);
 

@@ -19,7 +19,7 @@ use std::collections::BTreeSet;
 // Agreement
 impl MyNode {
     #[instrument(skip(self), level = "trace")]
-    pub(crate) async fn handle_general_agreements(
+    pub(crate) fn handle_general_agreements(
         &mut self,
         proposal: Proposal,
         sig: SectionSig,
@@ -29,7 +29,7 @@ impl MyNode {
             Proposal::VoteNodeOffline(node_state) => {
                 Ok(self.handle_offline_agreement(node_state, sig))
             }
-            Proposal::SectionInfo(sap) => self.handle_section_info_agreement(sap, sig).await,
+            Proposal::SectionInfo(sap) => self.handle_section_info_agreement(sap, sig),
             Proposal::NewElders(_) => {
                 error!("Elders agreement should be handled in a separate blocking fashion");
                 Ok(None)
@@ -51,7 +51,7 @@ impl MyNode {
     }
 
     #[instrument(skip(self), level = "trace")]
-    async fn handle_section_info_agreement(
+    fn handle_section_info_agreement(
         &mut self,
         sap: SectionAuthorityProvider,
         sig: SectionSig,
@@ -74,7 +74,7 @@ impl MyNode {
 
         // check if at the given memberhip gen, the elders candidates are matching
         let membership_gen = sap.membership_gen();
-        let signed_sap = SectionSigned::new(sap, sig.clone());
+        let signed_sap = SectionSigned::new(sap, sig);
         let dkg_sessions_info = self.best_elder_candidates_at_gen(membership_gen);
 
         let elder_candidates = BTreeSet::from_iter(signed_sap.names());
@@ -124,7 +124,7 @@ impl MyNode {
     }
 
     #[instrument(skip(self), level = "trace")]
-    pub(crate) async fn handle_new_elders_agreement(
+    pub(crate) fn handle_new_elders_agreement(
         &mut self,
         signed_sap: SectionSigned<SectionAuthorityProvider>,
         section_sig: SectionSig,
@@ -149,7 +149,7 @@ impl MyNode {
                     Ok(true) => {
                         info!("Updated our network knowledge for {:?}", prefix);
                         info!("Writing updated knowledge to disk");
-                        self.write_section_tree().await
+                        self.write_section_tree()
                     }
                     Err(err) => {
                         error!("Error updating our network knowledge for {prefix:?}: {err:?}")
@@ -166,6 +166,6 @@ impl MyNode {
             self.network_knowledge.section_tree()
         );
 
-        self.update_on_elder_change(&snapshot).await
+        self.update_on_elder_change(&snapshot)
     }
 }
