@@ -169,6 +169,8 @@ impl<'a> Joiner<'a> {
                         continue;
                     }
 
+
+
                     // Ensure this decision includes us as a joining node
                     if decision
                         .proposals
