@@ -227,8 +227,14 @@ impl MyNode {
                 && !self.state_snapshot().members.contains(&self.name())
             {
                 error!("Detected that we've been removed from the section");
-                self.send_event(Event::Membership(MembershipEvent::RemovedFromSection))
-                    .await;
+                // move off thread to keep fn sync
+                let event_sender = self.event_sender.clone();
+                let _handle = tokio::spawn(async move {
+                    event_sender
+                        .send(Event::Membership(MembershipEvent::RemovedFromSection))
+                        .await;
+                });
+
                 return Err(Error::RemovedFromSection);
             }
         }
