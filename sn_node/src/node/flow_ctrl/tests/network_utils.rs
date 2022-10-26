@@ -333,20 +333,14 @@ pub(crate) fn create_section_with_elders(
     sk_set: &bls::SecretKeySet,
     sap: &SectionAuthorityProvider,
 ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
-    let (mut section, section_key_share) = do_create_section(sap, sk_set, None, None)?;
+    let (mut section, section_key_share) =
+        TestNetworkKnowledge::do_create_section(sap, sk_set, None, None)?;
     for peer in sap.elders() {
         let node_state = NodeState::joined(*peer, None);
         let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state)?;
         let _updated = section.update_member(node_state);
     }
     Ok((section, section_key_share))
-}
-
-pub(crate) fn create_section_auth() -> (SectionAuthorityProvider, Vec<MyNodeInfo>, bls::SecretKeySet)
-{
-    let (section_auth, elders, secret_key_set) =
-        TestSAP::random_sap(Prefix::default(), elder_count(), 0, None);
-    (section_auth, elders, secret_key_set)
 }
 
 pub(crate) fn create_peer(age: u8) -> Peer {
@@ -407,7 +401,8 @@ fn do_create_section(
 ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
     let (section_chain, last_sk, share_index) = if let Some(other_section_keys) = other_section_keys
     {
-        let section_chain = make_section_chain(&genesis_ks.secret_key(), &other_section_keys)?;
+        let section_chain =
+            TestSectionTree::gen_proof_chain(&genesis_ks.secret_key(), &other_section_keys)?;
         let last_key = other_section_keys
             .last()
             .ok_or_else(|| eyre!("The section keys list must be populated"))?;
@@ -430,18 +425,4 @@ fn do_create_section(
     let sks = bls::SecretKeySet::from_bytes(last_sk.to_bytes().to_vec())?;
     let section_key_share = TestKeys::get_section_key_share(&sks, share_index);
     Ok((section, section_key_share))
-}
-
-fn make_section_chain(
-    genesis_key: &bls::SecretKey,
-    other_keys: &Vec<bls::SecretKey>,
-) -> Result<SectionsDAG> {
-    let mut section_chain = SectionsDAG::new(genesis_key.public_key());
-    let mut parent = genesis_key.clone();
-    for key in other_keys {
-        let sig = parent.sign(key.public_key().to_bytes());
-        section_chain.insert(&parent.public_key(), key.public_key(), sig)?;
-        parent = key.clone();
-    }
-    Ok(section_chain)
 }

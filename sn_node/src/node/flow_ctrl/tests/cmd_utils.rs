@@ -14,7 +14,7 @@ use sn_interface::{
         data::{ClientMsg, Error as MessagingDataError},
         serialisation::WireMsg,
         system::{JoinResponse, NodeCmd, NodeMsg},
-        AuthorityProof, ClientAuth, MsgId, MsgType,
+        AuthorityProof, ClientAuth, MsgId,
     },
     network_knowledge::{
         test_utils::*, MembershipState, NodeState, RelocateDetails, SectionAuthorityProvider,

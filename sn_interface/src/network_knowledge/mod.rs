@@ -603,11 +603,92 @@ fn create_first_sig<T: Serialize>(
     })
 }
 
+#[cfg(any(test, feature = "test-utils"))]
+pub mod test_utils_nw {
+    use super::{
+        MyNodeInfo, NetworkKnowledge, NodeState, SectionKeyShare, SectionTree, SectionTreeUpdate,
+        SectionsDAG,
+    };
+    use crate::{
+        test_utils::{TestSAP, TestSectionTree},
+        types::keys::test_utils::TestKeys,
+        SectionAuthorityProvider,
+    };
+    use eyre::{eyre, Result};
+    use xor_name::Prefix;
+
+    /// `NetworkKnowledge` related utils for testing
+    pub struct TestNetworkKnowledge {}
+
+    impl TestNetworkKnowledge {
+        /// Generate a random `NetworkKnowledge` (section) for testing.
+        pub fn random_section_with_key(
+            prefix: Prefix,
+            elder_count: usize,
+            adult_count: usize,
+            sk_set: &bls::SecretKeySet,
+        ) -> Result<(NetworkKnowledge, Vec<MyNodeInfo>)> {
+            let pk_set = sk_set.public_keys();
+            let (sap, node_infos) =
+                TestSAP::random_sap_with_key(prefix, elder_count, adult_count, sk_set);
+            let signed_sap = TestKeys::get_section_signed(&sk_set.secret_key(), sap)?;
+            let section_tree_update =
+                super::SectionTreeUpdate::new(signed_sap, SectionsDAG::new(pk_set.public_key()));
+            let mut network_knowledge =
+                NetworkKnowledge::new(SectionTree::new(pk_set.public_key()), section_tree_update)?;
+
+            // update the sap members
+            for peer in network_knowledge.signed_sap.elders() {
+                let node_state = NodeState::joined(*peer, None);
+                let signed_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state)?;
+                let _changed = network_knowledge.section_peers.update(signed_state);
+            }
+            Ok((network_knowledge, node_infos))
+        }
+
+        pub fn do_create_section(
+            section_auth: &SectionAuthorityProvider,
+            genesis_ks: &bls::SecretKeySet,
+            other_section_keys: Option<Vec<bls::SecretKey>>,
+            parent_section_tree: Option<SectionTree>,
+        ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
+            let (section_chain, last_sk, share_index) =
+                if let Some(other_section_keys) = other_section_keys {
+                    let section_chain = TestSectionTree::gen_proof_chain(
+                        &genesis_ks.secret_key(),
+                        &other_section_keys,
+                    )?;
+                    let last_key = other_section_keys
+                        .last()
+                        .ok_or_else(|| eyre!("The section keys list must be populated"))?;
+                    let share_index = other_section_keys.len() - 1;
+                    (section_chain, last_key.clone(), share_index)
+                } else {
+                    let section_chain = SectionsDAG::new(genesis_ks.public_keys().public_key());
+                    (section_chain, genesis_ks.secret_key(), 0)
+                };
+
+            let signed_sap = TestKeys::get_section_signed(&last_sk, section_auth.clone())?;
+            let section_tree_update = SectionTreeUpdate::new(signed_sap, section_chain);
+            let section_tree = if let Some(parent_section_tree) = parent_section_tree {
+                parent_section_tree
+            } else {
+                SectionTree::new(genesis_ks.public_keys().public_key())
+            };
+            let section = NetworkKnowledge::new(section_tree, section_tree_update)?;
+
+            let sks = bls::SecretKeySet::from_bytes(last_sk.to_bytes().to_vec())?;
+            let section_key_share = TestKeys::get_section_key_share(&sks, share_index);
+            Ok((section, section_key_share))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{supermajority, NetworkKnowledge};
     use crate::{
-        test_utils::{gen_addr, gen_section_tree_update, prefix, TestKeys, TestSAP},
+        test_utils::{gen_addr, prefix, TestKeys, TestSAP, TestSectionTree},
         types::Peer,
     };
     use bls::SecretKeySet;
@@ -654,7 +735,7 @@ mod tests {
         let our_node_name_prefix_1 = sap1.prefix().name();
         let proof_chain = knowledge.section_chain();
         let section_tree_update =
-            gen_section_tree_update(&sap1, &proof_chain, &sk_gen.secret_key())?;
+            TestSectionTree::get_section_tree_update(&sap1, &proof_chain, &sk_gen.secret_key())?;
         assert!(knowledge.update_knowledge_if_valid(
             section_tree_update,
             None,
@@ -666,7 +747,7 @@ mod tests {
         let (sap0, _, sk_0) = TestSAP::random_sap(prefix("0")?, 0, 0, None);
         let sap0 = TestKeys::get_section_signed(&sk_0.secret_key(), sap0)?;
         let section_tree_update =
-            gen_section_tree_update(&sap0, &proof_chain, &sk_gen.secret_key())?;
+            TestSectionTree::get_section_tree_update(&sap0, &proof_chain, &sk_gen.secret_key())?;
         // our node is still in prefix1
         assert!(knowledge.update_knowledge_if_valid(
             section_tree_update,

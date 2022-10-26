@@ -1,10 +1,6 @@
-use super::{
-    NetworkKnowledge, NodeState, SectionKeysProvider, SectionTree, SectionTreeUpdate, SectionsDAG,
-};
+use super::SectionKeysProvider;
 use crate::{
-    messaging::system::SectionSigned,
     network_knowledge::{section_keys::build_spent_proof_share, Error, MyNodeInfo, MIN_ADULT_AGE},
-    test_utils::{TestKeys, TestSAP},
     SectionAuthorityProvider,
 };
 use eyre::{eyre, Result};
@@ -33,7 +29,6 @@ pub fn gen_addr() -> SocketAddr {
     thread_local! {
         static NEXT_PORT: Cell<u16> = Cell::new(1000);
     }
-
     let port = NEXT_PORT.with(|cell| cell.replace(cell.get().wrapping_add(1)));
 
     ([192, 0, 2, 0], port).into()
@@ -58,48 +53,6 @@ pub fn gen_sorted_nodes(prefix: &Prefix, count: usize, age_diff: bool) -> Vec<My
         })
         .sorted_by_key(|node| node.name())
         .collect()
-}
-
-/// Generate a random `NetworkKnowledge` for testing.
-///
-/// Uses `random_sap_with_key` to generate SAP; section_peer list is updated with the `NodeState` as well
-pub fn gen_network_knowledge_with_key(
-    prefix: Prefix,
-    elder_count: usize,
-    adult_count: usize,
-    sk_set: &bls::SecretKeySet,
-) -> Result<(NetworkKnowledge, Vec<MyNodeInfo>)> {
-    let pk_set = sk_set.public_keys();
-    let (sap, node_infos) = TestSAP::random_sap_with_key(prefix, elder_count, adult_count, sk_set);
-    let signed_sap = TestKeys::get_section_signed(&sk_set.secret_key(), sap)?;
-    let section_tree_update =
-        SectionTreeUpdate::new(signed_sap, SectionsDAG::new(pk_set.public_key()));
-    let mut network_knowledge =
-        NetworkKnowledge::new(SectionTree::new(pk_set.public_key()), section_tree_update)?;
-
-    // update the sap members
-    for peer in network_knowledge.signed_sap.elders() {
-        let node_state = NodeState::joined(*peer, None);
-        let signed_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state)?;
-        let _changed = network_knowledge.section_peers.update(signed_state);
-    }
-    Ok((network_knowledge, node_infos))
-}
-
-/// Generate a `SectionTreeUpdate` where the SAP's section key is appended to the proof chain
-pub fn gen_section_tree_update(
-    sap: &SectionSigned<SectionAuthorityProvider>,
-    proof_chain: &SectionsDAG,
-    parent_sk: &bls::SecretKey,
-) -> Result<SectionTreeUpdate> {
-    let signed_key = TestKeys::get_section_signed(parent_sk, sap.section_key())?;
-    let mut proof_chain = proof_chain.clone();
-    proof_chain.insert(
-        &parent_sk.public_key(),
-        signed_key.value,
-        signed_key.sig.signature,
-    )?;
-    Ok(SectionTreeUpdate::new(sap.clone(), proof_chain))
 }
 
 pub fn section_decision<P: Proposition>(

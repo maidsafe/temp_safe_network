@@ -382,7 +382,8 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let local = tokio::task::LocalSet::new();
     local
         .run_until(async move {
-            let (section_auth, mut nodes, sk_set) = network_utils::create_section_auth();
+            let (section_auth, mut nodes, sk_set) =
+                TestSAP::random_sap(Prefix::default(), elder_count(), 0, None);
 
             let (mut section, _) =
                 network_utils::create_section(&sk_set, &section_auth, None, None)?;
@@ -450,7 +451,8 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             let sk0 = bls::SecretKey::random();
             let pk0 = sk0.public_key();
 
-            let (old_sap, mut nodes, sk_set1) = network_utils::create_section_auth();
+            let (old_sap, mut nodes, sk_set1) =
+                TestSAP::random_sap(Prefix::default(), elder_count(), 0, None);
             let members =
                 BTreeSet::from_iter(nodes.iter().map(|n| NodeState::joined(n.peer(), None)));
             let pk1 = sk_set1.secret_key().public_key();

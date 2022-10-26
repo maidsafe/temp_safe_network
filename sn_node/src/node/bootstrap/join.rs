@@ -465,7 +465,7 @@ mod tests {
             TestSAP::random_sap(Prefix::default(), elder_count(), 0, None);
 
         let next_section_key = next_sk_set.public_keys().public_key();
-        let section_tree_update = gen_section_tree_update(
+        let section_tree_update = TestSectionTree::get_section_tree_update(
             &TestKeys::get_section_signed(&next_sk_set.secret_key(), next_sap.clone())?,
             &SectionsDAG::new(genesis_pk),
             &genesis_sk,
@@ -811,7 +811,7 @@ mod tests {
             let (next_sap, next_elders, next_sk_set) =
                 TestSAP::random_sap(Prefix::default(), 1, 0, None);
             let next_section_key = next_sk_set.public_keys().public_key();
-            let section_tree_update = gen_section_tree_update(
+            let section_tree_update = TestSectionTree::get_section_tree_update(
                 &TestKeys::get_section_signed(&next_sk_set.secret_key(), next_sap)?,
                 &SectionsDAG::new(genesis_pk),
                 &genesis_sk,

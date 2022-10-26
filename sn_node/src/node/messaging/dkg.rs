@@ -809,7 +809,8 @@ mod tests {
             system::{DkgSessionId, NodeMsg},
             MsgId, Traceroute,
         },
-        network_knowledge::{test_utils::gen_network_knowledge_with_key, SectionKeyShare},
+        network_knowledge::SectionKeyShare,
+        test_utils::TestNetworkKnowledge,
         types::Peer,
     };
     use std::{
@@ -1019,8 +1020,12 @@ mod tests {
             SecretKeySet::from(poly)
         };
 
-        let (network_knowledge, node_infos) =
-            gen_network_knowledge_with_key(Prefix::default(), elders, 0, &gen_section_key_set)?;
+        let (network_knowledge, node_infos) = TestNetworkKnowledge::random_section_with_key(
+            Prefix::default(),
+            elders,
+            0,
+            &gen_section_key_set,
+        )?;
 
         for (idx, info) in node_infos.into_iter().enumerate() {
             let comm = create_comm().await?;

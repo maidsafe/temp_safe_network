@@ -200,27 +200,21 @@ pub mod test_utils {
         network_knowledge::{MyNodeInfo, NodeState, SectionAuthorityProvider},
         test_utils::{gen_sorted_nodes, TestKeys},
     };
-    use eyre::{Context, Result};
+    use eyre::Result;
     use rand::RngCore;
     use xor_name::Prefix;
 
+    /// `SectionAuthorityProvider` related utils for testing
     pub struct TestSAP {}
 
     impl TestSAP {
-        pub fn gen_section_auth(
-            prefix: Prefix,
-        ) -> Result<(SectionSigned<SectionAuthorityProvider>, bls::SecretKey)> {
-            let (section_auth, _, secret_key_set) = Self::random_sap(prefix, 5, 0, None);
-            let sap = TestKeys::get_section_signed(&secret_key_set.secret_key(), section_auth)
-                .context(format!("Failed to generate SAP for prefix {:?}", prefix))?;
-            Ok((sap, secret_key_set.secret_key()))
-        }
-
         /// Generate a random `SectionAuthorityProvider` for testing.
         ///
         /// The total number of members in the section will be `elder_count` + `adult_count`. A lot of
         /// tests don't require adults in the section, so zero is an acceptable value for
         /// `adult_count`.
+        ///
+        /// The rng is used to generate the `SecretKeySet`
         ///
         /// An optional `sk_threshold_size` can be passed to specify the threshold when the secret key
         /// set is generated for the section key. Some tests require a low threshold.
@@ -241,6 +235,9 @@ pub mod test_utils {
             (section_auth, nodes, sks)
         }
 
+        /// Generate a random `SectionAuthorityProvider` for testing.
+        ///
+        /// Same as `random_sap_with_rng` but with `thread_rng`.
         pub fn random_sap(
             prefix: Prefix,
             elder_count: usize,
@@ -272,6 +269,25 @@ pub mod test_utils {
             let section_auth =
                 SectionAuthorityProvider::new(elders, prefix, members, sk_set.public_keys(), 0);
             (section_auth, nodes)
+        }
+
+        /// Generate a random `SectionAuthorityProvider` which is signed by itself
+        pub fn random_signed_sap(
+            prefix: Prefix,
+            elder_count: usize,
+            adult_count: usize,
+            sk_threshold_size: Option<usize>,
+        ) -> Result<(
+            SectionSigned<SectionAuthorityProvider>,
+            Vec<MyNodeInfo>,
+            bls::SecretKey,
+        )> {
+            let (section_auth, nodes, secret_key_set) =
+                Self::random_sap(prefix, elder_count, adult_count, sk_threshold_size);
+            let signed_sap =
+                TestKeys::get_section_signed(&secret_key_set.secret_key(), section_auth)?;
+
+            Ok((signed_sap, nodes, secret_key_set.secret_key()))
         }
     }
 }
