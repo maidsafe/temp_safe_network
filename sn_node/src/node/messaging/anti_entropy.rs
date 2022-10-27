@@ -13,9 +13,9 @@ use crate::node::{
     Error, Event, MembershipEvent, MyNode, Result, StateSnapshot,
 };
 
+use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
 use qp2p::{SendStream, UsrMsgBytes};
-use rand::Rng;
 #[cfg(feature = "traceroute")]
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
@@ -278,7 +278,7 @@ impl MyNode {
             return Ok(cmds);
         }
 
-        self.hold_back_randomly().await;
+        self.create_or_wait_for_backoff(&response_peer).await;
 
         trace!("{}", LogMarker::AeResendAfterAeRedirect);
 
@@ -296,14 +296,41 @@ impl MyNode {
         Ok(cmds)
     }
 
-    async fn hold_back_randomly(&mut self) {
-        // Having a sleep time ranging from 100ms to 1s randomly
-        // TODO: the previous backoff cache has the benefit of detecting false peer that
-        //       sending AE repeatedly. It can also carry out `exponentially backoff`
-        //       on per-peer. Which might be more ideal.
-        let mut rng = rand::rngs::OsRng;
-        let sleep_time: u64 = rng.gen_range(100..1_000);
-        log_sleep!(Duration::from_millis(sleep_time));
+    /// Checks AE-BackoffCache for backoff, or creates a new instance
+    /// waits for any required backoff duration
+    async fn create_or_wait_for_backoff(&mut self, peer: &Peer) {
+        let our_backoff = self
+            .ae_backoff_cache
+            .find(|(node, _)| node == peer)
+            .map(|(_, backoff)| backoff);
+
+        if let Some(backoff) = our_backoff {
+            let next_backoff = backoff.next_backoff();
+            let sleep_time = if let Some(mut next_wait) = next_backoff {
+                // The default setup start with around 400ms
+                // then increases to around 50s after 25 calls.
+                // with `next_wait /= 100`, the sleep_time still rise to over 800ms quickly.
+                next_wait /= 200;
+                if next_wait > Duration::from_millis(500) {
+                    backoff.reset();
+                }
+                Some(next_wait)
+            } else {
+                // The `ae_backoff_cache` is `uluru::LRUCache` which doesn't carry out
+                // time based pruning. Which means the backoff actually got disabled once
+                // the total backoff got elapsed. So here a reset shall be carried out.
+                backoff.reset();
+                backoff.next_backoff()
+            };
+
+            if let Some(sleep_time) = sleep_time {
+                log_sleep!(Duration::from_millis(sleep_time.as_millis() as u64));
+            }
+        } else {
+            let _res = self
+                .ae_backoff_cache
+                .insert((*peer, ExponentialBackoff::default()));
+        }
     }
 
     // If entropy is found, determine the msg to send in order to

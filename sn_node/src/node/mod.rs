@@ -96,6 +96,7 @@ mod core {
         types::{keys::ed25519::Digest256, log_markers::LogMarker, Cache, DataAddress, Peer},
     };
 
+    use backoff::ExponentialBackoff;
     use ed25519_dalek::Keypair;
     use itertools::Itertools;
 
@@ -108,6 +109,7 @@ mod core {
         time::Duration,
     };
     use tokio::sync::Mutex;
+    use uluru::LRUCache;
 
     /// Amount of tokens to be owned by the Genesis DBC.
     /// At the inception of the Network a total supply of 4,525,524,120 whole tokens will be created.
@@ -122,6 +124,8 @@ mod core {
     // It's worth noting that nodes clean up all connections every two mins, so this max can only last that long.
     // (and yes, some clients may unfortunately be disconnected quickly)
     pub(crate) const MAX_WAITING_PEERS_PER_QUERY: usize = 100;
+
+    const BACKOFF_CACHE_LIMIT: usize = 100;
 
     // File name where to cache this node's section tree (stored at this node's set root storage dir)
     const SECTION_TREE_FILE_NAME: &str = "section_tree";
@@ -142,6 +146,9 @@ mod core {
         pub(crate) session_id: DkgSessionId,
         pub(crate) authority: AuthorityProof<SectionSig>,
     }
+
+    // Store up to 100 in use backoffs
+    pub(crate) type AeBackoffCache = LRUCache<(Peer, ExponentialBackoff), BACKOFF_CACHE_LIMIT>;
 
     pub(crate) struct MyNode {
         pub(crate) addr: SocketAddr, // does this change? if so... when? only at node start atm?
@@ -176,6 +183,8 @@ mod core {
         /// Cache the request combo,  (OperationId -> An adult xorname), to waiting Clients peers for that combo
         pub(crate) pending_data_queries:
             Cache<(OperationId, XorName), BTreeMap<(MsgId, Peer), OptionalResponseStream>>,
+        // Caches
+        pub(crate) ae_backoff_cache: AeBackoffCache,
     }
 
     impl MyNode {
@@ -259,6 +268,7 @@ mod core {
                 dysfunction_tracking: node_dysfunction_detector,
                 pending_data_queries: Cache::with_expiry_duration(DATA_QUERY_TIMEOUT),
                 pending_data_to_replicate_to_peers: BTreeMap::new(),
+                ae_backoff_cache: AeBackoffCache::default(),
                 membership,
             };
 
