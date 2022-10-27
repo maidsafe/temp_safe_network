@@ -14,7 +14,7 @@ use crate::{
 
 use serde::{Deserialize, Serialize};
 
-/// A Proposal about the state of the network
+/// A Proposal about the state of the section
 /// This can be a result of seeing a node come online, go offline, changes to section info etc.
 /// Anything where we need section authority before action can be taken
 /// Proposals sent by elders or elder candidates, to elders or elder candidates
