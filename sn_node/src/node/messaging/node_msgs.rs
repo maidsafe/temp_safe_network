@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
+    comm::Comm,
     node::{
         flow_ctrl::cmds::Cmd,
         messaging::{OutgoingMsg, Peers},
@@ -73,6 +74,7 @@ impl MyNode {
         msg_id: MsgId,
         msg: NodeMsg,
         sender: Peer,
+        comm: &Comm,
         send_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
@@ -240,7 +242,7 @@ impl MyNode {
                 }
 
                 Ok(
-                    MyNode::handle_join_as_relocated_request(node, sender, *join_request)
+                    MyNode::handle_join_as_relocated_request(node, sender, *join_request, comm)
                         .await
                         .into_iter()
                         .collect(),

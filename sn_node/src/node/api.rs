@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::comm::Comm;
 use crate::{
     node::{
         flow_ctrl::{cmds::Cmd, event_channel::EventSender},
@@ -29,19 +28,18 @@ use sn_dbc::{
     rng, Dbc, Hash, IndexedSignatureShare, MlsagMaterial, Owner, OwnerOnce, RevealedCommitment,
     SpentProofContent, SpentProofShare, Token, TransactionBuilder, TrueInput,
 };
-use std::{path::PathBuf, sync::Arc};
+use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 use xor_name::XorName;
 
 impl MyNode {
     pub(crate) async fn first_node(
-        comm: Comm,
+        our_addr: SocketAddr,
         keypair: Arc<Keypair>,
         event_sender: EventSender,
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
         genesis_sk_set: bls::SecretKeySet,
     ) -> Result<(Self, Dbc)> {
-        let our_addr = comm.socket_addr();
         let info = MyNodeInfo {
             keypair: keypair.clone(),
             addr: our_addr,
@@ -54,7 +52,7 @@ impl MyNode {
             NetworkKnowledge::first_node(info.peer(), genesis_sk_set)?;
 
         let node = Self::new(
-            comm,
+            our_addr,
             keypair.clone(),
             network_knowledge,
             Some(section_key_share),

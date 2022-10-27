@@ -11,13 +11,12 @@ use crate::node::{messaging::Peers, Cmd, Error, MyNode, Prefix, Result};
 use bytes::Bytes;
 use itertools::Itertools;
 use qp2p::SendStream;
-use sn_dysfunction::IssueType;
 #[cfg(feature = "traceroute")]
-use sn_interface::messaging::{MsgType, Traceroute, WireMsg};
+use sn_interface::messaging::{Traceroute, WireMsg};
 use sn_interface::{
     data_copy_count,
     messaging::{
-        data::{ClientMsg, DataQuery, MetadataExchange, StorageLevel},
+        data::{DataQuery, MetadataExchange, StorageLevel},
         system::{NodeCmd, NodeMsg, NodeQuery, OperationId},
         AuthorityProof, ClientAuth, Dst, MsgId, MsgKind,
     },
@@ -51,7 +50,7 @@ impl MyNode {
     }
 
     /// Find target adult, sends a bidi msg, awaiting response, and then sends this on to the client
-    pub(crate) async fn read_data_from_adults_and_respond_to_client(
+    pub(crate) async fn read_data_from_adults(
         &self,
         query: DataQuery,
         msg_id: MsgId,
@@ -115,49 +114,17 @@ impl MyNode {
             traceroute.clone(),
         )?;
 
-        // set up to track node issue if no response in THRESHOLD_TIME
-        // TODO: how to determine that time?
-        // TODO: don't use arbitrary time here. (But 3s is very realistic here under normal load)
-        let response = match tokio::time::timeout(tokio::time::Duration::from_secs(3), async {
-            self.comm
-                .send_out_bytes_to_peer_and_return_response(target, msg_id, bytes_to_adult)
-                .await
-        })
-        .await
-        {
-            Ok(resp) => resp,
-            Err(_elapsed) => {
-                error!("No response before arbitrary timeout. Marking adult as dysfunctional");
-                return Ok(vec![Cmd::TrackNodeIssueInDysfunction {
-                    name: target.name(),
-                    // TODO: no need for op id tracking here, this can be a simple counter
-                    issue: IssueType::PendingRequestOperation(operation_id),
-                }]);
-            }
-        }?;
+        let cmd = Cmd::SendToAdultsAndReturnToClient {
+            msg_id,
+            operation_id,
+            target,
+            bytes_to_adult,
+            client_response_stream,
+            #[cfg(feature = "traceroute")]
+            traceroute,
+        };
 
-        if let MsgType::Node {
-            msg: NodeMsg::NodeQueryResponse { response, .. },
-            ..
-        } = response.into_msg()?
-        {
-            let client_msg = ClientMsg::QueryResponse {
-                response,
-                correlation_id: msg_id,
-            };
-
-            let (kind, payload) = self.serialize_sign_client_msg(client_msg)?;
-
-            if let Some(stream) = client_response_stream {
-                self.send_msg_on_stream(payload, kind, stream, target, msg_id, traceroute)
-                    .await?
-            } else {
-                warn!("No send stream to respond to client on! (This is likely due to the msg originating at the elder as a healthcheck");
-            }
-        }
-
-        // Everything went okay, so no further cmds to handle
-        Ok(vec![])
+        Ok(vec![cmd])
     }
 
     /// Send an OutgoingMsg on a given stream

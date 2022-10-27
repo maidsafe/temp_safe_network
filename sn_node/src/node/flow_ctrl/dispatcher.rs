@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::comm::Comm;
 use crate::node::{
     messaging::{OutgoingMsg, Peers},
     Cmd, Error, MyNode, Result,
@@ -28,11 +29,12 @@ use tokio::sync::RwLock;
 // Cmd Dispatcher.
 pub(crate) struct Dispatcher {
     node: Arc<RwLock<MyNode>>,
+    comm: Comm,
 }
 
 impl Dispatcher {
-    pub(crate) fn new(node: Arc<RwLock<MyNode>>) -> Self {
-        Self { node }
+    pub(crate) fn new(node: Arc<RwLock<MyNode>>, comm: Comm) -> Self {
+        Self { node, comm }
     }
 
     pub(crate) fn node(&self) -> Arc<RwLock<MyNode>> {
@@ -44,6 +46,69 @@ impl Dispatcher {
         trace!("doing actual processing cmd: {cmd:?}");
 
         match cmd {
+            Cmd::SendToAdultsAndReturnToClient {
+                msg_id,
+                operation_id,
+                target,
+                bytes_to_adult,
+                client_response_stream,
+                #[cfg(feature = "traceroute")]
+                traceroute,
+            } => {
+                // set up to track node issue if no response in THRESHOLD_TIME
+                // TODO: how to determine that time?
+                // TODO: don't use arbitrary time here. (But 3s is very realistic here under normal load)
+                let response =
+                    match tokio::time::timeout(tokio::time::Duration::from_secs(3), async {
+                        self.comm
+                            .send_out_bytes_to_peer_and_return_response(
+                                target,
+                                msg_id,
+                                bytes_to_adult,
+                            )
+                            .await
+                    })
+                    .await
+                    {
+                        Ok(resp) => resp,
+                        Err(_elapsed) => {
+                            error!(
+                            "No response before arbitrary timeout. Marking adult as dysfunctional"
+                        );
+                            return Ok(vec![Cmd::TrackNodeIssueInDysfunction {
+                                name: target.name(),
+                                // TODO: no need for op id tracking here, this can be a simple counter
+                                issue: sn_dysfunction::IssueType::PendingRequestOperation(
+                                    operation_id,
+                                ),
+                            }]);
+                        }
+                    }?;
+
+                if let sn_interface::messaging::MsgType::Node {
+                    msg:
+                        sn_interface::messaging::system::NodeMsg::NodeQueryResponse { response, .. },
+                    ..
+                } = response.into_msg()?
+                {
+                    let client_msg = sn_interface::messaging::data::ClientMsg::QueryResponse {
+                        response,
+                        correlation_id: msg_id,
+                    };
+
+                    let node = self.node.read().await;
+                    let (kind, payload) = node.serialize_sign_client_msg(client_msg)?;
+
+                    if let Some(stream) = client_response_stream {
+                        node.send_msg_on_stream(payload, kind, stream, target, msg_id, traceroute)
+                            .await?
+                    } else {
+                        warn!("No send stream to respond to client on! (This is likely due to the msg originating at the elder as a healthcheck");
+                    }
+                }
+
+                Ok(vec![])
+            }
             Cmd::SendMsg {
                 msg,
                 msg_id,
@@ -68,11 +133,10 @@ impl Dispatcher {
                     )?
                 };
 
-                let comm = self.node.read().await.comm.clone();
-
-                let tasks = peer_msgs
-                    .into_iter()
-                    .map(|(peer, msg)| comm.send_out_bytes(peer, msg_id, msg, send_stream.clone()));
+                let tasks = peer_msgs.into_iter().map(|(peer, msg)| {
+                    self.comm
+                        .send_out_bytes(peer, msg_id, msg, send_stream.clone())
+                });
                 let results = futures::future::join_all(tasks).await;
 
                 // Any failed sends are tracked via Cmd::HandlePeerFailedSend, which will log dysfunction for any peers
@@ -157,6 +221,7 @@ impl Dispatcher {
                     msg_id,
                     msg,
                     origin,
+                    &self.comm,
                     send_stream,
                     #[cfg(feature = "traceroute")]
                     traceroute.clone(),

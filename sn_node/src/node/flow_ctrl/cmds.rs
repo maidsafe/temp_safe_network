@@ -11,7 +11,7 @@ use crate::node::{
     Proposal, XorName,
 };
 
-use qp2p::SendStream;
+use qp2p::{SendStream, UsrMsgBytes};
 use sn_consensus::Decision;
 use sn_dysfunction::IssueType;
 #[cfg(feature = "traceroute")]
@@ -19,7 +19,7 @@ use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         data::ClientMsg,
-        system::{NodeMsg, SectionSig, SectionSigned},
+        system::{NodeMsg, OperationId, SectionSig, SectionSigned},
         AuthorityProof, ClientAuth, MsgId, WireMsg,
     },
     network_knowledge::{NodeState, SectionAuthorityProvider, SectionKeyShare, SectionsDAG},
@@ -56,6 +56,15 @@ pub(crate) struct CmdJob {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub(crate) enum Cmd {
+    SendToAdultsAndReturnToClient {
+        msg_id: MsgId,
+        operation_id: OperationId,
+        target: Peer,
+        bytes_to_adult: UsrMsgBytes,
+        client_response_stream: Option<Arc<Mutex<SendStream>>>,
+        #[cfg(feature = "traceroute")]
+        traceroute: Traceroute,
+    },
     /// Validate `wire_msg` from `sender`.
     /// Holding the WireMsg that has been received from the network,
     ValidateMsg {
@@ -169,6 +178,7 @@ impl Cmd {
     pub(crate) fn statemap_state(&self) -> sn_interface::statemap::State {
         use sn_interface::statemap::State;
         match self {
+            Cmd::SendToAdultsAndReturnToClient { .. } => State::Comms,
             Cmd::SendMsg { .. } => State::Comms,
             Cmd::HandleFailedSendToNode { .. } => State::Comms,
             Cmd::ValidateMsg { .. } => State::Validation,
@@ -188,6 +198,13 @@ impl Cmd {
 impl fmt::Display for Cmd {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Cmd::SendToAdultsAndReturnToClient { msg_id, target, .. } => {
+                write!(
+                    f,
+                    "SendToAdultsAndReturnToClient {:?}: {:?}",
+                    msg_id, target
+                )
+            }
             #[cfg(not(feature = "test-utils"))]
             Cmd::ValidateMsg { wire_msg, .. } => {
                 write!(f, "ValidateMsg {:?}", wire_msg.msg_id())

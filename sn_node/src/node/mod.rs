@@ -61,7 +61,6 @@ pub use qp2p::{Config as NetworkConfig, SendStream};
 pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API update
 
 mod core {
-    use crate::comm::Comm;
     use crate::{
         node::{
             bootstrap::JoiningAsRelocated,
@@ -120,7 +119,6 @@ mod core {
     }
 
     pub(crate) struct MyNode {
-        pub(crate) comm: Comm,
         pub(crate) addr: SocketAddr, // does this change? if so... when? only at node start atm?
         pub(crate) event_sender: EventSender,
         root_storage_dir: PathBuf,
@@ -155,7 +153,7 @@ mod core {
     impl MyNode {
         #[allow(clippy::too_many_arguments)]
         pub(crate) async fn new(
-            comm: Comm,
+            addr: SocketAddr,
             keypair: Arc<Keypair>,
             network_knowledge: NetworkKnowledge,
             section_key_share: Option<SectionKeyShare>,
@@ -163,7 +161,6 @@ mod core {
             used_space: UsedSpace,
             root_storage_dir: PathBuf,
         ) -> Result<Self> {
-            let addr = comm.socket_addr();
             let membership = if let Some(key) = section_key_share.clone() {
                 let n_elders = network_knowledge.signed_sap().elder_count();
 
@@ -215,7 +212,6 @@ mod core {
             };
 
             let node = Self {
-                comm,
                 addr,
                 keypair,
                 network_knowledge,

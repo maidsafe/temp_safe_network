@@ -229,7 +229,7 @@ impl MyNode {
             ClientMsg::Cmd(cmd) => cmd,
             ClientMsg::Query(query) => {
                 return self
-                    .read_data_from_adults_and_respond_to_client(
+                    .read_data_from_adults(
                         query,
                         msg_id,
                         auth,
