@@ -212,12 +212,17 @@ impl PeerSessionWorker {
                 Err(error) => {
                     error!("Error when attempting to send to peer. Job will be reenqueued for another attempt after a small timeout");
 
-                    job.connection_retries += 1;
+                    // only increment connection attempts if our connections set is empty
+                    // and so we'll be trying to create a fresh connection
+                    if link.connections.is_empty() {
+                        job.connection_retries += 1;
+                    }
+
                     job.reporter
                         .send(SendStatus::TransientError(format!("{error:?}")));
 
                     // we await here in case the connection is fresh and has not yet been added
-                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
                     if let Err(e) = queue.send(SessionCmd::Send(job)).await {
                         warn!("Failed to re-enqueue job {id:?} after failed connection retrieval error {e:?}");
                     }
@@ -258,6 +263,9 @@ impl PeerSessionWorker {
                     warn!(
                         "Transient error while attempting to send, re-enqueing job {id:?} {err:?}. Connection id was {:?}",connection_id
                     );
+
+                    // we await here in case the connection is fresh and has not yet been added
+                    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
                     job.reporter
                         .send(SendStatus::TransientError(format!("{err:?}")));
