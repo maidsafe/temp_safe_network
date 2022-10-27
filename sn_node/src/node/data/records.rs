@@ -6,19 +6,22 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{messaging::Peers, Cmd, Error, MyNode, Prefix, Result};
+use crate::node::{
+    messaging::{OutgoingMsg, Peers},
+    Cmd, Error, MyNode, Prefix, Result,
+};
 
 use bytes::Bytes;
 use itertools::Itertools;
 use qp2p::SendStream;
 #[cfg(feature = "traceroute")]
-use sn_interface::messaging::{Traceroute, WireMsg};
+use sn_interface::messaging::Traceroute;
 use sn_interface::{
     data_copy_count,
     messaging::{
         data::{DataQuery, MetadataExchange, StorageLevel},
         system::{NodeCmd, NodeMsg, NodeQuery, OperationId},
-        AuthorityProof, ClientAuth, Dst, MsgId, MsgKind,
+        AuthorityProof, ClientAuth, MsgId,
     },
     types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData},
 };
@@ -58,7 +61,7 @@ impl MyNode {
         source_client: Peer,
         client_response_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
-    ) -> Result<Vec<Cmd>> {
+    ) -> Cmd {
         // We generate the operation id to track the response from the Adult
         // by using the query msg id, which shall be unique per query.
         let operation_id = OperationId::from(&Bytes::copy_from_slice(msg_id.as_ref()));
@@ -83,18 +86,18 @@ impl MyNode {
                 found: targets.len() as u8,
             };
 
-            self.query_error_response(
-                error,
-                &query.variant,
-                source_client,
-                msg_id,
-                client_response_stream,
-                #[cfg(feature = "traceroute")]
-                traceroute,
-            )
-            .await?;
             // TODO: do error processing
-            return Ok(vec![]);
+            return self
+                .query_error_response(
+                    error,
+                    &query.variant,
+                    source_client,
+                    msg_id,
+                    client_response_stream,
+                    #[cfg(feature = "traceroute")]
+                    traceroute,
+                )
+                .await;
         };
 
         // Form a msg to our adult
@@ -104,105 +107,14 @@ impl MyNode {
             operation_id,
         });
 
-        let (kind, payload) = self.serialize_node_msg(msg)?;
-
-        let (bytes_to_adult, msg_id) = self.form_usr_msg_bytes_to_node(
-            payload,
-            kind,
-            target,
-            #[cfg(feature = "traceroute")]
-            traceroute.clone(),
-        )?;
-
-        let cmd = Cmd::SendToAdultsAndReturnToClient {
-            msg_id,
+        Cmd::SendToAdultAndReturnToClient {
             operation_id,
+            msg: OutgoingMsg::Node(msg),
             target,
-            bytes_to_adult,
             client_response_stream,
             #[cfg(feature = "traceroute")]
             traceroute,
-        };
-
-        Ok(vec![cmd])
-    }
-
-    /// Send an OutgoingMsg on a given stream
-    pub(crate) async fn send_msg_on_stream(
-        &self,
-        payload: Bytes,
-        kind: MsgKind,
-        send_stream: Arc<Mutex<SendStream>>,
-        source_peer: Peer,
-        original_msg_id: MsgId,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
-    ) -> Result<()> {
-        // TODO why do we need dst here?
-        let (bytes, _new_msg_id) = self.form_usr_msg_bytes_to_node(
-            payload,
-            kind,
-            source_peer,
-            #[cfg(feature = "traceroute")]
-            traceroute,
-        )?;
-        trace!("USING BIDI to send to client! OH DEAR, FASTEN SEATBELTS");
-        let stream_prio = 10;
-        let mut send_stream = send_stream.lock().await;
-
-        debug!("stream locked");
-        send_stream.set_priority(stream_prio);
-        if let Err(error) = send_stream.send_user_msg(bytes).await {
-            error!(
-                        "Could not send query response {original_msg_id:?} to client {source_peer:?} over response stream: {error:?}",
-
-                    );
         }
-        if let Err(error) = send_stream.finish().await {
-            error!(
-                        "Could not close response stream for {original_msg_id:?} to client {source_peer:?}: {error:?}",
-                    );
-        }
-
-        debug!("sent");
-
-        Ok(())
-    }
-
-    pub(crate) fn form_usr_msg_bytes_to_node(
-        &self,
-        payload: Bytes,
-        kind: MsgKind,
-        target: Peer,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
-    ) -> Result<(qp2p::UsrMsgBytes, MsgId)> {
-        let msg_id = MsgId::new();
-        // let (kind, payload) = self.serialize_node_msg(msg)?;
-        // we first generate the XorName
-        let dst = Dst {
-            name: target.name(),
-            section_key: self.network_knowledge().section_key(),
-        };
-
-        #[allow(unused_mut)]
-        let mut wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
-
-        // TODO: do we still need traceroute now?
-        #[cfg(feature = "traceroute")]
-        {
-            let mut traceroute = traceroute;
-            traceroute.0.push(self.identity());
-            wire_msg.append_trace(&mut traceroute);
-        }
-
-        #[cfg(feature = "test-utils")]
-        let wire_msg = wire_msg.set_payload_debug(msg);
-
-        Ok((
-            wire_msg
-                .serialize_and_cache_bytes()
-                .map_err(|_| Error::InvalidMessage)?,
-            msg_id,
-        ))
     }
 
     pub(crate) fn get_metadata_of(&self, prefix: &Prefix) -> MetadataExchange {

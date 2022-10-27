@@ -11,7 +11,7 @@ use crate::node::{
     Proposal, XorName,
 };
 
-use qp2p::{SendStream, UsrMsgBytes};
+use qp2p::SendStream;
 use sn_consensus::Decision;
 use sn_dysfunction::IssueType;
 #[cfg(feature = "traceroute")]
@@ -56,11 +56,10 @@ pub(crate) struct CmdJob {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub(crate) enum Cmd {
-    SendToAdultsAndReturnToClient {
-        msg_id: MsgId,
+    SendToAdultAndReturnToClient {
         operation_id: OperationId,
+        msg: OutgoingMsg,
         target: Peer,
-        bytes_to_adult: UsrMsgBytes,
         client_response_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")]
         traceroute: Traceroute,
@@ -143,7 +142,7 @@ impl Cmd {
         )
     }
 
-    pub(crate) fn send_msg_via_response_stream(
+    pub(crate) fn send_msg_via_stream(
         msg: OutgoingMsg,
         recipients: Peers,
         send_stream: Option<Arc<Mutex<SendStream>>>,
@@ -155,6 +154,22 @@ impl Cmd {
             send_stream,
             #[cfg(feature = "traceroute")]
             traceroute: Traceroute(vec![]),
+        }
+    }
+
+    pub(crate) fn send_traced_msg_via_stream(
+        msg: OutgoingMsg,
+        recipients: Peers,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
+    ) -> Self {
+        Cmd::SendMsg {
+            msg,
+            msg_id: MsgId::new(),
+            recipients,
+            send_stream,
+            #[cfg(feature = "traceroute")]
+            traceroute,
         }
     }
 
@@ -178,7 +193,7 @@ impl Cmd {
     pub(crate) fn statemap_state(&self) -> sn_interface::statemap::State {
         use sn_interface::statemap::State;
         match self {
-            Cmd::SendToAdultsAndReturnToClient { .. } => State::Comms,
+            Cmd::SendToAdultAndReturnToClient { .. } => State::Comms,
             Cmd::SendMsg { .. } => State::Comms,
             Cmd::HandleFailedSendToNode { .. } => State::Comms,
             Cmd::ValidateMsg { .. } => State::Validation,
@@ -198,11 +213,16 @@ impl Cmd {
 impl fmt::Display for Cmd {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Cmd::SendToAdultsAndReturnToClient { msg_id, target, .. } => {
+            Cmd::SendToAdultAndReturnToClient {
+                operation_id,
+                target,
+                msg,
+                ..
+            } => {
                 write!(
                     f,
-                    "SendToAdultsAndReturnToClient {:?}: {:?}",
-                    msg_id, target
+                    "SendToAdultsAndReturnToClient {:?}: {:?}, {:?}",
+                    operation_id, target, msg
                 )
             }
             #[cfg(not(feature = "test-utils"))]

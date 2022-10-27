@@ -73,29 +73,19 @@ impl MyNode {
         correlation_id: MsgId,
         send_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
-    ) -> Result<()> {
+    ) -> Cmd {
         let the_error_msg = ClientMsg::QueryResponse {
             response: query.to_error_response(error.into()),
             correlation_id,
         };
 
-        let (kind, payload) = self.serialize_sign_client_msg(the_error_msg)?;
-
-        if let Some(stream) = send_stream {
-            self.send_msg_on_stream(
-                payload,
-                kind,
-                stream,
-                source_peer,
-                correlation_id,
-                #[cfg(feature = "traceroute")]
-                traceroute,
-            )
-            .await?
-        } else {
-            error!("no client stream to respond to for query error");
-        }
-        Ok(())
+        self.send_client_msg(
+            the_error_msg,
+            Peers::Single(source_peer),
+            send_stream,
+            #[cfg(feature = "traceroute")]
+            traceroute,
+        )
     }
 
     /// Forms a `CmdError` msg to send back to the client
@@ -156,7 +146,7 @@ impl MyNode {
         requesting_elder: Peer,
         send_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
-    ) -> Result<()> {
+    ) -> Cmd {
         let response = self
             .data_storage
             .query(query, User::Key(auth.public_key))
@@ -168,39 +158,13 @@ impl MyNode {
             operation_id,
         };
 
-        let (kind, payload) = self.serialize_node_msg(msg)?;
-
-        let (bytes, msg_id) = self.form_usr_msg_bytes_to_node(
-            payload,
-            kind,
-            requesting_elder,
+        self.trace_system_msg_via_stream(
+            msg,
+            Peers::Single(requesting_elder),
+            send_stream,
             #[cfg(feature = "traceroute")]
             traceroute,
-        )?;
-
-        if let Some(send_stream) = send_stream {
-            // send response on the stream
-            debug!("SEND STREAM EXISTSSSS for adult response");
-            // let _handle = tokio::spawn(async move {
-            trace!("USING BIDI! OH DEAR, FASTEN SEATBELTS");
-            let stream_prio = 10;
-            let mut send_stream = send_stream.lock().await;
-            send_stream.set_priority(stream_prio);
-            if let Err(error) = send_stream.send_user_msg(bytes).await {
-                error!(
-                    "Could not send msg {:?} over response stream: {error:?}",
-                    msg_id
-                );
-            }
-            if let Err(error) = send_stream.finish().await {
-                error!(
-                    "Could not close response stream for {:?}: {error:?}",
-                    msg_id
-                );
-            }
-        }
-
-        Ok(())
+        )
     }
 
     /// Handle incoming client msgs. Though NOT queries, as this requires
@@ -213,9 +177,9 @@ impl MyNode {
         origin: Peer,
         send_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
-    ) -> Result<Vec<Cmd>> {
+    ) -> Vec<Cmd> {
         if !self.is_elder() {
-            return Ok(vec![]);
+            return vec![];
         }
 
         trace!(
@@ -228,8 +192,8 @@ impl MyNode {
         let cmd = match msg {
             ClientMsg::Cmd(cmd) => cmd,
             ClientMsg::Query(query) => {
-                return self
-                    .read_data_from_adults(
+                return vec![
+                    self.read_data_from_adults(
                         query,
                         msg_id,
                         auth,
@@ -238,14 +202,15 @@ impl MyNode {
                         #[cfg(feature = "traceroute")]
                         traceroute,
                     )
-                    .await
+                    .await,
+                ];
             }
             _ => {
                 warn!(
                     "!!!! Unexpected ClientMsg received, and it was not handled: {:?}",
                     msg
                 );
-                return Ok(vec![]);
+                return vec![];
             }
         };
 
@@ -287,7 +252,7 @@ impl MyNode {
                         #[cfg(feature = "traceroute")]
                         traceroute,
                     };
-                    return Ok(vec![update_command]);
+                    return vec![update_command];
                 }
                 self.extract_contents_as_replicated_data(cmd)
             }
@@ -306,13 +271,12 @@ impl MyNode {
                     #[cfg(feature = "traceroute")]
                     traceroute,
                 );
-                return Ok(vec![cmd]);
+                return vec![cmd];
             }
         };
 
         trace!("{:?}: {:?}", LogMarker::DataStoreReceivedAtElder, data);
 
-        let mut cmds = vec![];
         let targets = self.target_data_holders(data.name());
 
         // make sure the expected replication factor is achieved
@@ -334,27 +298,26 @@ impl MyNode {
                 #[cfg(feature = "traceroute")]
                 traceroute,
             );
-            return Ok(vec![cmd]);
+            return vec![cmd];
         }
 
-        // the replication msg sent to adults
-        cmds.push(self.replicate_data(
-            data,
-            targets,
-            #[cfg(feature = "traceroute")]
-            traceroute.clone(),
-        ));
-
-        // the ack sent to client
-        cmds.push(self.send_cmd_ack(
-            origin,
-            msg_id,
-            send_stream,
-            #[cfg(feature = "traceroute")]
-            traceroute,
-        ));
-
-        Ok(cmds)
+        vec![
+            // the replication msg sent to adults
+            self.replicate_data(
+                data,
+                targets,
+                #[cfg(feature = "traceroute")]
+                traceroute.clone(),
+            ),
+            // the ack sent to client
+            self.send_cmd_ack(
+                origin,
+                msg_id,
+                send_stream,
+                #[cfg(feature = "traceroute")]
+                traceroute,
+            ),
+        ]
     }
 
     // helper to extract the contents of the cmd as ReplicatedData

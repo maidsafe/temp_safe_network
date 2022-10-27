@@ -44,17 +44,30 @@ impl Dispatcher {
     /// Handles a single cmd.
     pub(crate) async fn process_cmd(&self, cmd: Cmd) -> Result<Vec<Cmd>> {
         trace!("doing actual processing cmd: {cmd:?}");
-
         match cmd {
-            Cmd::SendToAdultsAndReturnToClient {
-                msg_id,
+            Cmd::SendToAdultAndReturnToClient {
                 operation_id,
+                msg,
                 target,
-                bytes_to_adult,
                 client_response_stream,
                 #[cfg(feature = "traceroute")]
                 traceroute,
             } => {
+                let msg_id = MsgId::new();
+                let (_, bytes_to_adult) = {
+                    let node = self.node.read().await;
+                    into_msg_bytes(
+                        &node,
+                        msg,
+                        msg_id,
+                        Peers::Single(target),
+                        #[cfg(feature = "traceroute")]
+                        traceroute.clone(),
+                    )?
+                    .into_iter()
+                    .next()
+                    .expect("FIXME: This is a temporary unwrap!")
+                };
                 // set up to track node issue if no response in THRESHOLD_TIME
                 // TODO: how to determine that time?
                 // TODO: don't use arbitrary time here. (But 3s is very realistic here under normal load)
@@ -85,29 +98,22 @@ impl Dispatcher {
                         }
                     }?;
 
-                if let sn_interface::messaging::MsgType::Node {
-                    msg:
-                        sn_interface::messaging::system::NodeMsg::NodeQueryResponse { response, .. },
-                    ..
-                } = response.into_msg()?
-                {
+                if let Some(response) = extract_query_response(response) {
                     let client_msg = sn_interface::messaging::data::ClientMsg::QueryResponse {
                         response,
                         correlation_id: msg_id,
                     };
-
-                    let node = self.node.read().await;
-                    let (kind, payload) = node.serialize_sign_client_msg(client_msg)?;
-
-                    if let Some(stream) = client_response_stream {
-                        node.send_msg_on_stream(payload, kind, stream, target, msg_id, traceroute)
-                            .await?
-                    } else {
-                        warn!("No send stream to respond to client on! (This is likely due to the msg originating at the elder as a healthcheck");
-                    }
+                    Ok(vec![Cmd::SendMsg {
+                        msg: OutgoingMsg::Client(client_msg),
+                        msg_id,
+                        recipients: Peers::Single(target),
+                        send_stream: client_response_stream,
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
+                    }])
+                } else {
+                    Ok(vec![])
                 }
-
-                Ok(vec![])
             }
             Cmd::SendMsg {
                 msg,
@@ -196,16 +202,17 @@ impl Dispatcher {
                 let node = self.node.read().await;
 
                 debug!("Network knowledge was updated: {updated}");
-                node.handle_valid_client_msg(
-                    msg_id,
-                    msg,
-                    auth,
-                    origin,
-                    send_stream,
-                    #[cfg(feature = "traceroute")]
-                    traceroute,
-                )
-                .await
+                Ok(node
+                    .handle_valid_client_msg(
+                        msg_id,
+                        msg,
+                        auth,
+                        origin,
+                        send_stream,
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
+                    )
+                    .await)
             }
             Cmd::HandleValidNodeMsg {
                 origin,
@@ -286,6 +293,20 @@ impl Dispatcher {
     }
 }
 
+fn extract_query_response(
+    response: WireMsg,
+) -> Option<sn_interface::messaging::data::QueryResponse> {
+    if let Ok(sn_interface::messaging::MsgType::Node {
+        msg: sn_interface::messaging::system::NodeMsg::NodeQueryResponse { response, .. },
+        ..
+    }) = response.into_msg()
+    {
+        Some(response)
+    } else {
+        None
+    }
+}
+
 // Serializes and signs the msg if it's a Client message,
 // and produces one [`WireMsg`] instance per recipient -
 // the last step before passing it over to comms module.
@@ -331,7 +352,7 @@ fn into_msg_bytes(
     for peer in recipients {
         match node.network_knowledge.generate_dst(&peer.name()) {
             Ok(dst) => {
-                // TODO log errror here isntead of throwing
+                // TODO log error here instead of throwing
                 let all_the_bytes = initial_wire_msg.serialize_with_new_dst(&dst)?;
                 msgs.push((peer, all_the_bytes));
             }

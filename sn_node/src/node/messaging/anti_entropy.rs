@@ -345,7 +345,7 @@ impl MyNode {
 
                     // client response, so send it over stream
                     if send_stream.is_some() {
-                        return Ok(Some(Cmd::send_msg_via_response_stream(
+                        return Ok(Some(Cmd::send_msg_via_stream(
                             OutgoingMsg::Node(ae_msg),
                             Peers::Single(*sender),
                             send_stream,
@@ -394,7 +394,7 @@ impl MyNode {
 
         // client response, so send it over stream
         if send_stream.is_some() {
-            Ok(Some(Cmd::send_msg_via_response_stream(
+            Ok(Some(Cmd::send_msg_via_stream(
                 OutgoingMsg::Node(ae_msg),
                 Peers::Single(*sender),
                 send_stream,

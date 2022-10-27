@@ -126,22 +126,6 @@ impl MyNode {
                 // if it's otherwise a response for a client we shall skip drop it.
                 let dst_name = match &msg {
                     ClientMsg::Cmd(cmd) => cmd.dst_name(),
-                    // ClientMsg::Query(query)
-                    //     if self.pending_data_queries.len() > DATA_QUERY_LIMIT =>
-                    // {
-                    //     // we have a query, and we have too many on the go....
-                    //     warn!("Pending queries length exceeded, dropping query {msg:?}");
-                    //     let cmd = self.query_error_response(
-                    //         Error::CannotHandleQuery(query.clone()),
-                    //         &query.variant,
-                    //         origin,
-                    //         msg_id,
-                    //         send_stream,
-                    //         #[cfg(feature = "traceroute")]
-                    //         wire_msg.traceroute(),
-                    //     );
-                    //     return Ok(vec![cmd]);
-                    // }
                     ClientMsg::Query(query) => query.variant.dst_name(),
                     other => {
                         error!(
@@ -167,16 +151,17 @@ impl MyNode {
                     return Ok(vec![cmd]);
                 }
 
-                self.handle_valid_client_msg(
-                    msg_id,
-                    msg,
-                    auth,
-                    origin,
-                    send_stream.clone(),
-                    #[cfg(feature = "traceroute")]
-                    wire_msg.traceroute(),
-                )
-                .await
+                Ok(self
+                    .handle_valid_client_msg(
+                        msg_id,
+                        msg,
+                        auth,
+                        origin,
+                        send_stream.clone(),
+                        #[cfg(feature = "traceroute")]
+                        wire_msg.traceroute(),
+                    )
+                    .await)
             }
         }
     }

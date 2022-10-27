@@ -67,6 +67,24 @@ impl MyNode {
         )
     }
 
+    /// Send a (`NodeMsg`) message to a node
+    pub(crate) fn trace_system_msg_via_stream(
+        &self,
+        msg: NodeMsg,
+        recipients: Peers,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
+    ) -> Cmd {
+        trace!("{}: {:?}", LogMarker::SendToNodes, msg);
+        Cmd::send_traced_msg_via_stream(
+            OutgoingMsg::Node(msg),
+            recipients,
+            send_stream,
+            #[cfg(feature = "traceroute")]
+            traceroute,
+        )
+    }
+
     // Handler for data messages which have successfully
     // passed all signature checks and msg verifications
     pub(crate) async fn handle_valid_system_msg(
@@ -468,17 +486,18 @@ impl MyNode {
                     msg_id, operation_id
                 );
 
-                node.handle_data_query_at_adult(
-                    operation_id,
-                    &query,
-                    auth,
-                    sender,
-                    send_stream,
-                    #[cfg(feature = "traceroute")]
-                    traceroute,
-                )
-                .await?;
-                Ok(vec![])
+                Ok(vec![
+                    node.handle_data_query_at_adult(
+                        operation_id,
+                        &query,
+                        auth,
+                        sender,
+                        send_stream,
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
+                    )
+                    .await,
+                ])
             }
             // TODO: refactor msging to lose this type.
             NodeMsg::NodeQueryResponse { operation_id, .. } => {
