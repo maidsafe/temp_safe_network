@@ -97,6 +97,8 @@ impl Link {
                     // Timeouts etc should register instantly so we should clean those up fair fast
                     let _ = connections.remove(id);
                 }
+
+                debug!("Connection remove from link: {id:?}");
                 // dont close just let the conn timeout incase msgs are coming in...
                 // it's removed from out Peer tracking, so wont be used again for sending.
                 Err(SendToOneError::Send(error))
