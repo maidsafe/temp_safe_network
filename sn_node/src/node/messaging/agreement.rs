@@ -30,8 +30,8 @@ impl MyNode {
             Proposal::VoteNodeOffline(node_state) => {
                 cmds.extend(self.handle_offline_agreement(node_state, sig))
             }
-            Proposal::SectionInfo(sap) => {
-                cmds.extend(self.handle_section_info_agreement(sap, sig).await?)
+            Proposal::RequestHandover(sap) => {
+                cmds.extend(self.handle_request_handover_agreement(sap, sig).await?)
             }
             Proposal::NewElders(_) => {
                 error!("Elders agreement should be handled in a separate blocking fashion");
@@ -53,7 +53,7 @@ impl MyNode {
     }
 
     #[instrument(skip(self), level = "trace")]
-    async fn handle_section_info_agreement(
+    async fn handle_request_handover_agreement(
         &mut self,
         sap: SectionAuthorityProvider,
         sig: SectionSig,
@@ -67,7 +67,7 @@ impl MyNode {
             // Other section. We shouln't be receiving or updating a SAP for
             // a remote section here, that is done with a AE msg response.
             debug!(
-                "Ignoring Proposal::SectionInfo since prefix doesn't match ours: {:?}",
+                "Ignoring Proposal::RequestHandover since prefix doesn't match ours: {:?}",
                 sap
             );
             return Ok(vec![]);
