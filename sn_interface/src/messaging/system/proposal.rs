@@ -6,25 +6,36 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::Result;
-
-use sn_interface::{
-    messaging::system::{Proposal as ProposalMsg, SectionSigShare, SectionSigned},
+use crate::{
+    messaging::system::{SectionSigShare, SectionSigned},
+    messaging::{Error, Result},
     network_knowledge::{NodeState, SectionAuthorityProvider},
 };
 
+use serde::{Deserialize, Serialize};
+
+/// A Proposal about the state of the network
+/// This can be a result of seeing a node come online, go offline, changes to section info etc.
+/// Anything where we need section authority before action can be taken
+/// Proposals sent by elders or elder candidates, to elders or elder candidates
 #[allow(clippy::large_enum_variant)]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) enum Proposal {
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum Proposal {
+    /// Proposal to remove a node from our section (elder->elder)
     VoteNodeOffline(NodeState),
-    SectionInfo(SectionAuthorityProvider),
+    /// After DKG, elder candidates request handover with this Proposal to the current elders
+    /// by submitting their new SAP (candidates->elder)
+    RequestHandover(SectionAuthorityProvider),
+    /// After Handover consensus, the elders inform the candidates that they are promoted (elder->candidates)
+    /// Contains the candidate's SAP signed by the current elder's section key
     NewElders(SectionSigned<SectionAuthorityProvider>),
+    /// Proposal to change whether new nodes are allowed to join our section (elder->elder)
     JoinsAllowed(bool),
 }
 
 impl Proposal {
     /// Create `SigShare` for this proposal.
-    pub(crate) fn sign_with_key_share(
+    pub fn sign_with_key_share(
         &self,
         public_key_set: bls::PublicKeySet,
         index: usize,
@@ -38,31 +49,27 @@ impl Proposal {
         ))
     }
 
-    pub(crate) fn as_signable_bytes(&self) -> Result<Vec<u8>> {
-        Ok(match self {
+    pub fn as_signable_bytes(&self) -> Result<Vec<u8>> {
+        let bytes = match self {
             Self::VoteNodeOffline(node_state) => bincode::serialize(node_state),
-            Self::SectionInfo(sap) => bincode::serialize(sap),
+            Self::RequestHandover(sap) => bincode::serialize(sap),
             Self::NewElders(info) => bincode::serialize(&info.sig.public_key), // the pub key of the new elders
             Self::JoinsAllowed(joins_allowed) => bincode::serialize(&joins_allowed),
-        }?)
-    }
-
-    // Add conversion methods to/from `messaging::...::Proposal`
-    // We prefer this over `From<...>` to make it easier to read the conversion.
-    pub(crate) fn into_msg(self) -> ProposalMsg {
-        match self {
-            Self::VoteNodeOffline(node_state) => ProposalMsg::VoteNodeOffline(node_state),
-            Self::SectionInfo(sap) => ProposalMsg::SectionInfo(sap),
-            Self::NewElders(sap) => ProposalMsg::NewElders(sap),
-            Self::JoinsAllowed(allowed) => ProposalMsg::JoinsAllowed(allowed),
         }
+        .map_err(|err| {
+            Error::Serialisation(format!(
+                "Couldn't serialise the Proposal '{:?}': {:?}",
+                self, err
+            ))
+        })?;
+        Ok(bytes)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sn_interface::network_knowledge::test_utils::random_sap;
+    use crate::network_knowledge::test_utils::random_sap;
 
     use eyre::Result;
     use serde::Serialize;
@@ -71,16 +78,16 @@ mod tests {
 
     #[test]
     fn serialize_for_signing() -> Result<()> {
-        // Proposal::SectionInfo
+        // Proposal::RequestHandover
         let (section_auth, _, _) = random_sap(Prefix::default(), 4, 0, None);
-        let proposal = Proposal::SectionInfo(section_auth.clone());
+        let proposal = Proposal::RequestHandover(section_auth.clone());
         verify_serialize_for_signing(&proposal, &section_auth)?;
 
         // Proposal::NewElders
         let new_sk = bls::SecretKey::random();
         let new_pk = new_sk.public_key();
         let section_signed_auth =
-            sn_interface::network_knowledge::test_utils::section_signed(&new_sk, section_auth)?;
+            crate::network_knowledge::test_utils::section_signed(&new_sk, section_auth)?;
         let proposal = Proposal::NewElders(section_signed_auth);
         verify_serialize_for_signing(&proposal, &new_pk)?;
 

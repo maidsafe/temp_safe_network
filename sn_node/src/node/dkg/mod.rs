@@ -26,10 +26,15 @@ use std::sync::Arc;
 use std::time::Instant;
 use xor_name::XorName;
 
+/// A mapping of DKG participant XorName to their ephemeral bls public key along
+/// with their ed signature over it as proof that we can trust it
 pub(crate) type DkgPubKeys = BTreeMap<XorName, (BlsPublicKey, Signature)>;
 
+/// Ephemeral bls keys used for a single DKG session
 pub(crate) struct DkgEphemeralKeys {
+    /// our own generated secret key
     secret_key: BlsSecretKey,
+    /// the pub keys of other participants
     pub_keys: DkgPubKeys,
 }
 

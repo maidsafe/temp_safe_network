@@ -780,7 +780,7 @@ impl MyNode {
         } else {
             // This proposal is sent to the current set of elders to be aggregated
             // and section signed.
-            let proposal = Proposal::SectionInfo(sap);
+            let proposal = Proposal::RequestHandover(sap);
             let recipients: Vec<_> = self.network_knowledge.section_auth().elders_vec();
             self.send_proposal_with(recipients, proposal, &key_share)
         }

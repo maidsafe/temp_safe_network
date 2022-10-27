@@ -58,7 +58,7 @@ impl MyNode {
 
         // Broadcast the proposal to the rest of the section elders.
         let msg = NodeMsg::Propose {
-            proposal: proposal.clone().into_msg(),
+            proposal: proposal.clone(),
             sig_share: sig_share.clone(),
         };
 
@@ -99,7 +99,7 @@ impl MyNode {
         let sig_share_pk = &sig_share.public_key_set.public_key();
         let our_prefix = self.network_knowledge.prefix();
         // Any other proposal than SectionInfo needs to be signed by a known section key.
-        if let Proposal::SectionInfo(sap) = &proposal {
+        if let Proposal::RequestHandover(sap) = &proposal {
             if sap.prefix() == our_prefix || sap.prefix().is_extension_of(&our_prefix) {
                 // This `SectionInfo` is proposed by the DKG participants and
                 // it's signed by the new key created by the DKG so we don't
