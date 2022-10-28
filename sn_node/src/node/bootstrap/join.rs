@@ -542,7 +542,7 @@ mod tests {
         let state = Joiner::new(node.clone(), send_tx, &mut recv_rx, tree);
 
         // Create the bootstrap task, but don't run it yet.
-        let bootstrap = async move { state.try_join(join_timeout).await.map_err(Error::from) };
+        let bootstrap = async { state.try_join(join_timeout).await.map_err(Error::from) };
 
         let (next_sap, next_sk_set, next_elders, _) =
             TestSapBuilder::new(Prefix::default()).build();
@@ -557,37 +557,35 @@ mod tests {
         // Create the task that executes the body of the test, but don't run it either.
         let others = async {
             // Receive JoinRequest
-            let (wire_msg, recipients) = send_rx
-                .recv()
-                .await
-                .ok_or_else(|| eyre!("JoinRequest was not received"))?;
-
+            let (wire_msg, recipients) = send_rx.recv().await.expect("Expected join message");
             itertools::assert_equal(recipients, genesis_sap.elders());
+            let node_msg =
+                assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node { msg, .. }) => msg);
+            assert_matches!(node_msg, NodeMsg::AntiEntropyProbe(_));
 
-            let node_msg = assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node { msg, .. }) =>
-                msg);
-
+            let (wire_msg, recipients) = send_rx.recv().await.expect("Expected join message");
+            itertools::assert_equal(recipients, genesis_sap.elders());
+            let node_msg =
+                assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node { msg, .. }) => msg);
             assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest { .. }));
 
             // Send JoinResponse::Retry with new SAP
             let other_elders: Vec<&MyNodeInfo> =
                 next_elders.iter().take(2 * elder_count() / 3).collect_vec();
             for elder in other_elders.iter() {
-                send_response(
+                send_join_response(
                     &recv_tx,
                     JoinResponse::Retry {
                         section_tree_update: section_tree_update.clone(),
                     },
                     elder,
                     next_sap.section_key(),
-                )?;
+                );
             }
 
             // Receive the second JoinRequest with correct section info
-            let (wire_msg, recipients) = send_rx
-                .recv()
-                .await
-                .ok_or_else(|| eyre!("JoinRequest was not received"))?;
+            let (wire_msg, recipients) =
+                send_rx.recv().await.expect("JoinRequest was not received");
             let (node_msg, dst) = assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node { msg, dst,.. }) =>
                 (msg, dst));
 
@@ -601,7 +599,7 @@ mod tests {
             let new_peer = Peer::new(dst.name, node.peer().addr());
             // Send JoinResponse::Approved
             let decision = section_decision(&next_sk_set, NodeState::joined(new_peer, None));
-            send_response(
+            send_join_response(
                 &recv_tx,
                 JoinResponse::Approved {
                     section_tree_update,
@@ -609,7 +607,7 @@ mod tests {
                 },
                 &next_elders[0],
                 next_sap.section_key(),
-            )?;
+            );
 
             Ok(())
         };
@@ -664,12 +662,12 @@ mod tests {
             // Send JoinResponse::Redirect
             let (new_sap, ..) = TestSapBuilder::new(Prefix::default()).build();
 
-            send_response(
+            send_join_response(
                 &recv_tx,
                 JoinResponse::Redirect(new_sap.clone()),
                 &genesis_nodes[0],
                 new_sap.section_key(),
-            )?;
+            );
 
             task::yield_now().await;
 
@@ -739,7 +737,7 @@ mod tests {
             let (new_sap, new_sk_set, ..) = TestSapBuilder::new(Prefix::default()).build();
             let new_pk_set = new_sk_set.public_keys();
 
-            send_response(
+            send_join_response(
                 &recv_tx,
                 JoinResponse::Redirect(SectionAuthorityProvider::new(
                     BTreeSet::new(),
@@ -750,15 +748,15 @@ mod tests {
                 )),
                 &genesis_nodes[0],
                 new_sap.section_key(),
-            )?;
+            );
             task::yield_now().await;
 
-            send_response(
+            send_join_response(
                 &recv_tx,
                 JoinResponse::Redirect(new_sap.clone()),
                 &genesis_nodes[0],
                 new_sap.section_key(),
-            )?;
+            );
             task::yield_now().await;
 
             let (wire_msg, _) = send_rx
@@ -813,12 +811,12 @@ mod tests {
             assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node { msg, .. }) =>
                                 assert_matches!(msg, NodeMsg::JoinRequest{..}));
 
-            send_response(
+            send_join_response(
                 &recv_tx,
                 JoinResponse::Rejected(JoinRejectionReason::JoinsDisallowed),
                 &genesis_nodes[0],
                 genesis_sap.section_key(),
-            )?;
+            );
 
             Ok(())
         };
@@ -881,14 +879,14 @@ mod tests {
                 bad_signed_sap.value = bad_sap;
                 SectionTreeUpdate::new(bad_signed_sap, proof_chain.clone())
             };
-            send_response(
+            send_join_response(
                 &recv_tx,
                 JoinResponse::Retry {
                     section_tree_update: bad_section_tree_update,
                 },
                 &genesis_nodes[0],
                 genesis_pk,
-            )?;
+            );
             task::yield_now().await;
 
             // Send `Retry` with valid update
@@ -904,14 +902,14 @@ mod tests {
             let good_elders: Vec<&MyNodeInfo> =
                 next_elders.iter().take(2 * elder_count() / 3).collect_vec();
             for elder in good_elders.iter() {
-                send_response(
+                send_join_response(
                     &recv_tx,
                     JoinResponse::Retry {
                         section_tree_update: section_tree_update.clone(),
                     },
                     elder,
                     next_section_key,
-                )?;
+                );
             }
 
             Ok(())
@@ -928,29 +926,44 @@ mod tests {
 
     // test helper
     #[instrument]
-    fn send_response(
+    fn send_join_response(
         recv_tx: &mpsc::Sender<MsgFromPeer>,
-        response: JoinResponse,
+        join_response: JoinResponse,
         bootstrap_node: &MyNodeInfo,
         section_pk: BlsPublicKey,
-    ) -> Result<()> {
+    ) {
+        send_response(
+            recv_tx,
+            NodeMsg::JoinResponse(Box::new(join_response)),
+            bootstrap_node,
+            section_pk,
+        )
+    }
+
+    // test helper
+    #[instrument]
+    fn send_response(
+        recv_tx: &mpsc::Sender<MsgFromPeer>,
+        node_msg: NodeMsg,
+        bootstrap_node: &MyNodeInfo,
+        section_pk: BlsPublicKey,
+    ) {
         let wire_msg = WireMsg::single_src(
             bootstrap_node,
             Dst {
                 name: XorName::from(PublicKey::Bls(section_pk)),
                 section_key: section_pk,
             },
-            NodeMsg::JoinResponse(Box::new(response)),
-        )?;
+            node_msg,
+        )
+        .expect("Failed to build wire msg");
 
-        debug!("wire msg built");
-
-        recv_tx.try_send(MsgFromPeer {
-            sender: bootstrap_node.peer(),
-            wire_msg,
-            send_stream: None,
-        })?;
-
-        Ok(())
+        recv_tx
+            .try_send(MsgFromPeer {
+                sender: bootstrap_node.peer(),
+                wire_msg,
+                send_stream: None,
+            })
+            .expect("Failed to send message");
     }
 }
