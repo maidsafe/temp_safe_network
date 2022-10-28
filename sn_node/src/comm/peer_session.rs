@@ -164,7 +164,6 @@ impl PeerSessionWorker {
                             }
 
                             job.reporter.send(SendStatus::Sent);
-
                         });
 
                         SessionStatus::Ok

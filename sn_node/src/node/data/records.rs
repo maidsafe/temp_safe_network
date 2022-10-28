@@ -208,7 +208,7 @@ impl MyNode {
 
         let (kind, payload) = self.serialize_node_msg(msg)?;
 
-        let bytes_to_adult= self.form_usr_msg_bytes_to_node(
+        let bytes_to_adult = self.form_usr_msg_bytes_to_node(
             payload,
             kind,
             target,
@@ -217,7 +217,7 @@ impl MyNode {
             traceroute.clone(),
         )?;
 
-            debug!("sending out {msg_id:?}");
+        debug!("sending out {msg_id:?}");
         // TODO: how to determine this time?
         // TODO: don't use arbitrary time here. (But 3s is very realistic here under normal load)
         let response = match tokio::time::timeout(tokio::time::Duration::from_secs(7), async {
@@ -279,7 +279,7 @@ impl MyNode {
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<()> {
         // TODO why do we need dst here?
-        let bytes= self.form_usr_msg_bytes_to_node(
+        let bytes = self.form_usr_msg_bytes_to_node(
             payload,
             kind,
             source_peer,
@@ -339,11 +339,9 @@ impl MyNode {
         #[cfg(feature = "test-utils")]
         let wire_msg = wire_msg.set_payload_debug(msg);
 
-        Ok(
-            wire_msg
-                .serialize_and_cache_bytes()
-                .map_err(|_| Error::InvalidMessage)?,
-        )
+        Ok(wire_msg
+            .serialize_and_cache_bytes()
+            .map_err(|_| Error::InvalidMessage)?)
     }
 
     pub(crate) fn get_metadata_of(&self, prefix: &Prefix) -> MetadataExchange {

@@ -100,7 +100,7 @@ impl Session {
         // This could be further strict to wait for ALL the Acks get received.
         // The period is expected to have AE completed, hence no extra wait is required.
         self.we_have_sufficient_acks_for_cmd(msg_id, elders.clone(), &mut resp_rx)
-        .await
+            .await
     }
 
     /// Checks for acks for a given msg.

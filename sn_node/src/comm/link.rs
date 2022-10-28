@@ -187,38 +187,38 @@ impl Link {
             trace!("Grabbing a connection from link.. {:?}", self.peer());
             // temp store for dead conn ids. We cannot remove them in a loop reading conns
             // otherwise DashMap might deadlock, so we need to do it afterwards.
-            let mut dead_conns = vec![];
+            // let mut dead_conns = vec![];
             let mut live_conn = None;
             for entry in self.connections.iter() {
                 let conn = entry.value();
                 debug!("iterating conns");
 
-                // TODO: replace this with simple connection check when available.
-                let is_connected = conn.open_bi().await.is_ok();
-                debug!("is connected?? {is_connected:?}");
+                // // TODO: replace this with simple connection check when available.
+                // let is_connected = conn.open_bi().await.is_ok();
+                // debug!("is connected?? {is_connected:?}");
 
-                // set up some cleanup
-                if !is_connected {
-                    debug!("not connected");
-                    dead_conns.push(conn.id());
-                    continue;
-                }
+                // // set up some cleanup
+                // if !is_connected {
+                //     debug!("not connected");
+                //     dead_conns.push(conn.id());
+                //     continue;
+                // }
 
                 // return the first live conn
                 live_conn = Some(conn.clone());
                 break;
             }
 
-            debug!("iterated over connss");
+            // debug!("iterated over connss: {:?}");
 
             // cleanup those dead conns
-            for dead_conn_id in dead_conns {
-                warn!(
-                    "Dead connection to {:?} being removed from link",
-                    self.peer()
-                );
-                let _conn = self.connections.remove(&dead_conn_id);
-            }
+            // for dead_conn_id in dead_conns {
+            //     warn!(
+            //         "Dead connection to {:?} being removed from link",
+            //         self.peer()
+            //     );
+            //     let _conn = self.connections.remove(&dead_conn_id);
+            // }
 
             debug!("dead conns done");
             if let Some(conn) = live_conn {
@@ -251,7 +251,8 @@ impl Link {
 
         self.insert(conn.clone());
 
-        self.listener.listen(conn.clone(), incoming_msgs);
+        self.listener
+            .listen(conn.clone(), incoming_msgs, Some(self.connections.clone()));
 
         Ok(conn)
     }

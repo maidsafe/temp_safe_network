@@ -13,10 +13,11 @@ use sn_interface::{
     types::{log_markers::LogMarker, Peer},
 };
 
+use dashmap::DashMap;
 use qp2p::ConnectionIncoming;
+use std::sync::Arc;
 use tokio::{sync::mpsc, task};
 use tracing::Instrument;
-
 #[derive(Debug)]
 pub(crate) enum ListenerEvent {
     Connected {
@@ -43,13 +44,27 @@ impl MsgListener {
     }
 
     #[tracing::instrument(skip_all)]
-    pub(crate) fn listen(&self, conn: qp2p::Connection, incoming_msgs: ConnectionIncoming) {
+    pub(crate) fn listen(
+        &self,
+        conn: qp2p::Connection,
+        incoming_msgs: ConnectionIncoming,
+        link_conns: Option<Arc<DashMap<String, qp2p::Connection>>>,
+    ) {
         let clone = self.clone();
-        let _ = task::spawn(clone.listen_internal(conn, incoming_msgs).in_current_span());
+        let _ = task::spawn(
+            clone
+                .listen_internal(conn, incoming_msgs, link_conns)
+                .in_current_span(),
+        );
     }
 
     #[tracing::instrument(skip_all)]
-    async fn listen_internal(self, conn: qp2p::Connection, mut incoming_msgs: ConnectionIncoming) {
+    async fn listen_internal(
+        self,
+        conn: qp2p::Connection,
+        mut incoming_msgs: ConnectionIncoming,
+        link_conns: Option<Arc<DashMap<String, qp2p::Connection>>>,
+    ) {
         let conn_id = conn.id();
         let remote_address = conn.remote_address();
         let mut first = true;
@@ -115,6 +130,11 @@ impl MsgListener {
             }
         }
 
+        if let Some(conns) = link_conns {
+            debug!("Connection was closed, removing from link conns: {conn_id:?}");
+
+            conns.remove(&conn_id);
+        }
         trace!(%conn_id, %remote_address, "{}", LogMarker::ConnectionClosed);
     }
 }

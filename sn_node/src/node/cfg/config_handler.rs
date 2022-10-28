@@ -127,7 +127,7 @@ pub struct Config {
     /// declaring us offline. If none is supplied we'll default to the documented constant.
     ///
     /// The interval is in milliseconds. A value of 0 disables this feature.
-    #[clap(long, default_value="3000")]
+    #[clap(long, default_value = "3000")]
     pub keep_alive_interval_msec: u32,
     /// Duration of a UPnP port mapping.
     #[clap(long)]

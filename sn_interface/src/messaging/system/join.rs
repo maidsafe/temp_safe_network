@@ -39,8 +39,6 @@ pub enum JoinResponse {
         /// The update to our NetworkKnowledge containing the current `SectionAuthorityProvider`
         /// and the section chain truncated from the section key found in the join request.
         section_tree_update: SectionTreeUpdate,
-        /// The age of the node as expected by the section.
-        expected_age: u8,
     },
     /// Response redirecting a joining peer to join a different section,
     /// containing addresses of nodes that are closer (than the recipient) to the

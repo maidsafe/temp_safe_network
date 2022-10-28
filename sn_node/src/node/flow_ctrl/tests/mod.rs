@@ -49,8 +49,7 @@ use sn_interface::{
         recommended_section_size, supermajority, test_utils::*, Error as NetworkKnowledgeError,
         MembershipState, MyNodeInfo, NetworkKnowledge, NodeState, RelocateDetails,
         SectionAuthorityProvider, SectionKeyShare, SectionKeysProvider, SectionTree,
-        SectionTreeUpdate, SectionsDAG, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE,
-        MIN_ADULT_AGE,
+        SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
     },
     types::{keyed_signed, keys::ed25519, Peer, PublicKey, ReplicatedData, SecretKeySet},
 };

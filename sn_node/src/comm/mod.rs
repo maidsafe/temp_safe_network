@@ -363,7 +363,7 @@ fn listen_for_incoming_msgs(
                 connection.id()
             );
 
-            msg_listener.listen(connection, incoming_msgs);
+            msg_listener.listen(connection, incoming_msgs, None);
         }
     });
 }
