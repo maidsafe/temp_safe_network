@@ -7,24 +7,20 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::comm::Comm;
-use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Error, MyNode, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, Result};
 
 use sn_interface::{
-    elder_count,
     messaging::system::{
         JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest,
         JoinResponse, NodeMsg,
     },
     network_knowledge::{
-        MembershipState, NodeState, SectionAuthUtils, SectionTreeUpdate, FIRST_SECTION_MAX_AGE,
-        MIN_ADULT_AGE,
+        MembershipState, NodeState, SectionAuthUtils, SectionTreeUpdate, MIN_ADULT_AGE,
     },
     types::{log_markers::LogMarker, Peer},
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;
-
-const FIRST_SECTION_MIN_ELDER_AGE: u8 = 82;
 
 // Message handling
 impl MyNode {
@@ -78,26 +74,28 @@ impl MyNode {
             ));
         }
 
-        let (is_age_invalid, expected_age) = read_locked_node.verify_joining_node_age(&peer)?;
+        let is_age_valid = read_locked_node.verify_joining_node_age(&peer);
 
-        trace!("our_prefix {our_prefix:?} expected_age {expected_age:?} is_age_invalid {is_age_invalid:?}");
+        trace!("our_prefix={our_prefix:?}, is_age_valid={is_age_valid:?}");
 
         if !section_key_matches {
             trace!("{}", LogMarker::SendJoinRetryNotCorrectKey);
             trace!("JoinRequest from {peer} doesn't have our latest section_key {our_section_key:?}, provided {provided_section_key:?}.");
         }
 
-        if is_age_invalid {
+        if !is_age_valid {
             trace!("{}", LogMarker::SendJoinRetryAgeIssue);
-            trace!("JoinRequest from {peer} (with age {}) doesn't have the expected age: {expected_age}", peer.age());
+            trace!(
+                "JoinRequest from {peer} (with age {}) has invalid age",
+                peer.age()
+            );
         }
 
-        if !section_key_matches || is_age_invalid {
+        if !section_key_matches || !is_age_valid {
             let signed_sap = read_locked_node.network_knowledge.signed_sap();
             let proof_chain = read_locked_node.network_knowledge.section_chain();
             let msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Retry {
                 section_tree_update: SectionTreeUpdate::new(signed_sap, proof_chain),
-                expected_age,
             }));
             trace!("Sending {:?} to {}", msg, peer);
             return Ok(Some(
@@ -125,52 +123,9 @@ impl MyNode {
         }
     }
 
-    pub(crate) fn verify_joining_node_age(&self, peer: &Peer) -> Result<(bool, u8)> {
-        // During the first section, nodes shall use ranged age to avoid too many nodes getting
-        // relocated at the same time. After the first section splits, nodes shall only
-        // start with an age of MIN_ADULT_AGE
-
-        if let Some(membership) = &self.membership {
-            let current_section_size = membership.current_section_members().len();
-            let our_prefix = self.network_knowledge.prefix();
-
-            // Prefix will be empty for first section
-            if our_prefix.is_empty() {
-                let elders = self.network_knowledge.elders();
-                // Forces the joining node to be younger than the youngest elder in genesis section
-                // avoiding unnecessary churn.
-
-                // Check if `elder_count()` Elders are already present
-                if elders.len() == elder_count() {
-                    // Check if the joining node is younger than the youngest elder and older than
-                    // MIN_ADULT_AGE in the first section, to avoid unnecessary churn during genesis.
-                    let mut expected_age =
-                        FIRST_SECTION_MIN_ELDER_AGE - (current_section_size as u8 * 2);
-                    if expected_age < MIN_ADULT_AGE {
-                        expected_age = MIN_ADULT_AGE
-                    }
-
-                    let is_age_invalid = peer.age() < MIN_ADULT_AGE || peer.age() > expected_age;
-
-                    Ok((is_age_invalid, expected_age))
-                } else {
-                    // Since enough elders haven't joined the first section calculate a value
-                    // within the range [FIRST_SECTION_MIN_ELDER_AGE, FIRST_SECTION_MAX_AGE].
-                    let expected_age = FIRST_SECTION_MAX_AGE - (current_section_size as u8 * 2);
-
-                    // TODO: avoid looping by ensure can only update to lower non-FIRST_SECTION_MIN_ELDER_AGE age
-                    let is_age_invalid = peer.age() != expected_age;
-                    Ok((is_age_invalid, expected_age))
-                }
-            } else {
-                // Age should be MIN_ADULT_AGE for joining nodes after genesis section.
-                let is_age_invalid = peer.age() != MIN_ADULT_AGE;
-                Ok((is_age_invalid, MIN_ADULT_AGE))
-            }
-        } else {
-            error!("No membership found, cannot guage age of joining nodes.");
-            Err(Error::NoMembershipFound)
-        }
+    pub(crate) fn verify_joining_node_age(&self, peer: &Peer) -> bool {
+        // Age should be MIN_ADULT_AGE for joining nodes.
+        peer.age() == MIN_ADULT_AGE
     }
 
     pub(crate) async fn handle_join_as_relocated_request(

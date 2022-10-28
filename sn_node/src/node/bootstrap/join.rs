@@ -25,7 +25,7 @@ use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
 use futures::future;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use tokio::{sync::mpsc, time::Duration};
 use tracing::Instrument;
 use xor_name::Prefix;
@@ -65,8 +65,7 @@ struct Joiner<'a> {
     prefix: Prefix,
     section_tree: SectionTree,
     backoff: ExponentialBackoff,
-    aggregated: bool,
-    retry_responses_cache: BTreeMap<Peer, u8>,
+    retry_responses_cache: BTreeSet<Peer>,
 }
 
 impl<'a> Joiner<'a> {
@@ -93,7 +92,6 @@ impl<'a> Joiner<'a> {
             prefix: Prefix::default(),
             section_tree,
             backoff,
-            aggregated: false,
             retry_responses_cache: Default::default(),
         }
     }
@@ -194,15 +192,13 @@ impl<'a> Joiner<'a> {
                 }
                 JoinResponse::Retry {
                     section_tree_update,
-                    expected_age,
                 } => {
                     let signed_sap = section_tree_update.signed_sap.clone();
 
                     trace!(
-                        "Joining node {:?} - {:?}/{:?} received a Retry from {}, expected_age: {expected_age}, SAP: {}, proof_chain: {:?}",
+                        "Joining node {:?} - {:?} received a Retry from {}, SAP: {}, proof_chain: {:?}",
                         self.prefix,
                         self.node.name(),
-                        self.node.age(),
                         sender.name(),
                         signed_sap.value,
                         section_tree_update.proof_chain
@@ -226,31 +222,13 @@ impl<'a> Joiner<'a> {
                         }
                     };
 
-                    if let Some(expected_age) =
-                        self.insert_retry_response(sender, expected_age, signed_sap.elders_set())
-                    {
-                        // adjust our joining age to the expected by the network
-                        trace!(
-                            "Re-generating name due to mis-matched age, current {} vs. expected {}",
-                            self.node.age(),
-                            expected_age
-                        );
-                        // The expected_age is a sequence of 98, 96, 94, 92, ...
-                        // The prefix is deduced from the age's bits.
-                        let mut cur_age = expected_age / 2;
-                        let mut new_prefix = Prefix::default();
-                        while cur_age > 0 {
-                            let push_prefix_0 = cur_age % 2 == 1;
-                            new_prefix = new_prefix.pushed(push_prefix_0);
-                            cur_age /= 2;
-                        }
-                        trace!("Name shall have the prefix of {:?}", new_prefix);
-
+                    if self.insert_retry_response(sender, signed_sap.elders_set()) {
+                        trace!("Re-generating name for retry");
                         let new_keypair =
-                            ed25519::gen_keypair(&new_prefix.range_inclusive(), expected_age);
+                            ed25519::gen_keypair(&prefix.range_inclusive(), self.node.age());
                         let new_name = ed25519::name(&new_keypair.public);
 
-                        info!("Setting Node name to {} (age {})", new_name, expected_age);
+                        info!("Setting Node name to {new_name}");
                         self.node = MyNodeInfo::new(new_keypair, self.node.addr);
                         self.retry_responses_cache = Default::default();
 
@@ -335,45 +313,15 @@ impl<'a> Joiner<'a> {
         }
     }
 
-    // The retry responses may containing different expected ages, or only having
-    // more than 1/3 of elders voted (which blocks the aggregation).
-    // So a restart with new name shall happen when: received 1/3 of elders voted
-    // And with an age of: the most expected age
-    fn insert_retry_response(
-        &mut self,
-        sender: Peer,
-        expected_age: u8,
-        elders: BTreeSet<Peer>,
-    ) -> Option<u8> {
+    // We'll restart the join process once we receive Retry responses from >1/3 of elders
+    fn insert_retry_response(&mut self, sender: Peer, elders: BTreeSet<Peer>) -> bool {
         if !elders.contains(&sender) {
             error!("Sender {sender:?} of the retry-response is not part of the elders {elders:?}");
-            return None;
+            return false;
         }
-        let _ = self.retry_responses_cache.insert(sender, expected_age);
-        let mut expected_ages: BTreeMap<u8, u8> = Default::default();
-        for (elder, expected_age) in self.retry_responses_cache.iter() {
-            if elders.contains(elder) {
-                *expected_ages.entry(*expected_age).or_insert(0) += 1;
-            }
-        }
+        let _ = self.retry_responses_cache.insert(sender);
 
-        // To avoid restarting too quick, the voted age must got supermajority votes.
-        // In case there is split votes, leave to the overall join_timeout to restart.
-        if !self.aggregated {
-            let threshold = 2 * elders.len() / 3;
-            let voted_expected_age = expected_ages
-                .iter()
-                .find(|(_age, count)| **count >= threshold as u8)
-                .map(|(age, _count)| *age)?;
-            if self.node.age() != voted_expected_age {
-                return Some(voted_expected_age);
-            }
-            trace!(
-                "No restart as current age({}) same to the expected {voted_expected_age}",
-                self.node.age()
-            );
-        }
-        None
+        self.retry_responses_cache.len() > elders.len() / 3
     }
 
     #[tracing::instrument(skip(self))]
@@ -504,7 +452,7 @@ mod tests {
         let genesis_pk = genesis_sk.public_key();
 
         let node = MyNodeInfo::new(
-            ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE + 1),
+            ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
 
@@ -550,7 +498,6 @@ mod tests {
                     &recv_tx,
                     JoinResponse::Retry {
                         section_tree_update: section_tree_update.clone(),
-                        expected_age: MIN_ADULT_AGE,
                     },
                     elder,
                     next_sap.section_key(),
@@ -857,7 +804,6 @@ mod tests {
                 &recv_tx,
                 JoinResponse::Retry {
                     section_tree_update: bad_section_tree_update,
-                    expected_age: MIN_ADULT_AGE,
                 },
                 &genesis_nodes[0],
                 genesis_pk,
@@ -879,7 +825,6 @@ mod tests {
                     &recv_tx,
                     JoinResponse::Retry {
                         section_tree_update: section_tree_update.clone(),
-                        expected_age: MIN_ADULT_AGE + 1,
                     },
                     elder,
                     next_section_key,
