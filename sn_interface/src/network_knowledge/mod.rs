@@ -17,7 +17,7 @@ mod sections_dag;
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils;
 #[cfg(any(test, feature = "test-utils"))]
-pub use section_tree::test_utils as section_tree_test_utils;
+pub use section_tree::test_utils as test_utils_st;
 
 pub use self::{
     errors::{Error, Result},

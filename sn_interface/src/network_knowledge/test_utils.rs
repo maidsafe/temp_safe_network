@@ -79,7 +79,8 @@ pub fn gen_sorted_nodes(
                 gen_addr(),
             )
         }))
-        .sorted_by_key(|node| node.name())
+        .sorted_by_key(|node| node.age())
+        .rev()
         .collect()
 }
 

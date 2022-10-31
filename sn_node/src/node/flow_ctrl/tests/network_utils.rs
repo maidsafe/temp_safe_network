@@ -28,7 +28,7 @@ pub(crate) static TEST_EVENT_CHANNEL_SIZE: usize = 20;
 /// Utility for constructing a Node with a mock network section.
 ///
 /// The purpose is to reduce test setup verbosity when unit testing things like message handlers.
-pub(crate) struct TestNodeBuilder<'a> {
+pub(crate) struct TestNodeBuilder {
     pub(crate) prefix: Prefix,
     pub(crate) elder_count: usize,
     pub(crate) adult_count: usize,
@@ -42,10 +42,10 @@ pub(crate) struct TestNodeBuilder<'a> {
     pub(crate) custom_peer: Option<Peer>,
     pub(crate) other_section_keys: Option<Vec<bls::SecretKey>>,
     pub(crate) parent_section_tree: Option<SectionTree>,
-    pub(crate) elder_age_pattern: Option<&'a [u8]>,
+    pub(crate) elder_age_pattern: Option<Vec<u8>>,
 }
 
-impl<'a> TestNodeBuilder<'a> {
+impl TestNodeBuilder {
     /// Create an instance of the builder.
     ///
     /// At the minimum a prefix for the section and an elder count value are required.
@@ -55,7 +55,7 @@ impl<'a> TestNodeBuilder<'a> {
     ///
     /// To supply different values for these, use the `adult_count` and `section_sk_threshold`
     /// functions to set them.
-    pub(crate) fn new(prefix: Prefix, elder_count: usize) -> TestNodeBuilder<'a> {
+    pub(crate) fn new(prefix: Prefix, elder_count: usize) -> TestNodeBuilder {
         let supermajority = 1 + elder_count * 2 / 3;
         let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
         Self {
@@ -77,7 +77,7 @@ impl<'a> TestNodeBuilder<'a> {
     }
 
     /// Provide a the genesis key set for the section to be created with.
-    pub(crate) fn genesis_sk_set(mut self, sk_set: bls::SecretKeySet) -> TestNodeBuilder<'a> {
+    pub(crate) fn genesis_sk_set(mut self, sk_set: bls::SecretKeySet) -> TestNodeBuilder {
         self.genesis_sk_set = Some(sk_set);
         self
     }
@@ -85,10 +85,7 @@ impl<'a> TestNodeBuilder<'a> {
     /// Provide other keys for the section chain.
     ///
     /// This list should *not* include the genesis key.
-    pub(crate) fn other_section_keys(
-        mut self,
-        other_keys: Vec<bls::SecretKey>,
-    ) -> TestNodeBuilder<'a> {
+    pub(crate) fn other_section_keys(mut self, other_keys: Vec<bls::SecretKey>) -> TestNodeBuilder {
         self.other_section_keys = Some(other_keys);
         self
     }
@@ -99,7 +96,7 @@ impl<'a> TestNodeBuilder<'a> {
     pub(crate) fn parent_section_tree(
         mut self,
         parent_section_tree: SectionTree,
-    ) -> TestNodeBuilder<'a> {
+    ) -> TestNodeBuilder {
         self.parent_section_tree = Some(parent_section_tree);
         self
     }
@@ -109,7 +106,7 @@ impl<'a> TestNodeBuilder<'a> {
     /// The default is 0.
     ///
     /// The total members for the section will be `elder_count` + `adult_count`.
-    pub(crate) fn adult_count(mut self, count: usize) -> TestNodeBuilder<'a> {
+    pub(crate) fn adult_count(mut self, count: usize) -> TestNodeBuilder {
         self.adult_count = count;
         self
     }
@@ -119,7 +116,7 @@ impl<'a> TestNodeBuilder<'a> {
     /// The default is the supermajority of the elder count, minus one.
     ///
     /// It will sometimes be necessary to set this value to 0.
-    pub(crate) fn section_sk_threshold(mut self, threshold: usize) -> TestNodeBuilder<'a> {
+    pub(crate) fn section_sk_threshold(mut self, threshold: usize) -> TestNodeBuilder {
         self.section_sk_threshold = threshold;
         self
     }
@@ -134,7 +131,7 @@ impl<'a> TestNodeBuilder<'a> {
     ///
     /// In your test, it may be desirable to control the amount of commands that would be
     /// generated.
-    pub(crate) fn data_copy_count(mut self, count: usize) -> TestNodeBuilder<'a> {
+    pub(crate) fn data_copy_count(mut self, count: usize) -> TestNodeBuilder {
         self.data_copy_count = count;
         self
     }
@@ -144,7 +141,7 @@ impl<'a> TestNodeBuilder<'a> {
     /// The event sender and receiver is a pair. If you need to access the receiver in the test,
     /// create the pair in the test setup and then pass the sender in here and then access the
     /// receiver as needed.
-    pub(crate) fn event_sender(mut self, event_sender: EventSender) -> TestNodeBuilder<'a> {
+    pub(crate) fn event_sender(mut self, event_sender: EventSender) -> TestNodeBuilder {
         self.node_event_sender = event_sender;
         self
     }
@@ -161,7 +158,7 @@ impl<'a> TestNodeBuilder<'a> {
         section: NetworkKnowledge,
         sk_set: bls::SecretKeySet,
         first_node: MyNodeInfo,
-    ) -> TestNodeBuilder<'a> {
+    ) -> TestNodeBuilder {
         self.section = Some(section);
         self.genesis_sk_set = Some(sk_set);
         self.first_node = Some(first_node);
@@ -171,7 +168,7 @@ impl<'a> TestNodeBuilder<'a> {
     /// Specify a single custom peer in the section.
     ///
     /// This may have a different age than other members in the section.
-    pub(crate) fn custom_peer(mut self, peer: Peer) -> TestNodeBuilder<'a> {
+    pub(crate) fn custom_peer(mut self, peer: Peer) -> TestNodeBuilder {
         self.custom_peer = Some(peer);
         self
     }
@@ -182,8 +179,8 @@ impl<'a> TestNodeBuilder<'a> {
     /// If age_pattern.len() == elder, then apply the respective ages to each node
     /// If age_pattern.len() < elder, then the last element's value is taken as the age for the remaining nodes.
     /// If age_pattern.len() > elder, then the extra elements after `count` are ignored.
-    pub(crate) fn elder_age_pattern(mut self, elder_age_pattern: &'a [u8]) -> TestNodeBuilder<'a> {
-        self.elder_age_pattern = Some(elder_age_pattern);
+    pub(crate) fn elder_age_pattern(mut self, elder_age_pattern: &[u8]) -> TestNodeBuilder {
+        self.elder_age_pattern = Some(Vec::from(elder_age_pattern));
         self
     }
 
@@ -206,13 +203,12 @@ impl<'a> TestNodeBuilder<'a> {
         } else {
             bls::SecretKeySet::random(self.section_sk_threshold, &mut rand::thread_rng())
         };
-
         let (sap, _) = TestSAP::random_sap_with_key(
             self.prefix,
             self.elder_count,
             self.adult_count,
             &section_key_set,
-            self.elder_age_pattern,
+            self.elder_age_pattern.as_ref().map(Vec::as_ref),
         );
         let genesis_key_set = if let Some(ref genesis_sk_set) = self.genesis_sk_set {
             genesis_sk_set.clone()
@@ -266,7 +262,7 @@ impl<'a> TestNodeBuilder<'a> {
                         self.elder_count,
                         self.adult_count,
                         &sk_set,
-                        self.elder_age_pattern,
+                        self.elder_age_pattern.as_ref().map(Vec::as_ref),
                     );
                     (sap, nodes, sk_set)
                 } else {
@@ -274,7 +270,7 @@ impl<'a> TestNodeBuilder<'a> {
                         self.prefix,
                         self.elder_count,
                         self.adult_count,
-                        self.elder_age_pattern,
+                        self.elder_age_pattern.as_ref().map(Vec::as_ref),
                         Some(self.section_sk_threshold),
                     )
                 };

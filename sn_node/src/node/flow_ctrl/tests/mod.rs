@@ -171,7 +171,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
 
             // Creates nodes where everybody has age 6 except one has 5.
             let mut nodes: Vec<_> =
-                gen_sorted_nodes(&Prefix::default(), elder_count(), 0, Some(&[6, 5]));
+                gen_sorted_nodes(&Prefix::default(), elder_count(), 0, Some(&[5, 6]));
 
             let elders = nodes.iter().map(MyNodeInfo::peer);
             let members = nodes.iter().map(|n| NodeState::joined(n.peer(), None));
