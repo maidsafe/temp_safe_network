@@ -824,12 +824,10 @@ mod tests {
     use tokio::sync::RwLock;
     use xor_name::{Prefix, XorName};
 
-    /// Simulate an entire round of dkg till termination; The dkg round just creates a new keyshare
-    /// but without any elder change (i.e., the dkg is between the same set of elders). The test
-    /// collect the `NodeMsg`s and passes them to the recipient nodes directly instead of using the
+    /// Simulate an entire round of dkg till termination; The dkg round creates a new keyshare set
+    /// without any elder change (i.e., the dkg is between the same set of elders). The test
+    /// collects the `NodeMsg`s and passes them to the recipient nodes directly instead of using the
     /// comm module.
-    /// TODO: implement elder change, i.e., a new node with higher age joins, now all 8 nodes should
-    /// handle the messages.
     #[tokio::test]
     async fn simulate_dkg_round() -> Result<()> {
         init_logger();
@@ -837,27 +835,24 @@ mod tests {
         let loc = tokio::task::LocalSet::new();
 
         loc.run_until(async {
-            let mut rng_for_seed = rand::thread_rng();
-            let seed = rng_for_seed.gen();
+            let mut rng = rand::thread_rng();
             let node_count = 7;
-            let mut rng = StdRng::seed_from_u64(seed);
             let traceroute = Traceroute(vec![]);
             let (mut node_instances, initial_sk_set) =
                 MyNodeInstance::new_instances(node_count, &mut rng).await?;
 
             // let current set of elders start the dkg round and capture the msgs that are outbound to the other nodes
-            MyNodeInstance::start_dkg(&mut node_instances).await?;
+            let _ = MyNodeInstance::start_dkg(&mut node_instances).await?;
 
             let mut new_secret_key_shares = BTreeMap::new();
             let mut done = false;
             while !done {
-                // For each of the node instances and for each of the msg in their `msg_queue`, 1) handle the msg and
-                // the cmds 2) handle the cmds 3) if the cmds produce more msgs, add them to the `msg_queue` of the
-                // respective nodes
+                // For every msg in `msg_queue` for every node instance, 1) handle the msg 2) handle the cmds
+                // 3) if the cmds produce more msgs, add them to the `msg_queue` of the respective peer
                 let mut msgs_to_other_nodes = Vec::new();
                 for mock_node in node_instances.values() {
                     let node = mock_node.node.clone();
-                    debug!("\n\n NODE: {}", node.read().await.name());
+                    info!("\n\n NODE: {}", node.read().await.name());
                     while let Some((msg_id, msg, sender)) = mock_node.msg_queue.write().await.pop()
                     {
                         let cmds = MyNode::handle_valid_system_msg(
@@ -871,7 +866,7 @@ mod tests {
                         .await?;
 
                         for cmd in cmds {
-                            debug!("Got cmd {}", cmd);
+                            info!("Got cmd {}", cmd);
                             match cmd {
                                 Cmd::SendMsg {
                                     msg,
@@ -941,21 +936,20 @@ mod tests {
                 MyNodeInstance::new_instances(node_count, &mut rng).await?;
 
             // let current set of elders start the dkg round and capture the msgs that are outbound to the other nodes
-            MyNodeInstance::start_dkg(&mut node_instances).await?;
+            let _ = MyNodeInstance::start_dkg(&mut node_instances).await?;
 
             let mut new_secret_key_shares: BTreeMap<XorName, SectionKeyShare> = BTreeMap::new();
             let mut new_sap: BTreeSet<SectionAuthorityProvider> = BTreeSet::new();
             let mut lagging = false;
             let mut done = false;
             while !done {
-                // For each of the node instances and for each of the msg in their `msg_queue`, 1) handle the msg and
-                // the cmds 2) handle the cmds 3) if the cmds produce more msgs, add them to the `msg_queue` of the
-                // respective nodes
+                // For every msg in `msg_queue` for every node instance, 1) handle the msg 2) handle the cmds
+                // 3) if the cmds produce more msgs, add them to the `msg_queue` of the respective peer
                 let mut msgs_to_other_nodes = Vec::new();
                 for mock_node in node_instances.values() {
                     let node = mock_node.node.clone();
                     let name = node.read().await.name();
-                    debug!("\n\n NODE: {}", name);
+                    info!("\n\n NODE: {}", name);
                     while let Some((msg_id, msg, sender)) = mock_node.msg_queue.write().await.pop()
                     {
                         let cmds = MyNode::handle_valid_system_msg(
@@ -968,8 +962,10 @@ mod tests {
                         )
                         .await?;
 
-                        // if we have the supermajority of the sk_shares, sign the sap and insert it into the remaining node's
-                        // section tree. Now these nodes should not trigger the `Proposal::SectionInfo`
+                        // If supermajority of the nodes have terminated, then the remaining nodes
+                        // can be considered as 'lagging'. So use the supermajority of the shares
+                        // to sign the sap and insert them into the lagging nodes, now these nodes
+                        // should not trigger `Proposal::SectionInfo`.
                         if !lagging && new_secret_key_shares.len() >= supermajority(node_count) {
                             assert_eq!(new_sap.len(), 1);
                             let new_sap = new_sap
@@ -1019,7 +1015,7 @@ mod tests {
                                         .filter(|node| !new_secret_key_shares.contains_key(node))
                                         .cloned()
                                         .collect::<Vec<_>>();
-                                    debug!("Lagging node {lagging_nodes:?}");
+                                    info!("Lagging node {lagging_nodes:?}");
                                     // update them
                                     for lag in lagging_nodes {
                                         let _updated = node_instances
@@ -1034,7 +1030,7 @@ mod tests {
                                                 None,
                                                 &name,
                                             )?;
-                                        debug!("nw update: {_updated} for {lag} ");
+                                        info!("nw update: {_updated} for {lag} ");
                                     }
                                     // successfully simulated lagging nodes
                                     lagging = true;
@@ -1049,7 +1045,7 @@ mod tests {
                         }
 
                         for cmd in cmds {
-                            debug!("Got cmd {}", cmd);
+                            info!("Got cmd {}", cmd);
                             match cmd {
                                 Cmd::SendMsg {
                                     msg,
@@ -1118,6 +1114,7 @@ mod tests {
         .await
     }
 
+    // The dkg will stall even if a single node is not responsive.
     #[tokio::test]
     async fn total_participation_is_required_for_dkg_votes() -> Result<()> {
         init_logger();
@@ -1131,7 +1128,7 @@ mod tests {
             let (mut node_instances, _initial_sk_set) =
                 MyNodeInstance::new_instances(node_count, &mut rng).await?;
 
-            MyNodeInstance::start_dkg(&mut node_instances).await?;
+            let _ = MyNodeInstance::start_dkg(&mut node_instances).await?;
 
             let dead_node = node_instances
                 .keys()
@@ -1143,7 +1140,7 @@ mod tests {
                 let mut msgs_to_other_nodes = Vec::new();
                 for mock_node in node_instances.values() {
                     let node = mock_node.node.clone();
-                    debug!("\n\n NODE: {}", node.read().await.name());
+                    info!("\n\n NODE: {}", node.read().await.name());
                     while let Some((msg_id, msg, sender)) = mock_node.msg_queue.write().await.pop()
                     {
                         let cmds = MyNode::handle_valid_system_msg(
@@ -1157,7 +1154,7 @@ mod tests {
                         .await?;
 
                         for cmd in cmds {
-                            debug!("Got cmd {}", cmd);
+                            info!("Got cmd {}", cmd);
                             match cmd {
                                 Cmd::SendMsg {
                                     msg,
@@ -1185,6 +1182,153 @@ mod tests {
             }
 
             // all the msgs are processed and we counldn't reach dkg termination
+            Ok(())
+        })
+        .await
+    }
+
+    // We randomly drop an outbound `NodeMsg` to a peer, this will effectively stall the dkg since
+    // some nodes don't receive certain votes. We solve this by gossiping the votes from a random
+    // node until we reach termination.
+    #[tokio::test]
+    async fn nodes_should_be_brought_up_to_date_using_gossip() -> Result<()> {
+        init_logger();
+        // Construct a local task set that can run `!Send` futures.
+        let loc = tokio::task::LocalSet::new();
+
+        loc.run_until(async {
+            let mut rng = rand::thread_rng();
+            let node_count = 7;
+            let traceroute = Traceroute(vec![]);
+            let (mut node_instances, initial_sk_set) =
+                MyNodeInstance::new_instances(node_count, &mut rng).await?;
+
+            // let current set of elders start the dkg round and capture the msgs that are outbound to the other nodes
+            let dkg_session_id = MyNodeInstance::start_dkg(&mut node_instances).await?;
+
+            let mut new_secret_key_shares = BTreeMap::new();
+            let mut done = false;
+            while !done {
+                let mut msgs_to_other_nodes = Vec::new();
+                for mock_node in node_instances.values() {
+                    let node = mock_node.node.clone();
+                    info!("\n\n NODE: {}", node.read().await.name());
+
+                    while let Some((msg_id, msg, sender)) = mock_node.msg_queue.write().await.pop()
+                    {
+                        let cmds = MyNode::handle_valid_system_msg(
+                            node.clone(),
+                            msg_id,
+                            msg,
+                            sender,
+                            &mock_node.comm,
+                            traceroute.clone(),
+                        )
+                        .await?;
+
+                        for cmd in cmds {
+                            info!("Got cmd {}", cmd);
+                            match cmd {
+                                Cmd::SendMsg {
+                                    msg,
+                                    msg_id,
+                                    recipients,
+                                    ..
+                                } => {
+                                    let mut new_msgs =
+                                        node.read().await.mock_send_msg(msg, msg_id, recipients)?;
+                                    // randomly drop the msg to a peer; chance = 1/node_count
+                                    new_msgs.1.retain(|_| rng.gen::<usize>() % node_count != 0);
+                                    msgs_to_other_nodes.push(new_msgs);
+                                }
+                                Cmd::HandleDkgOutcome {
+                                    section_auth,
+                                    outcome,
+                                } => {
+                                    // capture the sk_share here as we don't proceed with the SAP update
+                                    let _ = new_secret_key_shares
+                                        .insert(node.read().await.name(), outcome.clone());
+                                    let ((_, msg, _), _) = node
+                                        .write()
+                                        .await
+                                        .mock_dkg_outcome_proposal(section_auth, outcome)
+                                        .await?;
+                                    assert_matches!(msg, NodeMsg::Propose { proposal, .. } => {
+                                        assert_matches!(proposal, Proposal::SectionInfo(_))
+                                    });
+                                }
+                                _ => panic!("got a different cmd {:?}", cmd),
+                            }
+                        }
+                    }
+                }
+
+                // If the msg_queue is empty for all participant and if the current dkg
+                // session has not terminated, then send a gossip msg from a random node. This
+                // allows everyone to catchup.(in the real network each node sends out a
+                // gossip if it has not recieved any valid dkg msg in 30 seconds).
+                if MyNodeInstance::is_msg_queue_empty(&node_instances).await
+                    && msgs_to_other_nodes.is_empty()
+                    && new_secret_key_shares.len() != node_count
+                {
+                    // select a random_node which has not terminated, since terminated node
+                    // sends out HandleDkgOutcome cmd instead of NodeMsg
+                    let random_node = loop {
+                        let random_node = &node_instances
+                            .values()
+                            .nth(rng.gen::<usize>() % node_count)
+                            .ok_or_else(|| eyre!("there should be node_count nodes"))?
+                            .node;
+                        if !random_node
+                            .read()
+                            .await
+                            .dkg_voter
+                            .reached_termination(&dkg_session_id)?
+                        {
+                            break random_node;
+                        }
+                    };
+                    info!(
+                        "Sending gossip from random node {:?}",
+                        random_node.read().await.name()
+                    );
+                    let cmds = random_node.read().await.dkg_gossip_msgs();
+                    for cmd in cmds {
+                        info!("Got cmd {}", cmd);
+                        match cmd {
+                            Cmd::SendMsg {
+                                msg,
+                                msg_id,
+                                recipients,
+                                ..
+                            } => {
+                                let new_msgs = random_node
+                                    .read()
+                                    .await
+                                    .mock_send_msg(msg, msg_id, recipients)?;
+                                msgs_to_other_nodes.push(new_msgs);
+                            }
+                            _ => panic!("should be send msg, got {cmd}"),
+                        }
+                    }
+                }
+
+                // add the msgs to the msg_queue of each node
+                MyNodeInstance::add_msgs_to_queue(&mut node_instances, msgs_to_other_nodes).await?;
+
+                // done if we have generated all the sk_shares
+                done = new_secret_key_shares.len() == node_count;
+            }
+
+            // dkg done, make sure the new key share is valid
+            MyNodeInstance::verify_new_key(
+                &node_instances,
+                &initial_sk_set,
+                &new_secret_key_shares,
+                node_count,
+            )
+            .await?;
+
             Ok(())
         })
         .await
@@ -1269,7 +1413,7 @@ mod tests {
         }
 
         // Each node sends out DKG start msg and they are added to the msg queue for the other nodes
-        async fn start_dkg(nodes: &mut BTreeMap<XorName, MyNodeInstance>) -> Result<()> {
+        async fn start_dkg(nodes: &mut BTreeMap<XorName, MyNodeInstance>) -> Result<DkgSessionId> {
             let mut elders = BTreeMap::new();
             for (name, node) in nodes.iter() {
                 let _ = elders.insert(*name, node.node.read().await.addr);
@@ -1299,7 +1443,8 @@ mod tests {
                 msgs_to_other_nodes.push(msg);
             }
             // add the msgs to the msg_queue of each node
-            Self::add_msgs_to_queue(nodes, msgs_to_other_nodes).await
+            Self::add_msgs_to_queue(nodes, msgs_to_other_nodes).await?;
+            Ok(session_id)
         }
 
         // Given a list of node instances and a lit of NodeMsgs, add the msgs to the message queue of the recipients
@@ -1378,6 +1523,7 @@ mod tests {
                 }
                 sig_count += 1;
             }
+            info!("the generated key is valid!");
             Ok(())
         }
     }
@@ -1389,7 +1535,7 @@ mod tests {
             msg_id: MsgId,
             recipients: Peers,
         ) -> Result<(MockSystemMsg, Vec<Peer>)> {
-            trace!("msg: {msg:?} msg_id {msg_id:?}, recipients {recipients:?}");
+            info!("msg: {msg:?} msg_id {msg_id:?}, recipients {recipients:?}");
             if let OutgoingMsg::Node(msg) = msg {
                 let current_node = Peer::new(self.name(), self.addr);
 
@@ -1398,7 +1544,7 @@ mod tests {
                     Peers::Multiple(peers) => peers.into_iter().collect(),
                 };
                 let mock_system_msg: MockSystemMsg = (msg_id, msg, current_node);
-                debug!("SendMsg output {}", mock_system_msg.2);
+                info!("SendMsg output {}", mock_system_msg.2);
                 Ok((mock_system_msg, recipients))
             } else {
                 Err(eyre!("Should be OutgoingMsg::Node"))
