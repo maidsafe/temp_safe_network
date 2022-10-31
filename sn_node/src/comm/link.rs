@@ -11,6 +11,7 @@ use super::MsgListener;
 use dashmap::DashMap;
 use qp2p::{Connection, Endpoint, RetryConfig, UsrMsgBytes};
 use sn_interface::types::{log_markers::LogMarker, Peer};
+use sn_interface::messaging::MsgId;
 use std::sync::Arc;
 
 type ConnId = String;
@@ -110,8 +111,9 @@ impl Link {
     pub(crate) async fn send_bi(
         &mut self,
         bytes: UsrMsgBytes,
+        msg_id: MsgId
     ) -> Result<UsrMsgBytes, SendToOneError> {
-        debug!("Sending via a bi stream");
+        debug!("Sending {msg_id:?} via a bi stream");
 
         let mut attempts = 1;
         while attempts <= 3 {
@@ -119,7 +121,7 @@ impl Link {
             let conn = match self.get_or_connect().await {
                 Ok(conn) => conn,
                 Err(err) => {
-                    error!("Err getting connection during bi stream initialisation. Retrying");
+                    error!("Err getting connection during bi stream initialisation {msg_id:?}. Retrying");
                     if attempts > 3 {
                         return Err(err);
                     }
@@ -127,12 +129,12 @@ impl Link {
                 }
             };
             let conn_id = conn.id();
-            debug!("connnnection got to: {:?}", self.peer);
+            debug!("connnnection got to: {:?} {msg_id:?}", self.peer);
             let (mut send_stream, mut recv_stream) =
                 match conn.open_bi().await.map_err(SendToOneError::Connection) {
                     Ok(streams) => streams,
                     Err(stream_opening_err) => {
-                        error!("Error opening streams: {stream_opening_err:?}");
+                        error!("{msg_id:?} Error opening streams: {stream_opening_err:?}");
 
                         self.connections.remove(&conn_id);
 
@@ -142,14 +144,14 @@ impl Link {
                         continue;
                     }
                 };
-            debug!("bidi openeed to: {:?}", self.peer);
+            debug!("bidi openeed for {msg_id:?} to: {:?}", self.peer);
             send_stream.set_priority(10);
             match send_stream
             .send_user_msg(bytes.clone())
             .await {
                 Ok(_) => {},
                 Err(err) => {
-                    error!("Error sending bytes over stream: {:?}", err);
+                    error!("Error sending bytes {msg_id:?} over stream: {:?}", err);
                     // remove that broken conn
                     self.connections.remove(&conn_id);
 
@@ -161,7 +163,7 @@ impl Link {
             }
             // .map_err(SendToOneError::Send)?;
 
-            debug!("bidi sent to: {:?}", self.peer);
+            debug!("bidi for {msg_id:?} sent to: {:?}", self.peer);
             send_stream.finish().await.or_else(|err| match err {
                 qp2p::SendError::StreamLost(qp2p::StreamError::Stopped(_)) => Ok(()),
                 _ => {
@@ -170,7 +172,7 @@ impl Link {
                 },
             })?;
 
-            debug!("bidi finished to: {:?}", self.peer);
+            debug!("bidi finished {msg_id:?} to: {:?}", self.peer);
             return recv_stream.next().await.map_err(SendToOneError::Recv)
         }
 

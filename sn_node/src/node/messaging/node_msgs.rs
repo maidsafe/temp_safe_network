@@ -80,7 +80,7 @@ impl MyNode {
         let section_pk = PublicKey::Bls(self.network_knowledge.section_key());
         let node_keypair = Keypair::Ed25519(self.keypair.clone());
         let data_addr = data.address();
-        trace!("About to store data : {data_addr:?}");
+        trace!("About to store data from {original_msg_id:?}: {data_addr:?}");
         // TODO: Respond with errors etc over the bidi stream
 
         // We are an adult here, so just store away!
@@ -116,6 +116,8 @@ impl MyNode {
             }
             Err(error) => {
                 // the rest seem to be non-problematic errors.. (?)
+
+                // this could be an "we already have it" error... so we should continue with that...
                 error!("Problem storing data, but it was ignored: {error}");
             }
         }
@@ -462,6 +464,7 @@ impl MyNode {
                 Ok(node
                     .replicate_data_to_adults(
                         data,
+                        msg_id,
                         targets,
                         None,
                         #[cfg(feature = "traceroute")]

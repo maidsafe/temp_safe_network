@@ -99,6 +99,8 @@ impl Session {
         // We are not wait for the receive of majority of cmd Acks.
         // This could be further strict to wait for ALL the Acks get received.
         // The period is expected to have AE completed, hence no extra wait is required.
+
+        // tokio::time::sleep(Duration::from_secs(5)).await;
         self.we_have_sufficient_acks_for_cmd(msg_id, elders.clone(), resp_rx)
             .await
     }
@@ -111,6 +113,7 @@ impl Session {
         elders: Vec<Peer>,
         mut resp_rx: mpsc::Receiver<MsgResponse>,
     ) -> Result<()> {
+        debug!("----> init of check for acks for {:?}", msg_id);
         let expected_acks = elders.len();
         let mut received_acks = BTreeSet::default();
         let mut received_errors = BTreeSet::default();

@@ -33,12 +33,13 @@ impl MyNode {
     pub(crate) async fn replicate_data_to_adults(
         &self,
         data: ReplicatedData,
+        msg_id: MsgId,
         targets: BTreeSet<Peer>,
         client_response_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         info!(
-            "Replicating data {:?} to holders {:?}",
+            "Replicating data from {msg_id:?} {:?} to holders {:?}",
             data.name(),
             &targets,
         );
@@ -51,7 +52,7 @@ impl MyNode {
         let mut cmds = vec![];
         // TODO: do this in parallel
         for target in targets {
-            let (bytes_to_adult, msg_id) = self.form_usr_msg_bytes_to_node(
+            let (bytes_to_adult, _new_msg_id) = self.form_usr_msg_bytes_to_node(
                 payload.clone(),
                 kind.clone(),
                 target,
@@ -59,6 +60,10 @@ impl MyNode {
                 traceroute.clone(),
             )?;
 
+            info!(
+                "About to send {msg_id:?} to holder: {:?}",
+                &target,
+            );
             let response = match tokio::time::timeout(tokio::time::Duration::from_secs(3), async {
                 self.comm
                     .send_out_bytes_to_peer_and_return_response(target, msg_id, bytes_to_adult)
@@ -68,7 +73,7 @@ impl MyNode {
             {
                 Ok(resp) => resp,
                 Err(_elapsed) => {
-                    error!("No response before arbitrary timeout. Marking adult as dysfunctional");
+                    error!("No response to {msg_id:?} before arbitrary timeout. Marking adult as dysfunctional");
                     // TODO: actually mark as dysf
 
                     // cmds.push(Cmd::TrackNodeIssueInDysfunction {

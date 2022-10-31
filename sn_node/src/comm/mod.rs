@@ -172,9 +172,10 @@ impl Comm {
         msg_id: MsgId,
         bytes: UsrMsgBytes,
     ) -> Result<WireMsg> {
+        debug!("trying to get peer session in order to send: {msg_id:?}");
         if let Some(mut peer) = self.get_or_create(&peer).await {
             debug!("Peer session retrieved for {msg_id:?}");
-            let adult_response_bytes = peer.send_with_bi_return_response(bytes).await?;
+            let adult_response_bytes = peer.send_with_bi_return_response(bytes, msg_id).await?;
             debug!("peer response is in for {msg_id:?}");
             WireMsg::from(adult_response_bytes).map_err(|_| Error::InvalidMessage)
         } else {

@@ -342,6 +342,7 @@ impl MyNode {
         cmds.extend(
             self.replicate_data_to_adults(
                 data,
+                msg_id,
                 targets,
                 send_stream,
                 #[cfg(feature = "traceroute")]
