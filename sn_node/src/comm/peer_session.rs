@@ -72,10 +72,15 @@ impl PeerSession {
         bytes: UsrMsgBytes,
     ) -> Result<UsrMsgBytes> {
         // TODO: make a real error here
-        self.link
+        let r = self.link
             .send_bi(bytes)
-            .await
-            .map_err(|_e| Error::CmdSendError)
+            .await;
+
+        if r.is_err() {
+            error!("Error sending on bi conn: {r:?}");
+        }
+
+        Ok(r.map_err(|_e| Error::CmdSendError)?)
     }
 
     #[instrument(skip(self, bytes))]

@@ -43,7 +43,8 @@ impl MyNode {
             &targets,
         );
 
-        let msg = NodeMsg::NodeCmd(NodeCmd::ReplicateData(vec![data]));
+        // TODO: general ReplicateData flow could go bidi? Atm that's perhaps more bother than its worth
+        let msg = NodeMsg::NodeCmd(NodeCmd::ReplicateOneData(data));
 
         let (kind, payload) = self.serialize_node_msg(msg)?;
 
