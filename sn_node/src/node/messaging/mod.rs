@@ -62,9 +62,9 @@ impl MyNode {
         wire_msg: WireMsg,
         send_stream: Option<Arc<Mutex<SendStream>>>,
     ) -> Result<Vec<Cmd>> {
-        debug!("validating msg");
         // Deserialize the payload of the incoming message
         let msg_id = wire_msg.msg_id();
+        debug!("validating msg {msg_id:?}");
 
         let msg_type = match wire_msg.into_msg() {
             Ok(msg_type) => msg_type,
@@ -198,6 +198,7 @@ impl MyNode {
                 Ok(vec![])
             }
             _ => {
+                debug!("Checking {msg_id:?} for entropy", wire_msg.msg_id());
                 if let Some(ae_cmd) = self.check_for_entropy(
                     wire_msg,
                     &dst.section_key,
