@@ -198,7 +198,7 @@ impl MyNode {
                 Ok(vec![])
             }
             _ => {
-                debug!("Checking {msg_id:?} for entropy", wire_msg.msg_id());
+                debug!("Checking {:?} for entropy", wire_msg.msg_id());
                 if let Some(ae_cmd) = self.check_for_entropy(
                     wire_msg,
                     &dst.section_key,

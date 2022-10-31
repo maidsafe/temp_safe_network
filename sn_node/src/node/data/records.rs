@@ -210,7 +210,7 @@ impl MyNode {
 
         let (kind, payload) = self.serialize_node_msg(msg)?;
 
-        let (bytes_to_adult, msg_id) = self.form_usr_msg_bytes_to_node(
+        let (bytes_to_adult, _new_msg_id) = self.form_usr_msg_bytes_to_node(
             payload,
             kind,
             target,
