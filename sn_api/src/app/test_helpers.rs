@@ -31,7 +31,7 @@ const NUM_OF_DBCS_TO_REISSUE: usize = 40;
 
 // Range of values to pick the random balances each of
 // the NUM_OF_DBCS_TO_REISSUE reissued DBCs will own
-const REISSUED_DBC_MIN_BALANCE: u64 = 5_000_000_000;
+const REISSUED_DBC_MIN_BALANCE: u64 = 50_000_000_000;
 const REISSUED_DBC_MAX_BALANCE: u64 = 100_000_000_000;
 
 // Load the genesis DBC.
