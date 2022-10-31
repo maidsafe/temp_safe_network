@@ -769,7 +769,7 @@ mod test {
             .await;
         match res {
             NodeQueryResponse::GetRegisterEntry(Err(e)) => {
-                assert_eq!(e, sn_interface::messaging::data::Error::NoSuchEntry)
+                assert_eq!(e, sn_interface::messaging::data::Error::NoSuchEntry(hash))
             }
             NodeQueryResponse::GetRegisterEntry(Ok(entry)) => {
                 panic!("Should not exist any entry for random hash! {:?}", entry)
@@ -801,7 +801,7 @@ mod test {
             .await;
         match res {
             NodeQueryResponse::GetRegisterUserPermissions(Err(e)) => {
-                assert_eq!(e, sn_interface::messaging::data::Error::NoSuchEntry)
+                assert_eq!(e, sn_interface::messaging::data::Error::NoSuchUser(user))
             }
             NodeQueryResponse::GetRegisterUserPermissions(Ok(perms)) => panic!(
                 "Should not exist any permissions for random user! {:?}",

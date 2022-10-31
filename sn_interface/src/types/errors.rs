@@ -6,7 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{register::User, RegisterAddress};
+use super::{
+    register::{EntryHash, User},
+    RegisterAddress,
+};
 
 use crate::messaging::data::Error as ErrorMsg;
 
@@ -58,24 +61,17 @@ pub enum Error {
     #[error("Some entry actions are not valid")]
     InvalidEntryActions(BTreeMap<Vec<u8>, Error>),
     /// Entry could not be found on the data
-    #[error("Requested entry not found")]
-    NoSuchEntry,
-    /// Key does not exist
-    #[error("Key does not exist")]
-    NoSuchKey,
+    #[error("Requested entry not found {0}")]
+    NoSuchEntry(EntryHash),
+    /// User entry could not be found on the data
+    #[error("Requested user not found {0:?}")]
+    NoSuchUser(User),
     /// Owner is not valid
     #[error("Owner is not a PublicKeySet")]
     InvalidOwnerNotPublicKeySet,
     /// No Policy has been set to the data
     #[error("No policy has been set for this data")]
     PolicyNotSet,
-    /// Invalid version for performing a given mutating operation. Contains the
-    /// current data version.
-    #[error("Invalid version provided: {0}")]
-    InvalidSuccessor(u64),
-    /// Invalid mutating operation as it causality dependency is currently not satisfied
-    #[error("Operation is not causally ready. Ensure you have the full history of operations.")]
-    OpNotCausallyReady,
     /// Invalid Operation such as a POST on ImmutableData
     #[error("Invalid operation")]
     InvalidOperation,
@@ -88,31 +84,12 @@ pub enum Error {
     /// Failed to parse a string.
     #[error("Failed to parse: {0}")]
     FailedToParse(String),
-    /// Inexistent recipient balance.
-    // TODO: this should not be possible
-    #[error("No such recipient key balance")]
-    NoSuchRecipient,
-    #[error("No matching Section")]
-    NoMatchingSection,
-    /// Expected data size exceeded.
-    #[error("Size of the structure exceeds the limit")]
-    ExceededSize,
     /// Number out of expected range.
     #[error("The provided number is out of the expected range")]
     OutOfRange,
-    /// The operation has not been signed by an actor PK and so cannot be validated.
-    #[error("CRDT operation missing actor signature")]
-    CrdtMissingOpSignature,
-    /// The data for a given policy could not be located, so CRDT operations cannot be applied.
-    #[error("CRDT data is in an unexpected and/or inconsistent state. No data found for current policy.")]
-    CrdtUnexpectedState,
     /// The CRDT operation cannot be applied as it targets a different content address.
     #[error("The CRDT operation cannot be applied as it targets a different content address.")]
     CrdtWrongAddress(RegisterAddress),
-    #[error("Section authority provider cannot be trusted: {0}")]
-    UntrustedSectionAuthProvider(String),
-    #[error("Proof chain cannot be trusted: {0}")]
-    UntrustedProofChain(String),
     #[error("BlsError: {0}")]
     BlsError(#[from] BlsError),
 }
@@ -127,7 +104,8 @@ pub fn convert_dt_error_to_error_msg(error: Error) -> ErrorMsg {
         Error::InvalidOperation => {
             ErrorMsg::InvalidOperation("DtError::InvalidOperation".to_string())
         }
-        Error::NoSuchEntry => ErrorMsg::NoSuchEntry,
+        Error::NoSuchEntry(hash) => ErrorMsg::NoSuchEntry(hash),
+        Error::NoSuchUser(user) => ErrorMsg::NoSuchUser(user),
         Error::AccessDenied(pk) => ErrorMsg::AccessDenied(pk),
         other => ErrorMsg::InvalidOperation(format!("DtError: {:?}", other)),
     }

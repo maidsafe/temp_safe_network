@@ -6,7 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::types::{register::User, DataAddress};
+use crate::types::{
+    register::{EntryHash, User},
+    DataAddress,
+};
 use serde::{Deserialize, Serialize};
 use std::result;
 use thiserror::Error;
@@ -42,8 +45,11 @@ pub enum Error {
     #[error("Data provided already exists: {0:?}")]
     DataExists(DataAddress),
     /// Entry could not be found on the data
-    #[error("Requested entry not found")]
-    NoSuchEntry,
+    #[error("Requested entry not found {0}")]
+    NoSuchEntry(EntryHash),
+    /// User entry could not be found on the data
+    #[error("Requested user not found {0:?}")]
+    NoSuchUser(User),
     /// Invalid Operation such as a POST on ImmutableData
     #[error("Invalid operation: {0}")]
     InvalidOperation(String),
