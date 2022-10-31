@@ -180,7 +180,7 @@ impl QueryResponse {
     }
 }
 
-/// The response to a query, containing the query result.
+/// The response to a Cmd, containing the query result.
 #[allow(clippy::large_enum_variant, clippy::type_complexity)]
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug, Hash)]
 pub enum CmdResponse {

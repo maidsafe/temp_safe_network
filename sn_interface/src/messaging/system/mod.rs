@@ -172,7 +172,7 @@ impl NodeMsg {
             #[cfg(any(feature = "chunks", feature = "registers"))]
             // Inter-node comms related to processing client requests
             Self::NodeCmd(_)
-            | Self::NodeEvent(NodeEvent::CouldNotStoreData { .. })
+            | Self::NodeEvent(_)
             | Self::NodeQuery(_)
             | Self::NodeQueryResponse { .. } => NODE_DATA_MSG_PRIORITY,
         }

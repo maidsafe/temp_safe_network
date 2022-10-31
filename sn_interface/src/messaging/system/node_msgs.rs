@@ -29,7 +29,9 @@ pub enum NodeCmd {
         /// The storage level reported by the node.
         level: StorageLevel,
     },
-    /// Tells an Adult to store a replica of the data
+    /// Tells an Adult to store a  data
+    ReplicateOneData(ReplicatedData),
+    /// Tells an Adult to store a replica of some data set
     ReplicateData(Vec<ReplicatedData>),
     /// Tells an Adult to fetch and replicate data from the sender
     SendAnyMissingRelevantData(Vec<DataAddress>),
@@ -55,6 +57,7 @@ pub enum NodeEvent {
         /// Whether store failed due to full
         full: bool,
     },
+    DataStored(DataAddress),
 }
 
 /// Query originating at a node

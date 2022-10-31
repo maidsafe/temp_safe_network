@@ -325,16 +325,19 @@ impl MyNode {
         // Check if the message has reached the correct section,
         // if not, we'll need to respond with AE
         let our_prefix = self.network_knowledge.prefix();
-
+        let msg_id = wire_msg.msg_id();
         // Let's try to find a section closer to the destination, if it's not for us.
         if !self.network_knowledge.prefix().matches(&dst_name) {
             debug!(
-                "AE: prefix not matching. We are: {:?}, they sent to: {:?}",
+                "AE: {msg_id:?} prefix not matching. We are: {:?}, they sent to: {:?}",
                 our_prefix, dst_name
             );
             return match self.network_knowledge.closest_signed_sap(&dst_name) {
                 Some((signed_sap, proof_chain)) => {
-                    info!("Found a better matching prefix {:?}", signed_sap.prefix());
+                    info!(
+                        "{msg_id:?} Found a better matching prefix {:?}",
+                        signed_sap.prefix()
+                    );
                     let bounced_msg = wire_msg.serialize()?;
                     let section_tree_update =
                         SectionTreeUpdate::new(signed_sap.clone(), proof_chain);
@@ -345,18 +348,20 @@ impl MyNode {
                     };
 
                     trace!(
-                        "{} entropy found. {sender:?} should be updated",
+                        "{} {msg_id:?} entropy found. {sender:?} should be updated",
                         LogMarker::AeSendRedirect
                     );
 
                     // client response, so send it over stream
                     if send_stream.is_some() {
+                        debug!("sending repsonse over send_stream");
                         return Ok(Some(Cmd::send_msg_via_response_stream(
                             OutgoingMsg::Node(ae_msg),
                             Peers::Single(*sender),
                             send_stream,
                         )));
                     } else {
+                        debug!("sending repsonse over fresh conn");
                         return Ok(Some(Cmd::send_msg(
                             OutgoingMsg::Node(ae_msg),
                             Peers::Single(*sender),
@@ -381,7 +386,7 @@ impl MyNode {
 
         let section_key = self.network_knowledge.section_key();
         trace!(
-            "Performing AE checks, provided pk was: {:?} ours is: {:?}",
+            "Performing AE checks on {msg_id:?}, provided pk was: {:?} ours is: {:?}",
             dst_section_key,
             section_key
         );
