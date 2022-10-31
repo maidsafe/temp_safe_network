@@ -45,31 +45,6 @@ impl PeerLinks {
         links.keys().into_iter().cloned().collect()
     }
 
-    /// Any number of incoming qp2p:Connections can be added.
-    /// We will eventually converge to the same one in our comms with the peer.
-    pub async fn add_incoming(&self, peer: &Peer, conn: qp2p::Connection) {
-        {
-            let link = self.links.read().await;
-            if let Some(c) = link.get(peer) {
-                // peer exists, add to it
-                c.add(conn).await;
-                return;
-            }
-            // else still not in list, go ahead and insert
-        }
-
-        let mut links = self.links.write().await;
-        match links.get(peer) {
-            // someone else inserted in the meanwhile, add to it
-            Some(c) => c.add(conn).await,
-            // still not in list, go ahead and insert
-            None => {
-                let link = Link::new_with(*peer, self.endpoint.clone(), conn).await;
-                let _ = links.insert(*peer, link);
-            }
-        }
-    }
-
     #[allow(unused)]
     pub async fn is_connected(&self, peer: &Peer) -> bool {
         let link = self.links.read().await;
@@ -116,23 +91,6 @@ impl PeerLinks {
         }
     }
 
-    // /// Disposes of the link and all underlying resources.
-    // #[allow(unused)]
-    // pub async fn disconnect(&self, id: Peer) {
-    //     let mut links = self.links.write().await;
-    //     let link = match links.remove(&id) {
-    //         // someone else inserted in the meanwhile, so use that
-    //         Some(link) => link,
-    //         // none here, all good
-    //         None => {
-    //             trace!("Attempted to remove {id:?}, it was not found");
-    //             return;
-    //         }
-    //     };
-
-    //     link.disconnect().await;
-    // }
-
     async fn get(&self, id: &Peer) -> Option<Link> {
         let links = self.links.read().await;
         links.get(id).cloned()
@@ -153,6 +111,7 @@ impl PeerLinks {
     /// Does NOT disconnect it, as it could still be used to receveive
     /// messages on
     pub async fn remove_link_from_peer_links(&self, id: &Peer) {
+        debug!("removing linkkk");
         let mut links = self.links.write().await;
         let _existing_link = links.remove(id);
     }

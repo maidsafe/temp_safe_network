@@ -83,7 +83,7 @@ impl Session {
             }
 
             // TODO: ???? once we drop the stream, do we know the connection is closed ???
-            trace!("{} to {}", LogMarker::ConnectionClosed, addr);
+            trace!("{} to {}", LogMarker::StreamClosed, addr);
         })
         .in_current_span();
     }
@@ -268,6 +268,7 @@ impl Session {
     /// Checks AE cache to see if we should be forwarding this msg (and to whom)
     /// or if it has already been dealt with
     #[instrument(skip_all, level = "debug")]
+    #[allow(clippy::type_complexity)]
     async fn new_target_elders(
         bounced_msg: UsrMsgBytes,
         received_auth: &SectionAuthorityProvider,
