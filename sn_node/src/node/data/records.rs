@@ -6,19 +6,19 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{messaging::Peers, Cmd, Error, MyNode, Prefix, Result};
+use crate::node::{Cmd, Error, MyNode, Prefix, Result};
 
 use bytes::Bytes;
 use itertools::Itertools;
-use qp2p::SendStream;
+use qp2p::{SendStream, UsrMsgBytes};
 use sn_dysfunction::IssueType;
 #[cfg(feature = "traceroute")]
 use sn_interface::messaging::{MsgType, Traceroute, WireMsg};
 use sn_interface::{
     data_copy_count,
     messaging::{
-        data::{ClientMsg, DataQuery, MetadataExchange, StorageLevel},
-        system::{NodeCmd, NodeMsg, NodeQuery, OperationId},
+        data::{ClientMsg, CmdResponse, DataQuery, MetadataExchange, StorageLevel},
+        system::{NodeCmd, NodeEvent, NodeMsg, NodeQuery, OperationId},
         AuthorityProof, ClientAuth, Dst, MsgId, MsgKind,
     },
     types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData},
@@ -30,25 +30,121 @@ use xor_name::XorName;
 
 impl MyNode {
     // Locate ideal holders for this data, instruct them to store the data
-    pub(crate) fn replicate_data(
+    pub(crate) async fn replicate_data(
         &self,
         data: ReplicatedData,
         targets: BTreeSet<Peer>,
+        client_response_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
-    ) -> Cmd {
+    ) -> Result<Vec<Cmd>> {
         info!(
             "Replicating data {:?} to holders {:?}",
             data.name(),
             &targets,
         );
 
-        self.trace_system_msg(
-            NodeMsg::NodeCmd(NodeCmd::ReplicateData(vec![data])),
-            Peers::Multiple(targets),
-            #[cfg(feature = "traceroute")]
-            traceroute,
-        )
+        let msg = NodeMsg::NodeCmd(NodeCmd::ReplicateData(vec![data]));
+
+        let (kind, payload) = self.serialize_node_msg(msg)?;
+
+        let mut cmds = vec![];
+        // TODO: do this in parallel
+        for target in targets {
+            let (bytes_to_adult, msg_id) = self.form_usr_msg_bytes_to_node(
+                payload.clone(),
+                kind.clone(),
+                target,
+                #[cfg(feature = "traceroute")]
+                traceroute.clone(),
+            )?;
+
+            let response = match tokio::time::timeout(tokio::time::Duration::from_secs(3), async {
+                self.comm
+                    .send_out_bytes_to_peer_and_return_response(target, msg_id, bytes_to_adult)
+                    .await
+            })
+            .await
+            {
+                Ok(resp) => resp,
+                Err(_elapsed) => {
+                    error!("No response before arbitrary timeout. Marking adult as dysfunctional");
+                    // TODO: actually mark as dysf
+
+                    // cmds.push(Cmd::TrackNodeIssueInDysfunction {
+                    //     name: target.name(),
+                    //     // TODO: no need for op id tracking here, this can be a simple counter
+                    //     issue: IssueType::PendingRequestOperation(operation_id),
+                    // });
+
+                    // TODO: handle this properly in parallel.
+                    // One fail should not kill us here... (although maybe for now?)
+                    return Ok(cmds);
+                }
+            }?;
+
+            if let MsgType::Node {
+                msg: NodeMsg::NodeEvent(NodeEvent::DataStored(_address)),
+                ..
+            } = response.into_msg()?
+            {
+                let client_msg = ClientMsg::CmdResponse {
+                    response: CmdResponse::StoreChunk(Ok(())),
+                    correlation_id: msg_id,
+                };
+
+                let (kind, payload) = self.serialize_sign_client_msg(client_msg)?;
+
+                if let Some(stream) = client_response_stream.clone() {
+                    self.send_msg_on_stream(
+                        payload,
+                        kind,
+                        stream,
+                        target,
+                        msg_id,
+                        traceroute.clone(),
+                    )
+                    .await?
+                } else {
+                    warn!("No send stream to respond to client on! (This is likely due to the msg originating at the elder as a healthcheck");
+                }
+            } else {
+                error!("Unexpected reponse to query from node. To : {msg_id:?}; response: {response:?}");
+            }
+        }
+
+        Ok(cmds)
+
+        // self.trace_system_msg(
+        //     NodeMsg::NodeCmd(NodeCmd::ReplicateData(vec![data])),
+        //     Peers::Multiple(targets),
+        //     #[cfg(feature = "traceroute")]
+        //     traceroute,
+        // )
     }
+
+    // /// Send msg over a bidirectional stream to a node and await the response.
+    // /// If no response comes in before X timeout, an
+    // async fn await_response_msg_from_node(&self, bytes_to_adult: UsrMsgBytes, msg_id: MsgId, target: Peer) -> Result<WireMsg>{
+    //     // TODO: how to determine this time?
+    //     // TODO: don't use arbitrary time here. (But 3s is very realistic here under normal load)
+    //     let response = match tokio::time::timeout(tokio::time::Duration::from_secs(3), async {
+    //         self.comm
+    //             .send_out_bytes_to_peer_and_return_response(target, msg_id, bytes_to_adult)
+    //             .await
+    //     })
+    //     .await
+    //     {
+    //         Ok(resp) => resp,
+    //         Err(_elapsed) => {
+    //             error!("No response before arbitrary timeout. Marking adult as dysfunctional");
+    //             return Ok(vec![Cmd::TrackNodeIssueInDysfunction {
+    //                 name: target.name(),
+    //                 // TODO: no need for op id tracking here, this can be a simple counter
+    //                 issue: IssueType::PendingRequestOperation(operation_id),
+    //             }]);
+    //         }
+    //     }?;
+    // }
 
     /// Find target adult, sends a bidi msg, awaiting response, and then sends this on to the client
     pub(crate) async fn read_data_from_adults_and_respond_to_client(
@@ -153,6 +249,10 @@ impl MyNode {
             } else {
                 warn!("No send stream to respond to client on! (This is likely due to the msg originating at the elder as a healthcheck");
             }
+        } else {
+            error!(
+                "Unexpected reponse to query from node. To : {msg_id:?}; response: {response:?}"
+            );
         }
 
         // Everything went okay, so no further cmds to handle

@@ -353,6 +353,11 @@ impl MyNode {
                 node.set_adult_levels(metadata);
                 Ok(vec![])
             }
+            NodeMsg::NodeEvent(NodeEvent::DataStored(address)) => {
+                // data was stored. this should be sent over a response stream only.
+                warn!("Unexpected DataStore ({address:?})node event received as direct msg. It should be sent as a response over a stream...");
+                Ok(vec![])
+            }
             NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
                 node_id,
                 data,
@@ -379,12 +384,15 @@ impl MyNode {
 
                 let targets = node.target_data_holders(data.name());
 
-                Ok(vec![node.replicate_data(
-                    data,
-                    targets,
-                    #[cfg(feature = "traceroute")]
-                    traceroute,
-                )])
+                Ok(node
+                    .replicate_data(
+                        data,
+                        targets,
+                        None,
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
+                    )
+                    .await?)
             }
             NodeMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)) => {
                 let node_read_lock = node.read().await;

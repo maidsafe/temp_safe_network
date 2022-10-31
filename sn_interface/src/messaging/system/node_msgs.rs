@@ -7,11 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::OperationId;
-use crate::messaging::{
-    data::{DataQueryVariant, MetadataExchange, QueryResponse, StorageLevel},
-    ClientAuth,
-};
 use crate::types::{DataAddress, PublicKey, ReplicatedData};
+use crate::{
+    messaging::{
+        data::{DataQueryVariant, MetadataExchange, QueryResponse, StorageLevel},
+        ClientAuth,
+    },
+    types::ChunkAddress,
+};
 
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
@@ -55,6 +58,7 @@ pub enum NodeEvent {
         /// Whether store failed due to full
         full: bool,
     },
+    DataStored(ChunkAddress),
 }
 
 /// Query originating at a node

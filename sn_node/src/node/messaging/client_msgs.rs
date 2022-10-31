@@ -322,6 +322,8 @@ impl MyNode {
             };
 
             debug!("Will send error response back to client");
+
+            // TODO: Use response stream here. This wont work anymore!
             let cmd = self.cmd_error_response(
                 cmd,
                 error,
@@ -335,21 +337,18 @@ impl MyNode {
         }
 
         // the replication msg sent to adults
-        cmds.push(self.replicate_data(
-            data,
-            targets,
-            #[cfg(feature = "traceroute")]
-            traceroute.clone(),
-        ));
-
-        // the ack sent to client
-        cmds.push(self.send_cmd_ack(
-            origin,
-            msg_id,
-            send_stream,
-            #[cfg(feature = "traceroute")]
-            traceroute,
-        ));
+        // cmds here may be dysfunction tracking.
+        // CmdAcks are sent over the send stream herein
+        cmds.extend(
+            self.replicate_data(
+                data,
+                targets,
+                send_stream,
+                #[cfg(feature = "traceroute")]
+                traceroute.clone(),
+            )
+            .await?,
+        );
 
         Ok(cmds)
     }
