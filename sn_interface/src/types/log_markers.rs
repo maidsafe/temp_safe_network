@@ -85,7 +85,7 @@ pub enum LogMarker {
     TriggeringPromotionAndDemotion,
     // Anti-Entropy
     AeResendAfterRetry,
-    AeResendAfterAeRedirect,
+    AeResendAfterRedirect,
     AeSendRedirect,
     AeSendRetryAsOutdated,
     AeSendRetryDstPkFail,
