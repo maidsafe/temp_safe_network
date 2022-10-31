@@ -16,7 +16,6 @@ use sn_interface::{
 use qp2p::ConnectionIncoming;
 use tokio::{sync::mpsc, task};
 use tracing::Instrument;
-
 #[derive(Debug)]
 pub(crate) enum ListenerEvent {
     Connected {
@@ -115,6 +114,10 @@ impl MsgListener {
             }
         }
 
+        // if let Some(conns) = link_conns {
+        //     debug!("Connection was closed, removing from link conns: {conn_id:?}");
+        //     let _conn = conns.remove(&conn_id);
+        // }
         trace!(%conn_id, %remote_address, "{}", LogMarker::ConnectionClosed);
     }
 }

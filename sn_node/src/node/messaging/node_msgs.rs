@@ -14,6 +14,7 @@ use crate::{
     },
     storage::Error as StorageError,
 };
+use sn_interface::types::ReplicatedData;
 
 use qp2p::SendStream;
 #[cfg(feature = "traceroute")]
@@ -64,6 +65,89 @@ impl MyNode {
             #[cfg(feature = "traceroute")]
             traceroute,
         )
+    }
+
+    pub(crate) async fn store_data_as_adult_and_respond(
+        &mut self,
+        data: ReplicatedData,
+        response_stream: Option<Arc<Mutex<SendStream>>>,
+        target: Peer,
+        original_msg_id: MsgId,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
+    ) -> Result<Vec<Cmd>> {
+        let mut cmds = vec![];
+
+        let section_pk = PublicKey::Bls(self.network_knowledge.section_key());
+        let node_keypair = Keypair::Ed25519(self.keypair.clone());
+        let data_addr = data.address();
+        trace!("About to store data from {original_msg_id:?}: {data_addr:?}");
+        // TODO: Respond with errors etc over the bidi stream
+
+        // We are an adult here, so just store away!
+        // This may return a DatabaseFull error... but we should have reported storage increase
+        // well before this
+        match self
+            .data_storage
+            .store(&data, section_pk, node_keypair.clone())
+            .await
+        {
+            Ok(level_report) => {
+                info!("Storage level report: {:?}", level_report);
+                cmds.extend(self.record_storage_level_if_any(
+                    level_report,
+                    #[cfg(feature = "traceroute")]
+                    traceroute.clone(),
+                )?);
+
+                #[cfg(feature = "traceroute")]
+                info!("End of message flow. Trace: {:?}", traceroute);
+            }
+            Err(StorageError::NotEnoughSpace) => {
+                // storage full
+                error!("Not enough space to store more data");
+                let node_id = PublicKey::from(self.keypair.public);
+                let msg = NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
+                    node_id,
+                    data,
+                    full: true,
+                });
+
+                cmds.push(self.send_msg_to_our_elders(msg))
+            }
+            Err(error) => {
+                // the rest seem to be non-problematic errors.. (?)
+
+                // this could be an "we already have it" error... so we should continue with that...
+                error!("Problem storing data, but it was ignored: {error}");
+            }
+        }
+
+        trace!("Data has been stored: {data_addr:?}");
+        let msg = NodeMsg::NodeEvent(NodeEvent::DataStored(data_addr));
+        let (kind, payload) = self.serialize_node_msg(msg)?;
+        // let (bytes_to_elder, msg_id) = self.form_usr_msg_bytes_to_node(
+        //     payload.clone(),
+        //     kind.clone(),
+        //     target,
+        //     #[cfg(feature = "traceroute")]
+        //     traceroute.clone(),
+        // )?;
+
+        if let Some(stream) = response_stream {
+            self.send_msg_on_stream(
+                payload,
+                kind,
+                stream,
+                Some(target),
+                original_msg_id,
+                traceroute.clone(),
+            )
+            .await?;
+        } else {
+            error!("Cannot respond over stream, none exists after storing! {data_addr:?}");
+        }
+
+        Ok(cmds)
     }
 
     // Handler for data messages which have successfully
@@ -353,6 +437,11 @@ impl MyNode {
                 node.set_adult_levels(metadata);
                 Ok(vec![])
             }
+            NodeMsg::NodeEvent(NodeEvent::DataStored(address)) => {
+                // data was stored. this should be sent over a response stream only.
+                warn!("Unexpected DataStore ({address:?})node event received as direct msg. It should be sent as a response over a stream...");
+                Ok(vec![])
+            }
             NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
                 node_id,
                 data,
@@ -379,12 +468,41 @@ impl MyNode {
 
                 let targets = node.target_data_holders(data.name());
 
-                Ok(vec![node.replicate_data(
-                    data,
-                    targets,
-                    #[cfg(feature = "traceroute")]
-                    traceroute,
-                )])
+                Ok(node
+                    .replicate_data_to_adults(
+                        data,
+                        msg_id,
+                        targets,
+                        None,
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
+                    )
+                    .await?)
+            }
+            NodeMsg::NodeCmd(NodeCmd::ReplicateOneData(data)) => {
+                let node_read_lock = node.read().await;
+                if node_read_lock.is_elder() {
+                    error!("Received unexpected message while Elder");
+                    return Ok(vec![]);
+                }
+                debug!(
+                    "Attempting to store data locally as adult: {:?}",
+                    data.address()
+                );
+
+                // ensure we drop the read lock as it's not needed
+                drop(node_read_lock);
+
+                // grab the write lock each time in the loop to not hold it over large data sets
+                let mut node = node.write().await;
+
+                debug!(
+                    "Attempting to store data locally as adult:: write lock gotten: {:?}",
+                    data.address()
+                );
+                // store data and respond w/ack on the response stream
+                node.store_data_as_adult_and_respond(data, send_stream, sender, msg_id, traceroute)
+                    .await
             }
             NodeMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)) => {
                 let node_read_lock = node.read().await;
@@ -402,6 +520,7 @@ impl MyNode {
                 let node_keypair = Keypair::Ed25519(node_read_lock.keypair.clone());
                 // ensure we drop the read lock as it's not needed
                 drop(node_read_lock);
+
                 for data in data_collection {
                     // grab the write lock each time in the loop to not hold it over large data sets
                     let mut node = node.write().await;
@@ -478,6 +597,7 @@ impl MyNode {
                     &query,
                     auth,
                     sender,
+                    msg_id,
                     send_stream,
                     #[cfg(feature = "traceroute")]
                     traceroute,

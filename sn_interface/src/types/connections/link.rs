@@ -8,9 +8,9 @@
 
 use super::Peer;
 
+use crate::messaging::MsgId;
 use crate::types::log_markers::LogMarker;
-use qp2p::{Connection, ConnectionIncoming as IncomingMsgs, Endpoint, RecvStream, UsrMsgBytes};
-
+use qp2p::{Connection, Endpoint, RecvStream, UsrMsgBytes};
 // Required for docs
 #[allow(unused_imports)]
 use qp2p::RetryConfig;
@@ -46,158 +46,59 @@ impl Link {
         }
     }
 
-    pub(crate) async fn new_with(id: Peer, endpoint: Endpoint, conn: Connection) -> Self {
-        let instance = Self::new(id, endpoint);
-        instance.insert(conn).await;
-        instance
-    }
-
     #[allow(unused)]
     pub(crate) fn name(&self) -> XorName {
         self.peer.name()
     }
 
-    pub(crate) async fn add(&self, conn: Connection) {
-        self.insert(conn).await;
-    }
-
-    /// Send a message to the peer with default retry configuration.
-    ///
-    /// The message will be sent on a unidirectional QUIC stream, meaning the application is
-    /// responsible for correlating any anticipated responses from incoming streams.
-    ///
-    ///
-    /// The priority will be `0` and retry behaviour will be determined by the
-    /// [`RetryConfig`] that was used to construct the [`Endpoint`] this connection
-    /// belongs to. See [`send_with`](Self::send_with) if you want to send a message with specific
-    /// configuration.
-    #[allow(unused)]
-    pub async fn send<F: Fn(Connection, IncomingMsgs)>(
+    pub async fn send_bi(
         &self,
         bytes: UsrMsgBytes,
-        listen: F,
-    ) -> Result<(), SendToOneError> {
-        self.send_with(bytes, listen).await
-    }
-
-    /// Send a message to the peer using the given configuration.
-    ///
-    /// See [`send`](Self::send) if you want to send with the default configuration.
-    #[instrument(skip_all)]
-    pub async fn send_with<F: Fn(Connection, IncomingMsgs)>(
-        &self,
-        bytes: UsrMsgBytes,
-        listen: F,
-    ) -> Result<(), SendToOneError> {
-        let default_priority = 10;
-        let conn = self.get_or_connect_with_listener(listen).await?;
-        trace!(
-            "We have {} open connections to peer {}.",
-            self.connections.read().await.len(),
-            self.peer
-        );
-
-        // Simulate failed connections
-        #[cfg(feature = "chaos")]
-        {
-            use rand::Rng;
-            let mut rng = rand::thread_rng();
-            let x: f64 = rng.gen_range(0.0..1.0);
-
-            if x > 0.9 {
-                warn!(
-                    "\n =========== [Chaos] Connection fail chaos. Conection removed from Link w/ x of: {}. ============== \n",
-                    x
-                );
-
-                // clean up failing connections at once, no nead to leak it outside of here
-                // next send (e.g. when retrying) will use/create a new connection
-                let id = &conn.id();
-
-                {
-                    let _ = self.connections.write().await.remove(id);
-                }
-                conn.close(Some(format!("{:?}", error)));
-                Err(SendToOneError::ChaosNoConnection)
-            }
-        }
-
-        match conn.send_with(bytes, default_priority, None).await {
-            Ok(()) => Ok(()),
-            Err(error) => {
-                // clean up failing connections at once, no nead to leak it outside of here
-                // next send (e.g. when retrying) will use/create a new connection
-                let id = &conn.id();
-
-                {
-                    let _ = self.connections.write().await.remove(id);
-                }
-                Err(SendToOneError::Send(error))
-            }
-        }
-    }
-
-    pub async fn send_bi(&self, bytes: UsrMsgBytes) -> Result<RecvStream, SendToOneError> {
-        let conn = self.get_or_connect().await?;
-
+        msg_id: MsgId,
+    ) -> Result<RecvStream, SendToOneError> {
+        debug!("sending bidi msg out... {msg_id:?} ");
+        let conn = self.get_or_connect(msg_id).await?;
+        debug!("conenction got {msg_id:?}");
         let (mut send_stream, recv_stream) =
             conn.open_bi().await.map_err(SendToOneError::Connection)?;
+
+        debug!("{msg_id:?} bidi opened");
         send_stream.set_priority(10);
         send_stream
-            .send_user_msg(bytes)
+            .send_user_msg(bytes.clone())
             .await
             .map_err(SendToOneError::Send)?;
+        debug!("{msg_id:?} bidi msg sent");
 
         send_stream.finish().await.or_else(|err| match err {
             qp2p::SendError::StreamLost(qp2p::StreamError::Stopped(_)) => Ok(()),
             _ => Err(SendToOneError::Send(err)),
         })?;
-
+        debug!("{msg_id:?} bidi finished");
         Ok(recv_stream)
     }
 
-    // gets a conn or creates one with a listener func
-    async fn get_or_connect_with_listener<F: Fn(Connection, IncomingMsgs)>(
-        &self,
-        listen: F,
-    ) -> Result<Connection, SendToOneError> {
-        if self.connections.read().await.is_empty() {
-            // read again
-            // first caller will find none again, but the subsequent callers
-            // will access only after the first one finished creating a new connection
-            // thus will find a connection here:
-            debug!("creating conn with {:?}", self.peer);
-            self.create_connection_with_listener(listen).await
-        } else {
-            // let x = self.connections.read().await.iter().enumerate().filter(|(i, _)| i == 0).map(|(_,conn)|conn);
-            if let Some((_id, conn)) = self.connections.read().await.iter().next() {
-                return Ok(conn.clone());
-            }
-
-            // we should never hit here...
-            // but if we do, we'll try making a conn
-            self.create_connection_with_listener(listen).await
-        }
-    }
-
     // Get a connection or create a fresh one
-    async fn get_or_connect(&self) -> Result<Connection, SendToOneError> {
-        if self.connections.read().await.is_empty() {
+    async fn get_or_connect(&self, msg_id: MsgId) -> Result<Connection, SendToOneError> {
+        debug!("Attempting to get conn read lock... {msg_id:?}");
+        let empty_conns = self.connections.read().await.is_empty();
+        debug!("lockgottt {msg_id:?}");
+        if empty_conns {
             // read again
             // first caller will find none again, but the subsequent callers
             // will access only after the first one finished creating a new connection
             // thus will find a connection here:
-            debug!("creating conn with {:?}", self.peer);
-            self.create_connection().await
+            debug!("{msg_id:?} creating conn with {:?}", self.peer);
+            self.create_connection(msg_id).await
         } else {
-            // let x = self.connections.read().await.iter().enumerate().filter(|(i, _)| i == 0).map(|(_,conn)|conn);
-            if let Some((_id, conn)) = self.connections.read().await.iter().next() {
-                return Ok(conn.clone());
-            }
-
-            // we should never hit here...
-            // but if we do, we'll try making a conn
-            self.create_connection().await
+            debug!("{msg_id:?} connections do exist...");
+            // TODO: add in simple connection check when available.
+            // we can then remove dead conns easily and return only valid conns
+            let connections = self.connections.read().await;
+            let conn = connections.iter().next().map(|(_, c)| c.clone());
+            // we have to drop connection read here before we attempt to create (and write) connections
+            drop(connections);
+            Ok(conn.unwrap_or(self.create_connection(msg_id).await?))
         }
     }
 
@@ -207,38 +108,19 @@ impl Link {
         !self.connections.read().await.is_empty()
     }
 
-    async fn create_connection_with_listener<F: Fn(Connection, IncomingMsgs)>(
-        &self,
-        listen: F,
-    ) -> Result<Connection, SendToOneError> {
-        let (conn, incoming_msgs) = self
-            .endpoint
-            .connect_to(&self.peer.addr())
-            .await
-            .map_err(SendToOneError::Connection)?;
-
-        trace!(
-            "{} to {} (id: {})",
-            LogMarker::ConnectionOpened,
-            conn.remote_address(),
-            conn.id()
-        );
-
-        self.insert(conn.clone()).await;
-
-        listen(conn.clone(), incoming_msgs);
-
-        Ok(conn)
-    }
-
     /// Uses qp2p to create a connection and stores it on Self
-    async fn create_connection(&self) -> Result<Connection, SendToOneError> {
+    async fn create_connection(&self, msg_id: MsgId) -> Result<Connection, SendToOneError> {
+        // grab write lock to prevent many many conns being opened at once
+        let mut conns = self.connections.write().await;
+
+        debug!("{msg_id:?} creating connnnn to {:?}", self.peer);
         let (conn, _incoming_msgs) = self
             .endpoint
             .connect_to(&self.peer.addr())
             .await
             .map_err(SendToOneError::Connection)?;
 
+        debug!("conn creating done {:?}", self.peer);
         trace!(
             "{} to {} (id: {})",
             LogMarker::ConnectionOpened,
@@ -246,17 +128,9 @@ impl Link {
             conn.id()
         );
 
-        self.insert(conn.clone()).await;
+        let _ = conns.insert(conn.id(), conn.clone());
 
         Ok(conn)
-    }
-
-    async fn insert(&self, conn: Connection) {
-        let id = conn.id();
-
-        {
-            let _ = self.connections.write().await.insert(id.clone(), conn);
-        }
     }
 }
 
@@ -270,6 +144,8 @@ pub enum SendToOneError {
     #[cfg(feature = "chaos")]
     /// ChaosNoConn
     ChaosNoConnection,
+    /// Sending failed repeatedly
+    SendRepeatedlyFailed,
 }
 
 impl SendToOneError {

@@ -6,27 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{messaging::NUM_OF_ELDERS_SUBSET_FOR_QUERIES, MsgResponse, Session};
+use super::{messaging::NUM_OF_ELDERS_SUBSET_FOR_QUERIES, Session};
 
 use crate::{Error, Result};
 
 use qp2p::{RecvStream, UsrMsgBytes};
 use sn_interface::{
     at_least_one_correct_elder,
-    messaging::{
-        data::ClientMsg,
-        system::{AntiEntropyKind, NodeMsg},
-        AuthorityProof, ClientAuth, Dst, MsgId, MsgKind, MsgType, WireMsg,
-    },
+    messaging::{data::ClientMsg, AuthorityProof, ClientAuth, Dst, MsgId, MsgType, WireMsg},
     network_knowledge::{SectionAuthorityProvider, SectionTreeUpdate},
-    types::{log_markers::LogMarker, Peer},
+    types::Peer,
 };
 
 use itertools::Itertools;
 use rand::{rngs::OsRng, seq::SliceRandom};
-use std::net::SocketAddr;
-use tokio::sync::mpsc;
-use tracing::Instrument;
 
 impl Session {
     #[instrument(skip_all, level = "debug")]
@@ -48,191 +41,9 @@ impl Session {
         Ok(msg_type)
     }
 
-    // Spawn a task to wait for a single msg incoming on the provided RecvStream
-    #[instrument(skip_all, level = "debug")]
-    pub(crate) fn spawn_recv_stream_listener(
-        mut session: Self,
-        msg_id: MsgId,
-        peer: Peer,
-        mut recv_stream: RecvStream,
-        resp_tx: mpsc::Sender<MsgResponse>,
-    ) {
-        let addr = peer.addr();
-        let stream_id = recv_stream.id();
-        debug!("Waiting for response msg on {stream_id} from {peer:?} for {msg_id:?}");
-
-        let _handle = tokio::spawn(async move {
-            match Self::read_msg_from_recvstream(&mut recv_stream).await {
-                Ok(MsgType::Client { msg_id, msg, .. }) => {
-                    Self::handle_client_msg(msg_id, msg, peer.addr(), resp_tx).await;
-                }
-                Ok(MsgType::Node { msg, .. }) => {
-                    if let Err(err) = session.handle_system_msg(msg, peer, resp_tx).await {
-                        error!(
-                            "Error while handling incoming system msg on {stream_id} \
-                            from {addr:?} for {msg_id:?}: {err:?}"
-                        );
-                    }
-                }
-                Err(error) => {
-                    error!(
-                        "Error while processing incoming msg on {stream_id} \
-                        from {addr:?} in response to {msg_id:?}: {error:?}"
-                    );
-                }
-            }
-
-            // TODO: ???? once we drop the stream, do we know the connection is closed ???
-            trace!("{} to {}", LogMarker::ConnectionClosed, addr);
-        })
-        .in_current_span();
-    }
-
-    async fn handle_system_msg(
-        &mut self,
-        msg: NodeMsg,
-        src_peer: Peer,
-        resp_tx: mpsc::Sender<MsgResponse>,
-    ) -> Result<(), Error> {
-        match msg {
-            NodeMsg::AntiEntropy {
-                section_tree_update,
-                kind:
-                    AntiEntropyKind::Redirect { bounced_msg } | AntiEntropyKind::Retry { bounced_msg },
-            } => {
-                debug!("AE-Redirect/Retry msg received");
-                let result = self
-                    .handle_ae_msg(section_tree_update, bounced_msg, src_peer, resp_tx)
-                    .await;
-                if result.is_err() {
-                    error!("Failed to handle AE msg from {src_peer:?}, {result:?}");
-                }
-                result
-            }
-            msg_type => {
-                warn!("Unexpected msg type received: {msg_type:?}");
-                Ok(())
-            }
-        }
-    }
-
-    #[instrument(skip(resp_tx), level = "debug")]
-    async fn write_msg_response(
-        resp_tx: mpsc::Sender<MsgResponse>,
-        correlation_id: MsgId,
-        src_addr: SocketAddr,
-        msg_resp: MsgResponse,
-    ) {
-        if let Err(err) = resp_tx.send(msg_resp).await {
-            // this is not necessarily a problem, the receiver could have closed
-            // the channel if enough responses were already received
-            warn!(
-                "Error reporting from response listener, response received from {src_addr:?} for \
-                correlation_id {correlation_id:?}: {err:?}"
-            );
-        } else {
-            debug!(
-                "Response received from {src_addr:?} for correlation_id {correlation_id:?} \
-                reported from listener"
-            );
-        }
-    }
-
-    // Handle msgs intended for client consumption (re: queries + cmds)
-    #[instrument(skip(resp_tx), level = "debug")]
-    async fn handle_client_msg(
-        msg_id: MsgId,
-        msg: ClientMsg,
-        src_addr: SocketAddr,
-        resp_tx: mpsc::Sender<MsgResponse>,
-    ) {
-        debug!("ClientMsg with id {msg_id:?} received from {src_addr:?}",);
-
-        let (msg_resp, correlation_id) = match msg {
-            ClientMsg::QueryResponse {
-                response,
-                correlation_id,
-            } => {
-                trace!(
-                    "ClientMsg with id {msg_id:?} is QueryResponse regarding correlation_id \
-                    {correlation_id:?} with response {response:?}"
-                );
-
-                let resp = MsgResponse::QueryResponse(src_addr, Box::new(response));
-                (resp, correlation_id)
-            }
-            ClientMsg::CmdResponse {
-                response,
-                correlation_id,
-            } => {
-                trace!(
-                    "ClientMsg with id {msg_id:?} is CmdResponse regarding correlation_id \
-                    {correlation_id:?} with response {response:?}"
-                );
-                let resp = MsgResponse::CmdResponse(src_addr, Box::new(response));
-                (resp, correlation_id)
-            }
-            _ => {
-                warn!("Ignoring unexpected msg type received: {msg:?}");
-                return;
-            }
-        };
-
-        Self::write_msg_response(resp_tx, correlation_id, src_addr, msg_resp).await;
-    }
-
-    // Handle Anti-Entropy Redirect or Retry msgs
-    #[instrument(skip_all, level = "debug")]
-    async fn handle_ae_msg(
-        &mut self,
-        section_tree_update: SectionTreeUpdate,
-        bounced_msg: UsrMsgBytes,
-        src_peer: Peer,
-        resp_tx: mpsc::Sender<MsgResponse>,
-    ) -> Result<(), Error> {
-        let target_sap = section_tree_update.signed_sap.value.clone();
-        debug!("Received Anti-Entropy from {src_peer}, with SAP: {target_sap:?}");
-
-        // Try to update our network knowledge first
-        self.update_network_knowledge(section_tree_update, src_peer)
-            .await;
-
-        if let Some((msg_id, elders, service_msg, dst, auth)) =
-            Self::new_target_elders(bounced_msg.clone(), &target_sap).await?
-        {
-            let ae_msg_src_name = src_peer.name();
-            // here we send this to only one elder for each AE message we get in. We _should_ have one per elder we sent to.
-            // deterministically send to most elder based upon sender
-            let target_elder = elders
-                .iter()
-                .sorted_by(|lhs, rhs| ae_msg_src_name.cmp_distance(&lhs.name(), &rhs.name()))
-                .cloned()
-                .collect_vec()
-                .pop();
-
-            // there should always be one
-            if let Some(elder) = target_elder {
-                let payload = WireMsg::serialize_msg_payload(&service_msg)?;
-                let wire_msg =
-                    WireMsg::new_msg(msg_id, payload, MsgKind::Client(auth.into_inner()), dst);
-
-                debug!(
-                    "Resending original message on AE-Redirect with updated details. \
-                    Expecting an AE-Retry next"
-                );
-                self.send_msg(vec![elder], wire_msg, msg_id, false, resp_tx)
-                    .await?;
-            } else {
-                error!("No elder determined for resending AE message");
-            }
-        }
-
-        Ok(())
-    }
-
     /// Update our network knowledge making sure proof chain validates the
     /// new SAP based on currently known remote section SAP or genesis key.
-    async fn update_network_knowledge(
+    pub(crate) async fn update_network_knowledge(
         &mut self,
         section_tree_update: SectionTreeUpdate,
         src_peer: Peer,
@@ -268,7 +79,8 @@ impl Session {
     /// Checks AE cache to see if we should be forwarding this msg (and to whom)
     /// or if it has already been dealt with
     #[instrument(skip_all, level = "debug")]
-    async fn new_target_elders(
+    #[allow(clippy::type_complexity)]
+    pub(crate) async fn new_target_elders(
         bounced_msg: UsrMsgBytes,
         received_auth: &SectionAuthorityProvider,
     ) -> Result<Option<(MsgId, Vec<Peer>, ClientMsg, Dst, AuthorityProof<ClientAuth>)>, Error> {

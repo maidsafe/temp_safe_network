@@ -138,19 +138,12 @@ async fn main() -> Result<()> {
         )
     }
 
-    if command_line_args.keep_alive_interval_msec.is_some() {
-        assert_eq!(
-            command_line_args
-                .keep_alive_interval_msec
-                .map(|i| Duration::from_millis(i.into())),
-            config.network_config.keep_alive_interval
-        )
-    } else {
-        assert_eq!(
-            file_config.network_config.keep_alive_interval,
-            config.network_config.keep_alive_interval
-        )
-    }
+    assert_eq!(
+        Some(Duration::from_millis(
+            command_line_args.keep_alive_interval_msec
+        )),
+        config.network_config.keep_alive_interval
+    );
 
     if command_line_args.upnp_lease_duration.is_some() {
         assert_eq!(

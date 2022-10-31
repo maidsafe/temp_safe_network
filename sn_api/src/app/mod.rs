@@ -123,8 +123,8 @@ impl Safe {
     }
 
     // Private helper to obtain the Client instance
-    pub(crate) fn get_safe_client(&self) -> Result<&Client> {
-        match &self.client {
+    pub(crate) fn get_safe_client(&mut self) -> Result<Client> {
+        match self.client {
             Some(client) => Ok(client),
             None => Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
         }

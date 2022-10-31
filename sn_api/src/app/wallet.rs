@@ -37,11 +37,11 @@ const NUM_OF_DBC_REISSUE_ATTEMPTS: u8 = 5;
 
 /// Verifier required by sn_dbc API to check a SpentProof
 /// is signed by known sections keys.
-struct SpentProofKeyVerifier<'a> {
-    client: &'a Client,
+struct SpentProofKeyVerifier {
+    client: Client,
 }
 
-impl sn_dbc::SpentProofKeyVerifier for SpentProofKeyVerifier<'_> {
+impl sn_dbc::SpentProofKeyVerifier for SpentProofKeyVerifier {
     type Error = crate::Error;
 
     // Called by sn_dbc API when it needs to verify a SpentProof is signed by a known key,
@@ -462,7 +462,7 @@ impl Safe {
             .add_inputs_dbc_bearer(input_dbcs.iter())?
             .add_outputs_by_amount(outputs.into_iter().map(|(token, owner)| (token, owner)));
 
-        let client = self.get_safe_client()?;
+        let mut client = self.get_safe_client()?;
         let change_owneronce =
             OwnerOnce::from_owner_base(client.dbc_owner().clone(), &mut rng::thread_rng());
         if change_amount.as_nano() > 0 {

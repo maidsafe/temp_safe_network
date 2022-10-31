@@ -193,6 +193,9 @@ pub enum Error {
         /// Number of Chunks retrieved
         retrieved: usize,
     },
+    /// All attempts to initiate bi di streams via Link Connections failed
+    #[error("All attempts to initiate bi di streams via Link Connections failed: {0:?}")]
+    FailedToInitateBiDiStream(MsgId),
     /// Could not chunk all the data required to encrypt the data. (Expected, Actual)
     #[error("Not all data was chunked, expected {expected}, but we have {chunked}.)")]
     NotAllDataWasChunked {

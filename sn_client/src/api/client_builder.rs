@@ -191,7 +191,7 @@ impl ClientBuilder {
             .dbc_owner
             .unwrap_or_else(|| Owner::from_random_secret_key(&mut rand::thread_rng()));
 
-        let client = Client {
+        let mut client = Client {
             keypair,
             dbc_owner,
             session,
