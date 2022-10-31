@@ -30,7 +30,7 @@ use xor_name::XorName;
 
 impl MyNode {
     // Locate ideal holders for this data, instruct them to store the data
-    pub(crate) async fn replicate_data(
+    pub(crate) async fn replicate_data_to_adults(
         &self,
         data: ReplicatedData,
         targets: BTreeSet<Peer>,

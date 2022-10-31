@@ -340,7 +340,7 @@ impl MyNode {
         // cmds here may be dysfunction tracking.
         // CmdAcks are sent over the send stream herein
         cmds.extend(
-            self.replicate_data(
+            self.replicate_data_to_adults(
                 data,
                 targets,
                 send_stream,
