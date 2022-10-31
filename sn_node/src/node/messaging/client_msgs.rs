@@ -22,8 +22,7 @@ use sn_interface::{
     data_copy_count,
     messaging::{
         data::{
-            ClientMsg, CmdResponse, DataCmd, DataQueryVariant, EditRegister, SignedRegisterEdit,
-            SpentbookCmd,
+            ClientMsg, DataCmd, DataQueryVariant, EditRegister, SignedRegisterEdit, SpentbookCmd,
         },
         system::{NodeMsg, OperationId},
         AuthorityProof, ClientAuth, MsgId,
@@ -42,28 +41,6 @@ use std::sync::Arc;
 use xor_name::XorName;
 
 impl MyNode {
-    /// Forms a `ACK` msg to send back to the client
-    pub(crate) fn send_cmd_ack(
-        &self,
-        target: Peer,
-        correlation_id: MsgId,
-        send_stream: Option<Arc<Mutex<SendStream>>>,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
-    ) -> Cmd {
-        // NB: temp use of `CmdResponse::StoreChunk(Ok(()))` before that is handled at Adult.
-        let the_ack_msg = ClientMsg::CmdResponse {
-            response: CmdResponse::StoreChunk(Ok(())),
-            correlation_id,
-        };
-        self.send_client_msg(
-            the_ack_msg,
-            Peers::Single(target),
-            send_stream,
-            #[cfg(feature = "traceroute")]
-            traceroute,
-        )
-    }
-
     /// Forms a `QueryError` msg to send back to the client on a stream
     pub(crate) async fn query_error_response(
         &self,
@@ -86,7 +63,7 @@ impl MyNode {
                 payload,
                 kind,
                 stream,
-                source_peer,
+                Some(source_peer),
                 correlation_id,
                 #[cfg(feature = "traceroute")]
                 traceroute,
@@ -154,6 +131,7 @@ impl MyNode {
         query: &DataQueryVariant,
         auth: ClientAuth,
         requesting_elder: Peer,
+        msg_id: MsgId,
         send_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<()> {
@@ -170,10 +148,11 @@ impl MyNode {
 
         let (kind, payload) = self.serialize_node_msg(msg)?;
 
-        let (bytes, msg_id) = self.form_usr_msg_bytes_to_node(
+        let bytes = self.form_usr_msg_bytes_to_node(
             payload,
             kind,
-            requesting_elder,
+            Some(requesting_elder),
+            msg_id,
             #[cfg(feature = "traceroute")]
             traceroute,
         )?;
@@ -226,7 +205,7 @@ impl MyNode {
             ClientMsg::Cmd(cmd) => cmd,
             ClientMsg::Query(query) => {
                 return self
-                    .read_data_from_adults_and_respond_to_client(
+                    .read_data_from_adult_and_respond_to_client(
                         query,
                         msg_id,
                         auth,
@@ -322,6 +301,8 @@ impl MyNode {
             };
 
             debug!("Will send error response back to client");
+
+            // TODO: Use response stream here. This wont work anymore!
             let cmd = self.cmd_error_response(
                 cmd,
                 error,
@@ -335,21 +316,19 @@ impl MyNode {
         }
 
         // the replication msg sent to adults
-        cmds.push(self.replicate_data(
-            data,
-            targets,
-            #[cfg(feature = "traceroute")]
-            traceroute.clone(),
-        ));
-
-        // the ack sent to client
-        cmds.push(self.send_cmd_ack(
-            origin,
-            msg_id,
-            send_stream,
-            #[cfg(feature = "traceroute")]
-            traceroute,
-        ));
+        // cmds here may be dysfunction tracking.
+        // CmdAcks are sent over the send stream herein
+        cmds.extend(
+            self.replicate_data_to_adults(
+                data,
+                msg_id,
+                targets,
+                send_stream,
+                #[cfg(feature = "traceroute")]
+                traceroute.clone(),
+            )
+            .await?,
+        );
 
         Ok(cmds)
     }

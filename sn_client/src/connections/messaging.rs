@@ -22,13 +22,12 @@ use sn_interface::{
         ClientAuth, Dst, MsgId, MsgKind, WireMsg,
     },
     network_knowledge::supermajority,
-    types::{ChunkAddress, Peer, SendToOneError},
+    types::{ChunkAddress, Peer},
 };
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bytes::Bytes;
 use futures::future::join_all;
-use qp2p::SendError;
 use rand::{rngs::OsRng, seq::SliceRandom};
 use std::{collections::BTreeSet, time::Duration};
 use tokio::sync::mpsc;
@@ -111,6 +110,7 @@ impl Session {
         elders: Vec<Peer>,
         mut resp_rx: mpsc::Receiver<MsgResponse>,
     ) -> Result<()> {
+        debug!("----> init of check for acks for {:?}", msg_id);
         let expected_acks = elders.len();
         let mut received_acks = BTreeSet::default();
         let mut received_errors = BTreeSet::default();
@@ -167,7 +167,10 @@ impl Session {
             .filter(|p| !received_errors.contains(&p.addr()))
             .collect();
 
-        error!("Missing Responses from: {:?}", missing_responses);
+        debug!(
+            "Missing Responses for {msg_id:?} from: {:?}",
+            missing_responses
+        );
 
         debug!(
             "Insufficient acks returned: {}/{expected_acks}",
@@ -589,90 +592,72 @@ impl Session {
         nodes: Vec<Peer>,
         wire_msg: WireMsg,
         msg_id: MsgId,
-        mut force_new_link: bool,
+        force_new_link: bool,
         resp_tx: mpsc::Sender<MsgResponse>,
     ) -> Result<()> {
         debug!("---> send msg {msg_id:?} going... will force new?: {force_new_link}");
         let bytes = wire_msg.serialize()?;
 
-        // Send message to all Elders concurrently
-        let tasks = nodes
-            .clone()
-            .into_iter()
-            .map(|peer| {
-                let session = self.clone();
-                let bytes = bytes.clone();
-                let resp_tx_clone = resp_tx.clone();
+        let mut tasks = vec![];
+        let nodes_len = nodes.len();
 
-                tokio::spawn(async move {
-                    let mut link = session
-                        .peer_links
-                        .get_or_create_link(&peer, force_new_link)
-                        .await;
+        for peer in nodes.clone() {
+            let session = self.clone();
+            let bytes = bytes.clone();
+            let resp_tx_clone = resp_tx.clone();
 
-                    let result = loop {
-                        match link.send_bi(bytes.clone()).await {
-                            Ok(recv_stream) => {
-                                // let's spawn a task for each bi-stream to listen for responses
-                                Self::spawn_recv_stream_listener(
-                                    session.clone(),
-                                    msg_id,
-                                    peer,
-                                    recv_stream,
-                                    resp_tx_clone,
-                                );
-                                break Ok(());
-                            }
-                            #[cfg(features = "chaos")]
-                            Err(SendToOneError::ChaosNoConnection) => {
-                                break Err(Error::ChoasSendFail)
-                            }
-                            Err(SendToOneError::Connection(error)) => {
-                                break Err(Error::QuicP2pConnection { peer, error, msg_id });
-                            }
-                            Err(SendToOneError::Send(error @ SendError::ConnectionLost(_))) => {
-                                warn!("Connection lost to {peer:?} (new link?: {force_new_link}): {error}");
+            let task = async move {
+                let link = session
+                    .peer_links
+                    .get_or_create_link(&peer, force_new_link)
+                    .await;
 
-                                // Unless we were forcing a new link to the peer up front, let's
-                                // retry (only once) to reconnect to this peer and send the msg.
-                                if force_new_link {
-                                    break Err(Error::QuicP2pSend { peer, error, msg_id });
-                                } else {
-                                    // let's retry once by forcing a new connection to this peer
-                                    force_new_link = true;
-                                    link = session
-                                        .peer_links
-                                        .get_or_create_link(&peer, force_new_link)
-                                        .await;
-                                    continue;
-                                }
-                            }
-                            Err(SendToOneError::Send(error)) => {
-                                break Err(Error::QuicP2pSend { peer, error, msg_id });
-                            }
+                debug!("Trying to send msg to link {msg_id:?} to {peer:?}");
+                let result = {
+                    match link.send_bi(bytes.clone(), msg_id).await {
+                        Ok(recv_stream) => {
+                            debug!(
+                                "That's {msg_id:?} sent to {peer:?}... spawning recieve listener"
+                            );
+                            // let's spawn a task for each bi-stream to listen for responses
+                            Self::spawn_recv_stream_listener(
+                                session.clone(),
+                                msg_id,
+                                peer,
+                                recv_stream,
+                                resp_tx_clone,
+                            );
+
+                            Ok(())
                         }
-                    };
-
-                    if let Err(err) = &result {
-                        session.peer_links.remove_link_from_peer_links(&peer).await;
-                        warn!("Issue when sending {msg_id:?} to {peer:?}: {err:?}");
+                        #[cfg(features = "chaos")]
+                        Err(SendToOneError::ChaosNoConnection) => break Err(Error::ChoasSendFail),
+                        Err(error) => {
+                            error!("Error sending {msg_id:?} bidi to {peer:?}: {error:?}");
+                            Err(Error::FailedToInitateBiDiStream(msg_id))
+                        }
                     }
+                };
 
-                    result
-                })
-            })
-            .collect::<Vec<_>>();
+                if let Err(err) = &result {
+                    session.peer_links.remove_link_from_peer_links(&peer).await;
+                    warn!("Issue when sending {msg_id:?} to {peer:?}: {err:?}");
+                }
+
+                result
+            };
+
+            tasks.push(task)
+        }
 
         // Let's await for all messages to be sent
         let results = join_all(tasks).await;
 
-        let nodes_len = nodes.len();
         let mut last_error = None;
         let mut failures = nodes_len;
         results.into_iter().for_each(|result| match result {
-            Ok(Err(error)) => last_error = Some(error),
-            Ok(Ok(())) => failures -= 1,
-            Err(join_error) => warn!("Tokio join error as we send: {join_error:?}"),
+            Err(error) => last_error = Some(error),
+            Ok(()) => failures -= 1,
         });
 
         if failures > 0 {

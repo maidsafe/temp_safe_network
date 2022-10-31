@@ -8,7 +8,7 @@ use sn_interface::{
     data_copy_count,
     messaging::{
         data::{ClientMsg, DataQuery, DataQueryVariant, QueryResponse},
-        WireMsg, MsgId
+        MsgId, WireMsg,
     },
     types::{Chunk, ChunkAddress},
 };

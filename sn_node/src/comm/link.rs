@@ -10,9 +10,9 @@ use super::MsgListener;
 
 use dashmap::DashMap;
 use qp2p::{Connection, Endpoint, RetryConfig, UsrMsgBytes};
+use sn_interface::messaging::MsgId;
 use sn_interface::types::{log_markers::LogMarker, Peer};
 use std::sync::Arc;
-
 type ConnId = String;
 
 /// A link to a peer in our network.
@@ -110,43 +110,101 @@ impl Link {
     pub(crate) async fn send_bi(
         &mut self,
         bytes: UsrMsgBytes,
+        msg_id: MsgId,
     ) -> Result<UsrMsgBytes, SendToOneError> {
-        debug!("Sending via a bi stream");
-        // TODO: pull this conn from link..
-        let conn = self.get_or_connect().await?;
+        trace!("Sending {msg_id:?} via a bi stream");
 
-        debug!("connnnection got");
+        let conn = match self.get_or_connect().await {
+            Ok(conn) => conn,
+            Err(err) => {
+                error!(
+                    "Err getting connection during bi stream initialisation {msg_id:?}. Retrying"
+                );
+                return Err(err);
+            }
+        };
+        let conn_id = conn.id();
+        trace!("connection got to: {:?} {msg_id:?}", self.peer);
         let (mut send_stream, mut recv_stream) =
-            conn.open_bi().await.map_err(SendToOneError::Connection)?;
-        send_stream.set_priority(10);
-        send_stream
-            .send_user_msg(bytes)
-            .await
-            .map_err(SendToOneError::Send)?;
+            match conn.open_bi().await.map_err(SendToOneError::Connection) {
+                Ok(streams) => streams,
+                Err(stream_opening_err) => {
+                    error!("{msg_id:?} Error opening streams {stream_opening_err:?}");
 
+                    let _conn = self.connections.remove(&conn_id);
+
+                    return Err(stream_opening_err);
+                }
+            };
+        trace!("bidi openeed for {msg_id:?} to: {:?}", self.peer);
+        send_stream.set_priority(10);
+        match send_stream.send_user_msg(bytes.clone()).await {
+            Ok(_) => {}
+            Err(err) => {
+                error!("Error sending bytes {msg_id:?} over stream: {:?}", err);
+                // remove that broken conn
+                let _conn = self.connections.remove(&conn_id);
+            }
+        }
+
+        trace!("{msg_id:?} bidi sent to: {:?}", self.peer);
         send_stream.finish().await.or_else(|err| match err {
             qp2p::SendError::StreamLost(qp2p::StreamError::Stopped(_)) => Ok(()),
-            _ => Err(SendToOneError::Send(err)),
+            _ => {
+                error!("{msg_id:?} Error finishing up stream... {err:?}");
+                Err(SendToOneError::Send(err))
+            }
         })?;
+
+        trace!("bidi finished {msg_id:?} to: {:?}", self.peer);
 
         recv_stream.next().await.map_err(SendToOneError::Recv)
     }
 
     // Gets an existing connection or creates a new one to the Link's Peer
+    // Should only return still valid connections
     pub(crate) async fn get_or_connect(&mut self) -> Result<Connection, SendToOneError> {
         if self.connections.is_empty() {
             debug!("attempting to create a connection");
             self.create_connection().await
         } else {
-            trace!("Grabbing a connection from link..");
-            // let mut fastest_conn = None;
-            if let Some(conn) = self.connections.iter().next() {
-                return Ok(conn.value().clone());
+            trace!("Grabbing a connection from link.. {:?}", self.peer());
+            // TODO: add in simple connection check when available.
+            // we can then remove dead conns easily and return only valid conns
+            let connections = &self.connections;
+            let mut dead_conns = vec![];
+            let mut live_conn = None;
+
+            for entry in connections.iter() {
+                let conn = entry.value().clone();
+                let conn_id = conn.id();
+
+                let is_valid = conn.open_bi().await.is_ok();
+
+                if !is_valid {
+                    dead_conns.push(conn_id);
+                    continue;
+                }
+                //we have a conn
+                live_conn = Some(conn);
+                break;
             }
 
-            error!("No connection existed in connections, even though it's marked as non-empty");
-            // This should not be possible to hit...
-            Err(SendToOneError::NoConnection)
+            // cleanup dead conns
+            for dead_conn in dead_conns {
+                let _gone = self.connections.remove(&dead_conn);
+            }
+
+            if let Some(conn) = live_conn {
+                trace!("live connection found to {:?}", self.peer());
+                Ok(conn)
+            } else {
+                trace!(
+                    "No live connection found to {:?}, creating a new one.",
+                    self.peer()
+                );
+                self.create_connection().await
+            }
         }
     }
 
@@ -190,8 +248,6 @@ pub(crate) enum SendToOneError {
     Send(qp2p::SendError),
     ///
     Recv(qp2p::RecvError),
-    /// No Connection Exists to send on, as required by should_establish_new_connection
-    NoConnection,
 }
 
 impl SendToOneError {

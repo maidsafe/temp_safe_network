@@ -16,7 +16,6 @@ use sn_interface::{
 use qp2p::ConnectionIncoming;
 use tokio::{sync::mpsc, task};
 use tracing::Instrument;
-
 #[derive(Debug)]
 pub(crate) enum ListenerEvent {
     Connected {
