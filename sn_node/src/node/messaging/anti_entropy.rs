@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::log_sleep;
 use crate::node::{
     flow_ctrl::cmds::Cmd,
     messaging::{OutgoingMsg, Peers},
@@ -15,7 +14,6 @@ use crate::node::{
 
 use bls::PublicKey as BlsPublicKey;
 use qp2p::{SendStream, UsrMsgBytes};
-use rand::Rng;
 use sn_interface::{
     messaging::{
         system::{AntiEntropyKind, NodeCmd, NodeMsg, SectionSigned},
@@ -24,7 +22,7 @@ use sn_interface::{
     network_knowledge::{NodeState, SectionTreeUpdate},
     types::{log_markers::LogMarker, Peer, PublicKey},
 };
-use std::{collections::BTreeSet, sync::Arc, time::Duration};
+use std::{collections::BTreeSet, sync::Arc};
 use tokio::sync::Mutex;
 use xor_name::{Prefix, XorName};
 
@@ -244,7 +242,10 @@ impl MyNode {
                     .ae_update_msg_received(&sender.name());
                 return Ok(cmds);
             } // Nope, bail early
-            AntiEntropyKind::Retry { bounced_msg } => (bounced_msg, sender),
+            AntiEntropyKind::Retry { bounced_msg } => {
+                trace!("{}", LogMarker::AeResendAfterRetry);
+                (bounced_msg, sender)
+            }
             AntiEntropyKind::Redirect { bounced_msg } => {
                 // We choose the Elder closest to the dst section key,
                 // just to pick one of them in an arbitrary but deterministic fashion.
@@ -259,6 +260,8 @@ impl MyNode {
                     error!("Failed to find closest Elder to resend msg upon AE-Redirect response.");
                     return Ok(cmds);
                 };
+
+                trace!("{}", LogMarker::AeResendAfterRedirect);
 
                 (bounced_msg, chosen_dst_elder)
             }
@@ -280,21 +283,9 @@ impl MyNode {
             error!("Dropping bounced msg ({sender:?}) received in AE-Retry from {msg_id:?} as suggested new dst section key is the same as previously sent: {:?}", sap.section_key());
             return Ok(cmds);
         }
-        self.hold_back_randomly().await;
-        trace!("{}", LogMarker::AeResendAfterAeRedirect);
-
+        trace!("Resend Original {msg_id:?} to {response_peer:?} with {msg_to_resend:?}");
         cmds.push(self.send_system_msg(msg_to_resend, Peers::Single(response_peer)));
         Ok(cmds)
-    }
-
-    async fn hold_back_randomly(&mut self) {
-        // Having a sleep time ranging from 100ms to 1s randomly
-        // TODO: the previous backoff cache has the benefit of detecting false peer that
-        //       sending AE repeatedly. It can also carry out `exponentially backoff`
-        //       on per-peer. Which might be more ideal.
-        let mut rng = rand::rngs::OsRng;
-        let sleep_time: u64 = rng.gen_range(100..1_000);
-        log_sleep!(Duration::from_millis(sleep_time));
     }
 
     // If entropy is found, determine the msg to send in order to
@@ -386,6 +377,12 @@ impl MyNode {
         let ae_msg = self.generate_ae_msg(
             Some(*dst_section_key),
             AntiEntropyKind::Retry { bounced_msg },
+        );
+
+        trace!(
+            "CMD of Sending AE message to {:?} with {:?}",
+            sender,
+            ae_msg
         );
 
         // client response, so send it over stream
