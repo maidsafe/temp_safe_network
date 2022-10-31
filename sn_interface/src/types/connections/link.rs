@@ -138,22 +138,38 @@ impl Link {
     }
 
     pub async fn send_bi(&self, bytes: UsrMsgBytes) -> Result<RecvStream, SendToOneError> {
-        let conn = self.get_or_connect().await?;
+        // TODO: proper retry code setup
+        let mut attempts = 1;
+        while attempts <= 3 {
+            attempts +=1;
+            let conn = match self.get_or_connect().await {
+                Ok(conn) => conn,
+                Err(err) => {
+                    error!("Err getting connection to {:?} during bi stream initialisation. Retrying...", self.peer);
+                    if attempts > 3 {
+                        return Err(err);
+                    }
+                    continue;
+                }
+            };
 
-        let (mut send_stream, recv_stream) =
-            conn.open_bi().await.map_err(SendToOneError::Connection)?;
-        send_stream.set_priority(10);
-        send_stream
-            .send_user_msg(bytes)
-            .await
-            .map_err(SendToOneError::Send)?;
+            let (mut send_stream, recv_stream) =
+                conn.open_bi().await.map_err(SendToOneError::Connection)?;
+            send_stream.set_priority(10);
+            send_stream
+                .send_user_msg(bytes.clone())
+                .await
+                .map_err(SendToOneError::Send)?;
 
-        send_stream.finish().await.or_else(|err| match err {
-            qp2p::SendError::StreamLost(qp2p::StreamError::Stopped(_)) => Ok(()),
-            _ => Err(SendToOneError::Send(err)),
-        })?;
+            send_stream.finish().await.or_else(|err| match err {
+                qp2p::SendError::StreamLost(qp2p::StreamError::Stopped(_)) => Ok(()),
+                _ => Err(SendToOneError::Send(err)),
+            })?;
+            return Ok(recv_stream)
+        }
 
-        Ok(recv_stream)
+        Err(SendToOneError::SendRepeatedlyFailed)
+
     }
 
     // gets a conn or creates one with a listener func
@@ -270,6 +286,8 @@ pub enum SendToOneError {
     #[cfg(feature = "chaos")]
     /// ChaosNoConn
     ChaosNoConnection,
+    /// Sending failed repeatedly
+    SendRepeatedlyFailed
 }
 
 impl SendToOneError {

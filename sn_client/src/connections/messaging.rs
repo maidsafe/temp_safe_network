@@ -167,7 +167,7 @@ impl Session {
             .filter(|p| !received_errors.contains(&p.addr()))
             .collect();
 
-        error!("Missing Responses from: {:?}", missing_responses);
+        error!("Missing Responses for {msg_id:?} from: {:?}", missing_responses);
 
         debug!(
             "Insufficient acks returned: {}/{expected_acks}",
@@ -627,6 +627,9 @@ impl Session {
                             #[cfg(features = "chaos")]
                             Err(SendToOneError::ChaosNoConnection) => {
                                 break Err(Error::ChoasSendFail)
+                            }
+                            Err(SendToOneError::SendRepeatedlyFailed) => {
+                                break Err(Error::FailedToInitateBiDiStream(msg_id))
                             }
                             Err(SendToOneError::Connection(error)) => {
                                 break Err(Error::QuicP2pConnection { peer, error, msg_id });

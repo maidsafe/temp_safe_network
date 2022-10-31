@@ -72,6 +72,7 @@ impl MyNode {
         data: ReplicatedData,
         response_stream: Option<Arc<Mutex<SendStream>>>,
         target: Peer,
+        original_msg_id: MsgId,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
@@ -122,16 +123,16 @@ impl MyNode {
         trace!("Data has been stored: {data_addr:?}");
         let msg = NodeMsg::NodeEvent(NodeEvent::DataStored(data_addr));
         let (kind, payload) = self.serialize_node_msg(msg)?;
-        let (bytes_to_adult, msg_id) = self.form_usr_msg_bytes_to_node(
-            payload.clone(),
-            kind.clone(),
-            target,
-            #[cfg(feature = "traceroute")]
-            traceroute.clone(),
-        )?;
+        // let (bytes_to_elder, msg_id) = self.form_usr_msg_bytes_to_node(
+        //     payload.clone(),
+        //     kind.clone(),
+        //     target,
+        //     #[cfg(feature = "traceroute")]
+        //     traceroute.clone(),
+        // )?;
 
         if let Some(stream) = response_stream {
-            self.send_msg_on_stream(payload, kind, stream, target, msg_id, traceroute.clone())
+            self.send_msg_on_stream(payload, kind, stream, target, original_msg_id, traceroute.clone())
                 .await?;
         } else {
             error!("Cannot respond over stream, none exists after storing! {data_addr:?}");
@@ -482,7 +483,7 @@ impl MyNode {
                 let mut node = node.write().await;
 
                 // store data and respond w/ack on the response stream
-                node.store_data_as_adult_and_respond(data, send_stream, sender, traceroute)
+                node.store_data_as_adult_and_respond(data, send_stream, sender, msg_id, traceroute)
                     .await
             }
             NodeMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)) => {
@@ -599,7 +600,7 @@ impl MyNode {
         }
     }
 
-    pub fn record_storage_level_if_any(
+    fn record_storage_level_if_any(
         &self,
         level: Option<StorageLevel>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,

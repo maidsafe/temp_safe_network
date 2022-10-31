@@ -173,8 +173,9 @@ impl Comm {
         bytes: UsrMsgBytes,
     ) -> Result<WireMsg> {
         if let Some(mut peer) = self.get_or_create(&peer).await {
-            debug!("Peer session retrieved");
+            debug!("Peer session retrieved for {msg_id:?}");
             let adult_response_bytes = peer.send_with_bi_return_response(bytes).await?;
+            debug!("peer response is in for {msg_id:?}");
             WireMsg::from(adult_response_bytes).map_err(|_| Error::InvalidMessage)
         } else {
             debug!("No client conn exists or could be created to send this msg on.... {msg_id:?}");

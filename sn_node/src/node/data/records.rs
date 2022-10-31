@@ -83,6 +83,7 @@ impl MyNode {
                 }
             }?;
 
+            debug!("Response in from peer for {msg_id:?} {response:?}");
             if let MsgType::Node {
                 msg: NodeMsg::NodeEvent(NodeEvent::DataStored(_address)),
                 ..
@@ -232,6 +233,10 @@ impl MyNode {
             }
         }?;
 
+
+        debug!("Response in from peer for {msg_id:?} {response:?}");
+
+
         if let MsgType::Node {
             msg: NodeMsg::NodeQueryResponse { response, .. },
             ..
@@ -285,10 +290,13 @@ impl MyNode {
         debug!("stream locked");
         send_stream.set_priority(stream_prio);
         if let Err(error) = send_stream.send_user_msg(bytes).await {
+
             error!(
                         "Could not send query response {original_msg_id:?} to client {source_peer:?} over response stream: {error:?}",
 
                     );
+                return Err(Error::from(error))
+
         }
         if let Err(error) = send_stream.finish().await {
             error!(
@@ -296,7 +304,7 @@ impl MyNode {
                     );
         }
 
-        debug!("sent");
+        debug!("sent {original_msg_id:?}");
 
         Ok(())
     }

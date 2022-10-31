@@ -112,24 +112,71 @@ impl Link {
         bytes: UsrMsgBytes,
     ) -> Result<UsrMsgBytes, SendToOneError> {
         debug!("Sending via a bi stream");
-        // TODO: pull this conn from link..
-        let conn = self.get_or_connect().await?;
 
-        debug!("connnnection got");
-        let (mut send_stream, mut recv_stream) =
-            conn.open_bi().await.map_err(SendToOneError::Connection)?;
-        send_stream.set_priority(10);
-        send_stream
-            .send_user_msg(bytes)
-            .await
-            .map_err(SendToOneError::Send)?;
+        let mut attempts = 1;
+        while attempts <= 3 {
+            attempts +=1;
+            let conn = match self.get_or_connect().await {
+                Ok(conn) => conn,
+                Err(err) => {
+                    error!("Err getting connection during bi stream initialisation. Retrying");
+                    if attempts > 3 {
+                        return Err(err);
+                    }
+                    continue;
+                }
+            };
+            let conn_id = conn.id();
+            debug!("connnnection got to: {:?}", self.peer);
+            let (mut send_stream, mut recv_stream) =
+                match conn.open_bi().await.map_err(SendToOneError::Connection) {
+                    Ok(streams) => streams,
+                    Err(stream_opening_err) => {
+                        error!("Error opening streams: {stream_opening_err:?}");
 
-        send_stream.finish().await.or_else(|err| match err {
-            qp2p::SendError::StreamLost(qp2p::StreamError::Stopped(_)) => Ok(()),
-            _ => Err(SendToOneError::Send(err)),
-        })?;
+                        self.connections.remove(&conn_id);
 
-        recv_stream.next().await.map_err(SendToOneError::Recv)
+                        if attempts > 3 {
+                            return Err(stream_opening_err)
+                        }
+                        continue;
+                    }
+                };
+            debug!("bidi openeed to: {:?}", self.peer);
+            send_stream.set_priority(10);
+            match send_stream
+            .send_user_msg(bytes.clone())
+            .await {
+                Ok(_) => {},
+                Err(err) => {
+                    error!("Error sending bytes over stream: {:?}", err);
+                    // remove that broken conn
+                    self.connections.remove(&conn_id);
+
+                    if attempts > 3 {
+                        return Err(err).map_err(SendToOneError::Send)
+                    }
+                    continue;
+                }
+            }
+            // .map_err(SendToOneError::Send)?;
+
+            debug!("bidi sent to: {:?}", self.peer);
+            send_stream.finish().await.or_else(|err| match err {
+                qp2p::SendError::StreamLost(qp2p::StreamError::Stopped(_)) => Ok(()),
+                _ => {
+                    error!("Error finishing up stream...");
+                    Err(SendToOneError::Send(err))
+                },
+            })?;
+
+            debug!("bidi finished to: {:?}", self.peer);
+            return recv_stream.next().await.map_err(SendToOneError::Recv)
+        }
+
+        // TODO: make this a more relevant error
+        Err(SendToOneError::NoConnection)
+
     }
 
     // Gets an existing connection or creates a new one to the Link's Peer
