@@ -475,9 +475,12 @@ mod tests {
         {
             Ok(_) => bail!("Should not be able to retrieve an entry for a random user"),
             Err(Error::ErrorMsg {
-                source: ErrorMsg::NoSuchEntry,
+                source: ErrorMsg::NoSuchUser(user),
                 ..
-            }) => Ok(()),
+            }) => {
+                assert_eq!(user, other_user);
+                Ok(())
+            },
             Err(err) => Err(eyre!(
                 "Unexpected error returned when retrieving non-existing Register user permission: {:?}", err,
             )),
@@ -607,15 +610,19 @@ mod tests {
         assert_eq!(retrieved_value_2, value_2);
 
         // Requesting an entry which doesn't exist returns an error
+        let entry_hash = EntryHash(rand::thread_rng().gen::<[u8; 32]>());
         match client
-            .get_register_entry(address, EntryHash(rand::thread_rng().gen::<[u8; 32]>()))
+            .get_register_entry(address, entry_hash)
             .instrument(tracing::info_span!("final get"))
             .await
         {
             Err(Error::ErrorMsg {
-                source: ErrorMsg::NoSuchEntry,
+                source: ErrorMsg::NoSuchEntry(hash),
                 ..
-            }) => Ok(()),
+            }) => {
+                assert_eq!(hash, entry_hash);
+                Ok(())
+            }
             Err(err) => Err(eyre!(
                 "Unexpected error returned when retrieving a non-existing Register entry: {:?}",
                 err,

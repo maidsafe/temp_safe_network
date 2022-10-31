@@ -108,7 +108,7 @@ impl Safe {
                 let client = self.get_safe_client()?;
                 match client.read_register(address).await {
                     Ok(entry) => Ok(entry),
-                    Err(ClientError::NetworkDataError(SafeNdError::NoSuchEntry)) => Err(
+                    Err(ClientError::NetworkDataError(SafeNdError::NoSuchEntry(_))) => Err(
                         Error::EmptyContent(format!("Empty Register found at \"{}\"", url)),
                     ),
                     Err(ClientError::ErrorMsg {
@@ -158,7 +158,7 @@ impl Safe {
             .await
             .map_err(|err| {
                 if let ClientError::ErrorMsg {
-                    source: sn_interface::messaging::data::Error::NoSuchEntry,
+                    source: sn_interface::messaging::data::Error::NoSuchEntry(_),
                     ..
                 } = err
                 {
