@@ -103,7 +103,7 @@ impl Register {
 
     /// Return a value corresponding to the provided 'hash', if present.
     pub fn get(&self, hash: EntryHash) -> Result<&Entry> {
-        self.crdt.get(hash).ok_or(Error::NoSuchEntry)
+        self.crdt.get(hash).ok_or(Error::NoSuchEntry(hash))
     }
 
     /// Read the last entry, or entries when there are branches, if the register is not empty.
@@ -113,7 +113,7 @@ impl Register {
 
     /// Return user permissions, if applicable.
     pub fn permissions(&self, user: User) -> Result<Permissions> {
-        self.policy.permissions(user).ok_or(Error::NoSuchEntry)
+        self.policy.permissions(user).ok_or(Error::NoSuchUser(user))
     }
 
     /// Return the policy.
@@ -344,7 +344,7 @@ mod tests {
 
         let non_existing_hash = EntryHash::default();
         let entry_not_found = register.get(non_existing_hash);
-        assert_eq!(entry_not_found, Err(Error::NoSuchEntry));
+        assert_eq!(entry_not_found, Err(Error::NoSuchEntry(non_existing_hash)));
 
         Ok(())
     }
@@ -402,7 +402,10 @@ mod tests {
 
         let random_keypair = Keypair::new_ed25519();
         let random_user = User::Key(random_keypair.public_key());
-        assert_eq!(replica2.permissions(random_user), Err(Error::NoSuchEntry),);
+        assert_eq!(
+            replica2.permissions(random_user),
+            Err(Error::NoSuchUser(random_user))
+        );
 
         Ok(())
     }
