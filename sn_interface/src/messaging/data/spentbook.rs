@@ -27,7 +27,7 @@ pub enum SpentbookQuery {
 
 /// A Spentbook cmd.
 #[allow(clippy::large_enum_variant)]
-#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, custom_debug::Debug)]
 pub enum SpentbookCmd {
     /// Request to Elders to log a key image and its associated transaction as spent.
     ///
@@ -38,9 +38,13 @@ pub enum SpentbookCmd {
     /// was signed with a section key that the spend request section was not aware of.
     Spend {
         key_image: KeyImage,
+        #[debug(skip)]
         tx: RingCtTransaction,
+        #[debug(skip)]
         spent_proofs: BTreeSet<SpentProof>,
+        #[debug(skip)]
         spent_transactions: BTreeSet<RingCtTransaction>,
+        #[debug(skip)]
         network_knowledge: Option<(SectionsDAG, SectionSigned<SectionAuthorityProvider>)>,
     },
 }
