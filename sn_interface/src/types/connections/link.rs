@@ -208,7 +208,8 @@ impl Link {
             let mut dead_conns = vec![];
             let mut live_conn = None;
 
-            while let Some((_id, conn)) = self.connections.read().await.iter().next() {
+            for (_, conn) in self.connections.read().await.iter() {
+
                 // TODO: replace this with simple connection check when available.
                 let is_connected = conn.open_bi().await.is_ok();
 
