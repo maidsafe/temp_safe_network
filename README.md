@@ -2,7 +2,7 @@
 
 The Safe Network is a fully autonomous data and communications network. For a general introduction and more information about its features and the problems it intends to solve, please see [The Safe Network Primer](https://primer.safenetwork.org/).
 
-The network is implemented in Rust. This repository is a workspace consisting of 4 crates:
+The network is implemented in Rust. This repository is a workspace consisting of 5 crates:
 
 * [sn_node](https://crates.io/crates/sn_node): implements the Safe Network Node binary.
 * [sn_client](https://crates.io/crates/sn_client): provides the low-level interface to connect to a network.
@@ -10,7 +10,7 @@ The network is implemented in Rust. This repository is a workspace consisting of
 * [sn_cli](https://crates.io/crates/sn_cli): a command line interface for using the network.
 * sn_cmd_test_utilities: internal, unpublished crate that provides tools for integration testing.
 
-Currently, the network can be used via these 3 published crates. To see how, a good place to start is the [README](sn_cli/README.md) for the CLI. You can run your own local network or perhaps participate in a remote network.
+Currently, the network can be used via the 4 published crates. To see how, a good place to start is the [README](sn_cli/README.md) for the CLI. You can run your own local network or perhaps participate in a remote network.
 
 ## Testing
 
