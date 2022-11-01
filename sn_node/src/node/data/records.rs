@@ -52,7 +52,7 @@ impl MyNode {
         let mut cmds = vec![];
         // TODO: do this in parallel
         for target in targets {
-            let (bytes_to_adult, _new_msg_id) = self.form_usr_msg_bytes_to_node(
+            let (bytes_to_adult, new_msg_id) = self.form_usr_msg_bytes_to_node(
                 payload.clone(),
                 kind.clone(),
                 target,
@@ -60,7 +60,7 @@ impl MyNode {
                 traceroute.clone(),
             )?;
 
-            info!("About to send {msg_id:?} to holder: {:?}", &target,);
+            info!("About to send {msg_id:?} to holder: {:?} as {new_msg_id:?}", &target,);
             let response = match tokio::time::timeout(tokio::time::Duration::from_secs(3), async {
                 self.comm
                     .send_out_bytes_to_peer_and_return_response(target, msg_id, bytes_to_adult)
@@ -207,7 +207,7 @@ impl MyNode {
 
         let (kind, payload) = self.serialize_node_msg(msg)?;
 
-        let (bytes_to_adult, _new_msg_id) = self.form_usr_msg_bytes_to_node(
+        let (bytes_to_adult, new_msg_id) = self.form_usr_msg_bytes_to_node(
             payload,
             kind,
             target,
@@ -215,6 +215,7 @@ impl MyNode {
             traceroute.clone(),
         )?;
 
+            debug!("sending out {msg_id:?} as {new_msg_id:?}");
         // TODO: how to determine this time?
         // TODO: don't use arbitrary time here. (But 3s is very realistic here under normal load)
         let response = match tokio::time::timeout(tokio::time::Duration::from_secs(3), async {
