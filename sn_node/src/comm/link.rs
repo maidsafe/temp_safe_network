@@ -199,7 +199,6 @@ impl Link {
 
                 // set up some cleanup
                 if !is_connected {
-
                     debug!("not connected");
                     dead_conns.push(conn.id());
                     continue;

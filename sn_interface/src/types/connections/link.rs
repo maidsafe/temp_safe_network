@@ -209,7 +209,6 @@ impl Link {
             let mut live_conn = None;
 
             for (_, conn) in self.connections.read().await.iter() {
-
                 // TODO: replace this with simple connection check when available.
                 let is_connected = conn.open_bi().await.is_ok();
 
