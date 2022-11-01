@@ -9,6 +9,7 @@
 use crate::node::{Cmd, Error, MyNode, Prefix, Result};
 
 use bytes::Bytes;
+use futures::FutureExt;
 use itertools::Itertools;
 use qp2p::{SendStream, UsrMsgBytes};
 use sn_dysfunction::IssueType;
@@ -50,71 +51,90 @@ impl MyNode {
         let (kind, payload) = self.serialize_node_msg(msg)?;
 
         let mut cmds = vec![];
+
+        let mut send_tasks = vec![];
+
         // TODO: do this in parallel
         for target in targets {
             let bytes_to_adult = self.form_usr_msg_bytes_to_node(
                 payload.clone(),
                 kind.clone(),
-                target,
+                Some(target),
                 msg_id,
                 #[cfg(feature = "traceroute")]
                 traceroute.clone(),
             )?;
 
             info!("About to send {msg_id:?} to holder: {:?}", &target,);
-            let response = match tokio::time::timeout(tokio::time::Duration::from_secs(7), async {
-                self.comm
-                    .send_out_bytes_to_peer_and_return_response(target, msg_id, bytes_to_adult)
-                    .await
-            })
-            .await
-            {
-                Ok(resp) => resp,
-                Err(_elapsed) => {
-                    error!("No response to {msg_id:?} before arbitrary timeout. Marking adult as dysfunctional");
-                    // TODO: actually mark as dysf
+            // let response =
+            // match tokio::time::timeout(tokio::time::Duration::from_secs(7), async {
 
-                    // cmds.push(Cmd::TrackNodeIssueInDysfunction {
-                    //     name: target.name(),
-                    //     // TODO: no need for op id tracking here, this can be a simple counter
-                    //     issue: IssueType::PendingRequestOperation(operation_id),
-                    // });
-
-                    // TODO: handle this properly in parallel.
-                    // One fail should not kill us here... (although maybe for now?)
-                    return Ok(cmds);
+            send_tasks.push(
+                async move {
+                    self.comm
+                        .send_out_bytes_to_peer_and_return_response(
+                            target,
+                            msg_id.clone(),
+                            bytes_to_adult.clone(),
+                        )
+                        .await
+                    // TODO: parse response and fail if err msg
                 }
-            }?;
+                .boxed(),
+            );
+            // })
+            // .await
+            // {
+            //     Ok(resp) => resp,
+            //     Err(_elapsed) => {
+            //         error!("No response to {msg_id:?} before arbitrary timeout. Marking adult as dysfunctional");
+            //         // TODO: actually mark as dysf
 
-            debug!("Response in from peer for {msg_id:?} {response:?}");
-            if let MsgType::Node {
-                msg: NodeMsg::NodeEvent(NodeEvent::DataStored(_address)),
-                ..
-            } = response.into_msg()?
-            {
-                let client_msg = ClientMsg::CmdResponse {
-                    response: CmdResponse::StoreChunk(Ok(())),
-                    correlation_id: msg_id,
-                };
+            //         // cmds.push(Cmd::TrackNodeIssueInDysfunction {
+            //         //     name: target.name(),
+            //         //     // TODO: no need for op id tracking here, this can be a simple counter
+            //         //     issue: IssueType::PendingRequestOperation(operation_id),
+            //         // });
 
-                let (kind, payload) = self.serialize_sign_client_msg(client_msg)?;
+            //         // TODO: handle this properly in parallel.
+            //         // One fail should not kill us here... (although maybe for now?)
+            //         // return Ok(cmds);
+            //     }
+            // }?;
+        }
 
-                if let Some(stream) = client_response_stream.clone() {
-                    self.send_msg_on_stream(
-                        payload,
-                        kind,
-                        stream,
-                        target,
-                        msg_id,
-                        traceroute.clone(),
-                    )
-                    .await?
-                } else {
-                    warn!("No send stream to respond to client on! (This is likely due to the msg originating at the elder as a healthcheck");
-                }
+        let (response, _what) = futures::future::select_ok(send_tasks).await?;
+
+        debug!("Response in from peer for {msg_id:?} {response:?}");
+        if let MsgType::Node {
+            msg: NodeMsg::NodeEvent(NodeEvent::DataStored(_address)),
+            ..
+        } = response.into_msg()?
+        {
+            let client_msg = ClientMsg::CmdResponse {
+                response: CmdResponse::StoreChunk(Ok(())),
+                correlation_id: msg_id,
+            };
+
+            let (kind, payload) = self.serialize_sign_client_msg(client_msg)?;
+
+            if let Some(stream) = client_response_stream.clone() {
+                self.send_msg_on_stream(
+                    payload,
+                    kind,
+                    stream,
+                    None, // we shouldn't need this...
+                    msg_id,
+                    traceroute.clone(),
+                )
+                .await?
             } else {
-                error!("Unexpected reponse to query from node. To : {msg_id:?}; response: {response:?}");
+                warn!("No send stream to respond to client on! (This is likely due to the msg originating at the elder as a healthcheck");
             }
+        } else {
+            error!(
+                "Unexpected reponse to query from node. To : {msg_id:?}; response: {response:?}"
+            );
         }
 
         Ok(cmds)
@@ -211,7 +231,7 @@ impl MyNode {
         let bytes_to_adult = self.form_usr_msg_bytes_to_node(
             payload,
             kind,
-            target,
+            Some(target),
             msg_id,
             #[cfg(feature = "traceroute")]
             traceroute.clone(),
@@ -253,7 +273,7 @@ impl MyNode {
             let (kind, payload) = self.serialize_sign_client_msg(client_msg)?;
 
             if let Some(stream) = client_response_stream {
-                self.send_msg_on_stream(payload, kind, stream, target, msg_id, traceroute)
+                self.send_msg_on_stream(payload, kind, stream, Some(target), msg_id, traceroute)
                     .await?
             } else {
                 warn!("No send stream to respond to client on! (This is likely due to the msg originating at the elder as a healthcheck");
@@ -274,7 +294,7 @@ impl MyNode {
         payload: Bytes,
         kind: MsgKind,
         send_stream: Arc<Mutex<SendStream>>,
-        source_peer: Peer,
+        target_peer: Option<Peer>,
         original_msg_id: MsgId,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<()> {
@@ -282,12 +302,12 @@ impl MyNode {
         let bytes = self.form_usr_msg_bytes_to_node(
             payload,
             kind,
-            source_peer,
+            target_peer,
             original_msg_id,
             #[cfg(feature = "traceroute")]
             traceroute,
         )?;
-        trace!("USING BIDI to send to client! OH DEAR, FASTEN SEATBELTS");
+        trace!("USING BIDI to send to msg! OH DEAR, FASTEN SEATBELTS");
         let stream_prio = 10;
         let mut send_stream = send_stream.lock().await;
 
@@ -295,14 +315,14 @@ impl MyNode {
         send_stream.set_priority(stream_prio);
         if let Err(error) = send_stream.send_user_msg(bytes).await {
             error!(
-                        "Could not send query response {original_msg_id:?} to client {source_peer:?} over response stream: {error:?}",
+                        "Could not send query response {original_msg_id:?} to peer {target_peer:?} over response stream: {error:?}",
 
                     );
             return Err(Error::from(error));
         }
         if let Err(error) = send_stream.finish().await {
             error!(
-                        "Could not close response stream for {original_msg_id:?} to client {source_peer:?}: {error:?}",
+                        "Could not close response stream for {original_msg_id:?} to peer {target_peer:?}: {error:?}",
                     );
         }
 
@@ -315,13 +335,14 @@ impl MyNode {
         &self,
         payload: Bytes,
         kind: MsgKind,
-        target: Peer,
+        target: Option<Peer>,
         msg_id: MsgId,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<qp2p::UsrMsgBytes> {
+        let dst_name = target.map_or(XorName::default(), |peer| peer.name());
         // we first generate the XorName
         let dst = Dst {
-            name: target.name(),
+            name: dst_name,
             section_key: self.network_knowledge().section_key(),
         };
 

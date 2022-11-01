@@ -86,7 +86,7 @@ impl MyNode {
                 payload,
                 kind,
                 stream,
-                source_peer,
+                Some(source_peer),
                 correlation_id,
                 #[cfg(feature = "traceroute")]
                 traceroute,
@@ -174,7 +174,7 @@ impl MyNode {
         let bytes = self.form_usr_msg_bytes_to_node(
             payload,
             kind,
-            requesting_elder,
+            Some(requesting_elder),
             msg_id,
             #[cfg(feature = "traceroute")]
             traceroute,

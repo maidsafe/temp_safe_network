@@ -138,7 +138,7 @@ impl MyNode {
                 payload,
                 kind,
                 stream,
-                target,
+                Some(target),
                 original_msg_id,
                 traceroute.clone(),
             )
@@ -485,6 +485,10 @@ impl MyNode {
                     error!("Received unexpected message while Elder");
                     return Ok(vec![]);
                 }
+                debug!(
+                    "Attempting to store data locally as adult: {:?}",
+                    data.address()
+                );
 
                 // ensure we drop the read lock as it's not needed
                 drop(node_read_lock);
@@ -492,6 +496,10 @@ impl MyNode {
                 // grab the write lock each time in the loop to not hold it over large data sets
                 let mut node = node.write().await;
 
+                debug!(
+                    "Attempting to store data locally as adult:: write lock gotten: {:?}",
+                    data.address()
+                );
                 // store data and respond w/ack on the response stream
                 node.store_data_as_adult_and_respond(data, send_stream, sender, msg_id, traceroute)
                     .await
