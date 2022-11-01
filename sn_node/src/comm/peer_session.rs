@@ -162,6 +162,9 @@ impl PeerSessionWorker {
                                     job.msg_id
                                 );
                             }
+
+                            job.reporter.send(SendStatus::Sent);
+
                         });
 
                         SessionStatus::Ok

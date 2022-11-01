@@ -127,8 +127,8 @@ pub struct Config {
     /// declaring us offline. If none is supplied we'll default to the documented constant.
     ///
     /// The interval is in milliseconds. A value of 0 disables this feature.
-    #[clap(long)]
-    pub keep_alive_interval_msec: Option<u32>,
+    #[clap(long, default_value="3000")]
+    pub keep_alive_interval_msec: u32,
     /// Duration of a UPnP port mapping.
     #[clap(long)]
     pub upnp_lease_duration: Option<u32>,
@@ -257,9 +257,7 @@ impl Config {
             self.idle_timeout_msec = Some(idle_timeout);
         }
 
-        if let Some(keep_alive) = config.keep_alive_interval_msec {
-            self.keep_alive_interval_msec = Some(keep_alive);
-        }
+        self.keep_alive_interval_msec = config.keep_alive_interval_msec;
 
         if let Some(upnp_lease_duration) = config.upnp_lease_duration {
             self.network_config.upnp_lease_duration =

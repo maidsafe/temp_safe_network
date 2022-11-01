@@ -100,7 +100,7 @@ impl Session {
         // This could be further strict to wait for ALL the Acks get received.
         // The period is expected to have AE completed, hence no extra wait is required.
 
-        // tokio::time::sleep(Duration::from_secs(5)).await;
+        tokio::time::sleep(Duration::from_secs(4)).await;
         self.we_have_sufficient_acks_for_cmd(msg_id, elders.clone(), resp_rx)
             .await
     }

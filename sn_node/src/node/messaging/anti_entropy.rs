@@ -354,12 +354,14 @@ impl MyNode {
 
                     // client response, so send it over stream
                     if send_stream.is_some() {
+                        debug!("sending repsonse over send_stream");
                         return Ok(Some(Cmd::send_msg_via_response_stream(
                             OutgoingMsg::Node(ae_msg),
                             Peers::Single(*sender),
                             send_stream,
                         )));
                     } else {
+                        debug!("sending repsonse over fresh conn");
                         return Ok(Some(Cmd::send_msg(
                             OutgoingMsg::Node(ae_msg),
                             Peers::Single(*sender),

@@ -173,7 +173,7 @@ impl Comm {
         bytes: UsrMsgBytes,
     ) -> Result<WireMsg> {
         debug!("trying to get peer session in order to send: {msg_id:?}");
-        if let Some(mut peer) = self.get_or_create(&peer).await {
+        if let Some(mut peer) = self.get_or_create(&peer) {
             debug!("Peer session retrieved for {msg_id:?}");
             let adult_response_bytes = peer.send_with_bi_return_response(bytes, msg_id).await?;
             debug!("peer response is in for {msg_id:?}");
@@ -238,12 +238,17 @@ impl Comm {
 
     /// Get a PeerSession if it already exists, otherwise create and insert
     #[instrument(skip(self))]
-    async fn get_or_create(&self, peer: &Peer) -> Option<PeerSession> {
+    fn get_or_create(&self, peer: &Peer) -> Option<PeerSession> {
+        debug!("getting or Creating peer session to: {peer:?}");
         if let Some(entry) = self.sessions.get(peer) {
+            debug!(" session to: {peer:?} exists");
             return Some(entry.value().clone());
         }
+
+        debug!("session to: {peer:?} does not exists");
         let link = Link::new(*peer, self.our_endpoint.clone(), self.msg_listener.clone());
         let session = PeerSession::new(link);
+        debug!("about to insert session");
         let _ = self.sessions.insert(*peer, session.clone());
         Some(session)
     }
@@ -294,7 +299,7 @@ impl Comm {
             recipient
         );
 
-        if let Some(peer) = self.get_or_create(&recipient).await {
+        if let Some(peer) = self.get_or_create(&recipient) {
             debug!("Peer session retrieved");
             Ok(Some(
                 peer.send_using_session_or_stream(msg_id, bytes, send_stream)
