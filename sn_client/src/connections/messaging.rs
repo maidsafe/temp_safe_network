@@ -86,7 +86,7 @@ impl Session {
         // Don't immediately fail if sending to one elder fails. This could prevent further sends
         // and further responses coming in...
         // Failing directly here could cause us to miss a send success
-        let (resp_tx, resp_rx) = mpsc::channel(elders_len);
+        let (resp_tx, mut resp_rx) = mpsc::channel(elders_len);
         let send_msg_res = self
             .send_msg(elders.clone(), wire_msg, msg_id, force_new_link, resp_tx)
             .await;
@@ -100,9 +100,17 @@ impl Session {
         // This could be further strict to wait for ALL the Acks get received.
         // The period is expected to have AE completed, hence no extra wait is required.
 
-        tokio::time::sleep(Duration::from_secs(4)).await;
-        self.we_have_sufficient_acks_for_cmd(msg_id, elders.clone(), resp_rx)
-            .await
+
+
+        let mut res = self.we_have_sufficient_acks_for_cmd(msg_id, elders.clone(), &mut resp_rx)
+        .await;
+        while res.is_err() {
+            self.we_have_sufficient_acks_for_cmd(msg_id, elders.clone(), &mut resp_rx)
+            .await;
+            tokio::time::sleep(Duration::from_millis(250)).await;
+        }
+
+        res
     }
 
     /// Checks for acks for a given msg.
@@ -111,7 +119,7 @@ impl Session {
         &self,
         msg_id: MsgId,
         elders: Vec<Peer>,
-        mut resp_rx: mpsc::Receiver<MsgResponse>,
+        resp_rx: &mut mpsc::Receiver<MsgResponse>,
     ) -> Result<()> {
         debug!("----> init of check for acks for {:?}", msg_id);
         let expected_acks = elders.len();
