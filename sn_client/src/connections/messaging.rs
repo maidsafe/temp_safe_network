@@ -99,18 +99,8 @@ impl Session {
         // We are not wait for the receive of majority of cmd Acks.
         // This could be further strict to wait for ALL the Acks get received.
         // The period is expected to have AE completed, hence no extra wait is required.
-
-
-
-        let mut res = self.we_have_sufficient_acks_for_cmd(msg_id, elders.clone(), &mut resp_rx)
-        .await;
-        while res.is_err() {
-            self.we_have_sufficient_acks_for_cmd(msg_id, elders.clone(), &mut resp_rx)
-            .await;
-            tokio::time::sleep(Duration::from_millis(250)).await;
-        }
-
-        res
+        self.we_have_sufficient_acks_for_cmd(msg_id, elders.clone(), &mut resp_rx)
+        .await
     }
 
     /// Checks for acks for a given msg.
@@ -178,7 +168,7 @@ impl Session {
             .filter(|p| !received_errors.contains(&p.addr()))
             .collect();
 
-        error!(
+        debug!(
             "Missing Responses for {msg_id:?} from: {:?}",
             missing_responses
         );

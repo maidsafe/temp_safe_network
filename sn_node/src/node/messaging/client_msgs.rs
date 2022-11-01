@@ -154,6 +154,7 @@ impl MyNode {
         query: &DataQueryVariant,
         auth: ClientAuth,
         requesting_elder: Peer,
+        msg_id: MsgId,
         send_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<()> {
@@ -170,10 +171,11 @@ impl MyNode {
 
         let (kind, payload) = self.serialize_node_msg(msg)?;
 
-        let (bytes, msg_id) = self.form_usr_msg_bytes_to_node(
+        let bytes = self.form_usr_msg_bytes_to_node(
             payload,
             kind,
             requesting_elder,
+            msg_id,
             #[cfg(feature = "traceroute")]
             traceroute,
         )?;

@@ -52,15 +52,16 @@ impl MyNode {
         let mut cmds = vec![];
         // TODO: do this in parallel
         for target in targets {
-            let (bytes_to_adult, new_msg_id) = self.form_usr_msg_bytes_to_node(
+            let bytes_to_adult = self.form_usr_msg_bytes_to_node(
                 payload.clone(),
                 kind.clone(),
                 target,
+                msg_id,
                 #[cfg(feature = "traceroute")]
                 traceroute.clone(),
             )?;
 
-            info!("About to send {msg_id:?} to holder: {:?} as {new_msg_id:?}", &target,);
+            info!("About to send {msg_id:?} to holder: {:?}", &target,);
             let response = match tokio::time::timeout(tokio::time::Duration::from_secs(3), async {
                 self.comm
                     .send_out_bytes_to_peer_and_return_response(target, msg_id, bytes_to_adult)
@@ -207,15 +208,16 @@ impl MyNode {
 
         let (kind, payload) = self.serialize_node_msg(msg)?;
 
-        let (bytes_to_adult, new_msg_id) = self.form_usr_msg_bytes_to_node(
+        let bytes_to_adult= self.form_usr_msg_bytes_to_node(
             payload,
             kind,
             target,
+            msg_id,
             #[cfg(feature = "traceroute")]
             traceroute.clone(),
         )?;
 
-            debug!("sending out {msg_id:?} as {new_msg_id:?}");
+            debug!("sending out {msg_id:?}");
         // TODO: how to determine this time?
         // TODO: don't use arbitrary time here. (But 3s is very realistic here under normal load)
         let response = match tokio::time::timeout(tokio::time::Duration::from_secs(3), async {
@@ -277,10 +279,11 @@ impl MyNode {
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<()> {
         // TODO why do we need dst here?
-        let (bytes, _new_msg_id) = self.form_usr_msg_bytes_to_node(
+        let bytes= self.form_usr_msg_bytes_to_node(
             payload,
             kind,
             source_peer,
+            original_msg_id,
             #[cfg(feature = "traceroute")]
             traceroute,
         )?;
@@ -313,9 +316,9 @@ impl MyNode {
         payload: Bytes,
         kind: MsgKind,
         target: Peer,
+        msg_id: MsgId,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
-    ) -> Result<(qp2p::UsrMsgBytes, MsgId)> {
-        let msg_id = MsgId::new();
+    ) -> Result<qp2p::UsrMsgBytes> {
         // we first generate the XorName
         let dst = Dst {
             name: target.name(),
@@ -336,12 +339,11 @@ impl MyNode {
         #[cfg(feature = "test-utils")]
         let wire_msg = wire_msg.set_payload_debug(msg);
 
-        Ok((
+        Ok(
             wire_msg
                 .serialize_and_cache_bytes()
                 .map_err(|_| Error::InvalidMessage)?,
-            msg_id,
-        ))
+        )
     }
 
     pub(crate) fn get_metadata_of(&self, prefix: &Prefix) -> MetadataExchange {

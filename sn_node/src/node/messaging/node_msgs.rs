@@ -589,6 +589,7 @@ impl MyNode {
                     &query,
                     auth,
                     sender,
+                    msg_id,
                     send_stream,
                     #[cfg(feature = "traceroute")]
                     traceroute,
