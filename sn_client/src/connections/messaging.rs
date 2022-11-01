@@ -317,7 +317,6 @@ impl Session {
                     error_response = Some(*response);
                     discarded_responses += 1;
                 }
-
                 QueryResponse::GetRegister(Ok(ref register)) => {
                     debug!("okay got register from {peer_address:?}");
                     // TODO: properly merge all registers

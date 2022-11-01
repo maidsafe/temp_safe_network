@@ -162,10 +162,6 @@ impl QueryResponse {
     /// Returns true if the result returned is DataNotFound
     pub fn is_data_not_found(&self) -> bool {
         use QueryResponse::*;
-        if let SpentProofShares(Ok(vec)) = self {
-            return vec.len() < 5;
-        }
-
         matches!(
             self,
             GetChunk(Err(Error::DataNotFound(_)))
