@@ -60,10 +60,7 @@ impl MyNode {
                 traceroute.clone(),
             )?;
 
-            info!(
-                "About to send {msg_id:?} to holder: {:?}",
-                &target,
-            );
+            info!("About to send {msg_id:?} to holder: {:?}", &target,);
             let response = match tokio::time::timeout(tokio::time::Duration::from_secs(3), async {
                 self.comm
                     .send_out_bytes_to_peer_and_return_response(target, msg_id, bytes_to_adult)
@@ -238,9 +235,7 @@ impl MyNode {
             }
         }?;
 
-
         debug!("Response in from peer for {msg_id:?} {response:?}");
-
 
         if let MsgType::Node {
             msg: NodeMsg::NodeQueryResponse { response, .. },
@@ -295,13 +290,11 @@ impl MyNode {
         debug!("stream locked");
         send_stream.set_priority(stream_prio);
         if let Err(error) = send_stream.send_user_msg(bytes).await {
-
             error!(
                         "Could not send query response {original_msg_id:?} to client {source_peer:?} over response stream: {error:?}",
 
                     );
-                return Err(Error::from(error))
-
+            return Err(Error::from(error));
         }
         if let Err(error) = send_stream.finish().await {
             error!(

@@ -70,12 +70,10 @@ impl PeerSession {
     pub(crate) async fn send_with_bi_return_response(
         &mut self,
         bytes: UsrMsgBytes,
-        msg_id: MsgId
+        msg_id: MsgId,
     ) -> Result<UsrMsgBytes> {
         // TODO: make a real error here
-        let r = self.link
-            .send_bi(bytes, msg_id)
-            .await;
+        let r = self.link.send_bi(bytes, msg_id).await;
 
         if r.is_err() {
             error!("Error sending on bi conn: {r:?}");

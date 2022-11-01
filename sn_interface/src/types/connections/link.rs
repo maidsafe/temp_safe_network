@@ -141,7 +141,7 @@ impl Link {
         // TODO: proper retry code setup
         let mut attempts = 1;
         while attempts <= 3 {
-            attempts +=1;
+            attempts += 1;
             let conn = match self.get_or_connect().await {
                 Ok(conn) => conn,
                 Err(err) => {
@@ -165,11 +165,10 @@ impl Link {
                 qp2p::SendError::StreamLost(qp2p::StreamError::Stopped(_)) => Ok(()),
                 _ => Err(SendToOneError::Send(err)),
             })?;
-            return Ok(recv_stream)
+            return Ok(recv_stream);
         }
 
         Err(SendToOneError::SendRepeatedlyFailed)
-
     }
 
     // gets a conn or creates one with a listener func
@@ -206,14 +205,39 @@ impl Link {
             debug!("creating conn with {:?}", self.peer);
             self.create_connection().await
         } else {
-            // let x = self.connections.read().await.iter().enumerate().filter(|(i, _)| i == 0).map(|(_,conn)|conn);
-            if let Some((_id, conn)) = self.connections.read().await.iter().next() {
-                return Ok(conn.clone());
+            let mut dead_conns = vec![];
+            let mut live_conn = None;
+
+            while let Some((_id, conn)) = self.connections.read().await.iter().next() {
+                // TODO: replace this with simple connection check when available.
+                let is_connected = conn.open_bi().await.is_ok();
+
+                // set up some cleanup
+                if !is_connected {
+                    dead_conns.push(conn.id());
+                    continue;
+                }
+
+                // return the first live conn
+                live_conn = Some(conn.clone());
             }
 
-            // we should never hit here...
-            // but if we do, we'll try making a conn
-            self.create_connection().await
+            // cleanup those dead conns
+            for dead_conn_id in dead_conns {
+                warn!("Dead connection to {:?} being removed from link", self.peer);
+                let _conn = self.connections.write().await.remove(&dead_conn_id);
+            }
+
+            if let Some(conn) = live_conn {
+                trace!("live connection found to {:?}", self.peer);
+                Ok(conn)
+            } else {
+                trace!(
+                    "No live connection found to {:?}, creating a new one.",
+                    self.peer
+                );
+                self.create_connection().await
+            }
         }
     }
 
@@ -287,7 +311,7 @@ pub enum SendToOneError {
     /// ChaosNoConn
     ChaosNoConnection,
     /// Sending failed repeatedly
-    SendRepeatedlyFailed
+    SendRepeatedlyFailed,
 }
 
 impl SendToOneError {

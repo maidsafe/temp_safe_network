@@ -334,7 +334,10 @@ impl MyNode {
             );
             return match self.network_knowledge.closest_signed_sap(&dst_name) {
                 Some((signed_sap, proof_chain)) => {
-                    info!("{msg_id:?} Found a better matching prefix {:?}", signed_sap.prefix());
+                    info!(
+                        "{msg_id:?} Found a better matching prefix {:?}",
+                        signed_sap.prefix()
+                    );
                     let bounced_msg = wire_msg.serialize()?;
                     let section_tree_update =
                         SectionTreeUpdate::new(signed_sap.clone(), proof_chain);

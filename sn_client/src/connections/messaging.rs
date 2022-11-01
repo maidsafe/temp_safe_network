@@ -170,7 +170,10 @@ impl Session {
             .filter(|p| !received_errors.contains(&p.addr()))
             .collect();
 
-        error!("Missing Responses for {msg_id:?} from: {:?}", missing_responses);
+        error!(
+            "Missing Responses for {msg_id:?} from: {:?}",
+            missing_responses
+        );
 
         debug!(
             "Insufficient acks returned: {}/{expected_acks}",

@@ -10,8 +10,8 @@ use super::MsgListener;
 
 use dashmap::DashMap;
 use qp2p::{Connection, Endpoint, RetryConfig, UsrMsgBytes};
-use sn_interface::types::{log_markers::LogMarker, Peer};
 use sn_interface::messaging::MsgId;
+use sn_interface::types::{log_markers::LogMarker, Peer};
 use std::sync::Arc;
 
 type ConnId = String;
@@ -111,13 +111,13 @@ impl Link {
     pub(crate) async fn send_bi(
         &mut self,
         bytes: UsrMsgBytes,
-        msg_id: MsgId
+        msg_id: MsgId,
     ) -> Result<UsrMsgBytes, SendToOneError> {
         debug!("Sending {msg_id:?} via a bi stream");
 
         let mut attempts = 1;
         while attempts <= 3 {
-            attempts +=1;
+            attempts += 1;
             let conn = match self.get_or_connect().await {
                 Ok(conn) => conn,
                 Err(err) => {
@@ -136,27 +136,25 @@ impl Link {
                     Err(stream_opening_err) => {
                         error!("{msg_id:?} Error opening streams: {stream_opening_err:?}");
 
-                        self.connections.remove(&conn_id);
+                        let _conn = self.connections.remove(&conn_id);
 
                         if attempts > 3 {
-                            return Err(stream_opening_err)
+                            return Err(stream_opening_err);
                         }
                         continue;
                     }
                 };
             debug!("bidi openeed for {msg_id:?} to: {:?}", self.peer);
             send_stream.set_priority(10);
-            match send_stream
-            .send_user_msg(bytes.clone())
-            .await {
-                Ok(_) => {},
+            match send_stream.send_user_msg(bytes.clone()).await {
+                Ok(_) => {}
                 Err(err) => {
                     error!("Error sending bytes {msg_id:?} over stream: {:?}", err);
                     // remove that broken conn
-                    self.connections.remove(&conn_id);
+                    let _conn = self.connections.remove(&conn_id);
 
                     if attempts > 3 {
-                        return Err(err).map_err(SendToOneError::Send)
+                        return Err(err).map_err(SendToOneError::Send);
                     }
                     continue;
                 }
@@ -169,16 +167,15 @@ impl Link {
                 _ => {
                     error!("Error finishing up stream...");
                     Err(SendToOneError::Send(err))
-                },
+                }
             })?;
 
             debug!("bidi finished {msg_id:?} to: {:?}", self.peer);
-            return recv_stream.next().await.map_err(SendToOneError::Recv)
+            return recv_stream.next().await.map_err(SendToOneError::Recv);
         }
 
         // TODO: make this a more relevant error
         Err(SendToOneError::NoConnection)
-
     }
 
     // Gets an existing connection or creates a new one to the Link's Peer
@@ -188,14 +185,45 @@ impl Link {
             self.create_connection().await
         } else {
             trace!("Grabbing a connection from link..");
-            // let mut fastest_conn = None;
-            if let Some(conn) = self.connections.iter().next() {
-                return Ok(conn.value().clone());
+            // temp store for dead conn ids. We cannot remove them in a loop reading conns
+            // otherwise DashMap might deadlock, so we need to do it afterwards.
+            let mut dead_conns = vec![];
+            let mut live_conn = None;
+            while let Some(conn) = self.connections.iter().next() {
+                let conn = conn.value();
+
+                // TODO: replace this with simple connection check when available.
+                let is_connected = conn.open_bi().await.is_ok();
+
+                // set up some cleanup
+                if !is_connected {
+                    dead_conns.push(conn.id());
+                    continue;
+                }
+
+                // return the first live conn
+                live_conn = Some(conn.clone());
             }
 
-            error!("No connection existed in connections, even though it's marked as non-empty");
-            // This should not be possible to hit...
-            Err(SendToOneError::NoConnection)
+            // cleanup those dead conns
+            for dead_conn_id in dead_conns {
+                warn!(
+                    "Dead connection to {:?} being removed from link",
+                    self.peer()
+                );
+                let _conn = self.connections.remove(&dead_conn_id);
+            }
+
+            if let Some(conn) = live_conn {
+                trace!("live connection found to {:?}", self.peer());
+                return Ok(conn.clone());
+            } else {
+                trace!(
+                    "No live connection found to {:?}, creating a new one.",
+                    self.peer()
+                );
+                self.create_connection().await
+            }
         }
     }
 

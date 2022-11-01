@@ -134,8 +134,15 @@ impl MyNode {
         // )?;
 
         if let Some(stream) = response_stream {
-            self.send_msg_on_stream(payload, kind, stream, target, original_msg_id, traceroute.clone())
-                .await?;
+            self.send_msg_on_stream(
+                payload,
+                kind,
+                stream,
+                target,
+                original_msg_id,
+                traceroute.clone(),
+            )
+            .await?;
         } else {
             error!("Cannot respond over stream, none exists after storing! {data_addr:?}");
         }
