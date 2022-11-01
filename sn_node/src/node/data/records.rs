@@ -172,7 +172,7 @@ impl MyNode {
     // }
 
     /// Find target adult, sends a bidi msg, awaiting response, and then sends this on to the client
-    pub(crate) async fn read_data_from_adults_and_respond_to_client(
+    pub(crate) async fn read_data_from_adult_and_respond_to_client(
         &self,
         query: DataQuery,
         msg_id: MsgId,
