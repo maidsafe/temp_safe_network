@@ -62,7 +62,7 @@ impl MyNode {
             )?;
 
             info!("About to send {msg_id:?} to holder: {:?}", &target,);
-            let response = match tokio::time::timeout(tokio::time::Duration::from_secs(3), async {
+            let response = match tokio::time::timeout(tokio::time::Duration::from_secs(7), async {
                 self.comm
                     .send_out_bytes_to_peer_and_return_response(target, msg_id, bytes_to_adult)
                     .await
@@ -220,7 +220,7 @@ impl MyNode {
             debug!("sending out {msg_id:?}");
         // TODO: how to determine this time?
         // TODO: don't use arbitrary time here. (But 3s is very realistic here under normal load)
-        let response = match tokio::time::timeout(tokio::time::Duration::from_secs(3), async {
+        let response = match tokio::time::timeout(tokio::time::Duration::from_secs(7), async {
             self.comm
                 .send_out_bytes_to_peer_and_return_response(target, msg_id, bytes_to_adult)
                 .await
