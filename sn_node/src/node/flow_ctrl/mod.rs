@@ -30,7 +30,7 @@ use tokio::sync::{mpsc, RwLock};
 /// Periodically triggers other Cmd Processes (eg health checks, dysfunction etc)
 pub(crate) struct FlowCtrl {
     node: Arc<RwLock<MyNode>>,
-    cmd_sender_channel: mpsc::Sender<(Cmd, Option<usize>)>,
+    cmd_sender_channel: mpsc::Sender<(Cmd, Vec<usize>)>,
     timestamps: PeriodicChecksTimestamps,
 }
 
@@ -40,13 +40,10 @@ impl FlowCtrl {
     pub(crate) fn start(
         cmd_ctrl: CmdCtrl,
         mut incoming_msg_events: mpsc::Receiver<MsgFromPeer>,
-    ) -> mpsc::Sender<(Cmd, Option<usize>)> {
-        let dispatcher = cmd_ctrl.dispatcher.clone();
-        let node = cmd_ctrl.node();
-        let node_for_cmds = node.clone();
+    ) -> mpsc::Sender<(Cmd, Vec<usize>)> {
         let (cmd_sender_channel, mut incoming_cmds_from_apis) = mpsc::channel(10_000);
         let flow_ctrl = Self {
-            node,
+            node: cmd_ctrl.node(),
             cmd_sender_channel: cmd_sender_channel.clone(),
             timestamps: PeriodicChecksTimestamps::now(),
         };
@@ -59,22 +56,18 @@ impl FlowCtrl {
         let cmd_channel = cmd_sender_channel.clone();
         let cmd_channel_for_msgs = cmd_sender_channel.clone();
 
+        let node = cmd_ctrl.node();
         // start a new thread to kick off incoming cmds
         let _ = tokio::task::spawn(async move {
             // do one read to get a stable identifier for statemap naming.
             // this is NOT the node's current name. It's the initial name... but will not change
             // for the entire statemap
-            let node_identifier = node_for_cmds.read().await.info().name();
+            let node_identifier = node.read().await.info().name();
 
             while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
-                CmdCtrl::process_cmd_job(
-                    dispatcher.clone(),
-                    cmd,
-                    cmd_id,
-                    node_identifier,
-                    cmd_channel.clone(),
-                )
-                .await
+                cmd_ctrl
+                    .process_cmd_job(cmd, cmd_id, node_identifier, cmd_channel.clone())
+                    .await
             }
         });
 
@@ -89,7 +82,7 @@ impl FlowCtrl {
                     }
                 };
 
-                if let Err(error) = cmd_channel_for_msgs.send((cmd.clone(), None)).await {
+                if let Err(error) = cmd_channel_for_msgs.send((cmd.clone(), vec![])).await {
                     error!("Error sending msg onto cmd channel {error:?}");
                 }
             }
