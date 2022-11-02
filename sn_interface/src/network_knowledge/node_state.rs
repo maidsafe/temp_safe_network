@@ -14,6 +14,7 @@ use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::{Signature, Verifier};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::{self, Debug, Formatter};
 use std::net::SocketAddr;
 use xor_name::{Prefix, XorName};
 
@@ -29,7 +30,7 @@ pub enum MembershipState {
 }
 
 /// Information about a member of our section.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct NodeState {
     peer: Peer,
     /// Current state of the peer
@@ -38,6 +39,22 @@ pub struct NodeState {
     previous_name: Option<XorName>,
 }
 
+impl Debug for NodeState {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let mut f = f.debug_tuple("NodeState");
+        let f = f
+            .field(&self.name())
+            .field(&self.addr())
+            .field(&self.state());
+
+        let f = if let Some(prev_name) = self.previous_name() {
+            f.field(&format!("prev_name: {prev_name:?}"))
+        } else {
+            f
+        };
+        f.finish()
+    }
+}
 impl NodeState {
     // Creates a `NodeState` in the `Joined` state.
     pub fn joined(peer: Peer, previous_name: Option<XorName>) -> Self {

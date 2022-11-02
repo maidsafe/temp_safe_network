@@ -6,22 +6,31 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use serde::{Deserialize, Serialize};
-use std::{borrow::Borrow, ops::Deref};
-use xor_name::Prefix;
-
 use crate::messaging::{
     signature_aggregator::{AggregatorError, SignatureAggregator},
     AuthorityProof,
 };
+use serde::{Deserialize, Serialize};
+use std::{
+    borrow::Borrow,
+    fmt::{self, Debug, Formatter},
+    ops::Deref,
+};
+use xor_name::Prefix;
 
 /// Signature created when a quorum of the section elders has agreed on something.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct SectionSig {
     /// The BLS public key.
     pub public_key: bls::PublicKey,
     /// The BLS signature corresponding to the public key.
     pub signature: bls::Signature,
+}
+
+impl Debug for SectionSig {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_tuple("SectionSig").field(&self.public_key).finish()
+    }
 }
 
 impl SectionSig {

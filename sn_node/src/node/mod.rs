@@ -56,9 +56,7 @@ pub use crate::storage::DataStorage;
 #[cfg(test)]
 pub(crate) use relocation::{check as relocation_check, ChurnId};
 
-pub use sn_interface::network_knowledge::{
-    FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
-};
+pub use sn_interface::network_knowledge::MIN_ADULT_AGE;
 use sn_interface::{
     messaging::system::{NodeMsg, Proposal},
     types::Peer,
