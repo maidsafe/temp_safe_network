@@ -103,7 +103,7 @@ impl FlowCtrl {
         }
 
         for cmd in cmds {
-            if let Err(error) = self.cmd_sender_channel.send((cmd, None)).await {
+            if let Err(error) = self.cmd_sender_channel.send((cmd, vec![])).await {
                 error!("Error queuing std periodic check: {error:?}");
             }
         }
@@ -120,7 +120,7 @@ impl FlowCtrl {
         }
 
         for cmd in cmds {
-            if let Err(error) = self.cmd_sender_channel.send((cmd, None)).await {
+            if let Err(error) = self.cmd_sender_channel.send((cmd, vec![])).await {
                 error!("Error queuing adult periodic check: {error:?}");
             }
         }
@@ -196,7 +196,7 @@ impl FlowCtrl {
         debug!(" ----> all elder periodics cmds ready to push ");
 
         for cmd in cmds {
-            if let Err(error) = self.cmd_sender_channel.send((cmd, None)).await {
+            if let Err(error) = self.cmd_sender_channel.send((cmd, vec![])).await {
                 error!("Error queuing std periodic check: {error:?}");
             }
         }
@@ -344,7 +344,7 @@ impl FlowCtrl {
                     }
 
                     for cmd in cmds {
-                        if let Err(error) = cmd_channel.send((cmd, None)).await {
+                        if let Err(error) = cmd_channel.send((cmd, vec![])).await {
                             error!("Error sending DKG gossip msgs {error:?}");
                         }
                     }

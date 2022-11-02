@@ -104,7 +104,7 @@ impl NodeTestApi {
     /// Messages sent here, either section to section or node to node.
     async fn send_cmd(&self, cmd: Cmd) -> Result<()> {
         self.cmd_channel
-            .send((cmd, None))
+            .send((cmd, vec![]))
             .await
             .map_err(|_| Error::CmdSendError)?;
 
