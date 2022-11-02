@@ -49,7 +49,7 @@ const GENESIS_DBC_FILENAME: &str = "genesis_dbc";
 
 static EVENT_CHANNEL_SIZE: usize = 10_000;
 
-pub(crate) type CmdChannel = mpsc::Sender<(Cmd, Option<usize>)>;
+pub(crate) type CmdChannel = mpsc::Sender<(Cmd, Vec<usize>)>;
 
 /// Test only
 pub async fn new_test_api(
