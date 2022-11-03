@@ -155,15 +155,21 @@ impl PeerSessionWorker {
                                     "Could not send msg {:?} over response stream: {error:?}",
                                     job.msg_id
                                 );
-                            }
-                            if let Err(error) = send_stream.finish().await {
+
+                                job.reporter.send(SendStatus::TransientError(
+                                    "Could not send msg on stream".to_string(),
+                                ));
+                            } else if let Err(error) = send_stream.finish().await {
                                 error!(
                                     "Could not close response stream for {:?}: {error:?}",
                                     job.msg_id
                                 );
+                                job.reporter.send(SendStatus::TransientError(
+                                    "Could not close stream".to_string(),
+                                ));
+                            } else {
+                                job.reporter.send(SendStatus::Sent);
                             }
-
-                            job.reporter.send(SendStatus::Sent);
                         });
 
                         SessionStatus::Ok
