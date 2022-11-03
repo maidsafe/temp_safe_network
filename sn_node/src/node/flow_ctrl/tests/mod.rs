@@ -1396,7 +1396,7 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
 /// with the spend request, but I don't know exactly what the conditions are for getting the
 /// network knowledge to update correctly.
 #[tokio::test]
-//#[ignore]
+#[ignore = "Needs to be refactored to take into account that ClientMsgs require a stream (or to avoid this)"]
 async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node() -> Result<()> {
     let local = tokio::task::LocalSet::new();
     local
