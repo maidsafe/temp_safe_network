@@ -680,6 +680,7 @@ impl Session {
         result
     }
 
+
     #[instrument(skip_all, level = "trace")]
     /// All operations to the network return a response, either an ACK or a QueryResult
     pub(super) async fn send_many_msgs_and_await_responses(
