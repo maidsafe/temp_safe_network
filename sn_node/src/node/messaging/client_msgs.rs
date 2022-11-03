@@ -174,6 +174,8 @@ impl MyNode {
                     msg_id
                 );
             }
+        } else {
+            error!("Send stream missing from {requesting_elder:?}, data request response was not sent out.")
         }
 
         Ok(())
