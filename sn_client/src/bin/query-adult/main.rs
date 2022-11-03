@@ -131,7 +131,7 @@ async fn send_query(client: &Client, query: DataQuery) -> Result<QueryResponse> 
     let msg = ClientMsg::Query(query.clone());
     let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
     let signature = client.keypair().sign(&serialised_query);
-]    Ok(client
+    Ok(client
         .send_signed_query(
             query,
             client_pk,
