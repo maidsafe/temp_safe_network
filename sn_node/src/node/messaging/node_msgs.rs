@@ -461,16 +461,16 @@ impl MyNode {
 
                 let targets = node.target_data_holders(data.name());
 
-                Ok(node
-                    .replicate_data_to_adults(
-                        data,
-                        msg_id,
-                        targets,
-                        None,
-                        #[cfg(feature = "traceroute")]
-                        traceroute,
-                    )
-                    .await?)
+                node.replicate_data_to_adults(
+                    data,
+                    msg_id,
+                    targets,
+                    #[cfg(feature = "traceroute")]
+                    traceroute,
+                )
+                .await;
+                // TODO: handle responses where replication failed...
+                Ok(vec![])
             }
             NodeMsg::NodeCmd(NodeCmd::ReplicateOneData(data)) => {
                 let node_read_lock = node.read().await;

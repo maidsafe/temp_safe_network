@@ -1090,6 +1090,64 @@ async fn handle_demote_during_split() -> Result<()> {
         .await
 }
 
+#[test]
+#[ignore = "This needs to be refactored away from Cmd handling, as we need/use a client response stream therein"]
+async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack() -> Result<()> {
+    let local = tokio::task::LocalSet::new();
+    local
+        .run_until(async move {
+            init_logger();
+            let replication_count = 5;
+            let (dispatcher, _, peer, sk_set) =
+                network_utils::TestNodeBuilder::new(Prefix::default().pushed(true), elder_count())
+                    .adult_count(6)
+                    .section_sk_threshold(0)
+                    .data_copy_count(replication_count)
+                    .build()
+                    .await?;
+
+            let (key_image, tx, spent_proofs, spent_transactions) =
+                dbc_utils::get_genesis_dbc_spend_info(&sk_set)?;
+
+            let cmds = run_node_handle_client_msg_and_collect_cmds(
+                ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                    key_image,
+                    tx: tx.clone(),
+                    spent_proofs,
+                    spent_transactions,
+                    network_knowledge: None,
+                })),
+                peer,
+                &dispatcher,
+            )
+            .await?;
+
+            assert_eq!(cmds.len(), 2);
+
+            let replicate_cmd = cmds[0].clone();
+            let recipients = replicate_cmd.recipients()?;
+            assert_eq!(recipients.len(), replication_count);
+
+            let replicated_data = replicate_cmd.get_replicated_data()?;
+            assert_matches!(replicated_data, ReplicatedData::SpentbookWrite(_));
+
+            let spent_proof_share =
+                dbc_utils::get_spent_proof_share_from_replicated_data(replicated_data)?;
+            assert_eq!(key_image.to_hex(), spent_proof_share.key_image().to_hex());
+            assert_eq!(Hash::from(tx.hash()), spent_proof_share.transaction_hash());
+            assert_eq!(
+                sk_set.public_keys().public_key().to_hex(),
+                spent_proof_share.spentbook_pks().public_key().to_hex()
+            );
+
+            let client_msg = cmds[1].clone().get_client_msg()?;
+            assert_matches!(client_msg, ClientMsg::CmdResponse { response, .. } => response.is_success());
+
+            Result::<()>::Ok(())
+        })
+        .await
+}
+
 #[tokio::test]
 async fn spentbook_spend_spent_proof_with_invalid_pk_should_return_spentbook_error() -> Result<()> {
     let local = tokio::task::LocalSet::new();
@@ -1374,6 +1432,84 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
                                 MessagingDataError::from(Error::SpentbookError(
                                     "The DBC transaction must have at least one input".to_string()
                                 ))
+                                .to_string(),
+                                "A different error was expected for this case: {:?}",
+                                error
+                            );
+                            return Ok(());
+                        } else {
+                            bail!("We expected an error to be returned");
+                        }
+                    }
+                    _ => continue,
+                }
+            }
+
+            bail!("We expected an error to be returned");
+        })
+        .await
+}
+
+#[tokio::test]
+#[ignore = "Needs to be refactored to take into account that ClientMsgs require a stream (or to avoid this)"]
+async fn spentbook_spend_with_random_key_image_should_return_spentbook_error() -> Result<()> {
+    let local = tokio::task::LocalSet::new();
+    local
+        .run_until(async move {
+            init_logger();
+            let replication_count = 5;
+            let (dispatcher, section, peer, sk_set) =
+                network_utils::TestNodeBuilder::new(Prefix::default().pushed(true), elder_count())
+                    .adult_count(6)
+                    .section_sk_threshold(0)
+                    .data_copy_count(replication_count)
+                    .build()
+                    .await?;
+
+            let sap = section.section_auth();
+            let keys_provider = dispatcher.node().read().await.section_keys_provider.clone();
+            let genesis_dbc = gen_genesis_dbc(&sk_set, &sk_set.secret_key())?;
+            let new_dbc = reissue_dbc(
+                &genesis_dbc,
+                10,
+                &bls::SecretKey::random(),
+                &sap,
+                &keys_provider,
+            )?;
+            let new_dbc2_sk = bls::SecretKey::random();
+            let new_dbc2 = reissue_dbc(&new_dbc, 5, &new_dbc2_sk, &sap, &keys_provider)?;
+
+            let pk = bls::SecretKey::random().public_key();
+            let cmds = run_node_handle_client_msg_and_collect_cmds(
+                ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                    key_image: pk,
+                    tx: new_dbc2.transaction.clone(),
+                    spent_proofs: new_dbc.spent_proofs.clone(),
+                    spent_transactions: new_dbc.spent_transactions.clone(),
+                    network_knowledge: None,
+                })),
+                peer,
+                &dispatcher,
+            )
+            .await?;
+
+            for cmd in cmds {
+                match cmd {
+                    Cmd::SendMsg {
+                        msg:
+                            OutgoingMsg::Client(ClientMsg::CmdResponse {
+                                response: CmdResponse::SpendKey(result),
+                                ..
+                            }),
+                        ..
+                    } => {
+                        if let Some(error) = result.err() {
+                            assert_eq!(
+                                error.to_string(),
+                                MessagingDataError::from(Error::SpentbookError(format!(
+                                    "There are no commitments for the given key image {:?}",
+                                    pk
+                                )))
                                 .to_string(),
                                 "A different error was expected for this case: {:?}",
                                 error

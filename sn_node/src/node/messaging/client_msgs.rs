@@ -48,7 +48,7 @@ impl MyNode {
         query: &DataQueryVariant,
         source_peer: Peer,
         correlation_id: MsgId,
-        send_stream: Option<Arc<Mutex<SendStream>>>,
+        send_stream: Arc<Mutex<SendStream>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<()> {
         let the_error_msg = ClientMsg::QueryResponse {
@@ -58,21 +58,16 @@ impl MyNode {
 
         let (kind, payload) = self.serialize_sign_client_msg(the_error_msg)?;
 
-        if let Some(stream) = send_stream {
-            self.send_msg_on_stream(
-                payload,
-                kind,
-                stream,
-                Some(source_peer),
-                correlation_id,
-                #[cfg(feature = "traceroute")]
-                traceroute,
-            )
-            .await?
-        } else {
-            error!("no client stream to respond to for query error");
-        }
-        Ok(())
+        self.send_msg_on_stream(
+            payload,
+            kind,
+            send_stream,
+            Some(source_peer),
+            correlation_id,
+            #[cfg(feature = "traceroute")]
+            traceroute,
+        )
+        .await
     }
 
     /// Forms a `CmdError` msg to send back to the client
@@ -82,7 +77,7 @@ impl MyNode {
         error: Error,
         target: Peer,
         correlation_id: MsgId,
-        send_stream: Option<Arc<Mutex<SendStream>>>,
+        send_stream: Arc<Mutex<SendStream>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Cmd {
         let the_error_msg = ClientMsg::CmdResponse {
@@ -104,7 +99,7 @@ impl MyNode {
         &self,
         msg: ClientMsg,
         recipients: Peers,
-        send_stream: Option<Arc<Mutex<SendStream>>>,
+        send_stream: Arc<Mutex<SendStream>>,
         #[cfg(feature = "traceroute")] mut traceroute: Traceroute,
     ) -> Cmd {
         #[cfg(feature = "traceroute")]
@@ -117,7 +112,7 @@ impl MyNode {
             msg: OutgoingMsg::Client(msg),
             msg_id,
             recipients,
-            send_stream,
+            send_stream: Some(send_stream),
             #[cfg(feature = "traceroute")]
             traceroute,
         }
@@ -189,19 +184,14 @@ impl MyNode {
         msg: ClientMsg,
         auth: AuthorityProof<ClientAuth>,
         origin: Peer,
-        send_stream: Option<Arc<Mutex<SendStream>>>,
+        send_stream: Arc<Mutex<SendStream>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         if !self.is_elder() {
             warn!("could not handle valid as not elder");
             return Ok(vec![]);
         }
-        trace!(
-            "{:?} {:?} stream is some: {:?} ",
-            LogMarker::ClientMsgToBeHandled,
-            msg,
-            send_stream.is_some()
-        );
+        trace!("{:?}: {:?} ", LogMarker::ClientMsgToBeHandled, msg);
 
         let cmd = match msg {
             ClientMsg::Cmd(cmd) => cmd,
@@ -320,8 +310,8 @@ impl MyNode {
         // the replication msg sent to adults
         // cmds here may be dysfunction tracking.
         // CmdAcks are sent over the send stream herein
-        cmds.extend(
-            self.replicate_data_to_adults(
+        let replication_responses = self
+            .replicate_data_to_adults_and_ack_to_client(
                 data,
                 msg_id,
                 targets,
@@ -329,8 +319,10 @@ impl MyNode {
                 #[cfg(feature = "traceroute")]
                 traceroute.clone(),
             )
-            .await?,
-        );
+            .await?;
+
+        // TODO: handle failed responses
+        // cmds.extend();
 
         Ok(cmds)
     }

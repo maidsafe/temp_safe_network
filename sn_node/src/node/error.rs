@@ -29,6 +29,9 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Debug, Error)]
 #[allow(missing_docs)]
 pub enum Error {
+    /// Client messages always need a response, so should come in on bidi streams
+    #[error("No client response stream. Client message came in on a unidirectional stream. All client messages should be bidirectional.")]
+    NoClientResponseStream,
     #[error("The bootstrap connection unexpectedly closed")]
     BootstrapConnectionClosed,
     /// This Peer SendJob could not be sent. We should remove this peer

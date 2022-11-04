@@ -19,7 +19,7 @@ mod relocation;
 mod serialize;
 mod update_section;
 
-use crate::node::{flow_ctrl::cmds::Cmd, MyNode, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result};
 
 use qp2p::SendStream;
 use sn_interface::{
@@ -111,9 +111,11 @@ impl MyNode {
                 auth,
             } => {
                 debug!("valid client msg");
-                if send_stream.is_none() {
-                    error!("No client response stream!");
-                }
+
+                let Some(send_stream) = send_stream else {
+                    return Err(Error::NoClientResponseStream)
+                };
+
                 if self.is_not_elder() {
                     trace!("Redirecting from Adult to section Elders");
                     return Ok(vec![
@@ -139,12 +141,13 @@ impl MyNode {
                 };
 
                 // Then we perform AE checks
+                // TODO: make entropy check for client specifically w/r/t response stream
                 if let Some(cmd) = self.check_for_entropy(
                     &wire_msg,
                     &dst.section_key,
                     dst_name,
                     &origin,
-                    send_stream.clone(),
+                    Some(send_stream.clone()),
                 )? {
                     // short circuit and send those AE responses
                     return Ok(vec![cmd]);
