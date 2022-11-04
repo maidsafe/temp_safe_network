@@ -1185,7 +1185,7 @@ pub(super) mod tests {
 
         let (sap_gen, _, sk_gen) = random_sap_with_rng(&mut rng, Prefix::default(), 0, 0, None);
         let sk_gen = sk_gen.secret_key();
-        let sap_gen = section_signed(&sk_gen, sap_gen)?;
+        let sap_gen = section_signed(&sk_gen, sap_gen);
         let pk_gen = sap_gen.public_key_set().public_key();
 
         let mut dag = SectionsDAG::new(pk_gen);
@@ -1212,7 +1212,7 @@ pub(super) mod tests {
             dag: &mut SectionsDAG,
         ) -> Result<()> {
             let (sap, _, sk_set) = random_sap_with_rng(rng, prefix, 0, 0, None);
-            let sap = section_signed(&sk_set.secret_key(), sap)?;
+            let sap = section_signed(&sk_set.secret_key(), sap);
             let key = sap.public_key_set().public_key();
             let sig = sign(parent_sk, &key);
             dag.insert(&parent_sk.public_key(), sap.section_key(), sig)?;
@@ -1221,8 +1221,8 @@ pub(super) mod tests {
         }
 
         // insert prefix 0,1
-        insert(prefix("0")?, &sk_gen, &mut rng, &mut sections_map, &mut dag)?;
-        insert(prefix("1")?, &sk_gen, &mut rng, &mut sections_map, &mut dag)?;
+        insert(prefix("0"), &sk_gen, &mut rng, &mut sections_map, &mut dag)?;
+        insert(prefix("1"), &sk_gen, &mut rng, &mut sections_map, &mut dag)?;
 
         while count < n_sections {
             let leaves: Vec<_> = dag.leaf_keys().into_iter().collect();
@@ -1236,9 +1236,9 @@ pub(super) mod tests {
 
             if rng.gen_range(0..2) % 2 == 0 {
                 // Split, insert two sections; increment the prefix
-                let pref = prefix(format!("{:b}0", sap_leaf.prefix()).as_str())?;
+                let pref = prefix(format!("{:b}0", sap_leaf.prefix()).as_str());
                 insert(pref, &sk_leaf, &mut rng, &mut sections_map, &mut dag)?;
-                let pref = prefix(format!("{:b}1", sap_leaf.prefix()).as_str())?;
+                let pref = prefix(format!("{:b}1", sap_leaf.prefix()).as_str());
                 insert(pref, &sk_leaf, &mut rng, &mut sections_map, &mut dag)?;
                 count += 2;
             } else {
@@ -1254,8 +1254,8 @@ pub(super) mod tests {
             }
         }
         let map = sections_map
-            .iter()
-            .map(|(key, (_, sap))| (*key, sap.clone()))
+            .into_iter()
+            .map(|(key, (_, sap))| (key, sap))
             .collect();
         Ok((dag, map))
     }

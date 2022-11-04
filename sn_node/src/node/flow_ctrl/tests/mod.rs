@@ -106,7 +106,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
                 Some(relocated_node_old_name),
                 relocate_details,
             );
-            let relocate_proof = section_signed(&sk_set.secret_key(), node_state)?;
+            let relocate_proof = section_signed(&sk_set.secret_key(), node_state);
 
             let signature_over_new_name =
                 ed25519::sign(&relocated_node.name().0, &relocated_node_old_keypair);
@@ -199,7 +199,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                 0,
             );
             let section_tree_update = {
-                let signed_sap = section_signed(&sk_set.secret_key(), section_auth.clone())?;
+                let signed_sap = section_signed(&sk_set.secret_key(), section_auth.clone());
                 SectionTreeUpdate::new(signed_sap, section_chain)
             };
 
@@ -208,7 +208,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
 
             for peer in section_auth.elders() {
                 let node_state = NodeState::joined(*peer, None);
-                let sig = prove(&sk_set.secret_key(), &node_state)?;
+                let sig = prove(&sk_set.secret_key(), &node_state);
                 let _updated = section.update_member(SectionSigned {
                     value: node_state,
                     sig,
@@ -231,7 +231,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             let new_peer = network_utils::create_peer(MIN_ADULT_AGE + 1);
             let node_state = NodeState::joined(new_peer, Some(xor_name::rand::random()));
 
-            let membership_decision = section_decision(&sk_set, node_state.clone())?;
+            let membership_decision = section_decision(&sk_set, node_state.clone());
 
             // Force this node to join
             dispatcher
@@ -384,7 +384,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
 
             let existing_peer = network_utils::create_peer(MIN_ADULT_AGE);
             let node_state = NodeState::joined(existing_peer, None);
-            let node_state = section_signed(&sk_set.secret_key(), node_state)?;
+            let node_state = section_signed(&sk_set.secret_key(), node_state);
             let _updated = section.update_member(node_state);
 
             // Pick the elder to remove.
@@ -448,10 +448,10 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             let pk1 = sk_set1.secret_key().public_key();
 
             let section_tree_update = gen_section_tree_update(
-                &section_signed(&sk_set1.secret_key(), old_sap.clone())?,
+                &section_signed(&sk_set1.secret_key(), old_sap.clone()),
                 &SectionsDAG::new(pk0),
                 &sk0,
-            )?;
+            );
             let network_knowledge =
                 NetworkKnowledge::new(SectionTree::new(pk0), section_tree_update)?;
 
@@ -497,10 +497,10 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             );
             let new_section_elders: BTreeSet<_> = new_sap.names();
             let section_tree_update = gen_section_tree_update(
-                &section_signed(sk2, new_sap.clone())?,
+                &section_signed(sk2, new_sap.clone()),
                 &node.section_chain(),
                 &sk_set1.secret_key(),
-            )?;
+            );
 
             // Create the `Sync` message containing the new `Section`.
             let wire_msg = WireMsg::single_src(
@@ -659,13 +659,13 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
                 adults -= 1;
                 let non_elder_peer = network_utils::create_peer(MIN_ADULT_AGE);
                 let node_state = NodeState::joined(non_elder_peer, None);
-                let node_state = section_signed(&sk_set.secret_key(), node_state)?;
+                let node_state = section_signed(&sk_set.secret_key(), node_state);
                 assert!(section.update_member(node_state));
             }
 
             let non_elder_peer = network_utils::create_peer(MIN_ADULT_AGE - 1);
             let node_state = NodeState::joined(non_elder_peer, None);
-            let node_state = section_signed(&sk_set.secret_key(), node_state)?;
+            let node_state = section_signed(&sk_set.secret_key(), node_state);
             assert!(section.update_member(node_state));
             let node = nodes.remove(0);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
@@ -688,7 +688,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
             };
 
             let membership_decision =
-                network_utils::create_relocation_trigger(&sk_set, relocated_peer.age())?;
+                network_utils::create_relocation_trigger(&sk_set, relocated_peer.age());
             let cmds = run_and_collect_cmds(
                 Cmd::HandleMembershipDecision(membership_decision),
                 &dispatcher,
@@ -816,7 +816,7 @@ async fn handle_elders_update() -> Result<()> {
 
         for peer in [&adult_peer, &promoted_peer] {
             let node_state = NodeState::joined(*peer, None);
-            let node_state = section_signed(sk_set0.secret_key(), node_state)?;
+            let node_state = section_signed(sk_set0.secret_key(), node_state);
             assert!(section0.update_member(node_state));
         }
 
@@ -838,7 +838,7 @@ async fn handle_elders_update() -> Result<()> {
         );
         let elder_names1: BTreeSet<_> = sap1.names();
 
-        let signed_sap1 = section_signed(sk_set1.secret_key(), sap1)?;
+        let signed_sap1 = section_signed(sk_set1.secret_key(), sap1);
         let proposal = Proposal::NewElders(signed_sap1.clone());
         let signature = sk_set0.secret_key().sign(&proposal.as_signable_bytes()?);
         let sig = SectionSig {
@@ -971,7 +971,7 @@ async fn handle_demote_during_split() -> Result<()> {
             // all peers b are added
             for peer in peers_b.iter().chain(iter::once(&peer_c)).cloned() {
                 let node_state = NodeState::joined(peer, None);
-                let node_state = section_signed(sk_set_v0.secret_key(), node_state)?;
+                let node_state = section_signed(sk_set_v0.secret_key(), node_state);
                 assert!(section.update_member(node_state));
             }
 
@@ -1030,7 +1030,7 @@ async fn handle_demote_during_split() -> Result<()> {
                 0,
             );
 
-            let signed_sap = section_signed(sk_set_v1_p0.secret_key(), section_auth)?;
+            let signed_sap = section_signed(sk_set_v1_p0.secret_key(), section_auth);
             let cmd = create_our_elders_cmd(signed_sap)?;
             let mut cmds = run_and_collect_cmds(cmd, &dispatcher).await?;
 
@@ -1043,7 +1043,7 @@ async fn handle_demote_during_split() -> Result<()> {
                 0,
             );
 
-            let signed_sap = section_signed(sk_set_v1_p1.secret_key(), section_auth)?;
+            let signed_sap = section_signed(sk_set_v1_p1.secret_key(), section_auth);
             let cmd = create_our_elders_cmd(signed_sap)?;
 
             let new_cmds = run_and_collect_cmds(cmd, &dispatcher).await?;

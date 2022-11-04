@@ -183,7 +183,7 @@ mod tests {
             0,
         );
         let section_tree_update = {
-            let signed_sap = section_signed(sk, section_auth)?;
+            let signed_sap = section_signed(sk, section_auth);
             SectionTreeUpdate::new(signed_sap, SectionsDAG::new(genesis_pk))
         };
 
@@ -192,7 +192,7 @@ mod tests {
 
         for peer in &peers {
             let info = NodeState::joined(*peer, None);
-            let info = section_signed(sk, info)?;
+            let info = section_signed(sk, info);
 
             assert!(network_knowledge.update_member(info));
         }

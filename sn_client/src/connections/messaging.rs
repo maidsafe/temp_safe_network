@@ -657,22 +657,16 @@ impl Session {
 mod tests {
     use super::*;
     use sn_interface::network_knowledge::{
-        test_utils::{random_sap, section_signed},
+        test_utils::{prefix, random_sap, section_signed},
         SectionTree,
     };
 
-    use eyre::{eyre, Result};
+    use eyre::Result;
     use qp2p::Config;
     use std::{
         net::{Ipv4Addr, SocketAddr},
         time::Duration,
     };
-    use xor_name::Prefix;
-
-    fn prefix(s: &str) -> Result<Prefix> {
-        s.parse()
-            .map_err(|err| eyre!("failed to parse Prefix '{}': {}", s, err))
-    }
 
     fn new_network_network_contacts() -> (SectionTree, bls::SecretKey, bls::PublicKey) {
         let genesis_sk = bls::SecretKey::random();
@@ -687,9 +681,9 @@ mod tests {
     async fn cmd_sent_to_all_elders() -> Result<()> {
         let elders_len = 5;
 
-        let prefix = prefix("0")?;
+        let prefix = prefix("0");
         let (section_auth, _, secret_key_set) = random_sap(prefix, elders_len, 0, None);
-        let sap0 = section_signed(&secret_key_set.secret_key(), section_auth)?;
+        let sap0 = section_signed(&secret_key_set.secret_key(), section_auth);
         let (mut network_contacts, _genesis_sk, _) = new_network_network_contacts();
         assert!(network_contacts.insert_without_chain(sap0));
 

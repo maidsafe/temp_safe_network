@@ -272,7 +272,7 @@ impl TestNodeBuilder {
 
         if let Some(custom_peer) = self.custom_peer {
             let node_state = NodeState::joined(custom_peer, None);
-            let node_state = section_signed(&sk_set.secret_key(), node_state)?;
+            let node_state = section_signed(&sk_set.secret_key(), node_state);
             let _updated = section.update_member(node_state);
         }
 
@@ -316,7 +316,7 @@ pub(crate) fn create_section(
     let (mut section, section_key_share) =
         do_create_section(sap, genesis_sk_set, other_keys, parent_section_tree)?;
     for ns in sap.members() {
-        let auth_ns = section_signed(&genesis_sk_set.secret_key(), ns.clone())?;
+        let auth_ns = section_signed(&genesis_sk_set.secret_key(), ns.clone());
         let _updated = section.update_member(auth_ns);
     }
     Ok((section, section_key_share))
@@ -332,7 +332,7 @@ pub(crate) fn create_section_with_elders(
     let (mut section, section_key_share) = do_create_section(sap, sk_set, None, None)?;
     for peer in sap.elders() {
         let node_state = NodeState::joined(*peer, None);
-        let node_state = section_signed(sk_set.secret_key(), node_state)?;
+        let node_state = section_signed(sk_set.secret_key(), node_state);
         let _updated = section.update_member(node_state);
     }
     Ok((section, section_key_share))
@@ -387,17 +387,17 @@ pub(crate) async fn create_comm() -> Result<Comm> {
 pub(crate) fn create_relocation_trigger(
     sk_set: &bls::SecretKeySet,
     age: u8,
-) -> Result<Decision<NodeState>> {
+) -> Decision<NodeState> {
     loop {
         let node_state =
             NodeState::joined(create_peer(MIN_ADULT_AGE), Some(xor_name::rand::random()));
-        let decision = section_decision(sk_set, node_state.clone())?;
+        let decision = section_decision(sk_set, node_state.clone());
 
         let sig: Signature = decision.proposals[&node_state].clone();
         let churn_id = ChurnId(sig.to_bytes());
 
         if relocation_check(age, &churn_id) && !relocation_check(age + 1, &churn_id) {
-            return Ok(decision);
+            return decision;
         }
     }
 }
@@ -425,7 +425,7 @@ fn do_create_section(
         (section_chain, genesis_ks.secret_key(), 0)
     };
 
-    let signed_sap = section_signed(&last_sk, section_auth.clone())?;
+    let signed_sap = section_signed(&last_sk, section_auth.clone());
     let section_tree_update = SectionTreeUpdate::new(signed_sap, section_chain);
     let section_tree = if let Some(parent_section_tree) = parent_section_tree {
         parent_section_tree

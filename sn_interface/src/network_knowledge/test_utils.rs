@@ -15,9 +15,8 @@ use std::{cell::Cell, collections::BTreeMap, fmt, net::SocketAddr};
 use xor_name::Prefix;
 
 // Parse `Prefix` from string
-pub fn prefix(s: &str) -> Result<Prefix> {
-    s.parse()
-        .map_err(|err| eyre!("failed to parse Prefix '{}': {}", s, err))
+pub fn prefix(s: &str) -> Prefix {
+    s.parse().expect("Failed to parse prefix")
 }
 
 // Generate unique SocketAddr for testing purposes
@@ -114,47 +113,54 @@ pub fn gen_section_tree_update(
     sap: &SectionSigned<SectionAuthorityProvider>,
     proof_chain: &SectionsDAG,
     parent_sk: &bls::SecretKey,
-) -> Result<SectionTreeUpdate> {
-    let signed_key = section_signed(parent_sk, sap.section_key())?;
+) -> SectionTreeUpdate {
+    let signed_key = section_signed(parent_sk, sap.section_key());
     let mut proof_chain = proof_chain.clone();
-    proof_chain.insert(
-        &parent_sk.public_key(),
-        signed_key.value,
-        signed_key.sig.signature,
-    )?;
-    Ok(SectionTreeUpdate::new(sap.clone(), proof_chain))
+    proof_chain
+        .insert(
+            &parent_sk.public_key(),
+            signed_key.value,
+            signed_key.sig.signature,
+        )
+        .expect("Failed to insert into proof chain");
+    SectionTreeUpdate::new(sap.clone(), proof_chain)
 }
 
 // Create signature for the given payload using the given secret key.
-pub fn prove<T: Serialize>(secret_key: &bls::SecretKey, payload: &T) -> Result<SectionSig> {
-    let bytes = bincode::serialize(payload).map_err(|_| Error::InvalidPayload)?;
-    Ok(SectionSig {
+pub fn prove<T: Serialize>(secret_key: &bls::SecretKey, payload: &T) -> SectionSig {
+    let bytes = bincode::serialize(payload).expect("Failed to serialize payload");
+    SectionSig {
         public_key: secret_key.public_key(),
         signature: secret_key.sign(&bytes),
-    })
+    }
 }
 
 pub fn section_decision<P: Proposition>(
     secret_key_set: &bls::SecretKeySet,
     proposal: P,
-) -> Result<Decision<P>> {
+) -> Decision<P> {
     let n = secret_key_set.threshold() + 1;
     let mut nodes = Vec::from_iter((1..=n).into_iter().map(|idx| {
         let secret = (idx as u8, secret_key_set.secret_key_share(idx));
         Consensus::from(secret, secret_key_set.public_keys(), n)
     }));
 
-    let first_vote = nodes[0].sign_vote(Vote {
-        gen: 0,
-        ballot: Ballot::Propose(proposal),
-        faults: Default::default(),
-    })?;
+    let first_vote = nodes[0]
+        .sign_vote(Vote {
+            gen: 0,
+            ballot: Ballot::Propose(proposal),
+            faults: Default::default(),
+        })
+        .expect("Failed to sign first vote");
 
-    let mut votes = vec![nodes[0].cast_vote(first_vote)?];
+    let mut votes = vec![nodes[0].cast_vote(first_vote).expect("Failed to cast vote")];
 
     while let Some(vote) = votes.pop() {
         for node in &mut nodes {
-            match node.handle_signed_vote(vote.clone())? {
+            match node
+                .handle_signed_vote(vote.clone())
+                .expect("Failed to handle vote")
+            {
                 VoteResponse::WaitingForMoreVotes => (),
                 VoteResponse::Broadcast(vote) => votes.push(vote),
             }
@@ -177,17 +183,15 @@ pub fn section_decision<P: Proposition>(
     let decision = nodes[0]
         .decision
         .clone()
-        .ok_or_else(|| eyre!("A decision was expected to be found for this particular node"))?;
-    Ok(decision)
+        .expect("We should have seen a decision, this is a bug");
+
+    decision
 }
 
 // Wrap the given payload in `SectionSigned`
-pub fn section_signed<T: Serialize>(
-    secret_key: &bls::SecretKey,
-    payload: T,
-) -> Result<SectionSigned<T>> {
-    let sig = prove(secret_key, &payload)?;
-    Ok(SectionSigned::new(payload, sig))
+pub fn section_signed<T: Serialize>(secret_key: &bls::SecretKey, payload: T) -> SectionSigned<T> {
+    let sig = prove(secret_key, &payload);
+    SectionSigned::new(payload, sig)
 }
 
 struct FakeProofKeyVerifier {}
