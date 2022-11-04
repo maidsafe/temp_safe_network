@@ -79,7 +79,7 @@ pub(crate) enum Cmd {
         msg_id: MsgId,
         msg: ClientMsg,
         origin: Peer,
-        send_stream: Option<Arc<Mutex<SendStream>>>,
+        send_stream: Arc<Mutex<SendStream>>,
         /// Requester's authority over this message
         auth: AuthorityProof<ClientAuth>,
         #[cfg(feature = "traceroute")]

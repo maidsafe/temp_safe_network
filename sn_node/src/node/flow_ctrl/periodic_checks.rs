@@ -42,7 +42,7 @@ const ELDER_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(3);
 pub(super) struct PeriodicChecksTimestamps {
     last_probe: Instant,
     last_section_probe: Instant,
-    last_adult_health_check: Instant,
+    // last_adult_health_check: Instant,
     last_elder_health_check: Instant,
     last_vote_check: Instant,
     last_dkg_msg_check: Instant,
@@ -55,7 +55,7 @@ impl PeriodicChecksTimestamps {
         Self {
             last_probe: Instant::now(),
             last_section_probe: Instant::now(),
-            last_adult_health_check: Instant::now(),
+            // last_adult_health_check: Instant::now(),
             last_elder_health_check: Instant::now(),
             last_vote_check: Instant::now(),
             last_dkg_msg_check: Instant::now(),
@@ -142,19 +142,22 @@ impl FlowCtrl {
             debug!(" ----> probe periodics done");
         }
 
-        if self.timestamps.last_adult_health_check.elapsed() > ADULT_HEALTH_CHECK_INTERVAL {
-            debug!(" ----> adult health periodics sgtart");
-            self.timestamps.last_adult_health_check = now;
-            let health_cmds = match Self::perform_health_checks(self.node.clone()).await {
-                Ok(cmds) => cmds,
-                Err(error) => {
-                    error!("Error handling client msg to perform health check: {error:?}");
-                    vec![]
-                }
-            };
-            cmds.extend(health_cmds);
-            debug!(" ----> adult health periodics done");
-        }
+        // TODO: reevaluate health checks. Does this make sense mocking a client req?
+        // how do we handle the need for a bidi stream (if using the whole client flow?)
+
+        // if self.timestamps.last_adult_health_check.elapsed() > ADULT_HEALTH_CHECK_INTERVAL {
+        //     debug!(" ----> adult health periodics sgtart");
+        //     self.timestamps.last_adult_health_check = now;
+        //     let health_cmds = match Self::perform_health_checks(self.node.clone()).await {
+        //         Ok(cmds) => cmds,
+        //         Err(error) => {
+        //             error!("Error handling client msg to perform health check: {error:?}");
+        //             vec![]
+        //         }
+        //     };
+        //     cmds.extend(health_cmds);
+        //     debug!(" ----> adult health periodics done");
+        // }
 
         // The above health check only queries for chunks
         // here we specifically ask for AE prob msgs and manually
@@ -203,40 +206,39 @@ impl FlowCtrl {
         debug!(" ----> all elder periodics cmds pushed ");
     }
 
-    /// Initiates and generates all the subsequent Cmds to perform a healthcheck
-    async fn perform_health_checks(node: Arc<RwLock<MyNode>>) -> Result<Vec<Cmd>> {
-        info!("Starting to check the section's health");
-        let node = node.read().await;
-        let our_prefix = node.network_knowledge.prefix();
+    // /// Initiates and generates all the subsequent Cmds to perform a healthcheck
+    // async fn perform_health_checks(node: Arc<RwLock<MyNode>>) -> Result<Vec<Cmd>> {
+    //     info!("Starting to check the section's health");
+    //     let node = node.read().await;
+    //     let our_prefix = node.network_knowledge.prefix();
 
-        // random chunk addr will be sent to relevant nodes in the section.
-        let chunk_addr = xor_name::rand::random();
+    //     // random chunk addr will be sent to relevant nodes in the section.
+    //     let chunk_addr = xor_name::rand::random();
 
-        let chunk_addr = our_prefix.substituted_in(chunk_addr);
+    //     let chunk_addr = our_prefix.substituted_in(chunk_addr);
 
-        let msg = ClientMsg::Query(DataQuery {
-            variant: DataQueryVariant::GetChunk(ChunkAddress(chunk_addr)),
-            adult_index: 0,
-        });
+    //     let msg = ClientMsg::Query(DataQuery {
+    //         variant: DataQueryVariant::GetChunk(ChunkAddress(chunk_addr)),
+    //         adult_index: 0,
+    //     });
 
-        let msg_id = MsgId::new();
-        let our_info = node.info();
-        let origin = our_info.peer();
+    //     let msg_id = MsgId::new();
+    //     let our_info = node.info();
+    //     let origin = our_info.peer();
 
-        let auth = auth(&node, &msg)?;
+    //     let auth = auth(&node, &msg)?;
 
-        // generate the cmds, and ensure we go through dysfunction tracking
-        node.handle_valid_client_msg(
-            msg_id,
-            msg,
-            auth,
-            origin,
-            None,
-            #[cfg(feature = "traceroute")]
-            Traceroute(vec![]),
-        )
-        .await
-    }
+    //     // generate the cmds, and ensure we go through dysfunction tracking
+    //     node.handle_valid_client_msg(
+    //         msg_id,
+    //         msg,
+    //         auth,
+    //         origin,
+    //         #[cfg(feature = "traceroute")]
+    //         Traceroute(vec![]),
+    //     )
+    //     .await
+    // }
 
     /// Generates a probe msg, which goes to a random section in order to
     /// passively maintain network knowledge over time
