@@ -649,12 +649,12 @@ mod tests {
         let (mut knowledge, _) = NetworkKnowledge::first_node(peer, sk_gen.clone())?;
 
         // section 1
-        let (sap1, _, sk_1) = random_sap(prefix("1")?, 0, 0, None);
-        let sap1 = section_signed(&sk_1.secret_key(), sap1)?;
+        let (sap1, _, sk_1) = random_sap(prefix("1"), 0, 0, None);
+        let sap1 = section_signed(&sk_1.secret_key(), sap1);
         let our_node_name_prefix_1 = sap1.prefix().name();
         let proof_chain = knowledge.section_chain();
         let section_tree_update =
-            gen_section_tree_update(&sap1, &proof_chain, &sk_gen.secret_key())?;
+            gen_section_tree_update(&sap1, &proof_chain, &sk_gen.secret_key());
         assert!(knowledge.update_knowledge_if_valid(
             section_tree_update,
             None,
@@ -663,10 +663,10 @@ mod tests {
         assert_eq!(knowledge.signed_sap, sap1);
 
         // section with different prefix (0) and our node name doesn't match
-        let (sap0, _, sk_0) = random_sap(prefix("0")?, 0, 0, None);
-        let sap0 = section_signed(&sk_0.secret_key(), sap0)?;
+        let (sap0, _, sk_0) = random_sap(prefix("0"), 0, 0, None);
+        let sap0 = section_signed(&sk_0.secret_key(), sap0);
         let section_tree_update =
-            gen_section_tree_update(&sap0, &proof_chain, &sk_gen.secret_key())?;
+            gen_section_tree_update(&sap0, &proof_chain, &sk_gen.secret_key());
         // our node is still in prefix1
         assert!(knowledge.update_knowledge_if_valid(
             section_tree_update,

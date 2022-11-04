@@ -137,7 +137,7 @@ mod tests {
 
         // adding node set 1
         let sk_1 = SecretKeySet::random(None).secret_key().clone();
-        let nodes_1 = gen_random_signed_node_states(1, MembershipState::Left, &sk_1)?;
+        let nodes_1 = gen_random_signed_node_states(1, MembershipState::Left, &sk_1);
         nodes_1.iter().for_each(|node| {
             section_peers.update(node.clone());
         });
@@ -154,11 +154,8 @@ mod tests {
             dst_section_key: bls::SecretKey::random().public_key(),
             age: 10,
         };
-        let nodes_2 = gen_random_signed_node_states(
-            1,
-            MembershipState::Relocated(Box::new(relocate)),
-            &sk_2,
-        )?;
+        let nodes_2 =
+            gen_random_signed_node_states(1, MembershipState::Relocated(Box::new(relocate)), &sk_2);
         nodes_2.iter().for_each(|node| {
             section_peers.update(node.clone());
         });
@@ -173,7 +170,7 @@ mod tests {
 
         // adding node set 3
         let sk_3 = SecretKeySet::random(None).secret_key().clone();
-        let nodes_3 = gen_random_signed_node_states(1, MembershipState::Left, &sk_3)?;
+        let nodes_3 = gen_random_signed_node_states(1, MembershipState::Left, &sk_3);
         nodes_3.iter().for_each(|node| {
             section_peers.update(node.clone());
         });
@@ -188,7 +185,7 @@ mod tests {
 
         // adding node set 4
         let sk_4 = SecretKeySet::random(None).secret_key().clone();
-        let nodes_4 = gen_random_signed_node_states(1, MembershipState::Left, &sk_4)?;
+        let nodes_4 = gen_random_signed_node_states(1, MembershipState::Left, &sk_4);
         nodes_4.iter().for_each(|node| {
             section_peers.update(node.clone());
         });
@@ -206,7 +203,7 @@ mod tests {
         //              |
         //              -> 5
         let sk_5 = SecretKeySet::random(None).secret_key().clone();
-        let nodes_5 = gen_random_signed_node_states(1, MembershipState::Left, &sk_5)?;
+        let nodes_5 = gen_random_signed_node_states(1, MembershipState::Left, &sk_5);
         nodes_5.iter().for_each(|node| {
             section_peers.update(node.clone());
         });
@@ -223,11 +220,11 @@ mod tests {
     }
 
     #[test]
-    fn archived_members_should_not_be_moved_to_members_list() -> Result<()> {
+    fn archived_members_should_not_be_moved_to_members_list() {
         let mut rng = thread_rng();
         let mut section_peers = SectionPeers::default();
         let sk = SecretKeySet::random(None).secret_key().clone();
-        let node_left = gen_random_signed_node_states(1, MembershipState::Left, &sk)?[0].clone();
+        let node_left = gen_random_signed_node_states(1, MembershipState::Left, &sk)[0].clone();
         let relocate = RelocateDetails {
             previous_name: XorName::random(&mut rng),
             dst: XorName::random(&mut rng),
@@ -235,31 +232,30 @@ mod tests {
             age: 10,
         };
         let node_relocated =
-            gen_random_signed_node_states(1, MembershipState::Relocated(Box::new(relocate)), &sk)?
+            gen_random_signed_node_states(1, MembershipState::Relocated(Box::new(relocate)), &sk)
                 [0]
             .clone();
 
         assert!(section_peers.update(node_left.clone()));
         assert!(section_peers.update(node_relocated.clone()));
 
-        let node_left_joins = section_signed(&sk, NodeState::joined(*node_left.peer(), None))?;
+        let node_left_joins = section_signed(&sk, NodeState::joined(*node_left.peer(), None));
         let node_relocated_joins =
-            section_signed(&sk, NodeState::joined(*node_relocated.peer(), None))?;
+            section_signed(&sk, NodeState::joined(*node_relocated.peer(), None));
         assert!(!section_peers.update(node_left_joins));
         assert!(!section_peers.update(node_relocated_joins));
 
         assert_lists(section_peers.archive.values(), &[node_left, node_relocated]);
         assert!(section_peers.members().is_empty());
-        Ok(())
     }
 
     #[test]
-    fn members_should_be_archived_if_they_leave_or_relocate() -> Result<()> {
+    fn members_should_be_archived_if_they_leave_or_relocate() {
         let mut rng = thread_rng();
         let mut section_peers = SectionPeers::default();
         let sk = SecretKeySet::random(None).secret_key().clone();
 
-        let node_1 = gen_random_signed_node_states(1, MembershipState::Joined, &sk)?[0].clone();
+        let node_1 = gen_random_signed_node_states(1, MembershipState::Joined, &sk)[0].clone();
         let relocate = RelocateDetails {
             previous_name: XorName::random(&mut rng),
             dst: XorName::random(&mut rng),
@@ -267,22 +263,21 @@ mod tests {
             age: 10,
         };
         let node_2 =
-            gen_random_signed_node_states(1, MembershipState::Relocated(Box::new(relocate)), &sk)?
+            gen_random_signed_node_states(1, MembershipState::Relocated(Box::new(relocate)), &sk)
                 [0]
             .clone();
         assert!(section_peers.update(node_1.clone()));
         assert!(section_peers.update(node_2.clone()));
 
         let node_1 = NodeState::left(*node_1.peer(), Some(node_1.name()));
-        let node_1 = section_signed(&sk, node_1)?;
+        let node_1 = section_signed(&sk, node_1);
         let node_2 = NodeState::left(*node_2.peer(), Some(node_2.name()));
-        let node_2 = section_signed(&sk, node_2)?;
+        let node_2 = section_signed(&sk, node_2);
         assert!(section_peers.update(node_1.clone()));
         assert!(section_peers.update(node_2.clone()));
 
         assert!(section_peers.members().is_empty());
         assert_lists(section_peers.archive.values(), &[node_1, node_2]);
-        Ok(())
     }
 
     // Test helpers
@@ -291,7 +286,7 @@ mod tests {
         num_nodes: usize,
         membership_state: MembershipState,
         secret_key: &bls::SecretKey,
-    ) -> Result<Vec<SectionSigned<NodeState>>> {
+    ) -> Vec<SectionSigned<NodeState>> {
         let mut rng = thread_rng();
         let mut signed_node_states = Vec::new();
         for _ in 0..num_nodes {
@@ -305,9 +300,9 @@ mod tests {
                     NodeState::relocated(peer, None, (**details).clone())
                 }
             };
-            let sig = section_signed(secret_key, node_state)?;
+            let sig = section_signed(secret_key, node_state);
             signed_node_states.push(sig);
         }
-        Ok(signed_node_states)
+        signed_node_states
     }
 }

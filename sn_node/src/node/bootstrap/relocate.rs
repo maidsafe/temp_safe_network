@@ -268,7 +268,7 @@ mod tests {
             gen_addr(),
         );
         let node_state = NodeState::joined(node.peer(), None);
-        let signed_node_state = section_signed(&from_sk_set.secret_key(), node_state)?;
+        let signed_node_state = section_signed(&from_sk_set.secret_key(), node_state);
         // to_sap
         let (to_sap, _) = generate_sap();
 
@@ -315,7 +315,7 @@ mod tests {
                 gen_addr(),
             );
             let node_state = NodeState::joined(node.peer(), None);
-            let signed_node_state = section_signed(&from_sk_set.secret_key(), node_state)?;
+            let signed_node_state = section_signed(&from_sk_set.secret_key(), node_state);
             // to_sap
             let (to_sap, to_sk_set) = generate_sap();
 
@@ -380,7 +380,7 @@ mod tests {
                 gen_addr(),
             );
             let node_state = NodeState::joined(node.peer(), None);
-            let signed_node_state = section_signed(&from_sk_set.secret_key(), node_state)?;
+            let signed_node_state = section_signed(&from_sk_set.secret_key(), node_state);
             // to_sap
             let (to_sap, to_sk_set) = generate_sap();
 

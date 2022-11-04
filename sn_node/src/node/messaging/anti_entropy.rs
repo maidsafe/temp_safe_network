@@ -648,7 +648,7 @@ mod tests {
             let (sap, mut nodes, secret_key_set) = random_sap(prefix0, elder_count(), 0, None);
             let info = nodes.remove(0);
             let sap_sk = secret_key_set.secret_key();
-            let signed_sap = section_signed(&sap_sk, sap)?;
+            let signed_sap = section_signed(&sap_sk, sap);
 
             let (proof_chain, genesis_sk_set) = create_proof_chain(signed_sap.section_key())
                 .context("failed to create section chain")?;
@@ -681,7 +681,7 @@ mod tests {
             // generate other SAP for prefix1
             let (other_sap, _, secret_key_set) = random_sap(prefix1, elder_count(), 0, None);
             let other_sap_sk = secret_key_set.secret_key();
-            let other_sap = section_signed(&other_sap_sk, other_sap)?;
+            let other_sap = section_signed(&other_sap_sk, other_sap);
             // generate a proof chain for this other SAP
             let mut proof_chain = SectionsDAG::new(genesis_pk);
             let signature = bincode::serialize(&other_sap_sk.public_key())
