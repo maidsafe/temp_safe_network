@@ -180,12 +180,10 @@ pub fn section_decision<P: Proposition>(
         1
     );
 
-    let decision = nodes[0]
+    nodes[0]
         .decision
         .clone()
-        .expect("We should have seen a decision, this is a bug");
-
-    decision
+        .expect("We should have seen a decision, this is a bug")
 }
 
 // Wrap the given payload in `SectionSigned`
