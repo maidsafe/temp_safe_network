@@ -38,9 +38,8 @@ impl MyNode {
         data: ReplicatedData,
         msg_id: MsgId,
         targets: BTreeSet<Peer>,
-        client_response_stream: Option<Arc<Mutex<SendStream>>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
-    ) -> Result<Vec<Cmd>> {
+    ) -> Result<Vec<(Peer, Result<WireMsg>)>> {
         info!(
             "Replicating data from {msg_id:?} {:?} to holders {:?}",
             data.name(),
@@ -53,8 +52,6 @@ impl MyNode {
         let msg = NodeMsg::NodeCmd(NodeCmd::ReplicateOneData(data));
 
         let (kind, payload) = self.serialize_node_msg(msg)?;
-
-        let cmds = vec![];
 
         let mut send_tasks = vec![];
 
@@ -72,22 +69,79 @@ impl MyNode {
 
             send_tasks.push(
                 async move {
-                    self.comm
-                        .send_out_bytes_to_peer_and_return_response(
-                            target,
-                            msg_id,
-                            bytes_to_adult.clone(),
-                        )
-                        .await
-                    // TODO: parse response and fail if err msg
+                    (
+                        target,
+                        self.comm
+                            .send_out_bytes_to_peer_and_return_response(
+                                target,
+                                msg_id,
+                                bytes_to_adult.clone(),
+                            )
+                            .await,
+                    )
                 }
                 .boxed(),
             );
         }
 
-        let (response, _what) = futures::future::select_ok(send_tasks).await?;
+        Ok(futures::future::join_all(send_tasks).await)
+    }
 
-        debug!("Response in from peer for {msg_id:?} {response:?}");
+    // Locate ideal holders for this data, instruct them to store the data
+    pub(crate) async fn replicate_data_to_adults_and_ack_to_client(
+        &self,
+        data: ReplicatedData,
+        msg_id: MsgId,
+        targets: BTreeSet<Peer>,
+        client_response_stream: Arc<Mutex<SendStream>>,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
+    ) -> Result<()> {
+        info!(
+            "Replicating data from client {msg_id:?} {:?} to holders {:?}",
+            data.name(),
+            &targets,
+        );
+
+        let responses = self
+            .replicate_data_to_adults(
+                data,
+                msg_id,
+                targets,
+                #[cfg(feature = "traceroute")]
+                traceroute.clone(),
+            )
+            .await?;
+        let mut has_responded_to_client = false;
+        for (peer, the_response) in responses {
+            if let Ok(response) = the_response {
+                debug!("Response in from {peer:?} for {msg_id:?} {response:?}");
+                if !has_responded_to_client {
+                    self.send_ack_to_client_on_stream(
+                        response,
+                        msg_id,
+                        client_response_stream.clone(),
+                        traceroute.clone(),
+                    )
+                    .await?;
+                    has_responded_to_client = true;
+                }
+            } else {
+                error!("{msg_id:?} Error when replicating to adult {peer:?}");
+                // TODO: Do something...
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Parses WireMsg and if DataStored Ack, we send a response to the client
+    async fn send_ack_to_client_on_stream(
+        &self,
+        response: WireMsg,
+        msg_id: MsgId,
+        send_stream: Arc<Mutex<SendStream>>,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
+    ) -> Result<()> {
         if let MsgType::Node {
             msg: NodeMsg::NodeEvent(NodeEvent::DataStored(_address)),
             ..
@@ -100,27 +154,23 @@ impl MyNode {
 
             let (kind, payload) = self.serialize_sign_client_msg(client_msg)?;
 
-            if let Some(stream) = client_response_stream.clone() {
-                debug!("sending cmd response ack back to client");
-                self.send_msg_on_stream(
-                    payload,
-                    kind,
-                    stream,
-                    None, // we shouldn't need this...
-                    msg_id,
-                    traceroute.clone(),
-                )
-                .await?
-            } else {
-                warn!("No send stream to respond to client on! (This is likely due to the msg originating at the elder as a healthcheck");
-            }
+            debug!("sending cmd response ack back to client");
+            self.send_msg_on_stream(
+                payload,
+                kind,
+                send_stream,
+                None, // we shouldn't need this...
+                msg_id,
+                traceroute.clone(),
+            )
+            .await
         } else {
             error!(
                 "Unexpected reponse to query from node. To : {msg_id:?}; response: {response:?}"
             );
+            // TODO: handle this bad response
+            Ok(())
         }
-
-        Ok(cmds)
     }
 
     /// Find target adult, sends a bidi msg, awaiting response, and then sends this on to the client
@@ -130,7 +180,7 @@ impl MyNode {
         msg_id: MsgId,
         auth: AuthorityProof<ClientAuth>,
         source_client: Peer,
-        client_response_stream: Option<Arc<Mutex<SendStream>>>,
+        client_response_stream: Arc<Mutex<SendStream>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         // We generate the operation id to track the response from the Adult
@@ -224,12 +274,15 @@ impl MyNode {
 
             let (kind, payload) = self.serialize_sign_client_msg(client_msg)?;
 
-            if let Some(stream) = client_response_stream {
-                self.send_msg_on_stream(payload, kind, stream, Some(target), msg_id, traceroute)
-                    .await?
-            } else {
-                warn!("No send stream to respond to client on! (This is likely due to the msg originating at the elder as a healthcheck");
-            }
+            self.send_msg_on_stream(
+                payload,
+                kind,
+                client_response_stream,
+                Some(target),
+                msg_id,
+                traceroute,
+            )
+            .await?;
         } else {
             error!(
                 "Unexpected reponse to query from node. To : {msg_id:?}; response: {response:?}"
