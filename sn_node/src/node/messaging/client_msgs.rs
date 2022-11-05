@@ -280,7 +280,7 @@ impl MyNode {
 
         trace!("{:?}: {:?}", LogMarker::DataStoreReceivedAtElder, data);
 
-        let mut cmds = vec![];
+        let cmds = vec![];
         let targets = self.target_data_holders(data.name());
 
         // make sure the expected replication factor is achieved
@@ -310,16 +310,15 @@ impl MyNode {
         // the replication msg sent to adults
         // cmds here may be dysfunction tracking.
         // CmdAcks are sent over the send stream herein
-        let replication_responses = self
-            .replicate_data_to_adults_and_ack_to_client(
-                data,
-                msg_id,
-                targets,
-                send_stream,
-                #[cfg(feature = "traceroute")]
-                traceroute.clone(),
-            )
-            .await?;
+        self.replicate_data_to_adults_and_ack_to_client(
+            data,
+            msg_id,
+            targets,
+            send_stream,
+            #[cfg(feature = "traceroute")]
+            traceroute.clone(),
+        )
+        .await?;
 
         // TODO: handle failed responses
         // cmds.extend();
