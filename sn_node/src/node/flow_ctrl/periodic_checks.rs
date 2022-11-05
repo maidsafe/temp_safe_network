@@ -12,17 +12,9 @@ use crate::node::{
     flow_ctrl::cmds::Cmd, messaging::Peers, node_starter::CmdChannel, MyNode, Result,
 };
 
-use ed25519_dalek::Signer;
-#[cfg(feature = "traceroute")]
-use sn_interface::messaging::Traceroute;
 use sn_interface::{
-    messaging::{
-        data::{ClientMsg, DataQuery, DataQueryVariant},
-        system::{NodeCmd, NodeMsg},
-        AuthorityProof, ClientAuth, MsgId, WireMsg,
-    },
+    messaging::system::{NodeCmd, NodeMsg},
     types::log_markers::LogMarker,
-    types::{ChunkAddress, PublicKey, Signature},
 };
 
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
@@ -36,7 +28,7 @@ const DATA_BATCH_INTERVAL: Duration = Duration::from_millis(50);
 const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 // 30 adult nodes checked per minute., so each node should be queried 10x in 10 mins
 // Which should hopefully trigger dysfunction if we're not getting responses back
-const ADULT_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(2);
+// const ADULT_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(2);
 const ELDER_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(3);
 
 pub(super) struct PeriodicChecksTimestamps {
@@ -432,15 +424,15 @@ impl FlowCtrl {
     }
 }
 
-fn auth(node: &MyNode, msg: &ClientMsg) -> Result<AuthorityProof<ClientAuth>> {
-    let keypair = node.keypair.clone();
-    let payload = WireMsg::serialize_msg_payload(&msg)?;
-    let signature = keypair.sign(&payload);
+// fn auth(node: &MyNode, msg: &ClientMsg) -> Result<AuthorityProof<ClientAuth>> {
+//     let keypair = node.keypair.clone();
+//     let payload = WireMsg::serialize_msg_payload(&msg)?;
+//     let signature = keypair.sign(&payload);
 
-    let auth = ClientAuth {
-        public_key: PublicKey::Ed25519(keypair.public),
-        signature: Signature::Ed25519(signature),
-    };
+//     let auth = ClientAuth {
+//         public_key: PublicKey::Ed25519(keypair.public),
+//         signature: Signature::Ed25519(signature),
+//     };
 
-    Ok(AuthorityProof::verify(auth, payload)?)
-}
+//     Ok(AuthorityProof::verify(auth, payload)?)
+// }
