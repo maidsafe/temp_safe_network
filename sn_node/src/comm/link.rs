@@ -114,15 +114,16 @@ impl Link {
     ) -> Result<UsrMsgBytes, SendToOneError> {
         trace!("Sending {msg_id:?} via a bi stream");
 
-        let conn = match self.get_or_connect().await {
+        let conn = match self.get_or_connect(msg_id).await {
             Ok(conn) => conn,
             Err(err) => {
                 error!(
-                    "Err getting connection during bi stream initialisation {msg_id:?}. Retrying"
+                    "{msg_id:?} Err getting connection during bi stream initialisation to: {:?}.", self.peer()
                 );
                 return Err(err);
             }
         };
+
         let conn_id = conn.id();
         trace!("connection got to: {:?} {msg_id:?}", self.peer);
         let (mut send_stream, mut recv_stream) =
@@ -163,12 +164,12 @@ impl Link {
 
     // Gets an existing connection or creates a new one to the Link's Peer
     // Should only return still valid connections
-    pub(crate) async fn get_or_connect(&mut self) -> Result<Connection, SendToOneError> {
+    pub(crate) async fn get_or_connect(&mut self, msg_id: MsgId) -> Result<Connection, SendToOneError> {
         if self.connections.is_empty() {
-            debug!("attempting to create a connection");
-            self.create_connection().await
+            debug!("{msg_id:?} attempting to create a connection");
+            self.create_connection(msg_id).await
         } else {
-            trace!("Grabbing a connection from link.. {:?}", self.peer());
+            trace!("{msg_id:?} Grabbing a connection from link.. {:?}", self.peer());
             // TODO: add in simple connection check when available.
             // we can then remove dead conns easily and return only valid conns
             let connections = &self.connections;
@@ -196,20 +197,20 @@ impl Link {
             }
 
             if let Some(conn) = live_conn {
-                trace!("live connection found to {:?}", self.peer());
+                trace!("{msg_id:?} live connection found to {:?}", self.peer());
                 Ok(conn)
             } else {
                 trace!(
-                    "No live connection found to {:?}, creating a new one.",
+                    "{msg_id:?} No live connection found to {:?}, creating a new one.",
                     self.peer()
                 );
-                self.create_connection().await
+                self.create_connection(msg_id).await
             }
         }
     }
 
-    async fn create_connection(&mut self) -> Result<Connection, SendToOneError> {
-        debug!("create conn attempt");
+    async fn create_connection(&mut self, msg_id: MsgId) -> Result<Connection, SendToOneError> {
+        debug!("{msg_id:?} create conn attempt");
         let (conn, incoming_msgs) = self
             .endpoint
             .connect_to(&self.peer.addr())
@@ -217,7 +218,7 @@ impl Link {
             .map_err(SendToOneError::Connection)?;
 
         trace!(
-            "{} to {} (id: {})",
+            "{msg_id:?}: {} to {} (id: {})",
             LogMarker::ConnectionOpened,
             conn.remote_address(),
             conn.id()
