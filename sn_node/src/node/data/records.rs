@@ -102,6 +102,8 @@ impl MyNode {
             &targets,
         );
 
+        let targets_len = targets.len();
+
         let responses = self
             .replicate_data_to_adults(
                 data,
@@ -111,25 +113,39 @@ impl MyNode {
                 traceroute.clone(),
             )
             .await?;
-        let mut has_responded_to_client = false;
+        let mut success_count = 0;
+        let mut ack_response = None;
         for (peer, the_response) in responses {
             if let Ok(response) = the_response {
+                success_count +=1;
                 debug!("Response in from {peer:?} for {msg_id:?} {response:?}");
-                if !has_responded_to_client {
-                    self.send_ack_to_client_on_stream(
-                        response,
-                        msg_id,
-                        client_response_stream.clone(),
-                        traceroute.clone(),
-                    )
-                    .await?;
-                    has_responded_to_client = true;
-                }
+                ack_response = Some(response);
             } else {
-                error!("{msg_id:?} Error when replicating to adult {peer:?}");
+                error!("{msg_id:?} Error when replicating to adult {peer:?}: {the_response:?}");
                 // TODO: Do something...
             }
         }
+
+        // everything went fine, tell the client that
+        if success_count == targets_len {
+            if let Some(response) = ack_response {
+                self.send_ack_to_client_on_stream(
+                    response,
+                    msg_id,
+                    client_response_stream.clone(),
+                    traceroute.clone(),
+                )
+                .await?;
+            }
+            else {
+                // This should not be possible with above checks
+                error!("No valid ack response to send from all responses for {msg_id:?}")
+            }
+        }
+        else {
+            error!("Storage was not completely successful for {msg_id:?}");
+        }
+
 
         Ok(())
     }

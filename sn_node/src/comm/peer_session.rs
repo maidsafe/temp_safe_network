@@ -235,7 +235,7 @@ impl PeerSessionWorker {
             // Attempt to get a connection or make one to another node.
             // if there's no connection here yet, we requeue the job after a wait
             // incase there's been a delay adding the connection to Comms
-            let conn = match link.get_or_connect().await {
+            let conn = match link.get_or_connect(id).await {
                 Ok(conn) => conn,
                 Err(error) => {
                     error!("Error when attempting to send to peer. Job will be reenqueued for another attempt after a small timeout");
