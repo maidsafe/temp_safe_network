@@ -117,7 +117,7 @@ impl MyNode {
         let mut ack_response = None;
         for (peer, the_response) in responses {
             if let Ok(response) = the_response {
-                success_count +=1;
+                success_count += 1;
                 debug!("Response in from {peer:?} for {msg_id:?} {response:?}");
                 ack_response = Some(response);
             } else {
@@ -136,16 +136,13 @@ impl MyNode {
                     traceroute.clone(),
                 )
                 .await?;
-            }
-            else {
+            } else {
                 // This should not be possible with above checks
                 error!("No valid ack response to send from all responses for {msg_id:?}")
             }
-        }
-        else {
+        } else {
             error!("Storage was not completely successful for {msg_id:?}");
         }
-
 
         Ok(())
     }
@@ -170,7 +167,7 @@ impl MyNode {
 
             let (kind, payload) = self.serialize_sign_client_msg(client_msg)?;
 
-            debug!("sending cmd response ack back to client");
+            debug!("{msg_id:?} sending cmd response ack back to client");
             self.send_msg_on_stream(
                 payload,
                 kind,
@@ -328,26 +325,29 @@ impl MyNode {
             #[cfg(feature = "traceroute")]
             traceroute,
         )?;
-        trace!("USING BIDI to send to msg! OH DEAR, FASTEN SEATBELTS");
+        trace!("USING BIDI to send to msg {original_msg_id:?}! OH DEAR, FASTEN SEATBELTS");
         let stream_prio = 10;
         let mut send_stream = send_stream.lock().await;
 
-        debug!("stream locked");
+        debug!("stream locked for {original_msg_id:?} to {target_peer:?}");
         send_stream.set_priority(stream_prio);
+        debug!("prio set for {original_msg_id:?} to {target_peer:?}");
         if let Err(error) = send_stream.send_user_msg(bytes).await {
             error!(
-                        "Could not send query response {original_msg_id:?} to peer {target_peer:?} over response stream: {error:?}",
+                "Could not send query response {original_msg_id:?} to peer {target_peer:?} over response stream: {error:?}",
 
-                    );
+            );
             return Err(Error::from(error));
         }
+
+        debug!("msg away for {original_msg_id:?} to {target_peer:?}");
         if let Err(error) = send_stream.finish().await {
             error!(
                         "Could not close response stream for {original_msg_id:?} to peer {target_peer:?}: {error:?}",
                     );
         }
 
-        debug!("sent {original_msg_id:?}");
+        debug!("sent the msg over stream {original_msg_id:?} to {target_peer:?}");
 
         Ok(())
     }

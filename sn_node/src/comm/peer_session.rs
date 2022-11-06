@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use super::Link;
 
@@ -67,19 +68,30 @@ impl PeerSession {
 
     /// Sends out a UsrMsg on a bidi connection and awaits response bytes
     /// As such this may be long running if response is returned slowly.
+    /// This manages retries over bidi connection attempts
     pub(crate) async fn send_with_bi_return_response(
         &mut self,
         bytes: UsrMsgBytes,
         msg_id: MsgId,
     ) -> Result<UsrMsgBytes> {
         // TODO: make a real error here
-        let r = self.link.send_bi(bytes, msg_id).await;
-
-        if r.is_err() {
-            error!("Error sending on bi conn: {r:?}");
+        let mut attempts = 0;
+        let mut response = self
+            .link
+            .send_on_new_bi_di_stream(bytes.clone(), msg_id)
+            .await;
+        while response.is_err() && attempts <= 2 {
+            error!("Error sending on bi conn: {response:?}, attempt # {attempts}");
+            response = self
+                .link
+                .send_on_new_bi_di_stream(bytes.clone(), msg_id)
+                .await;
+            attempts += 1;
+            // wee sleep
+            tokio::time::sleep(Duration::from_millis(100)).await;
         }
 
-        r.map_err(|_e| Error::CmdSendError)
+        response.map_err(|_e| Error::CmdSendError)
     }
 
     #[instrument(skip(self, bytes))]
