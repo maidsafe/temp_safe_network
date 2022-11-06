@@ -107,7 +107,7 @@ impl Link {
     }
 
     /// Send a message using a bi-di stream and await response
-    pub(crate) async fn send_bi(
+    pub(crate) async fn send_on_new_bi_di_stream(
         &mut self,
         bytes: UsrMsgBytes,
         msg_id: MsgId,
@@ -118,7 +118,8 @@ impl Link {
             Ok(conn) => conn,
             Err(err) => {
                 error!(
-                    "{msg_id:?} Err getting connection during bi stream initialisation to: {:?}.", self.peer()
+                    "{msg_id:?} Err getting connection during bi stream initialisation to: {:?}.",
+                    self.peer()
                 );
                 return Err(err);
             }
@@ -164,12 +165,18 @@ impl Link {
 
     // Gets an existing connection or creates a new one to the Link's Peer
     // Should only return still valid connections
-    pub(crate) async fn get_or_connect(&mut self, msg_id: MsgId) -> Result<Connection, SendToOneError> {
+    pub(crate) async fn get_or_connect(
+        &mut self,
+        msg_id: MsgId,
+    ) -> Result<Connection, SendToOneError> {
         if self.connections.is_empty() {
             debug!("{msg_id:?} attempting to create a connection");
             self.create_connection(msg_id).await
         } else {
-            trace!("{msg_id:?} Grabbing a connection from link.. {:?}", self.peer());
+            trace!(
+                "{msg_id:?} Grabbing a connection from link.. {:?}",
+                self.peer()
+            );
             // TODO: add in simple connection check when available.
             // we can then remove dead conns easily and return only valid conns
             let connections = &self.connections;
@@ -210,7 +217,7 @@ impl Link {
     }
 
     async fn create_connection(&mut self, msg_id: MsgId) -> Result<Connection, SendToOneError> {
-        debug!("{msg_id:?} create conn attempt");
+        debug!("{msg_id:?} create conn attempt to {:?}", self.peer);
         let (conn, incoming_msgs) = self
             .endpoint
             .connect_to(&self.peer.addr())
