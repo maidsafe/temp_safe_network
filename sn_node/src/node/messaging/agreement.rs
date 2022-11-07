@@ -23,22 +23,24 @@ impl MyNode {
         &mut self,
         proposal: Proposal,
         sig: SectionSig,
-    ) -> Result<Option<Cmd>> {
+    ) -> Result<Vec<Cmd>> {
         debug!("{:?} {:?}", LogMarker::ProposalAgreed, proposal);
+        let mut cmds = Vec::new();
         match proposal {
             Proposal::VoteNodeOffline(node_state) => {
-                Ok(self.handle_offline_agreement(node_state, sig))
+                cmds.extend(self.handle_offline_agreement(node_state, sig))
             }
-            Proposal::SectionInfo(sap) => self.handle_section_info_agreement(sap, sig),
+            Proposal::SectionInfo(sap) => {
+                cmds.extend(self.handle_section_info_agreement(sap, sig)?)
+            }
             Proposal::NewElders(_) => {
                 error!("Elders agreement should be handled in a separate blocking fashion");
-                Ok(None)
             }
             Proposal::JoinsAllowed(joins_allowed) => {
                 self.joins_allowed = joins_allowed;
-                Ok(None)
             }
         }
+        Ok(cmds)
     }
 
     #[instrument(skip(self))]
@@ -55,7 +57,7 @@ impl MyNode {
         &mut self,
         sap: SectionAuthorityProvider,
         sig: SectionSig,
-    ) -> Result<Option<Cmd>> {
+    ) -> Result<Vec<Cmd>> {
         // check if section matches our prefix
         let equal_prefix = sap.prefix() == self.network_knowledge.prefix();
         let is_extension_prefix = sap
@@ -68,7 +70,7 @@ impl MyNode {
                 "Ignoring Proposal::SectionInfo since prefix doesn't match ours: {:?}",
                 sap
             );
-            return Ok(None);
+            return Ok(vec![]);
         }
         debug!("Handling section info with prefix: {:?}", sap.prefix());
 
@@ -83,7 +85,7 @@ impl MyNode {
             .all(|session| !session.elder_names().eq(elder_candidates.iter().copied()))
         {
             error!("Elder candidates don't match best elder candidates at given gen in received section agreement, ignoring it.");
-            return Ok(None);
+            return Ok(vec![]);
         };
 
         // handle regular elder handover (1 to 1)
@@ -119,7 +121,7 @@ impl MyNode {
             self.propose_handover_consensus(SapCandidate::SectionSplit(sap1.clone(), sap2.clone()))
         } else {
             debug!("Waiting for more split handover candidates");
-            Ok(None)
+            Ok(vec![])
         }
     }
 

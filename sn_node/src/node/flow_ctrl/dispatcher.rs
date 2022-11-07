@@ -129,7 +129,6 @@ impl Dispatcher {
             Cmd::HandleAgreement { proposal, sig } => {
                 let mut node = self.node.write().await;
                 node.handle_general_agreements(proposal, sig)
-                    .map(|c| c.into_iter().collect())
             }
             Cmd::HandleMembershipDecision(decision) => {
                 let mut node = self.node.write().await;
