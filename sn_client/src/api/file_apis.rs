@@ -645,6 +645,7 @@ mod tests {
         store_and_read(&client, 20 * 1024 * 1024).await;
     }
 
+    #[ignore = "too hectic for CI so far"]
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_40mb() {
         init_logger();
