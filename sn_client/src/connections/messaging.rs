@@ -40,9 +40,6 @@ pub(crate) const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
 // Number of bootstrap nodes to attempt to contact per batch (if provided by the node_config)
 pub(crate) const NODES_TO_CONTACT_PER_STARTUP_BATCH: usize = 3;
 
-// Duration of wait for the node to have chance to pickup network knowledge at the beginning
-const INITIAL_WAIT: u64 = 1;
-
 impl Session {
     #[instrument(
         skip(self, auth, payload, client_pk),
@@ -116,6 +113,7 @@ impl Session {
         let mut received_errors = BTreeSet::default();
 
         while let Some(msg_resp) = resp_rx.recv().await {
+            debug!("Handling msg_resp sent to ack wait channel: {msg_resp:?}");
             let (src, result) = match msg_resp {
                 MsgResponse::CmdResponse(src, response) => (src, response.result().clone()),
                 MsgResponse::QueryResponse(src, resp) => {
@@ -438,9 +436,6 @@ impl Session {
 
         // this seems needed for custom settings to take effect
         backoff.reset();
-
-        // wait here to give a chance for AE responses to come in and be parsed
-        tokio::time::sleep(Duration::from_secs(INITIAL_WAIT)).await;
 
         info!("Client startup... awaiting some network knowledge");
 
