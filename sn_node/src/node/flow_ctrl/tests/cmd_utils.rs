@@ -115,8 +115,8 @@ pub(crate) async fn run_and_collect_cmds(
 }
 
 pub(crate) async fn run_node_handle_client_msg_and_collect_cmds(
-    msg: ClientMsg,
-    peer: Peer,
+    _msg: ClientMsg,
+    _peer: Peer,
     dispatcher: &Dispatcher,
 ) -> crate::node::error::Result<Vec<Cmd>> {
     let mut all_cmds = vec![];
@@ -124,7 +124,7 @@ pub(crate) async fn run_node_handle_client_msg_and_collect_cmds(
     let node = dispatcher.node();
     let the_node = node.read().await;
 
-    let (msg_id, msg, auth) = get_client_msg_parts_for_handling(msg)?;
+    // let (msg_id, msg, auth) = get_client_msg_parts_for_handling(msg)?;
 
     // TODO: decide how to test this, w/r/t no client stream.
     let mut cmds = vec![];
