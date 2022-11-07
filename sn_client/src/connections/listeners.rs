@@ -67,6 +67,7 @@ impl Session {
                     Self::handle_client_msg(msg_id, msg, peer.addr(), resp_tx).await;
                 }
                 Ok(MsgType::Node { msg, .. }) => {
+                    debug!("AE msg received for {msg_id:?}");
                     if let Err(err) = session.handle_system_msg(msg, peer, resp_tx).await {
                         error!(
                             "Error while handling incoming system msg on {stream_id} \
@@ -110,7 +111,7 @@ impl Session {
                 result
             }
             msg_type => {
-                warn!("Unexpected msg type received: {msg_type:?}");
+                warn!("Unexpected msg type received in system handler: {msg_type:?}");
                 Ok(())
             }
         }
@@ -148,6 +149,10 @@ impl Session {
     ) {
         debug!("ClientMsg with id {msg_id:?} received from {src_addr:?}",);
 
+        if resp_tx.is_closed() {
+            debug!("Resp tx is closed. Client could have received all needed responses, so we can drop anything further.");
+            return;
+        }
         let (msg_resp, correlation_id) = match msg {
             ClientMsg::QueryResponse {
                 response,
@@ -200,31 +205,20 @@ impl Session {
         if let Some((msg_id, elders, service_msg, dst, auth)) =
             Self::new_target_elders(bounced_msg.clone(), &target_sap).await?
         {
+            // let new_msg_id = MsgId::new();
+
+            debug!("updated AE response msg going out for: {msg_id:?}");
             let ae_msg_src_name = src_peer.name();
-            // here we send this to only one elder for each AE message we get in. We _should_ have one per elder we sent to.
-            // deterministically send to most elder based upon sender
-            let target_elder = elders
-                .iter()
-                .sorted_by(|lhs, rhs| ae_msg_src_name.cmp_distance(&lhs.name(), &rhs.name()))
-                .cloned()
-                .collect_vec()
-                .pop();
+            // We should send to all elders. There's no (I think) realiable way to ensure we choose a different elder mapped to a given elder of the initially attempted section.
+            // Trick here will be shortcircuiting if we've already got all ACKs in...
+            let payload = WireMsg::serialize_msg_payload(&service_msg)?;
+            let wire_msg =
+                WireMsg::new_msg(msg_id, payload, MsgKind::Client(auth.into_inner()), dst);
 
-            // there should always be one
-            if let Some(elder) = target_elder {
-                let payload = WireMsg::serialize_msg_payload(&service_msg)?;
-                let wire_msg =
-                    WireMsg::new_msg(msg_id, payload, MsgKind::Client(auth.into_inner()), dst);
+            debug!("Resending original message to {src_peer:?} to new section elders");
 
-                debug!(
-                    "Resending original message on AE-Redirect with updated details. \
-                    Expecting an AE-Retry next"
-                );
-                self.send_msg(vec![elder], wire_msg, msg_id, false, resp_tx)
-                    .await?;
-            } else {
-                error!("No elder determined for resending AE message");
-            }
+            self.send_msg(elders, wire_msg, msg_id, false, resp_tx)
+                .await?;
         }
 
         Ok(())
@@ -237,9 +231,12 @@ impl Session {
         section_tree_update: SectionTreeUpdate,
         src_peer: Peer,
     ) {
+        debug!("Attempting to update our knowledge...");
         let sap = section_tree_update.signed_sap.value.clone();
+        let mut network = self.network.write().await;
+        debug!("Attempting to update our knowledge... WRITE LOCK GOT");
         // Update our network PrefixMap based upon passed in knowledge
-        match self.network.write().await.update(section_tree_update) {
+        match network.update(section_tree_update) {
             Ok(true) => {
                 debug!(
                     "Anti-Entropy: updated remote section SAP updated for {:?}",
@@ -312,9 +309,9 @@ impl Session {
                 .sorted_by(|lhs, rhs| {
                     dst_address_of_bounced_msg.cmp_distance(&lhs.name(), &rhs.name())
                 })
-                .take(target_count)
                 .collect()
         };
+
         // shuffle so elders sent to is random for better availability
         target_elders.shuffle(&mut OsRng);
 
