@@ -18,7 +18,7 @@ use sn_interface::messaging::{MsgType, Traceroute, WireMsg};
 use sn_interface::{
     data_copy_count,
     messaging::{
-        data::{ClientMsg, CmdResponse, DataQuery, MetadataExchange, StorageLevel},
+        data::{ClientMsg, CmdResponse, DataCmd, DataQuery, MetadataExchange, StorageLevel},
         system::{NodeCmd, NodeEvent, NodeMsg, NodeQuery, OperationId},
         AuthorityProof, ClientAuth, Dst, MsgId, MsgKind,
     },
@@ -90,6 +90,7 @@ impl MyNode {
     // Locate ideal holders for this data, instruct them to store the data
     pub(crate) async fn replicate_data_to_adults_and_ack_to_client(
         &self,
+        cmd: DataCmd,
         data: ReplicatedData,
         msg_id: MsgId,
         targets: BTreeSet<Peer>,
@@ -115,14 +116,18 @@ impl MyNode {
             .await?;
         let mut success_count = 0;
         let mut ack_response = None;
+        let mut last_error = None;
         for (peer, the_response) in responses {
-            if let Ok(response) = the_response {
-                success_count += 1;
-                debug!("Response in from {peer:?} for {msg_id:?} {response:?}");
-                ack_response = Some(response);
-            } else {
-                error!("{msg_id:?} Error when replicating to adult {peer:?}: {the_response:?}");
-                // TODO: Do something...
+            match the_response {
+                Ok(response) => {
+                    success_count += 1;
+                    debug!("Response in from {peer:?} for {msg_id:?} {response:?}");
+                    ack_response = Some(response);
+                }
+                Err(error) => {
+                    error!("{msg_id:?} Error when replicating to adult {peer:?}: {error:?}");
+                    last_error = Some(error);
+                }
             }
         }
 
@@ -142,6 +147,18 @@ impl MyNode {
             }
         } else {
             error!("Storage was not completely successful for {msg_id:?}");
+
+            if let Some(error) = last_error {
+                self.send_cmd_error_response_over_stream(
+                    cmd,
+                    error,
+                    msg_id,
+                    client_response_stream,
+                    #[cfg(feature = "traceroute")]
+                    traceroute,
+                )
+                .await?;
+            }
         }
 
         Ok(())
