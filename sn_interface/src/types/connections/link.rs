@@ -144,8 +144,6 @@ pub enum SendToOneError {
     #[cfg(feature = "chaos")]
     /// ChaosNoConn
     ChaosNoConnection,
-    /// Sending failed repeatedly
-    SendRepeatedlyFailed,
 }
 
 impl SendToOneError {
