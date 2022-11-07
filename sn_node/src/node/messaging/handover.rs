@@ -282,6 +282,7 @@ impl MyNode {
 
         match &self.handover_voting {
             Some(handover_state) => {
+                let had_consensus_value = handover_state.consensus_value().is_some();
                 let mut state = handover_state.clone();
                 let mut cmds = self.handle_vote(&mut state, signed_vote, peer)?;
 
@@ -290,14 +291,30 @@ impl MyNode {
 
                 // check for successful termination
                 if let Some(candidates_sap) = state.consensus_value() {
-                    debug!(
-                        "{}: {:?}",
-                        LogMarker::HandoverConsensusTermination,
-                        candidates_sap
-                    );
+                    // The Termination & Decision Broadcasting shall only undertaken
+                    // on the first time the consensus reached.
+                    // Aslo, for handover 2 elders sap, only need handover consensus from genesis.
+                    // Which already reached consensus when initialize the handover state.
+                    let elders_count =
+                        if let SapCandidate::ElderHandover(signed_sap) = candidates_sap.clone() {
+                            let count = signed_sap.value.elders().count();
+                            trace!("Currently handover for {count:?} elders");
+                            count
+                        } else {
+                            // For SplitHandover, just give a fixed value
+                            7
+                        };
 
-                    let bcast_cmds = self.broadcast_handover_decision(candidates_sap);
-                    cmds.extend(bcast_cmds);
+                    if elders_count < 3 || !had_consensus_value {
+                        debug!(
+                            "{}: {:?}",
+                            LogMarker::HandoverConsensusTermination,
+                            candidates_sap
+                        );
+
+                        let bcast_cmds = self.broadcast_handover_decision(candidates_sap);
+                        cmds.extend(bcast_cmds);
+                    }
                 }
                 self.handover_voting = Some(state);
                 Ok(cmds)
