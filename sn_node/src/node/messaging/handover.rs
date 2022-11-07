@@ -28,20 +28,33 @@ impl MyNode {
     pub(crate) fn propose_handover_consensus(
         &mut self,
         sap_candidates: SapCandidate,
-    ) -> Result<Option<Cmd>> {
+    ) -> Result<Vec<Cmd>> {
+        let mut cmds = Vec::new();
         match &self.handover_voting {
             Some(handover_voting_state) => {
                 let mut vs = handover_voting_state.clone();
-                let vote = vs.propose(sap_candidates)?;
-                self.handover_voting = Some(vs);
+                let vote = vs.propose(sap_candidates.clone())?;
+                self.handover_voting = Some(vs.clone());
+
                 debug!("{}: {:?}", LogMarker::HandoverConsensusTrigger, &vote);
-                Ok(Some(self.broadcast_handover_vote_msg(vote)))
+                cmds.push(self.broadcast_handover_vote_msg(vote));
+
+                // For handover 2 elders sap, only the handover vote from genesis is required.
+                // Which make the vote state reached consensus when initialized.
+                if vs.consensus_value().is_some() {
+                    debug!(
+                        "{}: {:?}",
+                        LogMarker::HandoverConsensusTermination,
+                        sap_candidates
+                    );
+                    cmds.extend(self.broadcast_handover_decision(sap_candidates));
+                }
             }
             None => {
                 warn!("Failed to make handover consensus proposal because node is not an Elder");
-                Ok(None)
             }
         }
+        Ok(cmds)
     }
 
     /// Broadcast handover Vote message to Elders
@@ -282,6 +295,7 @@ impl MyNode {
 
         match &self.handover_voting {
             Some(handover_state) => {
+                let had_consensus_value = handover_state.consensus_value().is_some();
                 let mut state = handover_state.clone();
                 let mut cmds = self.handle_vote(&mut state, signed_vote, peer)?;
 
@@ -290,14 +304,18 @@ impl MyNode {
 
                 // check for successful termination
                 if let Some(candidates_sap) = state.consensus_value() {
-                    debug!(
-                        "{}: {:?}",
-                        LogMarker::HandoverConsensusTermination,
-                        candidates_sap
-                    );
+                    // The Termination & Decision Broadcasting shall only undertaken
+                    // on the first time the consensus reached.
+                    if !had_consensus_value {
+                        debug!(
+                            "{}: {:?}",
+                            LogMarker::HandoverConsensusTermination,
+                            candidates_sap
+                        );
 
-                    let bcast_cmds = self.broadcast_handover_decision(candidates_sap);
-                    cmds.extend(bcast_cmds);
+                        let bcast_cmds = self.broadcast_handover_decision(candidates_sap);
+                        cmds.extend(bcast_cmds);
+                    }
                 }
                 self.handover_voting = Some(state);
                 Ok(cmds)
