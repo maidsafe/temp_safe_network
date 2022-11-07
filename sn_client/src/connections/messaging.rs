@@ -626,7 +626,7 @@ impl Session {
                             Ok(())
                         }
                         #[cfg(features = "chaos")]
-                        Err(SendToOneError::ChaosNoConnection) => break Err(Error::ChoasSendFail),
+                        Err(SendToOneError::ChaosNoConnection) => Err(Error::ChoasSendFail),
                         Err(error) => {
                             error!("Error sending {msg_id:?} bidi to {peer:?}: {error:?}");
                             Err(Error::FailedToInitateBiDiStream(msg_id))
