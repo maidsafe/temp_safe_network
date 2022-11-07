@@ -132,7 +132,6 @@ pub(crate) async fn run_node_handle_client_msg_and_collect_cmds(
             msg,
             auth,
             peer,
-            None,
             #[cfg(feature = "traceroute")]
             Traceroute(Vec::new()),
         )
