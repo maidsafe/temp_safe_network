@@ -273,7 +273,7 @@ impl MyNode {
             }
         }?;
 
-        debug!("Response in from peer for {msg_id:?} {response:?}");
+        debug!("Response in from peer for query {msg_id:?} {response:?}");
 
         if let MsgType::Node {
             msg: NodeMsg::NodeQueryResponse { response, .. },

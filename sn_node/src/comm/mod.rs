@@ -249,8 +249,11 @@ impl Comm {
         let link = Link::new(*peer, self.our_endpoint.clone(), self.msg_listener.clone());
         let session = PeerSession::new(link);
         debug!("about to insert session {peer:?}");
-        let _ = self.sessions.insert(*peer, session.clone());
-        debug!("inserted session {peer:?}");
+        let prev_peer = self.sessions.insert(*peer, session.clone());
+        debug!(
+            "inserted session {peer:?}, prev peer was discarded? {:?}",
+            prev_peer.is_some()
+        );
         Some(session)
     }
 
