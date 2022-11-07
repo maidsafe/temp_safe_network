@@ -6,8 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::messaging::{OutgoingMsg, Peers};
-
 use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result};
 use bytes::Bytes;
 
@@ -70,52 +68,32 @@ impl MyNode {
         .await
     }
 
-    /// Forms a `CmdError` msg to send back to the client
-    pub(crate) fn cmd_error_response(
+    /// Forms a `CmdError` msg to send back to the client over the response stream
+    pub(crate) async fn send_cmd_error_response_over_stream(
         &self,
         cmd: DataCmd,
         error: Error,
-        target: Peer,
         correlation_id: MsgId,
         send_stream: Arc<Mutex<SendStream>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
-    ) -> Cmd {
-        let the_error_msg = ClientMsg::CmdResponse {
+    ) -> Result<()> {
+        let client_msg = ClientMsg::CmdResponse {
             response: cmd.to_error_response(error.into()),
             correlation_id,
         };
 
-        self.send_client_msg(
-            the_error_msg,
-            Peers::Single(target),
+        let (kind, payload) = self.serialize_sign_client_msg(client_msg)?;
+
+        debug!("{correlation_id:?} sending cmd response error back to client");
+        self.send_msg_on_stream(
+            payload,
+            kind,
             send_stream,
-            #[cfg(feature = "traceroute")]
-            traceroute,
+            None, // we shouldn't need this...
+            correlation_id,
+            traceroute.clone(),
         )
-    }
-
-    /// Forms a cmd to send a cmd response error/ack to the client
-    fn send_client_msg(
-        &self,
-        msg: ClientMsg,
-        recipients: Peers,
-        send_stream: Arc<Mutex<SendStream>>,
-        #[cfg(feature = "traceroute")] mut traceroute: Traceroute,
-    ) -> Cmd {
-        #[cfg(feature = "traceroute")]
-        traceroute.0.push(self.identity());
-
-        let msg_id = MsgId::new();
-
-        debug!("SendMSg formed for {:?}", msg_id);
-        Cmd::SendMsg {
-            msg: OutgoingMsg::Client(msg),
-            msg_id,
-            recipients,
-            send_stream: Some(send_stream),
-            #[cfg(feature = "traceroute")]
-            traceroute,
-        }
+        .await
     }
 
     /// Handle data query
@@ -265,16 +243,17 @@ impl MyNode {
             Ok(data) => data,
             Err(error) => {
                 debug!("Will send error response back to client");
-                let cmd = self.cmd_error_response(
+                self.send_cmd_error_response_over_stream(
                     cmd,
                     error,
-                    origin,
                     msg_id,
                     send_stream,
                     #[cfg(feature = "traceroute")]
                     traceroute,
-                );
-                return Ok(vec![cmd]);
+                )
+                .await?;
+
+                return Ok(vec![]);
             }
         };
 
@@ -295,22 +274,23 @@ impl MyNode {
             debug!("Will send error response back to client");
 
             // TODO: Use response stream here. This wont work anymore!
-            let cmd = self.cmd_error_response(
+            self.send_cmd_error_response_over_stream(
                 cmd,
                 error,
-                origin,
                 msg_id,
                 send_stream,
                 #[cfg(feature = "traceroute")]
                 traceroute,
-            );
-            return Ok(vec![cmd]);
+            )
+            .await?;
+            return Ok(vec![]);
         }
 
         // the replication msg sent to adults
         // cmds here may be dysfunction tracking.
         // CmdAcks are sent over the send stream herein
         self.replicate_data_to_adults_and_ack_to_client(
+            cmd,
             data,
             msg_id,
             targets,
