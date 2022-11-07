@@ -1149,6 +1149,7 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
 }
 
 #[tokio::test]
+#[ignore = "This needs to be refactored away from Cmd handling, as we need/use a client response stream therein"]
 async fn spentbook_spend_spent_proof_with_invalid_pk_should_return_spentbook_error() -> Result<()> {
     let local = tokio::task::LocalSet::new();
     local
@@ -1223,6 +1224,7 @@ async fn spentbook_spend_spent_proof_with_invalid_pk_should_return_spentbook_err
 }
 
 #[tokio::test]
+#[ignore = "This needs to be refactored away from Cmd handling, as we need/use a client response stream therein"]
 async fn spentbook_spend_spent_proof_with_key_not_in_section_chain_should_return_cmd_error_response(
 ) -> Result<()> {
     let local = tokio::task::LocalSet::new();
@@ -1289,6 +1291,7 @@ async fn spentbook_spend_spent_proof_with_key_not_in_section_chain_should_return
 }
 
 #[tokio::test]
+#[ignore = "This needs to be refactored away from Cmd handling, as we need/use a client response stream therein"]
 async fn spentbook_spend_spent_proofs_do_not_relate_to_input_dbcs_should_return_spentbook_error(
 ) -> Result<()> {
     let local = tokio::task::LocalSet::new();
@@ -1374,6 +1377,7 @@ async fn spentbook_spend_spent_proofs_do_not_relate_to_input_dbcs_should_return_
 }
 
 #[tokio::test]
+#[ignore = "This needs to be refactored away from Cmd handling, as we need/use a client response stream therein"]
 async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_error() -> Result<()> {
     let local = tokio::task::LocalSet::new();
     local

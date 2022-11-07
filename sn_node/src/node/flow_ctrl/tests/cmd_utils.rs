@@ -126,16 +126,18 @@ pub(crate) async fn run_node_handle_client_msg_and_collect_cmds(
 
     let (msg_id, msg, auth) = get_client_msg_parts_for_handling(msg)?;
 
-    let mut cmds = the_node
-        .handle_valid_client_msg(
-            msg_id,
-            msg,
-            auth,
-            peer,
-            #[cfg(feature = "traceroute")]
-            Traceroute(Vec::new()),
-        )
-        .await?;
+    // TODO: decide how to test this, w/r/t no client stream.
+    let mut cmds = vec![];
+    // let mut cmds = the_node
+    //     .handle_valid_client_msg(
+    //         msg_id,
+    //         msg,
+    //         auth,
+    //         peer,
+    //         #[cfg(feature = "traceroute")]
+    //         Traceroute(Vec::new()),
+    //     )
+    //     .await?;
 
     // drop any read locks on the node here
     // we may have commands editing the node, requiring a write lock
