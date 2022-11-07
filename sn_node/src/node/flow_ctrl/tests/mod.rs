@@ -1090,7 +1090,7 @@ async fn handle_demote_during_split() -> Result<()> {
         .await
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "This needs to be refactored away from Cmd handling, as we need/use a client response stream therein"]
 async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack() -> Result<()> {
     let local = tokio::task::LocalSet::new();

@@ -205,10 +205,7 @@ impl Session {
         if let Some((msg_id, elders, service_msg, dst, auth)) =
             Self::new_target_elders(bounced_msg.clone(), &target_sap).await?
         {
-            // let new_msg_id = MsgId::new();
-
             debug!("updated AE response msg going out for: {msg_id:?}");
-            let ae_msg_src_name = src_peer.name();
             // We should send to all elders. There's no (I think) realiable way to ensure we choose a different elder mapped to a given elder of the initially attempted section.
             // Trick here will be shortcircuiting if we've already got all ACKs in...
             let payload = WireMsg::serialize_msg_payload(&service_msg)?;
@@ -285,7 +282,7 @@ impl Session {
 
         trace!("Bounced msg ({msg_id:?}) received in an AE response: {service_msg:?}");
 
-        let (target_count, dst_address_of_bounced_msg) = match service_msg.clone() {
+        let (_target_count, dst_address_of_bounced_msg) = match service_msg.clone() {
             ClientMsg::Cmd(cmd) => (at_least_one_correct_elder(), cmd.dst_name()),
             ClientMsg::Query(query) => (NUM_OF_ELDERS_SUBSET_FOR_QUERIES, query.variant.dst_name()),
             _ => {
