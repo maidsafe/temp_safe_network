@@ -910,21 +910,6 @@ dependencies = [
 
 [[package]]
 name = "console"
-version = "0.14.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3993e6445baa160675931ec041a5e03ca84b9c6e32a056150d3aa2bdda0a1f45"
-dependencies = [
- "encode_unicode",
- "lazy_static",
- "libc",
- "regex",
- "terminal_size",
- "unicode-width",
- "winapi",
-]
-
-[[package]]
-name = "console"
 version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c050367d967ced717c04b65d8c619d863ef9292ce0c5760028655a2fb298718c"
@@ -933,6 +918,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "terminal_size",
+ "unicode-width",
  "winapi",
 ]
 
@@ -2172,7 +2158,7 @@ version = "0.16.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d207dc617c7a380ab07ff572a6e52fa202a2a8f355860ac9c38e23f8196be1b"
 dependencies = [
- "console 0.15.2",
+ "console",
  "lazy_static",
  "number_prefix",
  "regex",
@@ -3942,7 +3928,7 @@ dependencies = [
  "clap_complete",
  "color-eyre",
  "comfy-table",
- "console 0.14.1",
+ "console",
  "criterion",
  "ctor",
  "dirs-next 2.0.0",
