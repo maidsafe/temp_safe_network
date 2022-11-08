@@ -889,13 +889,13 @@ dependencies = [
 
 [[package]]
 name = "comfy-table"
-version = "5.0.1"
+version = "6.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b103d85ca6e209388771bfb7aa6b68a7aeec4afbf6f0a0264bfbf50360e5212e"
+checksum = "1090f39f45786ec6dc6286f8ea9c75d0a7ef0a0d3cda674cef0c3af7b307fbc2"
 dependencies = [
  "crossterm",
- "strum",
- "strum_macros",
+ "strum 0.24.1",
+ "strum_macros 0.24.3",
  "unicode-width",
 ]
 
@@ -1075,9 +1075,9 @@ dependencies = [
 
 [[package]]
 name = "crossterm"
-version = "0.23.2"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2102ea4f781910f8a5b98dd061f4c2023f479ce7bb1236330099ceb5a93cf17"
+checksum = "e64e6c0fbe2c17357405f7c758c1ef960fce08bdfb2c03d88d2a18d7e09c4b67"
 dependencies = [
  "bitflags",
  "crossterm_winapi",
@@ -1301,16 +1301,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3dd60d1080a57a05ab032377049e0591415d2b31afd7028356dbf3cc6dcb066"
 dependencies = [
  "generic-array",
-]
-
-[[package]]
-name = "dirs-next"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf36e65a80337bea855cd4ef9b8401ffce06a7baedf2e85ec467b1ac3f6e82b6"
-dependencies = [
- "cfg-if",
- "dirs-sys-next",
 ]
 
 [[package]]
@@ -2370,8 +2360,8 @@ dependencies = [
  "eyre",
  "grep",
  "sn_interface",
- "strum",
- "strum_macros",
+ "strum 0.23.0",
+ "strum_macros 0.23.1",
  "walkdir",
 ]
 
@@ -3874,7 +3864,7 @@ dependencies = [
  "blsttc",
  "bytes",
  "color-eyre",
- "dirs-next 2.0.0",
+ "dirs-next",
  "ed25519-dalek",
  "env_logger",
  "futures",
@@ -3931,7 +3921,7 @@ dependencies = [
  "console",
  "criterion",
  "ctor",
- "dirs-next 2.0.0",
+ "dirs-next",
  "duct",
  "ed25519-dalek",
  "futures",
@@ -3979,7 +3969,7 @@ dependencies = [
  "crdts",
  "criterion",
  "custom_debug",
- "dirs-next 2.0.0",
+ "dirs-next",
  "ed25519",
  "ed25519-dalek",
  "eyre",
@@ -4004,8 +3994,8 @@ dependencies = [
  "sn_dbc",
  "sn_interface",
  "sn_launch_tool",
- "strum",
- "strum_macros",
+ "strum 0.23.0",
+ "strum_macros 0.23.1",
  "tempfile",
  "termcolor",
  "thiserror",
@@ -4028,7 +4018,7 @@ dependencies = [
  "assert_fs",
  "color-eyre",
  "ctor",
- "dirs-next 2.0.0",
+ "dirs-next",
  "multibase",
  "rand 0.8.5",
  "reqwest",
@@ -4121,8 +4111,8 @@ dependencies = [
  "sn_consensus",
  "sn_dbc",
  "sn_sdkg",
- "strum",
- "strum_macros",
+ "strum 0.23.0",
+ "strum_macros 0.23.1",
  "tempfile",
  "thiserror",
  "tiny-keccak",
@@ -4137,13 +4127,13 @@ dependencies = [
 
 [[package]]
 name = "sn_launch_tool"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "913e030d6cb0a1e34ab1961c1564d0e9f782aaacf7661ac8102dd570d3607cd3"
+checksum = "75b26a1d1e66d075d93e1be3d042366eb97dde9b308ad8c3263b359715487794"
 dependencies = [
  "clap",
  "color-eyre",
- "dirs-next 1.0.2",
+ "dirs-next",
  "eyre",
  "tracing",
  "tracing-subscriber",
@@ -4170,7 +4160,7 @@ dependencies = [
  "ctor",
  "custom_debug",
  "dashmap",
- "dirs-next 2.0.0",
+ "dirs-next",
  "ed25519",
  "ed25519-dalek",
  "eyre",
@@ -4203,8 +4193,8 @@ dependencies = [
  "sn_dysfunction",
  "sn_interface",
  "sn_sdkg",
- "strum",
- "strum_macros",
+ "strum 0.23.0",
+ "strum_macros 0.23.1",
  "sysinfo",
  "tempfile",
  "thiserror",
@@ -4282,12 +4272,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cae14b91c7d11c9a851d3fbc80a963198998c2a64eec840477fa92d8ce9b70bb"
 
 [[package]]
+name = "strum"
+version = "0.24.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "063e6045c0e62079840579a7e47a355ae92f60eb74daaf156fb1e84ba164e63f"
+
+[[package]]
 name = "strum_macros"
 version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5bb0dc7ee9c15cea6199cde9a127fa16a4c5819af85395457ad72d68edc85a38"
 dependencies = [
  "heck 0.3.3",
+ "proc-macro2 1.0.47",
+ "quote 1.0.21",
+ "rustversion",
+ "syn 1.0.103",
+]
+
+[[package]]
+name = "strum_macros"
+version = "0.24.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e385be0d24f186b4ce2f9982191e7101bb737312ad61c1f2f984f34bcf85d59"
+dependencies = [
+ "heck 0.4.0",
  "proc-macro2 1.0.47",
  "quote 1.0.21",
  "rustversion",
@@ -4404,7 +4413,7 @@ version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c59df8ac95d96ff9bede18eb7300b0fda5e5d8d90960e76f8e14ae765eedbf1f"
 dependencies = [
- "dirs-next 2.0.0",
+ "dirs-next",
  "rustversion",
  "winapi",
 ]
@@ -4452,7 +4461,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "color-eyre",
- "dirs-next 2.0.0",
+ "dirs-next",
  "eyre",
  "sn_launch_tool",
  "tokio",
