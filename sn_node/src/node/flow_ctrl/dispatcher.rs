@@ -52,9 +52,6 @@ impl Dispatcher {
                 #[cfg(feature = "traceroute")]
                 traceroute,
             } => {
-                // ClientMsgs are only used for the communication between Client and Elders
-                let is_msg_for_client = matches!(msg, OutgoingMsg::Client(_));
-
                 trace!("Sending msg: {msg_id:?}");
                 let peer_msgs = {
                     let node = self.node.read().await;
@@ -81,12 +78,7 @@ impl Dispatcher {
                     .into_iter()
                     .filter_map(|result| match result {
                         Err(Error::FailedSend(peer)) => {
-                            if is_msg_for_client {
-                                warn!("Client msg send failed to: {peer}, for {msg_id:?}");
-                                None
-                            } else {
-                                Some(Cmd::HandleFailedSendToNode { peer, msg_id })
-                            }
+                            Some(Cmd::HandleFailedSendToNode { peer, msg_id })
                         }
                         _ => None,
                     })
@@ -234,7 +226,6 @@ fn into_msg_bytes(
 ) -> Result<Vec<(Peer, UsrMsgBytes)>> {
     let (kind, payload) = match msg {
         OutgoingMsg::Node(msg) => node.serialize_node_msg(msg)?,
-        OutgoingMsg::Client(msg) => node.serialize_sign_client_msg(msg)?,
     };
     let recipients = match recipients {
         Peers::Single(peer) => vec![peer],

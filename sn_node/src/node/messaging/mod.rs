@@ -34,7 +34,6 @@ use tokio::sync::Mutex;
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum OutgoingMsg {
     Node(NodeMsg),
-    Client(ClientMsg),
 }
 
 #[derive(Debug, Clone)]
