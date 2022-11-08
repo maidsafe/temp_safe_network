@@ -87,7 +87,7 @@ impl Client {
         // this seems needed for custom settings to take effect
         backoff.reset();
 
-        loop {
+        let res = loop {
             let msg = ClientMsg::Query(query.clone());
             let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
             let signature = self.keypair.sign(&serialised_query);
@@ -115,7 +115,7 @@ impl Client {
             // copies of the data. Retry the closest adult again.
             if query.adult_index >= data_copy_count() - 1 {
                 // we don't want to retry beyond data_copy_count Adults
-                return res;
+                break res;
             }
 
             if let Some(delay) = backoff.next_backoff() {
@@ -138,9 +138,47 @@ impl Client {
             } else {
                 warn!("Finished trying and last response to {query:?} is {res:?}");
                 // we're done trying
+                break res;
+            }
+        };
+
+        // HACK TO TRY ONCE MORE
+
+        if let Ok(result) = &res {
+            if result.data_was_found() {
                 return res;
             }
         }
+
+        error!(
+            ">>>>> FAILED EVEN AFTER RETRYING index {}, ONE MORE AFTER 20secs: {res:?}",
+            query.adult_index
+        );
+        sleep(tokio::time::Duration::from_secs(20)).await;
+
+        query.adult_index = 0;
+        let msg = ClientMsg::Query(query.clone());
+        let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
+        let signature = self.keypair.sign(&serialised_query);
+
+        // grab up to date destination section from our local network knowledge
+        let (section_pk, elders) = self.session.get_query_elders(dst).await?;
+
+        let res2 = self
+            .send_signed_query_to_section(
+                query,
+                client_pk,
+                serialised_query.clone(),
+                signature.clone(),
+                Some((section_pk, elders.clone())),
+                force_new_link,
+                flow_name,
+            )
+            .await;
+
+        warn!(">>>>> AFTER LAST ATTEMPT: {res2:?}");
+
+        res
     }
 
     /// Send a Query to the network and await a response.
