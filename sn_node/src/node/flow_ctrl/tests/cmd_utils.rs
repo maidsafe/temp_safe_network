@@ -208,7 +208,7 @@ impl Cmd {
                         _ => Err(eyre!("A NodeCmd::ReplicateData variant was expected")),
                     },
                     _ => Err(eyre!("An NodeMsg::NodeCmd variant was expected")),
-                }
+                },
             },
             _ => Err(eyre!("A Cmd::SendMsg variant was expected")),
         }
