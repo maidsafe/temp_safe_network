@@ -604,7 +604,7 @@ impl Session {
             let task = async move {
                 let link = session
                     .peer_links
-                    .get_or_create_link(&peer, force_new_link)
+                    .get_or_create_link(peer, force_new_link)
                     .await;
 
                 debug!("Trying to send msg to link {msg_id:?} to {peer:?}");
@@ -636,7 +636,7 @@ impl Session {
                 };
 
                 if let Err(err) = &result {
-                    session.peer_links.remove_link_from_peer_links(&peer).await;
+                    session.peer_links.remove_link_from_peer_links(peer).await;
                     warn!("Issue when sending {msg_id:?} to {peer:?}: {err:?}");
                 }
 
