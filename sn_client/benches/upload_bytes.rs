@@ -73,10 +73,10 @@ async fn create_client() -> Result<Client, Error> {
 
 /// This bench requires a network already set up
 async fn upload_and_read_bytes(client: &Client, bytes: Bytes) -> Result<(), Error> {
-    let address = client.upload(bytes.clone()).await?;
+    let address = client.upload(bytes.clone(), "BENCH").await?;
 
     // let's make sure the public chunk is stored
-    let received_bytes = client.read_bytes(address).await?;
+    let received_bytes = client.read_bytes(address, "BENCH").await?;
 
     assert_eq!(received_bytes, bytes);
 
@@ -145,7 +145,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     group.bench_with_input("upload 3072b", &(&seed, &client), |b, (seed, client)| {
         b.to_async(&runtime).iter(|| async {
             let bytes = grows_vec_to_bytes(seed, 3072);
-            match client.upload(bytes).await {
+            match client.upload(bytes, "BENCH").await {
                 Ok(_) => {}
                 Err(error) => println!("3072b upload bench failed with {:?}", error),
             }
@@ -154,7 +154,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     group.bench_with_input("upload 1mb", &(&seed, &client), |b, (seed, client)| {
         b.to_async(&runtime).iter(|| async {
             let bytes = grows_vec_to_bytes(seed, 1024 * 1024);
-            match client.upload(bytes).await {
+            match client.upload(bytes, "BENCH").await {
                 Ok(_) => {}
                 Err(error) => println!("1mb upload bench failed with {:?}", error),
             }
@@ -163,7 +163,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     group.bench_with_input("upload 10mb", &(&seed, &client), |b, (seed, client)| {
         b.to_async(&runtime).iter(|| async {
             let bytes = grows_vec_to_bytes(seed, 1024 * 1024 * 10);
-            match client.upload(bytes).await {
+            match client.upload(bytes, "BENCH").await {
                 Ok(_) => {}
                 Err(error) => println!("10mb upload bench failed with {:?}", error),
             }

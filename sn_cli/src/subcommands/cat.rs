@@ -28,12 +28,17 @@ pub struct CatCommands {
     hexdump: bool,
 }
 
-pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe) -> Result<()> {
+pub async fn cat_commander(
+    cmd: CatCommands,
+    output_fmt: OutputFmt,
+    safe: &Safe,
+    flow_name: &str,
+) -> Result<()> {
     let link = get_from_arg_or_stdin(cmd.location, None)?;
     let url = get_target_url(&link)?;
     debug!("Running cat for: {}", &url.to_string());
 
-    match safe.fetch(&url.to_string(), None).await? {
+    match safe.fetch(&url.to_string(), None, flow_name).await? {
         SafeData::FilesContainer {
             version, files_map, ..
         } => {
@@ -94,7 +99,7 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe)
             if safeurl.content_type() == ContentType::Wallet {
                 if OutputFmt::Pretty == output_fmt {
                     println!("Spendable balances of wallet at \"{}\":", xorurl);
-                    let table = gen_wallet_table(safe, &data).await?;
+                    let table = gen_wallet_table(safe, &data, flow_name).await?;
                     println!("{table}");
                 } else {
                     println!("{}", serialise_output(&(url.to_string(), data), output_fmt));

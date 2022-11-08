@@ -132,10 +132,17 @@ impl WireMsg {
     }
 
     /// Creates a new `WireMsg` with the provided serialized payload and `MsgKind`.
-    pub fn new_msg(msg_id: MsgId, payload: Bytes, auth: MsgKind, dst: Dst) -> Self {
+    pub fn new_msg(
+        msg_id: MsgId,
+        flow_name: String,
+        payload: Bytes,
+        auth: MsgKind,
+        dst: Dst,
+    ) -> Self {
         Self {
             header: WireMsgHeader::new(
                 msg_id,
+                flow_name,
                 auth,
                 #[cfg(feature = "traceroute")]
                 Traceroute(vec![]),
@@ -246,6 +253,7 @@ impl WireMsg {
 
                 Ok(MsgType::Client {
                     msg_id: self.header.msg_envelope.msg_id,
+                    flow_name: self.header.msg_envelope.flow_name.clone(),
                     auth,
                     dst: self.dst,
                     msg,
@@ -258,6 +266,7 @@ impl WireMsg {
 
                 Ok(MsgType::Node {
                     msg_id: self.header.msg_envelope.msg_id,
+                    flow_name: self.header.msg_envelope.flow_name.clone(),
                     dst: self.dst,
                     msg,
                 })
@@ -354,7 +363,7 @@ mod tests {
 
         let payload = WireMsg::serialize_msg_payload(&msg)?;
         let kind = MsgKind::Node(Default::default());
-        let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
+        let wire_msg = WireMsg::new_msg(msg_id, "TEST".to_string(), payload, kind, dst);
         let serialized = wire_msg.serialize()?;
 
         // test deserialisation of header
@@ -369,6 +378,7 @@ mod tests {
             deserialized.into_msg()?,
             MsgType::Node {
                 msg_id: wire_msg.msg_id(),
+                flow_name: "TEST".to_string(),
                 dst,
                 msg,
             }
@@ -401,7 +411,7 @@ mod tests {
         let auth_proof = AuthorityProof::verify(auth.clone(), &payload)?;
         let kind = MsgKind::Client(auth);
 
-        let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
+        let wire_msg = WireMsg::new_msg(msg_id, "TEST".to_string(), payload, kind, dst);
         let serialized = wire_msg.serialize()?;
 
         // test deserialisation of header
@@ -416,6 +426,7 @@ mod tests {
             deserialized.into_msg()?,
             MsgType::Client {
                 msg_id: wire_msg.msg_id(),
+                flow_name: "TEST".to_string(),
                 auth: auth_proof,
                 dst,
                 msg: client_msg,

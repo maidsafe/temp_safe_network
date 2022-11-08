@@ -385,7 +385,8 @@ impl MyNode {
         };
 
         #[allow(unused_mut)]
-        let mut wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
+        let mut wire_msg =
+            WireMsg::new_msg(msg_id, "NODE_2_NODE_MSG".to_string(), payload, kind, dst);
 
         // TODO: do we still need traceroute now?
         #[cfg(feature = "traceroute")]

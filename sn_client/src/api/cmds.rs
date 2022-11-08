@@ -36,6 +36,7 @@ impl Client {
         serialised_cmd: Bytes,
         signature: Signature,
         force_new_link: bool,
+        flow_name: &str,
     ) -> Result<(), Error> {
         let auth = ClientAuth {
             public_key: client_pk,
@@ -51,6 +52,7 @@ impl Client {
                     force_new_link,
                     #[cfg(feature = "traceroute")]
                     self.public_key(),
+                    flow_name,
                 )
                 .await
         })
@@ -62,7 +64,7 @@ impl Client {
     /// The provided `DataCmd` is serialised and signed with the
     /// keypair this Client instance has been setup with.
     #[instrument(skip_all, level = "debug", name = "client-api send cmd")]
-    pub async fn send_cmd(&self, cmd: DataCmd) -> Result<(), Error> {
+    pub async fn send_cmd(&self, cmd: DataCmd, flow_name: &str) -> Result<(), Error> {
         let client_pk = self.public_key();
         let dst_name = cmd.dst_name();
 
@@ -83,6 +85,7 @@ impl Client {
                 serialised_cmd,
                 signature,
                 force_new_link,
+                flow_name,
             )
             .await;
 

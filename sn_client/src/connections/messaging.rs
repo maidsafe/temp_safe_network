@@ -53,6 +53,7 @@ impl Session {
         payload: Bytes,
         force_new_link: bool,
         #[cfg(feature = "traceroute")] client_pk: PublicKey,
+        flow_name: &str,
     ) -> Result<()> {
         let endpoint = self.endpoint.clone();
         // TODO: Consider other approach: Keep a session per section!
@@ -74,7 +75,7 @@ impl Session {
         let kind = MsgKind::Client(auth);
 
         #[allow(unused_mut)]
-        let mut wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
+        let mut wire_msg = WireMsg::new_msg(msg_id, flow_name.to_string(), payload, kind, dst);
 
         #[cfg(feature = "traceroute")]
         wire_msg.append_trace(&mut Traceroute(vec![Entity::Client(client_pk)]));
@@ -196,6 +197,7 @@ impl Session {
         dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
         force_new_link: bool,
         #[cfg(feature = "traceroute")] client_pk: PublicKey,
+        flow_name: &str,
     ) -> Result<QueryResult> {
         let endpoint = self.endpoint.clone();
 
@@ -232,7 +234,7 @@ impl Session {
         let kind = MsgKind::Client(auth);
 
         #[allow(unused_mut)]
-        let mut wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
+        let mut wire_msg = WireMsg::new_msg(msg_id, flow_name.to_string(), payload, kind, dst);
 
         #[cfg(feature = "traceroute")]
         wire_msg.append_trace(&mut Traceroute(vec![Entity::Client(client_pk)]));
@@ -410,7 +412,7 @@ impl Session {
             section_key: section_pk,
         };
         let kind = MsgKind::Client(auth);
-        let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
+        let wire_msg = WireMsg::new_msg(msg_id, "INITAL_CONTACT".to_string(), payload, kind, dst);
 
         let initial_contacts = nodes
             .clone()

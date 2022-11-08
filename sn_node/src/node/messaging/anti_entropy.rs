@@ -747,6 +747,7 @@ mod tests {
 
             Ok(WireMsg::new_msg(
                 msg_id,
+                "NODE_MSG_AE".to_string(),
                 payload,
                 MsgKind::Node(sender.name()),
                 dst,

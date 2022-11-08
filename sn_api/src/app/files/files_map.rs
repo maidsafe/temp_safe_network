@@ -97,9 +97,10 @@ pub(crate) async fn add_or_update_file_item(
     name_exists: bool,
     files_map: &mut FilesMap,
     processed_files: &mut ProcessedFiles,
+    flow_name: &str,
 ) -> bool {
     // We need to add a new FileInfo, let's generate the FileInfo first
-    match gen_new_file_item(safe, file_path, file_meta, file_link).await {
+    match gen_new_file_item(safe, file_path, file_meta, file_link, flow_name).await {
         Ok(new_file_item) => {
             // note: files have link property, dirs and symlinks do not
             let xorurl = new_file_item
@@ -139,11 +140,12 @@ async fn gen_new_file_item(
     file_path: &Path,
     file_meta: &FileMeta,
     link: Option<&str>, // must be symlink target or None if FileMeta::is_symlink() is true.
+    flow_name: &str,
 ) -> Result<FileInfo> {
     let mut file_item = file_meta.to_file_item();
     if file_meta.is_file() {
         let xorurl = match link {
-            None => upload_file_to_net(safe, file_path).await?,
+            None => upload_file_to_net(safe, file_path, flow_name).await?,
             Some(link) => link.to_string(),
         };
         file_item.insert(PREDICATE_LINK.to_string(), xorurl);

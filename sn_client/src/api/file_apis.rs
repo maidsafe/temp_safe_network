@@ -29,12 +29,12 @@ use xor_name::XorName;
 impl Client {
     #[instrument(skip(self), level = "debug")]
     /// Reads [`Bytes`] from the network, whose contents are contained within on or more chunks.
-    pub async fn read_bytes(&self, address: XorName) -> Result<Bytes> {
-        let chunk = self.get_chunk(&address).await?;
+    pub async fn read_bytes(&self, address: XorName, flow_name: &str) -> Result<Bytes> {
+        let chunk = self.get_chunk(&address, flow_name).await?;
 
         // first try to deserialize a LargeFile, if it works, we go and seek it
-        if let Ok(data_map) = self.unpack_chunk(chunk.clone()).await {
-            self.read_all(data_map).await
+        if let Ok(data_map) = self.unpack_chunk(chunk.clone(), flow_name).await {
+            self.read_all(data_map, flow_name).await
         } else {
             // if an error occurs, we assume it's a SmallFile
             Ok(chunk.value().clone())
@@ -50,7 +50,13 @@ impl Client {
     /// Passing `0` to position reads the data from the beginning,
     /// and the `length` is just an upper limit.
     #[instrument(skip_all, level = "trace")]
-    pub async fn read_from(&self, address: XorName, position: usize, length: usize) -> Result<Bytes>
+    pub async fn read_from(
+        &self,
+        address: XorName,
+        position: usize,
+        length: usize,
+        flow_name: &str,
+    ) -> Result<Bytes>
     where
         Self: Sized,
     {
@@ -61,12 +67,12 @@ impl Client {
             &position,
         );
 
-        let chunk = self.get_chunk(&address).await?;
+        let chunk = self.get_chunk(&address, flow_name).await?;
 
         // First try to deserialize a LargeFile, if it works, we go and seek it.
         // If an error occurs, we consider it to be a SmallFile.
-        if let Ok(data_map) = self.unpack_chunk(chunk.clone()).await {
-            return self.seek(data_map, position, length).await;
+        if let Ok(data_map) = self.unpack_chunk(chunk.clone(), flow_name).await {
+            return self.seek(data_map, position, length, flow_name).await;
         }
 
         // The error above is ignored to avoid leaking the storage format detail of SmallFiles and LargeFiles.
@@ -81,7 +87,7 @@ impl Client {
     }
 
     #[instrument(skip(self), level = "trace")]
-    pub(crate) async fn get_chunk(&self, name: &XorName) -> Result<Chunk> {
+    pub(crate) async fn get_chunk(&self, name: &XorName, flow_name: &str) -> Result<Chunk> {
         // first check it's not already in our Chunks' cache
         if let Some(chunk) = self
             .chunks_cache
@@ -94,7 +100,7 @@ impl Client {
         }
 
         let query = DataQueryVariant::GetChunk(ChunkAddress(*name));
-        let res = self.send_query(query.clone()).await?;
+        let res = self.send_query(query.clone(), flow_name).await?;
 
         let chunk: Chunk = match res.response {
             QueryResponse::GetChunk(result) => {
@@ -140,8 +146,8 @@ impl Client {
     /// Directly writes [`Bytes`] to the network in the
     /// form of immutable chunks, without any batching.
     #[instrument(skip(self, bytes), level = "debug")]
-    pub async fn upload(&self, bytes: Bytes) -> Result<XorName> {
-        self.upload_bytes(bytes, false).await
+    pub async fn upload(&self, bytes: Bytes, flow_name: &str) -> Result<XorName> {
+        self.upload_bytes(bytes, false, flow_name).await
     }
 
     /// Directly writes [`Bytes`] to the network in the
@@ -149,8 +155,8 @@ impl Client {
     /// It also attempts to verify that all the data was uploaded to the network before returning.
     /// It does this via running `read_bytes` with each chunk with `query_timeout` set.
     #[instrument(skip_all, level = "trace")]
-    pub async fn upload_and_verify(&self, bytes: Bytes) -> Result<XorName> {
-        self.upload_bytes(bytes, true).await
+    pub async fn upload_and_verify(&self, bytes: Bytes, flow_name: &str) -> Result<XorName> {
+        self.upload_bytes(bytes, true, flow_name).await
     }
 
     /// Calculates a LargeFile's/SmallFile's address from self encrypted chunks,
@@ -172,28 +178,38 @@ impl Client {
     // --------------------------------------------
 
     #[instrument(skip(self, bytes), level = "trace")]
-    async fn upload_bytes(&self, bytes: Bytes, verify: bool) -> Result<XorName> {
+    async fn upload_bytes(&self, bytes: Bytes, verify: bool, flow_name: &str) -> Result<XorName> {
         if let Ok(file) = LargeFile::new(bytes.clone()) {
-            self.upload_large(file, verify).await
+            self.upload_large(file, verify, flow_name).await
         } else {
             let file = SmallFile::new(bytes)?;
-            self.upload_small(file, verify).await
+            self.upload_small(file, verify, flow_name).await
         }
     }
 
     /// Directly writes a [`LargeFile`] to the network in the
     /// form of immutable self encrypted chunks, without any batching.
     #[instrument(skip_all, level = "trace")]
-    async fn upload_large(&self, large: LargeFile, verify: bool) -> Result<XorName> {
+    async fn upload_large(
+        &self,
+        large: LargeFile,
+        verify: bool,
+        flow_name: &str,
+    ) -> Result<XorName> {
         let (head_address, all_chunks) = Self::encrypt_large(large)?;
 
         let tasks = all_chunks.into_iter().map(|chunk| {
             let client_clone = self.clone();
+            let flow_name_cloned = flow_name.to_string();
             task::spawn(async move {
                 let chunk_addr = *chunk.address().name();
-                client_clone.send_cmd(DataCmd::StoreChunk(chunk)).await?;
+                client_clone
+                    .send_cmd(DataCmd::StoreChunk(chunk), &flow_name_cloned)
+                    .await?;
                 if verify {
-                    client_clone.verify_chunk_is_stored(chunk_addr).await?;
+                    client_clone
+                        .verify_chunk_is_stored(chunk_addr, &flow_name_cloned)
+                        .await?;
                 }
                 Ok::<(), Error>(())
             })
@@ -216,25 +232,30 @@ impl Client {
     /// Directly writes a [`SmallFile`] to the network in the
     /// form of a single chunk, without any batching.
     #[instrument(skip_all, level = "trace")]
-    async fn upload_small(&self, small: SmallFile, verify: bool) -> Result<XorName> {
+    async fn upload_small(
+        &self,
+        small: SmallFile,
+        verify: bool,
+        flow_name: &str,
+    ) -> Result<XorName> {
         let chunk = Self::package_small(small)?;
         let address = *chunk.name();
-        self.send_cmd(DataCmd::StoreChunk(chunk)).await?;
+        self.send_cmd(DataCmd::StoreChunk(chunk), flow_name).await?;
 
         if verify {
-            self.verify_chunk_is_stored(address).await?;
+            self.verify_chunk_is_stored(address, flow_name).await?;
         }
 
         Ok(address)
     }
 
     // Verify a chunk is stored at provided address
-    async fn verify_chunk_is_stored(&self, address: XorName) -> Result<()> {
+    async fn verify_chunk_is_stored(&self, address: XorName, flow_name: &str) -> Result<()> {
         // `read_bytes` could return earlier than query_timeout
         // with `DataNotFound` eg, but this could just mean that the data has not yet
         // reached adults...and so, we retry once but within the timeout limit set
         let _chunk = tokio::time::timeout(self.query_timeout, async {
-            let mut response = self.get_chunk(&address).await;
+            let mut response = self.get_chunk(&address, flow_name).await;
             if response.is_err() {
                 error!(
                     "Error when attempting to verify chunk was stored at {:?}: {:?}",
@@ -242,7 +263,7 @@ impl Client {
                 );
 
                 sleep(self.max_backoff_interval).await;
-                response = self.get_chunk(&address).await;
+                response = self.get_chunk(&address, flow_name).await;
             }
             response
         })
@@ -254,8 +275,8 @@ impl Client {
 
     // Gets and decrypts chunks from the network using nothing else but the data map,
     // then returns the raw data.
-    async fn read_all(&self, data_map: DataMap) -> Result<Bytes> {
-        let encrypted_chunks = Self::try_get_chunks(self, data_map.infos()).await?;
+    async fn read_all(&self, data_map: DataMap, flow_name: &str) -> Result<Bytes> {
+        let encrypted_chunks = Self::try_get_chunks(self, data_map.infos(), flow_name).await?;
         let bytes = self_encryption::decrypt_full_set(&data_map, &encrypted_chunks)?;
         Ok(bytes)
     }
@@ -263,7 +284,13 @@ impl Client {
     // Gets a subset of chunks from the network, decrypts and
     // reads `len` bytes of the data starting at given `pos` of original file.
     #[instrument(skip_all, level = "trace")]
-    async fn seek(&self, data_map: DataMap, pos: usize, len: usize) -> Result<Bytes> {
+    async fn seek(
+        &self,
+        data_map: DataMap,
+        pos: usize,
+        len: usize,
+        flow_name: &str,
+    ) -> Result<Bytes> {
         let info = self_encryption::seek_info(data_map.file_size(), pos, len);
         let range = &info.index_range;
         let all_infos = data_map.infos();
@@ -274,6 +301,7 @@ impl Client {
                 .clone()
                 .map(|i| all_infos[i].clone())
                 .collect_vec(),
+            flow_name,
         )
         .await?;
 
@@ -287,12 +315,17 @@ impl Client {
     async fn try_get_chunks(
         client: &Self,
         chunks_info: Vec<ChunkInfo>,
+        flow_name: &str,
     ) -> Result<Vec<EncryptedChunk>> {
         let expected_count = chunks_info.len();
         let tasks = chunks_info.into_iter().map(|chunk_info| {
             let client = client.clone();
+            let flow_name_cloned = flow_name.to_string();
             task::spawn(async move {
-                match client.get_chunk(&chunk_info.dst_hash).await {
+                match client
+                    .get_chunk(&chunk_info.dst_hash, &flow_name_cloned)
+                    .await
+                {
                     Ok(chunk) => Ok(EncryptedChunk {
                         index: chunk_info.index,
                         content: chunk.value().clone(),
@@ -332,14 +365,14 @@ impl Client {
     /// If the DataMapLevel is not the first level mapping directly to the user's contents,
     /// the process repeats itself until it obtains the first level DataMapLevel.
     #[instrument(skip_all, level = "trace")]
-    async fn unpack_chunk(&self, mut chunk: Chunk) -> Result<DataMap> {
+    async fn unpack_chunk(&self, mut chunk: Chunk, flow_name: &str) -> Result<DataMap> {
         loop {
             match deserialize(chunk.value())? {
                 DataMapLevel::First(data_map) => {
                     return Ok(data_map);
                 }
                 DataMapLevel::Additional(data_map) => {
-                    let serialized_chunk = self.read_all(data_map).await?;
+                    let serialized_chunk = self.read_all(data_map, flow_name).await?;
                     chunk = deserialize(&serialized_chunk)?;
                 }
             }
@@ -359,6 +392,7 @@ mod tests {
 
     use bytes::Bytes;
     use eyre::{eyre, Result};
+    use function_name::named;
     use futures::future::join_all;
     use tokio::time::Instant;
     use tracing::{instrument::Instrumented, Instrument};
@@ -385,7 +419,9 @@ mod tests {
 
     // Test storing and reading min sized LargeFile.
     #[tokio::test(flavor = "multi_thread")]
+    #[named]
     async fn store_and_read_3kb() -> Result<()> {
+        let flow_name = function_name!();
         init_logger();
         let _start_span = tracing::info_span!("store_and_read_3kb").entered();
 
@@ -394,14 +430,14 @@ mod tests {
         let file = LargeFile::new(random_bytes(MIN_ENCRYPTABLE_BYTES))?;
 
         // Store file (also verifies that the file is stored)
-        let address = client.upload_and_verify(file.bytes()).await?;
-        let read_data = client.read_bytes(address).await?;
+        let address = client.upload_and_verify(file.bytes(), flow_name).await?;
+        let read_data = client.read_bytes(address, flow_name).await?;
         compare(file.bytes(), read_data);
 
         // Test storing file with the same value.
         // Should not conflict and should return same address
         let reupload_address = client
-            .upload_large(file.clone(), false)
+            .upload_large(file.clone(), false, flow_name)
             .instrument(tracing::info_span!(
                 "checking no conflict on same private upload"
             ))
@@ -412,7 +448,9 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[named]
     async fn seek_with_unknown_length() -> Result<()> {
+        let flow_name = function_name!();
         init_logger();
         let _outer_span = tracing::info_span!("seek_with_unknown_length").entered();
         let client = create_test_client().await?;
@@ -421,10 +459,10 @@ mod tests {
         let size = 2 * MIN_ENCRYPTABLE_BYTES;
         let file = LargeFile::new(random_bytes(size))?;
 
-        let address = client.upload_and_verify(file.bytes()).await?;
+        let address = client.upload_and_verify(file.bytes(), flow_name).await?;
 
         let pos = 512;
-        let read_data = read_from_pos(&file, address, pos, usize::MAX, &client).await?;
+        let read_data = read_from_pos(&file, address, pos, usize::MAX, &client, flow_name).await?;
 
         assert_eq!(read_data.len(), size - pos);
         compare(file.bytes().split_off(pos), read_data);
@@ -433,7 +471,9 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[named]
     async fn seek_in_data() -> Result<()> {
+        let flow_name = function_name!();
         init_logger();
         let _outer_span = tracing::info_span!("seek_in_data").entered();
         let client = create_test_client().await?;
@@ -446,18 +486,18 @@ mod tests {
                 let len = size / divisor;
                 let file = LargeFile::new(random_bytes(size))?;
 
-                let address = client.upload_and_verify(file.bytes()).await?;
+                let address = client.upload_and_verify(file.bytes(), flow_name).await?;
 
                 // Read first part
                 let read_data_1 = {
                     let pos = 0;
-                    read_from_pos(&file, address, pos, len, &client).await?
+                    read_from_pos(&file, address, pos, len, &client, flow_name).await?
                 };
 
                 // Read second part
                 let read_data_2 = {
                     let pos = len;
-                    read_from_pos(&file, address, pos, len, &client).await?
+                    read_from_pos(&file, address, pos, len, &client, flow_name).await?
                 };
 
                 // Join parts
@@ -475,7 +515,9 @@ mod tests {
 
     // Test storing and reading 5mb file. Try and read from many clients and ensure we do not overwelm nodes.
     #[tokio::test(flavor = "multi_thread")]
+    #[named]
     async fn store_and_read_5mb_from_many_clients() -> Result<()> {
+        let flow_name = function_name!();
         init_logger();
         let _start_span = tracing::info_span!("store_and_read_5mb_from_many_clients").entered();
 
@@ -485,7 +527,7 @@ mod tests {
         let file = LargeFile::new(bytes)?;
 
         // Store file (also verifies that the chunks are stored)
-        let address = uploader.upload_and_verify(file.bytes()).await?;
+        let address = uploader.upload_and_verify(file.bytes(), flow_name).await?;
 
         debug!("======> Data uploaded");
 
@@ -498,7 +540,7 @@ mod tests {
         for client in clients {
             let handle: Instrumented<tokio::task::JoinHandle<Result<()>>> =
                 tokio::spawn(async move {
-                    match client.read_bytes(address).await {
+                    match client.read_bytes(address, flow_name).await {
                         Ok(_data) => {
                             debug!("client #{:?} got the data", client.public_key());
                         }
@@ -568,8 +610,10 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[named]
     #[ignore = "Testnet network_assert_ tests should be excluded from normal tests runs, they need to be run in sequence to ensure validity of checks"]
     async fn file_network_assert_expected_log_counts() -> Result<()> {
+        let flow_name = function_name!();
         init_logger();
 
         let _outer_span = tracing::info_span!("file_network_assert").entered();
@@ -586,7 +630,7 @@ mod tests {
 
         let mut the_logs = crate::testnet_grep::NetworkLogState::new()?;
 
-        let _address = client.upload_and_verify(bytes.clone()).await?;
+        let _address = client.upload_and_verify(bytes.clone(), flow_name).await?;
 
         // small delay to ensure all node's logs have written
         tokio::time::sleep(delay).await;
@@ -605,68 +649,84 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[named]
     async fn store_and_read_1kb() {
+        let flow_name = function_name!();
         init_logger();
         let size = MIN_ENCRYPTABLE_BYTES / 3;
         let _outer_span = tracing::info_span!("store_and_read_1kb", size).entered();
         let client = try_create_test_client().await;
-        store_and_read(&client, size).await;
+        store_and_read(&client, size, flow_name).await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[named]
     async fn store_and_read_1mb() {
+        let flow_name = function_name!();
         init_logger();
         let _outer_span = tracing::info_span!("store_and_read_1mb").entered();
         let client = try_create_test_client().await;
-        store_and_read(&client, 1024 * 1024).await;
+        store_and_read(&client, 1024 * 1024, flow_name).await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[named]
     async fn ae_checks_file_test() {
+        let flow_name = function_name!();
         init_logger();
         let _outer_span = tracing::info_span!("ae_checks_file_test").entered();
         let client = try_create_test_client().await;
-        store_and_read(&client, 10 * 1024 * 1024).await;
+        store_and_read(&client, 10 * 1024 * 1024, flow_name).await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[named]
     async fn store_and_read_10mb() {
+        let flow_name = function_name!();
         init_logger();
         let _outer_span = tracing::info_span!("store_and_read_10mb").entered();
         let client = try_create_test_client().await;
-        store_and_read(&client, 10 * 1024 * 1024).await;
+        store_and_read(&client, 10 * 1024 * 1024, flow_name).await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[named]
     async fn store_and_read_20mb() {
+        let flow_name = function_name!();
         init_logger();
         let _outer_span = tracing::info_span!("store_and_read_20mb").entered();
         let client = try_create_test_client().await;
-        store_and_read(&client, 20 * 1024 * 1024).await;
+        store_and_read(&client, 20 * 1024 * 1024, flow_name).await;
     }
 
     #[ignore = "too hectic for CI so far"]
+    #[named]
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_40mb() {
+        let flow_name = function_name!();
         init_logger();
         let _outer_span = tracing::info_span!("store_and_read_40mb").entered();
         let client = try_create_test_client().await;
-        store_and_read(&client, 40 * 1024 * 1024).await;
+        store_and_read(&client, 40 * 1024 * 1024, flow_name).await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[named]
     #[ignore = "too heavy for CI"]
     async fn store_and_read_100mb() {
+        let flow_name = function_name!();
         init_logger();
         let _outer_span = tracing::info_span!("store_and_read_100mb").entered();
         let client = try_create_test_client().await;
-        store_and_read(&client, 100 * 1024 * 1024).await;
+        store_and_read(&client, 100 * 1024 * 1024, flow_name).await;
     }
 
     // Essentially a load test, seeing how much parallel batting the nodes can take.
     #[tokio::test(flavor = "multi_thread")]
+    #[named]
     #[ignore = "too heavy for CI"]
     async fn parallel_timings() -> Result<()> {
+        let flow_name = function_name!();
         init_logger();
         let _outer_span = tracing::info_span!("parallel_timings").entered();
 
@@ -677,7 +737,7 @@ mod tests {
             .map(|(i, client)| {
                 tokio::spawn(async move {
                     let file = LargeFile::new(random_bytes(MIN_ENCRYPTABLE_BYTES))?;
-                    let _ = client.upload_large(file, false).await?;
+                    let _ = client.upload_large(file, false, flow_name).await?;
                     println!("Iter: {}", i);
                     let res: Result<()> = Ok(());
                     res
@@ -700,8 +760,10 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[named]
     #[ignore = "too heavy for CI"]
     async fn one_by_one_timings() -> Result<()> {
+        let flow_name = function_name!();
         init_logger();
         let _outer_span = tracing::info_span!("test__one_by_one_timings").entered();
 
@@ -710,7 +772,7 @@ mod tests {
         for i in 0..1000_usize {
             let file = LargeFile::new(random_bytes(MIN_ENCRYPTABLE_BYTES))?;
             let now = Instant::now();
-            let _ = client.upload_large(file, false).await?;
+            let _ = client.upload_large(file, false, flow_name).await?;
             let elapsed = now.elapsed();
             println!("Iter: {}, in {} millis", i, elapsed.as_millis());
         }
@@ -721,7 +783,7 @@ mod tests {
     // We use `expect()` from within this function instead of returning a `Result` since
     // there is an issue in Rust which prevents more info being reported when `Err` is returned:
     // https://github.com/rust-lang/rust/issues/69517
-    async fn store_and_read(client: &Client, size: usize) {
+    async fn store_and_read(client: &Client, size: usize, flow_name: &str) {
         // cannot use scope as var w/ macro
         let _ = tracing::info_span!("store_and_read_bytes", size).entered();
 
@@ -734,7 +796,7 @@ mod tests {
 
         // we use upload_and_verify since it uploads and also confirms chunks were uploaded
         let address = client
-            .upload_and_verify(bytes.clone())
+            .upload_and_verify(bytes.clone(), flow_name)
             .await
             .expect("Failed to upload and verify file");
         assert_eq!(
@@ -745,7 +807,7 @@ mod tests {
 
         // then the content should be what we stored
         let read_data = client
-            .read_bytes(address)
+            .read_bytes(address, flow_name)
             .await
             .expect("Couldn't fetch uplaoded file");
         compare(bytes, read_data);
@@ -757,8 +819,9 @@ mod tests {
         pos: usize,
         len: usize,
         client: &Client,
+        flow_name: &str,
     ) -> Result<Bytes> {
-        let read_data = client.read_from(address, pos, len).await?;
+        let read_data = client.read_from(address, pos, len, flow_name).await?;
         let mut expected = file.bytes();
         let _ = expected.split_to(pos);
         expected.truncate(len);

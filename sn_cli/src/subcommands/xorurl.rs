@@ -95,13 +95,14 @@ pub async fn xorurl_of_files(
     follow_symlinks: bool,
     output_fmt: OutputFmt,
     xorurl_base: XorUrlBase,
+    flow_name: &str,
 ) -> Result<()> {
     // Do a dry-run on the location
     let safe = Safe::dry_runner(Some(xorurl_base));
 
     let location = get_from_arg_or_stdin(location, Some("...awaiting location path from stdin"))?;
     let (_, processed_files, _) = safe
-        .files_container_create_from(&location, None, recursive, follow_symlinks)
+        .files_container_create_from(&location, None, recursive, follow_symlinks, flow_name)
         .await?;
 
     // Now let's just print out a list of the xorurls

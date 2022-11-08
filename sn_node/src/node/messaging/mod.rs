@@ -77,7 +77,13 @@ impl MyNode {
         };
 
         match msg_type {
-            MsgType::Node { msg_id, dst, msg } => {
+            MsgType::Node {
+                msg_id,
+                flow_name,
+                dst,
+                msg,
+            } => {
+                info!(">>>>> NODE MSG ARRIVED FLOW {flow_name} -> {msg_id:?}");
                 // Check for entropy before we proceed further
                 // Anythign returned here means there's an issue and we should
                 // short-circuit below
@@ -105,11 +111,13 @@ impl MyNode {
             }
             MsgType::Client {
                 msg_id,
+                flow_name,
                 msg,
                 dst,
                 auth,
             } => {
                 debug!("valid client msg");
+                info!(">>>>> CLIENT MSG ARRIVED FLOW {flow_name} -> {msg_id:?}");
 
                 let Some(send_stream) = send_stream else {
                     return Err(Error::NoClientResponseStream)

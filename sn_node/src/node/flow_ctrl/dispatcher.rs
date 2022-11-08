@@ -285,7 +285,7 @@ fn wire_msg(
     #[cfg(feature = "traceroute")] trace: Trace,
 ) -> WireMsg {
     #[allow(unused_mut)]
-    let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
+    let mut wire_msg = WireMsg::new_msg(msg_id, "NODE_MSG".to_string(), payload, auth, dst);
     #[cfg(feature = "traceroute")]
     {
         let mut traceroute = trace.traceroute;

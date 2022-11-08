@@ -31,7 +31,13 @@ async fn main() -> Result<()> {
 
     println!("Uploading '{}' to Safe ...", file_path.display());
     let (xorurl, _, _) = safe
-        .files_container_create_from(&file_path, dst, recursive, follow_links)
+        .files_container_create_from(
+            &file_path,
+            dst,
+            recursive,
+            follow_links,
+            "FILE_UPLOAD_EXAMPLE",
+        )
         .await?;
 
     // The 'files_container_create_from' API returns (among other information) the
@@ -56,7 +62,9 @@ async fn main() -> Result<()> {
     // it will return not only thee content of the file
     // but its metadata too so we can distinguish what has
     // been fetched from the provided Safe-URL.
-    let fetched = safe.fetch(&url.to_string(), None).await;
+    let fetched = safe
+        .fetch(&url.to_string(), None, "FILE_UPLOAD_EXAMPLE")
+        .await;
     if let Ok(SafeData::PublicFile { data, .. }) = fetched {
         println!(
             "Content retrieved:\n{}",

@@ -41,6 +41,8 @@ pub enum MsgType {
     Client {
         /// Message ID
         msg_id: MsgId,
+        /// FLOW NAME
+        flow_name: String,
         /// Requester's authority over this message
         auth: AuthorityProof<ClientAuth>,
         /// Message dst
@@ -52,6 +54,8 @@ pub enum MsgType {
     Node {
         /// Message ID
         msg_id: MsgId,
+        /// FLOW NAME
+        flow_name: String,
         /// Message dst
         dst: Dst,
         /// the message

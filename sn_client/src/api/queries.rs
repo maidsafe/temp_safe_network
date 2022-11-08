@@ -29,8 +29,12 @@ impl Client {
     /// Send a Query to the network and await a response.
     /// Queries are automatically retried using exponential backoff if the timeout is hit.
     #[instrument(skip(self), level = "debug")]
-    pub async fn send_query(&self, query: DataQueryVariant) -> Result<QueryResult, Error> {
-        self.send_query_with_retry(query, true).await
+    pub async fn send_query(
+        &self,
+        query: DataQueryVariant,
+        flow_name: &str,
+    ) -> Result<QueryResult, Error> {
+        self.send_query_with_retry(query, true, flow_name).await
     }
 
     /// Send a Query to the network and await a response.
@@ -39,8 +43,9 @@ impl Client {
     pub async fn send_query_without_retry(
         &self,
         query: DataQueryVariant,
+        flow_name: &str,
     ) -> Result<QueryResult, Error> {
-        self.send_query_with_retry(query, false).await
+        self.send_query_with_retry(query, false, flow_name).await
     }
 
     // Send a Query to the network and await a response.
@@ -51,6 +56,7 @@ impl Client {
         &self,
         query: DataQueryVariant,
         retry: bool,
+        flow_name: &str,
     ) -> Result<QueryResult, Error> {
         let client_pk = self.public_key();
         let mut query = DataQuery {
@@ -101,6 +107,7 @@ impl Client {
                     signature.clone(),
                     Some((section_pk, elders.clone())),
                     force_new_link,
+                    flow_name,
                 )
                 .await;
 
@@ -127,7 +134,6 @@ impl Client {
 
                 // In the next attempt, try the next adult, further away.
                 query.adult_index += 1;
-                debug!("Sleeping before trying query again: {delay:?} sleep for {query:?}");
                 sleep(delay).await;
             } else {
                 warn!("Finished trying and last response to {query:?} is {res:?}");
@@ -146,6 +152,7 @@ impl Client {
         client_pk: PublicKey,
         serialised_query: Bytes,
         signature: Signature,
+        flow_name: &str,
     ) -> Result<QueryResult, Error> {
         debug!("Sending Query: {:?}", query);
         self.send_signed_query_to_section(
@@ -155,6 +162,7 @@ impl Client {
             signature,
             None,
             false,
+            flow_name,
         )
         .await
     }
@@ -170,6 +178,7 @@ impl Client {
         signature: Signature,
         dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
         force_new_link: bool,
+        flow_name: &str,
     ) -> Result<QueryResult, Error> {
         let auth = ClientAuth {
             public_key: client_pk,
@@ -185,6 +194,7 @@ impl Client {
                 force_new_link,
                 #[cfg(feature = "traceroute")]
                 self.public_key(),
+                flow_name,
             )
             .await
     }

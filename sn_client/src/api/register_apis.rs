@@ -41,9 +41,13 @@ impl Client {
     /// Incrementing the WAL index as successful writes are sent out. Stops at the first error.
     /// Starts publishing from the index when called again with the same WAL.
     #[instrument(skip(self), level = "debug")]
-    pub async fn publish_register_ops(&self, wal: RegisterWriteAheadLog) -> Result<(), Error> {
+    pub async fn publish_register_ops(
+        &self,
+        wal: RegisterWriteAheadLog,
+        flow_name: &str,
+    ) -> Result<(), Error> {
         for cmd in &wal {
-            self.send_cmd(cmd.clone()).await?;
+            self.send_cmd(cmd.clone(), flow_name).await?;
         }
         Ok(())
     }
@@ -61,6 +65,7 @@ impl Client {
         name: XorName,
         tag: u64,
         policy: Policy,
+        flow_name: &str,
     ) -> Result<(Address, RegisterWriteAheadLog), Error> {
         let address = Address { name, tag };
 
@@ -93,11 +98,12 @@ impl Client {
         address: Address,
         entry: Entry,
         children: BTreeSet<EntryHash>,
+        flow_name: &str,
     ) -> Result<(EntryHash, RegisterWriteAheadLog), Error> {
         // First we fetch it so we can get the causality info,
         // either from local CRDT replica or from the network if not found
         debug!("Writing to register at {:?}", address);
-        let mut register = self.get_register(address).await?;
+        let mut register = self.get_register(address, flow_name).await?;
 
         // Let's check the policy/permissions to make sure this operation is allowed,
         // otherwise it will fail when the operation is applied on the network replica.
@@ -130,10 +136,10 @@ impl Client {
 
     /// Get the entire Register from the Network
     #[instrument(skip(self), level = "debug")]
-    pub async fn get_register(&self, address: Address) -> Result<Register, Error> {
+    pub async fn get_register(&self, address: Address, flow_name: &str) -> Result<Register, Error> {
         // Let's fetch the Register from the network
         let query = DataQueryVariant::Register(RegisterQuery::Get(address));
-        let query_result = self.send_query(query.clone()).await?;
+        let query_result = self.send_query(query.clone(), flow_name).await?;
 
         debug!("get_register result is; {query_result:?}");
         match query_result.response {
@@ -150,9 +156,10 @@ impl Client {
     pub async fn read_register(
         &self,
         address: Address,
+        flow_name: &str,
     ) -> Result<BTreeSet<(EntryHash, Entry)>, Error> {
         let query = DataQueryVariant::Register(RegisterQuery::Read(address));
-        let query_result = self.send_query(query.clone()).await?;
+        let query_result = self.send_query(query.clone(), flow_name).await?;
         match query_result.response {
             QueryResponse::ReadRegister(res) => res.map_err(|err| Error::ErrorMsg { source: err }),
             other => Err(Error::UnexpectedQueryResponse {
@@ -168,9 +175,10 @@ impl Client {
         &self,
         address: Address,
         hash: EntryHash,
+        flow_name: &str,
     ) -> Result<Entry, Error> {
         let query = DataQueryVariant::Register(RegisterQuery::GetEntry { address, hash });
-        let query_result = self.send_query(query.clone()).await?;
+        let query_result = self.send_query(query.clone(), flow_name).await?;
         match query_result.response {
             QueryResponse::GetRegisterEntry(res) => {
                 res.map_err(|err| Error::ErrorMsg { source: err })
@@ -188,9 +196,13 @@ impl Client {
 
     /// Get the owner of a Register.
     #[instrument(skip(self), level = "debug")]
-    pub async fn get_register_owner(&self, address: Address) -> Result<User, Error> {
+    pub async fn get_register_owner(
+        &self,
+        address: Address,
+        flow_name: &str,
+    ) -> Result<User, Error> {
         let query = DataQueryVariant::Register(RegisterQuery::GetOwner(address));
-        let query_result = self.send_query(query.clone()).await?;
+        let query_result = self.send_query(query.clone(), flow_name).await?;
         match query_result.response {
             QueryResponse::GetRegisterOwner(res) => {
                 res.map_err(|err| Error::ErrorMsg { source: err })
@@ -212,9 +224,10 @@ impl Client {
         &self,
         address: Address,
         user: User,
+        flow_name: &str,
     ) -> Result<Permissions, Error> {
         let query = DataQueryVariant::Register(RegisterQuery::GetUserPermissions { address, user });
-        let query_result = self.send_query(query.clone()).await?;
+        let query_result = self.send_query(query.clone(), flow_name).await?;
         match query_result.response {
             QueryResponse::GetRegisterUserPermissions(res) => {
                 res.map_err(|err| Error::ErrorMsg { source: err })
@@ -228,9 +241,13 @@ impl Client {
 
     /// Get the Policy of a Register.
     #[instrument(skip(self), level = "debug")]
-    pub async fn get_register_policy(&self, address: Address) -> Result<Policy, Error> {
+    pub async fn get_register_policy(
+        &self,
+        address: Address,
+        flow_name: &str,
+    ) -> Result<Policy, Error> {
         let query = DataQueryVariant::Register(RegisterQuery::GetPolicy(address));
-        let query_result = self.send_query(query.clone()).await?;
+        let query_result = self.send_query(query.clone(), flow_name).await?;
         match query_result.response {
             QueryResponse::GetRegisterPolicy(res) => {
                 res.map_err(|err| Error::ErrorMsg { source: err })
@@ -274,6 +291,7 @@ mod tests {
     };
 
     use eyre::{bail, eyre, Context, Result};
+    use function_name::named;
     use rand::Rng;
     use std::{
         collections::{BTreeMap, BTreeSet},
@@ -292,7 +310,9 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[named]
     async fn test_register_batching() -> Result<()> {
+        let flow_name = function_name!();
         init_logger();
         let _outer_span = tracing::info_span!("test__register_batching").entered();
 
@@ -302,26 +322,30 @@ mod tests {
         let owner = User::Key(client.public_key());
 
         // create a Register
-        let (address, mut batch) = client.create_register(name, tag, policy(owner)).await?;
+        let (address, mut batch) = client
+            .create_register(name, tag, policy(owner), flow_name)
+            .await?;
 
         // create a second Register
-        let (address2, mut batch2) = client.create_register(name, tag, policy(owner)).await?;
+        let (address2, mut batch2) = client
+            .create_register(name, tag, policy(owner), flow_name)
+            .await?;
 
         // batch them up
         batch.append(&mut batch2);
 
         // publish that batch to the network
-        client.publish_register_ops(batch).await?;
+        client.publish_register_ops(batch, flow_name).await?;
         delay_before_we_query_pubished_data().await;
 
         // check they're both there
-        let register1 = client.get_register(address).await?;
+        let register1 = client.get_register(address, flow_name).await?;
         assert_eq!(*register1.name(), name);
         assert_eq!(register1.tag(), tag);
         assert_eq!(register1.size(), 0);
         assert_eq!(register1.owner(), owner);
 
-        let register2 = client.get_register(address2).await?;
+        let register2 = client.get_register(address2, flow_name).await?;
         assert_eq!(*register2.name(), name);
         assert_eq!(register2.tag(), tag);
         assert_eq!(register2.size(), 0);
@@ -331,8 +355,10 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[named]
     #[ignore = "Testnet network_assert_ tests should be excluded from normal tests runs, they need to be run in sequence to ensure validity of checks"]
     async fn register_network_assert_expected_log_counts() -> Result<()> {
+        let flow_name = function_name!();
         init_logger();
         let _outer_span = tracing::info_span!("register_network_assert").entered();
 
@@ -350,8 +376,10 @@ mod tests {
         let owner = User::Key(client.public_key());
 
         // store a Register
-        let (_address, batch) = client.create_register(name, tag, policy(owner)).await?;
-        client.publish_register_ops(batch).await?;
+        let (_address, batch) = client
+            .create_register(name, tag, policy(owner), flow_name)
+            .await?;
+        client.publish_register_ops(batch, flow_name).await?;
 
         // small delay to ensure logs have written by the nodes
         sleep(delay).await;
@@ -363,8 +391,10 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[named]
     #[ignore = "too heavy for CI"]
     async fn measure_upload_times() -> Result<()> {
+        let flow_name = function_name!();
         init_logger();
         let _outer_span = tracing::info_span!("test__measure_upload_times").entered();
 
@@ -374,8 +404,10 @@ mod tests {
         let tag = 10;
         let owner = User::Key(client.public_key());
 
-        let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
-        client.publish_register_ops(batch).await?;
+        let (address, batch) = client
+            .create_register(name, tag, policy(owner), flow_name)
+            .await?;
+        client.publish_register_ops(batch, flow_name).await?;
 
         let mut total = 0;
         let value_1 = random_register_entry();
@@ -384,9 +416,9 @@ mod tests {
             let now = Instant::now();
 
             let (_value1_hash, batch) = client
-                .write_to_local_register(address, value_1.clone(), BTreeSet::new())
+                .write_to_local_register(address, value_1.clone(), BTreeSet::new(), flow_name)
                 .await?;
-            client.publish_register_ops(batch).await?;
+            client.publish_register_ops(batch, flow_name).await?;
 
             let elapsed = now.elapsed().as_millis();
             total += elapsed;
@@ -401,7 +433,9 @@ mod tests {
     /**** Register data tests ****/
 
     #[tokio::test(flavor = "multi_thread")]
+    #[named]
     async fn register_basics() -> Result<()> {
+        let flow_name = function_name!();
         init_logger();
         let _outer_span = tracing::info_span!("test__register_basics").entered();
 
@@ -411,11 +445,13 @@ mod tests {
         let owner = User::Key(client.public_key());
 
         // store a Register
-        let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
-        client.publish_register_ops(batch).await?;
+        let (address, batch) = client
+            .create_register(name, tag, policy(owner), flow_name)
+            .await?;
+        client.publish_register_ops(batch, flow_name).await?;
         delay_before_we_query_pubished_data().await;
 
-        let register = client.get_register(address).await?;
+        let register = client.get_register(address, flow_name).await?;
 
         assert_eq!(*register.name(), name);
         assert_eq!(register.tag(), tag);
@@ -423,11 +459,13 @@ mod tests {
         assert_eq!(register.owner(), owner);
 
         // store a second Register
-        let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
-        client.publish_register_ops(batch).await?;
+        let (address, batch) = client
+            .create_register(name, tag, policy(owner), flow_name)
+            .await?;
+        client.publish_register_ops(batch, flow_name).await?;
         delay_before_we_query_pubished_data().await;
 
-        let register = client.get_register(address).await?;
+        let register = client.get_register(address, flow_name).await?;
 
         assert_eq!(*register.name(), name);
         assert_eq!(register.tag(), tag);
@@ -438,7 +476,9 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[named]
     async fn register_permissions() -> Result<()> {
+        let flow_name = function_name!();
         init_logger();
         let _outer_span = tracing::info_span!("test__register_permissions").entered();
 
@@ -449,16 +489,16 @@ mod tests {
         let owner = User::Key(client.public_key());
 
         let (address, batch) = client
-            .create_register(name, tag, none_policy(owner)) // trying to set write perms to false for the owner (will not be reflected as long as the user is the owner, as an owner will have full authority)
+            .create_register(name, tag, none_policy(owner), flow_name) // trying to set write perms to false for the owner (will not be reflected as long as the user is the owner, as an owner will have full authority)
             .await?;
         client
-            .publish_register_ops(batch)
+            .publish_register_ops(batch, flow_name)
             .await
             .context("publish ops failed")?;
         delay_before_we_query_pubished_data().await;
 
         let permissions = client
-            .get_register_permissions_for_user(address, owner)
+            .get_register_permissions_for_user(address, owner, flow_name)
             .instrument(tracing::info_span!("get owner perms"))
             .await
             .context("get user perms failed")?;
@@ -469,7 +509,7 @@ mod tests {
         let other_user = User::Key(Keypair::new_ed25519().public_key());
 
         match client
-            .get_register_permissions_for_user(address, other_user)
+            .get_register_permissions_for_user(address, other_user,flow_name)
             .instrument(tracing::info_span!("get other user perms"))
             .await
         {
@@ -488,7 +528,9 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[named]
     async fn register_hashes_dont_clash() -> Result<()> {
+        let flow_name = function_name!();
         init_logger();
         let start_span =
             tracing::info_span!("test__register_write_without_publish_start").entered();
@@ -499,15 +541,17 @@ mod tests {
         let tag = 10;
         let owner = User::Key(client.public_key());
 
-        let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
-        client.publish_register_ops(batch).await?;
+        let (address, batch) = client
+            .create_register(name, tag, policy(owner), flow_name)
+            .await?;
+        client.publish_register_ops(batch, flow_name).await?;
         delay_before_we_query_pubished_data().await;
 
         let value_1 = random_register_entry();
 
         // Different entries written to the same rigister from root shall giving different hash
         let (value1_hash, _batch) = client
-            .write_to_local_register(address, value_1.clone(), BTreeSet::new())
+            .write_to_local_register(address, value_1.clone(), BTreeSet::new(), flow_name)
             .await?;
 
         let value_2 = random_register_entry();
@@ -516,7 +560,7 @@ mod tests {
             tracing::info_span!("test__register_write_without_publish__second_write").entered();
 
         let (value2_hash, _batch) = client
-            .write_to_local_register(address, value_2.clone(), BTreeSet::new())
+            .write_to_local_register(address, value_2.clone(), BTreeSet::new(), flow_name)
             .await?;
 
         assert!(value1_hash != value2_hash);
@@ -531,10 +575,10 @@ mod tests {
             tracing::info_span!("test__register_write_without_publish__third_write").entered();
 
         let (value1_3_hash, _batch) = client
-            .write_to_local_register(address, value_3.clone(), children.clone())
+            .write_to_local_register(address, value_3.clone(), children.clone(), flow_name)
             .await?;
         let (value1_2_hash, _batch) = client
-            .write_to_local_register(address, value_2.clone(), children.clone())
+            .write_to_local_register(address, value_2.clone(), children.clone(), flow_name)
             .await?;
         assert!(value1_2_hash != value1_3_hash);
 
@@ -545,7 +589,9 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[named]
     async fn register_write() -> Result<()> {
+        let flow_name = function_name!();
         init_logger();
         let start_span = tracing::info_span!("test__register_write_start").entered();
 
@@ -555,19 +601,21 @@ mod tests {
         let tag = 10;
         let owner = User::Key(client.public_key());
 
-        let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
-        client.publish_register_ops(batch).await?;
+        let (address, batch) = client
+            .create_register(name, tag, policy(owner), flow_name)
+            .await?;
+        client.publish_register_ops(batch, flow_name).await?;
 
         let value_1 = random_register_entry();
 
         let (value1_hash, batch) = client
-            .write_to_local_register(address, value_1.clone(), BTreeSet::new())
+            .write_to_local_register(address, value_1.clone(), BTreeSet::new(), flow_name)
             .await?;
-        client.publish_register_ops(batch).await?;
+        client.publish_register_ops(batch, flow_name).await?;
         delay_before_we_query_pubished_data().await;
 
         // now check last entry
-        let hashes = client.read_register(address).await?;
+        let hashes = client.read_register(address, flow_name).await?;
 
         assert_eq!(1, hashes.len());
         let current = hashes.iter().next();
@@ -580,31 +628,31 @@ mod tests {
 
         // write to the register
         let (value2_hash, batch) = client
-            .write_to_local_register(address, value_2.clone(), BTreeSet::new())
+            .write_to_local_register(address, value_2.clone(), BTreeSet::new(), flow_name)
             .await?;
 
         // we get an op to publish
         assert!(batch.len() == 1);
 
-        client.publish_register_ops(batch).await?;
+        client.publish_register_ops(batch, flow_name).await?;
         delay_before_we_query_pubished_data().await;
 
         // and then lets check all entries are returned
         // NB: these will not be ordered according to insertion order,
         // but according to the hashes of the values.
-        let hashes = client.read_register(address).await?;
+        let hashes = client.read_register(address, flow_name).await?;
 
         assert_eq!(2, hashes.len());
 
         // get_register_entry
         let retrieved_value_1 = client
-            .get_register_entry(address, value1_hash)
+            .get_register_entry(address, value1_hash, flow_name)
             .instrument(tracing::info_span!("get_value_1"))
             .await?;
         assert_eq!(retrieved_value_1, value_1);
 
         let retrieved_value_2 = client
-            .get_register_entry(address, value2_hash)
+            .get_register_entry(address, value2_hash, flow_name)
             .instrument(tracing::info_span!("get_value_2"))
             .await?;
         assert_eq!(retrieved_value_2, value_2);
@@ -612,7 +660,7 @@ mod tests {
         // Requesting an entry which doesn't exist returns an error
         let entry_hash = EntryHash(rand::thread_rng().gen::<[u8; 32]>());
         match client
-            .get_register_entry(address, entry_hash)
+            .get_register_entry(address, entry_hash, flow_name)
             .instrument(tracing::info_span!("final get"))
             .await
         {
@@ -634,7 +682,9 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[named]
     async fn register_owner() -> Result<()> {
+        let flow_name = function_name!();
         init_logger();
         let _outer_span = tracing::info_span!("test__register_owner").entered();
 
@@ -644,12 +694,14 @@ mod tests {
         let tag = 10;
         let owner = User::Key(client.public_key());
 
-        let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
-        client.publish_register_ops(batch).await?;
+        let (address, batch) = client
+            .create_register(name, tag, policy(owner), flow_name)
+            .await?;
+        client.publish_register_ops(batch, flow_name).await?;
         delay_before_we_query_pubished_data().await;
 
         // Assert that the data is stored.
-        let current_owner = client.get_register_owner(address).await?;
+        let current_owner = client.get_register_owner(address, flow_name).await?;
 
         assert_eq!(owner, current_owner);
 
@@ -657,7 +709,9 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[named]
     async fn ae_checks_register_test() -> Result<()> {
+        let flow_name = function_name!();
         init_logger();
         let _outer_span = tracing::info_span!("ae_checks_register_test").entered();
         let client = create_test_client()
@@ -670,17 +724,17 @@ mod tests {
 
         // store a Register
         let (address, batch) = client
-            .create_register(name, tag, policy(owner))
+            .create_register(name, tag, policy(owner), flow_name)
             .await
             .context("Creating register failed")?;
         client
-            .publish_register_ops(batch)
+            .publish_register_ops(batch, flow_name)
             .await
             .context("publishing reg failed")?;
         delay_before_we_query_pubished_data().await;
 
         let _register = client
-            .get_register(address)
+            .get_register(address, flow_name)
             .await
             .context("get reg failed after publish")?;
 

@@ -58,10 +58,15 @@ impl Safe {
     ///     assert!(xorurl.contains("safe://"))
     /// # });
     /// ```
-    pub async fn files_container_create(&self) -> Result<XorUrl> {
+    pub async fn files_container_create(&self, flow_name: &str) -> Result<XorUrl> {
         // Build a Register creation operation
         let xorurl = self
-            .register_create(None, FILES_CONTAINER_TYPE_TAG, ContentType::FilesContainer)
+            .register_create(
+                None,
+                FILES_CONTAINER_TYPE_TAG,
+                ContentType::FilesContainer,
+                flow_name,
+            )
             .await?;
 
         Ok(xorurl)
@@ -86,10 +91,12 @@ impl Safe {
         dst: Option<&Path>,
         recursive: bool,
         follow_links: bool,
+        flow_name: &str,
     ) -> Result<(XorUrl, ProcessedFiles, FilesMap)> {
         // Let's upload the files (if not dry_run) and generate the list of local files paths
         let mut processed_files =
-            file_system_dir_walk(self, location.as_ref(), recursive, follow_links).await?;
+            file_system_dir_walk(self, location.as_ref(), recursive, follow_links, flow_name)
+                .await?;
 
         // The FilesContainer is stored on a Register
         // and the link to the serialised FilesMap as the entry's value
@@ -99,17 +106,18 @@ impl Safe {
             location.as_ref(),
             dst,
             follow_links,
+            flow_name,
         )
         .await?;
 
         // Create a Register
-        let xorurl = self.files_container_create().await?;
+        let xorurl = self.files_container_create(flow_name).await?;
 
         if self.dry_run_mode {
             Ok((xorurl.to_string(), processed_files, files_map))
         } else {
             // Store files map on network
-            let files_map_xorurl = self.store_files_map(&files_map).await?;
+            let files_map_xorurl = self.store_files_map(&files_map, flow_name).await?;
 
             let mut reg_url = SafeUrl::from_xorurl(&xorurl)?;
 
@@ -118,10 +126,10 @@ impl Safe {
             let entry = files_map_xorurl.as_bytes().to_vec();
             let client = self.get_safe_client()?;
             let (entry_hash, reg_op) = client
-                .write_to_local_register(reg_address, entry, Default::default())
+                .write_to_local_register(reg_address, entry, Default::default(), flow_name)
                 .await?;
 
-            client.publish_register_ops(reg_op).await?;
+            client.publish_register_ops(reg_op, flow_name).await?;
 
             // We return versioned xorurl
             reg_url.set_content_version(Some(VersionHash::from(&entry_hash)));
@@ -145,17 +153,22 @@ impl Safe {
     ///     println!("FilesMap of fetched version is: {:?}", files_map);
     /// # });
     /// ```
-    pub async fn files_container_get(&self, url: &str) -> Result<Option<(VersionHash, FilesMap)>> {
+    pub async fn files_container_get(
+        &self,
+        url: &str,
+        flow_name: &str,
+    ) -> Result<Option<(VersionHash, FilesMap)>> {
         debug!("Getting files container from: {:?}", url);
-        let safe_url = self.parse_and_resolve_url(url).await?;
+        let safe_url = self.parse_and_resolve_url(url, flow_name).await?;
 
-        self.fetch_files_container(&safe_url).await
+        self.fetch_files_container(&safe_url, flow_name).await
     }
 
     /// Fetch a `FilesContainer` from a `SafeUrl` without performing any type of URL resolution
     pub(crate) async fn fetch_files_container(
         &self,
         safe_url: &SafeUrl,
+        flow_name: &str,
     ) -> Result<Option<(VersionHash, FilesMap)>> {
         // fetch register entries and wrap errors
         debug!(
@@ -165,7 +178,7 @@ impl Safe {
         );
 
         let entries = self
-            .register_fetch_entries(safe_url)
+            .register_fetch_entries(safe_url, flow_name)
             .await
             .map_err(|e| match e {
                 Error::ContentNotFound(_) => {
@@ -201,7 +214,7 @@ impl Safe {
 
         // Using the FilesMap XOR-URL we can now fetch the FilesMap and deserialise it
         let files_map_url = SafeUrl::from_xorurl(files_map_xorurl)?;
-        let serialised_files_map = self.fetch_data(&files_map_url, None).await?;
+        let serialised_files_map = self.fetch_data(&files_map_url, None, flow_name).await?;
         let files_map = serde_json::from_slice(serialised_files_map.chunk()).map_err(|err| {
             Error::ContentError(format!(
                 "Couldn't deserialise the FilesMap stored in the FilesContainer: {:?}",
@@ -240,6 +253,7 @@ impl Safe {
         follow_links: bool,
         delete: bool,
         update_nrs: bool,
+        flow_name: &str,
     ) -> Result<(Option<(VersionHash, FilesMap)>, ProcessedFiles)> {
         if delete && !recursive {
             return Err(Error::InvalidInput(
@@ -256,14 +270,14 @@ impl Safe {
             ));
         }
 
-        let mut safe_url = self.parse_and_resolve_url(url).await?;
+        let mut safe_url = self.parse_and_resolve_url(url, flow_name).await?;
 
         // If the FilesContainer URL was resolved from an NRS name we need to remove
         // the version from it so we can fetch latest version of it for sync-ing
         safe_url.set_content_version(None);
 
         let (current_version, current_files_map) =
-            match self.fetch_files_container(&safe_url).await? {
+            match self.fetch_files_container(&safe_url, flow_name).await? {
                 Some((version, files_map)) => (Some(version), files_map),
                 None => (None, FilesMap::default()),
             };
@@ -271,8 +285,14 @@ impl Safe {
         // Let's generate the list of local files paths, without uploading any new file yet.
         // Use a dry runner only for this next operation
         let dry_runner = Safe::dry_runner(Some(self.xorurl_base));
-        let processed_files =
-            file_system_dir_walk(&dry_runner, location.as_ref(), recursive, follow_links).await?;
+        let processed_files = file_system_dir_walk(
+            &dry_runner,
+            location.as_ref(),
+            recursive,
+            follow_links,
+            flow_name,
+        )
+        .await?;
 
         let dst_path = Path::new(safe_url.path());
 
@@ -286,6 +306,7 @@ impl Safe {
             false,
             true,
             follow_links,
+            flow_name,
         )
         .await?;
 
@@ -297,6 +318,7 @@ impl Safe {
             url,
             safe_url,
             update_nrs,
+            flow_name,
         )
         .await
     }
@@ -327,17 +349,26 @@ impl Safe {
         force: bool,
         update_nrs: bool,
         follow_links: bool,
+        flow_name: &str,
     ) -> Result<(Option<(VersionHash, FilesMap)>, ProcessedFiles)> {
         debug!("Adding file to FilesContainer at {}", url);
         let (safe_url, current_version, current_files_map) =
-            validate_files_add_params(self, source_file, url, update_nrs).await?;
+            validate_files_add_params(self, source_file, url, update_nrs, flow_name).await?;
 
         let dst_path = Path::new(safe_url.path());
 
         // Let's act according to if it's a local file path or a safe:// location
         let (processed_files, new_files_map, success_count) = if source_file.starts_with("safe://")
         {
-            files_map_add_link(self, current_files_map, source_file, dst_path, force).await?
+            files_map_add_link(
+                self,
+                current_files_map,
+                source_file,
+                dst_path,
+                force,
+                flow_name,
+            )
+            .await?
         } else {
             // We then assume source is a local path
             let source_path = Path::new(source_file);
@@ -345,7 +376,8 @@ impl Safe {
             // Let's generate the list of local files paths, without uploading any new file yet.
             // Use dry runner only for this next operation
             let dry_runner = Safe::dry_runner(Some(self.xorurl_base));
-            let processed_files = file_system_single_file(&dry_runner, source_path).await?;
+            let processed_files =
+                file_system_single_file(&dry_runner, source_path, flow_name).await?;
 
             files_map_sync(
                 self,
@@ -357,6 +389,7 @@ impl Safe {
                 force,
                 false,
                 follow_links,
+                flow_name,
             )
             .await?
         };
@@ -369,6 +402,7 @@ impl Safe {
             url,
             safe_url,
             update_nrs,
+            flow_name,
         )
         .await
     }
@@ -399,15 +433,23 @@ impl Safe {
         url: &str,
         force: bool,
         update_nrs: bool,
+        flow_name: &str,
     ) -> Result<(Option<(VersionHash, FilesMap)>, ProcessedFiles)> {
         let (safe_url, current_version, current_files_map) =
-            validate_files_add_params(self, "", url, update_nrs).await?;
+            validate_files_add_params(self, "", url, update_nrs, flow_name).await?;
 
-        let new_file_xorurl = self.store_bytes(data, None).await?;
+        let new_file_xorurl = self.store_bytes(data, None, flow_name).await?;
 
         let dst_path = Path::new(safe_url.path());
-        let (processed_files, new_files_map, success_count) =
-            files_map_add_link(self, current_files_map, &new_file_xorurl, dst_path, force).await?;
+        let (processed_files, new_files_map, success_count) = files_map_add_link(
+            self,
+            current_files_map,
+            &new_file_xorurl,
+            dst_path,
+            force,
+            flow_name,
+        )
+        .await?;
 
         self.update_files_container(
             success_count,
@@ -417,6 +459,7 @@ impl Safe {
             url,
             safe_url,
             update_nrs,
+            flow_name,
         )
         .await
     }
@@ -443,6 +486,7 @@ impl Safe {
         url: &str,
         recursive: bool,
         update_nrs: bool,
+        flow_name: &str,
     ) -> Result<(VersionHash, ProcessedFiles, FilesMap)> {
         let safe_url = SafeUrl::from_url(url)?;
         let dst_path = safe_url.path();
@@ -459,21 +503,22 @@ impl Safe {
             ));
         }
 
-        let mut safe_url = self.parse_and_resolve_url(url).await?;
+        let mut safe_url = self.parse_and_resolve_url(url, flow_name).await?;
 
         // If the FilesContainer URL was resolved from an NRS name we need to remove
         // the version from it so we can fetch latest version of it
         safe_url.set_content_version(None);
 
-        let (current_version, files_map) = match self.fetch_files_container(&safe_url).await? {
-            Some(info) => info,
-            None => {
-                return Err(Error::EmptyContent(format!(
-                    "FilesContainer found at \"{}\" was empty",
-                    safe_url
-                )))
-            }
-        };
+        let (current_version, files_map) =
+            match self.fetch_files_container(&safe_url, flow_name).await? {
+                Some(info) => info,
+                None => {
+                    return Err(Error::EmptyContent(format!(
+                        "FilesContainer found at \"{}\" was empty",
+                        safe_url
+                    )))
+                }
+            };
 
         let (processed_files, new_files_map, success_count) =
             files_map_remove_path(Path::new(dst_path), files_map, recursive)?;
@@ -487,6 +532,7 @@ impl Safe {
                 url,
                 safe_url,
                 update_nrs,
+                flow_name,
             )
             .await?
         };
@@ -506,6 +552,7 @@ impl Safe {
         url: &str,
         safe_url: SafeUrl,
         update_nrs: bool,
+        flow_name: &str,
     ) -> Result<(Option<(VersionHash, FilesMap)>, ProcessedFiles)> {
         if files_map_changes_count == 0 {
             if let Some(version) = current_version {
@@ -534,6 +581,7 @@ impl Safe {
                     url,
                     safe_url,
                     update_nrs,
+                    flow_name,
                 )
                 .await?;
 
@@ -551,11 +599,12 @@ impl Safe {
         url: &str,
         mut safe_url: SafeUrl,
         update_nrs: bool,
+        flow_name: &str,
     ) -> Result<VersionHash> {
         // The FilesContainer is updated by adding an entry containing the link to
         // the file with the serialised new version of the FilesMap.
         let files_map_xorurl = if !self.dry_run_mode {
-            self.store_files_map(new_files_map).await?
+            self.store_files_map(new_files_map, flow_name).await?
         } else {
             "".to_string()
         };
@@ -564,7 +613,7 @@ impl Safe {
         let entry = files_map_xorurl.as_bytes().to_vec();
         let replace = current_version.iter().map(|e| e.entry_hash()).collect();
         let entry_hash = &self
-            .register_write(&safe_url.to_string(), entry, replace)
+            .register_write(&safe_url.to_string(), entry, replace, flow_name)
             .await?;
         let new_version: VersionHash = entry_hash.into();
 
@@ -574,7 +623,7 @@ impl Safe {
             safe_url.set_content_version(Some(new_version));
             let nrs_url = SafeUrl::from_url(url)?;
             let top_name = nrs_url.top_name();
-            let _ = self.nrs_associate(top_name, &safe_url).await?;
+            let _ = self.nrs_associate(top_name, &safe_url, flow_name).await?;
         }
 
         Ok(new_version)
@@ -599,7 +648,12 @@ impl Safe {
     ///     assert_eq!(received_data, data);
     /// # });
     /// ```
-    pub async fn store_bytes(&self, bytes: Bytes, media_type: Option<&str>) -> Result<XorUrl> {
+    pub async fn store_bytes(
+        &self,
+        bytes: Bytes,
+        media_type: Option<&str>,
+        flow_name: &str,
+    ) -> Result<XorUrl> {
         let content_type = media_type.map_or_else(
             || Ok(ContentType::Raw),
             |media_type_str| {
@@ -623,7 +677,7 @@ impl Safe {
         } else {
             debug!("Storing {} bytes of data", bytes.len());
             let client = self.get_safe_client()?;
-            client.upload_and_verify(bytes).await?
+            client.upload_and_verify(bytes, flow_name).await?
         };
         let xorurl = SafeUrl::from_bytes(address, content_type)?.encode(self.xorurl_base);
 
@@ -646,21 +700,26 @@ impl Safe {
     ///     assert_eq!(received_data, data);
     /// # });
     /// ```
-    pub async fn files_get(&self, url: &str, range: Range) -> Result<Bytes> {
+    pub async fn files_get(&self, url: &str, range: Range, flow_name: &str) -> Result<Bytes> {
         // TODO: do we want ownership from other PKs yet?
-        let safe_url = self.parse_and_resolve_url(url).await?;
-        self.fetch_data(&safe_url, range).await
+        let safe_url = self.parse_and_resolve_url(url, flow_name).await?;
+        self.fetch_data(&safe_url, range, flow_name).await
     }
 
     /// Fetch a file from a `SafeUrl` without performing any type of URL resolution
-    pub(crate) async fn fetch_data(&self, safe_url: &SafeUrl, range: Range) -> Result<Bytes> {
+    pub(crate) async fn fetch_data(
+        &self,
+        safe_url: &SafeUrl,
+        range: Range,
+        flow_name: &str,
+    ) -> Result<Bytes> {
         match safe_url.data_type() {
-            DataType::File => self.get_bytes(safe_url.xorname(), range).await,
+            DataType::File => self.get_bytes(safe_url.xorname(), range, flow_name).await,
             other => Err(Error::ContentError(format!("{}", other))),
         }
     }
 
-    async fn get_bytes(&self, address: XorName, range: Range) -> Result<Bytes> {
+    async fn get_bytes(&self, address: XorName, range: Range, flow_name: &str) -> Result<Bytes> {
         debug!("Attempting to fetch data from {:?}", address);
         let client = self.get_safe_client()?;
         let data = if let Some((start, end)) = range {
@@ -669,9 +728,9 @@ impl Safe {
                 .map(|end_index| end_index as usize - start)
                 .unwrap_or(usize::MAX);
 
-            client.read_from(address, start, len).await
+            client.read_from(address, start, len, flow_name).await
         } else {
-            client.read_bytes(address).await
+            client.read_bytes(address, flow_name).await
         }
         .map_err(|e| Error::NetDataError(format!("Failed to GET file: {:?}", e)))?;
 
@@ -685,7 +744,7 @@ impl Safe {
     }
 
     // Private helper to serialise a FilesMap and store it in a file
-    async fn store_files_map(&self, files_map: &FilesMap) -> Result<String> {
+    async fn store_files_map(&self, files_map: &FilesMap, flow_name: &str) -> Result<String> {
         // The FilesMapContainer is a Register where each NRS Map version is
         // an entry containing the XOR-URL of the file that contains the serialised NrsMap.
         let serialised_files_map = serde_json::to_string(&files_map).map_err(|err| {
@@ -696,7 +755,7 @@ impl Safe {
         })?;
 
         let files_map_xorurl = self
-            .store_bytes(Bytes::from(serialised_files_map), None)
+            .store_bytes(Bytes::from(serialised_files_map), None, flow_name)
             .await?;
 
         Ok(files_map_xorurl)
@@ -711,6 +770,7 @@ async fn validate_files_add_params(
     source_file: &str,
     url: &str,
     update_nrs: bool,
+    flow_name: &str,
 ) -> Result<(SafeUrl, Option<VersionHash>, FilesMap)> {
     let safe_url = SafeUrl::from_url(url)?;
 
@@ -721,7 +781,7 @@ async fn validate_files_add_params(
         ));
     }
 
-    let mut safe_url = safe.parse_and_resolve_url(url).await?;
+    let mut safe_url = safe.parse_and_resolve_url(url, flow_name).await?;
 
     // If the FilesContainer URL was resolved from an NRS name we need to remove
     // the version from it so we can fetch latest version of it for sync-ing
@@ -746,10 +806,11 @@ async fn validate_files_add_params(
         }
     }
 
-    let (current_version, current_files_map) = match safe.fetch_files_container(&safe_url).await? {
-        Some((version, files_map)) => (Some(version), files_map),
-        None => (None, FilesMap::default()),
-    };
+    let (current_version, current_files_map) =
+        match safe.fetch_files_container(&safe_url, flow_name).await? {
+            Some((version, files_map)) => (Some(version), files_map),
+            None => (None, FilesMap::default()),
+        };
 
     Ok((safe_url, current_version, current_files_map))
 }
@@ -808,6 +869,7 @@ async fn files_map_sync(
     force: bool,
     compare_file_content: bool,
     follow_links: bool,
+    flow_name: &str,
 ) -> Result<(ProcessedFiles, FilesMap, u64)> {
     let (location_base_path, dst_base_path) = get_base_paths(location, dst_path);
     let mut updated_files_map = FilesMap::new();
@@ -848,6 +910,7 @@ async fn files_map_sync(
                     false,
                     &mut updated_files_map,
                     &mut processed_files,
+                    flow_name,
                 )
                 .await
                 {
@@ -874,7 +937,8 @@ async fn files_map_sync(
             }
             Some(file_item) => {
                 let is_modified =
-                    is_file_item_modified(safe, Path::new(local_file_name), file_item).await;
+                    is_file_item_modified(safe, Path::new(local_file_name), file_item, flow_name)
+                        .await;
                 if force || (compare_file_content && is_modified) {
                     // We need to update the current FileInfo
                     if add_or_update_file_item(
@@ -887,6 +951,7 @@ async fn files_map_sync(
                         true,
                         &mut updated_files_map,
                         &mut processed_files,
+                        flow_name,
                     )
                     .await
                     {
@@ -961,12 +1026,17 @@ async fn files_map_sync(
     Ok((processed_files, updated_files_map, success_count))
 }
 
-async fn is_file_item_modified(safe: &Safe, local_filename: &Path, file_item: &FileInfo) -> bool {
+async fn is_file_item_modified(
+    safe: &Safe,
+    local_filename: &Path,
+    file_item: &FileInfo,
+    flow_name: &str,
+) -> bool {
     if FileMeta::filetype_is_file(&file_item[PREDICATE_TYPE]) {
         // Use a dry runner only for this next operation
         let dry_runner = Safe::dry_runner(Some(safe.xorurl_base));
 
-        match upload_file_to_net(&dry_runner, local_filename).await {
+        match upload_file_to_net(&dry_runner, local_filename, flow_name).await {
             Ok(local_xorurl) => file_item[PREDICATE_LINK] != local_xorurl,
             Err(_) => false,
         }
@@ -987,6 +1057,7 @@ async fn files_map_add_link(
     file_link: &str,
     file_name: &Path,
     force: bool,
+    flow_name: &str,
 ) -> Result<(ProcessedFiles, FilesMap, u64)> {
     let mut processed_files = ProcessedFiles::new();
     let mut success_count = 0;
@@ -1037,6 +1108,7 @@ async fn files_map_add_link(
                         true,
                         &mut files_map,
                         &mut processed_files,
+                        flow_name,
                     )
                     .await
                     {
@@ -1074,6 +1146,7 @@ async fn files_map_add_link(
                 false,
                 &mut files_map,
                 &mut processed_files,
+                flow_name,
             )
             .await
             {
@@ -1147,6 +1220,7 @@ async fn files_map_create(
     location: &Path,
     dst_path: Option<&Path>,
     follow_links: bool,
+    flow_name: &str,
 ) -> Result<FilesMap> {
     let mut files_map = FilesMap::default();
 
@@ -1192,6 +1266,7 @@ async fn files_map_create(
             false,
             &mut files_map,
             content,
+            flow_name,
         )
         .await;
     }
@@ -1209,6 +1284,7 @@ mod tests {
     };
     use anyhow::{anyhow, bail, Result};
     use assert_matches::assert_matches;
+    use function_name::named;
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
     const TEST_DATA_FOLDER: &str = "./testdata/";
@@ -1225,21 +1301,24 @@ mod tests {
     // Helper function to create a files container with all files from TEST_DATA_FOLDER
     async fn new_files_container_from_testdata(
         safe: &Safe,
+        flow_name: &str,
     ) -> Result<(String, ProcessedFiles, FilesMap)> {
         let (xorurl, processed_files, files_map) = safe
-            .files_container_create_from(TEST_DATA_FOLDER, None, true, true)
+            .files_container_create_from(TEST_DATA_FOLDER, None, true, true, flow_name)
             .await?;
 
         assert!(xorurl.starts_with("safe://"));
         assert_eq!(processed_files.len(), TESTDATA_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), TESTDATA_PUT_FILESMAP_COUNT);
-        let _ = safe.fetch(&xorurl, None).await;
+        let _ = safe.fetch(&xorurl, None, flow_name).await;
 
         Ok((xorurl, processed_files, files_map))
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_map_create() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
         let mut processed_files = ProcessedFiles::new();
         let first_xorurl = SafeUrl::from_url("safe://top_xorurl")?.to_xorurl_string();
@@ -1259,6 +1338,7 @@ mod tests {
             Path::new(TEST_DATA_FOLDER_NO_SLASH),
             Some(Path::new("")),
             true,
+            flow_name,
         )
         .await?;
         assert_eq!(files_map.len(), 2);
@@ -1275,21 +1355,30 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_create_empty() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
-        let xorurl = safe.files_container_create().await?;
+        let xorurl = safe.files_container_create(flow_name).await?;
 
         assert!(xorurl.starts_with("safe://"));
 
-        let _ = safe.fetch(&xorurl, None).await;
+        let _ = safe.fetch(&xorurl, None, flow_name).await;
 
         // we check that the container is empty, i.e. no entry in the underlying Register.
-        let file_map = safe.files_container_get(&xorurl).await?;
+        let file_map = safe.files_container_get(&xorurl, flow_name).await?;
         assert!(file_map.is_none());
 
         // let's add a file
         let (content, new_processed_files) = safe
-            .files_container_add("./testdata/test.md", &xorurl, false, false, false)
+            .files_container_add(
+                "./testdata/test.md",
+                &xorurl,
+                false,
+                false,
+                false,
+                flow_name,
+            )
             .await?;
         let (_, new_files_map) =
             content.ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
@@ -1308,7 +1397,9 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_store_bytes() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
         let random_content: String = thread_rng()
             .sample_iter(&Alphanumeric)
@@ -1317,21 +1408,29 @@ mod tests {
             .collect();
 
         let file_xorurl = safe
-            .store_bytes(Bytes::from(random_content.clone()), None)
+            .store_bytes(Bytes::from(random_content.clone()), None, flow_name)
             .await?;
 
-        let retrieved = safe.files_get(&file_xorurl, None).await?;
+        let retrieved = safe.files_get(&file_xorurl, None, flow_name).await?;
         assert_eq!(retrieved, random_content.as_bytes());
 
         Ok(())
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_create_from_file() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
         let filename = Path::new("./testdata/test.md");
         let (xorurl, processed_files, files_map) = safe
-            .files_container_create_from(&filename.display().to_string(), None, false, false)
+            .files_container_create_from(
+                &filename.display().to_string(),
+                None,
+                false,
+                false,
+                flow_name,
+            )
             .await?;
 
         assert!(xorurl.starts_with("safe://"));
@@ -1347,11 +1446,13 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_create_from_dry_run() -> Result<()> {
+        let flow_name = function_name!();
         let mut safe = new_safe_instance().await?;
         safe.dry_run_mode = true;
         let (xorurl, processed_files, files_map) = safe
-            .files_container_create_from(TEST_DATA_FOLDER, None, true, false)
+            .files_container_create_from(TEST_DATA_FOLDER, None, true, false, flow_name)
             .await?;
 
         assert!(xorurl.starts_with("safe://"));
@@ -1394,10 +1495,12 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_create_from_folder_without_trailing_slash() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
-            .files_container_create_from(TEST_DATA_FOLDER_NO_SLASH, None, true, true)
+            .files_container_create_from(TEST_DATA_FOLDER_NO_SLASH, None, true, true, flow_name)
             .await?;
 
         assert!(xorurl.starts_with("safe://"));
@@ -1436,9 +1539,12 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_create_from_folder_with_trailing_slash() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
-        let (_, processed_files, files_map) = new_files_container_from_testdata(&safe).await?;
+        let (_, processed_files, files_map) =
+            new_files_container_from_testdata(&safe, flow_name).await?;
 
         let filename1 = Path::new("./testdata/test.md");
         assert!(processed_files[filename1].is_added());
@@ -1472,7 +1578,9 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_create_from_dst_path_without_trailing_slash() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create_from(
@@ -1480,6 +1588,7 @@ mod tests {
                 Some(Path::new("/myroot")),
                 true,
                 true,
+                flow_name,
             )
             .await?;
 
@@ -1519,7 +1628,9 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_create_from_dst_path_with_trailing_slash() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create_from(
@@ -1527,6 +1638,7 @@ mod tests {
                 Some(Path::new("/myroot/")),
                 true,
                 true,
+                flow_name,
             )
             .await?;
 
@@ -1566,17 +1678,28 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_sync() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
-        let (xorurl, processed_files, _) = new_files_container_from_testdata(&safe).await?;
+        let (xorurl, processed_files, _) =
+            new_files_container_from_testdata(&safe, flow_name).await?;
 
         let (version0, _) = safe
-            .files_container_get(&xorurl)
+            .files_container_get(&xorurl, flow_name)
             .await?
             .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
         let (content, new_processed_files) = safe
-            .files_container_sync("./testdata/subfolder/", &xorurl, true, true, false, false)
+            .files_container_sync(
+                "./testdata/subfolder/",
+                &xorurl,
+                true,
+                true,
+                false,
+                false,
+                flow_name,
+            )
             .await?;
         let (version, new_files_map) =
             content.ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
@@ -1634,14 +1757,25 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_sync_dry_run() -> Result<()> {
+        let flow_name = function_name!();
         let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, _) = new_files_container_from_testdata(&safe).await?;
+        let (xorurl, processed_files, _) =
+            new_files_container_from_testdata(&safe, flow_name).await?;
 
         // set dry_run flag on
         safe.dry_run_mode = true;
         let (content, new_processed_files) = safe
-            .files_container_sync("./testdata/subfolder/", &xorurl, true, true, false, false)
+            .files_container_sync(
+                "./testdata/subfolder/",
+                &xorurl,
+                true,
+                true,
+                false,
+                false,
+                flow_name,
+            )
             .await?;
         let (_, new_files_map) =
             content.ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
@@ -1700,16 +1834,18 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_sync_same_size() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
-            .files_container_create_from("./testdata/test.md", None, false, false)
+            .files_container_create_from("./testdata/test.md", None, false, false, flow_name)
             .await?;
 
         assert_eq!(processed_files.len(), 1);
         assert_eq!(files_map.len(), 1);
 
-        let _ = safe.fetch(&xorurl, None).await;
+        let _ = safe.fetch(&xorurl, None, flow_name).await;
 
         let (content, new_processed_files) = safe
             .files_container_sync(
@@ -1719,6 +1855,7 @@ mod tests {
                 false,
                 false,
                 false,
+                flow_name,
             )
             .await?;
         let (_, new_files_map) =
@@ -1754,10 +1891,12 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     #[ignore]
     async fn test_files_container_sync_with_versioned_target() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
-        let (xorurl, _, _) = new_files_container_from_testdata(&safe).await?;
+        let (xorurl, _, _) = new_files_container_from_testdata(&safe, flow_name).await?;
 
         match safe
             .files_container_sync(
@@ -1768,6 +1907,7 @@ mod tests {
                 false,
                 // FIXME: shall we just set this to false
                 true, // this flag requests the update-nrs
+                flow_name,
             )
             .await
         {
@@ -1787,13 +1927,15 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_sync_with_delete() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
-        let (xorurl, _, files_map) = new_files_container_from_testdata(&safe).await?;
+        let (xorurl, _, files_map) = new_files_container_from_testdata(&safe, flow_name).await?;
 
-        let _ = safe.fetch(&xorurl, None).await;
+        let _ = safe.fetch(&xorurl, None, flow_name).await;
         let (version0, _) = safe
-            .files_container_get(&xorurl)
+            .files_container_get(&xorurl, flow_name)
             .await?
             .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
@@ -1805,6 +1947,7 @@ mod tests {
                 false,
                 true, // this sets the delete flag
                 false,
+                flow_name,
             )
             .await?;
         let (version1, new_files_map) =
@@ -1858,7 +2001,9 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_sync_delete_without_recursive() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
         match safe
             .files_container_sync(
@@ -1868,6 +2013,7 @@ mod tests {
                 false, // do not follow links
                 true,  // this sets the delete flag
                 false,
+                flow_name,
             )
             .await
         {
@@ -1887,15 +2033,17 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_sync_update_nrs_unversioned_link() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
-        let (xorurl, _, _) = new_files_container_from_testdata(&safe).await?;
+        let (xorurl, _, _) = new_files_container_from_testdata(&safe, flow_name).await?;
 
         let nrsurl = random_nrs_name();
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(None);
         let unversioned_link = safe_url;
-        match safe.nrs_add(&nrsurl, &unversioned_link).await {
+        match safe.nrs_add(&nrsurl, &unversioned_link, flow_name).await {
             Ok(_) => Err(anyhow!(
                 "NRS create was unexpectedly successful".to_string(),
             )),
@@ -1915,9 +2063,11 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_sync_update_nrs_with_xorurl() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
-        let (xorurl, _, _) = new_files_container_from_testdata(&safe).await?;
+        let (xorurl, _, _) = new_files_container_from_testdata(&safe, flow_name).await?;
 
         match safe
             .files_container_sync(
@@ -1927,6 +2077,7 @@ mod tests {
                 false,
                 false,
                 true, // this flag requests the update-nrs
+                flow_name,
             )
             .await
         {
@@ -1947,22 +2098,24 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     #[ignore] // TODO: tmp because hang
     async fn test_files_container_sync_update_nrs_versioned_link() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
-        let (xorurl, _, _) = new_files_container_from_testdata(&safe).await?;
+        let (xorurl, _, _) = new_files_container_from_testdata(&safe, flow_name).await?;
 
         let (version0, _) = safe
-            .files_container_get(&xorurl)
+            .files_container_get(&xorurl, flow_name)
             .await?
             .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
         let nrsurl = random_nrs_name();
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
-        let (nrs_xorurl, did_create) = safe.nrs_add(&nrsurl, &safe_url).await?;
+        let (nrs_xorurl, did_create) = safe.nrs_add(&nrsurl, &safe_url, flow_name).await?;
         assert!(did_create);
-        let _ = safe.fetch(&nrs_xorurl.to_string(), None).await?;
+        let _ = safe.fetch(&nrs_xorurl.to_string(), None, flow_name).await?;
 
         let (version1_content, _) = safe
             .files_container_sync(
@@ -1972,6 +2125,7 @@ mod tests {
                 false,
                 false,
                 true, // this flag requests the update-nrs
+                flow_name,
             )
             .await?;
         let (version1, _) =
@@ -1979,11 +2133,11 @@ mod tests {
 
         // wait for it
         retry_loop_for_pattern!(safe
-            .files_container_get(&safe_url.to_string()), Ok(Some((version, _))) if *version == version1)?;
+            .files_container_get(&safe_url.to_string(),flow_name), Ok(Some((version, _))) if *version == version1)?;
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version1));
-        let new_link = safe.parse_and_resolve_url(&nrsurl).await?;
+        let new_link = safe.parse_and_resolve_url(&nrsurl, flow_name).await?;
         // NRS points to the v0: check if different from v1 url
         assert_ne!(new_link.to_string(), safe_url.to_string());
 
@@ -1991,9 +2145,12 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_sync_target_path_without_trailing_slash() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
-        let (xorurl, processed_files, _) = new_files_container_from_testdata(&safe).await?;
+        let (xorurl, processed_files, _) =
+            new_files_container_from_testdata(&safe, flow_name).await?;
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_path("path/when/sync");
@@ -2005,6 +2162,7 @@ mod tests {
                 false,
                 false,
                 false,
+                flow_name,
             )
             .await?;
         let (_, new_files_map) =
@@ -2059,9 +2217,12 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_sync_target_path_with_trailing_slash() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
-        let (xorurl, processed_files, _) = new_files_container_from_testdata(&safe).await?;
+        let (xorurl, processed_files, _) =
+            new_files_container_from_testdata(&safe, flow_name).await?;
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_path("/path/when/sync/");
@@ -2073,6 +2234,7 @@ mod tests {
                 false,
                 false,
                 false,
+                flow_name,
             )
             .await?;
         let (_, new_files_map) =
@@ -2127,12 +2289,14 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_get() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
-        let (xorurl, _, files_map) = new_files_container_from_testdata(&safe).await?;
+        let (xorurl, _, files_map) = new_files_container_from_testdata(&safe, flow_name).await?;
 
         let (_, fetched_files_map) = safe
-            .files_container_get(&xorurl)
+            .files_container_get(&xorurl, flow_name)
             .await?
             .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
@@ -2150,12 +2314,14 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_version() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
-        let (xorurl, _, _) = new_files_container_from_testdata(&safe).await?;
+        let (xorurl, _, _) = new_files_container_from_testdata(&safe, flow_name).await?;
 
         let (version0, _) = safe
-            .files_container_get(&xorurl)
+            .files_container_get(&xorurl, flow_name)
             .await?
             .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
@@ -2167,6 +2333,7 @@ mod tests {
                 false,
                 true, // this sets the delete flag,
                 false,
+                flow_name,
             )
             .await?;
         let (version1, _) =
@@ -2177,19 +2344,21 @@ mod tests {
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(None);
         let (version, _) = retry_loop_for_pattern!(safe
-            .files_container_get(&safe_url.to_string()), Ok(Some((version, _))) if *version == version1)?.ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
+            .files_container_get(&safe_url.to_string(),flow_name), Ok(Some((version, _))) if *version == version1)?.ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
         assert_eq!(version, version1);
 
         Ok(())
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_get_with_version() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
-        let (xorurl, _, files_map) = new_files_container_from_testdata(&safe).await?;
+        let (xorurl, _, files_map) = new_files_container_from_testdata(&safe, flow_name).await?;
 
         let (version0, _) = safe
-            .files_container_get(&xorurl)
+            .files_container_get(&xorurl, flow_name)
             .await?
             .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
@@ -2202,6 +2371,7 @@ mod tests {
                 false,
                 true, // this sets the delete flag
                 false,
+                flow_name,
             )
             .await?;
         let (version1, new_files_map) =
@@ -2211,7 +2381,7 @@ mod tests {
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
         let (version, v0_files_map) = safe
-            .files_container_get(&safe_url.to_string())
+            .files_container_get(&safe_url.to_string(), flow_name)
             .await?
             .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
@@ -2227,7 +2397,7 @@ mod tests {
         // let's fetch version1
         safe_url.set_content_version(Some(version1));
         let (version, v1_files_map) = retry_loop_for_pattern!(safe
-                .files_container_get(&safe_url.to_string()), Ok(Some((version, _))) if *version == version1)?.ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
+                .files_container_get(&safe_url.to_string(),flow_name), Ok(Some((version, _))) if *version == version1)?.ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
         assert_eq!(version, version1);
         assert_eq!(new_files_map, v1_files_map);
@@ -2252,7 +2422,10 @@ mod tests {
         let random_hash = EntryHash(rand::thread_rng().gen::<[u8; 32]>());
         let version_hash = VersionHash::from(&random_hash);
         safe_url.set_content_version(Some(version_hash));
-        match safe.files_container_get(&safe_url.to_string()).await {
+        match safe
+            .files_container_get(&safe_url.to_string(), flow_name)
+            .await
+        {
             Ok(_) => Err(anyhow!(
                 "Unexpectedly retrieved invalid version of container".to_string(),
             )),
@@ -2274,12 +2447,14 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_create_from_get_empty_folder() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
-        let (xorurl, _, files_map) = new_files_container_from_testdata(&safe).await?;
+        let (xorurl, _, files_map) = new_files_container_from_testdata(&safe, flow_name).await?;
 
         let (_, files_map_get) = safe
-            .files_container_get(&xorurl.to_string())
+            .files_container_get(&xorurl, flow_name)
             .await?
             .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
@@ -2294,28 +2469,38 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     #[ignore = "fix unknown issue"]
     async fn test_files_container_sync_with_nrs_url() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
         let (xorurl, _, _) = safe
-            .files_container_create_from("./testdata/test.md", None, false, true)
+            .files_container_create_from("./testdata/test.md", None, false, true, flow_name)
             .await?;
-        let _ = safe.fetch(&xorurl, None).await;
+        let _ = safe.fetch(&xorurl, None, flow_name).await;
         let (version0, _) = safe
-            .files_container_get(&xorurl)
+            .files_container_get(&xorurl, flow_name)
             .await?
             .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
         let nrsurl = random_nrs_name();
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
-        let (nrs_xorurl, did_create) = safe.nrs_add(&nrsurl, &safe_url).await?;
+        let (nrs_xorurl, did_create) = safe.nrs_add(&nrsurl, &safe_url, flow_name).await?;
 
         assert!(did_create);
-        let _ = safe.fetch(&nrs_xorurl.to_string(), None).await?;
+        let _ = safe.fetch(&nrs_xorurl.to_string(), None, flow_name).await?;
 
         let _ = safe
-            .files_container_sync("./testdata/subfolder/", &xorurl, false, false, false, false)
+            .files_container_sync(
+                "./testdata/subfolder/",
+                &xorurl,
+                false,
+                false,
+                false,
+                false,
+                flow_name,
+            )
             .await?;
 
         let (version2_content, _) = safe
@@ -2326,6 +2511,7 @@ mod tests {
                 false,
                 false,
                 true, // this flag requests the update-nrs
+                flow_name,
             )
             .await?;
         let (version2, _) =
@@ -2341,23 +2527,25 @@ mod tests {
         // └── test.md
         //
         // So, we have 6 items.
-        let (_, fetched_files_map) = retry_loop_for_pattern!(safe.files_container_get(&xorurl), Ok(Some((version, _))) if *version == version2)?.ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
+        let (_, fetched_files_map) = retry_loop_for_pattern!(safe.files_container_get(&xorurl,flow_name), Ok(Some((version, _))) if *version == version2)?.ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
         assert_eq!(fetched_files_map.len(), 6);
 
         Ok(())
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_add() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
-            .files_container_create_from("./testdata/subfolder/", None, false, true)
+            .files_container_create_from("./testdata/subfolder/", None, false, true, flow_name)
             .await?;
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
-        let _ = safe.fetch(&xorurl, None).await;
+        let _ = safe.fetch(&xorurl, None, flow_name).await;
         let (version0, _) = safe
-            .files_container_get(&xorurl)
+            .files_container_get(&xorurl, flow_name)
             .await?
             .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
@@ -2371,6 +2559,7 @@ mod tests {
                 false,
                 false,
                 false,
+                flow_name,
             )
             .await?;
         let (version1, new_files_map) =
@@ -2404,14 +2593,16 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_add_dry_run() -> Result<()> {
+        let flow_name = function_name!();
         let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
-            .files_container_create_from("./testdata/subfolder/", None, false, true)
+            .files_container_create_from("./testdata/subfolder/", None, false, true, flow_name)
             .await?;
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
-        let _ = safe.fetch(&xorurl, None).await;
+        let _ = safe.fetch(&xorurl, None, flow_name).await;
 
         let mut url_with_path = SafeUrl::from_xorurl(&xorurl)?;
         url_with_path.set_path("/new_filename_test.md");
@@ -2424,6 +2615,7 @@ mod tests {
                 false,
                 false,
                 false,
+                flow_name,
             )
             .await?;
         let (_, new_files_map) =
@@ -2441,6 +2633,7 @@ mod tests {
                 false,
                 false,
                 false,
+                flow_name,
             )
             .await?;
         let (_, new_files_map2) =
@@ -2465,17 +2658,26 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_add_dir() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
-            .files_container_create_from("./testdata/subfolder/", None, false, true)
+            .files_container_create_from("./testdata/subfolder/", None, false, true, flow_name)
             .await?;
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT); // root "/" + 2 files
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
-        let _ = safe.fetch(&xorurl, None).await;
+        let _ = safe.fetch(&xorurl, None, flow_name).await;
 
         match safe
-            .files_container_add(TEST_DATA_FOLDER_NO_SLASH, &xorurl, false, false, false)
+            .files_container_add(
+                TEST_DATA_FOLDER_NO_SLASH,
+                &xorurl,
+                false,
+                false,
+                false,
+                flow_name,
+            )
             .await
         {
             Ok(_) => Err(anyhow!(
@@ -2496,17 +2698,19 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_add_existing_name() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
-            .files_container_create_from("./testdata/subfolder/", None, false, true)
+            .files_container_create_from("./testdata/subfolder/", None, false, true, flow_name)
             .await?;
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
 
-        let _ = safe.fetch(&xorurl, None).await;
+        let _ = safe.fetch(&xorurl, None, flow_name).await;
         let (version0, _) = safe
-            .files_container_get(&xorurl)
+            .files_container_get(&xorurl, flow_name)
             .await?
             .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
@@ -2522,6 +2726,7 @@ mod tests {
                 false,
                 false,
                 false,
+                flow_name,
             )
             .await?;
         let (version1, new_files_map) =
@@ -2545,6 +2750,7 @@ mod tests {
                 false,
                 false,
                 false,
+                flow_name,
             )
             .await?;
         let (version2, new_files_map) =
@@ -2567,6 +2773,7 @@ mod tests {
                 true, //force it
                 false,
                 false,
+                flow_name,
             )
             .await?;
         let (version3, new_files_map) =
@@ -2585,17 +2792,27 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_fail_add_or_sync_invalid_path() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
-            .files_container_create_from("./testdata/test.md", None, false, true)
+            .files_container_create_from("./testdata/test.md", None, false, true, flow_name)
             .await?;
         assert_eq!(processed_files.len(), 1);
         assert_eq!(files_map.len(), 1);
-        let _ = safe.fetch(&xorurl, None).await;
+        let _ = safe.fetch(&xorurl, None, flow_name).await;
 
         match safe
-            .files_container_sync("/non-existing-path", &xorurl, false, false, false, false)
+            .files_container_sync(
+                "/non-existing-path",
+                &xorurl,
+                false,
+                false,
+                false,
+                false,
+                flow_name,
+            )
             .await
         {
             Ok(_) => {
@@ -2620,6 +2837,7 @@ mod tests {
                 false,
                 false,
                 false,
+                flow_name,
             )
             .await
         {
@@ -2639,21 +2857,23 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_add_a_url() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
-            .files_container_create_from("./testdata/subfolder/", None, false, true)
+            .files_container_create_from("./testdata/subfolder/", None, false, true, flow_name)
             .await?;
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
-        let _ = safe.fetch(&xorurl, None).await;
+        let _ = safe.fetch(&xorurl, None, flow_name).await;
         let (version0, _) = safe
-            .files_container_get(&xorurl)
+            .files_container_get(&xorurl, flow_name)
             .await?
             .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
         let data = Bytes::from("0123456789");
-        let file_xorurl = safe.store_bytes(data.clone(), None).await?;
+        let file_xorurl = safe.store_bytes(data.clone(), None, flow_name).await?;
         let new_filename = Path::new("/new_filename_test.md");
 
         let mut url_with_path = SafeUrl::from_xorurl(&xorurl)?;
@@ -2666,6 +2886,7 @@ mod tests {
                 false,
                 false,
                 false,
+                flow_name,
             )
             .await?;
         let (version1, new_files_map) =
@@ -2701,7 +2922,7 @@ mod tests {
 
         // let's add another file but with the same name
         let data = Bytes::from("9876543210");
-        let other_file_xorurl = safe.store_bytes(data.clone(), None).await?;
+        let other_file_xorurl = safe.store_bytes(data.clone(), None, flow_name).await?;
         let (version2_content, mut new_processed_files) = safe
             .files_container_add(
                 &other_file_xorurl,
@@ -2709,6 +2930,7 @@ mod tests {
                 true, // force to overwrite it with new link
                 false,
                 false,
+                flow_name,
             )
             .await?;
         let (mut version2, mut new_files_map) =
@@ -2723,6 +2945,7 @@ mod tests {
                     true, // force to overwrite it with new link
                     false,
                     false,
+                    flow_name,
                 )
                 .await?;
 
@@ -2751,16 +2974,18 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_add_from_raw() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
-            .files_container_create_from("./testdata/subfolder/", None, false, true)
+            .files_container_create_from("./testdata/subfolder/", None, false, true, flow_name)
             .await?;
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
-        let _ = safe.fetch(&xorurl, None).await;
+        let _ = safe.fetch(&xorurl, None, flow_name).await;
         let (version0, _) = safe
-            .files_container_get(&xorurl)
+            .files_container_get(&xorurl, flow_name)
             .await?
             .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
@@ -2771,7 +2996,13 @@ mod tests {
         url_with_path.set_path(&new_filename.display().to_string());
 
         let (version1_content, new_processed_files) = safe
-            .files_container_add_from_raw(data.clone(), &url_with_path.to_string(), false, false)
+            .files_container_add_from_raw(
+                data.clone(),
+                &url_with_path.to_string(),
+                false,
+                false,
+                flow_name,
+            )
             .await?;
         let (version1, new_files_map) =
             version1_content.ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
@@ -2794,6 +3025,7 @@ mod tests {
                 &url_with_path.to_string(),
                 true, // force to overwrite it with new link
                 false,
+                flow_name,
             )
             .await?;
         let (version2, new_files_map) =
@@ -2812,12 +3044,14 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_files_container_remove_path() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
-        let (xorurl, _, files_map) = new_files_container_from_testdata(&safe).await?;
+        let (xorurl, _, files_map) = new_files_container_from_testdata(&safe, flow_name).await?;
 
         let (version0, _) = safe
-            .files_container_get(&xorurl)
+            .files_container_get(&xorurl, flow_name)
             .await?
             .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
@@ -2826,7 +3060,7 @@ mod tests {
 
         // let's remove a file first
         let (version1, new_processed_files, new_files_map) = safe
-            .files_container_remove_path(&url_with_path.to_string(), false, false)
+            .files_container_remove_path(&url_with_path.to_string(), false, false, flow_name)
             .await?;
 
         assert_ne!(version1, version0);
@@ -2843,7 +3077,7 @@ mod tests {
         // let's remove an entire folder now with recursive flag
         url_with_path.set_path("/subfolder");
         let (version2, new_processed_files, new_files_map) = safe
-            .files_container_remove_path(&url_with_path.to_string(), true, false)
+            .files_container_remove_path(&url_with_path.to_string(), true, false, flow_name)
             .await?;
 
         assert_ne!(version2, version0);

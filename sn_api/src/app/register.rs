@@ -34,6 +34,7 @@ impl Safe {
         name: Option<XorName>,
         tag: u64,
         content_type: ContentType,
+        flow_name: &str,
     ) -> Result<XorUrl> {
         debug!(
             "Storing Register data with tag type: {}, xorname: {:?}, dry_run: {}",
@@ -56,7 +57,7 @@ impl Safe {
 
         // Store the Register on the network
         let (_, op_batch) = client
-            .create_register(xorname, tag, policy(owner))
+            .create_register(xorname, tag, policy(owner), flow_name)
             .await
             .map_err(|e| {
                 Error::NetDataError(format!(
@@ -65,25 +66,34 @@ impl Safe {
                 ))
             })?;
 
-        client.publish_register_ops(op_batch).await?;
+        client.publish_register_ops(op_batch, flow_name).await?;
 
         Ok(xorurl)
     }
 
     /// Read value from a Register on the network
-    pub async fn register_read(&self, url: &str) -> Result<BTreeSet<(EntryHash, Entry)>> {
+    pub async fn register_read(
+        &self,
+        url: &str,
+        flow_name: &str,
+    ) -> Result<BTreeSet<(EntryHash, Entry)>> {
         debug!("Getting Register data from: {:?}", url);
-        let safeurl = self.parse_and_resolve_url(url).await?;
+        let safeurl = self.parse_and_resolve_url(url, flow_name).await?;
 
-        self.register_fetch_entries(&safeurl).await
+        self.register_fetch_entries(&safeurl, flow_name).await
     }
 
     /// Read value from a Register on the network by its hash
-    pub async fn register_read_entry(&self, url: &str, hash: EntryHash) -> Result<Entry> {
+    pub async fn register_read_entry(
+        &self,
+        url: &str,
+        hash: EntryHash,
+        flow_name: &str,
+    ) -> Result<Entry> {
         debug!("Getting Register data from: {:?}", url);
-        let safeurl = self.parse_and_resolve_url(url).await?;
+        let safeurl = self.parse_and_resolve_url(url, flow_name).await?;
 
-        self.register_fetch_entry(&safeurl, hash).await
+        self.register_fetch_entry(&safeurl, hash, flow_name).await
     }
 
     /// Fetch a Register from a `SafeUrl` without performing any type of URL resolution
@@ -92,13 +102,14 @@ impl Safe {
     pub(crate) async fn register_fetch_entries(
         &self,
         url: &SafeUrl,
+        flow_name: &str,
     ) -> Result<BTreeSet<(EntryHash, Entry)>> {
         debug!("Fetching Register entries from {}", url);
         let result = match url.content_version() {
             Some(v) => {
                 let hash = v.entry_hash();
                 debug!("Take entry with version hash: {:?}", hash);
-                self.register_fetch_entry(url, hash)
+                self.register_fetch_entry(url, hash, flow_name)
                     .await
                     .map(|entry| vec![(hash, entry)].into_iter().collect())
             }
@@ -106,7 +117,7 @@ impl Safe {
                 debug!("No version so take latest entry from Register at: {}", url);
                 let address = self.get_register_address(url)?;
                 let client = self.get_safe_client()?;
-                match client.read_register(address).await {
+                match client.read_register(address, flow_name).await {
                     Ok(entry) => Ok(entry),
                     Err(ClientError::NetworkDataError(SafeNdError::NoSuchEntry(_))) => Err(
                         Error::EmptyContent(format!("Empty Register found at \"{}\"", url)),
@@ -148,13 +159,14 @@ impl Safe {
         &self,
         url: &SafeUrl,
         hash: EntryHash,
+        flow_name: &str,
     ) -> Result<Entry> {
         // TODO: allow to specify the hash with the SafeUrl as well: safeurl.content_hash(),
         // e.g. safe://mysafeurl#ce56a3504c8f27bfeb13bdf9051c2e91409230ea
         let address = self.get_register_address(url)?;
         let client = self.get_safe_client()?;
         client
-            .get_register_entry(address, hash)
+            .get_register_entry(address, hash, flow_name)
             .await
             .map_err(|err| {
                 if let ClientError::ErrorMsg {
@@ -179,8 +191,9 @@ impl Safe {
         url: &str,
         entry: Entry,
         parents: BTreeSet<EntryHash>,
+        flow_name: &str,
     ) -> Result<EntryHash> {
-        let reg_url = self.parse_and_resolve_url(url).await?;
+        let reg_url = self.parse_and_resolve_url(url, flow_name).await?;
         let address = self.get_register_address(&reg_url)?;
         if self.dry_run_mode {
             return Ok(EntryHash(rand::thread_rng().gen::<[u8; 32]>()));
@@ -188,7 +201,7 @@ impl Safe {
 
         let client = self.get_safe_client()?;
         let (entry_hash, op_batch) = match client
-            .write_to_local_register(address, entry, parents)
+            .write_to_local_register(address, entry, parents, flow_name)
             .await
         {
             Ok(data) => data,
@@ -212,7 +225,7 @@ impl Safe {
             }
         };
 
-        client.publish_register_ops(op_batch).await?;
+        client.publish_register_ops(op_batch, flow_name).await?;
 
         Ok(entry_hash)
     }
@@ -242,23 +255,28 @@ fn policy(owner: User) -> Policy {
 mod tests {
     use crate::{app::test_helpers::new_safe_instance, ContentType, Error};
     use anyhow::{bail, Result};
+    use function_name::named;
 
     #[tokio::test]
+    #[named]
     async fn test_register_create() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
 
-        let xorurl = safe.register_create(None, 25_000, ContentType::Raw).await?;
+        let xorurl = safe
+            .register_create(None, 25_000, ContentType::Raw, flow_name)
+            .await?;
 
-        let received_data = safe.register_read(&xorurl).await?;
+        let received_data = safe.register_read(&xorurl, flow_name).await?;
 
         assert!(received_data.is_empty());
 
         let initial_data = "initial data bytes".as_bytes().to_vec();
         let hash = safe
-            .register_write(&xorurl, initial_data.clone(), Default::default())
+            .register_write(&xorurl, initial_data.clone(), Default::default(), flow_name)
             .await?;
 
-        let received_entry = safe.register_read_entry(&xorurl, hash).await?;
+        let received_entry = safe.register_read_entry(&xorurl, hash, flow_name).await?;
 
         assert_eq!(received_entry, initial_data.clone());
 
@@ -266,16 +284,18 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_register_owner_permissions() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
 
         let xorname = xor_name::rand::random();
 
         let xorurl = safe
-            .register_create(Some(xorname), 25_000, ContentType::Raw)
+            .register_create(Some(xorname), 25_000, ContentType::Raw, flow_name)
             .await?;
 
-        let received_data = safe.register_read(&xorurl).await?;
+        let received_data = safe.register_read(&xorurl, flow_name).await?;
 
         assert!(received_data.is_empty());
 
@@ -283,7 +303,12 @@ mod tests {
         let safe = new_safe_instance().await?;
 
         match safe
-            .register_write(&xorurl, b"dummy-pub-data".to_vec(), Default::default())
+            .register_write(
+                &xorurl,
+                b"dummy-pub-data".to_vec(),
+                Default::default(),
+                flow_name,
+            )
             .await
         {
             Err(Error::AccessDenied(msg)) => {
@@ -297,7 +322,7 @@ mod tests {
         }
 
         // now check that trying to read the same Registers with different owner
-        let _ = safe.register_read(&xorurl).await?;
+        let _ = safe.register_read(&xorurl, flow_name).await?;
         Ok(())
     }
 }

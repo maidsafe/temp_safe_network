@@ -20,19 +20,27 @@ use walkdir::{DirEntry, WalkDir};
 const MAX_RECURSIVE_DEPTH: usize = 10_000;
 
 // Upload a file to the Network
-pub(crate) async fn upload_file_to_net(safe: &Safe, path: &Path) -> Result<XorUrl> {
+pub(crate) async fn upload_file_to_net(
+    safe: &Safe,
+    path: &Path,
+    flow_name: &str,
+) -> Result<XorUrl> {
     let data = fs::read(path).map_err(|err| {
         Error::InvalidInput(format!("Failed to read file from local location: {}", err))
     })?;
     let data = Bytes::from(data);
 
     let mut mime_type_for_xorurl = mime_guess::from_path(path).first_raw();
-    let result = match safe.store_bytes(data.clone(), mime_type_for_xorurl).await {
+    let result = match safe
+        .store_bytes(data.clone(), mime_type_for_xorurl, flow_name)
+        .await
+    {
         Ok(xorurl) => Ok(xorurl),
         Err(Error::InvalidMediaType(_)) => {
             // Let's then upload it and set media-type to be simply raw content
             mime_type_for_xorurl = None;
-            safe.store_bytes(data.clone(), mime_type_for_xorurl).await
+            safe.store_bytes(data.clone(), mime_type_for_xorurl, flow_name)
+                .await
         }
         other_err => other_err,
     };
@@ -43,7 +51,9 @@ pub(crate) async fn upload_file_to_net(safe: &Safe, path: &Path) -> Result<XorUr
         // Let's obtain the xorurl with using dry-run mode.
         // Use a dry runner only for this next operation
         let dry_runner = Safe::dry_runner(Some(safe.xorurl_base));
-        let xorurl = dry_runner.store_bytes(data, mime_type_for_xorurl).await?;
+        let xorurl = dry_runner
+            .store_bytes(data, mime_type_for_xorurl, flow_name)
+            .await?;
 
         Err(Error::ContentUploadVerificationFailed(xorurl))
     } else {
@@ -64,6 +74,7 @@ pub(crate) async fn file_system_dir_walk(
     location: &Path,
     recursive: bool,
     follow_links: bool,
+    flow_name: &str,
 ) -> Result<ProcessedFiles> {
     info!("Reading files from {}", location.display());
 
@@ -120,7 +131,7 @@ pub(crate) async fn file_system_dir_walk(
                     }
 
                     if metadata.file_type().is_file() {
-                        match upload_file_to_net(safe, current_file_path).await {
+                        match upload_file_to_net(safe, current_file_path, flow_name).await {
                             Ok(xorurl) => {
                                 processed_files
                                     .insert(normalised_path, FilesMapChange::Added(xorurl));
@@ -172,6 +183,7 @@ fn valid_depth(entry: &DirEntry, max_depth: usize) -> bool {
 pub(crate) async fn file_system_single_file(
     safe: &Safe,
     location: &Path,
+    flow_name: &str,
 ) -> Result<ProcessedFiles> {
     info!("Reading file {}", location.display());
     let (metadata, _) = get_metadata(location, true)?; // follows symlinks.
@@ -185,7 +197,7 @@ pub(crate) async fn file_system_single_file(
             location.display()
         )))
     } else {
-        match upload_file_to_net(safe, location).await {
+        match upload_file_to_net(safe, location, flow_name).await {
             Ok(xorurl) => {
                 processed_files.insert(normalised_path, FilesMapChange::Added(xorurl));
             }

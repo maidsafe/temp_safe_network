@@ -198,6 +198,7 @@ pub async fn files_commander(
     cmd: FilesSubCommands,
     output_fmt: OutputFmt,
     safe: &Safe,
+    flow_name: &str,
 ) -> Result<()> {
     match cmd {
         FilesSubCommands::Put {
@@ -211,7 +212,13 @@ pub async fn files_commander(
                 notice_dry_run();
             }
             let (files_container_xorurl, processed_files, _) = safe
-                .files_container_create_from(&location, dst.as_deref(), recursive, follow_links)
+                .files_container_create_from(
+                    &location,
+                    dst.as_deref(),
+                    recursive,
+                    follow_links,
+                    flow_name,
+                )
                 .await?;
 
             // Now let's just print out a list of the files uploaded/processed
@@ -252,6 +259,7 @@ pub async fn files_commander(
                     follow_links,
                     delete,
                     update_nrs,
+                    flow_name,
                 )
                 .await?;
             let version = content.map(|(version, _)| version);
@@ -311,10 +319,10 @@ pub async fn files_commander(
                 if location.is_empty() {
                     let file_content = get_from_stdin(Some("...awaiting file's content to add from STDIN"))?;
                     // Update the FilesContainer on the Network
-                    safe.files_container_add_from_raw(Bytes::from(file_content), &target_url, force, update_nrs).await?
+                    safe.files_container_add_from_raw(Bytes::from(file_content), &target_url, force, update_nrs,flow_name).await?
                 } else {
                     // Update the FilesContainer on the Network
-                    safe.files_container_add(&location, &target_url, force, update_nrs, follow_links).await?
+                    safe.files_container_add(&location, &target_url, force, update_nrs, follow_links,flow_name).await?
                 };
 
             // Now let's just print out a list of the files synced/processed
@@ -340,7 +348,7 @@ pub async fn files_commander(
 
             // Update the FilesContainer on the Network
             let (version, processed_files, _) = safe
-                .files_container_remove_path(&target_url, recursive, update_nrs)
+                .files_container_remove_path(&target_url, recursive, update_nrs, flow_name)
                 .await?;
 
             // Now let's just print out a list of the files removed
@@ -352,7 +360,7 @@ pub async fn files_commander(
                 get_from_arg_or_stdin(target, Some("...awaiting target URl from STDIN"))?;
 
             debug!("Getting files in container {:?}", target_url);
-            let mut resolution_chain = safe.inspect(&target_url).await?;
+            let mut resolution_chain = safe.inspect(&target_url, flow_name).await?;
             let resolved_content = resolution_chain
                 .pop()
                 .ok_or_else(|| eyre!("Unexpectedly failed to obtain the resolved content"))?;
@@ -397,7 +405,7 @@ pub async fn files_commander(
             Ok(())
         }
         FilesSubCommands::Tree { target, details } => {
-            process_tree_command(safe, target, details, output_fmt).await
+            process_tree_command(safe, target, details, output_fmt, flow_name).await
         }
         FilesSubCommands::Get {
             source,
@@ -405,7 +413,12 @@ pub async fn files_commander(
             exists,
             progress,
             preserve,
-        } => process_get_command(safe, source, dst, exists, progress, preserve, output_fmt).await,
+        } => {
+            process_get_command(
+                safe, source, dst, exists, progress, preserve, output_fmt, flow_name,
+            )
+            .await
+        }
     }
 }
 
@@ -415,11 +428,12 @@ async fn process_tree_command(
     target: Option<XorUrl>,
     details: bool,
     output_fmt: OutputFmt,
+    flow_name: &str,
 ) -> Result<()> {
     let target_url = get_from_arg_or_stdin(target, Some("...awaiting target URl from STDIN"))?;
 
     debug!("Getting files in container {:?}", target_url);
-    let files_map = match safe.fetch(&target_url, None).await? {
+    let files_map = match safe.fetch(&target_url, None, flow_name).await? {
         SafeData::FilesContainer { files_map, .. } => files_map,
         _other_type => bail!("Make sure the URL targets a FilesContainer"),
     };

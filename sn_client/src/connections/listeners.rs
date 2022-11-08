@@ -215,7 +215,7 @@ impl Session {
         self.update_network_knowledge(section_tree_update, src_peer)
             .await;
 
-        if let Some((msg_id, elders, service_msg, dst, auth)) =
+        if let Some((msg_id, flow_name, elders, service_msg, dst, auth)) =
             Self::new_target_elders(bounced_msg.clone(), &target_sap).await?
         {
             debug!("{msg_id:?} AE bounced msg going out again. Resending original message (sent to {src_peer:?}) to new section eldere");
@@ -240,8 +240,13 @@ impl Session {
             // there should always be one
             if let Some(elder) = target_elder {
                 let payload = WireMsg::serialize_msg_payload(&service_msg)?;
-                let wire_msg =
-                    WireMsg::new_msg(msg_id, payload, MsgKind::Client(auth.into_inner()), dst);
+                let wire_msg = WireMsg::new_msg(
+                    msg_id,
+                    flow_name,
+                    payload,
+                    MsgKind::Client(auth.into_inner()),
+                    dst,
+                );
 
                 debug!("Resending original message on AE-Redirect with updated details. Expecting an AE-Retry next");
 
@@ -300,14 +305,25 @@ impl Session {
     async fn new_target_elders(
         bounced_msg: UsrMsgBytes,
         received_auth: &SectionAuthorityProvider,
-    ) -> Result<Option<(MsgId, Vec<Peer>, ClientMsg, Dst, AuthorityProof<ClientAuth>)>, Error> {
-        let (msg_id, service_msg, dst, auth) = match WireMsg::deserialize(bounced_msg)? {
+    ) -> Result<
+        Option<(
+            MsgId,
+            String,
+            Vec<Peer>,
+            ClientMsg,
+            Dst,
+            AuthorityProof<ClientAuth>,
+        )>,
+        Error,
+    > {
+        let (msg_id, flow_name, service_msg, dst, auth) = match WireMsg::deserialize(bounced_msg)? {
             MsgType::Client {
                 msg_id,
+                flow_name,
                 msg,
                 auth,
                 dst,
-            } => (msg_id, msg, dst, auth),
+            } => (msg_id, flow_name, msg, dst, auth),
             other => {
                 warn!("Unexpected non-ClientMsg returned in AE-Redirect response: {other:?}");
                 return Ok(None);
@@ -359,6 +375,13 @@ impl Session {
             );
         }
 
-        Ok(Some((msg_id, target_elders, service_msg, dst, auth)))
+        Ok(Some((
+            msg_id,
+            flow_name,
+            target_elders,
+            service_msg,
+            dst,
+            auth,
+        )))
     }
 }
