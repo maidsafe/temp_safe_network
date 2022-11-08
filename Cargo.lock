@@ -3897,7 +3897,6 @@ dependencies = [
  "bincode",
  "blsttc",
  "bytes",
- "chrono",
  "clap",
  "clap_complete",
  "color-eyre",
