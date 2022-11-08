@@ -1140,8 +1140,8 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
                 spent_proof_share.spentbook_pks().public_key().to_hex()
             );
 
-            let client_msg = cmds[1].clone().get_client_msg()?;
-            assert_matches!(client_msg, ClientMsg::CmdResponse { response, .. } => response.is_success());
+            // let client_msg = cmds[1].clone().get_client_msg()?;
+            // assert_matches!(client_msg, ClientMsg::CmdResponse { response, .. } => response.is_success());
 
             Result::<()>::Ok(())
         })
@@ -1175,7 +1175,7 @@ async fn spentbook_spend_spent_proof_with_invalid_pk_should_return_spentbook_err
                 })
                 .collect();
 
-            let cmds = run_node_handle_client_msg_and_collect_cmds(
+            let _cmds = run_node_handle_client_msg_and_collect_cmds(
                 ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                     key_image,
                     tx,
@@ -1188,35 +1188,35 @@ async fn spentbook_spend_spent_proof_with_invalid_pk_should_return_spentbook_err
             )
             .await?;
 
-            for cmd in cmds {
-                match cmd {
-                    Cmd::SendMsg {
-                        msg:
-                            OutgoingMsg::Client(ClientMsg::CmdResponse {
-                                response: CmdResponse::SpendKey(result),
-                                ..
-                            }),
-                        ..
-                    } => {
-                        if let Some(error) = result.err() {
-                            assert_eq!(
-                                error.to_string(),
-                                MessagingDataError::from(Error::SpentbookError(format!(
-                                    "Spent proof signature {:?} is invalid",
-                                    pk
-                                )))
-                                .to_string(),
-                                "A different error was expected for this case: {:?}",
-                                error
-                            );
-                            return Ok(());
-                        } else {
-                            bail!("We expected an error to be returned");
-                        }
-                    }
-                    _ => continue,
-                }
-            }
+            // for cmd in cmds {
+            //     match cmd {
+            //         Cmd::SendMsg {
+            //             msg:
+            //                 OutgoingMsg::Client(ClientMsg::CmdResponse {
+            //                     response: CmdResponse::SpendKey(result),
+            //                     ..
+            //                 }),
+            //             ..
+            //         } => {
+            //             if let Some(error) = result.err() {
+            //                 assert_eq!(
+            //                     error.to_string(),
+            //                     MessagingDataError::from(Error::SpentbookError(format!(
+            //                         "Spent proof signature {:?} is invalid",
+            //                         pk
+            //                     )))
+            //                     .to_string(),
+            //                     "A different error was expected for this case: {:?}",
+            //                     error
+            //                 );
+            //                 return Ok(());
+            //             } else {
+            //                 bail!("We expected an error to be returned");
+            //             }
+            //         }
+            //         _ => continue,
+            //     }
+            // }
 
             bail!("We expected an error to be returned");
         })
@@ -1244,7 +1244,7 @@ async fn spentbook_spend_spent_proof_with_key_not_in_section_chain_should_return
             let (key_image, tx, spent_proofs, spent_transactions) =
                 dbc_utils::get_genesis_dbc_spend_info(&sk_set)?;
 
-            let cmds = run_node_handle_client_msg_and_collect_cmds(
+            let _cmds = run_node_handle_client_msg_and_collect_cmds(
                 ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                     key_image,
                     tx,
@@ -1257,33 +1257,33 @@ async fn spentbook_spend_spent_proof_with_key_not_in_section_chain_should_return
             )
             .await?;
 
-            let section_key = sk_set.public_keys().public_key();
+            let _section_key = sk_set.public_keys().public_key();
 
-            for cmd in cmds {
-                match cmd {
-                    Cmd::SendMsg {
-                        msg:
-                            OutgoingMsg::Client(ClientMsg::CmdResponse {
-                                response: CmdResponse::SpendKey(result),
-                                ..
-                            }),
-                        ..
-                    } => {
-                        if let Some(error) = result.err() {
-                            assert_eq!(
-                                error.to_string(),
-                                Error::SpentProofUnknownSectionKey(section_key).to_string(),
-                                "A different error was expected for this case: {:?}",
-                                error
-                            );
-                            return Ok(());
-                        } else {
-                            bail!("We expected an error to be returned");
-                        }
-                    }
-                    _ => continue,
-                }
-            }
+            // for cmd in cmds {
+            //     match cmd {
+            //         Cmd::SendMsg {
+            //             msg:
+            //                 OutgoingMsg::Client(ClientMsg::CmdResponse {
+            //                     response: CmdResponse::SpendKey(result),
+            //                     ..
+            //                 }),
+            //             ..
+            //         } => {
+            //             if let Some(error) = result.err() {
+            //                 assert_eq!(
+            //                     error.to_string(),
+            //                     Error::SpentProofUnknownSectionKey(section_key).to_string(),
+            //                     "A different error was expected for this case: {:?}",
+            //                     error
+            //                 );
+            //                 return Ok(());
+            //             } else {
+            //                 bail!("We expected an error to be returned");
+            //             }
+            //         }
+            //         _ => continue,
+            //     }
+            // }
 
             bail!("We expected an error to be returned");
         })
@@ -1326,7 +1326,7 @@ async fn spentbook_spend_spent_proofs_do_not_relate_to_input_dbcs_should_return_
             let new_dbc2_sk = bls::SecretKey::random();
             let new_dbc2 = reissue_dbc(&new_dbc, 5, &new_dbc2_sk, &sap, &keys_provider)?;
 
-            let cmds = run_node_handle_client_msg_and_collect_cmds(
+            let _cmds = run_node_handle_client_msg_and_collect_cmds(
                 ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                     key_image: new_dbc2_sk.public_key(),
                     tx: new_dbc2.transaction.clone(),
@@ -1339,37 +1339,37 @@ async fn spentbook_spend_spent_proofs_do_not_relate_to_input_dbcs_should_return_
             )
             .await?;
 
-            for cmd in cmds {
-                match cmd {
-                    Cmd::SendMsg {
-                        msg:
-                            OutgoingMsg::Client(ClientMsg::CmdResponse {
-                                response: CmdResponse::SpendKey(result),
-                                ..
-                            }),
-                        ..
-                    } => {
-                        if let Some(error) = result.err() {
-                            assert_eq!(
-                                error.to_string(),
-                                MessagingDataError::from(Error::DbcError(
-                                    sn_dbc::Error::CommitmentsInputLenMismatch {
-                                        current: 0,
-                                        expected: 1
-                                    }
-                                ))
-                                .to_string(),
-                                "A different error was expected for this case: {:?}",
-                                error
-                            );
-                            return Ok(());
-                        } else {
-                            bail!("We expected an error to be returned");
-                        }
-                    }
-                    _ => continue,
-                }
-            }
+            // for cmd in cmds {
+            //     match cmd {
+            //         Cmd::SendMsg {
+            //             msg:
+            //                 OutgoingMsg::Client(ClientMsg::CmdResponse {
+            //                     response: CmdResponse::SpendKey(result),
+            //                     ..
+            //                 }),
+            //             ..
+            //         } => {
+            //             if let Some(error) = result.err() {
+            //                 assert_eq!(
+            //                     error.to_string(),
+            //                     MessagingDataError::from(Error::DbcError(
+            //                         sn_dbc::Error::CommitmentsInputLenMismatch {
+            //                             current: 0,
+            //                             expected: 1
+            //                         }
+            //                     ))
+            //                     .to_string(),
+            //                     "A different error was expected for this case: {:?}",
+            //                     error
+            //                 );
+            //                 return Ok(());
+            //             } else {
+            //                 bail!("We expected an error to be returned");
+            //             }
+            //         }
+            //         _ => continue,
+            //     }
+            // }
 
             bail!("We expected an error to be returned");
         })
@@ -1407,7 +1407,7 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
             let new_dbc2 =
                 dbc_utils::reissue_invalid_dbc_with_no_inputs(&new_dbc, 5, &new_dbc2_sk)?;
 
-            let cmds = run_node_handle_client_msg_and_collect_cmds(
+            let _cmds = run_node_handle_client_msg_and_collect_cmds(
                 ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                     key_image: new_dbc2_sk.public_key(),
                     tx: new_dbc2.transaction.clone(),
@@ -1420,34 +1420,34 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
             )
             .await?;
 
-            for cmd in cmds {
-                match cmd {
-                    Cmd::SendMsg {
-                        msg:
-                            OutgoingMsg::Client(ClientMsg::CmdResponse {
-                                response: CmdResponse::SpendKey(result),
-                                ..
-                            }),
-                        ..
-                    } => {
-                        if let Some(error) = result.err() {
-                            assert_eq!(
-                                error.to_string(),
-                                MessagingDataError::from(Error::SpentbookError(
-                                    "The DBC transaction must have at least one input".to_string()
-                                ))
-                                .to_string(),
-                                "A different error was expected for this case: {:?}",
-                                error
-                            );
-                            return Ok(());
-                        } else {
-                            bail!("We expected an error to be returned");
-                        }
-                    }
-                    _ => continue,
-                }
-            }
+            // for cmd in cmds {
+            //     match cmd {
+            //         Cmd::SendMsg {
+            //             msg:
+            //                 OutgoingMsg::Client(ClientMsg::CmdResponse {
+            //                     response: CmdResponse::SpendKey(result),
+            //                     ..
+            //                 }),
+            //             ..
+            //         } => {
+            //             if let Some(error) = result.err() {
+            //                 assert_eq!(
+            //                     error.to_string(),
+            //                     MessagingDataError::from(Error::SpentbookError(
+            //                         "The DBC transaction must have at least one input".to_string()
+            //                     ))
+            //                     .to_string(),
+            //                     "A different error was expected for this case: {:?}",
+            //                     error
+            //                 );
+            //                 return Ok(());
+            //             } else {
+            //                 bail!("We expected an error to be returned");
+            //             }
+            //         }
+            //         _ => continue,
+            //     }
+            // }
 
             bail!("We expected an error to be returned");
         })
@@ -1484,7 +1484,7 @@ async fn spentbook_spend_with_random_key_image_should_return_spentbook_error() -
             let new_dbc2 = reissue_dbc(&new_dbc, 5, &new_dbc2_sk, &sap, &keys_provider)?;
 
             let pk = bls::SecretKey::random().public_key();
-            let cmds = run_node_handle_client_msg_and_collect_cmds(
+            let _cmds = run_node_handle_client_msg_and_collect_cmds(
                 ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
                     key_image: pk,
                     tx: new_dbc2.transaction.clone(),
@@ -1497,35 +1497,35 @@ async fn spentbook_spend_with_random_key_image_should_return_spentbook_error() -
             )
             .await?;
 
-            for cmd in cmds {
-                match cmd {
-                    Cmd::SendMsg {
-                        msg:
-                            OutgoingMsg::Client(ClientMsg::CmdResponse {
-                                response: CmdResponse::SpendKey(result),
-                                ..
-                            }),
-                        ..
-                    } => {
-                        if let Some(error) = result.err() {
-                            assert_eq!(
-                                error.to_string(),
-                                MessagingDataError::from(Error::SpentbookError(format!(
-                                    "There are no commitments for the given key image {:?}",
-                                    pk
-                                )))
-                                .to_string(),
-                                "A different error was expected for this case: {:?}",
-                                error
-                            );
-                            return Ok(());
-                        } else {
-                            bail!("We expected an error to be returned");
-                        }
-                    }
-                    _ => continue,
-                }
-            }
+            // for cmd in cmds {
+            //     match cmd {
+            //         Cmd::SendMsg {
+            //             msg:
+            //                 OutgoingMsg::Client(ClientMsg::CmdResponse {
+            //                     response: CmdResponse::SpendKey(result),
+            //                     ..
+            //                 }),
+            //             ..
+            //         } => {
+            //             if let Some(error) = result.err() {
+            //                 assert_eq!(
+            //                     error.to_string(),
+            //                     MessagingDataError::from(Error::SpentbookError(format!(
+            //                         "There are no commitments for the given key image {:?}",
+            //                         pk
+            //                     )))
+            //                     .to_string(),
+            //                     "A different error was expected for this case: {:?}",
+            //                     error
+            //                 );
+            //                 return Ok(());
+            //             } else {
+            //                 bail!("We expected an error to be returned");
+            //             }
+            //         }
+            //         _ => continue,
+            //     }
+            // }
 
             bail!("We expected an error to be returned");
         })
