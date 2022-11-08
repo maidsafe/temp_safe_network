@@ -53,78 +53,87 @@ impl Session {
     #[instrument(skip_all, level = "debug")]
     pub(crate) fn spawn_recv_stream_listener(
         mut session: Self,
-        msg_id: MsgId,
+        correlation_id: MsgId,
         peer: Peer,
         peer_index: usize,
         mut recv_stream: RecvStream,
         resp_tx: mpsc::Sender<MsgResponse>,
     ) {
-        let addr = peer.addr();
+        let peer_addr = peer.addr();
         let stream_id = recv_stream.id();
-        debug!("Waiting for response msg on {stream_id} from {peer:?} for {msg_id:?}");
+        debug!("Waiting for response msg on {stream_id} from {peer:?} for {correlation_id:?}");
 
         let _handle = tokio::spawn(async move {
             match Self::read_msg_from_recvstream(&mut recv_stream).await {
                 Ok(MsgType::Client { msg_id, msg, .. }) => {
-                    Self::handle_client_msg(msg_id, msg, peer.addr(), resp_tx).await;
+                    Self::handle_client_msg(msg_id, msg, peer, correlation_id, resp_tx).await;
                 }
-                Ok(MsgType::Node { msg, .. }) => {
-                    debug!("AE msg received for {msg_id:?}");
-                    if let Err(err) = session
-                        .handle_system_msg(msg, peer, peer_index, resp_tx)
-                        .await
-                    {
-                        error!(
-                            "Error while handling incoming system msg on {stream_id} \
-                            from {addr:?} for {msg_id:?}: {err:?}"
-                        );
-                    }
+                Ok(MsgType::Node { msg_id, msg, .. }) => {
+                    session
+                        .handle_system_msg(msg_id, msg, peer, peer_index, correlation_id, resp_tx)
+                        .await;
                 }
                 Err(error) => {
                     error!(
                         "Error while processing incoming msg on {stream_id} \
-                        from {addr:?} in response to {msg_id:?}: {error:?}"
+                        from {peer_addr:?} in response to {correlation_id:?}: {error:?}"
                     );
+                    let msg_resp = MsgResponse::Failure(peer_addr, error);
+                    Self::write_msg_response(resp_tx, correlation_id, peer_addr, msg_resp).await;
                 }
             }
 
-            // TODO: ???? once we drop the stream, do we know the connection is closed ???
-            trace!("{} to {}", LogMarker::StreamClosed, addr);
+            trace!("{} to {}", LogMarker::StreamClosed, peer_addr);
         })
         .in_current_span();
     }
 
     async fn handle_system_msg(
         &mut self,
+        msg_id: MsgId,
         msg: NodeMsg,
         src_peer: Peer,
         peer_index: usize,
+        correlation_id: MsgId,
         resp_tx: mpsc::Sender<MsgResponse>,
-    ) -> Result<(), Error> {
+    ) {
+        let src_addr = src_peer.addr();
         match msg {
             NodeMsg::AntiEntropy {
                 section_tree_update,
                 kind:
                     AntiEntropyKind::Redirect { bounced_msg } | AntiEntropyKind::Retry { bounced_msg },
             } => {
-                debug!("AE-Redirect/Retry msg received");
-                let result = self
+                debug!("AE-Redirect/Retry msg with id {msg_id:?} received for {correlation_id:?}");
+                if let Err(err) = self
                     .handle_ae_msg(
                         section_tree_update,
                         bounced_msg,
                         src_peer,
                         peer_index,
-                        resp_tx,
+                        resp_tx.clone(),
                     )
-                    .await;
-                if result.is_err() {
-                    error!("Failed to handle AE msg from {src_peer:?}, {result:?}");
+                    .await
+                {
+                    error!(
+                        "Error while handling incoming AE msg from {src_peer:?} \
+                        for {correlation_id:?}: {err:?}"
+                    );
+                    let msg_resp = MsgResponse::Failure(src_addr, err);
+                    Self::write_msg_response(resp_tx, correlation_id, src_addr, msg_resp).await;
                 }
-                result
             }
-            msg_type => {
-                warn!("Unexpected msg type received in system handler: {msg_type:?}");
-                Ok(())
+            other_msg => {
+                warn!("Unexpected msg type with id {msg_id:?} received: {other_msg:?}");
+                let msg_resp = MsgResponse::Failure(
+                    src_addr,
+                    Error::UnexpectedResponseMsgType {
+                        msg_id: correlation_id,
+                        peer: src_peer,
+                        response: other_msg.to_string(),
+                    },
+                );
+                Self::write_msg_response(resp_tx, correlation_id, src_addr, msg_resp).await;
             }
         }
     }
@@ -156,15 +165,13 @@ impl Session {
     async fn handle_client_msg(
         msg_id: MsgId,
         msg: ClientMsg,
-        src_addr: SocketAddr,
+        src_peer: Peer,
+        correlation_id: MsgId,
         resp_tx: mpsc::Sender<MsgResponse>,
     ) {
+        let src_addr = src_peer.addr();
         debug!("ClientMsg with id {msg_id:?} received from {src_addr:?}",);
 
-        if resp_tx.is_closed() {
-            debug!("Resp tx is closed. Client could have received all needed responses, so we can drop anything further.");
-            return;
-        }
         let (msg_resp, correlation_id) = match msg {
             ClientMsg::QueryResponse {
                 response,
@@ -189,9 +196,17 @@ impl Session {
                 let resp = MsgResponse::CmdResponse(src_addr, Box::new(response));
                 (resp, correlation_id)
             }
-            _ => {
-                warn!("Ignoring unexpected msg type received: {msg:?}");
-                return;
+            other_msg => {
+                warn!("Ignoring unexpected msg type received: {other_msg:?}");
+                let resp = MsgResponse::Failure(
+                    src_addr,
+                    Error::UnexpectedResponseMsgType {
+                        msg_id: correlation_id,
+                        peer: src_peer,
+                        response: other_msg.to_string(),
+                    },
+                );
+                (resp, correlation_id)
             }
         };
 

@@ -120,6 +120,10 @@ impl Session {
                     debug!("Ignoring unexpected query response received from {src:?} when awaiting a CmdAck: {resp:?}");
                     continue;
                 }
+                MsgResponse::Failure(src, error) => {
+                    error!("Failure occurred for cmd {msg_id:?}, to Elder at {src:?}: {error:?}",);
+                    continue;
+                }
             };
             match result {
                 Ok(()) => {
@@ -277,6 +281,15 @@ impl Session {
                 MsgResponse::QueryResponse(src, resp) => (src, resp),
                 MsgResponse::CmdResponse(ack_src, _error) => {
                     debug!("Ignoring unexpected CmdAck response received from {ack_src:?} when awaiting a QueryResponse");
+                    continue;
+                }
+                MsgResponse::Failure(src, error) => {
+                    debug!(
+                        "Failure #{discarded_responses} for {msg_id:?} to Elder at {src:?} \
+                        (but may be overridden by a non-failure response from another elder): {:#?}",
+                        &error
+                    );
+                    discarded_responses += 1;
                     continue;
                 }
             };

@@ -133,6 +133,16 @@ pub enum Error {
         /// Unexpected response received
         response: QueryResponse,
     },
+    /// Unexpected type of response msg received
+    #[error("Unexpected type of message received from {peer} in response to {msg_id:?}. Received: {response:?}")]
+    UnexpectedResponseMsgType {
+        /// MsgId of the msg sent
+        msg_id: MsgId,
+        /// Peer the unexpected msg was received from
+        peer: Peer,
+        /// Unexpected response received
+        response: String,
+    },
     /// Other types errors
     #[error(transparent)]
     NetworkDataError(#[from] DtError),
