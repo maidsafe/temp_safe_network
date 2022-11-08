@@ -53,7 +53,7 @@ url = "2.2.2"
 xor_name = "~5.0.0"
 
 [dependencies.self_update]
-version = "~0.28.0"
+version = "0.32"
 default-features = false
 features = [
     "rustls",
