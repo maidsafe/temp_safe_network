@@ -21,7 +21,7 @@ use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         system::{AntiEntropyKind, NodeCmd, NodeMsg, SectionSigned},
-        MsgType, WireMsg,
+        MsgId, MsgType, WireMsg,
     },
     network_knowledge::{NodeState, SectionTreeUpdate},
     types::{log_markers::LogMarker, Peer, PublicKey},
@@ -419,22 +419,35 @@ impl MyNode {
     }
 
     // Generate an AE redirect cmd for the given message
-    pub(crate) fn ae_redirect_to_our_elders(
+    pub(crate) async fn ae_redirect_client_to_our_elders(
         &self,
         sender: Peer,
+        client_response_stream: Arc<Mutex<SendStream>>,
         bounced_msg: UsrMsgBytes,
-    ) -> Result<Cmd> {
+    ) -> Result<()> {
         trace!(
             "{} in ae_redirect to elders for {sender:?} ",
             LogMarker::AeSendRedirect
         );
 
         let ae_msg = self.generate_ae_msg(None, AntiEntropyKind::Redirect { bounced_msg });
+        let (kind, payload) = self.serialize_node_msg(ae_msg)?;
 
-        Ok(Cmd::send_msg(
-            OutgoingMsg::Node(ae_msg),
-            Peers::Single(sender),
-        ))
+        #[cfg(feature = "traceroute")]
+        let traceroute = Traceroute(vec![self.identity()]);
+
+        let msg_id = MsgId::new();
+
+        self.send_msg_on_stream(
+            payload,
+            kind,
+            client_response_stream,
+            Some(sender),
+            msg_id,
+            #[cfg(feature = "traceroute")]
+            traceroute,
+        )
+        .await
     }
 }
 

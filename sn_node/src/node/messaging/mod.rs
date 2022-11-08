@@ -117,10 +117,15 @@ impl MyNode {
 
                 if self.is_not_elder() {
                     trace!("Redirecting from Adult to section Elders");
-                    return Ok(vec![
-                        self.ae_redirect_to_our_elders(origin, wire_msg.serialize()?)?
-                    ]);
+                    self.ae_redirect_client_to_our_elders(
+                        origin,
+                        send_stream,
+                        wire_msg.serialize()?,
+                    )
+                    .await?;
+                    return Ok(vec![]);
                 }
+
                 // We shall perform AE checks only if this is a query coming from the client,
                 // if it's otherwise a response for a client we shall skip drop it.
                 let dst_name = match &msg {
