@@ -49,8 +49,8 @@ signature = "1.1.10"
 sn_consensus = "3.1"
 sn_dbc = { version = "8.1.0", features = ["serdes"] }
 sn_sdkg = "3.0.0"
-strum = "~0.23.0"
-strum_macros = "~0.23.1"
+strum = "0.24"
+strum_macros = "0.24"
 tempfile = "3.2.0"
 thiserror = "1.0.23"
 tiny-keccak = { version = "2.0.2", features = ["sha3"] }

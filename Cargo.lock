@@ -894,8 +894,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1090f39f45786ec6dc6286f8ea9c75d0a7ef0a0d3cda674cef0c3af7b307fbc2"
 dependencies = [
  "crossterm",
- "strum 0.24.1",
- "strum_macros 0.24.3",
+ "strum",
+ "strum_macros",
  "unicode-width",
 ]
 
@@ -2360,8 +2360,8 @@ dependencies = [
  "eyre",
  "grep",
  "sn_interface",
- "strum 0.23.0",
- "strum_macros 0.23.1",
+ "strum",
+ "strum_macros",
  "walkdir",
 ]
 
@@ -3994,8 +3994,8 @@ dependencies = [
  "sn_dbc",
  "sn_interface",
  "sn_launch_tool",
- "strum 0.23.0",
- "strum_macros 0.23.1",
+ "strum",
+ "strum_macros",
  "tempfile",
  "termcolor",
  "thiserror",
@@ -4111,8 +4111,8 @@ dependencies = [
  "sn_consensus",
  "sn_dbc",
  "sn_sdkg",
- "strum 0.23.0",
- "strum_macros 0.23.1",
+ "strum",
+ "strum_macros",
  "tempfile",
  "thiserror",
  "tiny-keccak",
@@ -4193,8 +4193,8 @@ dependencies = [
  "sn_dysfunction",
  "sn_interface",
  "sn_sdkg",
- "strum 0.23.0",
- "strum_macros 0.23.1",
+ "strum",
+ "strum_macros",
  "sysinfo",
  "tempfile",
  "thiserror",
@@ -4267,28 +4267,9 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "strum"
-version = "0.23.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cae14b91c7d11c9a851d3fbc80a963198998c2a64eec840477fa92d8ce9b70bb"
-
-[[package]]
-name = "strum"
 version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "063e6045c0e62079840579a7e47a355ae92f60eb74daaf156fb1e84ba164e63f"
-
-[[package]]
-name = "strum_macros"
-version = "0.23.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5bb0dc7ee9c15cea6199cde9a127fa16a4c5819af85395457ad72d68edc85a38"
-dependencies = [
- "heck 0.3.3",
- "proc-macro2 1.0.47",
- "quote 1.0.21",
- "rustversion",
- "syn 1.0.103",
-]
 
 [[package]]
 name = "strum_macros"
