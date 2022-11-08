@@ -101,22 +101,22 @@ impl Session {
         match msg {
             NodeMsg::AntiEntropy {
                 section_tree_update,
-                kind:
-                    AntiEntropyKind::Redirect { bounced_msg } | AntiEntropyKind::Retry { bounced_msg },
+                kind,
             } => {
-                debug!("AE-Redirect/Retry msg with id {msg_id:?} received for {correlation_id:?}");
+                debug!("AE {kind:?} msg with id {msg_id:?} received for {correlation_id:?}");
                 if let Err(err) = self
                     .handle_ae_msg(
                         section_tree_update,
-                        bounced_msg,
+                        kind.clone(),
                         src_peer,
                         peer_index,
+                        correlation_id,
                         resp_tx.clone(),
                     )
                     .await
                 {
                     error!(
-                        "Error while handling incoming AE msg from {src_peer:?} \
+                        "Error while handling incoming AE {kind:?} msg from {src_peer:?} \
                         for {correlation_id:?}: {err:?}"
                     );
                     let msg_resp = MsgResponse::Failure(src_addr, err);
@@ -218,9 +218,10 @@ impl Session {
     async fn handle_ae_msg(
         &mut self,
         section_tree_update: SectionTreeUpdate,
-        bounced_msg: UsrMsgBytes,
+        kind: AntiEntropyKind,
         src_peer: Peer,
         src_peer_index: usize,
+        correlation_id: MsgId,
         resp_tx: mpsc::Sender<MsgResponse>,
     ) -> Result<(), Error> {
         let target_sap = section_tree_update.signed_sap.value.clone();
@@ -230,10 +231,24 @@ impl Session {
         self.update_network_knowledge(section_tree_update, src_peer)
             .await;
 
-        if let Some((msg_id, elders, service_msg, dst, auth)) =
-            Self::new_target_elders(bounced_msg.clone(), &target_sap).await?
-        {
-            debug!("{msg_id:?} AE bounced msg going out again. Resending original message (sent to {src_peer:?}) to new section eldere");
+        let new_target_info = match kind {
+            AntiEntropyKind::Retry { bounced_msg } => {
+                Self::new_target_elders(bounced_msg, &target_sap /*, TODO: 1 Elder */).await?
+            }
+            AntiEntropyKind::Redirect { bounced_msg } => {
+                Self::new_target_elders(bounced_msg, &target_sap /*, TODO: N new Elders*/).await?
+            }
+            AntiEntropyKind::Update { .. } => {
+                return Err(Error::UnexpectedResponseMsgType {
+                    msg_id: correlation_id,
+                    peer: src_peer,
+                    response: format!("{kind:?}"),
+                });
+            }
+        };
+
+        if let Some((msg_id, elders, service_msg, dst, auth)) = new_target_info {
+            debug!("{msg_id:?} AE bounced msg going out again. Resending original message (sent to {src_peer:?}) to new section Elder");
 
             // The actual order of elders doesn't really matter. All that matters is we pass each AE response
             // we get through the same hoops, to then be able to ping a new elder on a 1-1 basis for the src_peer
@@ -325,6 +340,9 @@ impl Session {
             } => (msg_id, msg, dst, auth),
             other => {
                 warn!("Unexpected non-ClientMsg returned in AE-Redirect response: {other:?}");
+
+                // FIXME: send MsgResponse::Failure { .. }
+
                 return Ok(None);
             }
         };
@@ -339,6 +357,9 @@ impl Session {
                     "Invalid bounced msg {msg_id:?} received in AE response: {service_msg:?}. Msg is of invalid type"
                 );
                 // Early return with random name as we will discard the msg at the caller func
+
+                // FIXME: send MsgResponse::Failure { .. }
+
                 return Ok(None);
             }
         };
@@ -372,6 +393,9 @@ impl Session {
                 "Final target elders for resending {msg_id:?}: {service_msg:?} msg \
                 are {target_elders:?}"
             );
+
+            // FIXME: send MsgResponse::Failure { .. } so we know why we
+            // would not receive a response on this bi-stream
         }
 
         Ok(Some((msg_id, target_elders, service_msg, dst, auth)))
