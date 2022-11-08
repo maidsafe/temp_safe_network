@@ -28,6 +28,7 @@ use tracing::{debug, info_span};
 impl Client {
     /// Send a Query to the network and await a response.
     /// Queries are automatically retried using exponential backoff if the timeout is hit.
+    #[cfg(not(feature = "check-replicas"))]
     #[instrument(skip(self), level = "debug")]
     pub async fn send_query(&self, query: DataQueryVariant) -> Result<QueryResult, Error> {
         self.send_query_with_retry(query, true).await
@@ -187,5 +188,98 @@ impl Client {
                 self.public_key(),
             )
             .await
+    }
+
+    /// Send a Query to the network and await a response.
+    /// Queries are sent once per each replica, i.e. it sends the query targetting
+    /// all Adults replicas (using `query_index`) to make sure the piece of content
+    /// is stored in each and all of the expected data replicas at section Adults.
+    #[cfg(feature = "check-replicas")]
+    #[instrument(skip(self), level = "debug")]
+    pub async fn send_query(&self, query: DataQueryVariant) -> Result<QueryResult, Error> {
+        let span = info_span!("Attempting a query");
+        let _ = span.enter();
+
+        let client_pk = self.public_key();
+        let dst = query.dst_name();
+        let force_new_link = false;
+
+        // grab up to date destination section from our local network knowledge
+        let (section_pk, elders) = self.session.get_query_elders(dst).await?;
+
+        // Send queries to all replicas concurrently
+        let num_of_replicas = data_copy_count();
+        let mut tasks = vec![];
+        for adult_index in 0..num_of_replicas {
+            let data_query = DataQuery {
+                adult_index,
+                variant: query.clone(),
+            };
+            let msg = ClientMsg::Query(data_query.clone());
+            let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
+            let signature = self.keypair.sign(&serialised_query);
+            debug!("Attempting {data_query:?}");
+
+            let client = self.clone();
+            let elders_clone = elders.clone();
+            tasks.push(async move {
+                let result = client
+                    .send_signed_query_to_section(
+                        data_query,
+                        client_pk,
+                        serialised_query,
+                        signature,
+                        Some((section_pk, elders_clone)),
+                        force_new_link,
+                    )
+                    .await;
+
+                (result, adult_index)
+            });
+        }
+
+        // Let's await for all queries to be sent
+        let results = futures::future::join_all(tasks).await;
+
+        let mut errors = vec![];
+        let mut responses = vec![];
+        results.into_iter().for_each(|result| match result {
+            (Err(error), adult_index) => errors.push((error, adult_index)),
+            (Ok(resp), adult_index) => responses.push((resp, adult_index)),
+        });
+
+        if !errors.is_empty() {
+            let error_msg = errors.iter().fold(
+                format!(
+                    "Errors occurred when sending the query to {}/{num_of_replicas} \
+                    of the replicas. Errors received: ",
+                    errors.len()
+                ),
+                |acc, (e, i)| format!("{acc}, [ Adult-#{i}: {e:?} ]"),
+            );
+            error!(error_msg);
+            return Err(Error::DataReplicasCheck(error_msg));
+        }
+
+        if let Some((resp, adult_index)) = responses.pop() {
+            if responses.iter().all(|(r, _)| r.response == resp.response) {
+                return Ok(resp);
+            }
+
+            let error_msg = responses.iter().fold(
+                format!(
+                    "Not all responses received are the same when sending query to all \
+                    replicas: {query:?}. Responses received: [ Adult-#{adult_index}: {resp:?} ]"
+                ),
+                |acc, (r, i)| format!("{acc}, [ Adult-#{i}: {r:?} ]"),
+            );
+            error!(error_msg);
+            return Err(Error::DataReplicasCheck(error_msg));
+        }
+
+        let error_msg =
+            format!("No response or error obtained when sending query to all replicas: {query:?}");
+        error!(error_msg);
+        Err(Error::DataReplicasCheck(error_msg))
     }
 }

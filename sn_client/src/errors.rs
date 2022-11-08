@@ -221,4 +221,8 @@ pub enum Error {
     /// Occurs if a section key is not found when searching the sections DAG.
     #[error("Section key {0:?} was not found in the sections DAG")]
     SectionsDagKeyNotFound(PublicKey),
+    /// Data replicas check error
+    #[cfg(feature = "check-replicas")]
+    #[error("Data replicas check failed: {0}")]
+    DataReplicasCheck(String),
 }
