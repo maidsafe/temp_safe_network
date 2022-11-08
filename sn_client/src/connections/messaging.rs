@@ -683,16 +683,7 @@ mod tests {
 
     use eyre::Result;
     use qp2p::Config;
-    use std::{
-        net::{Ipv4Addr, SocketAddr},
-        time::Duration,
-    };
-    use xor_name::Prefix;
-
-    fn prefix(s: &str) -> Result<Prefix> {
-        s.parse()
-            .map_err(|err| eyre!("failed to parse Prefix '{}': {}", s, err))
-    }
+    use std::net::{Ipv4Addr, SocketAddr};
 
     fn new_network_network_contacts() -> (SectionTree, bls::SecretKey, bls::PublicKey) {
         let genesis_sk = bls::SecretKey::random();
