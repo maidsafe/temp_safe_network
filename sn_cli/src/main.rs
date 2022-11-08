@@ -48,8 +48,8 @@ async fn main() -> Result<(), Report> {
         tracing_subscriber::fmt()
             .with_env_filter(filter)
             .with_thread_names(true)
-            .with_ansi(false);
-        tracing_subscriber::fmt::init();
+            .with_ansi(false)
+            .init();
     };
 
     debug!("Starting Safe CLI...");

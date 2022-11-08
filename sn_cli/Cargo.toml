@@ -48,7 +48,7 @@ clap_complete = { version = "3.0.0" }
 tokio = { version = "1.6.0", features = ["macros"] }
 tempfile = "3.2.0"
 tracing = "~0.1.26"
-tracing-subscriber = "~0.2.15"
+tracing-subscriber = "0.3"
 url = "2.2.2"
 xor_name = "~5.0.0"
 
@@ -73,7 +73,7 @@ assert_fs = "1.0"
 ctor = "~0.1"
 duct = "~0.13"
 predicates = "2.0"
-criterion = "~0.3"
+criterion = "0.4"
 walkdir = "2.3.1"
 multibase = "~0.9.1"
 xor_name = "~5.0.0"

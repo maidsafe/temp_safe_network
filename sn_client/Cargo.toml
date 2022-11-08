@@ -90,7 +90,7 @@ features = ["fs", "io-util", "macros", "rt", "rt-multi-thread", "sync"]
 
 [dev-dependencies]
 clap = { version = "3.0.0", features = ["derive", "env"] }
-criterion = { version = "~0.3", features = ["async_tokio"] }
+criterion = { version = "0.4", features = ["async_tokio"] }
 eyre = "~0.6.5"
 grep="~0.2.8"
 proptest = "1.0.0"
