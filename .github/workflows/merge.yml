@@ -100,7 +100,7 @@ jobs:
         run: cargo fmt --all -- --check
 
       - shell: bash
-        run: cargo clippy --all-targets --all-features -- -Dwarnings -Aclippy::result_large_err
+        run: cargo clippy --all-targets --all-features -- -Dwarnings
 
 
       - name: Check documentation
