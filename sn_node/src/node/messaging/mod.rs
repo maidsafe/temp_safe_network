@@ -83,7 +83,7 @@ impl MyNode {
                 dst,
                 msg,
             } => {
-                info!(">>>>> NODE MSG ARRIVED FLOW {flow_name} -> {msg_id:?}");
+                info!(">>>>> NODE MSG ARRIVED FLOW {flow_name} -> {msg_id:?} === {msg:?}");
                 // Check for entropy before we proceed further
                 // Anythign returned here means there's an issue and we should
                 // short-circuit below
@@ -117,7 +117,7 @@ impl MyNode {
                 auth,
             } => {
                 debug!("valid client msg");
-                info!(">>>>> CLIENT MSG ARRIVED FLOW {flow_name} -> {msg_id:?}");
+                info!(">>>>> CLIENT MSG ARRIVED FLOW {flow_name} -> {msg_id:?} === {msg:?}");
 
                 let Some(send_stream) = send_stream else {
                     return Err(Error::NoClientResponseStream)

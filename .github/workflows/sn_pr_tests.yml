@@ -516,7 +516,7 @@ jobs:
         env:
           RUST_LOG: "sn_client=trace"
         run: cd sn_api && cargo test --release --lib -- --test-threads=1
-        timeout-minutes: 80
+        timeout-minutes: 160
 
       - name: Are nodes still running...?
         shell: bash

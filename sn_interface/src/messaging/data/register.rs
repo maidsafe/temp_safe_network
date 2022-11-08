@@ -97,6 +97,14 @@ impl RegisterCmd {
             Self::Edit(_) => CmdResponse::EditRegister(Err(error)),
         }
     }
+
+    /// Address of the Register
+    pub fn addr(&self) -> RegisterAddress {
+        match self {
+            Self::Create { cmd, .. } => cmd.op.address(),
+            Self::Edit(cmd) => cmd.op.address,
+        }
+    }
 }
 
 ///
