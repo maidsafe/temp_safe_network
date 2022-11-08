@@ -4224,7 +4224,7 @@ dependencies = [
  "thiserror",
  "tiny-keccak",
  "tokio",
- "tokio-util 0.6.10",
+ "tokio-util 0.7.4",
  "tracing",
  "tracing-appender",
  "tracing-core",
@@ -4666,7 +4666,6 @@ dependencies = [
  "futures-sink",
  "log",
  "pin-project-lite",
- "slab",
  "tokio",
 ]
 
@@ -4680,6 +4679,7 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "pin-project-lite",
+ "slab",
  "tokio",
  "tracing",
 ]
