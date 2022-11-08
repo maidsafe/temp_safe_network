@@ -596,7 +596,7 @@ impl Session {
         let mut tasks = vec![];
         let nodes_len = nodes.len();
 
-        for peer in nodes.clone() {
+        for (peer_index, peer) in nodes.iter().enumerate() {
             let session = self.clone();
             let bytes = bytes.clone();
             let resp_tx_clone = resp_tx.clone();
@@ -618,7 +618,8 @@ impl Session {
                             Self::spawn_recv_stream_listener(
                                 session.clone(),
                                 msg_id,
-                                peer,
+                                *peer,
+                                peer_index,
                                 recv_stream,
                                 resp_tx_clone,
                             );

@@ -28,6 +28,9 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
+    /// No elder was found to be closest from provided SAP. (The sap must therefore be empty)
+    #[error("No elders found in AntiEntropy msg SAP")]
+    AntiEntropyNoSapElders,
     /// Failed to obtain network contacts to bootstrap to
     #[error("Failed to obtain network contacts to bootstrap to: {0}")]
     NetworkContacts(String),
