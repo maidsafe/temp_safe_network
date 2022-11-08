@@ -27,6 +27,7 @@ use rand::{rngs::OsRng, seq::SliceRandom};
 use std::net::SocketAddr;
 use tokio::sync::mpsc;
 use tracing::Instrument;
+use xor_name::XorName;
 
 impl Session {
     #[instrument(skip_all, level = "debug")]
@@ -54,6 +55,7 @@ impl Session {
         mut session: Self,
         msg_id: MsgId,
         peer: Peer,
+        peer_index: usize,
         mut recv_stream: RecvStream,
         resp_tx: mpsc::Sender<MsgResponse>,
     ) {
@@ -68,7 +70,10 @@ impl Session {
                 }
                 Ok(MsgType::Node { msg, .. }) => {
                     debug!("AE msg received for {msg_id:?}");
-                    if let Err(err) = session.handle_system_msg(msg, peer, resp_tx).await {
+                    if let Err(err) = session
+                        .handle_system_msg(msg, peer, peer_index, resp_tx)
+                        .await
+                    {
                         error!(
                             "Error while handling incoming system msg on {stream_id} \
                             from {addr:?} for {msg_id:?}: {err:?}"
@@ -93,6 +98,7 @@ impl Session {
         &mut self,
         msg: NodeMsg,
         src_peer: Peer,
+        peer_index: usize,
         resp_tx: mpsc::Sender<MsgResponse>,
     ) -> Result<(), Error> {
         match msg {
@@ -103,7 +109,13 @@ impl Session {
             } => {
                 debug!("AE-Redirect/Retry msg received");
                 let result = self
-                    .handle_ae_msg(section_tree_update, bounced_msg, src_peer, resp_tx)
+                    .handle_ae_msg(
+                        section_tree_update,
+                        bounced_msg,
+                        src_peer,
+                        peer_index,
+                        resp_tx,
+                    )
                     .await;
                 if result.is_err() {
                     error!("Failed to handle AE msg from {src_peer:?}, {result:?}");
@@ -193,6 +205,7 @@ impl Session {
         section_tree_update: SectionTreeUpdate,
         bounced_msg: UsrMsgBytes,
         src_peer: Peer,
+        src_peer_index: usize,
         resp_tx: mpsc::Sender<MsgResponse>,
     ) -> Result<(), Error> {
         let target_sap = section_tree_update.signed_sap.value.clone();
@@ -205,17 +218,38 @@ impl Session {
         if let Some((msg_id, elders, service_msg, dst, auth)) =
             Self::new_target_elders(bounced_msg.clone(), &target_sap).await?
         {
-            debug!("updated AE response msg going out for: {msg_id:?}");
-            // We should send to all elders. There's no (I think) realiable way to ensure we choose a different elder mapped to a given elder of the initially attempted section.
-            // Trick here will be shortcircuiting if we've already got all ACKs in...
-            let payload = WireMsg::serialize_msg_payload(&service_msg)?;
-            let wire_msg =
-                WireMsg::new_msg(msg_id, payload, MsgKind::Client(auth.into_inner()), dst);
+            debug!("{msg_id:?} AE bounced msg going out again. Resending original message (sent to {src_peer:?}) to new section eldere");
 
-            debug!("Resending original message to {src_peer:?} to new section elders");
+            // The actual order of elders doesn't really matter. All that matters is we pass each AE response
+            // we get through the same hoops, to then be able to ping a new elder on a 1-1 basis for the src_peer
+            // we initially targetted.
+            let deterministic_ordering = XorName::from_content(
+                b"Arbitrary string that we use to sort new SAP elders consistently",
+            );
 
-            self.send_msg(elders, wire_msg, msg_id, false, resp_tx)
-                .await?;
+            // here we send this to only one elder for each AE message we get in. We _should_ have one per elder we sent to.
+            // deterministically sent to closest elder based upon the initial sender index
+            let ordered_elders = elders
+                .iter()
+                .sorted_by(|lhs, rhs| deterministic_ordering.cmp_distance(&lhs.name(), &rhs.name()))
+                .cloned()
+                .collect_vec();
+
+            let target_elder = ordered_elders.get(src_peer_index);
+
+            // there should always be one
+            if let Some(elder) = target_elder {
+                let payload = WireMsg::serialize_msg_payload(&service_msg)?;
+                let wire_msg =
+                    WireMsg::new_msg(msg_id, payload, MsgKind::Client(auth.into_inner()), dst);
+
+                debug!("Resending original message on AE-Redirect with updated details. Expecting an AE-Retry next");
+
+                self.send_msg(vec![*elder], wire_msg, msg_id, false, resp_tx)
+                    .await?;
+            } else {
+                return Err(Error::AntiEntropyNoSapElders);
+            }
         }
 
         Ok(())
