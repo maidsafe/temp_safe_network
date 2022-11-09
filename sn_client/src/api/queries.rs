@@ -197,6 +197,7 @@ impl Client {
     #[cfg(feature = "check-replicas")]
     #[instrument(skip(self), level = "debug")]
     pub async fn send_query(&self, query: DataQueryVariant) -> Result<QueryResult, Error> {
+        use crate::errors::DataReplicasCheckError;
         let span = info_span!("Attempting a query");
         let _ = span.enter();
 
@@ -258,7 +259,13 @@ impl Client {
                 |acc, (e, i)| format!("{acc}, [ Adult-#{i}: {e:?} ]"),
             );
             error!(error_msg);
-            return Err(Error::DataReplicasCheck(error_msg));
+
+            return Err(DataReplicasCheckError::ReceivedErrors {
+                replicas: num_of_replicas,
+                query,
+                errors,
+            }
+            .into());
         }
 
         if let Some((resp, adult_index)) = responses.pop() {
@@ -266,20 +273,25 @@ impl Client {
                 return Ok(resp);
             }
 
+            // put the last response back in the list so it's included in the report
+            responses.push((resp, adult_index));
             let error_msg = responses.iter().fold(
                 format!(
                     "Not all responses received are the same when sending query to all \
-                    replicas: {query:?}. Responses received: [ Adult-#{adult_index}: {resp:?} ]"
+                    replicas: {query:?}. Responses received: "
                 ),
                 |acc, (r, i)| format!("{acc}, [ Adult-#{i}: {r:?} ]"),
             );
             error!(error_msg);
-            return Err(Error::DataReplicasCheck(error_msg));
+
+            return Err(DataReplicasCheckError::DifferentResponses {
+                replicas: num_of_replicas,
+                query,
+                responses,
+            }
+            .into());
         }
 
-        let error_msg =
-            format!("No response or error obtained when sending query to all replicas: {query:?}");
-        error!(error_msg);
-        Err(Error::DataReplicasCheck(error_msg))
+        Err(DataReplicasCheckError::NoResponse(query).into())
     }
 }
