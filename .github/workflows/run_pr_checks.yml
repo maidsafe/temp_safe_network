@@ -1,10 +1,11 @@
+# Workflow to run the basic PR checks.
+# Currently this will run ubuntu oinly, as that is a good and fast canary.
+# Other platforms will be checked as part of the merge process via BORS
 name: PR Checks
 
 on:
   pull_request:
     branches: ["*"]
-  push:
-    branches: [staging, trying]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -17,27 +18,6 @@ env:
   NODE_COUNT: 15
 
 jobs:
-  # bors Continuous Integration
-  ci-success:
-    # refereneced in bors.toml
-    name: ci
-    if: ${{ success() }}
-    # github jobs that need to have passed for bors to give the all clear
-    needs:
-      - cargo-udeps
-      - cargo-deny
-      - e2e
-      - api
-      - cli
-      # - e2e-split
-      - unit
-      - checks
-      - lint
-    runs-on: ubuntu-latest
-    steps:
-      - name: CI succeeded
-        run: exit 0
-
   cargo-udeps:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Unused dependency check
@@ -112,10 +92,7 @@ jobs:
   unit:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Unit Tests
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
 
@@ -168,11 +145,7 @@ jobs:
   e2e:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: E2E tests
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
 
@@ -192,15 +165,6 @@ jobs:
 
       - name: install ripgrep ubuntu
         run: sudo apt-get install ripgrep
-        if: matrix.os == 'ubuntu-latest'
-
-      - name: install ripgrep mac
-        run: brew install ripgrep
-        if: matrix.os == 'macos-latest'
-
-      - name: install ripgrep windows
-        run: choco install ripgrep
-        if: matrix.os == 'windows-latest'
 
       - name: Build sn bins
         run: cd sn_node && cargo build --release --bins
@@ -209,10 +173,6 @@ jobs:
       - name: Build testnet
         run: cd testnet && cargo build --release --bin testnet
         timeout-minutes: 60
-
-      # - name: Build log_cmds_inspector
-      #   run: cargo build  --release --bin log_cmds_inspector
-      #   timeout-minutes: 60
 
       - name: Start the network
         run: ./target/release/testnet --interval 30000
@@ -243,14 +203,12 @@ jobs:
       - name: Ensure no nodes have left during test runs
         timeout-minutes: 1
         shell: bash
-        if: matrix.os != 'windows-latest'
         # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
         run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
 
       - name: Are nodes still running...?
         shell: bash
         timeout-minutes: 1
-        if: failure() && matrix.os != 'windows-latest'
         continue-on-error: true
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
@@ -311,15 +269,6 @@ jobs:
 
       # - name: install ripgrep ubuntu
       #   run: sudo apt-get install ripgrep
-      #   if: matrix.os == 'ubuntu-latest'
-
-      # - name: install ripgrep mac
-      #   run: brew install ripgrep
-      #   if: matrix.os == 'macos-latest'
-
-      # - name: install ripgrep windows
-      #   run: choco install ripgrep
-      #   if: matrix.os == 'windows-latest'
 
   #     - name: Build sn bins
   #       run: cd sn_node && cargo build --release --bins
@@ -399,7 +348,6 @@ jobs:
   #     - name: Ensure no nodes have left during test runs
   #       timeout-minutes: 1
   #       shell: bash
-  #       if: matrix.os != 'windows-latest'
   #       # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
   #       run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
 
@@ -455,11 +403,7 @@ jobs:
   api:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Run API tests
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
 
@@ -479,15 +423,6 @@ jobs:
 
       - name: install ripgrep ubuntu
         run: sudo apt-get install ripgrep
-        if: matrix.os == 'ubuntu-latest'
-
-      - name: install ripgrep mac
-        run: brew install ripgrep
-        if: matrix.os == 'macos-latest'
-
-      - name: install ripgrep windows
-        run: choco install ripgrep
-        if: matrix.os == 'windows-latest'
 
       - name: Build sn bins
         run: cd sn_node && cargo build --release --bins
@@ -529,7 +464,6 @@ jobs:
       - name: Ensure no nodes have left during test runs
         timeout-minutes: 1
         shell: bash
-        if: matrix.os != 'windows-latest'
         # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
         run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
 
@@ -564,11 +498,7 @@ jobs:
   cli:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Run CLI tests
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
 
@@ -588,15 +518,6 @@ jobs:
 
       - name: install ripgrep ubuntu
         run: sudo apt-get install ripgrep
-        if: matrix.os == 'ubuntu-latest'
-
-      - name: install ripgrep mac
-        run: brew install ripgrep
-        if: matrix.os == 'macos-latest'
-
-      - name: install ripgrep windows
-        run: choco install ripgrep
-        if: matrix.os == 'windows-latest'
 
       - name: Build sn bins
         run: cd sn_node && cargo build --release --bins
@@ -639,7 +560,6 @@ jobs:
       - name: Ensure no nodes have left during test runs
         timeout-minutes: 1
         shell: bash
-        if: matrix.os != 'windows-latest'
         # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
         run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
 
