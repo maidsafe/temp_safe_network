@@ -360,13 +360,13 @@ impl MyNode {
             #[cfg(feature = "traceroute")]
             traceroute,
         )?;
-        trace!("USING BIDI to send to msg {original_msg_id:?}! OH DEAR, FASTEN SEATBELTS");
+        trace!("Sending {original_msg_id:?} to recipient over stream");
         let stream_prio = 10;
         let mut send_stream = send_stream.lock().await;
 
-        debug!("stream locked for {original_msg_id:?} to {target_peer:?}");
+        trace!("Stream locked for {original_msg_id:?} to {target_peer:?}");
         send_stream.set_priority(stream_prio);
-        debug!("prio set for {original_msg_id:?} to {target_peer:?}");
+        trace!("Prio set for {original_msg_id:?} to {target_peer:?}");
         if let Err(error) = send_stream.send_user_msg(bytes).await {
             error!(
                 "Could not send query response {original_msg_id:?} to peer {target_peer:?} over response stream: {error:?}",
@@ -375,14 +375,14 @@ impl MyNode {
             return Err(Error::from(error));
         }
 
-        debug!("msg away for {original_msg_id:?} to {target_peer:?}");
+        trace!("Msg away for {original_msg_id:?} to {target_peer:?}");
         if let Err(error) = send_stream.finish().await {
             error!(
                         "Could not close response stream for {original_msg_id:?} to peer {target_peer:?}: {error:?}",
                     );
         }
 
-        debug!("sent the msg over stream {original_msg_id:?} to {target_peer:?}");
+        debug!("Sent the msg over stream {original_msg_id:?} to {target_peer:?}");
 
         Ok(())
     }

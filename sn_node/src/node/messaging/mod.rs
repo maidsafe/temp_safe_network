@@ -23,7 +23,10 @@ use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result};
 
 use qp2p::SendStream;
 use sn_interface::{
-    messaging::{data::ClientMsg, system::NodeMsg, Dst, MsgType, WireMsg},
+    messaging::{
+        MsgId,
+        {data::ClientMsg, system::NodeMsg, AuthorityProof, ClientAuth, Dst, MsgType, WireMsg},
+    },
     types::Peer,
 };
 
@@ -116,6 +119,7 @@ impl MyNode {
                     return Err(Error::NoClientResponseStream)
                 };
 
+                // first some AntiEntropy checks...
                 if node.read().await.is_not_elder() {
                     trace!("Redirecting from Adult to section Elders");
                     MyNode::ae_redirect_client_to_our_elders(
@@ -146,8 +150,10 @@ impl MyNode {
                     }
                 };
 
-                // Then we perform AE checks
-                // TODO: make entropy check for client specifically w/r/t response stream
+                // Now we compare provided section keys and target dst
+                // Currently this does no sending over the stream. We just form a
+                // SendMsg cmd and send to the client over that.
+                // TODO: rework this flow to avoid a SendMsg Cmd
                 if let Some(cmd) = node.read().await.check_for_entropy(
                     &wire_msg,
                     &dst.section_key,
@@ -159,22 +165,51 @@ impl MyNode {
                     return Ok(vec![cmd]);
                 }
 
-                trace!("No AE needed for client message, proceeding to handle msg");
-                MyNode::handle_valid_client_msg(
+                // before we move on to actually handling the msg
+                MyNode::spawn_client_msg_handling_thread(
                     node,
-                    msg_id,
                     msg,
-                    auth,
+                    msg_id,
                     origin,
-                    send_stream.clone(),
-                    #[cfg(feature = "traceroute")]
-                    wire_msg.traceroute(),
-                )
-                .await
+                    auth,
+                    send_stream,
+                    wire_msg,
+                );
+
+                // No new direct Cmds produced here.
+                // Should we need to we can pass in a CmdSender to update cmds from the
+                // spawned thread (eg for dysfunction logging)
+                Ok(vec![])
             }
         }
     }
 
+    /// Spawns a fresh thread to handle client query/cmd flow, where we await resposnes from
+    /// adults and perform IO over the response streams
+    fn spawn_client_msg_handling_thread(
+        node: Arc<RwLock<MyNode>>,
+        msg: ClientMsg,
+        msg_id: MsgId,
+        origin: Peer,
+        auth: AuthorityProof<ClientAuth>,
+        send_stream: Arc<Mutex<SendStream>>,
+        wire_msg: WireMsg,
+    ) {
+        let _handle = tokio::spawn(async move {
+            trace!("No AE needed for client message, proceeding to handle msg");
+            MyNode::handle_valid_client_msg(
+                node,
+                msg_id,
+                msg,
+                auth,
+                origin,
+                send_stream.clone(),
+                #[cfg(feature = "traceroute")]
+                wire_msg.traceroute(),
+            )
+            .await
+        });
+    }
     /// Check if the origin needs to be updated on network structure/members.
     /// Returns an ae cmd if we need to halt msg validation and update the origin instead.
     #[instrument(skip_all)]

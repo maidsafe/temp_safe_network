@@ -168,15 +168,12 @@ impl MyNode {
         send_stream: Arc<Mutex<SendStream>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
-        let read_locked_node = node.read().await;
-        if !read_locked_node.is_elder() {
+        if !node.read().await.is_elder() {
             warn!("could not handle valid as not elder");
             return Ok(vec![]);
         }
         trace!("{:?}: {:?} ", LogMarker::ClientMsgToBeHandled, msg);
 
-        // drop the read lock before diving into async
-        drop(read_locked_node);
         let cmd = match msg {
             ClientMsg::Cmd(cmd) => cmd,
             ClientMsg::Query(query) => {

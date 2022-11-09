@@ -156,9 +156,8 @@ impl PeerSessionWorker {
                 SessionCmd::Send(job) => {
                     if let Some(send_stream) = job.send_stream {
                         // send response on the stream
-                        debug!("SEND STREAM EXISTSSSS");
+                        debug!("Sending on stream via PeerSessionWorker");
                         let _handle = tokio::spawn(async move {
-                            trace!("USING BIDI! OH DEAR, FASTEN SEATBELTS");
                             let stream_prio = 10;
                             let mut send_stream = send_stream.lock().await;
                             send_stream.set_priority(stream_prio);
@@ -187,7 +186,7 @@ impl PeerSessionWorker {
                         SessionStatus::Ok
                     } else {
                         //another
-                        debug!("sending fresh msg flow over a connection");
+                        debug!("Sending a fresh msg flow over a connection");
                         match self.send_over_peer_connection(job).await {
                             Ok(s) => s,
                             Err(error) => {

@@ -418,7 +418,8 @@ impl MyNode {
         }
     }
 
-    // Generate an AE redirect cmd for the given message
+    /// Generate an AE redirect response and send to the client on the provided stream.
+    /// This moves the rest of the operation onto a new thread to not block the dispatcher
     pub(crate) async fn ae_redirect_client_to_our_elders(
         node: Arc<RwLock<MyNode>>,
         sender: Peer,
@@ -430,28 +431,32 @@ impl MyNode {
             LogMarker::AeSendRedirect
         );
 
-        let ae_msg = node
-            .read()
-            .await
-            .generate_ae_msg(None, AntiEntropyKind::Redirect { bounced_msg });
-        let (kind, payload) = node.read().await.serialize_node_msg(ae_msg)?;
+        let _handle = tokio::spawn(async move {
+            let ae_msg = node
+                .read()
+                .await
+                .generate_ae_msg(None, AntiEntropyKind::Redirect { bounced_msg });
+            let (kind, payload) = node.read().await.serialize_node_msg(ae_msg)?;
 
-        #[cfg(feature = "traceroute")]
-        let traceroute = Traceroute(vec![]);
-
-        let msg_id = MsgId::new();
-
-        MyNode::send_msg_on_stream(
-            node.read().await.network_knowledge().section_key(),
-            payload,
-            kind,
-            client_response_stream,
-            Some(sender),
-            msg_id,
             #[cfg(feature = "traceroute")]
-            traceroute,
-        )
-        .await
+            let traceroute = Traceroute(vec![]);
+
+            let msg_id = MsgId::new();
+
+            MyNode::send_msg_on_stream(
+                node.read().await.network_knowledge().section_key(),
+                payload,
+                kind,
+                client_response_stream,
+                Some(sender),
+                msg_id,
+                #[cfg(feature = "traceroute")]
+                traceroute,
+            )
+            .await
+        });
+
+        Ok(())
     }
 }
 
