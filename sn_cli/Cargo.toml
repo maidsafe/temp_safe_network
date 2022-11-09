@@ -64,6 +64,7 @@ features = [
 
 [features]
 default = [ "self-update" ]
+check-replicas = [ "sn_api/check-replicas" ]
 self-update = []
 
 [dev-dependencies]

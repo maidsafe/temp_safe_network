@@ -60,6 +60,7 @@ xor_name = "~5.0.0"
 authenticator = [ "rand-07" ]
 authd_client = [ ]
 app = [ ]
+check-replicas = [ "sn_client/check-replicas" ]
 test-utils = [ "sn_client/test-utils", "anyhow", "async_once", "tracing-subscriber" ]
 default = [ "authenticator", "authd_client", "app" ]
 
