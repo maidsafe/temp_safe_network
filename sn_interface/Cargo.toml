@@ -11,11 +11,10 @@ repository = "https://github.com/maidsafe/safe_network"
 version = "0.15.0"
 
 [features]
-default = ["chunks", "registers", "spentbook", "traceroute"]
+default = ["chunks", "registers", "spentbook"]
 chunks = []
 registers = []
 spentbook = []
-traceroute = []
 test-utils=["proptest"]
 
 [dependencies]

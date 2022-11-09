@@ -17,15 +17,6 @@ use custom_debug::Debug;
 use qp2p::UsrMsgBytes;
 use serde::Serialize;
 
-#[cfg(feature = "traceroute")]
-use crate::types::PublicKey;
-#[cfg(feature = "traceroute")]
-use itertools::Itertools;
-#[cfg(feature = "traceroute")]
-use serde::Deserialize;
-#[cfg(feature = "traceroute")]
-use std::fmt::{Debug as StdDebug, Display, Formatter};
-
 /// In order to send a message over the wire, it needs to be serialized
 /// along with a header (`WireMsgHeader`) which contains the information needed
 /// by the recipient to properly deserialize it.
@@ -50,48 +41,6 @@ pub struct WireMsg {
     // well as its serialization.
     #[cfg(feature = "test-utils")]
     pub payload_debug: Option<std::sync::Arc<dyn std::fmt::Debug + Send + Sync>>,
-}
-
-#[cfg(feature = "traceroute")]
-/// PublicKey of the entity that created/handled its associated WireMsg
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub enum Entity {
-    Elder(PublicKey),
-    Adult(PublicKey),
-    Client(PublicKey),
-}
-
-#[cfg(feature = "traceroute")]
-impl Display for Entity {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Elder(key) => write!(f, "Elder({})", key),
-            Self::Adult(key) => write!(f, "Adult({})", key),
-            Self::Client(key) => write!(f, "Client({})", key),
-        }
-    }
-}
-
-#[cfg(feature = "traceroute")]
-#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Traceroute(pub Vec<Entity>);
-
-#[cfg(feature = "traceroute")]
-impl Display for Traceroute {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Traceroute: ")?;
-        let res = self.0.iter().join(" => ");
-        write!(f, "{}", res)
-    }
-}
-
-#[cfg(feature = "traceroute")]
-impl StdDebug for Traceroute {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Traceroute: ")?;
-        let res = self.0.iter().join(" => ");
-        write!(f, "{}", res)
-    }
 }
 
 impl PartialEq for WireMsg {
@@ -134,12 +83,7 @@ impl WireMsg {
     /// Creates a new `WireMsg` with the provided serialized payload and `MsgKind`.
     pub fn new_msg(msg_id: MsgId, payload: Bytes, auth: MsgKind, dst: Dst) -> Self {
         Self {
-            header: WireMsgHeader::new(
-                msg_id,
-                auth,
-                #[cfg(feature = "traceroute")]
-                Traceroute(vec![]),
-            ),
+            header: WireMsgHeader::new(msg_id, auth),
             dst,
             payload,
             serialized_dst: None,
@@ -304,21 +248,6 @@ impl WireMsg {
     ) -> Self {
         self.payload_debug = Some(std::sync::Arc::new(payload_debug));
         self
-    }
-}
-
-#[cfg(feature = "traceroute")]
-impl WireMsg {
-    pub fn append_trace(&mut self, traceroute: &mut Traceroute) {
-        self.header
-            .msg_envelope
-            .traceroute
-            .0
-            .append(&mut traceroute.0)
-    }
-
-    pub fn traceroute(&self) -> Traceroute {
-        self.header.msg_envelope.traceroute.clone()
     }
 }
 

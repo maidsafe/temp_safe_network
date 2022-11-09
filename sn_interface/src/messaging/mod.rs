@@ -38,9 +38,6 @@ mod msg_kind;
 // Msg dst
 mod dst;
 
-#[cfg(feature = "traceroute")]
-pub use self::serialisation::{Entity, Traceroute};
-
 pub use self::{
     authority::{
         AuthorityProof, ClientAuth, NodeSig, SectionSig, SectionSigShare, VerifyAuthority,
