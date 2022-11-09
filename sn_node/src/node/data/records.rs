@@ -25,7 +25,7 @@ use sn_interface::{
     types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData},
 };
 use std::{cmp::Ordering, collections::BTreeSet, sync::Arc};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use tokio::time::Duration;
 use tracing::info;
 use xor_name::XorName;
@@ -34,7 +34,7 @@ const REPONSE_TIMEOUT: Duration = Duration::from_secs(7); // w/ 6s qp2p timeout,
 impl MyNode {
     // Locate ideal holders for this data, instruct them to store the data
     pub(crate) async fn replicate_data_to_adults(
-        &self,
+        node: Arc<RwLock<MyNode>>,
         data: ReplicatedData,
         msg_id: MsgId,
         targets: BTreeSet<Peer>,
@@ -50,13 +50,18 @@ impl MyNode {
         // Right now we've a new msg for just one datum.
         // Atm that's perhaps more bother than its worth..
         let msg = NodeMsg::NodeCmd(NodeCmd::ReplicateOneData(data));
-
-        let (kind, payload) = self.serialize_node_msg(msg)?;
-
         let mut send_tasks = vec![];
 
+        let read_locked_node = node.read().await;
+        let (kind, payload) = node.read().await.serialize_node_msg(msg)?;
+        let section_key = node.read().await.network_knowledge().section_key();
+        // drop the read lock before we do anything async
+        let comm = read_locked_node.comm.clone();
+        drop(read_locked_node);
+
         for target in targets {
-            let bytes_to_adult = self.form_usr_msg_bytes_to_node(
+            let bytes_to_adult = MyNode::form_usr_msg_bytes_to_node(
+                section_key,
                 payload.clone(),
                 kind.clone(),
                 Some(target),
@@ -65,19 +70,19 @@ impl MyNode {
                 traceroute.clone(),
             )?;
 
+            let comm = comm.clone();
             info!("About to send {msg_id:?} to holder: {:?}", &target,);
 
             send_tasks.push(
                 async move {
                     (
                         target,
-                        self.comm
-                            .send_out_bytes_to_peer_and_return_response(
-                                target,
-                                msg_id,
-                                bytes_to_adult.clone(),
-                            )
-                            .await,
+                        comm.send_out_bytes_to_peer_and_return_response(
+                            target,
+                            msg_id,
+                            bytes_to_adult.clone(),
+                        )
+                        .await,
                     )
                 }
                 .boxed(),
@@ -89,7 +94,7 @@ impl MyNode {
 
     // Locate ideal holders for this data, instruct them to store the data
     pub(crate) async fn replicate_data_to_adults_and_ack_to_client(
-        &self,
+        node: Arc<RwLock<MyNode>>,
         cmd: DataCmd,
         data: ReplicatedData,
         msg_id: MsgId,
@@ -105,15 +110,15 @@ impl MyNode {
 
         let targets_len = targets.len();
 
-        let responses = self
-            .replicate_data_to_adults(
-                data,
-                msg_id,
-                targets,
-                #[cfg(feature = "traceroute")]
-                traceroute.clone(),
-            )
-            .await?;
+        let responses = MyNode::replicate_data_to_adults(
+            node.clone(),
+            data,
+            msg_id,
+            targets,
+            #[cfg(feature = "traceroute")]
+            traceroute.clone(),
+        )
+        .await?;
         let mut success_count = 0;
         let mut ack_response = None;
         let mut last_error = None;
@@ -134,7 +139,8 @@ impl MyNode {
         // everything went fine, tell the client that
         if success_count == targets_len {
             if let Some(response) = ack_response {
-                self.send_ack_to_client_on_stream(
+                MyNode::send_ack_to_client_on_stream(
+                    node.clone(),
                     response,
                     msg_id,
                     client_response_stream.clone(),
@@ -149,7 +155,8 @@ impl MyNode {
             error!("Storage was not completely successful for {msg_id:?}");
 
             if let Some(error) = last_error {
-                self.send_cmd_error_response_over_stream(
+                MyNode::send_cmd_error_response_over_stream(
+                    node,
                     cmd,
                     error,
                     msg_id,
@@ -166,7 +173,7 @@ impl MyNode {
 
     /// Parses WireMsg and if DataStored Ack, we send a response to the client
     async fn send_ack_to_client_on_stream(
-        &self,
+        node: Arc<RwLock<MyNode>>,
         response: WireMsg,
         msg_id: MsgId,
         send_stream: Arc<Mutex<SendStream>>,
@@ -182,10 +189,12 @@ impl MyNode {
                 correlation_id: msg_id,
             };
 
-            let (kind, payload) = self.serialize_sign_client_msg(client_msg)?;
+            let (kind, payload) = node.read().await.serialize_sign_client_msg(client_msg)?;
+            let section_key = node.read().await.network_knowledge().section_key();
 
             debug!("{msg_id:?} sending cmd response ack back to client");
-            self.send_msg_on_stream(
+            MyNode::send_msg_on_stream(
+                section_key,
                 payload,
                 kind,
                 send_stream,
@@ -205,7 +214,7 @@ impl MyNode {
 
     /// Find target adult, sends a bidi msg, awaiting response, and then sends this on to the client
     pub(crate) async fn read_data_from_adult_and_respond_to_client(
-        &self,
+        node: Arc<RwLock<MyNode>>,
         query: DataQuery,
         msg_id: MsgId,
         auth: AuthorityProof<ClientAuth>,
@@ -224,7 +233,10 @@ impl MyNode {
             operation_id
         );
 
-        let targets = self.target_data_holders_including_full(address.name());
+        let targets = node
+            .read()
+            .await
+            .target_data_holders_including_full(address.name());
 
         // Query only the nth adult
         let target = if let Some(peer) = targets.iter().nth(query.adult_index) {
@@ -232,12 +244,13 @@ impl MyNode {
         } else {
             debug!("No targets found for {msg_id:?}");
             let error = Error::InsufficientAdults {
-                prefix: self.network_knowledge().prefix(),
+                prefix: node.read().await.network_knowledge().prefix(),
                 expected: query.adult_index as u8 + 1,
                 found: targets.len() as u8,
             };
 
-            self.query_error_response(
+            MyNode::send_query_error_response_on_stream(
+                node,
                 error,
                 &query.variant,
                 source_client,
@@ -258,9 +271,12 @@ impl MyNode {
             operation_id,
         });
 
-        let (kind, payload) = self.serialize_node_msg(msg)?;
+        let (kind, payload) = node.read().await.serialize_node_msg(msg)?;
+        let section_key = node.read().await.network_knowledge().section_key();
+        let comm = node.read().await.comm.clone();
 
-        let bytes_to_adult = self.form_usr_msg_bytes_to_node(
+        let bytes_to_adult = MyNode::form_usr_msg_bytes_to_node(
+            section_key,
             payload,
             kind,
             Some(target),
@@ -273,8 +289,7 @@ impl MyNode {
         // TODO: how to determine this time?
         // TODO: don't use arbitrary time here. (But 3s is very realistic here under normal load)
         let response = match tokio::time::timeout(REPONSE_TIMEOUT, async {
-            self.comm
-                .send_out_bytes_to_peer_and_return_response(target, msg_id, bytes_to_adult)
+            comm.send_out_bytes_to_peer_and_return_response(target, msg_id, bytes_to_adult)
                 .await
         })
         .await
@@ -302,9 +317,11 @@ impl MyNode {
                 correlation_id: msg_id,
             };
 
-            let (kind, payload) = self.serialize_sign_client_msg(client_msg)?;
+            let section_key = node.read().await.network_knowledge().section_key();
+            let (kind, payload) = node.read().await.serialize_sign_client_msg(client_msg)?;
 
-            self.send_msg_on_stream(
+            MyNode::send_msg_on_stream(
+                section_key,
                 payload,
                 kind,
                 client_response_stream,
@@ -325,7 +342,7 @@ impl MyNode {
 
     /// Send an OutgoingMsg on a given stream
     pub(crate) async fn send_msg_on_stream(
-        &self,
+        section_key: bls::PublicKey,
         payload: Bytes,
         kind: MsgKind,
         send_stream: Arc<Mutex<SendStream>>,
@@ -334,7 +351,8 @@ impl MyNode {
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<()> {
         // TODO why do we need dst here?
-        let bytes = self.form_usr_msg_bytes_to_node(
+        let bytes = MyNode::form_usr_msg_bytes_to_node(
+            section_key,
             payload,
             kind,
             target_peer,
@@ -370,7 +388,7 @@ impl MyNode {
     }
 
     pub(crate) fn form_usr_msg_bytes_to_node(
-        &self,
+        section_key: bls::PublicKey,
         payload: Bytes,
         kind: MsgKind,
         target: Option<Peer>,
@@ -381,17 +399,16 @@ impl MyNode {
         // we first generate the XorName
         let dst = Dst {
             name: dst_name,
-            section_key: self.network_knowledge().section_key(),
+            section_key,
         };
 
         #[allow(unused_mut)]
         let mut wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
-        // TODO: do we still need traceroute now?
+        // TODO: this will be removed as traceroute is remove
         #[cfg(feature = "traceroute")]
         {
             let mut traceroute = traceroute;
-            traceroute.0.push(self.identity());
             wire_msg.append_trace(&mut traceroute);
         }
 

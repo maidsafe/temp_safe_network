@@ -96,10 +96,8 @@ impl Dispatcher {
                 wire_msg,
                 send_stream,
             } => {
-                debug!("validatinge msg: {:?}", wire_msg.msg_id());
-                let node = self.node.read().await;
-                debug!("got node read lock for: {:?}", wire_msg.msg_id());
-                node.validate_msg(origin, wire_msg, send_stream).await
+                debug!("validating msg: {:?}", wire_msg.msg_id());
+                MyNode::validate_msg(self.node.clone(), origin, wire_msg, send_stream).await
             }
             Cmd::UpdateNetworkAndHandleValidClientMsg {
                 proof_chain,
@@ -113,20 +111,21 @@ impl Dispatcher {
                 traceroute,
             } => {
                 debug!("Updating network knowledge before handling message");
-                let mut node = self.node.write().await;
-                let name = node.name();
-                let updated = node.network_knowledge.update_knowledge_if_valid(
-                    SectionTreeUpdate::new(signed_sap, proof_chain),
-                    None,
-                    &name,
-                )?;
-                // drop the write lock
-                drop(node);
+                // block off the write lock to ensure it's dropped
+                {
+                    let mut node = self.node.write().await;
+                    let name = node.name();
+                    let updated = node.network_knowledge.update_knowledge_if_valid(
+                        SectionTreeUpdate::new(signed_sap, proof_chain),
+                        None,
+                        &name,
+                    )?;
 
-                let node = self.node.read().await;
+                    debug!("Network knowledge was updated: {updated}");
+                }
 
-                debug!("Network knowledge was updated: {updated}");
-                node.handle_valid_client_msg(
+                MyNode::handle_valid_client_msg(
+                    self.node.clone(),
                     msg_id,
                     msg,
                     auth,

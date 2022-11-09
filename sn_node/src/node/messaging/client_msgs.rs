@@ -32,7 +32,7 @@ use sn_interface::{
         Keypair, Peer, RegisterCmd, ReplicatedData, SPENTBOOK_TYPE_TAG,
     },
 };
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
@@ -40,8 +40,8 @@ use xor_name::XorName;
 
 impl MyNode {
     /// Forms a `QueryError` msg to send back to the client on a stream
-    pub(crate) async fn query_error_response(
-        &self,
+    pub(crate) async fn send_query_error_response_on_stream(
+        node: Arc<RwLock<MyNode>>,
         error: Error,
         query: &DataQueryVariant,
         source_peer: Peer,
@@ -54,9 +54,10 @@ impl MyNode {
             correlation_id,
         };
 
-        let (kind, payload) = self.serialize_sign_client_msg(the_error_msg)?;
+        let (kind, payload) = node.read().await.serialize_sign_client_msg(the_error_msg)?;
 
-        self.send_msg_on_stream(
+        MyNode::send_msg_on_stream(
+            node.read().await.network_knowledge().section_key(),
             payload,
             kind,
             send_stream,
@@ -70,7 +71,7 @@ impl MyNode {
 
     /// Forms a `CmdError` msg to send back to the client over the response stream
     pub(crate) async fn send_cmd_error_response_over_stream(
-        &self,
+        node: Arc<RwLock<MyNode>>,
         cmd: DataCmd,
         error: Error,
         correlation_id: MsgId,
@@ -82,10 +83,11 @@ impl MyNode {
             correlation_id,
         };
 
-        let (kind, payload) = self.serialize_sign_client_msg(client_msg)?;
+        let (kind, payload) = node.read().await.serialize_sign_client_msg(client_msg)?;
 
         debug!("{correlation_id:?} sending cmd response error back to client");
-        self.send_msg_on_stream(
+        MyNode::send_msg_on_stream(
+            node.read().await.network_knowledge().section_key(),
             payload,
             kind,
             send_stream,
@@ -121,7 +123,8 @@ impl MyNode {
 
         let (kind, payload) = self.serialize_node_msg(msg)?;
 
-        let bytes = self.form_usr_msg_bytes_to_node(
+        let bytes = MyNode::form_usr_msg_bytes_to_node(
+            self.network_knowledge.section_key(),
             payload,
             kind,
             Some(requesting_elder),
@@ -157,7 +160,7 @@ impl MyNode {
     /// Handle incoming client msgs. Though NOT queries, as this requires
     /// mutable access to the Node
     pub(crate) async fn handle_valid_client_msg(
-        &self,
+        node: Arc<RwLock<MyNode>>,
         msg_id: MsgId,
         msg: ClientMsg,
         auth: AuthorityProof<ClientAuth>,
@@ -165,26 +168,29 @@ impl MyNode {
         send_stream: Arc<Mutex<SendStream>>,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
-        if !self.is_elder() {
+        let read_locked_node = node.read().await;
+        if !read_locked_node.is_elder() {
             warn!("could not handle valid as not elder");
             return Ok(vec![]);
         }
         trace!("{:?}: {:?} ", LogMarker::ClientMsgToBeHandled, msg);
 
+        // drop the read lock before diving into async
+        drop(read_locked_node);
         let cmd = match msg {
             ClientMsg::Cmd(cmd) => cmd,
             ClientMsg::Query(query) => {
-                return self
-                    .read_data_from_adult_and_respond_to_client(
-                        query,
-                        msg_id,
-                        auth,
-                        origin,
-                        send_stream,
-                        #[cfg(feature = "traceroute")]
-                        traceroute,
-                    )
-                    .await
+                return MyNode::read_data_from_adult_and_respond_to_client(
+                    node,
+                    query,
+                    msg_id,
+                    auth,
+                    origin,
+                    send_stream,
+                    #[cfg(feature = "traceroute")]
+                    traceroute,
+                )
+                .await
             }
             _ => {
                 warn!(
@@ -235,7 +241,7 @@ impl MyNode {
                     };
                     return Ok(vec![update_command]);
                 }
-                self.extract_contents_as_replicated_data(cmd)
+                node.read().await.extract_contents_as_replicated_data(cmd)
             }
         };
 
@@ -243,7 +249,8 @@ impl MyNode {
             Ok(data) => data,
             Err(error) => {
                 debug!("Will send error response back to client");
-                self.send_cmd_error_response_over_stream(
+                MyNode::send_cmd_error_response_over_stream(
+                    node,
                     cmd,
                     error,
                     msg_id,
@@ -260,13 +267,13 @@ impl MyNode {
         trace!("{:?}: {:?}", LogMarker::DataStoreReceivedAtElder, data);
 
         let cmds = vec![];
-        let targets = self.target_data_holders(data.name());
+        let targets = node.read().await.target_data_holders(data.name());
 
         // make sure the expected replication factor is achieved
         if data_copy_count() > targets.len() {
             error!("InsufficientAdults for storing data reliably");
             let error = Error::InsufficientAdults {
-                prefix: self.network_knowledge().prefix(),
+                prefix: node.read().await.network_knowledge().prefix(),
                 expected: data_copy_count() as u8,
                 found: targets.len() as u8,
             };
@@ -274,7 +281,8 @@ impl MyNode {
             debug!("Will send error response back to client");
 
             // TODO: Use response stream here. This wont work anymore!
-            self.send_cmd_error_response_over_stream(
+            MyNode::send_cmd_error_response_over_stream(
+                node,
                 cmd,
                 error,
                 msg_id,
@@ -289,7 +297,8 @@ impl MyNode {
         // the replication msg sent to adults
         // cmds here may be dysfunction tracking.
         // CmdAcks are sent over the send stream herein
-        self.replicate_data_to_adults_and_ack_to_client(
+        MyNode::replicate_data_to_adults_and_ack_to_client(
+            node,
             cmd,
             data,
             msg_id,

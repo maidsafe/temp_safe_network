@@ -27,7 +27,7 @@ use sn_interface::{
     types::{log_markers::LogMarker, Peer, PublicKey},
 };
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use xor_name::{Prefix, XorName};
 
 impl MyNode {
@@ -420,7 +420,7 @@ impl MyNode {
 
     // Generate an AE redirect cmd for the given message
     pub(crate) async fn ae_redirect_client_to_our_elders(
-        &self,
+        node: Arc<RwLock<MyNode>>,
         sender: Peer,
         client_response_stream: Arc<Mutex<SendStream>>,
         bounced_msg: UsrMsgBytes,
@@ -430,15 +430,19 @@ impl MyNode {
             LogMarker::AeSendRedirect
         );
 
-        let ae_msg = self.generate_ae_msg(None, AntiEntropyKind::Redirect { bounced_msg });
-        let (kind, payload) = self.serialize_node_msg(ae_msg)?;
+        let ae_msg = node
+            .read()
+            .await
+            .generate_ae_msg(None, AntiEntropyKind::Redirect { bounced_msg });
+        let (kind, payload) = node.read().await.serialize_node_msg(ae_msg)?;
 
         #[cfg(feature = "traceroute")]
-        let traceroute = Traceroute(vec![self.identity()]);
+        let traceroute = Traceroute(vec![]);
 
         let msg_id = MsgId::new();
 
-        self.send_msg_on_stream(
+        MyNode::send_msg_on_stream(
+            node.read().await.network_knowledge().section_key(),
             payload,
             kind,
             client_response_stream,

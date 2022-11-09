@@ -127,7 +127,8 @@ impl MyNode {
         let (kind, payload) = self.serialize_node_msg(msg)?;
 
         if let Some(stream) = response_stream {
-            self.send_msg_on_stream(
+            MyNode::send_msg_on_stream(
+                self.network_knowledge.section_key(),
                 payload,
                 kind,
                 stream,
@@ -440,37 +441,37 @@ impl MyNode {
                 data,
                 full,
             }) => {
-                let mut node = node.write().await;
                 info!(
                     "Processing CouldNotStoreData event with MsgId: {:?}",
                     msg_id
                 );
-                if node.is_not_elder() {
+                if node.read().await.is_not_elder() {
                     error!("Received unexpected message while Adult");
                     return Ok(vec![]);
                 }
 
                 if full {
-                    let changed =
-                        node.set_storage_level(&node_id, StorageLevel::from(StorageLevel::MAX)?);
+                    let mut write_locked_node = node.write().await;
+                    let changed = write_locked_node
+                        .set_storage_level(&node_id, StorageLevel::from(StorageLevel::MAX)?);
                     if changed {
                         // ..then we accept a new node in place of the full node
-                        node.joins_allowed = true;
+                        write_locked_node.joins_allowed = true;
                     }
                 }
 
-                let targets = node.target_data_holders(data.name());
+                let targets = node.read().await.target_data_holders(data.name());
 
                 // TODO: handle responses where replication failed...
-                let _results = node
-                    .replicate_data_to_adults(
-                        data,
-                        msg_id,
-                        targets,
-                        #[cfg(feature = "traceroute")]
-                        traceroute,
-                    )
-                    .await?;
+                let _results = MyNode::replicate_data_to_adults(
+                    node,
+                    data,
+                    msg_id,
+                    targets,
+                    #[cfg(feature = "traceroute")]
+                    traceroute,
+                )
+                .await?;
 
                 Ok(vec![])
             }

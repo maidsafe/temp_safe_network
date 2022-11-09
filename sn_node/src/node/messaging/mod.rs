@@ -28,7 +28,7 @@ use sn_interface::{
 };
 
 use std::{collections::BTreeSet, sync::Arc};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
@@ -54,9 +54,9 @@ impl Peers {
 
 // Message handling
 impl MyNode {
-    #[instrument(skip(self))]
+    #[instrument(skip(node))]
     pub(crate) async fn validate_msg(
-        &self,
+        node: Arc<RwLock<MyNode>>,
         origin: Peer,
         wire_msg: WireMsg,
         send_stream: Option<Arc<Mutex<SendStream>>>,
@@ -78,10 +78,11 @@ impl MyNode {
 
         match msg_type {
             MsgType::Node { msg_id, dst, msg } => {
+                let read_locked_node = node.read().await;
                 // Check for entropy before we proceed further
                 // Anythign returned here means there's an issue and we should
                 // short-circuit below
-                let ae_cmds = self
+                let ae_cmds = read_locked_node
                     .apply_ae(&origin, &msg, &wire_msg, &dst, send_stream.clone())
                     .await?;
 
@@ -115,9 +116,10 @@ impl MyNode {
                     return Err(Error::NoClientResponseStream)
                 };
 
-                if self.is_not_elder() {
+                if node.read().await.is_not_elder() {
                     trace!("Redirecting from Adult to section Elders");
-                    self.ae_redirect_client_to_our_elders(
+                    MyNode::ae_redirect_client_to_our_elders(
+                        node,
                         origin,
                         send_stream,
                         wire_msg.serialize()?,
@@ -146,7 +148,7 @@ impl MyNode {
 
                 // Then we perform AE checks
                 // TODO: make entropy check for client specifically w/r/t response stream
-                if let Some(cmd) = self.check_for_entropy(
+                if let Some(cmd) = node.read().await.check_for_entropy(
                     &wire_msg,
                     &dst.section_key,
                     dst_name,
@@ -157,8 +159,9 @@ impl MyNode {
                     return Ok(vec![cmd]);
                 }
 
-                debug!("no aeeee");
-                self.handle_valid_client_msg(
+                trace!("No AE needed for client message, proceeding to handle msg");
+                MyNode::handle_valid_client_msg(
+                    node,
                     msg_id,
                     msg,
                     auth,
