@@ -57,11 +57,8 @@ impl Session {
             name: dst_address,
             section_key: section_pk,
         };
-
         let kind = MsgKind::Client(auth);
-
-        #[allow(unused_mut)]
-        let mut wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
+        let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
         // Don't immediately fail if sending to one elder fails. This could prevent further sends
         // and further responses coming in...
@@ -213,9 +210,7 @@ impl Session {
             section_key: section_pk,
         };
         let kind = MsgKind::Client(auth);
-
-        #[allow(unused_mut)]
-        let mut wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
+        let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
         let (resp_tx, resp_rx) = mpsc::channel(elders_len);
         let send_response = self
