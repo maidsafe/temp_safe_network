@@ -16,8 +16,6 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::mem::size_of;
 
-#[cfg(feature = "traceroute")]
-use crate::messaging::Traceroute;
 use custom_debug::Debug as CustomDebug;
 use std::io::Write;
 // Current version of the messaging protocol.
@@ -43,10 +41,6 @@ pub struct WireMsgHeader {
 pub struct MsgEnvelope {
     pub msg_id: MsgId,
     pub kind: MsgKind,
-    #[cfg(feature = "traceroute")]
-    // Remove if necessary to debug from WireMsg
-    #[debug(skip)]
-    pub traceroute: Traceroute,
 }
 
 // The first two fields in the header. This is not part of the public interface.
@@ -84,7 +78,6 @@ impl WireMsgHeader {
         msg_id: MsgId,
         auth: MsgKind,
         // dst: Dst,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Self {
         Self {
             //header_size: Self::max_size(),
@@ -93,8 +86,6 @@ impl WireMsgHeader {
                 msg_id,
                 kind: auth,
                 // dst,
-                #[cfg(feature = "traceroute")]
-                traceroute,
             },
         }
     }
