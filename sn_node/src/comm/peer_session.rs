@@ -81,7 +81,10 @@ impl PeerSession {
             .send_on_new_bi_di_stream(bytes.clone(), msg_id)
             .await;
         while response.is_err() && attempts <= 2 {
-            error!("Error sending on bi conn: {response:?}, attempt # {attempts}");
+            error!(
+                "Error sending to {:?} on bi conn: {response:?}, attempt # {attempts}",
+                self.link.peer()
+            );
             response = self
                 .link
                 .send_on_new_bi_di_stream(bytes.clone(), msg_id)
