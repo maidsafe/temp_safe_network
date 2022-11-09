@@ -226,8 +226,6 @@ impl FlowCtrl {
     //         msg,
     //         auth,
     //         origin,
-    //         #[cfg(feature = "traceroute")]
-    //         Traceroute(vec![]),
     //     )
     //     .await
     // }

@@ -7,8 +7,6 @@ use assert_matches::assert_matches;
 use eyre::eyre;
 use eyre::Result;
 use qp2p::SendStream;
-#[cfg(feature = "traceroute")]
-use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         data::{ClientMsg, Error as MessagingDataError},
@@ -134,8 +132,6 @@ pub(crate) async fn run_node_handle_client_msg_and_collect_cmds(
     //         msg,
     //         auth,
     //         peer,
-    //         #[cfg(feature = "traceroute")]
-    //         Traceroute(Vec::new()),
     //     )
     //     .await?;
 

@@ -17,8 +17,6 @@ use crate::{
 use sn_interface::types::ReplicatedData;
 
 use qp2p::SendStream;
-#[cfg(feature = "traceroute")]
-use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         data::StorageLevel,
@@ -43,28 +41,8 @@ impl MyNode {
 
     /// Send a (`NodeMsg`) message to a node
     pub(crate) fn send_system_msg(&self, msg: NodeMsg, recipients: Peers) -> Cmd {
-        self.trace_system_msg(
-            msg,
-            recipients,
-            #[cfg(feature = "traceroute")]
-            Traceroute(vec![]),
-        )
-    }
-
-    /// Send a (`NodeMsg`) message to a node
-    pub(crate) fn trace_system_msg(
-        &self,
-        msg: NodeMsg,
-        recipients: Peers,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
-    ) -> Cmd {
         trace!("{}: {:?}", LogMarker::SendToNodes, msg);
-        Cmd::send_traced_msg(
-            OutgoingMsg::Node(msg),
-            recipients,
-            #[cfg(feature = "traceroute")]
-            traceroute,
-        )
+        Cmd::send_msg(OutgoingMsg::Node(msg), recipients)
     }
 
     pub(crate) async fn store_data_as_adult_and_respond(
@@ -73,7 +51,6 @@ impl MyNode {
         response_stream: Option<Arc<Mutex<SendStream>>>,
         target: Peer,
         original_msg_id: MsgId,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
 
@@ -93,14 +70,7 @@ impl MyNode {
         {
             Ok(level_report) => {
                 info!("Storage level report: {:?}", level_report);
-                cmds.extend(self.record_storage_level_if_any(
-                    level_report,
-                    #[cfg(feature = "traceroute")]
-                    traceroute.clone(),
-                )?);
-
-                #[cfg(feature = "traceroute")]
-                info!("End of message flow. Trace: {:?}", traceroute);
+                cmds.extend(self.record_storage_level_if_any(level_report)?);
             }
             Err(StorageError::NotEnoughSpace) => {
                 // storage full
@@ -127,15 +97,8 @@ impl MyNode {
         let (kind, payload) = self.serialize_node_msg(msg)?;
 
         if let Some(stream) = response_stream {
-            self.send_msg_on_stream(
-                payload,
-                kind,
-                stream,
-                Some(target),
-                original_msg_id,
-                traceroute.clone(),
-            )
-            .await?;
+            self.send_msg_on_stream(payload, kind, stream, Some(target), original_msg_id)
+                .await?;
         } else {
             error!("Cannot respond over stream, none exists after storing! {data_addr:?}");
         }
@@ -151,19 +114,8 @@ impl MyNode {
         msg: NodeMsg,
         sender: Peer,
         send_stream: Option<Arc<Mutex<SendStream>>>,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         trace!("{:?}: {msg_id:?}", LogMarker::NodeMsgToBeHandled);
-
-        #[cfg(feature = "traceroute")]
-        {
-            if !traceroute.0.is_empty() {
-                info!(
-                    "Handling NodeMsg {}:{:?} with trace \n{:?}",
-                    msg, msg_id, traceroute
-                );
-            }
-        }
 
         match msg {
             NodeMsg::Relocate(node_state) => {
@@ -198,14 +150,8 @@ impl MyNode {
                 let mut node = node.write().await;
                 // as we've data storage reqs inside here for reorganisation, we have async calls to
                 // the fs
-                node.handle_anti_entropy_msg(
-                    section_tree_update,
-                    kind,
-                    sender,
-                    #[cfg(feature = "traceroute")]
-                    traceroute,
-                )
-                .await
+                node.handle_anti_entropy_msg(section_tree_update, kind, sender)
+                    .await
             }
             // Respond to a probe msg
             // We always respond to probe msgs if we're an elder as health checks use this to see if a node is alive
@@ -462,15 +408,7 @@ impl MyNode {
                 let targets = node.target_data_holders(data.name());
 
                 // TODO: handle responses where replication failed...
-                let _results = node
-                    .replicate_data_to_adults(
-                        data,
-                        msg_id,
-                        targets,
-                        #[cfg(feature = "traceroute")]
-                        traceroute,
-                    )
-                    .await?;
+                let _results = node.replicate_data_to_adults(data, msg_id, targets).await?;
 
                 Ok(vec![])
             }
@@ -496,7 +434,7 @@ impl MyNode {
                     data.address()
                 );
                 // store data and respond w/ack on the response stream
-                node.store_data_as_adult_and_respond(data, send_stream, sender, msg_id, traceroute)
+                node.store_data_as_adult_and_respond(data, send_stream, sender, msg_id)
                     .await
             }
             NodeMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)) => {
@@ -530,14 +468,7 @@ impl MyNode {
                     {
                         Ok(level_report) => {
                             info!("Storage level report: {:?}", level_report);
-                            cmds.extend(node.record_storage_level_if_any(
-                                level_report,
-                                #[cfg(feature = "traceroute")]
-                                traceroute.clone(),
-                            )?);
-
-                            #[cfg(feature = "traceroute")]
-                            info!("End of message flow. Trace: {:?}", traceroute);
+                            cmds.extend(node.record_storage_level_if_any(level_report)?);
                         }
                         Err(StorageError::NotEnoughSpace) => {
                             // storage full
@@ -594,8 +525,6 @@ impl MyNode {
                     sender,
                     msg_id,
                     send_stream,
-                    #[cfg(feature = "traceroute")]
-                    traceroute,
                 )
                 .await?;
                 Ok(vec![])
@@ -614,11 +543,7 @@ impl MyNode {
         }
     }
 
-    fn record_storage_level_if_any(
-        &self,
-        level: Option<StorageLevel>,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
-    ) -> Result<Vec<Cmd>> {
+    fn record_storage_level_if_any(&self, level: Option<StorageLevel>) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
         if let Some(level) = level {
             info!("Storage has now passed {} % used.", 10 * level.value());
@@ -634,12 +559,7 @@ impl MyNode {
 
             let dst = Peers::Multiple(self.network_knowledge.elders());
 
-            cmds.push(Cmd::send_traced_msg(
-                OutgoingMsg::Node(msg),
-                dst,
-                #[cfg(feature = "traceroute")]
-                traceroute,
-            ));
+            cmds.push(Cmd::send_msg(OutgoingMsg::Node(msg), dst));
         }
 
         Ok(cmds)

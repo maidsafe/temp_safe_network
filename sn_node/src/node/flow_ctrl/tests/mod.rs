@@ -31,8 +31,6 @@ use cmd_utils::{
 };
 use sn_consensus::Decision;
 use sn_dbc::{Hash, OwnerOnce, SpentProofShare, TransactionBuilder};
-#[cfg(feature = "traceroute")]
-use sn_interface::messaging::Traceroute;
 use sn_interface::{
     elder_count, init_logger,
     messaging::{
