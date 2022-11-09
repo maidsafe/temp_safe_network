@@ -184,8 +184,6 @@ impl Client {
                 serialised_query,
                 dst_section_info,
                 force_new_link,
-                #[cfg(feature = "traceroute")]
-                self.public_key(),
             )
             .await
     }

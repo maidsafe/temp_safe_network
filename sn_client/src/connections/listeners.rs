@@ -38,14 +38,6 @@ impl Session {
         let wire_msg = WireMsg::from(bytes)?;
         let msg_type = wire_msg.into_msg()?;
 
-        #[cfg(feature = "traceroute")]
-        {
-            info!(
-                "Message {msg_type} with the Traceroute received at client:\n {:?}",
-                wire_msg.traceroute()
-            )
-        }
-
         Ok(msg_type)
     }
 

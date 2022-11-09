@@ -44,14 +44,7 @@ impl Client {
 
         tokio::time::timeout(self.cmd_timeout, async {
             self.session
-                .send_cmd(
-                    dst_address,
-                    auth,
-                    serialised_cmd,
-                    force_new_link,
-                    #[cfg(feature = "traceroute")]
-                    self.public_key(),
-                )
+                .send_cmd(dst_address, auth, serialised_cmd, force_new_link)
                 .await
         })
         .await

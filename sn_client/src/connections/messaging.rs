@@ -7,15 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{MsgResponse, QueryResult, Session};
-
 use crate::{Error, Result};
-
-#[cfg(feature = "traceroute")]
-use sn_interface::{
-    messaging::{Entity, Traceroute},
-    types::PublicKey,
-};
-
 use sn_interface::{
     messaging::{
         data::{DataQuery, DataQueryVariant, QueryResponse},
@@ -41,18 +33,13 @@ pub(crate) const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
 pub(crate) const NODES_TO_CONTACT_PER_STARTUP_BATCH: usize = 3;
 
 impl Session {
-    #[instrument(
-        skip(self, auth, payload, client_pk),
-        level = "debug",
-        name = "session send cmd"
-    )]
+    #[instrument(skip(self, auth, payload), level = "debug", name = "session send cmd")]
     pub(crate) async fn send_cmd(
         &self,
         dst_address: XorName,
         auth: ClientAuth,
         payload: Bytes,
         force_new_link: bool,
-        #[cfg(feature = "traceroute")] client_pk: PublicKey,
     ) -> Result<()> {
         let endpoint = self.endpoint.clone();
         // TODO: Consider other approach: Keep a session per section!
@@ -75,9 +62,6 @@ impl Session {
 
         #[allow(unused_mut)]
         let mut wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
-
-        #[cfg(feature = "traceroute")]
-        wire_msg.append_trace(&mut Traceroute(vec![Entity::Client(client_pk)]));
 
         // Don't immediately fail if sending to one elder fails. This could prevent further sends
         // and further responses coming in...
@@ -182,7 +166,7 @@ impl Session {
     }
 
     #[instrument(
-        skip(self, auth, payload, client_pk),
+        skip(self, auth, payload),
         level = "debug",
         name = "session send query"
     )]
@@ -195,7 +179,6 @@ impl Session {
         payload: Bytes,
         dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
         force_new_link: bool,
-        #[cfg(feature = "traceroute")] client_pk: PublicKey,
     ) -> Result<QueryResult> {
         let endpoint = self.endpoint.clone();
 
@@ -233,9 +216,6 @@ impl Session {
 
         #[allow(unused_mut)]
         let mut wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
-
-        #[cfg(feature = "traceroute")]
-        wire_msg.append_trace(&mut Traceroute(vec![Entity::Client(client_pk)]));
 
         let (resp_tx, resp_rx) = mpsc::channel(elders_len);
         let send_response = self
