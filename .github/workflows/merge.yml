@@ -1,0 +1,667 @@
+# Run all tests on all platforms.
+name: Merge Flow. Run All Tests
+
+on:
+  push:
+    branches: [staging, trying]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_INCREMENTAL: 0  # bookkeeping for incremental builds has overhead, not useful in CI.
+  SAFE_AUTH_PASSPHRASE: "x"
+  SAFE_AUTH_PASSWORD: "y"
+  NODE_COUNT: 15
+
+jobs:
+  # bors Continuous Integration
+  ci-success:
+    # refereneced in bors.toml
+    name: ci
+    if: ${{ success() }}
+    # github jobs that need to have passed for bors to give the all clear
+    needs:
+      - cargo-udeps
+      # - cargo-deny
+      - e2e
+      - api
+      - cli
+      # - e2e-split
+      - unit
+      - checks
+      - lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: CI succeeded
+        run: exit 0
+
+  cargo-udeps:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Unused dependency check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          #Needs nightly to distinguish between deps of different versions
+          toolchain: nightly
+          override: true
+
+      - name: Run cargo-udeps
+        uses: aig787/cargo-udeps-action@v1
+        with:
+          version: 'latest'
+          args: '--all-targets'
+
+  cargo-deny:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - shell: bash
+      run: wget https://raw.githubusercontent.com/maidsafe/QA/master/misc-scripts/deny.toml
+
+    - uses: EmbarkStudios/cargo-deny-action@v1
+
+  lint:
+      runs-on: ubuntu-latest
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      steps:
+        - uses: actions/checkout@v2
+          with:
+            fetch-depth: 0
+        - uses: wagoid/commitlint-github-action@f114310111fdbd07e99f47f9ca13d62b3ec98372
+
+  checks:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Run rustfmt and clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+        id: toolchain
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v1
+        with:
+          cache-on-failure: true
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - shell: bash
+        run: cargo clippy --all-targets --all-features -- -Dwarnings -Aclippy::result_large_err
+
+
+      - name: Check documentation
+        # Deny certain `rustdoc` lints that are unwanted.
+        # See https://doc.rust-lang.org/rustdoc/lints.html for lints that are 'warning' by default.
+        run: RUSTDOCFLAGS="--deny=warnings" cargo doc --no-deps
+
+  unit:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Unit Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Rust
+        id: toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - uses: Swatinem/rust-cache@v1
+        continue-on-error: true
+        with:
+          cache-on-failure: true
+          sharedKey: ${{github.run_id}}-unit
+
+      - name: Build sn_interface tests before running
+        run: cd sn_interface && cargo test --no-run --release
+        timeout-minutes: 50
+
+      - name: Run sn_interface tests
+        timeout-minutes: 25
+        run: cd sn_interface && cargo test --release
+
+      - name: Build sn_dysfunction tests before running
+        run: cd sn_dysfunction && cargo test --no-run --release
+        timeout-minutes: 50
+
+      - name: Run sn_dysfunction tests
+        timeout-minutes: 15
+        run: cd sn_dysfunction && cargo test --release
+
+      - name: Build sn_node tests before running
+        run: cd sn_node && cargo test --no-run --release
+        timeout-minutes: 50
+
+      - name: Run sn_node tests
+        timeout-minutes: 20
+        run: cd sn_node && cargo test --release
+
+      - name: Build sn_cli tests before running
+        run: cd sn_cli && cargo test --no-run --release
+        timeout-minutes: 50
+
+      - name: Run sn_cli tests
+        timeout-minutes: 25
+        run: cd sn_cli && cargo test --release --bin safe
+
+  e2e:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: E2E tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Rust
+        id: toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - uses: Swatinem/rust-cache@v1
+        continue-on-error: true
+        with:
+          cache-on-failure: true
+          sharedKey: ${{github.run_id}}
+
+      - name: install ripgrep ubuntu
+        run: sudo apt-get install ripgrep
+        if: matrix.os == 'ubuntu-latest'
+
+      - name: install ripgrep mac
+        run: brew install ripgrep
+        if: matrix.os == 'macos-latest'
+
+      - name: install ripgrep windows
+        run: choco install ripgrep
+        if: matrix.os == 'windows-latest'
+
+      - name: Build sn bins
+        run: cd sn_node && cargo build --release --bins
+        timeout-minutes: 60
+
+      - name: Build testnet
+        run: cd testnet && cargo build --release --bin testnet
+        timeout-minutes: 60
+
+      - name: Start the network
+        run: ./target/release/testnet --interval 30000
+        id: section-startup
+        env:
+          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
+
+      - name: Wait for all nodes to join
+        shell: bash
+        run: ./resources/scripts/wait_for_nodes_to_join.sh
+        timeout-minutes: 5
+
+      - name: Build all tests before running non ubuntu
+        run: cd sn_client && cargo test --no-run --release
+        timeout-minutes: 50
+
+      - name: Run client tests
+        env:
+          RUST_LOG: "sn_client=trace,qp2p=debug"
+        run: cd sn_client && cargo test --release -- --test-threads=1
+        timeout-minutes: 50
+
+      - name: Run example app for file API against local network
+        timeout-minutes: 10
+        shell: bash
+        run: cd sn_client && cargo run --release --example client_files
+
+      - name: Ensure no nodes have left during test runs
+        timeout-minutes: 1
+        shell: bash
+        if: matrix.os != 'windows-latest'
+        # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
+        run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
+
+      - name: Are nodes still running...?
+        shell: bash
+        timeout-minutes: 1
+        if: failure() && matrix.os != 'windows-latest'
+        continue-on-error: true
+        run: |
+          echo "$(pgrep sn_node | wc -l) nodes still running"
+          ls $HOME/.safe/node/local-test-network
+
+      - name: Generate StateMap
+        shell: bash
+        continue-on-error: true
+        run: |
+          cargo install --git https://github.com/TritonDataCenter/statemap.git
+          ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
+
+      - name: Upload StateMap
+        uses: actions/upload-artifact@main
+        with:
+          name: statemap_e2e_${{matrix.os}}.svg
+          path: safe_statemap.svg
+        continue-on-error: true
+
+      - name: Tar log files
+        shell: bash
+        continue-on-error: true
+        run: find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
+        if: failure()
+
+      - name: Upload Node Logs
+        uses: actions/upload-artifact@main
+        with:
+          name: sn_node_logs_e2e_${{matrix.os}}
+          path: log_files.tar.gz
+        if: failure()
+        continue-on-error: true
+
+  # e2e-split:
+  #   #if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+  #   # disabled temporarily since `self-hosted-ubuntu` runner not available for NodeRefactorBranch branch
+  #   if: false
+  #   name: E2E tests w/ full network
+  #   runs-on: self-hosted-ubuntu
+  #   env:
+  #     NODE_COUNT: 15
+  #   steps:
+  #     - uses: actions/checkout@v2
+
+  #     - name: Install Rust
+  #       id: toolchain
+  #       uses: actions-rs/toolchain@v1
+  #       with:
+  #         profile: minimal
+  #         toolchain: stable
+  #         override: true
+
+  #     - uses: Swatinem/rust-cache@v1
+  #       continue-on-error: true
+  #       with:
+  #         cache-on-failure: true
+  #         sharedKey: ${{github.run_id}}
+
+      # - name: install ripgrep ubuntu
+      #   run: sudo apt-get install ripgrep
+      #   if: matrix.os == 'ubuntu-latest'
+
+      # - name: install ripgrep mac
+      #   run: brew install ripgrep
+      #   if: matrix.os == 'macos-latest'
+
+      # - name: install ripgrep windows
+      #   run: choco install ripgrep
+      #   if: matrix.os == 'windows-latest'
+
+  #     - name: Build sn bins
+  #       run: cd sn_node && cargo build --release --bins
+  #       timeout-minutes: 60
+
+  #     - name: Build testnet
+  #       run: cd testnet && cargo build  --release --bin testnet
+  #       timeout-minutes: 60
+
+  #     # - name: Build log_cmds_inspector
+  #     #   run: cargo build  --release --bin log_cmds_inspector
+  #     #   timeout-minutes: 60
+
+  #     # This starts a NODE_COUNT node network, and then adds 12 more nodes. We should kill before moving on to split checks
+  #     - name: Run network churn data integrity test
+  #       timeout-minutes: 35 # made 35 for now due to client slowdown. TODO: fix that!
+  #       shell: bash
+  #       run: cargo run --release --example churn
+  #       env:
+  #         RUST_LOG: "sn_node,sn_client,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
+
+
+  #     # - name: Print Network Stats after churn test
+  #     #   shell: bash
+  #     #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+
+
+  #     # - name: Cleanup churn test
+  #     #   run: |
+  #     #     killall -9 sn_node
+  #     #     sleep 10
+  #     #     rm -rf ~/.safe
+
+  #     # # This starts a NODE_COUNT node network, and then adds 15 _more_ nodes
+  #     # - name: Run network split data integrity test
+  #     #   timeout-minutes: 35 # made 35 for now due to client slowdown. TODO: fix that!
+  #     #   shell: bash
+  #     #   run: cargo run --release --example network_split
+  #     #   env:
+  #     #     RUST_LOG: "sn_node,sn_client,sn_consensus,sn_dysfunction=trace"
+
+
+  #     # - name: Print Network Log Stats at start
+  #     #   shell: bash
+  #     #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+
+  #     # - name: Wait for all nodes to join
+  #     #   shell: bash
+  #     #   # we should not have the full 33 nodes as yet.
+  #     #   run: NODE_COUNT=28 ./resources/scripts/wait_for_nodes_to_join.sh
+  #     #   timeout-minutes: 20
+
+  #     # - name: Is the network split and ready?
+  #     #   shell: bash
+  #     #   run: ./resources/scripts/network_is_ready.sh
+  #     #   timeout-minutes: 5
+
+  #     # - name: Print Network Log Stats after nodes joined
+  #     #   shell: bash
+  #     #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+
+  #     - name: Build all tests before running
+  #       run: cd sn_client && cargo test --no-run --release -p sn_client
+  #       timeout-minutes: 50
+
+  #     - name: Run client tests
+  #       env:
+  #         RUST_LOG: "sn_client=trace,qp2p=debug"
+  #       run: cargo test --release -p sn_client -- --test-threads=1
+  #       timeout-minutes: 25
+
+  #     - name: Run example app for file API against local network
+  #       timeout-minutes: 10
+  #       shell: bash
+  #       run: cargo run --release --example client_files
+
+  #     - name: Ensure no nodes have left during test runs
+  #       timeout-minutes: 1
+  #       shell: bash
+  #       if: matrix.os != 'windows-latest'
+  #       # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
+  #       run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
+
+  #     - name: Are nodes still running...?
+  #       shell: bash
+  #       timeout-minutes: 1
+  #       continue-on-error: true
+  #       run: |
+  #         echo "$(pgrep sn_node | wc -l) nodes still running"
+  #         ls $HOME/.safe/node/local-test-network
+
+  #     # - name: Print Network Log Stats
+  #     #   shell: bash
+  #     #   continue-on-error: true
+  #     #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+
+  #     - name: Generate StateMap
+  #       shell: bash
+  #       continue-on-error: true
+  #       run: |
+  #         cargo install --git https://github.com/TritonDataCenter/statemap.git
+  #         ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
+
+  #     - name: Upload StateMap
+  #       uses: actions/upload-artifact@main
+  #       with:
+  #         name: statemap_e2e_split_self_hosted_ubuntu.svg
+  #         path: safe_statemap.svg
+  #       continue-on-error: true
+
+  #     - name: Tar log files
+  #       shell: bash
+  #       continue-on-error: true
+  #       run: find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
+  #       if: failure()
+
+  #     - name: Upload Node Logs
+  #       uses: actions/upload-artifact@main
+  #       with:
+  #         name: sn_node_logs_e2e_split_self_hosted_ubuntu
+  #         path: log_files.tar.gz
+  #       if: failure()
+  #       continue-on-error: true
+
+  #    # if we don't clean up, the .safe folder might persist between runs
+  #     - name: Cleanup self-hosted runner
+  #       if: always()
+  #       run: |
+  #         killall -9 sn_node
+  #         sleep 10
+  #         rm -rf ~/.safe
+
+  api:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Run API tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Rust
+        id: toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - uses: Swatinem/rust-cache@v1
+        continue-on-error: true
+        with:
+          cache-on-failure: true
+          sharedKey: ${{github.run_id}}
+
+      - name: install ripgrep ubuntu
+        run: sudo apt-get install ripgrep
+        if: matrix.os == 'ubuntu-latest'
+
+      - name: install ripgrep mac
+        run: brew install ripgrep
+        if: matrix.os == 'macos-latest'
+
+      - name: install ripgrep windows
+        run: choco install ripgrep
+        if: matrix.os == 'windows-latest'
+
+      - name: Build sn bins
+        run: cd sn_node && cargo build --release --bins
+        timeout-minutes: 60
+
+      - name: Build testnet
+        run: cd testnet && cargo build --release --bin testnet
+        timeout-minutes: 60
+
+      - name: Start the network
+        run: ./target/release/testnet --interval 30000
+        id: section-startup
+        env:
+          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
+
+      - name: Wait for all nodes to join
+        shell: bash
+        run: ./resources/scripts/wait_for_nodes_to_join.sh
+        timeout-minutes: 5
+
+      - name: Build all tests before running
+        run: cd sn_api && cargo test --no-run --release
+        timeout-minutes: 50
+
+      - name: Run API tests
+        env:
+          RUST_LOG: "sn_client=trace"
+        run: cd sn_api && cargo test --release -- --test-threads=1
+        timeout-minutes: 30
+
+      - name: Are nodes still running...?
+        shell: bash
+        timeout-minutes: 1
+        if: failure() && matrix.os
+        run: |
+          echo "$(pgrep sn_node | wc -l) nodes still running"
+          ls $HOME/.safe/node/local-test-network
+
+      - name: Ensure no nodes have left during test runs
+        timeout-minutes: 1
+        shell: bash
+        if: matrix.os != 'windows-latest'
+        # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
+        run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
+
+      - name: Generate StateMap
+        shell: bash
+        continue-on-error: true
+        run: |
+          cargo install --git https://github.com/TritonDataCenter/statemap.git
+          ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
+
+      - name: Upload StateMap
+        uses: actions/upload-artifact@main
+        with:
+          name: statemap_api_${{matrix.os}}.svg
+          path: safe_statemap.svg
+        continue-on-error: true
+
+      - name: Tar log files
+        shell: bash
+        continue-on-error: true
+        run: find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
+        if: failure()
+
+      - name: Upload Node Logs
+        uses: actions/upload-artifact@main
+        with:
+          name: sn_node_logs_api_${{matrix.os}}
+          path: log_files.tar.gz
+        if: failure()
+        continue-on-error: true
+
+  cli:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Run CLI tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Rust
+        id: toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - uses: Swatinem/rust-cache@v1
+        continue-on-error: true
+        with:
+          cache-on-failure: true
+          sharedKey: ${{github.run_id}}
+
+      - name: install ripgrep ubuntu
+        run: sudo apt-get install ripgrep
+        if: matrix.os == 'ubuntu-latest'
+
+      - name: install ripgrep mac
+        run: brew install ripgrep
+        if: matrix.os == 'macos-latest'
+
+      - name: install ripgrep windows
+        run: choco install ripgrep
+        if: matrix.os == 'windows-latest'
+
+      - name: Build sn bins
+        run: cd sn_node && cargo build --release --bins
+        timeout-minutes: 60
+
+      - name: Build testnet
+        run: cd testnet && cargo build --release --bin testnet
+        timeout-minutes: 60
+
+      - name: Start the network
+        run: ./target/release/testnet --interval 30000
+        id: section-startup
+        env:
+          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
+
+      - name: Wait for all nodes to join
+        shell: bash
+        run: ./resources/scripts/wait_for_nodes_to_join.sh
+        timeout-minutes: 5
+
+      - name: Generate keys for test run
+        run: cargo run --package sn_cli --release -- keys create --for-cli
+
+      - name: Build all tests before running
+        run: cd sn_cli && cargo test --no-run --release
+        timeout-minutes: 50
+
+      - name: Run CLI tests
+        run: cd sn_cli && cargo test --release -- --test-threads=1
+        timeout-minutes: 50
+
+      - name: Are nodes still running...?
+        shell: bash
+        timeout-minutes: 1
+        if: failure() && matrix.os
+        run: |
+          echo "$(pgrep sn_node | wc -l) nodes still running"
+          ls $HOME/.safe/node/local-test-network
+
+      - name: Ensure no nodes have left during test runs
+        timeout-minutes: 1
+        shell: bash
+        if: matrix.os != 'windows-latest'
+        # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
+        run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
+
+      - name: Generate StateMap
+        shell: bash
+        continue-on-error: true
+        run: |
+          cargo install --git https://github.com/TritonDataCenter/statemap.git
+          ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
+
+      - name: Upload StateMap
+        uses: actions/upload-artifact@main
+        with:
+          name: statemap_cli_${{matrix.os}}.svg
+          path: safe_statemap.svg
+        continue-on-error: true
+
+      - name: Tar log files
+        shell: bash
+        continue-on-error: true
+        run: find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
+        if: failure()
+
+      - name: Upload Node Logs
+        uses: actions/upload-artifact@main
+        with:
+          name: sn_node_logs_cli_${{matrix.os}}
+          path: log_files.tar.gz
+        if: failure()
+        continue-on-error: true
