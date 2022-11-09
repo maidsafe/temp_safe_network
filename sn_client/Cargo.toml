@@ -33,12 +33,10 @@ name = "query-adult"
 required-features = ["build-bin"]
 
 [features]
-default = ["traceroute"]
 chaos = []
 check-replicas = []
 unstable-wiremsg-debuginfo = []
 test-utils = ["eyre"]
-traceroute = ["sn_interface/traceroute"]
 # Dependencies only when building binary (`query-adult`)
 build-bin = ["clap", "eyre"]
 
