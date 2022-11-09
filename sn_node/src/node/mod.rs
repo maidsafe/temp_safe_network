@@ -75,8 +75,6 @@ mod core {
         UsedSpace,
     };
     use sn_dysfunction::{DysfunctionDetection, IssueType};
-    #[cfg(feature = "traceroute")]
-    use sn_interface::messaging::Entity;
 
     use sn_interface::{
         messaging::{
@@ -722,15 +720,6 @@ mod core {
                     );
                 }
             });
-        }
-
-        #[cfg(feature = "traceroute")]
-        pub(crate) fn identity(&self) -> Entity {
-            if self.is_elder() {
-                Entity::Elder(self.info().public_key())
-            } else {
-                Entity::Adult(self.info().public_key())
-            }
         }
     }
 

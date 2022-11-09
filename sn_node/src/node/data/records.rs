@@ -13,8 +13,7 @@ use futures::FutureExt;
 use itertools::Itertools;
 use qp2p::{SendStream, UsrMsgBytes};
 use sn_dysfunction::IssueType;
-#[cfg(feature = "traceroute")]
-use sn_interface::messaging::{MsgType, Traceroute, WireMsg};
+use sn_interface::messaging::{MsgType, WireMsg};
 use sn_interface::{
     data_copy_count,
     messaging::{
@@ -38,7 +37,6 @@ impl MyNode {
         data: ReplicatedData,
         msg_id: MsgId,
         targets: BTreeSet<Peer>,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<(Peer, Result<WireMsg>)>> {
         info!(
             "Replicating data from {msg_id:?} {:?} to holders {:?}",
@@ -61,8 +59,6 @@ impl MyNode {
                 kind.clone(),
                 Some(target),
                 msg_id,
-                #[cfg(feature = "traceroute")]
-                traceroute.clone(),
             )?;
 
             info!("About to send {msg_id:?} to holder: {:?}", &target,);
@@ -95,7 +91,6 @@ impl MyNode {
         msg_id: MsgId,
         targets: BTreeSet<Peer>,
         client_response_stream: Arc<Mutex<SendStream>>,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<()> {
         info!(
             "Replicating data from client {msg_id:?} {:?} to holders {:?}",
@@ -105,15 +100,7 @@ impl MyNode {
 
         let targets_len = targets.len();
 
-        let responses = self
-            .replicate_data_to_adults(
-                data,
-                msg_id,
-                targets,
-                #[cfg(feature = "traceroute")]
-                traceroute.clone(),
-            )
-            .await?;
+        let responses = self.replicate_data_to_adults(data, msg_id, targets).await?;
         let mut success_count = 0;
         let mut ack_response = None;
         let mut last_error = None;
@@ -134,13 +121,8 @@ impl MyNode {
         // everything went fine, tell the client that
         if success_count == targets_len {
             if let Some(response) = ack_response {
-                self.send_ack_to_client_on_stream(
-                    response,
-                    msg_id,
-                    client_response_stream.clone(),
-                    traceroute.clone(),
-                )
-                .await?;
+                self.send_ack_to_client_on_stream(response, msg_id, client_response_stream.clone())
+                    .await?;
             } else {
                 // This should not be possible with above checks
                 error!("No valid ack response to send from all responses for {msg_id:?}")
@@ -154,8 +136,6 @@ impl MyNode {
                     error,
                     msg_id,
                     client_response_stream,
-                    #[cfg(feature = "traceroute")]
-                    traceroute,
                 )
                 .await?;
             }
@@ -170,7 +150,6 @@ impl MyNode {
         response: WireMsg,
         msg_id: MsgId,
         send_stream: Arc<Mutex<SendStream>>,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<()> {
         if let MsgType::Node {
             msg: NodeMsg::NodeEvent(NodeEvent::DataStored(_address)),
@@ -191,7 +170,6 @@ impl MyNode {
                 send_stream,
                 None, // we shouldn't need this...
                 msg_id,
-                traceroute.clone(),
             )
             .await
         } else {
@@ -211,7 +189,6 @@ impl MyNode {
         auth: AuthorityProof<ClientAuth>,
         source_client: Peer,
         client_response_stream: Arc<Mutex<SendStream>>,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         // We generate the operation id to track the response from the Adult
         // by using the query msg id, which shall be unique per query.
@@ -243,8 +220,6 @@ impl MyNode {
                 source_client,
                 msg_id,
                 client_response_stream,
-                #[cfg(feature = "traceroute")]
-                traceroute,
             )
             .await?;
             // TODO: do error processing
@@ -260,14 +235,8 @@ impl MyNode {
 
         let (kind, payload) = self.serialize_node_msg(msg)?;
 
-        let bytes_to_adult = self.form_usr_msg_bytes_to_node(
-            payload,
-            kind,
-            Some(target),
-            msg_id,
-            #[cfg(feature = "traceroute")]
-            traceroute.clone(),
-        )?;
+        let bytes_to_adult =
+            self.form_usr_msg_bytes_to_node(payload, kind, Some(target), msg_id)?;
 
         debug!("sending out {msg_id:?}");
         // TODO: how to determine this time?
@@ -304,15 +273,8 @@ impl MyNode {
 
             let (kind, payload) = self.serialize_sign_client_msg(client_msg)?;
 
-            self.send_msg_on_stream(
-                payload,
-                kind,
-                client_response_stream,
-                Some(target),
-                msg_id,
-                traceroute,
-            )
-            .await?;
+            self.send_msg_on_stream(payload, kind, client_response_stream, Some(target), msg_id)
+                .await?;
         } else {
             error!(
                 "Unexpected reponse to query from node. To : {msg_id:?}; response: {response:?}"
@@ -331,17 +293,9 @@ impl MyNode {
         send_stream: Arc<Mutex<SendStream>>,
         target_peer: Option<Peer>,
         original_msg_id: MsgId,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<()> {
         // TODO why do we need dst here?
-        let bytes = self.form_usr_msg_bytes_to_node(
-            payload,
-            kind,
-            target_peer,
-            original_msg_id,
-            #[cfg(feature = "traceroute")]
-            traceroute,
-        )?;
+        let bytes = self.form_usr_msg_bytes_to_node(payload, kind, target_peer, original_msg_id)?;
         trace!("USING BIDI to send to msg {original_msg_id:?}! OH DEAR, FASTEN SEATBELTS");
         let stream_prio = 10;
         let mut send_stream = send_stream.lock().await;
@@ -375,7 +329,6 @@ impl MyNode {
         kind: MsgKind,
         target: Option<Peer>,
         msg_id: MsgId,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<UsrMsgBytes> {
         let dst_name = target.map_or(XorName::default(), |peer| peer.name());
         // we first generate the XorName
@@ -386,14 +339,6 @@ impl MyNode {
 
         #[allow(unused_mut)]
         let mut wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
-
-        // TODO: do we still need traceroute now?
-        #[cfg(feature = "traceroute")]
-        {
-            let mut traceroute = traceroute;
-            traceroute.0.push(self.identity());
-            wire_msg.append_trace(&mut traceroute);
-        }
 
         #[cfg(feature = "test-utils")]
         let wire_msg = wire_msg.set_payload_debug(msg);

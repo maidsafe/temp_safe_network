@@ -14,8 +14,6 @@ use sn_dbc::{
     get_public_commitments_from_transaction, Commitment, KeyImage, RingCtTransaction, SpentProof,
     SpentProofShare,
 };
-#[cfg(feature = "traceroute")]
-use sn_interface::messaging::Traceroute;
 use sn_interface::{
     data_copy_count,
     messaging::{
@@ -47,7 +45,6 @@ impl MyNode {
         source_peer: Peer,
         correlation_id: MsgId,
         send_stream: Arc<Mutex<SendStream>>,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<()> {
         let the_error_msg = ClientMsg::QueryResponse {
             response: query.to_error_response(error.into()),
@@ -62,8 +59,6 @@ impl MyNode {
             send_stream,
             Some(source_peer),
             correlation_id,
-            #[cfg(feature = "traceroute")]
-            traceroute,
         )
         .await
     }
@@ -75,7 +70,6 @@ impl MyNode {
         error: Error,
         correlation_id: MsgId,
         send_stream: Arc<Mutex<SendStream>>,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<()> {
         let client_msg = ClientMsg::CmdResponse {
             response: cmd.to_error_response(error.into()),
@@ -91,7 +85,6 @@ impl MyNode {
             send_stream,
             None, // we shouldn't need this...
             correlation_id,
-            traceroute.clone(),
         )
         .await
     }
@@ -106,7 +99,6 @@ impl MyNode {
         requesting_elder: Peer,
         msg_id: MsgId,
         send_stream: Option<Arc<Mutex<SendStream>>>,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<()> {
         let response = self
             .data_storage
@@ -121,14 +113,8 @@ impl MyNode {
 
         let (kind, payload) = self.serialize_node_msg(msg)?;
 
-        let bytes = self.form_usr_msg_bytes_to_node(
-            payload,
-            kind,
-            Some(requesting_elder),
-            msg_id,
-            #[cfg(feature = "traceroute")]
-            traceroute,
-        )?;
+        let bytes =
+            self.form_usr_msg_bytes_to_node(payload, kind, Some(requesting_elder), msg_id)?;
 
         if let Some(send_stream) = send_stream {
             // send response on the stream
@@ -163,7 +149,6 @@ impl MyNode {
         auth: AuthorityProof<ClientAuth>,
         origin: Peer,
         send_stream: Arc<Mutex<SendStream>>,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         if !self.is_elder() {
             warn!("could not handle valid as not elder");
@@ -181,8 +166,6 @@ impl MyNode {
                         auth,
                         origin,
                         send_stream,
-                        #[cfg(feature = "traceroute")]
-                        traceroute,
                     )
                     .await
             }
@@ -230,8 +213,6 @@ impl MyNode {
                         origin,
                         send_stream,
                         auth,
-                        #[cfg(feature = "traceroute")]
-                        traceroute,
                     };
                     return Ok(vec![update_command]);
                 }
@@ -243,15 +224,8 @@ impl MyNode {
             Ok(data) => data,
             Err(error) => {
                 debug!("Will send error response back to client");
-                self.send_cmd_error_response_over_stream(
-                    cmd,
-                    error,
-                    msg_id,
-                    send_stream,
-                    #[cfg(feature = "traceroute")]
-                    traceroute,
-                )
-                .await?;
+                self.send_cmd_error_response_over_stream(cmd, error, msg_id, send_stream)
+                    .await?;
 
                 return Ok(vec![]);
             }
@@ -274,31 +248,16 @@ impl MyNode {
             debug!("Will send error response back to client");
 
             // TODO: Use response stream here. This wont work anymore!
-            self.send_cmd_error_response_over_stream(
-                cmd,
-                error,
-                msg_id,
-                send_stream,
-                #[cfg(feature = "traceroute")]
-                traceroute,
-            )
-            .await?;
+            self.send_cmd_error_response_over_stream(cmd, error, msg_id, send_stream)
+                .await?;
             return Ok(vec![]);
         }
 
         // the replication msg sent to adults
         // cmds here may be dysfunction tracking.
         // CmdAcks are sent over the send stream herein
-        self.replicate_data_to_adults_and_ack_to_client(
-            cmd,
-            data,
-            msg_id,
-            targets,
-            send_stream,
-            #[cfg(feature = "traceroute")]
-            traceroute.clone(),
-        )
-        .await?;
+        self.replicate_data_to_adults_and_ack_to_client(cmd, data, msg_id, targets, send_stream)
+            .await?;
 
         // TODO: handle failed responses
         // cmds.extend();

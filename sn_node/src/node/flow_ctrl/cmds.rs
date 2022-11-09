@@ -14,8 +14,6 @@ use crate::node::{
 use qp2p::SendStream;
 use sn_consensus::Decision;
 use sn_dysfunction::IssueType;
-#[cfg(feature = "traceroute")]
-use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         data::ClientMsg,
@@ -70,8 +68,6 @@ pub(crate) enum Cmd {
         msg: NodeMsg,
         origin: Peer,
         send_stream: Option<Arc<Mutex<SendStream>>>,
-        #[cfg(feature = "traceroute")]
-        traceroute: Traceroute,
     },
     UpdateNetworkAndHandleValidClientMsg {
         proof_chain: SectionsDAG,
@@ -82,8 +78,6 @@ pub(crate) enum Cmd {
         send_stream: Arc<Mutex<SendStream>>,
         /// Requester's authority over this message
         auth: AuthorityProof<ClientAuth>,
-        #[cfg(feature = "traceroute")]
-        traceroute: Traceroute,
     },
     /// Handle peer that's been detected as lost.
     HandleFailedSendToNode { peer: Peer, msg_id: MsgId },
@@ -117,8 +111,6 @@ pub(crate) enum Cmd {
         msg_id: MsgId,
         recipients: Peers,
         send_stream: Option<Arc<Mutex<SendStream>>>,
-        #[cfg(feature = "traceroute")]
-        traceroute: Traceroute,
     },
     /// Proposes peers as offline
     ProposeVoteNodesOffline(BTreeSet<XorName>),
@@ -126,12 +118,14 @@ pub(crate) enum Cmd {
 
 impl Cmd {
     pub(crate) fn send_msg(msg: OutgoingMsg, recipients: Peers) -> Self {
-        Self::send_traced_msg(
+        let msg_id = MsgId::new();
+        debug!("Sending msg {msg_id:?} {msg:?}");
+        Cmd::SendMsg {
             msg,
+            msg_id,
             recipients,
-            #[cfg(feature = "traceroute")]
-            Traceroute(vec![]),
-        )
+            send_stream: None,
+        }
     }
 
     pub(crate) fn send_msg_via_response_stream(
@@ -144,25 +138,6 @@ impl Cmd {
             msg_id: MsgId::new(),
             recipients,
             send_stream,
-            #[cfg(feature = "traceroute")]
-            traceroute: Traceroute(vec![]),
-        }
-    }
-
-    pub(crate) fn send_traced_msg(
-        msg: OutgoingMsg,
-        recipients: Peers,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
-    ) -> Self {
-        let msg_id = MsgId::new();
-        debug!("Sending msg {msg_id:?} {msg:?}");
-        Cmd::SendMsg {
-            msg,
-            msg_id,
-            recipients,
-            send_stream: None,
-            #[cfg(feature = "traceroute")]
-            traceroute,
         }
     }
 

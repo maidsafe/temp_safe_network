@@ -11,8 +11,6 @@ use crate::node::{
     Cmd, Error, MyNode, Result,
 };
 
-#[cfg(feature = "traceroute")]
-use sn_interface::{messaging::Entity, messaging::Traceroute};
 use sn_interface::{
     messaging::{Dst, MsgId, MsgKind, WireMsg},
     network_knowledge::SectionTreeUpdate,
@@ -49,20 +47,11 @@ impl Dispatcher {
                 msg_id,
                 recipients,
                 send_stream,
-                #[cfg(feature = "traceroute")]
-                traceroute,
             } => {
                 trace!("Sending msg: {msg_id:?}");
                 let peer_msgs = {
                     let node = self.node.read().await;
-                    into_msg_bytes(
-                        &node,
-                        msg,
-                        msg_id,
-                        recipients,
-                        #[cfg(feature = "traceroute")]
-                        traceroute,
-                    )?
+                    into_msg_bytes(&node, msg, msg_id, recipients)?
                 };
 
                 let comm = self.node.read().await.comm.clone();
@@ -109,8 +98,6 @@ impl Dispatcher {
                 origin,
                 auth,
                 send_stream,
-                #[cfg(feature = "traceroute")]
-                traceroute,
             } => {
                 debug!("Updating network knowledge before handling message");
                 let mut node = self.node.write().await;
@@ -126,36 +113,18 @@ impl Dispatcher {
                 let node = self.node.read().await;
 
                 debug!("Network knowledge was updated: {updated}");
-                node.handle_valid_client_msg(
-                    msg_id,
-                    msg,
-                    auth,
-                    origin,
-                    send_stream,
-                    #[cfg(feature = "traceroute")]
-                    traceroute,
-                )
-                .await
+                node.handle_valid_client_msg(msg_id, msg, auth, origin, send_stream)
+                    .await
             }
             Cmd::HandleValidNodeMsg {
                 origin,
                 msg_id,
                 msg,
                 send_stream,
-                #[cfg(feature = "traceroute")]
-                traceroute,
             } => {
                 debug!("handling valid msg {:?}", msg_id);
-                MyNode::handle_valid_system_msg(
-                    self.node.clone(),
-                    msg_id,
-                    msg,
-                    origin,
-                    send_stream,
-                    #[cfg(feature = "traceroute")]
-                    traceroute.clone(),
-                )
-                .await
+                MyNode::handle_valid_system_msg(self.node.clone(), msg_id, msg, origin, send_stream)
+                    .await
             }
             Cmd::HandleAgreement { proposal, sig } => {
                 let mut node = self.node.write().await;
@@ -222,7 +191,6 @@ fn into_msg_bytes(
     msg: OutgoingMsg,
     msg_id: MsgId,
     recipients: Peers,
-    #[cfg(feature = "traceroute")] traceroute: Traceroute,
 ) -> Result<Vec<(Peer, UsrMsgBytes)>> {
     let (kind, payload) = match msg {
         OutgoingMsg::Node(msg) => node.serialize_node_msg(msg)?,
@@ -237,20 +205,7 @@ fn into_msg_bytes(
         section_key: bls::SecretKey::random().public_key(),
     };
 
-    #[cfg(feature = "traceroute")]
-    let trace = Trace {
-        entity: node.identity(),
-        traceroute,
-    };
-
-    let mut initial_wire_msg = wire_msg(
-        msg_id,
-        payload,
-        kind,
-        dst,
-        #[cfg(feature = "traceroute")]
-        trace,
-    );
+    let mut initial_wire_msg = wire_msg(msg_id, payload, kind, dst);
 
     let _bytes = initial_wire_msg.serialize_and_cache_bytes()?;
 
@@ -271,27 +226,10 @@ fn into_msg_bytes(
     Ok(msgs)
 }
 
-#[cfg(feature = "traceroute")]
-struct Trace {
-    entity: Entity,
-    traceroute: Traceroute,
-}
-
-fn wire_msg(
-    msg_id: MsgId,
-    payload: Bytes,
-    auth: MsgKind,
-    dst: Dst,
-    #[cfg(feature = "traceroute")] trace: Trace,
-) -> WireMsg {
+fn wire_msg(msg_id: MsgId, payload: Bytes, auth: MsgKind, dst: Dst) -> WireMsg {
     #[allow(unused_mut)]
     let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
-    #[cfg(feature = "traceroute")]
-    {
-        let mut traceroute = trace.traceroute;
-        traceroute.0.push(trace.entity);
-        wire_msg.append_trace(&mut traceroute);
-    }
+
     #[cfg(feature = "test-utils")]
     let wire_msg = wire_msg.set_payload_debug(msg);
     wire_msg

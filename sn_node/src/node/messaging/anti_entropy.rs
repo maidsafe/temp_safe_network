@@ -16,8 +16,6 @@ use crate::node::{
 use bls::PublicKey as BlsPublicKey;
 use qp2p::{SendStream, UsrMsgBytes};
 use rand::Rng;
-#[cfg(feature = "traceroute")]
-use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         system::{AntiEntropyKind, NodeCmd, NodeMsg, SectionSigned},
@@ -194,7 +192,6 @@ impl MyNode {
         section_tree_update: SectionTreeUpdate,
         kind: AntiEntropyKind,
         sender: Peer,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         let snapshot = self.state_snapshot();
         let sap = section_tree_update.signed_sap.value.clone();
@@ -283,22 +280,10 @@ impl MyNode {
             error!("Dropping bounced msg ({sender:?}) received in AE-Retry from {msg_id:?} as suggested new dst section key is the same as previously sent: {:?}", sap.section_key());
             return Ok(cmds);
         }
-
         self.hold_back_randomly().await;
-
         trace!("{}", LogMarker::AeResendAfterAeRedirect);
 
-        if cfg!(feature = "traceroute") {
-            cmds.push(self.trace_system_msg(
-                msg_to_resend,
-                Peers::Single(response_peer),
-                #[cfg(feature = "traceroute")]
-                traceroute,
-            ))
-        } else {
-            cmds.push(self.send_system_msg(msg_to_resend, Peers::Single(response_peer)))
-        }
-
+        cmds.push(self.send_system_msg(msg_to_resend, Peers::Single(response_peer)));
         Ok(cmds)
     }
 
@@ -433,21 +418,10 @@ impl MyNode {
         let ae_msg = self.generate_ae_msg(None, AntiEntropyKind::Redirect { bounced_msg });
         let (kind, payload) = self.serialize_node_msg(ae_msg)?;
 
-        #[cfg(feature = "traceroute")]
-        let traceroute = Traceroute(vec![self.identity()]);
-
         let msg_id = MsgId::new();
 
-        self.send_msg_on_stream(
-            payload,
-            kind,
-            client_response_stream,
-            Some(sender),
-            msg_id,
-            #[cfg(feature = "traceroute")]
-            traceroute,
-        )
-        .await
+        self.send_msg_on_stream(payload, kind, client_response_stream, Some(sender), msg_id)
+            .await
     }
 }
 

@@ -90,17 +90,12 @@ impl MyNode {
                     return Ok(ae_cmds);
                 }
 
-                #[cfg(feature = "traceroute")]
-                let traceroute = wire_msg.traceroute();
-
                 // this needs write access...
                 Ok(vec![Cmd::HandleValidNodeMsg {
                     origin,
                     msg_id,
                     msg,
                     send_stream,
-                    #[cfg(feature = "traceroute")]
-                    traceroute,
                 }])
             }
             MsgType::Client {
@@ -158,16 +153,8 @@ impl MyNode {
                 }
 
                 debug!("no aeeee");
-                self.handle_valid_client_msg(
-                    msg_id,
-                    msg,
-                    auth,
-                    origin,
-                    send_stream.clone(),
-                    #[cfg(feature = "traceroute")]
-                    wire_msg.traceroute(),
-                )
-                .await
+                self.handle_valid_client_msg(msg_id, msg, auth, origin, send_stream.clone())
+                    .await
             }
         }
     }
