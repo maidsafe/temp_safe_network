@@ -8,22 +8,27 @@
 
 use crate::node::{MyNode, Result};
 
+use bytes::Bytes;
+use ed25519_dalek::Keypair;
+use ed25519_dalek::Signer;
 use sn_interface::{
     messaging::{data::ClientMsg, system::NodeMsg, ClientAuth, MsgKind, WireMsg},
     types::{PublicKey, Signature},
 };
-
-use bytes::Bytes;
-use signature::Signer;
+use std::sync::Arc;
+use xor_name::XorName;
 
 impl MyNode {
     /// Serialize and sign a message for a Client with our ed key
-    pub(crate) fn serialize_sign_client_msg(&self, msg: ClientMsg) -> Result<(MsgKind, Bytes)> {
+    pub(crate) fn serialize_sign_client_msg(
+        keypair: Arc<Keypair>,
+        msg: ClientMsg,
+    ) -> Result<(MsgKind, Bytes)> {
         let payload = WireMsg::serialize_msg_payload(&msg)?;
-        let signature = self.keypair.sign(&payload);
+        let signature = keypair.sign(&payload);
 
         let kind = MsgKind::Client(ClientAuth {
-            public_key: PublicKey::Ed25519(self.keypair.public),
+            public_key: PublicKey::Ed25519(keypair.public),
             signature: Signature::Ed25519(signature),
         });
 
@@ -31,9 +36,12 @@ impl MyNode {
     }
 
     /// Serialize a message for a Node with our ed key
-    pub(crate) fn serialize_node_msg(&self, msg: NodeMsg) -> Result<(MsgKind, Bytes)> {
+    pub(crate) fn serialize_node_msg(
+        our_node_name: XorName,
+        msg: NodeMsg,
+    ) -> Result<(MsgKind, Bytes)> {
         let payload = WireMsg::serialize_msg_payload(&msg)?;
-        let kind = MsgKind::Node(self.name());
+        let kind = MsgKind::Node(our_node_name);
 
         Ok((kind, payload))
     }

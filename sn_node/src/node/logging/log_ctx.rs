@@ -22,6 +22,9 @@ impl LogCtx {
     }
 
     pub(crate) async fn prefix(&self) -> Prefix {
-        self.node.read().await.network_knowledge().prefix()
+        debug!("[NODE READ]: logging lock attempt");
+        let p = self.node.read().await.network_knowledge().prefix();
+        debug!("[NODE READ]: logging lock got");
+        p
     }
 }

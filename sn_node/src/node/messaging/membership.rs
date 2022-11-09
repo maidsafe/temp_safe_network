@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    flow_ctrl::cmds::Cmd, membership, messaging::Peers, relocation::ChurnId, Event,
-    MembershipEvent, MyNode, Result,
+    core::MyNodeSnapshot, flow_ctrl::cmds::Cmd, membership, messaging::Peers, relocation::ChurnId,
+    Event, MembershipEvent, MyNode, Result,
 };
 
 use bls::Signature;
@@ -29,6 +29,8 @@ impl MyNode {
             node_state.name(),
             node_state.state()
         );
+
+        let snapshot = &self.get_snapshot();
         let prefix = self.network_knowledge.prefix();
         if let Some(membership) = self.membership.as_mut() {
             let membership_vote = match membership.propose(node_state, &prefix) {
@@ -38,7 +40,10 @@ impl MyNode {
                     return None;
                 }
             };
-            Some(self.send_msg_to_our_elders(NodeMsg::MembershipVotes(vec![membership_vote])))
+            Some(MyNode::send_msg_to_our_elders(
+                snapshot,
+                NodeMsg::MembershipVotes(vec![membership_vote]),
+            ))
         } else {
             error!("Membership - Failed to propose membership change, no membership instance");
             None
@@ -48,13 +53,13 @@ impl MyNode {
     /// Get our latest vote if any at this generation, and get cmds to resend to all elders
     /// (which should in turn trigger them to resend their votes)
     #[instrument(skip_all)]
-    pub(crate) async fn membership_gossip_votes(&self) -> Option<Cmd> {
-        let membership = self.membership.clone();
-
+    pub(crate) async fn membership_gossip_votes(snapshot: &MyNodeSnapshot) -> Option<Cmd> {
+        let membership = snapshot.membership.clone();
         if let Some(membership) = membership {
             trace!("{}", LogMarker::GossippingMembershipVotes);
             if let Ok(ae_votes) = membership.anti_entropy(membership.generation()) {
-                let cmd = self.send_msg_to_our_elders(NodeMsg::MembershipVotes(ae_votes));
+                let cmd =
+                    MyNode::send_msg_to_our_elders(snapshot, NodeMsg::MembershipVotes(ae_votes));
                 return Some(cmd);
             }
         }
@@ -71,7 +76,9 @@ impl MyNode {
             "{:?} {signed_votes:?} from {peer}",
             LogMarker::MembershipVotesBeingHandled
         );
-        let prefix = self.network_knowledge.prefix();
+
+        let snapshot = &self.get_snapshot();
+        let prefix = snapshot.network_knowledge.prefix();
 
         let mut cmds = vec![];
 
@@ -88,7 +95,7 @@ impl MyNode {
                         // We'll send a membership AE request to see if they can help us catch up.
                         debug!("{:?}", LogMarker::MembershipSendingAeUpdateRequest);
                         let msg = NodeMsg::MembershipAE(membership.generation());
-                        cmds.push(self.send_system_msg(msg, Peers::Single(peer)));
+                        cmds.push(MyNode::send_system_msg(msg, Peers::Single(peer)));
                         // return the vec w/ the AE cmd there so as not to loop and generate AE for
                         // any subsequent commands
                         return Ok(cmds);
@@ -118,7 +125,7 @@ impl MyNode {
             };
 
             if let Some(vote_msg) = vote_broadcast {
-                cmds.push(self.send_msg_to_our_elders(vote_msg));
+                cmds.push(MyNode::send_msg_to_our_elders(snapshot, vote_msg));
             }
         }
 
@@ -126,7 +133,7 @@ impl MyNode {
     }
 
     pub(crate) fn handle_membership_anti_entropy(
-        &self,
+        snapshot: &MyNodeSnapshot,
         peer: Peer,
         gen: Generation,
     ) -> Option<Cmd> {
@@ -137,11 +144,11 @@ impl MyNode {
             peer
         );
 
-        if let Some(membership) = self.membership.as_ref() {
+        if let Some(membership) = snapshot.membership.as_ref() {
             match membership.anti_entropy(gen) {
                 Ok(catchup_votes) => {
                     debug!("Sending catchup votes to {peer:?}");
-                    Some(self.send_system_msg(
+                    Some(MyNode::send_system_msg(
                         NodeMsg::MembershipVotes(catchup_votes),
                         Peers::Single(peer),
                     ))
@@ -282,7 +289,7 @@ impl MyNode {
         }));
 
         trace!("{}", LogMarker::SendNodeApproval);
-        self.send_system_msg(msg, Peers::Multiple(peers))
+        MyNode::send_system_msg(msg, Peers::Multiple(peers))
     }
 
     pub(crate) fn handle_node_left(
@@ -314,7 +321,7 @@ impl MyNode {
         if node_state.is_relocated() {
             let peer = *node_state.peer();
             let msg = NodeMsg::Relocate(node_state);
-            Some(self.send_system_msg(msg, Peers::Single(peer)))
+            Some(MyNode::send_system_msg(msg, Peers::Single(peer)))
         } else {
             None
         }

@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
+    core::MyNodeSnapshot,
     flow_ctrl::cmds::Cmd,
     handover::{Error as HandoverError, Handover},
     membership::{elder_candidates, try_split_dkg},
@@ -29,13 +30,14 @@ impl MyNode {
         &mut self,
         sap_candidates: SapCandidate,
     ) -> Result<Option<Cmd>> {
+        let snapshot = &self.get_snapshot();
         match &self.handover_voting {
             Some(handover_voting_state) => {
                 let mut vs = handover_voting_state.clone();
                 let vote = vs.propose(sap_candidates)?;
                 self.handover_voting = Some(vs);
                 debug!("{}: {:?}", LogMarker::HandoverConsensusTrigger, &vote);
-                Ok(Some(self.broadcast_handover_vote_msg(vote)))
+                Ok(Some(MyNode::broadcast_handover_vote_msg(snapshot, vote)))
             }
             None => {
                 warn!("Failed to make handover consensus proposal because node is not an Elder");
@@ -45,10 +47,14 @@ impl MyNode {
     }
 
     /// Broadcast handover Vote message to Elders
-    pub(crate) fn broadcast_handover_vote_msg(&self, signed_vote: SignedVote<SapCandidate>) -> Cmd {
+    pub(crate) fn broadcast_handover_vote_msg(
+        snapshot: &MyNodeSnapshot,
+        signed_vote: SignedVote<SapCandidate>,
+    ) -> Cmd {
         // Deliver each SignedVote to all current Elders
         trace!("Broadcasting Vote msg: {:?}", signed_vote);
-        self.send_msg_to_our_elders(NodeMsg::HandoverVotes(vec![signed_vote]))
+
+        MyNode::send_msg_to_our_elders(snapshot, NodeMsg::HandoverVotes(vec![signed_vote]))
     }
 
     /// Broadcast the decision of the terminated handover consensus by proposing the NewElders SAP
@@ -87,9 +93,9 @@ impl MyNode {
     }
 
     /// helper to handle a handover vote
-    #[instrument(skip(self), level = "trace")]
+    #[instrument(skip(snapshot), level = "trace")]
     fn handle_vote(
-        &self,
+        snapshot: &MyNodeSnapshot,
         handover_state: &mut Handover,
         signed_vote: SignedVote<SapCandidate>,
         peer: Peer,
@@ -100,7 +106,10 @@ impl MyNode {
                     ">>> Handover Vote msg successfully handled, broadcasting our vote: {:?}",
                     signed_vote
                 );
-                Ok(vec![self.broadcast_handover_vote_msg(signed_vote)])
+                Ok(vec![MyNode::broadcast_handover_vote_msg(
+                    snapshot,
+                    signed_vote,
+                )])
             }
             Ok(VoteResponse::WaitingForMoreVotes) => {
                 trace!(
@@ -279,11 +288,11 @@ impl MyNode {
         signed_vote: SignedVote<SapCandidate>,
     ) -> Result<Vec<Cmd>> {
         self.check_signed_vote_saps(&signed_vote)?;
-
+        let snapshot = &self.get_snapshot();
         match &self.handover_voting {
             Some(handover_state) => {
                 let mut state = handover_state.clone();
-                let mut cmds = self.handle_vote(&mut state, signed_vote, peer)?;
+                let mut cmds = MyNode::handle_vote(snapshot, &mut state, signed_vote, peer)?;
 
                 // check for unsuccessful termination
                 state.handle_empty_set_decision();
@@ -327,7 +336,10 @@ impl MyNode {
                     // We hit an error while processing this vote, perhaps we are missing information.
                     // We'll send a handover AE request to see if they can help us catch up.
                     debug!("{:?}", LogMarker::HandoverSendingAeUpdateRequest);
-                    cmds.push(self.send_system_msg(NodeMsg::HandoverAE(gen), Peers::Single(peer)));
+                    cmds.push(MyNode::send_system_msg(
+                        NodeMsg::HandoverAE(gen),
+                        Peers::Single(peer),
+                    ));
                     // return the vec w/ the AE cmd there so as not to loop and generate AE for
                     // any subsequent commands
                     return Ok(cmds);
@@ -351,12 +363,10 @@ impl MyNode {
 
         if let Some(handover) = self.handover_voting.as_ref() {
             match handover.anti_entropy(gen) {
-                Ok(catchup_votes) => {
-                    Some(self.send_system_msg(
-                        NodeMsg::HandoverVotes(catchup_votes),
-                        Peers::Single(peer),
-                    ))
-                }
+                Ok(catchup_votes) => Some(MyNode::send_system_msg(
+                    NodeMsg::HandoverVotes(catchup_votes),
+                    Peers::Single(peer),
+                )),
                 Err(e) => {
                     error!("Handover - Error while processing anti-entropy {:?}", e);
                     None

@@ -8,6 +8,7 @@
 
 use crate::{
     node::{
+        core::MyNodeSnapshot,
         flow_ctrl::cmds::Cmd,
         messaging::{OutgoingMsg, Peers},
         Event, MembershipEvent, MyNode, Proposal as CoreProposal, Result, MIN_LEVEL_WHEN_FULL,
@@ -33,56 +34,57 @@ use xor_name::XorName;
 
 impl MyNode {
     /// Send a (`NodeMsg`) message to all Elders in our section
-    pub(crate) fn send_msg_to_our_elders(&self, msg: NodeMsg) -> Cmd {
-        let sap = self.network_knowledge.section_auth();
+    pub(crate) fn send_msg_to_our_elders(snapshot: &MyNodeSnapshot, msg: NodeMsg) -> Cmd {
+        let sap = snapshot.network_knowledge.section_auth();
         let recipients = sap.elders_set();
-        self.send_system_msg(msg, Peers::Multiple(recipients))
+        MyNode::send_system_msg(msg, Peers::Multiple(recipients))
     }
 
     /// Send a (`NodeMsg`) message to a node
-    pub(crate) fn send_system_msg(&self, msg: NodeMsg, recipients: Peers) -> Cmd {
+    pub(crate) fn send_system_msg(msg: NodeMsg, recipients: Peers) -> Cmd {
         trace!("{}: {:?}", LogMarker::SendToNodes, msg);
         Cmd::send_msg(OutgoingMsg::Node(msg), recipients)
     }
 
     pub(crate) async fn store_data_as_adult_and_respond(
-        &mut self,
+        snapshot: &mut MyNodeSnapshot,
         data: ReplicatedData,
         response_stream: Option<Arc<Mutex<SendStream>>>,
         target: Peer,
         original_msg_id: MsgId,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
-
-        let section_pk = PublicKey::Bls(self.network_knowledge.section_key());
-        let node_keypair = Keypair::Ed25519(self.keypair.clone());
+        let section_pk = PublicKey::Bls(snapshot.network_knowledge.section_key());
+        let node_keypair = Keypair::Ed25519(snapshot.keypair.clone());
         let data_addr = data.address();
+        let our_node_name = snapshot.name;
+
         trace!("About to store data from {original_msg_id:?}: {data_addr:?}");
         // TODO: Respond with errors etc over the bidi stream
 
         // We are an adult here, so just store away!
         // This may return a DatabaseFull error... but we should have reported storage increase
         // well before this
-        match self
+        match snapshot
             .data_storage
             .store(&data, section_pk, node_keypair.clone())
             .await
         {
             Ok(level_report) => {
                 info!("Storage level report: {:?}", level_report);
-                cmds.extend(self.record_storage_level_if_any(level_report)?);
+                cmds.extend(MyNode::record_storage_level_if_any(snapshot, level_report)?);
             }
             Err(StorageError::NotEnoughSpace) => {
                 // storage full
                 error!("Not enough space to store more data");
-                let node_id = PublicKey::from(self.keypair.public);
+                let node_id = PublicKey::from(snapshot.keypair.public);
                 let msg = NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
                     node_id,
                     data,
                     full: true,
                 });
 
-                cmds.push(self.send_msg_to_our_elders(msg))
+                cmds.push(MyNode::send_msg_to_our_elders(snapshot, msg))
             }
             Err(error) => {
                 // the rest seem to be non-problematic errors.. (?)
@@ -94,11 +96,18 @@ impl MyNode {
 
         trace!("Data has been stored: {data_addr:?}");
         let msg = NodeMsg::NodeEvent(NodeEvent::DataStored(data_addr));
-        let (kind, payload) = self.serialize_node_msg(msg)?;
+        let (kind, payload) = MyNode::serialize_node_msg(our_node_name, msg)?;
 
         if let Some(stream) = response_stream {
-            self.send_msg_on_stream(payload, kind, stream, Some(target), original_msg_id)
-                .await?;
+            MyNode::send_msg_on_stream(
+                snapshot.network_knowledge.section_key(),
+                payload,
+                kind,
+                stream,
+                Some(target),
+                original_msg_id,
+            )
+            .await?;
         } else {
             error!("Cannot respond over stream, none exists after storing! {data_addr:?}");
         }
@@ -120,12 +129,14 @@ impl MyNode {
         match msg {
             NodeMsg::Relocate(node_state) => {
                 let mut node = node.write().await;
+                debug!("[NODE WRITE]: Relocated write gottt...");
 
                 trace!("Handling msg: Relocate from {}: {:?}", sender, msg_id);
                 Ok(node.handle_relocate(node_state)?.into_iter().collect())
             }
             NodeMsg::JoinAsRelocatedResponse(join_response) => {
                 let mut node = node.write().await;
+                debug!("[NODE WRITE]: joinasreloac write gottt...");
                 trace!("Handling msg: JoinAsRelocatedResponse from {}", sender);
                 if let Some(ref mut joining_as_relocated) = node.relocate_state {
                     if let Some(cmd) =
@@ -147,19 +158,20 @@ impl MyNode {
                 kind,
             } => {
                 trace!("Handling msg: AE from {sender}: {msg_id:?}");
-                let mut node = node.write().await;
                 // as we've data storage reqs inside here for reorganisation, we have async calls to
                 // the fs
-                node.handle_anti_entropy_msg(section_tree_update, kind, sender)
-                    .await
+                MyNode::handle_anti_entropy_msg(node, section_tree_update, kind, sender).await
             }
             // Respond to a probe msg
             // We always respond to probe msgs if we're an elder as health checks use this to see if a node is alive
             // and repsonsive, as well as being a method of keeping nodes up to date.
             NodeMsg::AntiEntropyProbe(section_key) => {
-                let node = node.read().await;
+                debug!("[NODE READ]: aeprobe attempts");
+                let snapshot = node.read().await.get_snapshot();
+                debug!("[NODE READ]: aeprobe lock got");
+
                 let mut cmds = vec![];
-                if !node.is_elder() {
+                if !snapshot.is_elder {
                     // early return here as we do not get health checks as adults,
                     // normal AE rules should have applied
                     return Ok(cmds);
@@ -168,12 +180,19 @@ impl MyNode {
                 trace!("Received Probe message from {}: {:?}", sender, msg_id);
                 let mut recipients = BTreeSet::new();
                 let _existed = recipients.insert(sender);
-                cmds.push(node.send_ae_update_to_nodes(recipients, section_key));
+                cmds.push(MyNode::send_ae_update_to_nodes(
+                    &snapshot,
+                    recipients,
+                    section_key,
+                ));
                 Ok(cmds)
             }
             // The AcceptedOnlineShare for relocation will be received here.
             NodeMsg::JoinResponse(join_response) => {
                 let mut node = node.write().await;
+                debug!("[NODE WRITE]: join response write gottt...");
+                let snapshot = node.get_snapshot();
+
                 match *join_response {
                     JoinResponse::Approved {
                         section_tree_update,
@@ -184,11 +203,10 @@ impl MyNode {
                             sender
                         );
                         info!("Relocation: Successfully aggregated ApprovalShares for joining the network");
-
                         if let Some(ref mut joining_as_relocated) = node.relocate_state {
                             let new_node = joining_as_relocated.node.clone();
                             let new_name = new_node.name();
-                            let previous_name = node.info().name();
+                            let previous_name = snapshot.name;
                             let new_keypair = new_node.keypair;
 
                             info!(
@@ -199,7 +217,7 @@ impl MyNode {
                             let recipients: Vec<_> =
                                 section_tree_update.signed_sap.elders().cloned().collect();
 
-                            let section_tree = node.network_knowledge.section_tree().clone();
+                            let section_tree = snapshot.network_knowledge.section_tree().clone();
                             let new_network_knowledge =
                                 NetworkKnowledge::new(section_tree, section_tree_update)?;
 
@@ -207,7 +225,6 @@ impl MyNode {
                             //       or still using the cmd pattern.
                             //       As the sending of the JoinRequest as notification
                             //       may require the `node` to be switched to new already.
-
                             node.relocate(new_keypair.clone(), new_network_knowledge)?;
 
                             trace!(
@@ -216,7 +233,7 @@ impl MyNode {
                             );
 
                             // move off thread to keep fn sync
-                            let event_sender = node.event_sender.clone();
+                            let event_sender = snapshot.event_sender;
                             let _handle = tokio::spawn(async move {
                                 event_sender
                                     .send(Event::Membership(MembershipEvent::Relocated {
@@ -241,11 +258,14 @@ impl MyNode {
             }
             NodeMsg::HandoverVotes(votes) => {
                 let mut node = node.write().await;
-
+                debug!("[NODE WRITE]: handover votes write gottt...");
                 node.handle_handover_msg(sender, votes)
             }
             NodeMsg::HandoverAE(gen) => {
+                debug!("[NODE READ]: handover ae attempts");
                 let node = node.read().await;
+                debug!("[NODE READ]: handover ae got");
+
                 Ok(node
                     .handle_handover_anti_entropy(sender, gen)
                     .into_iter()
@@ -253,20 +273,26 @@ impl MyNode {
             }
             NodeMsg::JoinRequest(join_request) => {
                 trace!("Handling msg {:?}: JoinRequest from {}", msg_id, sender);
-                MyNode::handle_join_request(node, sender, join_request)
+                let snapshot = &node.read().await.get_snapshot();
+                debug!("[NODE READ]: joinReq read got");
+
+                MyNode::handle_join_request(node, snapshot, sender, join_request)
                     .await
                     .map(|c| c.into_iter().collect())
             }
             NodeMsg::JoinAsRelocatedRequest(join_request) => {
                 trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
-                if node.read().await.is_not_elder()
-                    && join_request.section_key == node.read().await.network_knowledge.section_key()
+                let snapshot = &node.read().await.get_snapshot();
+                debug!("[NODE READ]: joinReqas relocated read got");
+
+                if snapshot.is_not_elder
+                    && join_request.section_key == snapshot.network_knowledge.section_key()
                 {
                     return Ok(vec![]);
                 }
 
                 Ok(
-                    MyNode::handle_join_as_relocated_request(node, sender, *join_request)
+                    MyNode::handle_join_as_relocated_request(node, snapshot, sender, *join_request)
                         .await
                         .into_iter()
                         .collect(),
@@ -274,22 +300,28 @@ impl MyNode {
             }
             NodeMsg::MembershipVotes(votes) => {
                 let mut node = node.write().await;
+                debug!("[NODE WRITE]: MembershipVotes write gottt...");
                 let mut cmds = vec![];
                 cmds.extend(node.handle_membership_votes(sender, votes)?);
                 Ok(cmds)
             }
             NodeMsg::MembershipAE(gen) => {
-                let node = node.read().await;
-                Ok(node
-                    .handle_membership_anti_entropy(sender, gen)
-                    .into_iter()
-                    .collect())
+                debug!("[NODE READ]: membership ae read ");
+                let snapshopt = node.read().await.get_snapshot();
+                debug!("[NODE READ]: membership ae read got");
+
+                Ok(
+                    MyNode::handle_membership_anti_entropy(&snapshopt, sender, gen)
+                        .into_iter()
+                        .collect(),
+                )
             }
             NodeMsg::Propose {
                 proposal,
                 sig_share,
             } => {
                 let mut node = node.write().await;
+                debug!("[NODE WRITE]: PROPOSE write gottt...");
                 if node.is_not_elder() {
                     trace!("Adult handling a Propose msg from {}: {:?}", sender, msg_id);
                 }
@@ -322,6 +354,7 @@ impl MyNode {
                 );
 
                 let mut node = node.write().await;
+                debug!("[NODE WRITE]: DKGstart write gottt...");
                 node.log_dkg_session(&sender.name());
                 node.handle_dkg_start(session_id, elder_sig)
             }
@@ -338,6 +371,7 @@ impl MyNode {
                     sender
                 );
                 let mut node = node.write().await;
+                debug!("[NODE WRITE]: DKG Ephemeral write gottt...");
                 node.handle_dkg_ephemeral_pubkey(&session_id, section_auth, pub_key, sig, sender)
             }
             NodeMsg::DkgVotes {
@@ -353,16 +387,21 @@ impl MyNode {
                     votes
                 );
                 let mut node = node.write().await;
+                debug!("[NODE WRITE]: DKG Votes write gottt...");
                 node.log_dkg_session(&sender.name());
                 node.handle_dkg_votes(&session_id, pub_keys, votes, sender)
             }
             NodeMsg::DkgAE(session_id) => {
+                debug!("[NODE READ]: dkg ae read ");
+
                 let node = node.read().await;
+                debug!("[NODE READ]: dkg ae read got");
                 trace!("Handling msg: DkgAE s{} from {}", session_id.sh(), sender);
                 node.handle_dkg_anti_entropy(session_id, sender)
             }
             NodeMsg::NodeCmd(NodeCmd::RecordStorageLevel { node_id, level, .. }) => {
                 let mut node = node.write().await;
+                debug!("[NODE WRITE]: RecordStorage write gottt...");
                 let changed = node.set_storage_level(&node_id, level);
                 if changed && level.value() == MIN_LEVEL_WHEN_FULL {
                     // ..then we accept a new node in place of the full node
@@ -372,6 +411,7 @@ impl MyNode {
             }
             NodeMsg::NodeCmd(NodeCmd::ReceiveMetadata { metadata }) => {
                 let mut node = node.write().await;
+                debug!("[NODE WRITE]: ReceveMeta write gottt...");
                 info!("Processing received MetadataExchange packet: {:?}", msg_id);
                 node.set_adult_levels(metadata);
                 Ok(vec![])
@@ -386,35 +426,44 @@ impl MyNode {
                 data,
                 full,
             }) => {
-                let mut node = node.write().await;
                 info!(
                     "Processing CouldNotStoreData event with MsgId: {:?}",
                     msg_id
                 );
-                if node.is_not_elder() {
+
+                let snapshot = node.read().await.get_snapshot();
+                debug!("[NODE READ]: could ont store data read got");
+
+                if snapshot.is_not_elder {
                     error!("Received unexpected message while Adult");
                     return Ok(vec![]);
                 }
 
                 if full {
-                    let changed =
-                        node.set_storage_level(&node_id, StorageLevel::from(StorageLevel::MAX)?);
+                    let mut write_locked_node = node.write().await;
+                    debug!("[NODE WRITE]: CouldNotStore write gottt...");
+                    let changed = write_locked_node
+                        .set_storage_level(&node_id, StorageLevel::from(StorageLevel::MAX)?);
                     if changed {
                         // ..then we accept a new node in place of the full node
-                        node.joins_allowed = true;
+                        write_locked_node.joins_allowed = true;
                     }
                 }
 
-                let targets = node.target_data_holders(data.name());
+                let targets = MyNode::target_data_holders(&snapshot, data.name());
 
                 // TODO: handle responses where replication failed...
-                let _results = node.replicate_data_to_adults(data, msg_id, targets).await?;
+                let _results =
+                    MyNode::replicate_data_to_adults(&snapshot, data, msg_id, targets).await?;
 
                 Ok(vec![])
             }
             NodeMsg::NodeCmd(NodeCmd::ReplicateOneData(data)) => {
-                let node_read_lock = node.read().await;
-                if node_read_lock.is_elder() {
+                debug!("[NODE READ]: replicate one data");
+                let mut snapshot = node.read().await.get_snapshot();
+                debug!("[NODE READ]: replicate one data read got");
+
+                if snapshot.is_elder {
                     error!("Received unexpected message while Elder");
                     return Ok(vec![]);
                 }
@@ -423,64 +472,63 @@ impl MyNode {
                     data.address()
                 );
 
-                // ensure we drop the read lock as it's not needed
-                drop(node_read_lock);
-
-                // grab the write lock each time in the loop to not hold it over large data sets
-                let mut node = node.write().await;
-
-                debug!(
-                    "Attempting to store data locally as adult:: write lock gotten: {:?}",
-                    data.address()
-                );
                 // store data and respond w/ack on the response stream
-                node.store_data_as_adult_and_respond(data, send_stream, sender, msg_id)
-                    .await
+                MyNode::store_data_as_adult_and_respond(
+                    &mut snapshot,
+                    data,
+                    send_stream,
+                    sender,
+                    msg_id,
+                )
+                .await
             }
             NodeMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)) => {
-                let node_read_lock = node.read().await;
-
                 info!("ReplicateData MsgId: {:?}", msg_id);
+                let mut snapshot = node.read().await.get_snapshot();
+                debug!("[NODE READ]: replicate data read got");
 
-                if node_read_lock.is_elder() {
+                if snapshot.is_elder {
                     error!("Received unexpected message while Elder");
                     return Ok(vec![]);
                 }
 
                 let mut cmds = vec![];
 
-                let section_pk = PublicKey::Bls(node_read_lock.network_knowledge.section_key());
-                let node_keypair = Keypair::Ed25519(node_read_lock.keypair.clone());
-                // ensure we drop the read lock as it's not needed
-                drop(node_read_lock);
+                let section_pk = PublicKey::Bls(snapshot.network_knowledge.section_key());
+                let node_keypair = Keypair::Ed25519(snapshot.keypair.clone());
 
                 for data in data_collection {
                     // grab the write lock each time in the loop to not hold it over large data sets
-                    let mut node = node.write().await;
+                    let store_result = snapshot
+                        .data_storage
+                        .store(&data, section_pk, node_keypair.clone())
+                        .await;
 
                     // We are an adult here, so just store away!
                     // This may return a DatabaseFull error... but we should have reported storage increase
                     // well before this
-                    match node
-                        .data_storage
-                        .store(&data, section_pk, node_keypair.clone())
-                        .await
-                    {
+                    match store_result {
                         Ok(level_report) => {
                             info!("Storage level report: {:?}", level_report);
-                            cmds.extend(node.record_storage_level_if_any(level_report)?);
+                            cmds.extend(MyNode::record_storage_level_if_any(
+                                &snapshot,
+                                level_report,
+                            )?);
+
+                            info!("End of message flow.");
                         }
                         Err(StorageError::NotEnoughSpace) => {
                             // storage full
                             error!("Not enough space to store more data");
-                            let node_id = PublicKey::from(node.keypair.public);
+
+                            let node_id = PublicKey::from(snapshot.keypair.public);
                             let msg = NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
                                 node_id,
                                 data,
                                 full: true,
                             });
 
-                            cmds.push(node.send_msg_to_our_elders(msg))
+                            cmds.push(MyNode::send_msg_to_our_elders(&snapshot, msg))
                         }
                         Err(error) => {
                             // the rest seem to be non-problematic errors.. (?)
@@ -492,33 +540,37 @@ impl MyNode {
                 Ok(cmds)
             }
             NodeMsg::NodeCmd(NodeCmd::SendAnyMissingRelevantData(known_data_addresses)) => {
-                let node = node.read().await;
-
                 info!(
                     "{:?} MsgId: {:?}",
                     LogMarker::RequestForAnyMissingData,
                     msg_id
                 );
-                Ok(node
-                    .get_missing_data_for_node(sender, known_data_addresses)
-                    .await
-                    .into_iter()
-                    .collect())
+                let snapshot = &node.read().await.get_snapshot();
+                debug!("[NODE READ]: send missing data read got");
+
+                Ok(
+                    MyNode::get_missing_data_for_node(snapshot, sender, known_data_addresses)
+                        .await
+                        .into_iter()
+                        .collect(),
+                )
             }
             NodeMsg::NodeQuery(NodeQuery::Data {
                 query,
                 auth,
                 operation_id,
             }) => {
-                let node = node.read().await;
-
                 // A request from EndUser - via elders - for locally stored data
                 debug!(
                     "Handle NodeQuery with msg_id {:?}, operation_id {}",
                     msg_id, operation_id
                 );
+                let snapshot = node.read().await.get_snapshot();
 
-                node.handle_data_query_at_adult(
+                debug!("[NODE READ]: node query read got");
+
+                MyNode::handle_data_query_at_adult(
+                    &snapshot,
                     operation_id,
                     &query,
                     auth,
@@ -543,11 +595,14 @@ impl MyNode {
         }
     }
 
-    fn record_storage_level_if_any(&self, level: Option<StorageLevel>) -> Result<Vec<Cmd>> {
+    fn record_storage_level_if_any(
+        snapshot: &MyNodeSnapshot,
+        level: Option<StorageLevel>,
+    ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
         if let Some(level) = level {
             info!("Storage has now passed {} % used.", 10 * level.value());
-            let node_id = PublicKey::from(self.keypair.public);
+            let node_id = PublicKey::from(snapshot.keypair.public);
             let node_xorname = XorName::from(node_id);
 
             // we ask the section to record the new level reached
@@ -557,7 +612,9 @@ impl MyNode {
                 level,
             });
 
-            let dst = Peers::Multiple(self.network_knowledge.elders());
+            // TODO: Force a lock on node to record new storage level only if one has been breached...
+
+            let dst = Peers::Multiple(snapshot.network_knowledge.elders());
 
             cmds.push(Cmd::send_msg(OutgoingMsg::Node(msg), dst));
         }

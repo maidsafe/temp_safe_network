@@ -84,7 +84,7 @@ impl MyNode {
             .filter(|peer| peer.name() != our_name)
             .collect();
 
-        cmds.push(self.send_system_msg(msg, Peers::Multiple(recipients)));
+        cmds.push(MyNode::send_system_msg(msg, Peers::Multiple(recipients)));
 
         Ok(cmds)
     }

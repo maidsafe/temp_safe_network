@@ -13,7 +13,7 @@ use crate::node::{
 
 use sn_interface::{
     messaging::{Dst, MsgId, MsgKind, WireMsg},
-    network_knowledge::SectionTreeUpdate,
+    network_knowledge::{NetworkKnowledge, SectionTreeUpdate},
     types::Peer,
 };
 
@@ -22,7 +22,7 @@ use qp2p::UsrMsgBytes;
 use bytes::Bytes;
 use std::{collections::BTreeSet, sync::Arc};
 use tokio::sync::RwLock;
-
+use xor_name::XorName;
 // Cmd Dispatcher.
 pub(crate) struct Dispatcher {
     node: Arc<RwLock<MyNode>>,
@@ -49,12 +49,20 @@ impl Dispatcher {
                 send_stream,
             } => {
                 trace!("Sending msg: {msg_id:?}");
+                let snapshot = self.node.read().await.get_snapshot();
+                debug!("[NODE READ]: send msg lock got");
+
                 let peer_msgs = {
-                    let node = self.node.read().await;
-                    into_msg_bytes(&node, msg, msg_id, recipients)?
+                    into_msg_bytes(
+                        &snapshot.network_knowledge,
+                        snapshot.name,
+                        msg,
+                        msg_id,
+                        recipients,
+                    )?
                 };
 
-                let comm = self.node.read().await.comm.clone();
+                let comm = snapshot.comm.clone();
 
                 let tasks = peer_msgs
                     .into_iter()
@@ -77,6 +85,7 @@ impl Dispatcher {
             }
             Cmd::TrackNodeIssueInDysfunction { name, issue } => {
                 let mut node = self.node.write().await;
+                debug!("[NODE WRITE]: dysf tracking write got");
                 node.log_node_issue(name, issue);
                 Ok(vec![])
             }
@@ -84,12 +93,7 @@ impl Dispatcher {
                 origin,
                 wire_msg,
                 send_stream,
-            } => {
-                debug!("validatinge msg: {:?}", wire_msg.msg_id());
-                let node = self.node.read().await;
-                debug!("got node read lock for: {:?}", wire_msg.msg_id());
-                node.validate_msg(origin, wire_msg, send_stream).await
-            }
+            } => MyNode::validate_msg(self.node.clone(), origin, wire_msg, send_stream).await,
             Cmd::UpdateNetworkAndHandleValidClientMsg {
                 proof_chain,
                 signed_sap,
@@ -100,20 +104,35 @@ impl Dispatcher {
                 send_stream,
             } => {
                 debug!("Updating network knowledge before handling message");
-                let mut node = self.node.write().await;
-                let name = node.name();
-                let updated = node.network_knowledge.update_knowledge_if_valid(
-                    SectionTreeUpdate::new(signed_sap, proof_chain),
-                    None,
-                    &name,
-                )?;
-                // drop the write lock
-                drop(node);
+                let mut snapshot = self.node.read().await.get_snapshot();
+                // block off the write lock to ensure it's dropped
+                {
+                    debug!("[NODE READ]: update client knowledge got");
 
-                let node = self.node.read().await;
+                    let name = snapshot.name;
+                    let there_was_an_update =
+                        snapshot.network_knowledge.update_knowledge_if_valid(
+                            SectionTreeUpdate::new(signed_sap.clone(), proof_chain.clone()),
+                            None,
+                            &name,
+                        )?;
 
-                debug!("Network knowledge was updated: {updated}");
-                node.handle_valid_client_msg(msg_id, msg, auth, origin, send_stream)
+                    if there_was_an_update {
+                        // okay lets do it for real
+                        let mut node = self.node.write().await;
+                        debug!("[NODE WRITE]: update client write got");
+                        let updated = node.network_knowledge.update_knowledge_if_valid(
+                            SectionTreeUpdate::new(signed_sap, proof_chain),
+                            None,
+                            &name,
+                        )?;
+                        debug!("Network knowledge was updated: {updated}");
+                    }
+                }
+
+                debug!("[NODE READ]: update & validate msg lock got");
+
+                MyNode::handle_valid_client_msg(snapshot, msg_id, msg, auth, origin, send_stream)
                     .await
             }
             Cmd::HandleValidNodeMsg {
@@ -127,21 +146,30 @@ impl Dispatcher {
                     .await
             }
             Cmd::HandleAgreement { proposal, sig } => {
+                debug!("[NODE WRITE]: general agreements node write...");
                 let mut node = self.node.write().await;
+                debug!("[NODE WRITE]: general agreements node write got");
+
                 node.handle_general_agreements(proposal, sig)
                     .map(|c| c.into_iter().collect())
             }
             Cmd::HandleMembershipDecision(decision) => {
+                debug!("[NODE WRITE]: membership decision agreements write...");
                 let mut node = self.node.write().await;
+                debug!("[NODE WRITE]: membership decision agreements write got...");
                 node.handle_membership_decision(decision)
             }
             Cmd::HandleNewEldersAgreement { new_elders, sig } => {
+                debug!("[NODE WRITE]: new elders decision agreements write...");
                 let mut node = self.node.write().await;
+                debug!("[NODE WRITE]: new elders decision agreements write got...");
                 node.handle_new_elders_agreement(new_elders, sig)
             }
             Cmd::HandleFailedSendToNode { peer, msg_id } => {
                 warn!("Message sending failed to {peer}, for {msg_id:?}");
+                debug!("[NODE WRITE]: HandleFailedSendToNode agreements write...");
                 let mut node = self.node.write().await;
+                debug!("[NODE WRITE]: HandleFailedSendToNode agreements write got...");
                 node.handle_failed_send(&peer.addr());
                 Ok(vec![])
             }
@@ -149,7 +177,9 @@ impl Dispatcher {
                 section_auth,
                 outcome,
             } => {
+                debug!("[NODE WRITE]: HandleDKg agreements write...");
                 let mut node = self.node.write().await;
+                debug!("[NODE WRITE]: HandleDKg agreements write got...");
                 node.handle_dkg_outcome(section_auth, outcome)
             }
             Cmd::EnqueueDataForReplication {
@@ -160,7 +190,9 @@ impl Dispatcher {
                 // we should queue this
                 for data in data_batch {
                     trace!("data being enqueued for replication {:?}", data);
+                    debug!("[NODE WRITE]: data for repl write...");
                     let mut node = self.node.write().await;
+                    debug!("[NODE WRITE]: data for repl write gottt...");
                     if let Some(peers_set) = node.pending_data_to_replicate_to_peers.get_mut(&data)
                     {
                         debug!("data already queued, adding peer");
@@ -176,7 +208,10 @@ impl Dispatcher {
                 Ok(vec![])
             }
             Cmd::ProposeVoteNodesOffline(names) => {
+                debug!("[NODE WRITE]: propose offline write gottt...");
+
                 let mut node = self.node.write().await;
+                debug!("[NODE WRITE]: propose offline write gottt...");
                 node.cast_offline_proposals(&names)
             }
         }
@@ -187,18 +222,20 @@ impl Dispatcher {
 // and produces one [`WireMsg`] instance per recipient -
 // the last step before passing it over to comms module.
 fn into_msg_bytes(
-    node: &MyNode,
+    network_knowledge: &NetworkKnowledge,
+    our_node_name: XorName,
     msg: OutgoingMsg,
     msg_id: MsgId,
     recipients: Peers,
 ) -> Result<Vec<(Peer, UsrMsgBytes)>> {
     let (kind, payload) = match msg {
-        OutgoingMsg::Node(msg) => node.serialize_node_msg(msg)?,
+        OutgoingMsg::Node(msg) => MyNode::serialize_node_msg(our_node_name, msg)?,
     };
     let recipients = match recipients {
         Peers::Single(peer) => vec![peer],
         Peers::Multiple(peers) => peers.into_iter().collect(),
     };
+
     // we first generate the XorName
     let dst = Dst {
         name: xor_name::rand::random(),
@@ -211,7 +248,7 @@ fn into_msg_bytes(
 
     let mut msgs = vec![];
     for peer in recipients {
-        match node.network_knowledge.generate_dst(&peer.name()) {
+        match network_knowledge.generate_dst(&peer.name()) {
             Ok(dst) => {
                 // TODO log errror here isntead of throwing
                 let all_the_bytes = initial_wire_msg.serialize_with_new_dst(&dst)?;

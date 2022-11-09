@@ -68,7 +68,7 @@ impl Session {
             }
 
             let stream_id = recv_stream.id();
-            debug!("Waiting for response msg on {stream_id} from {peer:?} for {correlation_id:?}, attempt #{attempt}");
+            debug!("Waiting for response msg on {stream_id} from {peer:?} @ index: {peer_index} for {correlation_id:?}, attempt #{attempt}");
 
             match Self::read_msg_from_recvstream(&mut recv_stream).await {
                 Ok(MsgType::Client { msg_id, msg, .. }) => {
@@ -112,7 +112,7 @@ impl Session {
                 kind:
                     AntiEntropyKind::Redirect { bounced_msg } | AntiEntropyKind::Retry { bounced_msg },
             } => {
-                debug!("AE Redirect/Retry msg with id {msg_id:?} received for {correlation_id:?}");
+                debug!("AE Redirect/Retry msg with id {msg_id:?} received for {correlation_id:?} from {src_peer:?}@{src_peer_index:?}");
                 self.handle_ae_msg(section_tree_update, bounced_msg, src_peer, src_peer_index)
                     .await
             }
@@ -183,7 +183,7 @@ impl Session {
         src_peer_index: usize,
     ) -> Result<MsgResent> {
         let target_sap = section_tree_update.signed_sap.value.clone();
-        debug!("Received Anti-Entropy from {src_peer}, with SAP: {target_sap:?}");
+        debug!("Received Anti-Entropy from {src_peer} (index:{src_peer_index:?}), with SAP: {target_sap:?}");
 
         // Try to update our network knowledge first
         self.update_network_knowledge(section_tree_update, src_peer)
@@ -191,8 +191,6 @@ impl Session {
 
         let (msg_id, elders, service_msg, dst, auth) =
             Self::new_target_elders(src_peer, bounced_msg.clone(), &target_sap).await?;
-
-        debug!("{msg_id:?} AE bounced msg going out again. Resending original message (sent to {src_peer:?}) to new section eldere");
 
         // The actual order of elders doesn't really matter. All that matters is we pass each AE response
         // we get through the same hoops, to then be able to ping a new elder on a 1-1 basis for the src_peer
@@ -218,7 +216,7 @@ impl Session {
                 WireMsg::new_msg(msg_id, payload, MsgKind::Client(auth.into_inner()), dst);
             let bytes = wire_msg.serialize()?;
 
-            debug!("Resending original message {msg_id:?} received on AE Redirect/Retry with updated details.");
+            debug!("{msg_id:?} AE bounced msg going out again. Resending original message (sent to index {src_peer_index:?} peer: {src_peer:?}) to new section elder {elder:?}");
 
             let link = self.peer_links.get_or_create_link(elder, false).await;
             let new_recv_stream = link
@@ -299,7 +297,9 @@ impl Session {
             }
         };
 
-        trace!("Bounced msg {msg_id:?} received in an AE response: {service_msg:?}");
+        trace!(
+            "Bounced msg {msg_id:?} received in an AE response: {service_msg:?} from {src_peer:?}"
+        );
         let dst_address_of_bounced_msg = match service_msg.clone() {
             ClientMsg::Cmd(cmd) => cmd.dst_name(),
             ClientMsg::Query(query) => query.variant.dst_name(),

@@ -9,7 +9,8 @@
 use super::FlowCtrl;
 
 use crate::node::{
-    flow_ctrl::cmds::Cmd, messaging::Peers, node_starter::CmdChannel, MyNode, Result,
+    core::MyNodeSnapshot, flow_ctrl::cmds::Cmd, messaging::Peers, node_starter::CmdChannel, MyNode,
+    Result,
 };
 
 use sn_interface::{
@@ -60,28 +61,34 @@ impl PeriodicChecksTimestamps {
 impl FlowCtrl {
     /// Generate and fire commands for all types of periodic checks
     pub(super) async fn perform_periodic_checks(&mut self) {
-        self.enqueue_cmds_for_standard_periodic_checks().await;
+        debug!("[NODE READ]: periodic msg lock attempt...");
+        let snapshot = &self.node.read().await.get_snapshot();
+        debug!("[NODE READ]: periodic msg lock got");
 
-        if !self.node.read().await.is_elder() {
-            self.enqueue_cmds_for_adult_periodic_checks().await;
+        self.enqueue_cmds_for_standard_periodic_checks(snapshot)
+            .await;
+
+        if snapshot.is_not_elder {
+            self.enqueue_cmds_for_adult_periodic_checks(snapshot).await;
 
             // we've pushed what we have as an adult and processed incoming msgs
             // and cmds... so we can return already
             return;
         }
 
-        self.enqueue_cmds_for_elder_periodic_checks().await;
+        self.enqueue_cmds_for_elder_periodic_checks(snapshot).await;
     }
 
     /// Periodic tasks run for elders and adults alike
-    async fn enqueue_cmds_for_standard_periodic_checks(&mut self) {
+    async fn enqueue_cmds_for_standard_periodic_checks(&mut self, snapshot: &MyNodeSnapshot) {
         let now = Instant::now();
         let mut cmds = vec![];
 
         // if we've passed enough time, batch outgoing data
         if self.timestamps.last_data_batch_check.elapsed() > DATA_BATCH_INTERVAL {
             self.timestamps.last_data_batch_check = now;
-            if let Some(cmd) = match Self::replicate_queued_data(self.node.clone()).await {
+            if let Some(cmd) = match Self::replicate_queued_data(self.node.clone(), snapshot).await
+            {
                 Ok(cmd) => cmd,
                 Err(error) => {
                     error!(
@@ -102,13 +109,13 @@ impl FlowCtrl {
     }
 
     /// Periodic tasks run for adults only
-    async fn enqueue_cmds_for_adult_periodic_checks(&mut self) {
+    async fn enqueue_cmds_for_adult_periodic_checks(&mut self, snapshot: &MyNodeSnapshot) {
         let mut cmds = vec![];
 
         // if we've passed enough time, section probe
         if self.timestamps.last_section_probe.elapsed() > SECTION_PROBE_INTERVAL {
             self.timestamps.last_section_probe = Instant::now();
-            cmds.push(Self::probe_the_section(self.node.clone()).await);
+            cmds.push(Self::probe_the_section(snapshot).await);
         }
 
         for cmd in cmds {
@@ -119,7 +126,7 @@ impl FlowCtrl {
     }
 
     /// Periodic tasks run for elders only
-    async fn enqueue_cmds_for_elder_periodic_checks(&mut self) {
+    async fn enqueue_cmds_for_elder_periodic_checks(&mut self, snapshot: &MyNodeSnapshot) {
         debug!(" ----> elder periodics START");
 
         let now = Instant::now();
@@ -128,7 +135,7 @@ impl FlowCtrl {
         if self.timestamps.last_probe.elapsed() > PROBE_INTERVAL {
             debug!(" ----> probe periodics start");
             self.timestamps.last_probe = now;
-            if let Some(cmd) = Self::probe_the_network(self.node.clone()).await {
+            if let Some(cmd) = Self::probe_the_network(snapshot).await {
                 cmds.push(cmd);
             }
             debug!(" ----> probe periodics done");
@@ -157,7 +164,7 @@ impl FlowCtrl {
         if self.timestamps.last_elder_health_check.elapsed() > ELDER_HEALTH_CHECK_INTERVAL {
             debug!(" ----> elder health periodics start");
             self.timestamps.last_elder_health_check = now;
-            for cmd in Self::health_check_elders_in_section(self.node.clone()).await {
+            for cmd in Self::health_check_elders_in_section(snapshot).await {
                 cmds.push(cmd);
             }
             debug!(" ----> elder health periodics done");
@@ -166,7 +173,7 @@ impl FlowCtrl {
         if self.timestamps.last_vote_check.elapsed() > MISSING_VOTE_INTERVAL {
             debug!(" ----> vote periodics start");
             self.timestamps.last_vote_check = now;
-            for cmd in self.check_for_missed_votes().await {
+            for cmd in self.check_for_missed_votes(snapshot).await {
                 cmds.push(cmd);
             }
             debug!(" ----> vote periodics done");
@@ -232,15 +239,14 @@ impl FlowCtrl {
 
     /// Generates a probe msg, which goes to a random section in order to
     /// passively maintain network knowledge over time
-    async fn probe_the_network(node: Arc<RwLock<MyNode>>) -> Option<Cmd> {
-        let node = node.read().await;
-        let prefix = node.network_knowledge().prefix();
+    async fn probe_the_network(snapshot: &MyNodeSnapshot) -> Option<Cmd> {
+        let prefix = snapshot.network_knowledge.prefix();
 
         // Send a probe message if we are an elder
         // but dont bother if we're the first section
         if !prefix.is_empty() {
             info!("Probing network");
-            match node.generate_probe_msg() {
+            match MyNode::generate_probe_msg(snapshot) {
                 Ok(cmd) => Some(cmd),
                 Err(error) => {
                     error!("Could not generate probe msg: {error:?}");
@@ -254,25 +260,22 @@ impl FlowCtrl {
 
     /// Generates a probe msg, which goes to our elders in order to
     /// passively maintain network knowledge over time
-    async fn probe_the_section(node: Arc<RwLock<MyNode>>) -> Cmd {
-        let node = node.read().await;
-
+    async fn probe_the_section(snapshot: &MyNodeSnapshot) -> Cmd {
         // Send a probe message to an elder
         info!("Starting to probe section");
-        node.generate_section_probe_msg()
+        MyNode::generate_section_probe_msg(snapshot)
     }
 
     /// Generates a probe msg, which goes to all section elders in order to
     /// passively maintain network knowledge over time and track dysfunction
     /// Tracking dysfunction while awaiting a response
-    async fn health_check_elders_in_section(node: Arc<RwLock<MyNode>>) -> Vec<Cmd> {
+    async fn health_check_elders_in_section(snapshot: &MyNodeSnapshot) -> Vec<Cmd> {
         let mut cmds = vec![];
-        let node = node.read().await;
 
         // Send a probe message to an elder
         debug!("Going to health check elders");
 
-        let elders = node.network_knowledge.elders();
+        let elders = snapshot.network_knowledge.elders();
         for elder in elders {
             // we track a knowledge issue
             // whhich is countered when an AE-Update is
@@ -283,16 +286,15 @@ impl FlowCtrl {
         }
 
         // Send a probe message to an elder
-        cmds.push(node.generate_section_probe_msg());
+        cmds.push(MyNode::generate_section_probe_msg(snapshot));
 
         cmds
     }
 
     /// Checks the interval since last vote received during a generation
-    async fn check_for_missed_votes(&self) -> Vec<Cmd> {
+    async fn check_for_missed_votes(&self, snapshot: &MyNodeSnapshot) -> Vec<Cmd> {
         info!("Checking for missed votes");
-        let node = self.node.read().await;
-        let membership = &node.membership;
+        let membership = &snapshot.membership;
         let mut cmds = vec![];
         if let Some(membership) = &membership {
             let last_received_vote_time = membership.last_received_vote_time();
@@ -301,14 +303,14 @@ impl FlowCtrl {
                 // we want to resend the prev vote
                 if time.elapsed() >= MISSING_VOTE_INTERVAL {
                     debug!("Vote consensus appears stalled...");
-                    if let Some(cmd) = node.membership_gossip_votes().await {
+                    if let Some(cmd) = MyNode::membership_gossip_votes(snapshot).await {
                         trace!("Vote resending cmd: {cmd:?}");
 
                         cmds.push(cmd);
                     }
                     // we may also be behind, so lets request AE incase that is the case!
                     let msg = NodeMsg::MembershipAE(membership.generation());
-                    cmds.push(node.send_msg_to_our_elders(msg));
+                    cmds.push(MyNode::send_msg_to_our_elders(snapshot, msg));
                 }
             }
         }
@@ -321,7 +323,10 @@ impl FlowCtrl {
 
         // DKG checks can be long running, move off thread to unblock the main loop
         let _handle = tokio::task::spawn(async move {
+            debug!("[NODE READ]: dkg msg lock attempt");
             let node = node.read().await;
+            debug!("[NODE READ]: dkg msg lock got");
+
             let dkg_voter = &node.dkg_voter;
 
             let last_received_dkg_message = dkg_voter.last_received_dkg_message();
@@ -345,11 +350,17 @@ impl FlowCtrl {
     }
 
     /// Periodically loop over any pending data batches and queue up `send_msg` for those
-    async fn replicate_queued_data(node: Arc<RwLock<MyNode>>) -> Result<Option<Cmd>> {
+    async fn replicate_queued_data(
+        node: Arc<RwLock<MyNode>>,
+        snapshot: &MyNodeSnapshot,
+    ) -> Result<Option<Cmd>> {
         use rand::seq::IteratorRandom;
         let mut rng = rand::rngs::OsRng;
         let data_queued = {
+            debug!("[NODE READ]: queued data msg lock got");
             let node = node.read().await;
+            debug!("[NODE READ]: queued data lock got");
+
             // choose a data to replicate at random
             let data_queued = node
                 .pending_data_to_replicate_to_peers
@@ -365,7 +376,10 @@ impl FlowCtrl {
 
             let target_peer = {
                 // careful now, if we're holding any ref into the read above we'll lock here.
+                debug!("[NODE WRITE]: periodic queue data offline write...");
+
                 let mut node = node.write().await;
+                debug!("[NODE WRITE]: periodic queue data write gottt...");
                 node.pending_data_to_replicate_to_peers.remove(&address)
             };
 
@@ -376,12 +390,7 @@ impl FlowCtrl {
                     return Ok(None);
                 }
 
-                let data_to_send = node
-                    .read()
-                    .await
-                    .data_storage
-                    .get_from_local_store(&address)
-                    .await?;
+                let data_to_send = snapshot.data_storage.get_from_local_store(&address).await?;
 
                 debug!(
                     "{:?} Data {:?} to: {:?}",
@@ -391,10 +400,11 @@ impl FlowCtrl {
                 );
 
                 let msg = NodeMsg::NodeCmd(NodeCmd::ReplicateData(vec![data_to_send]));
-                let node = node.read().await;
-                return Ok(Some(
-                    node.send_system_msg(msg, Peers::Multiple(data_recipients)),
-                ));
+
+                return Ok(Some(MyNode::send_system_msg(
+                    msg,
+                    Peers::Multiple(data_recipients),
+                )));
             }
         }
 
@@ -404,7 +414,10 @@ impl FlowCtrl {
     async fn check_for_dysfunction(node: Arc<RwLock<MyNode>>) -> Vec<Cmd> {
         info!("Performing dysfunction checking");
         let mut cmds = vec![];
+        debug!("[NODE WRITE]: periodic dysf  write ...");
         let dysfunctional_nodes = node.write().await.get_dysfunctional_node_names();
+        debug!("[NODE WRITE]: periodic dysf write gottt...");
+
         let unresponsive_nodes = match dysfunctional_nodes {
             Ok(nodes) => nodes,
             Err(error) => {
