@@ -1,8 +1,7 @@
-name: PR Checks
+# Run all tests on all platforms.
+name: Merge Flow. Run All Tests
 
 on:
-  pull_request:
-    branches: ["*"]
   push:
     branches: [staging, trying]
 
@@ -25,7 +24,7 @@ jobs:
     # github jobs that need to have passed for bors to give the all clear
     needs:
       - cargo-udeps
-      - cargo-deny
+      # - cargo-deny
       - e2e
       - api
       - cli
@@ -210,10 +209,6 @@ jobs:
         run: cd testnet && cargo build --release --bin testnet
         timeout-minutes: 60
 
-      # - name: Build log_cmds_inspector
-      #   run: cargo build  --release --bin log_cmds_inspector
-      #   timeout-minutes: 60
-
       - name: Start the network
         run: ./target/release/testnet --interval 30000
         id: section-startup
@@ -226,13 +221,13 @@ jobs:
         timeout-minutes: 5
 
       - name: Build all tests before running non ubuntu
-        run: cd sn_client && cargo test --no-run --release
+        run: cd sn_client && cargo test --no-run --release --features check-replicas
         timeout-minutes: 50
 
       - name: Run client tests
         env:
           RUST_LOG: "sn_client=trace,qp2p=debug"
-        run: cd sn_client && cargo test --release -- --test-threads=1
+        run: cd sn_client && cargo test --release --features check-replicas -- --test-threads=1
         timeout-minutes: 50
 
       - name: Run example app for file API against local network
@@ -509,13 +504,13 @@ jobs:
         timeout-minutes: 5
 
       - name: Build all tests before running
-        run: cd sn_api && cargo test --no-run --release
+        run: cd sn_api && cargo test --no-run --release --features check-replicas
         timeout-minutes: 50
 
       - name: Run API tests
         env:
           RUST_LOG: "sn_client=trace"
-        run: cd sn_api && cargo test --release -- --test-threads=1
+        run: cd sn_api && cargo test --release --features check-replicas -- --test-threads=1
         timeout-minutes: 30
 
       - name: Are nodes still running...?
@@ -621,11 +616,11 @@ jobs:
         run: cargo run --package sn_cli --release -- keys create --for-cli
 
       - name: Build all tests before running
-        run: cd sn_cli && cargo test --no-run --release
+        run: cd sn_cli && cargo test --no-run --release --features check-replicas
         timeout-minutes: 50
 
       - name: Run CLI tests
-        run: cd sn_cli && cargo test --release -- --test-threads=1
+        run: cd sn_cli && cargo test --release --features check-replicas -- --test-threads=1
         timeout-minutes: 50
 
       - name: Are nodes still running...?

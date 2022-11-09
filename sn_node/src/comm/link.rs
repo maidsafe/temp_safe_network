@@ -132,7 +132,7 @@ impl Link {
                 Ok(streams) => streams,
                 Err(stream_opening_err) => {
                     error!("{msg_id:?} Error opening streams {stream_opening_err:?}");
-
+                    // remove that broken conn
                     let _conn = self.connections.remove(&conn_id);
 
                     return Err(stream_opening_err);
@@ -154,6 +154,8 @@ impl Link {
             qp2p::SendError::StreamLost(qp2p::StreamError::Stopped(_)) => Ok(()),
             _ => {
                 error!("{msg_id:?} Error finishing up stream... {err:?}");
+                // remove that broken conn
+                let _conn = self.connections.remove(&conn_id);
                 Err(SendToOneError::Send(err))
             }
         })?;

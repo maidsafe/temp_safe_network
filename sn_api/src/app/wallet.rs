@@ -1172,16 +1172,7 @@ mod tests {
             .wallet_deposit(&wallet_xorurl, Some("deposited-dbc"), &dbc, None)
             .await
         {
-            Err(Error::DbcError(DbcError::InvalidSpentProofSignature(_, msg))) => {
-                assert_eq!(
-                    msg,
-                    format!(
-                        "Failed to verify SpentProof signature with key: {}",
-                        random_pk.to_hex()
-                    )
-                );
-                Ok(())
-            }
+            Err(Error::DbcError(DbcError::InvalidSpentProofSignature(_key_image))) => Ok(()),
             Err(err) => Err(anyhow!("Error returned is not the expected: {:?}", err)),
             Ok(_) => Err(anyhow!("Wallet deposit succeeded unexpectedly".to_string())),
         }

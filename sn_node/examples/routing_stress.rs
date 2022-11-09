@@ -21,7 +21,6 @@ use bls::PublicKey;
 use clap::Parser;
 use eyre::{eyre, Context, Error, Result};
 use futures::{
-    future,
     stream::{self, StreamExt},
     Stream,
 };
@@ -696,7 +695,6 @@ impl ChurnSchedule {
 
         // never yield again once the schedule is exhausted
         queue
-            .filter_map(|result| future::ready(result.ok()))
             .map(|expired| expired.into_inner())
             .chain(stream::pending())
     }

@@ -24,7 +24,7 @@ name="log_cmds_inspector"
 eyre = "~0.6.5"
 grep="~0.2.8"
 clap = { version = "3.0.0", features = ["derive", "env"] }
-strum = "~0.23.0"
-strum_macros = "~0.23.1"
+strum = "0.24"
+strum_macros = "0.24"
 walkdir = "2"
 sn_interface = { path = "../sn_interface", version = "^0.15.0" }

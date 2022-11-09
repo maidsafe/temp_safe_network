@@ -231,4 +231,43 @@ pub enum Error {
     /// Occurs if a section key is not found when searching the sections DAG.
     #[error("Section key {0:?} was not found in the sections DAG")]
     SectionsDagKeyNotFound(PublicKey),
+    /// Data replicas check errors
+    #[cfg(feature = "check-replicas")]
+    #[error(transparent)]
+    DataReplicasCheck(#[from] DataReplicasCheckError),
+}
+
+#[cfg(feature = "check-replicas")]
+#[derive(Error, Debug)]
+#[non_exhaustive]
+/// Data replicas check errors
+pub enum DataReplicasCheckError {
+    /// No response or error received when sending query to data replicas
+    #[error("No response or error obtained when sending query to all replicas: {0:?}")]
+    NoResponse(DataQueryVariant),
+    /// Errors received when checking data replicas
+    #[error("Errors occurred when sending the query to {}/{replicas} of the replicas: {query:?}. \
+        Errors received: {errors:?}", errors.len()
+    )]
+    ReceivedErrors {
+        /// Number of replicas queried
+        replicas: usize,
+        /// Query sent to data replicas
+        query: DataQueryVariant,
+        /// List of errors received with their corresponding replica/Adult index
+        errors: Vec<(Error, usize)>,
+    },
+    /// Not all responses received from data replicas are the same
+    #[error(
+        "Not all responses received are the same when sending query to {replicas} \
+        replicas: {query:?}. Responses received: {responses:?}"
+    )]
+    DifferentResponses {
+        /// Number of replicas queried
+        replicas: usize,
+        /// Query sent to data replicas
+        query: DataQueryVariant,
+        /// List of responses received with their corresponding replica/Adult index
+        responses: Vec<(crate::connections::QueryResult, usize)>,
+    },
 }
