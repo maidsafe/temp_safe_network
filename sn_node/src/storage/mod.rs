@@ -37,7 +37,9 @@ use xor_name::XorName;
 
 const BIT_TREE_DEPTH: usize = 20;
 
-/// Operations on data.
+/// Operations on data stored to disk.
+/// As data the storage struct may be cloned throughoout the node
+/// Operations here must be persisted to disk.
 #[derive(Debug, Clone)]
 // exposed as pub due to benches
 pub struct DataStorage {

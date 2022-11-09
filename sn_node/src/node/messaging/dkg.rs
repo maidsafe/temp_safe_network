@@ -102,7 +102,7 @@ impl MyNode {
 
         // send it to the other participants
         if !others.is_empty() {
-            cmds.push(self.send_system_msg(node_msg, Peers::Multiple(others)))
+            cmds.push(MyNode::send_system_msg(node_msg, Peers::Multiple(others)))
         }
 
         // handle our own
@@ -156,12 +156,12 @@ impl MyNode {
             pub_keys,
             votes,
         };
-        self.send_system_msg(node_msg, Peers::Multiple(recipients))
+        MyNode::send_system_msg(node_msg, Peers::Multiple(recipients))
     }
 
     fn request_dkg_ae(&self, session_id: &DkgSessionId, sender: Peer) -> Cmd {
         let node_msg = NodeMsg::DkgAE(session_id.clone());
-        self.send_system_msg(node_msg, Peers::Single(sender))
+        MyNode::send_system_msg(node_msg, Peers::Single(sender))
     }
 
     fn aggregate_dkg_start(
@@ -287,7 +287,7 @@ impl MyNode {
             sig,
         };
 
-        let cmd = self.send_system_msg(node_msg, Peers::Multiple(peers));
+        let cmd = MyNode::send_system_msg(node_msg, Peers::Multiple(peers));
         Ok(vec![cmd])
     }
 
@@ -554,7 +554,7 @@ impl MyNode {
                 pub_keys,
                 votes: our_votes,
             };
-            let cmd = self.send_system_msg(node_msg, Peers::Single(sender));
+            let cmd = MyNode::send_system_msg(node_msg, Peers::Single(sender));
             Ok(vec![cmd])
         } else {
             Ok(vec![])
@@ -578,7 +578,7 @@ impl MyNode {
             pub_keys,
             votes,
         };
-        let cmd = self.send_system_msg(node_msg, Peers::Single(sender));
+        let cmd = MyNode::send_system_msg(node_msg, Peers::Single(sender));
         Ok(vec![cmd])
     }
 
@@ -664,7 +664,7 @@ impl MyNode {
             pub_key: *pub_key,
             sig: *sig,
         };
-        let cmd = self.send_system_msg(node_msg, Peers::Multiple(peers));
+        let cmd = MyNode::send_system_msg(node_msg, Peers::Multiple(peers));
         vec![cmd]
     }
 
@@ -767,7 +767,7 @@ impl MyNode {
         // it to sign any msg that needs section agreement.
         self.section_keys_provider.insert(key_share.clone());
 
-        let snapshot = self.state_snapshot();
+        let snapshot = self.get_snapshot();
 
         // If we are lagging, we may have been already approved as new Elder, and
         // an AE update provided us with this same SAP but already signed by previous Elders,

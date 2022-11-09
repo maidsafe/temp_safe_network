@@ -19,16 +19,20 @@ mod relocation;
 mod serialize;
 mod update_section;
 
-use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, MyNodeSnapshot, Result};
 
 use qp2p::SendStream;
 use sn_interface::{
-    messaging::{data::ClientMsg, system::NodeMsg, Dst, MsgType, WireMsg},
+    messaging::{
+        data::ClientMsg,
+        system::{AntiEntropyKind, NodeMsg},
+        Dst, MsgType, WireMsg,
+    },
     types::Peer,
 };
 
 use std::{collections::BTreeSet, sync::Arc};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 
 #[derive(Debug, Clone)]
 pub(crate) enum Peers {
@@ -48,9 +52,9 @@ impl Peers {
 
 // Message handling
 impl MyNode {
-    #[instrument(skip(self))]
+    #[instrument(skip(node))]
     pub(crate) async fn validate_msg(
-        &self,
+        node: Arc<RwLock<MyNode>>,
         origin: Peer,
         wire_msg: WireMsg,
         send_stream: Option<Arc<Mutex<SendStream>>>,
@@ -70,14 +74,23 @@ impl MyNode {
             }
         };
 
+        let snapshot = node.read().await.get_snapshot();
+        debug!("[NODE READ]: validate msg lock got");
         match msg_type {
             MsgType::Node { msg_id, dst, msg } => {
+                debug!("node msg");
                 // Check for entropy before we proceed further
                 // Anythign returned here means there's an issue and we should
                 // short-circuit below
-                let ae_cmds = self
-                    .apply_ae(&origin, &msg, &wire_msg, &dst, send_stream.clone())
-                    .await?;
+                let ae_cmds = MyNode::apply_ae(
+                    &snapshot,
+                    &origin,
+                    &msg,
+                    &wire_msg,
+                    &dst,
+                    send_stream.clone(),
+                )
+                .await?;
 
                 if !ae_cmds.is_empty() {
                     // short circuit and send those AE responses
@@ -98,15 +111,27 @@ impl MyNode {
                 dst,
                 auth,
             } => {
-                debug!("valid client msg");
+                debug!("valid client {msg_id:?}");
 
                 let Some(send_stream) = send_stream else {
                     return Err(Error::NoClientResponseStream)
                 };
 
-                if self.is_not_elder() {
+                debug!("Attempting read lock get to get node snapshot");
+
+                // first some AntiEntropy checks...
+                if snapshot.is_not_elder {
+                    let bounced_msg = wire_msg.serialize()?;
+                    let ae_msg = MyNode::generate_ae_msg(
+                        &snapshot,
+                        None,
+                        AntiEntropyKind::Redirect { bounced_msg },
+                    );
                     trace!("Redirecting from Adult to section Elders");
-                    self.ae_redirect_client_to_our_elders(
+
+                    MyNode::ae_redirect_client_to_our_elders(
+                        ae_msg,
+                        snapshot,
                         origin,
                         send_stream,
                         wire_msg.serialize()?,
@@ -122,10 +147,13 @@ impl MyNode {
                     ClientMsg::Query(query) => query.variant.dst_name(),
                 };
 
-                // Then we perform AE checks
-                // TODO: make entropy check for client specifically w/r/t response stream
-                if let Some(cmd) = self.check_for_entropy(
+                // Now we compare provided section keys and target dst
+                // Currently this does no sending over the stream. We just form a
+                // SendMsg cmd and send to the client over that.
+                // TODO: rework this flow to avoid a SendMsg Cmd
+                if let Some(cmd) = MyNode::check_for_entropy(
                     &wire_msg,
+                    &snapshot,
                     &dst.section_key,
                     dst_name,
                     &origin,
@@ -135,9 +163,18 @@ impl MyNode {
                     return Ok(vec![cmd]);
                 }
 
-                debug!("no aeeee");
-                self.handle_valid_client_msg(msg_id, msg, auth, origin, send_stream.clone())
-                    .await
+                debug!("read lock got and dropped...");
+
+                trace!("{msg_id:?} No AE needed for client message, proceeding to handle msg");
+                MyNode::handle_valid_client_msg(
+                    snapshot,
+                    msg_id,
+                    msg,
+                    auth,
+                    origin,
+                    send_stream.clone(),
+                )
+                .await
             }
             other @ MsgType::ClientMsgResponse { .. } => {
                 error!(
@@ -154,7 +191,7 @@ impl MyNode {
     /// Returns an ae cmd if we need to halt msg validation and update the origin instead.
     #[instrument(skip_all)]
     async fn apply_ae(
-        &self,
+        snapshot: &MyNodeSnapshot,
         origin: &Peer,
         msg: &NodeMsg,
         wire_msg: &WireMsg,
@@ -163,7 +200,7 @@ impl MyNode {
     ) -> Result<Vec<Cmd>> {
         // Adult nodes don't need to carry out entropy checking,
         // however the message shall always be handled.
-        if !self.is_elder() {
+        if snapshot.is_not_elder {
             return Ok(vec![]);
         }
         // For the case of receiving a join request not matching our prefix,
@@ -184,8 +221,9 @@ impl MyNode {
             }
             _ => {
                 debug!("Checking {:?} for entropy", wire_msg.msg_id());
-                if let Some(ae_cmd) = self.check_for_entropy(
+                if let Some(ae_cmd) = MyNode::check_for_entropy(
                     wire_msg,
+                    snapshot,
                     &dst.section_key,
                     dst.name,
                     origin,

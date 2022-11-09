@@ -88,7 +88,8 @@ impl NodeTestApi {
 
     /// Returns the info about the section matching the name.
     pub async fn matching_section(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
-        self.node.read().await.matching_section(name)
+        let snapshot = &self.node.read().await.get_snapshot();
+        MyNode::matching_section(snapshot, name)
     }
 
     /// Send a system msg.

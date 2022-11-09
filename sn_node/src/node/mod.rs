@@ -30,7 +30,7 @@ mod relocation;
 
 use self::{
     bootstrap::join_network,
-    core::{MyNode, StateSnapshot, GENESIS_DBC_AMOUNT},
+    core::{MyNode, MyNodeSnapshot, GENESIS_DBC_AMOUNT},
     data::MIN_LEVEL_WHEN_FULL,
     flow_ctrl::{cmds::Cmd, event::Elders},
     node_starter::CmdChannel,
@@ -69,11 +69,12 @@ mod core {
             handover::Handover,
             membership::{elder_candidates, try_split_dkg, Membership},
             messaging::Peers,
-            DataStorage, Elders, Error, Event, MembershipEvent, NodeElderChange, Prefix, Proposal,
-            Result, XorName,
+            DataStorage, Elders, Error, Event, MembershipEvent, NodeElderChange, Proposal, Result,
+            XorName,
         },
         UsedSpace,
     };
+
     use sn_dysfunction::{DysfunctionDetection, IssueType};
 
     use sn_interface::{
@@ -148,7 +149,47 @@ mod core {
         pub(crate) dysfunction_tracking: DysfunctionDetection,
     }
 
+    #[derive(Clone)]
+    pub(crate) struct MyNodeSnapshot {
+        pub(crate) root_storage_dir: PathBuf,
+        pub(crate) is_elder: bool,
+        pub(crate) is_not_elder: bool,
+        pub(crate) data_storage: DataStorage,
+        pub(crate) name: XorName,
+        pub(crate) info: MyNodeInfo,
+        pub(crate) keypair: Arc<Keypair>,
+        pub(crate) network_knowledge: NetworkKnowledge,
+        pub(crate) section_keys_provider: SectionKeysProvider,
+        pub(crate) full_adults: BTreeSet<XorName>,
+        pub(crate) comm: Comm,
+        pub(crate) event_sender: EventSender,
+        pub(crate) joins_allowed: bool,
+        pub(crate) membership: Option<Membership>,
+    }
+
     impl MyNode {
+        /// Generate a read only snapshot of a subset of the node's state
+        /// Useful for longer running processes to avoid having to acquire
+        /// read locks eg
+        pub(crate) fn get_snapshot(&self) -> MyNodeSnapshot {
+            MyNodeSnapshot {
+                root_storage_dir: self.root_storage_dir.clone(),
+                is_elder: self.is_elder(),
+                is_not_elder: self.is_not_elder(),
+                name: self.name(),
+                info: self.info(),
+                full_adults: self.capacity.full_adults(),
+                keypair: self.keypair.clone(),
+                network_knowledge: self.network_knowledge().clone(),
+                section_keys_provider: self.section_keys_provider.clone(),
+                comm: self.comm.clone(),
+                event_sender: self.event_sender.clone(),
+                joins_allowed: self.joins_allowed,
+                membership: self.membership.clone(),
+                data_storage: self.data_storage.clone(),
+            }
+        }
+
         #[allow(clippy::too_many_arguments)]
         pub(crate) async fn new(
             comm: Comm,
@@ -233,8 +274,10 @@ mod core {
                 membership,
             };
 
+            let snapshot = &node.get_snapshot();
+
             // Write the section tree to this node's root storage directory
-            node.write_section_tree();
+            MyNode::write_section_tree(snapshot);
 
             Ok(node)
         }
@@ -254,30 +297,30 @@ mod core {
         ////////////////////////////////////////////////////////////////////////////
 
         /// Generates a random AE probe for _anywhere_ on the network.
-        pub(crate) fn generate_probe_msg(&self) -> Result<Cmd> {
+        pub(crate) fn generate_probe_msg(snapshot: &MyNodeSnapshot) -> Result<Cmd> {
             // Generate a random address not belonging to our Prefix
             let mut dst = xor_name::rand::random();
 
             // We don't probe ourselves
-            while self.network_knowledge.prefix().matches(&dst) {
+            while snapshot.network_knowledge.prefix().matches(&dst) {
                 dst = xor_name::rand::random();
             }
 
-            let matching_section = self.network_knowledge.section_auth_by_name(&dst)?;
+            let matching_section = snapshot.network_knowledge.section_auth_by_name(&dst)?;
             let recipients = matching_section.elders_set();
 
-            let probe = self.network_knowledge.anti_entropy_probe();
+            let probe = snapshot.network_knowledge.anti_entropy_probe();
 
             info!("ProbeMsg target {:?}: {probe:?}", matching_section.prefix());
 
-            Ok(self.send_system_msg(probe, Peers::Multiple(recipients)))
+            Ok(MyNode::send_system_msg(probe, Peers::Multiple(recipients)))
         }
 
         /// Generates a SectionProbeMsg with our current knowledge,
         /// targetting our section elders.
         /// Even if we're up to date, we expect a response.
-        pub(crate) fn generate_section_probe_msg(&self) -> Cmd {
-            let our_section = self.network_knowledge.section_auth();
+        pub(crate) fn generate_section_probe_msg(snapshot: &MyNodeSnapshot) -> Cmd {
+            let our_section = snapshot.network_knowledge.section_auth();
             let recipients = our_section.elders_set();
 
             info!(
@@ -286,8 +329,8 @@ mod core {
                 recipients,
             );
 
-            let probe = self.network_knowledge.anti_entropy_probe();
-            self.send_system_msg(probe, Peers::Multiple(recipients))
+            let probe = snapshot.network_knowledge.anti_entropy_probe();
+            MyNode::send_system_msg(probe, Peers::Multiple(recipients))
         }
 
         /// returns names that are relatively dysfunctional
@@ -320,21 +363,6 @@ mod core {
         pub(crate) fn log_dkg_session(&mut self, name: &XorName) {
             trace!("Logging Dkg session as responded to in dysfunction for {name}");
             self.dysfunction_tracking.dkg_ack_fulfilled(name);
-        }
-
-        pub(crate) fn state_snapshot(&self) -> StateSnapshot {
-            StateSnapshot {
-                is_elder: self.is_elder(),
-                section_key: self.network_knowledge.section_key(),
-                prefix: self.network_knowledge.prefix(),
-                elders: self.network_knowledge().section_auth().names(),
-                members: self
-                    .network_knowledge()
-                    .members()
-                    .into_iter()
-                    .map(|p| p.name())
-                    .collect(),
-            }
         }
 
         /// Generates section infos for the best elder candidate among the members at the given generation
@@ -489,10 +517,14 @@ mod core {
         }
 
         /// Updates various state if elders changed.
-        pub(crate) fn update_on_elder_change(&mut self, old: &StateSnapshot) -> Result<Vec<Cmd>> {
-            let new = self.state_snapshot();
+        pub(crate) fn update_on_elder_change(&mut self, old: &MyNodeSnapshot) -> Result<Vec<Cmd>> {
+            let new = self.get_snapshot();
+            let new_section_key = new.network_knowledge.section_key();
+            let new_prefix = new.network_knowledge.prefix();
+            let old_prefix = old.network_knowledge.prefix();
+            let old_section_key = old.network_knowledge.section_key();
 
-            if new.section_key == old.section_key {
+            if new_section_key == old_section_key {
                 // there was no change
                 return Ok(vec![]);
             }
@@ -529,8 +561,8 @@ mod core {
                 let sap = self.network_knowledge.section_auth();
                 info!(
                     "Section updated: prefix: ({:b}), key: {:?}, elders: {}",
-                    new.prefix,
-                    new.section_key,
+                    new_prefix,
+                    new_section_key,
                     sap.elders().format(", ")
                 );
 
@@ -542,7 +574,7 @@ mod core {
                 // again and we can complete our Elder state transition.
                 let we_have_our_key_share_for_new_section_key = self
                     .section_keys_provider
-                    .key_share(&new.section_key)
+                    .key_share(&new_section_key)
                     .is_ok();
 
                 if we_have_our_key_share_for_new_section_key {
@@ -569,21 +601,28 @@ mod core {
                 }
             }
 
+            let old_elders = old
+                .network_knowledge
+                .elders()
+                .iter()
+                .map(|e| e.name())
+                .collect();
+
             let current: BTreeSet<_> = self.network_knowledge.section_auth().names();
-            let added = current.difference(&old.elders).copied().collect();
-            let removed = old.elders.difference(&current).copied().collect();
-            let remaining = old.elders.intersection(&current).copied().collect();
+            let added = current.difference(&old_elders).copied().collect();
+            let removed = old_elders.difference(&current).copied().collect();
+            let remaining = old_elders.intersection(&current).copied().collect();
 
             let elders = Elders {
-                prefix: new.prefix,
-                key: new.section_key,
+                prefix: new_prefix,
+                key: new.network_knowledge.section_key(),
                 remaining,
                 added,
                 removed,
             };
 
             let self_status_change = if !old.is_elder && new.is_elder {
-                info!("{}: {:?}", LogMarker::PromotedToElder, new.prefix);
+                info!("{}: {:?}", LogMarker::PromotedToElder, new_prefix);
                 NodeElderChange::Promoted
             } else if old.is_elder && !new.is_elder {
                 info!("{}", LogMarker::DemotedFromElder);
@@ -596,14 +635,14 @@ mod core {
             let mut events = vec![];
 
             let new_elders = !elders.added.is_empty();
-            let section_split = new.prefix != old.prefix;
+            let section_split = new_prefix != old_prefix;
             let elders_changed = !elders.added.is_empty() || !elders.removed.is_empty();
 
             if section_split && new.is_elder {
-                info!("{}: {:?}", LogMarker::SplitSuccess, new.prefix);
+                info!("{}: {:?}", LogMarker::SplitSuccess, new_prefix);
 
                 if old.is_elder {
-                    info!("{}: {:?}", LogMarker::StillElderAfterSplit, new.prefix);
+                    info!("{}: {:?}", LogMarker::StillElderAfterSplit, new_prefix);
                 }
 
                 cmds.extend(self.send_updates_to_sibling_section(old)?);
@@ -637,7 +676,7 @@ mod core {
                         self.network_knowledge
                             .section_auth()
                             .elders()
-                            .filter(|peer| !old.elders.contains(&peer.name()))
+                            .filter(|peer| !old_elders.contains(&peer.name()))
                             .cloned()
                             .collect(),
                         &self.network_knowledge.prefix(),
@@ -707,9 +746,12 @@ mod core {
             };
         }
 
-        pub(crate) fn write_section_tree(&self) {
-            let section_tree = self.network_knowledge.section_tree().clone();
-            let path = self.root_storage_dir.clone().join(SECTION_TREE_FILE_NAME);
+        pub(crate) fn write_section_tree(snapshot: &MyNodeSnapshot) {
+            let section_tree = snapshot.network_knowledge.section_tree().clone();
+            let path = snapshot
+                .root_storage_dir
+                .clone()
+                .join(SECTION_TREE_FILE_NAME);
 
             let _ = tokio::spawn(async move {
                 if let Err(err) = section_tree.write_to_disk(&path).await {
@@ -723,12 +765,12 @@ mod core {
         }
     }
 
-    #[derive(Clone)]
-    pub(crate) struct StateSnapshot {
-        pub(crate) is_elder: bool,
-        pub(crate) section_key: bls::PublicKey,
-        pub(crate) prefix: Prefix,
-        pub(crate) elders: BTreeSet<XorName>,
-        pub(crate) members: BTreeSet<XorName>,
-    }
+    // #[derive(Clone)]
+    // pub(crate) struct StateSnapshot {
+    //     pub(crate) is_elder: bool,
+    //     pub(crate) section_key: bls::PublicKey,
+    //     pub(crate) prefix: Prefix,
+    //     pub(crate) elders: BTreeSet<XorName>,
+    //     pub(crate) members: BTreeSet<XorName>,
+    // }
 }

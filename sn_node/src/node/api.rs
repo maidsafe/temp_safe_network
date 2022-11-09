@@ -32,6 +32,8 @@ use sn_dbc::{
 use std::{path::PathBuf, sync::Arc};
 use xor_name::XorName;
 
+use super::core::MyNodeSnapshot;
+
 impl MyNode {
     pub(crate) async fn first_node(
         comm: Comm,
@@ -103,8 +105,12 @@ impl MyNode {
     }
 
     /// Returns the SAP of the section matching the name.
-    pub(crate) fn matching_section(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
-        self.network_knowledge
+    pub(crate) fn matching_section(
+        snapshot: &MyNodeSnapshot,
+        name: &XorName,
+    ) -> Result<SectionAuthorityProvider> {
+        snapshot
+            .network_knowledge
             .section_auth_by_name(name)
             .map_err(Error::from)
     }

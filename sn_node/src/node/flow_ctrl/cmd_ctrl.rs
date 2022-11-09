@@ -47,10 +47,10 @@ impl CmdCtrl {
         node_identifier: XorName,
         cmd_process_api: tokio::sync::mpsc::Sender<(Cmd, Vec<usize>)>,
     ) {
-        trace!("about to spawn task for processing cmd: {cmd:?}, id: {id:?}");
         if id.is_empty() {
             id.push(self.id_counter.fetch_add(1, Ordering::SeqCst));
         }
+
         let dispatcher = self.dispatcher.clone();
         let _ = tokio::task::spawn(async move {
             debug!("> spawned process for cmd {cmd:?}, id: {id:?}");

@@ -183,7 +183,10 @@ impl Link {
         msg_id: MsgId,
     ) -> Result<Connection, SendToOneError> {
         if self.connections.is_empty() {
-            debug!("{msg_id:?} attempting to create a connection");
+            debug!(
+                "{msg_id:?} attempting to create a connection to {:?}",
+                self.peer
+            );
             self.create_connection(msg_id).await
         } else {
             trace!(
