@@ -114,11 +114,6 @@ async fn main() -> Result<()> {
         }
 
         // Keep features consistent to avoid recompiling when possible
-        if cfg!(feature = "traceroute") {
-            build_args.extend(["--features", "traceroute"]);
-        }
-
-        // Keep features consistent to avoid recompiling when possible
         if cfg!(feature = "statemap") {
             build_args.extend(["--features", "statemap"]);
         }
