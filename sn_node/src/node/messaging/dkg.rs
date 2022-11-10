@@ -898,6 +898,158 @@ mod tests {
         Ok(())
     }
 
+    /// If a node already has the new SAP in its `SectionTree`, then it should not propose `SectionInfo`
+    #[tokio::test]
+    async fn lagging_node_should_not_propose_new_section_info() -> Result<()> {
+        init_logger();
+        let mut rng = rand::thread_rng();
+        let node_count = 7;
+        let (mut node_instances, initial_sk_set) =
+            MyNodeInstance::new_instances(node_count, &mut rng).await;
+
+        // let current set of elders start the dkg round and capture the msgs that are outbound to the other nodes
+        let _ = MyNodeInstance::start_dkg(&mut node_instances).await?;
+
+        let mut new_sk_shares: BTreeMap<XorName, SectionKeyShare> = BTreeMap::new();
+        let mut new_sap: BTreeSet<SectionAuthorityProvider> = BTreeSet::new();
+        let mut lagging = false;
+        let mut done = false;
+        while !done {
+            // For every msg in `msg_queue` for every node instance, 1) handle the msg 2) handle the cmds
+            // 3) if the cmds produce more msgs, add them to the `msg_queue` of the respective peer
+            let mut msgs_to_other_nodes = Vec::new();
+            for mock_node in node_instances.values() {
+                let node = mock_node.node.clone();
+                let name = node.read().await.name();
+                info!("\n\n NODE: {}", name);
+                while let Some((msg_id, msg, sender)) = mock_node.msg_queue.write().await.pop() {
+                    let cmds =
+                        MyNode::handle_valid_system_msg(node.clone(), msg_id, msg, sender, None)
+                            .await?;
+
+                    // If supermajority of the nodes have terminated, then the remaining nodes
+                    // can be considered as 'lagging'. So use the supermajority of the shares
+                    // to sign the sap and insert them into the lagging nodes, now these nodes
+                    // should not trigger `Proposal::SectionInfo`.
+                    if !lagging && new_sk_shares.len() >= supermajority(node_count) {
+                        let new_sk_set = TestKeys::get_sk_set_from_shares(
+                            &new_sk_shares.values().cloned().collect::<Vec<_>>(),
+                        )?;
+                        let section_tree_update = {
+                            assert_eq!(new_sap.len(), 1);
+                            let new_sap = new_sap
+                                .clone()
+                                .into_iter()
+                                .next()
+                                .ok_or_else(|| eyre!("should contain 1"))?;
+                            let signed_sap = TestKeys::get_section_signed(
+                                &new_sk_set.secret_key(),
+                                new_sap.clone(),
+                            );
+                            let proof_chain = {
+                                let parent = initial_sk_set.public_keys().public_key();
+                                let mut dag = SectionsDAG::new(parent);
+                                let sig = TestKeys::sign(
+                                    &initial_sk_set.secret_key(),
+                                    &new_sap.section_key(),
+                                );
+                                dag.insert(&parent, new_sap.section_key(), sig)?;
+                                dag
+                            };
+                            TestSectionTree::get_section_tree_update(
+                                &signed_sap,
+                                &proof_chain,
+                                &initial_sk_set.secret_key(),
+                            )
+                        };
+
+                        // find all the lagging nodes; i.e., ones that are yet to handle the dkg_outcome
+                        let lagging_nodes = node_instances
+                            .keys()
+                            .filter(|node| !new_sk_shares.contains_key(node))
+                            .cloned()
+                            .collect::<Vec<_>>();
+                        info!("Lagging node {lagging_nodes:?}");
+                        // update them
+                        for lag in lagging_nodes {
+                            let _updated = node_instances
+                                .get(&lag)
+                                .ok_or_else(|| eyre!("node will be present"))?
+                                .node
+                                .write()
+                                .await
+                                .network_knowledge
+                                .update_knowledge_if_valid(
+                                    section_tree_update.clone(),
+                                    None,
+                                    &name,
+                                )?;
+                            info!("nw update: {_updated} for {lag} ");
+                        }
+                        // successfully simulated lagging nodes
+                        lagging = true;
+                    }
+
+                    for cmd in cmds {
+                        info!("Got cmd {}", cmd);
+                        match cmd {
+                            Cmd::SendMsg {
+                                msg,
+                                msg_id,
+                                recipients,
+                                ..
+                            } => {
+                                let new_msgs =
+                                    node.read().await.mock_send_msg(msg, msg_id, recipients)?;
+                                msgs_to_other_nodes.push(new_msgs);
+                            }
+                            Cmd::HandleDkgOutcome {
+                                section_auth,
+                                outcome,
+                            } => {
+                                let _ =
+                                    new_sk_shares.insert(node.read().await.name(), outcome.clone());
+                                let _ = new_sap.insert(section_auth.clone());
+                                if !lagging {
+                                    let ((_, msg, _), _) = node
+                                        .write()
+                                        .await
+                                        .mock_dkg_outcome_proposal(section_auth, outcome)
+                                        .await?;
+                                    assert_matches!(msg, NodeMsg::Propose { proposal, .. } => {
+                                        assert_matches!(proposal, Proposal::SectionInfo(_))
+                                    });
+                                } else {
+                                    // Since the dkg session is for the same prefix, the
+                                    // lagging node just returns a empty cmd list. There are
+                                    // multiple paths here and testing them here is not a wise
+                                    // choice, instead we can test them where the logic is
+                                    // defined.
+                                    let cmds = node
+                                        .write()
+                                        .await
+                                        .handle_dkg_outcome(section_auth, outcome)?;
+                                    assert_eq!(cmds.len(), 0);
+                                }
+                            }
+                            _ => panic!("got a different cmd {:?}", cmd),
+                        }
+                    }
+                }
+            }
+
+            // add the msgs to the msg_queue of each node
+            MyNodeInstance::add_msgs_to_queue(&mut node_instances, msgs_to_other_nodes).await;
+
+            // done if the queues are empty
+            done = MyNodeInstance::is_msg_queue_empty(&node_instances).await;
+        }
+
+        // dkg done, make sure the new key share is valid
+        MyNodeInstance::verify_new_key(&new_sk_shares, node_count).await;
+
+        Ok(())
+    }
     // Test helpers
 
     /// Generate a set of `MyNode` instances
