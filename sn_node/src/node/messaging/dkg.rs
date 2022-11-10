@@ -1110,6 +1110,132 @@ mod tests {
         Ok(())
     }
 
+    // We randomly drop an outbound `NodeMsg` to a peer, this will effectively stall the dkg since
+    // some nodes don't receive certain votes. We solve this by gossiping the votes from a random
+    // node until we reach termination.
+    #[tokio::test]
+    async fn nodes_should_be_brought_up_to_date_using_gossip() -> Result<()> {
+        init_logger();
+        let mut rng = rand::thread_rng();
+        let node_count = 7;
+        let (mut node_instances, _) = MyNodeInstance::new_instances(node_count, &mut rng).await;
+
+        // let current set of elders start the dkg round and capture the msgs that are outbound to the other nodes
+        let dkg_session_id = MyNodeInstance::start_dkg(&mut node_instances).await?;
+
+        let mut new_sk_shares = BTreeMap::new();
+        let mut done = false;
+        while !done {
+            let mut msgs_to_other_nodes = Vec::new();
+            for mock_node in node_instances.values() {
+                let node = mock_node.node.clone();
+                info!("\n\n NODE: {}", node.read().await.name());
+
+                while let Some((msg_id, msg, sender)) = mock_node.msg_queue.write().await.pop() {
+                    let cmds =
+                        MyNode::handle_valid_system_msg(node.clone(), msg_id, msg, sender, None)
+                            .await?;
+
+                    for cmd in cmds {
+                        info!("Got cmd {}", cmd);
+                        match cmd {
+                            Cmd::SendMsg {
+                                msg,
+                                msg_id,
+                                recipients,
+                                ..
+                            } => {
+                                let mut new_msgs =
+                                    node.read().await.mock_send_msg(msg, msg_id, recipients)?;
+                                // randomly drop the msg to a peer; chance = 1/node_count
+                                new_msgs.1.retain(|_| rng.gen::<usize>() % node_count != 0);
+                                msgs_to_other_nodes.push(new_msgs);
+                            }
+                            Cmd::HandleDkgOutcome {
+                                section_auth,
+                                outcome,
+                            } => {
+                                // capture the sk_share here as we don't proceed with the SAP update
+                                let _ =
+                                    new_sk_shares.insert(node.read().await.name(), outcome.clone());
+                                let ((_, msg, _), _) = node
+                                    .write()
+                                    .await
+                                    .mock_dkg_outcome_proposal(section_auth, outcome)
+                                    .await?;
+                                assert_matches!(msg, NodeMsg::Propose { proposal, .. } => {
+                                    assert_matches!(proposal, Proposal::SectionInfo(_))
+                                });
+                            }
+                            _ => panic!("got a different cmd {:?}", cmd),
+                        }
+                    }
+                }
+            }
+
+            // If the msg_queue is empty for all participant and if the current dkg
+            // session has not terminated, then send a gossip msg from a random node. This
+            // allows everyone to catchup.(in the real network each node sends out a
+            // gossip if it has not recieved any valid dkg msg in 30 seconds).
+            if MyNodeInstance::is_msg_queue_empty(&node_instances).await
+                && msgs_to_other_nodes.is_empty()
+                && new_sk_shares.len() != node_count
+            {
+                // select a random_node which has not terminated, since terminated node
+                // sends out HandleDkgOutcome cmd instead of NodeMsg
+                let random_node = loop {
+                    let random_node = &node_instances
+                        .values()
+                        .nth(rng.gen::<usize>() % node_count)
+                        .ok_or_else(|| eyre!("there should be node_count nodes"))?
+                        .node;
+                    if !random_node
+                        .read()
+                        .await
+                        .dkg_voter
+                        .reached_termination(&dkg_session_id)?
+                    {
+                        break random_node;
+                    }
+                };
+                info!(
+                    "Sending gossip from random node {:?}",
+                    random_node.read().await.name()
+                );
+                let cmds = random_node.read().await.dkg_gossip_msgs();
+                for cmd in cmds {
+                    info!("Got cmd {}", cmd);
+                    match cmd {
+                        Cmd::SendMsg {
+                            msg,
+                            msg_id,
+                            recipients,
+                            ..
+                        } => {
+                            let new_msgs = random_node
+                                .read()
+                                .await
+                                .mock_send_msg(msg, msg_id, recipients)?;
+                            msgs_to_other_nodes.push(new_msgs);
+                        }
+                        _ => panic!("should be send msg, got {cmd}"),
+                    }
+                }
+            }
+
+            // add the msgs to the msg_queue of each node
+            MyNodeInstance::add_msgs_to_queue(&mut node_instances, msgs_to_other_nodes).await;
+
+            // done if we have generated all the sk_shares
+            done = new_sk_shares.len() == node_count;
+        }
+
+        // dkg done, make sure the new key share is valid
+        MyNodeInstance::verify_new_key(&new_sk_shares, node_count).await;
+
+        Ok(())
+    }
+
     // Test helpers
 
     /// Generate a set of `MyNode` instances
