@@ -19,10 +19,9 @@ use sn_interface::{
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bytes::Bytes;
-use futures::future::join_all;
 use rand::{rngs::OsRng, seq::SliceRandom};
 use std::{collections::BTreeSet, time::Duration};
-use tokio::sync::mpsc;
+use tokio::task::JoinSet;
 use tracing::{debug, error, trace, warn};
 use xor_name::XorName;
 
@@ -60,23 +59,14 @@ impl Session {
         let kind = MsgKind::Client(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
-        // Don't immediately fail if sending to one elder fails. This could prevent further sends
-        // and further responses coming in...
-        // Failing directly here could cause us to miss a send success
-        let (resp_tx, resp_rx) = mpsc::channel(elders_len);
-        let send_msg_res = self
-            .send_msg(elders.clone(), wire_msg, msg_id, force_new_link, resp_tx)
-            .await;
+        let send_cmd_tasks = self
+            .send_msg(elders.clone(), wire_msg, msg_id, force_new_link)
+            .await?;
         trace!("Cmd msg {:?} sent", msg_id);
 
-        if let Err(err) = send_msg_res {
-            trace!("Error when sending cmd msg out: {err:?}");
-        }
-
-        // We are not wait for the receive of majority of cmd Acks.
-        // This could be further strict to wait for ALL the Acks get received.
-        // The period is expected to have AE completed, hence no extra wait is required.
-        self.we_have_sufficient_acks_for_cmd(msg_id, elders.clone(), resp_rx)
+        // We wait for ALL the Acks get received.
+        // The AE messages are handled by the tasks, hence no extra wait is required.
+        self.we_have_sufficient_acks_for_cmd(msg_id, elders.clone(), send_cmd_tasks)
             .await
     }
 
@@ -86,22 +76,33 @@ impl Session {
         &self,
         msg_id: MsgId,
         elders: Vec<Peer>,
-        mut resp_rx: mpsc::Receiver<MsgResponse>,
+        mut send_cmd_tasks: JoinSet<MsgResponse>,
     ) -> Result<()> {
         debug!("----> init of check for acks for {:?}", msg_id);
         let expected_acks = elders.len();
         let mut received_acks = BTreeSet::default();
         let mut received_errors = BTreeSet::default();
 
-        while let Some(msg_resp) = resp_rx.recv().await {
+        while let Some(msg_resp) = send_cmd_tasks.join_next().await {
             debug!("Handling msg_resp sent to ack wait channel: {msg_resp:?}");
             let (src, result) = match msg_resp {
-                MsgResponse::CmdResponse(src, response) => (src, response.result().clone()),
-                MsgResponse::QueryResponse(src, resp) => {
-                    debug!("Ignoring unexpected query response received from {src:?} when awaiting a CmdAck: {resp:?}");
+                Ok(MsgResponse::CmdResponse(src, response)) => (src, response.result().clone()),
+                Ok(MsgResponse::QueryResponse(src, resp)) => {
+                    debug!("Unexpected query response received from {src:?} when awaiting a CmdAck: {resp:?}");
+                    let _ = received_errors.insert(src);
+                    continue;
+                }
+                Ok(MsgResponse::Failure(src, error)) => {
+                    debug!("Failure occurred with msg {msg_id:?} from {src:?}: {error:?}");
+                    let _ = received_errors.insert(src);
+                    continue;
+                }
+                Err(join_err) => {
+                    warn!("Join failure occurred with msg {msg_id:?}: {join_err:?}");
                     continue;
                 }
             };
+
             match result {
                 Ok(()) => {
                     let preexisting = !received_acks.insert(src) || received_errors.contains(&src);
@@ -147,12 +148,8 @@ impl Session {
             .collect();
 
         debug!(
-            "Missing Responses for {msg_id:?} from: {:?}",
-            missing_responses
-        );
-
-        debug!(
-            "Insufficient acks returned: {}/{expected_acks}",
+            "Insufficient CmdAcks returned for {msg_id:?}: {}/{expected_acks}. \
+            Missing Responses from: {missing_responses:?}",
             received_acks.len()
         );
         Err(Error::InsufficientAcksReceived {
@@ -212,14 +209,9 @@ impl Session {
         let kind = MsgKind::Client(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
-        let (resp_tx, resp_rx) = mpsc::channel(elders_len);
-        let send_response = self
-            .send_msg(elders.clone(), wire_msg, msg_id, force_new_link, resp_tx)
-            .await;
-
-        if send_response.is_err() {
-            trace!("Error when sending query msg out: {send_response:?}");
-        }
+        let send_query_tasks = self
+            .send_msg(elders.clone(), wire_msg, msg_id, force_new_link)
+            .await?;
 
         // TODO:
         // We are now simply accepting the very first valid response we receive,
@@ -231,7 +223,7 @@ impl Session {
         // so we don't need more than one valid response to prevent from accepting invalid responses
         // from byzantine nodes, however for mutable data (non-Chunk responses) we will
         // have to review the approach.
-        self.check_query_responses(msg_id, elders.clone(), chunk_addr, resp_rx)
+        self.check_query_responses(msg_id, elders.clone(), chunk_addr, send_query_tasks)
             .await
     }
 
@@ -240,24 +232,34 @@ impl Session {
         msg_id: MsgId,
         elders: Vec<Peer>,
         chunk_addr: Option<ChunkAddress>,
-        mut resp_rx: mpsc::Receiver<MsgResponse>,
+        mut send_query_tasks: JoinSet<MsgResponse>,
     ) -> Result<QueryResult> {
         let mut discarded_responses: usize = 0;
         let mut error_response = None;
         let mut valid_response = None;
         let elders_len = elders.len();
 
-        while let Some(msg_resp) = resp_rx.recv().await {
+        while let Some(msg_resp) = send_query_tasks.join_next().await {
             let (peer_address, response) = match msg_resp {
-                MsgResponse::QueryResponse(src, resp) => (src, resp),
-                MsgResponse::CmdResponse(ack_src, _error) => {
-                    debug!("Ignoring unexpected CmdAck response received from {ack_src:?} when awaiting a QueryResponse");
+                Ok(MsgResponse::QueryResponse(src, resp)) => (src, resp),
+                Ok(MsgResponse::CmdResponse(src, resp)) => {
+                    debug!("Unexpected CmdAck response received from {src:?} when awaiting a QueryResponse: {resp:?}");
+                    discarded_responses += 1;
+                    continue;
+                }
+                Ok(MsgResponse::Failure(src, error)) => {
+                    debug!("Failure occurred with msg {msg_id:?} from {src:?}: {error:?}");
+                    discarded_responses += 1;
+                    continue;
+                }
+                Err(join_err) => {
+                    warn!("Join failure occurred with msg {msg_id:?}: {join_err:?}");
                     continue;
                 }
             };
 
-            // lets see if we have a positive response...
-            debug!("response to {msg_id:?}: {:?}", response);
+            // let's see if we have a positive response...
+            debug!("Response to {msg_id:?}: {:?}", response);
 
             match *response {
                 QueryResponse::GetChunk(Ok(chunk)) => {
@@ -393,9 +395,10 @@ impl Session {
             .take(NODES_TO_CONTACT_PER_STARTUP_BATCH)
             .collect();
 
-        let (resp_tx, _rx) = mpsc::channel(nodes.len());
-        self.send_msg(initial_contacts, wire_msg.clone(), msg_id, false, resp_tx)
+        let mut tasks = self
+            .send_msg(initial_contacts, wire_msg.clone(), msg_id, false)
             .await?;
+        tasks.detach_all();
 
         let mut knowledge_checks = 0;
         let mut outgoing_msg_rounds = 1;
@@ -459,9 +462,10 @@ impl Session {
                 };
 
                 trace!("Sending out another batch of initial contact msgs to new nodes");
-                let (resp_tx, _rx) = mpsc::channel(next_contacts.len());
-                self.send_msg(next_contacts, wire_msg.clone(), msg_id, false, resp_tx)
+                let mut tasks = self
+                    .send_msg(next_contacts, wire_msg.clone(), msg_id, false)
                     .await?;
+                tasks.detach_all();
 
                 let next_wait = backoff.next_backoff();
                 trace!(
@@ -563,88 +567,46 @@ impl Session {
         wire_msg: WireMsg,
         msg_id: MsgId,
         force_new_link: bool,
-        resp_tx: mpsc::Sender<MsgResponse>,
-    ) -> Result<()> {
+    ) -> Result<JoinSet<MsgResponse>> {
         debug!("---> send msg {msg_id:?} going... will force new?: {force_new_link}");
         let bytes = wire_msg.serialize()?;
 
-        let mut tasks = vec![];
-        let nodes_len = nodes.len();
+        let mut tasks = JoinSet::new();
 
-        for (peer_index, peer) in nodes.iter().enumerate() {
+        for (peer_index, peer) in nodes.into_iter().enumerate() {
             let session = self.clone();
             let bytes = bytes.clone();
-            let resp_tx_clone = resp_tx.clone();
 
-            let task = async move {
+            let _abort_handle = tasks.spawn(async move {
                 let link = session
                     .peer_links
-                    .get_or_create_link(peer, force_new_link)
+                    .get_or_create_link(&peer, force_new_link)
                     .await;
 
                 debug!("Trying to send msg to link {msg_id:?} to {peer:?}");
-                let result = {
-                    match link.send_bi(bytes.clone(), msg_id).await {
-                        Ok(recv_stream) => {
-                            debug!(
-                                "That's {msg_id:?} sent to {peer:?}... spawning recieve listener"
-                            );
-                            // let's spawn a task for each bi-stream to listen for responses
-                            Self::spawn_recv_stream_listener(
-                                session.clone(),
-                                msg_id,
-                                *peer,
-                                peer_index,
-                                recv_stream,
-                                resp_tx_clone,
-                            );
-
-                            Ok(())
-                        }
-                        #[cfg(features = "chaos")]
-                        Err(SendToOneError::ChaosNoConnection) => Err(Error::ChoasSendFail),
-                        Err(error) => {
-                            error!("Error sending {msg_id:?} bidi to {peer:?}: {error:?}");
-                            Err(Error::FailedToInitateBiDiStream(msg_id))
-                        }
+                match link.send_bi(bytes.clone(), msg_id).await {
+                    Ok(recv_stream) => {
+                        debug!("That's {msg_id:?} sent to {peer:?}... starting recieve listener");
+                        // let's listen for responses on the bi-stream
+                        session
+                            .recv_stream_listener(msg_id, peer, peer_index, recv_stream)
+                            .await
                     }
-                };
-
-                if let Err(err) = &result {
-                    session.peer_links.remove_link_from_peer_links(peer).await;
-                    warn!("Issue when sending {msg_id:?} to {peer:?}: {err:?}");
+                    #[cfg(features = "chaos")]
+                    Err(SendToOneError::ChaosNoConnection) => {
+                        session.peer_links.remove_link_from_peer_links(peer).await;
+                        MsgResponse::Failure(peer.addr(), Error::ChoasSendFail)
+                    }
+                    Err(error) => {
+                        error!("Error sending {msg_id:?} bidi to {peer:?}: {error:?}");
+                        session.peer_links.remove_link_from_peer_links(&peer).await;
+                        MsgResponse::Failure(peer.addr(), Error::FailedToInitateBiDiStream(msg_id))
+                    }
                 }
-
-                result
-            };
-
-            tasks.push(task)
+            });
         }
 
-        // Let's await for all messages to be sent
-        let results = join_all(tasks).await;
-
-        let mut last_error = None;
-        let mut failures = nodes_len;
-        results.into_iter().for_each(|result| match result {
-            Err(error) => last_error = Some(error),
-            Ok(()) => failures -= 1,
-        });
-
-        if failures > 0 {
-            trace!(
-                "Sending the message ({msg_id:?}) from {} to {failures}/{nodes_len} of the \
-                nodes failed: {nodes:?}",
-                self.endpoint.public_addr(),
-            );
-
-            if let Some(error) = last_error {
-                warn!("The last error is: {error}");
-                return Err(error);
-            }
-        }
-
-        Ok(())
+        Ok(tasks)
     }
 }
 
