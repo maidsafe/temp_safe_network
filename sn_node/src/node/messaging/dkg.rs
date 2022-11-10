@@ -1050,6 +1050,66 @@ mod tests {
 
         Ok(())
     }
+
+    // The dkg will stall even if a single node is not responsive.
+    #[tokio::test]
+    async fn total_participation_is_required_for_dkg_votes() -> Result<()> {
+        init_logger();
+        let mut rng = rand::thread_rng();
+        let node_count = 7;
+        let (mut node_instances, _initial_sk_set) =
+            MyNodeInstance::new_instances(node_count, &mut rng).await;
+
+        let _ = MyNodeInstance::start_dkg(&mut node_instances).await?;
+
+        let dead_node = node_instances
+            .keys()
+            .next()
+            .cloned()
+            .ok_or_else(|| eyre!("node_instances is not empty"))?;
+        let mut done = false;
+        while !done {
+            let mut msgs_to_other_nodes = Vec::new();
+            for mock_node in node_instances.values() {
+                let node = mock_node.node.clone();
+                info!("\n\n NODE: {}", node.read().await.name());
+                while let Some((msg_id, msg, sender)) = mock_node.msg_queue.write().await.pop() {
+                    let cmds =
+                        MyNode::handle_valid_system_msg(node.clone(), msg_id, msg, sender, None)
+                            .await?;
+
+                    for cmd in cmds {
+                        info!("Got cmd {}", cmd);
+                        match cmd {
+                            Cmd::SendMsg {
+                                msg,
+                                msg_id,
+                                recipients,
+                                ..
+                            } => {
+                                let mut new_msgs =
+                                    node.read().await.mock_send_msg(msg, msg_id, recipients)?;
+                                // dead_node will not recieve the msg
+                                new_msgs.1.retain(|peer| peer.name() != dead_node);
+                                msgs_to_other_nodes.push(new_msgs);
+                            }
+                            _ => panic!("got a different cmd {:?}", cmd),
+                        }
+                    }
+                }
+            }
+
+            // add the msgs to the msg_queue of each node
+            MyNodeInstance::add_msgs_to_queue(&mut node_instances, msgs_to_other_nodes).await;
+
+            // done if the queues are empty
+            done = MyNodeInstance::is_msg_queue_empty(&node_instances).await;
+        }
+
+        // all the msgs are processed and we counldn't reach dkg termination
+        Ok(())
+    }
+
     // Test helpers
 
     /// Generate a set of `MyNode` instances
