@@ -9,7 +9,7 @@
 mod listeners;
 mod messaging;
 
-use crate::Result;
+use crate::{Error, Result};
 use sn_interface::{
     messaging::data::{CmdResponse, QueryResponse},
     network_knowledge::SectionTree,
@@ -26,6 +26,7 @@ use tokio::sync::RwLock;
 pub(super) enum MsgResponse {
     CmdResponse(SocketAddr, Box<CmdResponse>),
     QueryResponse(SocketAddr, Box<QueryResponse>),
+    Failure(SocketAddr, Error),
 }
 
 #[derive(Debug)]

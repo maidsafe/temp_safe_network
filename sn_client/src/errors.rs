@@ -8,7 +8,8 @@
 
 use sn_interface::{
     messaging::{
-        data::{DataQueryVariant, Error as ErrorMsg, QueryResponse},
+        data::{ClientMsg, DataQueryVariant, Error as ErrorMsg, QueryResponse},
+        system::NodeMsg,
         Error as MessagingError, MsgId,
     },
     types::{Error as DtError, Peer},
@@ -31,6 +32,17 @@ pub enum Error {
     /// No elder was found to be closest from provided SAP. (The sap must therefore be empty)
     #[error("No elders found in AntiEntropy msg SAP")]
     AntiEntropyNoSapElders,
+    /// Maximum number of retries upon AntiEntropy responses was reached
+    #[error(
+        "Maximum number of retries upon AntiEntropy responses was reached. \
+        Message {msg_id:?} was re-sent {retries} times due to AE responses."
+    )]
+    AntiEntropyMaxRetries {
+        /// Id of the cmd message sent
+        msg_id: MsgId,
+        /// Number of times the msg was re-sent
+        retries: u8,
+    },
     /// Failed to obtain network contacts to bootstrap to
     #[error("Failed to obtain network contacts to bootstrap to: {0}")]
     NetworkContacts(String),
@@ -132,6 +144,26 @@ pub enum Error {
         query: DataQueryVariant,
         /// Unexpected response received
         response: QueryResponse,
+    },
+    /// Unexpected NodeMsg received
+    #[error("Unexpected type of NodeMsg received from {peer} in response to {msg_id:?}. Received: {msg:?}")]
+    UnexpectedNodeMsg {
+        /// MsgId of the msg sent
+        msg_id: MsgId,
+        /// Peer the unexpected msg was received from
+        peer: Peer,
+        /// Unexpected msg received
+        msg: NodeMsg,
+    },
+    /// Unexpected ClientMsg received
+    #[error("Unexpected type of ClientMsg received from {peer} in response to {msg_id:?}. Received: {msg:?}")]
+    UnexpectedClientMsg {
+        /// MsgId of the msg sent
+        msg_id: MsgId,
+        /// Peer the unexpected msg was received from
+        peer: Peer,
+        /// Unexpected msg received
+        msg: ClientMsg,
     },
     /// Other types errors
     #[error(transparent)]
