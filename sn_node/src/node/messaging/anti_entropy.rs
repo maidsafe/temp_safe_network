@@ -455,183 +455,120 @@ mod tests {
 
     #[tokio::test]
     async fn ae_everything_up_to_date() -> Result<()> {
-        // Construct a local task set that can run `!Send` futures.
-        let local = tokio::task::LocalSet::new();
+        let env = Env::new().await?;
+        let our_prefix = env.node.network_knowledge().prefix();
+        let msg = env.create_msg(&our_prefix, env.node.network_knowledge().section_key())?;
+        let sender = env.node.info().peer();
+        let dst_name = our_prefix.substituted_in(xor_name::rand::random());
+        let dst_section_key = env.node.network_knowledge().section_key();
 
-        // Run the local task set.
-        local
-            .run_until(async move {
-                let env = Env::new().await?;
-                let our_prefix = env.node.network_knowledge().prefix();
-                let msg =
-                    env.create_msg(&our_prefix, env.node.network_knowledge().section_key())?;
-                let sender = env.node.info().peer();
-                let dst_name = our_prefix.substituted_in(xor_name::rand::random());
-                let dst_section_key = env.node.network_knowledge().section_key();
+        let cmd = env
+            .node
+            .check_for_entropy(&msg, &dst_section_key, dst_name, &sender, None)?;
 
-                let cmd =
-                    env.node
-                        .check_for_entropy(&msg, &dst_section_key, dst_name, &sender, None)?;
-
-                assert!(cmd.is_none());
-                Result::<()>::Ok(())
-            })
-            .await
+        assert!(cmd.is_none());
+        Ok(())
     }
 
     #[tokio::test]
     async fn ae_redirect_to_other_section() -> Result<()> {
-        // Construct a local task set that can run `!Send` futures.
-        let local = tokio::task::LocalSet::new();
+        let mut env = Env::new().await?;
 
-        // Run the local task set.
-        local.run_until(async move {
-            let mut env = Env::new().await?;
+        let other_sk = bls::SecretKey::random();
+        let other_pk = other_sk.public_key();
 
-            let other_sk = bls::SecretKey::random();
-            let other_pk = other_sk.public_key();
+        let wire_msg = env.create_msg(&env.other_signed_sap.prefix(), other_pk)?;
+        let sender = env.node.info().peer();
 
-            let wire_msg = env.create_msg(&env.other_signed_sap.prefix(), other_pk)?;
-            let sender = env.node.info().peer();
+        // since it's not aware of the other prefix, it will redirect to self
+        let dst_section_key = other_pk;
+        let dst_name = env.other_signed_sap.prefix().name();
 
-            // since it's not aware of the other prefix, it will redirect to self
-            let dst_section_key = other_pk;
-            let dst_name = env.other_signed_sap.prefix().name();
+        let cmd = env
+            .node
+            .check_for_entropy(&wire_msg, &dst_section_key, dst_name, &sender, None);
 
-            let cmd = env
-                .node
-                .check_for_entropy(
-                    &wire_msg,
-                    &dst_section_key,
-                    dst_name,
-                    &sender,
-                    None
-                );
+        let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg: OutgoingMsg::Node(msg), .. })) => {
+            msg
+        });
 
-            let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg: OutgoingMsg::Node(msg), .. })) => {
-                msg
-            });
+        assert_matches!(msg, NodeMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Redirect {..}, .. } => {
+            assert_eq!(section_tree_update.signed_sap, env.node.network_knowledge().signed_sap());
+        });
 
-            assert_matches!(msg, NodeMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Redirect {..}, .. } => {
-                assert_eq!(section_tree_update.signed_sap, env.node.network_knowledge().signed_sap());
-            });
+        // now let's insert the other SAP to make it aware of the other prefix
+        let section_tree_update =
+            SectionTreeUpdate::new(env.other_signed_sap.clone(), env.proof_chain);
+        assert!(env
+            .node
+            .update_network_knowledge(section_tree_update, None,)?);
 
-            // now let's insert the other SAP to make it aware of the other prefix
-            let section_tree_update = SectionTreeUpdate::new(env.other_signed_sap.clone(), env.proof_chain);
-            assert!(
-                env.node
-                    .update_network_knowledge(
-                        section_tree_update,
-                        None,
-                    )?
-            );
+        // and it now shall give us an AE redirect msg
+        // with the SAP we inserted for other prefix
+        let cmd = env
+            .node
+            .check_for_entropy(&wire_msg, &dst_section_key, dst_name, &sender, None);
 
-            // and it now shall give us an AE redirect msg
-            // with the SAP we inserted for other prefix
-            let cmd = env
-                .node
-                .check_for_entropy(
-                    &wire_msg,
-                    &dst_section_key,
-                    dst_name,
-                    &sender,
-                    None
-                );
+        let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg: OutgoingMsg::Node(msg), .. })) => {
+            msg
+        });
 
-            let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg: OutgoingMsg::Node(msg), .. })) => {
-                msg
-            });
-
-            assert_matches!(msg, NodeMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Redirect {..}, .. } => {
-                assert_eq!(section_tree_update.signed_sap, env.other_signed_sap);
-            });
-            Result::<()>::Ok(())
-        }).await
+        assert_matches!(msg, NodeMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Redirect {..}, .. } => {
+            assert_eq!(section_tree_update.signed_sap, env.other_signed_sap);
+        });
+        Ok(())
     }
 
     #[tokio::test]
     async fn ae_outdated_dst_key_of_our_section() -> Result<()> {
-        // Construct a local task set that can run `!Send` futures.
-        let local = tokio::task::LocalSet::new();
+        let env = Env::new().await?;
+        let our_prefix = env.node.network_knowledge().prefix();
 
-        // Run the local task set.
-        local.run_until(async move {
+        let msg = env.create_msg(&our_prefix, env.node.network_knowledge().section_key())?;
+        let sender = env.node.info().peer();
+        let dst_name = our_prefix.substituted_in(xor_name::rand::random());
+        let dst_section_key = env.node.network_knowledge().genesis_key();
 
+        let cmd = env
+            .node
+            .check_for_entropy(&msg, dst_section_key, dst_name, &sender, None)?;
 
-            let env = Env::new().await?;
-            let our_prefix = env.node.network_knowledge().prefix();
+        let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg: OutgoingMsg::Node(msg), .. }) => {
+            msg
+        });
 
-            let msg = env.create_msg(
-                &our_prefix,
-                env.node.network_knowledge().section_key(),
-            )?;
-            let sender = env.node.info().peer();
-            let dst_name = our_prefix.substituted_in(xor_name::rand::random());
-            let dst_section_key = env.node.network_knowledge().genesis_key();
-
-            let cmd = env
-                .node
-                .check_for_entropy(
-                    &msg,
-                    dst_section_key,
-                    dst_name,
-                    &sender,
-                    None
-                )?;
-
-            let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg: OutgoingMsg::Node(msg), .. }) => {
-                msg
-            });
-
-            assert_matches!(&msg, NodeMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Retry{..}, .. } => {
-                assert_eq!(section_tree_update.signed_sap, env.node.network_knowledge().signed_sap());
-                assert_eq!(section_tree_update.proof_chain, env.node.section_chain());
-            });
-            Ok(())
-        }).await
+        assert_matches!(&msg, NodeMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Retry{..}, .. } => {
+            assert_eq!(section_tree_update.signed_sap, env.node.network_knowledge().signed_sap());
+            assert_eq!(section_tree_update.proof_chain, env.node.section_chain());
+        });
+        Ok(())
     }
 
     #[tokio::test]
     async fn ae_wrong_dst_key_of_our_section_returns_retry() -> Result<()> {
-        // Construct a local task set that can run `!Send` futures.
-        let local = tokio::task::LocalSet::new();
+        let env = Env::new().await?;
+        let our_prefix = env.node.network_knowledge().prefix();
 
-        // Run the local task set.
-        local.run_until(async move {
+        let msg = env.create_msg(&our_prefix, env.node.network_knowledge().section_key())?;
+        let sender = env.node.info().peer();
+        let dst_name = our_prefix.substituted_in(xor_name::rand::random());
 
-            let env = Env::new().await?;
-            let our_prefix = env.node.network_knowledge().prefix();
+        let bogus_env = Env::new().await?;
+        let dst_section_key = bogus_env.node.network_knowledge().genesis_key();
 
-            let msg = env.create_msg(
-                &our_prefix,
-                env.node.network_knowledge().section_key(),
-            )?;
-            let sender = env.node.info().peer();
-            let dst_name = our_prefix.substituted_in(xor_name::rand::random());
+        let cmd = env
+            .node
+            .check_for_entropy(&msg, dst_section_key, dst_name, &sender, None)?;
 
-            let bogus_env = Env::new().await?;
-            let dst_section_key = bogus_env.node.network_knowledge().genesis_key();
+        let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg: OutgoingMsg::Node(msg), .. }) => {
+            msg
+        });
 
-            let cmd = env
-                .node
-                .check_for_entropy(
-                    &msg,
-                    dst_section_key,
-                    dst_name,
-                    &sender,
-                    None
-                )?;
-
-            let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg: OutgoingMsg::Node(msg), .. }) => {
-                msg
-            });
-
-            assert_matches!(&msg, NodeMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Retry {..}, .. } => {
-                assert_eq!(section_tree_update.signed_sap, env.node.network_knowledge().signed_sap());
-                assert_eq!(section_tree_update.proof_chain, env.node.section_chain());
-            });
-            Ok(())
-        }).await
+        assert_matches!(&msg, NodeMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Retry {..}, .. } => {
+            assert_eq!(section_tree_update.signed_sap, env.node.network_knowledge().signed_sap());
+            assert_eq!(section_tree_update.proof_chain, env.node.section_chain());
+        });
+        Ok(())
     }
 
     struct Env {
