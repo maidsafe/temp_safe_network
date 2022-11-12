@@ -433,6 +433,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
             let (old_sap, mut nodes, sk_set1) =
                 TestSAP::random_sap(Prefix::default(), elder_count(), 0, None, None);
+            let nodes_clone = nodes.clone();
             let members =
                 BTreeSet::from_iter(nodes.iter().map(|n| NodeState::joined(n.peer(), None)));
             let pk1 = sk_set1.secret_key().public_key();
@@ -472,10 +473,11 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
             // Create the new `SectionAuthorityProvider` by replacing the last peer with a new one.
             let new_peer = network_utils::create_peer(MIN_ADULT_AGE);
-            let new_elders = old_sap
-                .elders()
+            // nodes_clone is sorted by age
+            let new_elders = nodes_clone
+                .into_iter()
                 .take(old_sap.elder_count() - 1)
-                .cloned()
+                .map(|info| info.peer())
                 .chain(vec![new_peer]);
 
             let new_sap = SectionAuthorityProvider::new(
