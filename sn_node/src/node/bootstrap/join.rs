@@ -232,7 +232,7 @@ impl<'a> Joiner<'a> {
                     }
 
                     // make sure we received a valid and trusted new SAP
-                    let _is_new_sap = match self.section_tree.update(section_tree_update) {
+                    let is_new_sap = match self.section_tree.update(section_tree_update) {
                         Ok(updated) => updated,
                         Err(err) => {
                             debug!("Ignoring section tree updated in JoinResponse::Retry with an invalid or known SAP: {err:?}");
@@ -240,10 +240,9 @@ impl<'a> Joiner<'a> {
                         }
                     };
 
-                    let enough_responses_asking_to_retry =
-                        self.should_retry_after_response(sender, signed_sap.elders_set());
-
-                    if enough_responses_asking_to_retry {
+                    if is_new_sap
+                        || self.should_retry_after_response(sender, signed_sap.elders_set())
+                    {
                         let already_retried_for_this_sap =
                             self.retry_sap_cache.contains(&signed_sap);
 
