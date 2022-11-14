@@ -484,7 +484,7 @@ impl MyNode {
             }
             NodeMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)) => {
                 info!("ReplicateData MsgId: {:?}", msg_id);
-                let mut snapshot = node.read().await.get_snapshot();
+                let snapshot = node.read().await.get_snapshot();
                 debug!("[NODE READ]: replicate data read got");
 
                 if snapshot.is_elder {
@@ -595,6 +595,8 @@ impl MyNode {
         }
     }
 
+    /// Sets Cmd to locally record the storage level and send msgs to Elders
+    /// Advising the same
     fn record_storage_level_if_any(
         snapshot: &MyNodeSnapshot,
         level: Option<StorageLevel>,
@@ -602,6 +604,9 @@ impl MyNode {
         let mut cmds = vec![];
         if let Some(level) = level {
             info!("Storage has now passed {} % used.", 10 * level.value());
+
+            // Run a SetStorageLevel Cmd to actually update the DataStorage instance
+            cmds.push(Cmd::SetStorageLevel(level));
             let node_id = PublicKey::from(snapshot.keypair.public);
             let node_xorname = XorName::from(node_id);
 
@@ -611,8 +616,6 @@ impl MyNode {
                 node_id,
                 level,
             });
-
-            // TODO: Force a lock on node to record new storage level only if one has been breached...
 
             let dst = Peers::Multiple(snapshot.network_knowledge.elders());
 

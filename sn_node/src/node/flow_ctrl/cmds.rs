@@ -16,7 +16,7 @@ use sn_consensus::Decision;
 use sn_dysfunction::IssueType;
 use sn_interface::{
     messaging::{
-        data::ClientMsg,
+        data::{ClientMsg, StorageLevel},
         system::{NodeMsg, SectionSig, SectionSigned},
         AuthorityProof, ClientAuth, MsgId, WireMsg,
     },
@@ -61,6 +61,8 @@ pub(crate) enum Cmd {
         wire_msg: WireMsg,
         send_stream: Option<Arc<Mutex<SendStream>>>,
     },
+    /// Update our own storage level
+    SetStorageLevel(StorageLevel),
     /// Log a Node's Punishment, this pulls dysfunction and write locks out of some functions
     TrackNodeIssueInDysfunction { name: XorName, issue: IssueType },
     HandleValidNodeMsg {
@@ -145,6 +147,7 @@ impl Cmd {
         use sn_interface::statemap::State;
         match self {
             Cmd::SendMsg { .. } => State::Comms,
+            Cmd::SetStorageLevel { .. } => State::Node,
             Cmd::HandleFailedSendToNode { .. } => State::Comms,
             Cmd::ValidateMsg { .. } => State::Validation,
             Cmd::HandleValidNodeMsg { msg, .. } => msg.statemap_states(),
@@ -163,6 +166,10 @@ impl Cmd {
 impl fmt::Display for Cmd {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            #[cfg(not(feature = "test-utils"))]
+            Cmd::SetStorageLevel(level) => {
+                write!(f, "SetStorageLevel {:?}", level)
+            }
             #[cfg(not(feature = "test-utils"))]
             Cmd::ValidateMsg { wire_msg, .. } => {
                 write!(f, "ValidateMsg {:?}", wire_msg.msg_id())
