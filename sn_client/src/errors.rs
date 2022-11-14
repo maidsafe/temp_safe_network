@@ -29,6 +29,9 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
+    /// None was returned for recv_stream.next().await ...
+    #[error("No response returned on stream")]
+    NoResponseOnStream,
     /// No elder was found to be closest from provided SAP. (The sap must therefore be empty)
     #[error("No elders found in AntiEntropy msg SAP")]
     AntiEntropyNoSapElders,

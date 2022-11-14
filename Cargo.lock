@@ -3081,8 +3081,7 @@ dependencies = [
 [[package]]
 name = "qp2p"
 version = "0.30.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da67ecd34bb2a9584cdb480048708a5234a66fcec61cdb5561afca59428b124a"
+source = "git+https://github.com/joshuef/qp2p?branch=IncreaseBiDiStreamLimit#fdc81649f1c9c55ab0352dcf3ecffbb2c820852b"
 dependencies = [
  "backoff 0.3.0",
  "bincode",

@@ -36,11 +36,15 @@ struct MsgResent {
 impl Session {
     #[instrument(skip_all, level = "debug")]
     async fn read_msg_from_recvstream(recv_stream: &mut RecvStream) -> Result<MsgType, Error> {
-        let bytes = recv_stream.next().await?;
-        let wire_msg = WireMsg::from(bytes)?;
-        let msg_type = wire_msg.into_msg()?;
+        if let Some(bytes) = recv_stream.next().await? {
+            let wire_msg = WireMsg::from(bytes)?;
+            let msg_type = wire_msg.into_msg()?;
 
-        Ok(msg_type)
+            Ok(msg_type)
+        }
+        else {
+            Err(Error::NoResponseOnStream)
+        }
     }
 
     // Wait for a msg response incoming on the provided RecvStream

@@ -162,7 +162,11 @@ impl Link {
 
         trace!("bidi finished {msg_id:?} to: {:?}", self.peer);
 
-        recv_stream.next().await.map_err(SendToOneError::Recv)
+        if let Some(resp) = recv_stream.next().await.map_err(SendToOneError::Recv)? {
+            Ok(resp)
+        } else {
+            Err(SendToOneError::NoResponse)
+        }
     }
 
     // Gets an existing connection or creates a new one to the Link's Peer
@@ -261,6 +265,8 @@ pub(crate) enum SendToOneError {
     Send(qp2p::SendError),
     ///
     Recv(qp2p::RecvError),
+    /// No response returned on bidi stream when one was expected
+    NoResponse
 }
 
 impl SendToOneError {
