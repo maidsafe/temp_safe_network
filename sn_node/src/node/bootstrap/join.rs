@@ -12,6 +12,8 @@ use crate::comm::{Comm, MsgFromPeer};
 use crate::log_sleep;
 use crate::node::{messages::WireMsgUtils, Error, Result};
 
+use sn_interface::messaging::system::SectionSigned;
+use sn_interface::SectionAuthorityProvider;
 use sn_interface::{
     messaging::{
         system::{JoinRejectionReason, JoinRequest, JoinResponse, NodeMsg},
@@ -73,7 +75,11 @@ struct Joiner<'a> {
     prefix: Prefix,
     section_tree: SectionTree,
     backoff: ExponentialBackoff,
+    /// cache of retry response sending peers. When we exceed 1/3rd responses we retry
+    /// (the rety_response cache makes sure we retry only once per name/sap)
     retry_responses_cache: BTreeSet<Peer>,
+    /// Cache SAPs we have retried for to prevent repeated retries to same cache (if more responses come in later eg)
+    retry_sap_cache: Vec<SectionSigned<SectionAuthorityProvider>>,
 }
 
 impl<'a> Joiner<'a> {
@@ -101,6 +107,7 @@ impl<'a> Joiner<'a> {
             section_tree,
             backoff,
             retry_responses_cache: Default::default(),
+            retry_sap_cache: Default::default(),
         }
     }
 
@@ -134,7 +141,10 @@ impl<'a> Joiner<'a> {
     async fn join(mut self, response_timeout: Duration) -> Result<(MyNodeInfo, NetworkKnowledge)> {
         let (target_section_key, recipients) = self.join_target()?;
 
-        debug!("Initiating join with {recipients:?}");
+        debug!(
+            "Initiating join as node_name {:?} with {recipients:?}",
+            self.node.name()
+        );
 
         // We first use genesis key as the target section key, we'll be getting
         // a response with the latest section key for us to retry with.
@@ -182,7 +192,7 @@ impl<'a> Joiner<'a> {
                         .filter(|n| n.state() == MembershipState::Joined)
                         .all(|n| n.name() != self.node.name())
                     {
-                        trace!("Ignore join approval decision not for us: {decision:?}");
+                        trace!("MyNode named: {:?} Ignore join approval decision not for us: {decision:?}", self.node.name());
                         continue;
                     }
 
@@ -204,7 +214,7 @@ impl<'a> Joiner<'a> {
                     let signed_sap = section_tree_update.signed_sap.clone();
 
                     trace!(
-                        "Joining node {:?} - {:?} received a Retry from {}, SAP: {}, proof_chain: {:?}",
+                        "My joining node with {:?} - name: {:?} ; received a Retry from {}, SAP: {}, proof_chain: {:?}",
                         self.prefix,
                         self.node.name(),
                         sender.name(),
@@ -230,7 +240,20 @@ impl<'a> Joiner<'a> {
                         }
                     };
 
-                    if self.insert_retry_response(sender, signed_sap.elders_set()) {
+                    let enough_responses_asking_to_retry =
+                        self.should_retry_after_response(sender, signed_sap.elders_set());
+
+                    if enough_responses_asking_to_retry {
+                        let already_retried_for_this_sap =
+                            self.retry_sap_cache.contains(&signed_sap);
+
+                        if already_retried_for_this_sap {
+                            info!("We have already triggered a retry flow for this sap: {signed_sap:?}");
+                            continue;
+                        } else {
+                            self.retry_sap_cache.push(signed_sap.clone())
+                        }
+
                         trace!("Re-generating name for retry");
                         let new_keypair =
                             ed25519::gen_keypair(&prefix.range_inclusive(), self.node.age());
@@ -322,7 +345,7 @@ impl<'a> Joiner<'a> {
     }
 
     // We'll restart the join process once we receive Retry responses from >1/3 of elders
-    fn insert_retry_response(&mut self, sender: Peer, elders: BTreeSet<Peer>) -> bool {
+    fn should_retry_after_response(&mut self, sender: Peer, elders: BTreeSet<Peer>) -> bool {
         if !elders.contains(&sender) {
             error!("Sender {sender:?} of the retry-response is not part of the elders {elders:?}");
             return false;
