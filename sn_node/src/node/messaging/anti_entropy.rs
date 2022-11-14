@@ -530,10 +530,6 @@ mod tests {
         let dst_name = env.other_signed_sap.prefix().name();
         let snapshot = env.node.get_snapshot();
 
-        // let cmd = env
-        //     .node
-        //     .check_for_entropy(&wire_msg, &dst_section_key, dst_name, &sender, None);
-
         let cmd = MyNode::check_for_entropy(
             &wire_msg,
             &snapshot,
@@ -558,13 +554,12 @@ mod tests {
             .node
             .update_network_knowledge(section_tree_update, None,)?);
 
-        let snapshot = env.node.get_snapshot();
-
+        let new_snapshot = env.node.get_snapshot();
         // and it now shall give us an AE redirect msg
         // with the SAP we inserted for other prefix
         let cmd = MyNode::check_for_entropy(
             &wire_msg,
-            &snapshot,
+            &new_snapshot,
             &dst_section_key,
             dst_name,
             &sender,
