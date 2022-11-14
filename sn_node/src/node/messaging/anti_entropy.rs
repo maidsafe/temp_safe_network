@@ -575,21 +575,24 @@ mod tests {
                 assert_eq!(section_tree_update.signed_sap, env.node.network_knowledge().signed_sap());
             });
 
+
+
             // now let's insert the other SAP to make it aware of the other prefix
             let section_tree_update = SectionTreeUpdate::new(env.other_signed_sap.clone(), env.proof_chain);
             assert!(
                 env.node
-                    .update_network_knowledge(
-                        section_tree_update,
-                        None,
-                    )?
+                .update_network_knowledge(
+                    section_tree_update,
+                    None,
+                )?
             );
 
+            let new_snapshot = env.node.get_snapshot();
             // and it now shall give us an AE redirect msg
             // with the SAP we inserted for other prefix
             let cmd = MyNode::check_for_entropy(
                     &wire_msg,
-                    &snapshot,
+                    &new_snapshot,
                     &dst_section_key,
                     dst_name,
                     &sender,
