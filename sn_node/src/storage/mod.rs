@@ -344,7 +344,7 @@ mod tests {
         let used_space = UsedSpace::new(usize::MAX);
 
         // Create instance
-        let mut storage = DataStorage::new(path, used_space)?;
+        let storage = DataStorage::new(path, used_space)?;
 
         // 5mb random data chunk
         let bytes = random_bytes(5 * 1024 * 1024);
@@ -383,7 +383,7 @@ mod tests {
         let used_space = UsedSpace::new(usize::MAX);
 
         // Create instance
-        let mut storage = DataStorage::new(path, used_space)?;
+        let storage = DataStorage::new(path, used_space)?;
 
         // create reg cmd
 
