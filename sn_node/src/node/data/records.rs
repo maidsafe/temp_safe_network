@@ -24,12 +24,17 @@ use sn_interface::{
     types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData},
 };
 use std::{cmp::Ordering, collections::BTreeSet, sync::Arc};
-use tokio::sync::Mutex;
-use tokio::time::Duration;
+use tokio::{
+    sync::Mutex,
+    time::{timeout, Duration},
+};
 use tracing::info;
 use xor_name::XorName;
 
-const REPONSE_TIMEOUT: Duration = Duration::from_secs(7); // w/ 6s qp2p timeout, we give it just a bit more time
+// Timeout set for data queries forwarded to Adult
+// TODO: how to determine this time?
+const ADULT_REPONSE_TIMEOUT: Duration = Duration::from_secs(25);
+
 impl MyNode {
     // Locate ideal holders for this data, instruct them to store the data
     pub(crate) async fn replicate_data_to_adults(
@@ -239,9 +244,7 @@ impl MyNode {
             self.form_usr_msg_bytes_to_node(payload, kind, Some(target), msg_id)?;
 
         debug!("sending out {msg_id:?}");
-        // TODO: how to determine this time?
-        // TODO: don't use arbitrary time here. (But 3s is very realistic here under normal load)
-        let response = match tokio::time::timeout(REPONSE_TIMEOUT, async {
+        let response = match timeout(ADULT_REPONSE_TIMEOUT, async {
             self.comm
                 .send_out_bytes_to_peer_and_return_response(target, msg_id, bytes_to_adult)
                 .await
@@ -250,7 +253,7 @@ impl MyNode {
         {
             Ok(resp) => resp,
             Err(_elapsed) => {
-                error!("No response before arbitrary timeout. Marking adult as dysfunctional");
+                error!("No response to {msg_id:?} after {ADULT_REPONSE_TIMEOUT:?} timeout. Marking Adult {target:?} as dysfunctional");
                 return Ok(vec![Cmd::TrackNodeIssueInDysfunction {
                     name: target.name(),
                     // TODO: no need for op id tracking here, this can be a simple counter
