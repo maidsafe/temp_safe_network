@@ -12,8 +12,8 @@ use xor_name::XorName;
 
 /// Message Kind
 ///
-/// There are two kinds of messages, messages from clients (apps, browser, cli clients, ...)
-/// and messages from Network Nodes
+/// There are three kinds of messages, messages from clients (apps, browser, cli clients, ...),
+/// response to clients from Network Nodes, and messages among Network Nodes
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum MsgKind {
@@ -21,6 +21,8 @@ pub enum MsgKind {
     /// A data message, with the requesting peer's authority.
     /// Authority is needed to access private data, such as reading or writing a private file.
     Client(ClientAuth),
+    /// A data response sent from a Node (along with its name) to the client
+    ClientMsgResponse(XorName),
     /// A message from a Node along with its name
     Node(XorName),
 }

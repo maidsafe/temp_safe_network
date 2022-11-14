@@ -17,7 +17,9 @@ use sn_interface::messaging::{MsgType, WireMsg};
 use sn_interface::{
     data_copy_count,
     messaging::{
-        data::{ClientMsg, CmdResponse, DataCmd, DataQuery, MetadataExchange, StorageLevel},
+        data::{
+            ClientMsgResponse, CmdResponse, DataCmd, DataQuery, MetadataExchange, StorageLevel,
+        },
         system::{NodeCmd, NodeEvent, NodeMsg, NodeQuery, OperationId},
         AuthorityProof, ClientAuth, Dst, MsgId, MsgKind,
     },
@@ -156,12 +158,12 @@ impl MyNode {
             ..
         } = response.into_msg()?
         {
-            let client_msg = ClientMsg::CmdResponse {
+            let client_msg = ClientMsgResponse::CmdResponse {
                 response: CmdResponse::StoreChunk(Ok(())),
                 correlation_id: msg_id,
             };
 
-            let (kind, payload) = self.serialize_sign_client_msg(client_msg)?;
+            let (kind, payload) = self.serialize_client_msg_response(client_msg)?;
 
             debug!("{msg_id:?} sending cmd response ack back to client");
             self.send_msg_on_stream(
@@ -266,12 +268,12 @@ impl MyNode {
             ..
         } = response.into_msg()?
         {
-            let client_msg = ClientMsg::QueryResponse {
+            let client_msg = ClientMsgResponse::QueryResponse {
                 response,
                 correlation_id: msg_id,
             };
 
-            let (kind, payload) = self.serialize_sign_client_msg(client_msg)?;
+            let (kind, payload) = self.serialize_client_msg_response(client_msg)?;
 
             self.send_msg_on_stream(payload, kind, client_response_stream, Some(target), msg_id)
                 .await?;

@@ -8,8 +8,9 @@
 
 use super::wire_msg_header::WireMsgHeader;
 use crate::messaging::{
-    data::ClientMsg, system::NodeMsg, AuthorityProof, ClientAuth, Dst, Error, MsgId, MsgKind,
-    MsgType, Result,
+    data::{ClientMsg, ClientMsgResponse},
+    system::NodeMsg,
+    AuthorityProof, ClientAuth, Dst, Error, MsgId, MsgKind, MsgType, Result,
 };
 
 use bytes::Bytes;
@@ -192,6 +193,18 @@ impl WireMsg {
                     msg_id: self.header.msg_envelope.msg_id,
                     auth,
                     dst: self.dst,
+                    msg,
+                })
+            }
+            #[cfg(any(feature = "chunks", feature = "registers"))]
+            MsgKind::ClientMsgResponse(_) => {
+                let msg: ClientMsgResponse =
+                    rmp_serde::from_slice(&self.payload).map_err(|err| {
+                        Error::FailedToParse(format!("Data message payload as Msgpack: {}", err))
+                    })?;
+
+                Ok(MsgType::ClientMsgResponse {
+                    msg_id: self.header.msg_envelope.msg_id,
                     msg,
                 })
             }

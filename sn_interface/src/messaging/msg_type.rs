@@ -8,7 +8,11 @@
 
 use crate::messaging::Dst;
 
-use super::{data::ClientMsg, system::NodeMsg, AuthorityProof, ClientAuth, MsgId};
+use super::{
+    data::{ClientMsg, ClientMsgResponse},
+    system::NodeMsg,
+    AuthorityProof, ClientAuth, MsgId,
+};
 use std::fmt::{Display, Formatter};
 
 // highest priority, since we must sort out membership first of all
@@ -37,7 +41,7 @@ pub(crate) const CLIENT_QUERY_PRIORITY: i32 = -10;
 #[allow(clippy::large_enum_variant)]
 pub enum MsgType {
     #[cfg(any(feature = "chunks", feature = "registers"))]
-    /// Message for client<->node comms.
+    /// Message from client to nodes.
     Client {
         /// Message ID
         msg_id: MsgId,
@@ -47,6 +51,14 @@ pub enum MsgType {
         dst: Dst,
         /// the message
         msg: ClientMsg,
+    },
+    #[cfg(any(feature = "chunks", feature = "registers"))]
+    /// Message response for clients sent by nodes.
+    ClientMsgResponse {
+        /// Message ID
+        msg_id: MsgId,
+        /// the message
+        msg: ClientMsgResponse,
     },
     /// System message for node<->node comms.
     Node {
@@ -68,6 +80,8 @@ impl MsgType {
             // client <-> node service comms
             #[cfg(any(feature = "chunks", feature = "registers"))]
             Self::Client { msg, .. } => msg.priority(),
+            #[cfg(any(feature = "chunks", feature = "registers"))]
+            Self::ClientMsgResponse { msg, .. } => msg.priority(),
         }
     }
 }
@@ -75,8 +89,9 @@ impl MsgType {
 impl Display for MsgType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Node { msg, .. } => write!(f, "MsgType::System({})", msg),
-            Self::Client { msg, .. } => write!(f, "MsgType::Service({})", msg),
+            Self::Node { msg, .. } => write!(f, "MsgType::Node({})", msg),
+            Self::Client { msg, .. } => write!(f, "MsgType::Client({})", msg),
+            Self::ClientMsgResponse { msg, .. } => write!(f, "MsgType::ClientMsgResponse({})", msg),
         }
     }
 }

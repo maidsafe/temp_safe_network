@@ -1118,8 +1118,8 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
                 spent_proof_share.spentbook_pks().public_key().to_hex()
             );
 
-            // let client_msg = cmds[1].clone().get_client_msg()?;
-            // assert_matches!(client_msg, ClientMsg::CmdResponse { response, .. } => response.is_success());
+            // let client_msg_resp = cmds[1].clone().get_client_msg_resp()?;
+            // assert_matches!(client_msg_resp, ClientMsgResponse::CmdResponse { .. });
 
             Result::<()>::Ok(())
         })

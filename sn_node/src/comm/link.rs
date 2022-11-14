@@ -138,29 +138,40 @@ impl Link {
                     return Err(stream_opening_err);
                 }
             };
-        trace!("bidi openeed for {msg_id:?} to: {:?}", self.peer);
+
+        let stream_id = send_stream.id();
+        trace!(
+            "bidi {stream_id} openeed for {msg_id:?} to: {:?}",
+            self.peer
+        );
         send_stream.set_priority(10);
         match send_stream.send_user_msg(bytes.clone()).await {
             Ok(_) => {}
             Err(err) => {
-                error!("Error sending bytes {msg_id:?} over stream: {:?}", err);
+                error!(
+                    "Error sending bytes {msg_id:?} over stream {stream_id}: {:?}",
+                    err
+                );
                 // remove that broken conn
                 let _conn = self.connections.remove(&conn_id);
             }
         }
 
-        trace!("{msg_id:?} bidi sent to: {:?}", self.peer);
+        trace!("{msg_id:?} sent on {stream_id} to: {:?}", self.peer);
         send_stream.finish().await.or_else(|err| match err {
             qp2p::SendError::StreamLost(qp2p::StreamError::Stopped(_)) => Ok(()),
             _ => {
-                error!("{msg_id:?} Error finishing up stream... {err:?}");
+                error!("{msg_id:?} Error finishing up stream {stream_id}: {err:?}");
                 // remove that broken conn
                 let _conn = self.connections.remove(&conn_id);
                 Err(SendToOneError::Send(err))
             }
         })?;
 
-        trace!("bidi finished {msg_id:?} to: {:?}", self.peer);
+        trace!(
+            "bidi {stream_id} finished for {msg_id:?} to: {:?}",
+            self.peer
+        );
 
         recv_stream.next().await.map_err(SendToOneError::Recv)
     }

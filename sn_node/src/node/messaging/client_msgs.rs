@@ -18,7 +18,8 @@ use sn_interface::{
     data_copy_count,
     messaging::{
         data::{
-            ClientMsg, DataCmd, DataQueryVariant, EditRegister, SignedRegisterEdit, SpentbookCmd,
+            ClientMsg, ClientMsgResponse, DataCmd, DataQueryVariant, EditRegister,
+            SignedRegisterEdit, SpentbookCmd,
         },
         system::{NodeMsg, OperationId},
         AuthorityProof, ClientAuth, MsgId,
@@ -46,12 +47,12 @@ impl MyNode {
         correlation_id: MsgId,
         send_stream: Arc<Mutex<SendStream>>,
     ) -> Result<()> {
-        let the_error_msg = ClientMsg::QueryResponse {
+        let the_error_msg = ClientMsgResponse::QueryResponse {
             response: query.to_error_response(error.into()),
             correlation_id,
         };
 
-        let (kind, payload) = self.serialize_sign_client_msg(the_error_msg)?;
+        let (kind, payload) = self.serialize_client_msg_response(the_error_msg)?;
 
         self.send_msg_on_stream(
             payload,
@@ -71,12 +72,12 @@ impl MyNode {
         correlation_id: MsgId,
         send_stream: Arc<Mutex<SendStream>>,
     ) -> Result<()> {
-        let client_msg = ClientMsg::CmdResponse {
+        let client_msg = ClientMsgResponse::CmdResponse {
             response: cmd.to_error_response(error.into()),
             correlation_id,
         };
 
-        let (kind, payload) = self.serialize_sign_client_msg(client_msg)?;
+        let (kind, payload) = self.serialize_client_msg_response(client_msg)?;
 
         debug!("{correlation_id:?} sending cmd response error back to client");
         self.send_msg_on_stream(
@@ -168,13 +169,6 @@ impl MyNode {
                         send_stream,
                     )
                     .await
-            }
-            _ => {
-                warn!(
-                    "!!!! Unexpected ClientMsg received, and it was not handled: {:?}",
-                    msg
-                );
-                return Ok(vec![]);
             }
         };
 

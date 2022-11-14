@@ -207,8 +207,8 @@ impl Cmd {
         }
     }
 
-    // /// Get a `ClientMsg` from a `Cmd::SendMsg` enum variant.
-    // pub(crate) fn get_client_msg(&self) -> Result<ClientMsg> {
+    // /// Get a `ClientMsgResponse` from a `Cmd::SendMsg` enum variant.
+    // pub(crate) fn get_client_msg_resp(&self) -> Result<ClientMsgResponse> {
     //     match self {
     //         Cmd::SendMsg { msg, .. } => match msg {
     //             OutgoingMsg::Client(client_msg) => Ok(client_msg.clone()),
@@ -223,11 +223,11 @@ impl Cmd {
     //     match self {
     //         Cmd::SendMsg { msg, .. } => match msg {
     //             OutgoingMsg::Client(client_msg) => match client_msg {
-    //                 ClientMsg::CmdResponse { response, .. } => match response.result() {
+    //                 ClientMsgResponse::CmdResponse { response, .. } => match response.result() {
     //                     Ok(_) => Err(eyre!("A CmdResponse error was expected")),
     //                     Err(error) => Ok(error.clone()),
     //                 },
-    //                 _ => Err(eyre!("A ClientMsg::CmdResponse variant was expected")),
+    //                 _ => Err(eyre!("A ClientMsgResponse::CmdResponse variant was expected")),
     //             },
     //             _ => Err(eyre!("A OutgoingMsg::Client variant was expected")),
     //         },
