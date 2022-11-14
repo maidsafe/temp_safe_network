@@ -29,7 +29,7 @@ impl MyNode {
         trace!("Getting missing data for node");
         // Collection of data addresses that we do not have
 
-        // TODO: can we cache this data stored per churn event?
+        // TODO: can cache this data stored per churn event?
         let data_i_have = snapshot.data_storage.data_addrs().await;
         trace!("Our data got");
 

@@ -60,10 +60,16 @@ impl DataStorage {
         })
     }
 
+    /// Update the storage level on data storage
+    /// (To avoid needing a write lock for general storage ops, we separate out this state operation)
+    pub fn set_storage_level(&mut self, new_level: StorageLevel) {
+        self.last_recorded_level = new_level;
+    }
+
     /// Store data in the local store
     #[instrument(skip(self))]
     pub async fn store(
-        &mut self,
+        &self,
         data: &ReplicatedData,
         section_pk: PublicKey,
         node_keypair: Keypair,
@@ -96,7 +102,6 @@ impl DataStorage {
             // every level represents 10 percentage points
             if used_space_level as u8 >= next_level.value() {
                 debug!("Next level for storage has been reached");
-                self.last_recorded_level = next_level;
                 return Ok(Some(next_level));
             }
         }

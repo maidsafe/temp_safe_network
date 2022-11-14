@@ -186,9 +186,8 @@ impl Dispatcher {
                 // we should queue this
                 for data in data_batch {
                     trace!("data being enqueued for replication {:?}", data);
-                    debug!("[NODE WRITE]: data for repl write...");
                     let mut node = self.node.write().await;
-                    debug!("[NODE WRITE]: data for repl write gottt...");
+                    debug!("[NODE WRITE]: data for repl write got");
                     if let Some(peers_set) = node.pending_data_to_replicate_to_peers.get_mut(&data)
                     {
                         debug!("data already queued, adding peer");
@@ -204,11 +203,17 @@ impl Dispatcher {
                 Ok(vec![])
             }
             Cmd::ProposeVoteNodesOffline(names) => {
-                debug!("[NODE WRITE]: propose offline write gottt...");
-
                 let mut node = self.node.write().await;
-                debug!("[NODE WRITE]: propose offline write gottt...");
+                debug!("[NODE WRITE]: propose offline write got");
                 node.cast_offline_proposals(&names)
+            }
+            Cmd::SetStorageLevel(new_level) => {
+                let mut node = self.node.write().await;
+                debug!("[NODE WRITE]: Setting storage level");
+
+                node.data_storage.set_storage_level(new_level);
+
+                Ok(vec![])
             }
         }
     }
