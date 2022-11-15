@@ -6,13 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{
-    messaging::{OutgoingMsg, Peers},
-    Cmd, Error, MyNode, Result,
-};
+use crate::node::{messaging::Peers, Cmd, Error, MyNode, Result};
 
 use sn_interface::{
-    messaging::{Dst, MsgId, MsgKind, WireMsg},
+    messaging::{system::NodeMsg, Dst, MsgId, MsgKind, WireMsg},
     network_knowledge::SectionTreeUpdate,
     types::Peer,
 };
@@ -188,13 +185,11 @@ impl Dispatcher {
 // the last step before passing it over to comms module.
 fn into_msg_bytes(
     node: &MyNode,
-    msg: OutgoingMsg,
+    msg: NodeMsg,
     msg_id: MsgId,
     recipients: Peers,
 ) -> Result<Vec<(Peer, UsrMsgBytes)>> {
-    let (kind, payload) = match msg {
-        OutgoingMsg::Node(msg) => node.serialize_node_msg(msg)?,
-    };
+    let (kind, payload) = node.serialize_node_msg(msg)?;
     let recipients = match recipients {
         Peers::Single(peer) => vec![peer],
         Peers::Multiple(peers) => peers.into_iter().collect(),

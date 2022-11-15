@@ -8,11 +8,7 @@
 
 use super::UsedRecipientSaps;
 
-use crate::node::{
-    flow_ctrl::cmds::Cmd,
-    messaging::{OutgoingMsg, Peers},
-    Error, Result,
-};
+use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Error, Result};
 
 use sn_interface::{
     messaging::system::{JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeMsg, SectionSigned},
@@ -212,7 +208,7 @@ impl JoiningAsRelocated {
         info!("Sending {:?} to {:?}", join_request, recipients);
 
         let msg = NodeMsg::JoinAsRelocatedRequest(Box::new(join_request));
-        let cmd = Cmd::send_msg(OutgoingMsg::Node(msg), Peers::Multiple(recipients));
+        let cmd = Cmd::send_msg(msg, Peers::Multiple(recipients));
 
         Ok(cmd)
     }
@@ -240,10 +236,7 @@ impl JoiningAsRelocated {
 #[cfg(test)]
 mod tests {
     use super::JoiningAsRelocated;
-    use crate::node::{
-        messaging::{OutgoingMsg, Peers},
-        Cmd,
-    };
+    use crate::node::{messaging::Peers, Cmd};
     use color_eyre::Result;
     use eyre::eyre;
     use sn_interface::{
@@ -288,7 +281,7 @@ mod tests {
                     Peers::Single(_) => assert_eq!(bootstrap.len(), 1),
                     Peers::Multiple(recipients) => assert_eq!(bootstrap.len(), recipients.len()),
                 }
-                if !matches!(msg, OutgoingMsg::Node(NodeMsg::JoinAsRelocatedRequest(_))) {
+                if !matches!(msg, NodeMsg::JoinAsRelocatedRequest(_)) {
                     return Err(eyre!("Should be JoinAsRelocatedRequest"));
                 }
             }

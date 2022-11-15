@@ -31,12 +31,6 @@ use std::{collections::BTreeSet, sync::Arc};
 use tokio::sync::Mutex;
 
 #[derive(Debug, Clone)]
-#[allow(clippy::large_enum_variant)]
-pub(crate) enum OutgoingMsg {
-    Node(NodeMsg),
-}
-
-#[derive(Debug, Clone)]
 pub(crate) enum Peers {
     Single(Peer),
     Multiple(BTreeSet<Peer>),
