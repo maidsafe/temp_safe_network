@@ -60,7 +60,7 @@ impl Client {
         let dst_name = cmd.dst_name();
 
         let debug_cmd = format!("{:?}", cmd);
-        debug!("Attempting {:?}", debug_cmd);
+        debug!("Attempting {debug_cmd}");
 
         let serialised_cmd = {
             let msg = ClientMsg::Cmd(cmd);
@@ -80,9 +80,9 @@ impl Client {
             .await;
 
         if res.is_ok() {
-            debug!("{debug_cmd} sent okay: {:?}", res);
+            debug!("{debug_cmd} sent okay: {res:?}");
         } else {
-            trace!("Failed response on {debug_cmd} cmd: {:?}", res);
+            trace!("Failed response on {debug_cmd} cmd: {res:?}");
         }
 
         res

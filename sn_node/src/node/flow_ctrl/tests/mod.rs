@@ -1058,7 +1058,6 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
 
     // let client_msg = cmds[1].clone().get_client_msg()?;
     // assert_matches!(client_msg, ClientMsg::CmdResponse { response, .. } => response.is_success());
-
     Ok(())
 }
 

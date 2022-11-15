@@ -13,7 +13,7 @@ use crate::{Error, Result};
 use qp2p::{RecvStream, UsrMsgBytes};
 use sn_interface::{
     messaging::{
-        data::ClientMsg,
+        data::{ClientMsg, ClientMsgResponse},
         system::{AntiEntropyKind, NodeMsg},
         AuthorityProof, ClientAuth, Dst, MsgId, MsgKind, MsgType, WireMsg,
     },
@@ -28,6 +28,8 @@ use xor_name::XorName;
 // Maximum number of times we'll re-send a msg upon receiving an AE response for it
 const MAX_AE_RETRIES_TO_ATTEMPT: u8 = 5;
 
+// If the msg was resent due to AE response, we internally pass the information
+// about where the msg was resent to, and the bi-stream to read the response on.
 struct MsgResent {
     new_peer: Peer,
     new_recv_stream: RecvStream,
@@ -71,7 +73,7 @@ impl Session {
             debug!("Waiting for response msg on {stream_id} from {peer:?} for {correlation_id:?}, attempt #{attempt}");
 
             match Self::read_msg_from_recvstream(&mut recv_stream).await {
-                Ok(MsgType::Client { msg_id, msg, .. }) => {
+                Ok(MsgType::ClientMsgResponse { msg_id, msg, .. }) => {
                     break Self::handle_client_msg(msg_id, msg, peer, correlation_id).await;
                 }
                 Ok(MsgType::Node { msg_id, msg, .. }) => match self
@@ -90,6 +92,17 @@ impl Session {
                     }
                     Err(err) => break MsgResponse::Failure(addr, err),
                 },
+                Ok(msg @ MsgType::Client { .. }) => {
+                    warn!("Unexpected ClientMsg type received for {correlation_id:?}: {msg:?}");
+                    break MsgResponse::Failure(
+                        addr,
+                        Error::UnexpectedMsgType {
+                            correlation_id,
+                            peer,
+                            msg,
+                        },
+                    );
+                }
                 Err(err) => break MsgResponse::Failure(addr, err),
             }
         };
@@ -113,13 +126,19 @@ impl Session {
                     AntiEntropyKind::Redirect { bounced_msg } | AntiEntropyKind::Retry { bounced_msg },
             } => {
                 debug!("AE Redirect/Retry msg with id {msg_id:?} received for {correlation_id:?}");
-                self.handle_ae_msg(section_tree_update, bounced_msg, src_peer, src_peer_index)
-                    .await
+                self.handle_ae_msg(
+                    section_tree_update,
+                    bounced_msg,
+                    src_peer,
+                    src_peer_index,
+                    correlation_id,
+                )
+                .await
             }
             other_msg => {
                 warn!("Unexpected NodeMsg type with id {msg_id:?} received for {correlation_id:?}: {other_msg:?}");
                 Err(Error::UnexpectedNodeMsg {
-                    msg_id: correlation_id,
+                    correlation_id,
                     peer: src_peer,
                     msg: other_msg,
                 })
@@ -131,7 +150,7 @@ impl Session {
     #[instrument(level = "debug")]
     async fn handle_client_msg(
         msg_id: MsgId,
-        msg: ClientMsg,
+        msg: ClientMsgResponse,
         src_peer: Peer,
         correlation_id: MsgId,
     ) -> MsgResponse {
@@ -139,36 +158,25 @@ impl Session {
         debug!("ClientMsg with id {msg_id:?} received from {src_addr:?}",);
 
         match msg {
-            ClientMsg::QueryResponse {
+            ClientMsgResponse::QueryResponse {
                 response,
                 correlation_id,
             } => {
                 trace!(
-                    "ClientMsg with id {msg_id:?} is QueryResponse regarding correlation_id \
+                    "ClientMsgResponse with id {msg_id:?} is QueryResponse regarding correlation_id \
                     {correlation_id:?} with response {response:?}"
                 );
                 MsgResponse::QueryResponse(src_addr, Box::new(response))
             }
-            ClientMsg::CmdResponse {
+            ClientMsgResponse::CmdResponse {
                 response,
                 correlation_id,
             } => {
                 trace!(
-                    "ClientMsg with id {msg_id:?} is CmdResponse regarding correlation_id \
+                    "ClientMsgResponse with id {msg_id:?} is CmdAck regarding correlation_id \
                     {correlation_id:?} with response {response:?}"
                 );
                 MsgResponse::CmdResponse(src_addr, Box::new(response))
-            }
-            other_msg => {
-                warn!("Unexpected ClientMsg type received with id {msg_id:?} for {correlation_id:?}: {other_msg:?}");
-                MsgResponse::Failure(
-                    src_addr,
-                    Error::UnexpectedClientMsg {
-                        msg_id: correlation_id,
-                        peer: src_peer,
-                        msg: other_msg,
-                    },
-                )
             }
         }
     }
@@ -181,6 +189,7 @@ impl Session {
         bounced_msg: UsrMsgBytes,
         src_peer: Peer,
         src_peer_index: usize,
+        correlation_id: MsgId,
     ) -> Result<MsgResent> {
         let target_sap = section_tree_update.signed_sap.value.clone();
         debug!("Received Anti-Entropy from {src_peer}, with SAP: {target_sap:?}");
@@ -190,7 +199,8 @@ impl Session {
             .await;
 
         let (msg_id, elders, service_msg, dst, auth) =
-            Self::new_target_elders(src_peer, bounced_msg.clone(), &target_sap).await?;
+            Self::new_target_elders(src_peer, bounced_msg.clone(), &target_sap, correlation_id)
+                .await?;
 
         debug!("{msg_id:?} AE bounced msg going out again. Resending original message (sent to {src_peer:?}) to new section eldere");
 
@@ -281,6 +291,7 @@ impl Session {
         src_peer: Peer,
         bounced_msg: UsrMsgBytes,
         received_auth: &SectionAuthorityProvider,
+        correlation_id: MsgId,
     ) -> Result<(MsgId, Vec<Peer>, ClientMsg, Dst, AuthorityProof<ClientAuth>), Error> {
         let (msg_id, service_msg, dst, auth) = match WireMsg::deserialize(bounced_msg)? {
             MsgType::Client {
@@ -289,10 +300,10 @@ impl Session {
                 auth,
                 dst,
             } => (msg_id, msg, dst, auth),
-            MsgType::Node { msg_id, msg, .. } => {
+            msg @ MsgType::ClientMsgResponse { .. } | msg @ MsgType::Node { .. } => {
                 warn!("Unexpected bounced msg received in AE response: {msg:?}");
-                return Err(Error::UnexpectedNodeMsg {
-                    msg_id,
+                return Err(Error::UnexpectedMsgType {
+                    correlation_id,
                     peer: src_peer,
                     msg,
                 });
@@ -303,16 +314,6 @@ impl Session {
         let dst_address_of_bounced_msg = match service_msg.clone() {
             ClientMsg::Cmd(cmd) => cmd.dst_name(),
             ClientMsg::Query(query) => query.variant.dst_name(),
-            msg => {
-                warn!(
-                    "Invalid type of bounced msg {msg_id:?} received in AE response: {service_msg:?}"
-                );
-                return Err(Error::UnexpectedClientMsg {
-                    msg_id,
-                    peer: src_peer,
-                    msg,
-                });
-            }
         };
 
         let target_public_key = received_auth.section_key();

@@ -19,8 +19,7 @@ pub use self::{
     cmd::DataCmd,
     data_exchange::{MetadataExchange, StorageLevel},
     errors::{Error, Result},
-    query::DataQuery,
-    query::DataQueryVariant,
+    query::{DataQuery, DataQueryVariant},
     register::{
         CreateRegister, EditRegister, RegisterCmd, RegisterQuery, SignedRegisterCreate,
         SignedRegisterEdit,
@@ -28,7 +27,10 @@ pub use self::{
     spentbook::{SpentbookCmd, SpentbookQuery},
 };
 
-use crate::messaging::MsgId;
+use crate::messaging::{
+    msg_type::{CLIENT_CMD_PRIORITY, CLIENT_QUERY_PRIORITY},
+    MsgId,
+};
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register, User},
     Chunk,
@@ -56,40 +58,21 @@ pub enum ClientMsg {
     /// the eventually consistent nature of the network, it may be necessary to continually retry
     /// operations that depend on the effects of mutations.
     Cmd(DataCmd),
-    /// The response to a cmd, containing the cmd result (i.e. ACK or Error).
-    CmdResponse {
-        /// The result of the cmd.
-        response: CmdResponse,
-        /// ID of causing [`Cmd`] message.
-        ///
-        /// [`Cmd`]: Self::Cmd
-        correlation_id: MsgId,
-    },
     /// A read-only operation.
     ///
     /// Senders should eventually receive either a corresponding [`QueryResponse`] or an error in
     /// reply.
     /// [`QueryResponse`]: Self::QueryResponse
     Query(DataQuery),
-    /// The response to a query, containing the query result.
-    QueryResponse {
-        /// The result of the query.
-        response: QueryResponse,
-        /// ID of the query message.
-        correlation_id: MsgId,
-    },
 }
 
 impl ClientMsg {
     #[cfg(any(feature = "chunks", feature = "registers"))]
     /// The priority of the message, when handled by lower level comms.
     pub fn priority(&self) -> i32 {
-        use super::msg_type::{CLIENT_CMD_PRIORITY, CLIENT_QUERY_PRIORITY};
-
         match self {
-            // Client <-> node service comms
             Self::Cmd(_) => CLIENT_CMD_PRIORITY,
-            _ => CLIENT_QUERY_PRIORITY,
+            Self::Query(_) => CLIENT_QUERY_PRIORITY,
         }
     }
 }
@@ -98,12 +81,52 @@ impl Display for ClientMsg {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::Cmd(cmd) => write!(f, "ClientMsg::Cmd({:?})", cmd),
-            Self::CmdResponse { response, .. } => {
-                write!(f, "ClientMsg::CmdResponse({:?})", response)
-            }
             Self::Query(query) => write!(f, "ClientMsg::Query({:?})", query),
+        }
+    }
+}
+
+/// Messages sent from the nodes to the clients in response to queries or commands
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub enum ClientMsgResponse {
+    /// The response to a query, containing the query result.
+    QueryResponse {
+        /// The result of the query.
+        response: QueryResponse,
+        /// ID of the [`Query`] message.
+        ///
+        /// [`Query`]: self::ClientMsg::Query
+        correlation_id: MsgId,
+    },
+    /// The response will be sent back to the client when the handling on the
+    /// receiving Elder has been finished.
+    CmdResponse {
+        /// The result of the command.
+        response: CmdResponse,
+        /// ID of causing [`Cmd`] message.
+        ///
+        /// [`Cmd`]: self::ClientMsg::Cmd
+        correlation_id: MsgId,
+    },
+}
+
+impl ClientMsgResponse {
+    #[cfg(any(feature = "chunks", feature = "registers"))]
+    /// The priority of the message, when handled by lower level comms.
+    pub fn priority(&self) -> i32 {
+        CLIENT_QUERY_PRIORITY
+    }
+}
+
+impl Display for ClientMsgResponse {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
             Self::QueryResponse { response, .. } => {
-                write!(f, "ClientMsg::QueryResponse({:?})", response)
+                write!(f, "ClientMsgResponse::QueryResponse({response:?})")
+            }
+            Self::CmdResponse { response, .. } => {
+                write!(f, "ClientMsgResponse::CmdResponse({response:?})")
             }
         }
     }

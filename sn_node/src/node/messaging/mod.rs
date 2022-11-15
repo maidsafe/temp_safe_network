@@ -125,18 +125,7 @@ impl MyNode {
                 // if it's otherwise a response for a client we shall skip drop it.
                 let dst_name = match &msg {
                     ClientMsg::Cmd(cmd) => cmd.dst_name(),
-
                     ClientMsg::Query(query) => query.variant.dst_name(),
-                    other => {
-                        error!(
-                            "Client msg {:?}, from {}, has been dropped since it's not meant \
-                            to be handled by a node: {:?}",
-                            msg_id,
-                            origin.addr(),
-                            other
-                        );
-                        return Ok(vec![]);
-                    }
                 };
 
                 // Then we perform AE checks
@@ -155,6 +144,14 @@ impl MyNode {
                 debug!("no aeeee");
                 self.handle_valid_client_msg(msg_id, msg, auth, origin, send_stream.clone())
                     .await
+            }
+            other @ MsgType::ClientMsgResponse { .. } => {
+                error!(
+                    "Client msg response {msg_id:?}, from {}, has been dropped since it's not \
+                    meant to be handled by a node: {other:?}",
+                    origin.addr()
+                );
+                Ok(vec![])
             }
         }
     }

@@ -8,9 +8,9 @@
 
 use sn_interface::{
     messaging::{
-        data::{ClientMsg, DataQueryVariant, Error as ErrorMsg, QueryResponse},
+        data::{DataQueryVariant, Error as ErrorMsg, QueryResponse},
         system::NodeMsg,
-        Error as MessagingError, MsgId,
+        Error as MessagingError, MsgId, MsgType,
     },
     types::{Error as DtError, Peer},
 };
@@ -146,24 +146,24 @@ pub enum Error {
         response: QueryResponse,
     },
     /// Unexpected NodeMsg received
-    #[error("Unexpected type of NodeMsg received from {peer} in response to {msg_id:?}. Received: {msg:?}")]
+    #[error("Unexpected type of NodeMsg received from {peer} in response to {correlation_id:?}. Received: {msg:?}")]
     UnexpectedNodeMsg {
         /// MsgId of the msg sent
-        msg_id: MsgId,
+        correlation_id: MsgId,
         /// Peer the unexpected msg was received from
         peer: Peer,
         /// Unexpected msg received
         msg: NodeMsg,
     },
-    /// Unexpected ClientMsg received
-    #[error("Unexpected type of ClientMsg received from {peer} in response to {msg_id:?}. Received: {msg:?}")]
-    UnexpectedClientMsg {
+    /// Unexpected msg type received
+    #[error("Unexpected type of message received from {peer} in response to {correlation_id:?}. Received: {msg:?}")]
+    UnexpectedMsgType {
         /// MsgId of the msg sent
-        msg_id: MsgId,
+        correlation_id: MsgId,
         /// Peer the unexpected msg was received from
         peer: Peer,
         /// Unexpected msg received
-        msg: ClientMsg,
+        msg: MsgType,
     },
     /// Other types errors
     #[error(transparent)]
