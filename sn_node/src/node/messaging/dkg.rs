@@ -767,7 +767,7 @@ impl MyNode {
         // it to sign any msg that needs section agreement.
         self.section_keys_provider.insert(key_share.clone());
 
-        let snapshot = self.get_snapshot();
+        let snapshot = self.snapshot();
 
         // If we are lagging, we may have been already approved as new Elder, and
         // an AE update provided us with this same SAP but already signed by previous Elders,

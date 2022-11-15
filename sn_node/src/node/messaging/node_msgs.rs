@@ -165,7 +165,7 @@ impl MyNode {
             // and repsonsive, as well as being a method of keeping nodes up to date.
             NodeMsg::AntiEntropyProbe(section_key) => {
                 debug!("[NODE READ]: aeprobe attempts");
-                let snapshot = node.read().await.get_snapshot();
+                let snapshot = node.read().await.snapshot();
                 debug!("[NODE READ]: aeprobe lock got");
 
                 let mut cmds = vec![];
@@ -189,7 +189,7 @@ impl MyNode {
             NodeMsg::JoinResponse(join_response) => {
                 let mut node = node.write().await;
                 debug!("[NODE WRITE]: join response write gottt...");
-                let snapshot = node.get_snapshot();
+                let snapshot = node.snapshot();
 
                 match *join_response {
                     JoinResponse::Approved {
@@ -271,7 +271,7 @@ impl MyNode {
             }
             NodeMsg::JoinRequest(join_request) => {
                 trace!("Handling msg {:?}: JoinRequest from {}", msg_id, sender);
-                let snapshot = &node.read().await.get_snapshot();
+                let snapshot = &node.read().await.snapshot();
                 debug!("[NODE READ]: joinReq read got");
 
                 MyNode::handle_join_request(node, snapshot, sender, join_request)
@@ -280,7 +280,7 @@ impl MyNode {
             }
             NodeMsg::JoinAsRelocatedRequest(join_request) => {
                 trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
-                let snapshot = &node.read().await.get_snapshot();
+                let snapshot = &node.read().await.snapshot();
                 debug!("[NODE READ]: joinReqas relocated read got");
 
                 if snapshot.is_not_elder
@@ -305,7 +305,7 @@ impl MyNode {
             }
             NodeMsg::MembershipAE(gen) => {
                 debug!("[NODE READ]: membership ae read ");
-                let snapshopt = node.read().await.get_snapshot();
+                let snapshopt = node.read().await.snapshot();
                 debug!("[NODE READ]: membership ae read got");
 
                 Ok(
@@ -429,7 +429,7 @@ impl MyNode {
                     msg_id
                 );
 
-                let snapshot = node.read().await.get_snapshot();
+                let snapshot = node.read().await.snapshot();
                 debug!("[NODE READ]: could ont store data read got");
 
                 if snapshot.is_not_elder {
@@ -458,7 +458,7 @@ impl MyNode {
             }
             NodeMsg::NodeCmd(NodeCmd::ReplicateOneData(data)) => {
                 debug!("[NODE READ]: replicate one data");
-                let mut snapshot = node.read().await.get_snapshot();
+                let mut snapshot = node.read().await.snapshot();
                 debug!("[NODE READ]: replicate one data read got");
 
                 if snapshot.is_elder {
@@ -482,7 +482,7 @@ impl MyNode {
             }
             NodeMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)) => {
                 info!("ReplicateData MsgId: {:?}", msg_id);
-                let snapshot = node.read().await.get_snapshot();
+                let snapshot = node.read().await.snapshot();
                 debug!("[NODE READ]: replicate data read got");
 
                 if snapshot.is_elder {
@@ -543,7 +543,7 @@ impl MyNode {
                     LogMarker::RequestForAnyMissingData,
                     msg_id
                 );
-                let snapshot = &node.read().await.get_snapshot();
+                let snapshot = &node.read().await.snapshot();
                 debug!("[NODE READ]: send missing data read got");
 
                 Ok(
@@ -563,7 +563,7 @@ impl MyNode {
                     "Handle NodeQuery with msg_id {:?}, operation_id {}",
                     msg_id, operation_id
                 );
-                let snapshot = node.read().await.get_snapshot();
+                let snapshot = node.read().await.snapshot();
 
                 debug!("[NODE READ]: node query read got");
 

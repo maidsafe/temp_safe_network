@@ -74,7 +74,7 @@ impl MyNode {
             }
         };
 
-        let snapshot = node.read().await.get_snapshot();
+        let snapshot = node.read().await.snapshot();
         debug!("[NODE READ]: validate msg lock got");
         match msg_type {
             MsgType::Node { msg_id, dst, msg } => {

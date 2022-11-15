@@ -30,7 +30,7 @@ impl MyNode {
         &mut self,
         sap_candidates: SapCandidate,
     ) -> Result<Vec<Cmd>> {
-        let snapshot = &self.get_snapshot();
+        let snapshot = &self.snapshot();
         let mut cmds = vec![];
         match &self.handover_voting {
             Some(handover_voting_state) => {
@@ -301,7 +301,7 @@ impl MyNode {
         signed_vote: SignedVote<SapCandidate>,
     ) -> Result<Vec<Cmd>> {
         self.check_signed_vote_saps(&signed_vote)?;
-        let snapshot = &self.get_snapshot();
+        let snapshot = &self.snapshot();
         match &self.handover_voting {
             Some(handover_state) => {
                 let had_consensus_value = handover_state.consensus_value().is_some();

@@ -171,7 +171,7 @@ mod core {
         /// Generate a read only snapshot of a subset of the node's state
         /// Useful for longer running processes to avoid having to acquire
         /// read locks eg
-        pub(crate) fn get_snapshot(&self) -> MyNodeSnapshot {
+        pub(crate) fn snapshot(&self) -> MyNodeSnapshot {
             MyNodeSnapshot {
                 root_storage_dir: self.root_storage_dir.clone(),
                 is_elder: self.is_elder(),
@@ -274,7 +274,7 @@ mod core {
                 membership,
             };
 
-            let snapshot = &node.get_snapshot();
+            let snapshot = &node.snapshot();
 
             // Write the section tree to this node's root storage directory
             MyNode::write_section_tree(snapshot);
@@ -518,7 +518,7 @@ mod core {
 
         /// Updates various state if elders changed.
         pub(crate) fn update_on_elder_change(&mut self, old: &MyNodeSnapshot) -> Result<Vec<Cmd>> {
-            let new = self.get_snapshot();
+            let new = self.snapshot();
             let new_section_key = new.network_knowledge.section_key();
             let new_prefix = new.network_knowledge.prefix();
             let old_prefix = old.network_knowledge.prefix();

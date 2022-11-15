@@ -132,7 +132,7 @@ impl MyNode {
         section_sig: SectionSig,
     ) -> Result<Vec<Cmd>> {
         trace!("{}", LogMarker::HandlingNewEldersAgreement);
-        let snapshot = self.get_snapshot();
+        let snapshot = self.snapshot();
         let mut section_chain = self.section_chain();
         let last_key = section_chain.last_key()?;
 

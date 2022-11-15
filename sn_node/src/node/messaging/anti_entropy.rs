@@ -29,7 +29,7 @@ impl MyNode {
     /// Send `AntiEntropy` update message to all nodes in our own section.
     pub(crate) fn send_ae_update_to_our_section(&self) -> Result<Option<Cmd>> {
         let our_name = self.info().name();
-        let snapshot = &self.get_snapshot();
+        let snapshot = &self.snapshot();
         let recipients: BTreeSet<_> = self
             .network_knowledge
             .section_members()
@@ -203,7 +203,7 @@ impl MyNode {
         sender: Peer,
     ) -> Result<Vec<Cmd>> {
         debug!("[NODE READ]: handling AE read gottt...");
-        let starting_snapshot = node.read().await.get_snapshot();
+        let starting_snapshot = node.read().await.snapshot();
         let sap = section_tree_update.signed_sap.value.clone();
 
         let members = if let AntiEntropyKind::Update { members } = kind.clone() {
@@ -227,7 +227,7 @@ impl MyNode {
             (updated, cmds)
         };
 
-        let latest_snapshot = node.read().await.get_snapshot();
+        let latest_snapshot = node.read().await.snapshot();
         // Only trigger reorganize data when there is a membership change happens.
         if updated && latest_snapshot.is_not_elder {
             // only done if adult, since as an elder we dont want to get any more
@@ -506,7 +506,7 @@ mod tests {
         let dst_name = our_prefix.substituted_in(xor_name::rand::random());
         let dst_section_key = env.node.network_knowledge().section_key();
 
-        let snapshot = env.node.get_snapshot();
+        let snapshot = env.node.snapshot();
 
         let cmd =
             MyNode::check_for_entropy(&msg, &snapshot, &dst_section_key, dst_name, &sender, None)?;
@@ -528,7 +528,7 @@ mod tests {
         // since it's not aware of the other prefix, it will redirect to self
         let dst_section_key = other_pk;
         let dst_name = env.other_signed_sap.prefix().name();
-        let snapshot = env.node.get_snapshot();
+        let snapshot = env.node.snapshot();
 
         let cmd = MyNode::check_for_entropy(
             &wire_msg,
@@ -554,7 +554,7 @@ mod tests {
             .node
             .update_network_knowledge(section_tree_update, None,)?);
 
-        let new_snapshot = env.node.get_snapshot();
+        let new_snapshot = env.node.snapshot();
         // and it now shall give us an AE redirect msg
         // with the SAP we inserted for other prefix
         let cmd = MyNode::check_for_entropy(
@@ -580,7 +580,7 @@ mod tests {
     async fn ae_outdated_dst_key_of_our_section() -> Result<()> {
         let env = Env::new().await?;
         let our_prefix = env.node.network_knowledge().prefix();
-        let snapshot = env.node.get_snapshot();
+        let snapshot = env.node.snapshot();
         let msg = env.create_msg(&our_prefix, env.node.network_knowledge().section_key())?;
         let sender = env.node.info().peer();
         let dst_name = our_prefix.substituted_in(xor_name::rand::random());
@@ -611,7 +611,7 @@ mod tests {
 
         let bogus_env = Env::new().await?;
         let dst_section_key = bogus_env.node.network_knowledge().genesis_key();
-        let snapshot = env.node.get_snapshot();
+        let snapshot = env.node.snapshot();
 
         let cmd =
             MyNode::check_for_entropy(&msg, &snapshot, dst_section_key, dst_name, &sender, None)?;

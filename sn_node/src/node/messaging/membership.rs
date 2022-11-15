@@ -30,7 +30,7 @@ impl MyNode {
             node_state.state()
         );
 
-        let snapshot = &self.get_snapshot();
+        let snapshot = &self.snapshot();
         let prefix = self.network_knowledge.prefix();
         if let Some(membership) = self.membership.as_mut() {
             let membership_vote = match membership.propose(node_state, &prefix) {
@@ -77,7 +77,7 @@ impl MyNode {
             LogMarker::MembershipVotesBeingHandled
         );
 
-        let snapshot = &self.get_snapshot();
+        let snapshot = &self.snapshot();
         let prefix = snapshot.network_knowledge.prefix();
 
         let mut cmds = vec![];

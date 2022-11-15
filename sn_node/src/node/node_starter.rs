@@ -107,7 +107,7 @@ async fn new_node(
 
     {
         debug!("[NODE WRITE]: new node...");
-        let snapshot = node.read().await.get_snapshot();
+        let snapshot = node.read().await.snapshot();
         debug!("[NODE WRITE]: new node write got");
 
         // Network keypair may have to be changed due to naming criteria or network requirements.

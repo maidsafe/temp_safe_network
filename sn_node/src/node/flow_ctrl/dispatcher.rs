@@ -46,7 +46,7 @@ impl Dispatcher {
                 send_stream,
             } => {
                 trace!("Sending msg: {msg_id:?}");
-                let snapshot = self.node.read().await.get_snapshot();
+                let snapshot = self.node.read().await.snapshot();
                 debug!("[NODE READ]: send msg lock got");
 
                 let peer_msgs = {
@@ -101,7 +101,7 @@ impl Dispatcher {
                 send_stream,
             } => {
                 debug!("Updating network knowledge before handling message");
-                let mut snapshot = self.node.read().await.get_snapshot();
+                let mut snapshot = self.node.read().await.snapshot();
                 // block off the write lock to ensure it's dropped
                 {
                     debug!("[NODE READ]: update client knowledge got");

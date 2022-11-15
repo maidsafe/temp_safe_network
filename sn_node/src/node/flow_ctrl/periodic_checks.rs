@@ -62,7 +62,7 @@ impl FlowCtrl {
     /// Generate and fire commands for all types of periodic checks
     pub(super) async fn perform_periodic_checks(&mut self) {
         debug!("[NODE READ]: periodic msg lock attempt...");
-        let snapshot = &self.node.read().await.get_snapshot();
+        let snapshot = &self.node.read().await.snapshot();
         debug!("[NODE READ]: periodic msg lock got");
 
         self.enqueue_cmds_for_standard_periodic_checks(snapshot)
