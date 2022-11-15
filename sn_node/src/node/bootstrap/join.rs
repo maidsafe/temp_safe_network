@@ -403,7 +403,10 @@ impl<'a> Joiner<'a> {
             }
         }
 
-        info!("Sending {:?} to {:?}", msg, recipients);
+        info!(
+            "Sending {msg:?} to {:?}",
+            Vec::from_iter(recipients.iter().map(Peer::name))
+        );
 
         let wire_msg = WireMsg::single_src(
             &self.node,
@@ -542,7 +545,7 @@ mod tests {
         let state = Joiner::new(node.clone(), send_tx, &mut recv_rx, tree);
 
         // Create the bootstrap task, but don't run it yet.
-        let bootstrap = async { state.try_join(join_timeout).await.map_err(Error::from) };
+        let bootstrap = async { state.try_join(join_timeout).await.expect("Failed to join") };
 
         let (next_sap, next_sk_set, next_elders, _) =
             TestSapBuilder::new(Prefix::default()).build();
@@ -556,54 +559,44 @@ mod tests {
 
         // Create the task that executes the body of the test, but don't run it either.
         let others = async {
-            // Receive JoinRequest
-            let (wire_msg, recipients) = send_rx.recv().await.expect("Expected join message");
-            itertools::assert_equal(recipients, genesis_sap.elders());
-            let node_msg =
-                assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node { msg, .. }) => msg);
-            assert_matches!(node_msg, NodeMsg::AntiEntropyProbe(_));
+            // First the joining node bootstraps it's network knowledge.
+            // We expect two probes, one to the genesis elders, then another to the next sap elders.
 
-            let (wire_msg, recipients) = send_rx.recv().await.expect("Expected join message");
-            itertools::assert_equal(recipients, genesis_sap.elders());
-            let msg = wire_msg.into_msg().expect("Expected join message");
-            let node_msg = assert_matches!(msg, MsgType::Node { msg, .. } => msg);
+            for expected_recipients in [genesis_sap.elders(), next_sap.elders()] {
+                let (wire_msg, recipients) = send_rx.recv().await.expect("Expected message");
 
-            send_node_msg(
-                &recv_tx,
-                NodeMsg::AntiEntropy {
+                itertools::assert_equal(recipients, expected_recipients);
+
+                let node_msg =
+                    assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node { msg, .. }) => msg);
+
+                assert_matches!(node_msg, NodeMsg::AntiEntropyProbe(_));
+                info!("Received anti-entropy probe");
+
+                let ae_update_msg = NodeMsg::AntiEntropy {
                     section_tree_update: section_tree_update.clone(),
                     kind: AntiEntropyKind::Update {
                         members: Default::default(),
                     },
-                },
-                next_elders.first().expect("Should have at least one elder"),
-                next_sap.section_key(),
-            );
+                };
 
-            assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest { .. }));
-
-            // // Send JoinResponse::Retry with new SAP
-            // let other_elders: Vec<&MyNodeInfo> =
-            //     next_elders.iter().take(2 * elder_count() / 3).collect_vec();
-            // for elder in other_elders.iter() {
-            //     send_join_response(
-            //         &recv_tx,
-            //         JoinResponse::Retry {
-            //             section_tree_update: section_tree_update.clone(),
-            //         },
-            //         elder,
-            //         next_sap.section_key(),
-            //     );
-            // }
+                send_node_msg(
+                    &recv_tx,
+                    ae_update_msg,
+                    next_elders.first().expect("Should have at least one elder"),
+                    next_sap.section_key(),
+                );
+            }
 
             // Receive the second JoinRequest with correct section info
-            let (wire_msg, recipients) =
-                send_rx.recv().await.expect("JoinRequest was not received");
-            let (node_msg, dst) = assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node { msg, dst,.. }) =>
-                (msg, dst));
+            let (wire_msg, recipients) = send_rx.recv().await.expect("Expected JoinRequest");
+
+            itertools::assert_equal(recipients, next_sap.elders());
+
+            let msg = wire_msg.into_msg().expect("Failed decoding message");
+            let (node_msg, dst) = assert_matches!(msg, MsgType::Node { msg, dst,.. } => (msg, dst));
 
             assert_eq!(dst.section_key, next_section_key);
-            itertools::assert_equal(recipients, next_sap.elders());
             assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest{ section_key }) => {
                 assert_eq!(section_key, next_section_key);
             });
@@ -621,12 +614,10 @@ mod tests {
                 &next_elders[0],
                 next_sap.section_key(),
             );
-
-            Ok(())
         };
 
         // Drive both tasks to completion concurrently (but on the same thread).
-        let ((node, section), _) = future::try_join(bootstrap, others).await?;
+        let ((node, section), _) = future::join(bootstrap, others).await;
 
         assert_eq!(section.section_auth(), next_sap);
         assert_eq!(section.section_key(), next_section_key);
