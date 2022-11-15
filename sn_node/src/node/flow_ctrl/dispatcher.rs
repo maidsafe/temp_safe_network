@@ -102,29 +102,25 @@ impl Dispatcher {
             } => {
                 debug!("Updating network knowledge before handling message");
                 let mut snapshot = self.node.read().await.snapshot();
-                // block off the write lock to ensure it's dropped
-                {
-                    debug!("[NODE READ]: update client knowledge got");
+                debug!("[NODE READ]: update client knowledge got");
 
-                    let name = snapshot.name;
-                    let there_was_an_update =
-                        snapshot.network_knowledge.update_knowledge_if_valid(
-                            SectionTreeUpdate::new(signed_sap.clone(), proof_chain.clone()),
-                            None,
-                            &name,
-                        )?;
+                let name = snapshot.name;
+                let there_was_an_update = snapshot.network_knowledge.update_knowledge_if_valid(
+                    SectionTreeUpdate::new(signed_sap.clone(), proof_chain.clone()),
+                    None,
+                    &name,
+                )?;
 
-                    if there_was_an_update {
-                        // okay lets do it for real
-                        let mut node = self.node.write().await;
-                        debug!("[NODE WRITE]: update client write got");
-                        let updated = node.network_knowledge.update_knowledge_if_valid(
-                            SectionTreeUpdate::new(signed_sap, proof_chain),
-                            None,
-                            &name,
-                        )?;
-                        debug!("Network knowledge was updated: {updated}");
-                    }
+                if there_was_an_update {
+                    // okay lets do it for real
+                    let mut node = self.node.write().await;
+                    debug!("[NODE WRITE]: update client write got");
+                    let updated = node.network_knowledge.update_knowledge_if_valid(
+                        SectionTreeUpdate::new(signed_sap, proof_chain),
+                        None,
+                        &name,
+                    )?;
+                    debug!("Network knowledge was updated: {updated}");
                 }
 
                 debug!("[NODE READ]: update & validate msg lock got");
