@@ -48,7 +48,6 @@ pub use self::{
 };
 pub use crate::storage::DataStorage;
 
-// pub(crate) use self::monitoring::RateLimits;
 #[cfg(test)]
 pub(crate) use relocation::{check as relocation_check, ChurnId};
 
@@ -776,13 +775,4 @@ mod core {
             });
         }
     }
-
-    // #[derive(Clone)]
-    // pub(crate) struct StateSnapshot {
-    //     pub(crate) is_elder: bool,
-    //     pub(crate) section_key: bls::PublicKey,
-    //     pub(crate) prefix: Prefix,
-    //     pub(crate) elders: BTreeSet<XorName>,
-    //     pub(crate) members: BTreeSet<XorName>,
-    // }
 }
