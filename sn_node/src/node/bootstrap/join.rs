@@ -457,8 +457,7 @@ impl<'a> Joiner<'a> {
             sender, wire_msg, ..
         }) = self.incoming_msgs.recv().await
         {
-            // We are interested only in `JoinResponse` type of messages
-
+            // We are interested only in `Node` type of messages
             match wire_msg.into_msg()? {
                 MsgType::Node { msg, .. } => return Ok((msg, sender)),
                 MsgType::Client { msg_id, .. }
@@ -509,6 +508,7 @@ mod tests {
     use itertools::Itertools;
     use sn_interface::{
         elder_count, init_logger,
+        messaging::system::AntiEntropyKind,
         network_knowledge::{NodeState, SectionAuthorityProvider, SectionTreeUpdate, SectionsDAG},
         test_utils::*,
         types::PublicKey,
@@ -565,23 +565,36 @@ mod tests {
 
             let (wire_msg, recipients) = send_rx.recv().await.expect("Expected join message");
             itertools::assert_equal(recipients, genesis_sap.elders());
-            let node_msg =
-                assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node { msg, .. }) => msg);
+            let msg = wire_msg.into_msg().expect("Expected join message");
+            let node_msg = assert_matches!(msg, MsgType::Node { msg, .. } => msg);
+
+            send_node_msg(
+                &recv_tx,
+                NodeMsg::AntiEntropy {
+                    section_tree_update: section_tree_update.clone(),
+                    kind: AntiEntropyKind::Update {
+                        members: Default::default(),
+                    },
+                },
+                next_elders.first().expect("Should have at least one elder"),
+                next_sap.section_key(),
+            );
+
             assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest { .. }));
 
-            // Send JoinResponse::Retry with new SAP
-            let other_elders: Vec<&MyNodeInfo> =
-                next_elders.iter().take(2 * elder_count() / 3).collect_vec();
-            for elder in other_elders.iter() {
-                send_join_response(
-                    &recv_tx,
-                    JoinResponse::Retry {
-                        section_tree_update: section_tree_update.clone(),
-                    },
-                    elder,
-                    next_sap.section_key(),
-                );
-            }
+            // // Send JoinResponse::Retry with new SAP
+            // let other_elders: Vec<&MyNodeInfo> =
+            //     next_elders.iter().take(2 * elder_count() / 3).collect_vec();
+            // for elder in other_elders.iter() {
+            //     send_join_response(
+            //         &recv_tx,
+            //         JoinResponse::Retry {
+            //             section_tree_update: section_tree_update.clone(),
+            //         },
+            //         elder,
+            //         next_sap.section_key(),
+            //     );
+            // }
 
             // Receive the second JoinRequest with correct section info
             let (wire_msg, recipients) =
@@ -924,43 +937,37 @@ mod tests {
         }
     }
 
-    // test helper
-    #[instrument]
     fn send_join_response(
         recv_tx: &mpsc::Sender<MsgFromPeer>,
-        join_response: JoinResponse,
-        bootstrap_node: &MyNodeInfo,
+        resp: JoinResponse,
+        sender: &MyNodeInfo,
         section_pk: BlsPublicKey,
     ) {
-        send_response(
-            recv_tx,
-            NodeMsg::JoinResponse(Box::new(join_response)),
-            bootstrap_node,
-            section_pk,
-        )
+        let node_msg = NodeMsg::JoinResponse(Box::new(resp));
+        send_node_msg(recv_tx, node_msg, sender, section_pk);
     }
 
     // test helper
     #[instrument]
-    fn send_response(
+    fn send_node_msg(
         recv_tx: &mpsc::Sender<MsgFromPeer>,
-        node_msg: NodeMsg,
-        bootstrap_node: &MyNodeInfo,
+        msg: NodeMsg,
+        sender: &MyNodeInfo,
         section_pk: BlsPublicKey,
     ) {
         let wire_msg = WireMsg::single_src(
-            bootstrap_node,
+            sender,
             Dst {
                 name: XorName::from(PublicKey::Bls(section_pk)),
                 section_key: section_pk,
             },
-            node_msg,
+            msg,
         )
         .expect("Failed to build wire msg");
 
         recv_tx
             .try_send(MsgFromPeer {
-                sender: bootstrap_node.peer(),
+                sender: sender.peer(),
                 wire_msg,
                 send_stream: None,
             })

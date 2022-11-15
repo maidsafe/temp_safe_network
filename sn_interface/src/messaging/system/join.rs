@@ -32,7 +32,6 @@ impl JoinRequest {
 
 /// Response to a request to join a section
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[allow(clippy::large_enum_variant)]
 pub enum JoinResponse {
     /// Up to date section information for a joining peer to retry its join request with
     Retry {

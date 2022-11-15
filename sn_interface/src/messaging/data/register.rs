@@ -20,7 +20,6 @@ use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
 /// [`Register`] read operations.
-#[allow(clippy::large_enum_variant)]
 #[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
 pub enum RegisterQuery {
     /// Retrieve the [`Register`] at the given address.
