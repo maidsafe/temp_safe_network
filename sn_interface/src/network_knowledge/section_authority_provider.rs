@@ -225,105 +225,186 @@ impl SectionAuthorityProvider {
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils {
     use crate::{
-        messaging::system::SectionSigned,
-        network_knowledge::{MyNodeInfo, NodeState, SectionAuthorityProvider},
-        test_utils::{gen_sorted_nodes, TestKeys},
+        elder_count,
+        network_knowledge::{supermajority, MyNodeInfo, NodeState, SectionAuthorityProvider},
+        test_utils::gen_sorted_nodes,
     };
-    use rand::RngCore;
+    use rand::{thread_rng, RngCore};
     use xor_name::Prefix;
 
-    /// `SectionAuthorityProvider` related utils for testing
-    pub struct TestSAP {}
+    /// Generate sk_set with the provided threshold, else use sup(elder_count)-1. It's because,
+    /// generally we need sup(elder_count) shares to be valid. Thus threshold should be 1
+    /// less than that
+    pub fn gen_sk_set(
+        mut rng: impl RngCore,
+        elder_count: usize,
+        sk_threshold_size: Option<usize>,
+    ) -> bls::SecretKeySet {
+        bls::SecretKeySet::random(
+            sk_threshold_size.unwrap_or_else(|| supermajority(elder_count).saturating_sub(1)),
+            &mut rng,
+        )
+    }
 
-    impl TestSAP {
-        /// Generate a random `SectionAuthorityProvider` for testing with the `SectionKeySet` created using the rng.
+    /// Builder to generate a `SectionAuthorityProvider`
+    pub struct TestSapBuilder {
+        prefix: Prefix,
+        elder_count: usize,
+        adult_count: usize,
+        membership_gen: usize,
+        elder_nodes: Option<Vec<MyNodeInfo>>,
+        adult_nodes: Option<Vec<MyNodeInfo>>,
+        sk_set: Option<bls::SecretKeySet>,
+        sk_threshold_size: Option<usize>,
+        elder_age_pattern: Option<Vec<u8>>,
+    }
+
+    impl TestSapBuilder {
+        /// Set the `Prefix` of the SAP. Also initiates the SAP builder by providing default values
+        /// to the configs.
+        pub fn new(prefix: Prefix) -> Self {
+            Self {
+                prefix,
+                elder_count: elder_count(),
+                adult_count: 0,
+                membership_gen: 0,
+                sk_threshold_size: None,
+                elder_nodes: None,
+                adult_nodes: None,
+                sk_set: None,
+                elder_age_pattern: None,
+            }
+        }
+
+        /// Set the number of elders in the SAP. Will be overriden by `elder_nodes.len()` if
+        /// the nodes are provided.
+        pub fn elder_count(mut self, elder_count: usize) -> Self {
+            self.elder_count = elder_count;
+            self
+        }
+
+        /// Set the number of adults in the SAP. Will be overriden by `adult_nodes.len()` if
+        /// the nodes are provided.
         ///
-        /// The total number of members in the section will be `elder_count` + `adult_count`. A lot of
-        /// tests don't require adults in the section, so zero is an acceptable value for
-        /// `adult_count`.
+        /// A lot of tests don't require adults in the section, so zero is an acceptable value
+        /// for `adult_count`.
+        pub fn adult_count(mut self, adult_count: usize) -> Self {
+            self.adult_count = adult_count;
+            self
+        }
+
+        /// Set the membership generation of the SAP
+        pub fn membership_gen(mut self, gen: usize) -> Self {
+            self.membership_gen = gen;
+            self
+        }
+
+        /// Use the provided set of nodes as elders
+        pub fn elder_nodes(mut self, nodes: Vec<MyNodeInfo>) -> Self {
+            self.elder_count = nodes.len();
+            self.elder_nodes = Some(nodes);
+            self
+        }
+
+        /// Use the provided set of nodes as adults
+        pub fn adult_nodes(mut self, nodes: Vec<MyNodeInfo>) -> Self {
+            self.adult_count = nodes.len();
+            self.adult_nodes = Some(nodes);
+            self
+        }
+
+        /// Use custom `SecretKeySet` for the SAP
+        pub fn sk_set(mut self, sk_set: &bls::SecretKeySet) -> Self {
+            self.sk_set = Some(sk_set.clone());
+            self
+        }
+
+        /// Provide a threshold_size for the generated `SecretKeySet`. Will be overriden
+        /// if a `sk_set` is provided.
         ///
-        /// Optionally provide `age_pattern` to create elders with specific ages.
+        /// Some tests require a low threshold.
+        pub fn sk_threshold_size(mut self, sk_threshold_size: usize) -> Self {
+            self.sk_threshold_size = Some(sk_threshold_size);
+            self
+        }
+        /// Provide `age_pattern` to create elders with specific ages. Will be overriden if you
+        /// provide pre crafted elder nodes.
+        /// e.g., vec![10, 20] will generate elders with the following age (10, 20, 20, 20...)
+        ///
         /// If None = elder's age is set to `MIN_ADULT_AGE`
         /// If age_pattern.len() == elder, then apply the respective ages to each node
         /// If age_pattern.len() < elder, then the last element's value is taken as the age for the remaining nodes.
         /// If age_pattern.len() > elder, then the extra elements after `count` are ignored.
-        ///
-        /// Also an optional `sk_threshold_size` can be passed to specify the threshold when the secret key
-        /// set is generated for the section key. Some tests require a low threshold.
-        pub fn random_sap_with_rng<R: RngCore>(
-            rng: &mut R,
-            prefix: Prefix,
-            elder_count: usize,
-            adult_count: usize,
-            elder_age_pattern: Option<&[u8]>,
-            sk_threshold_size: Option<usize>,
-        ) -> (SectionAuthorityProvider, Vec<MyNodeInfo>, bls::SecretKeySet) {
-            let nodes = gen_sorted_nodes(&prefix, elder_count, adult_count, elder_age_pattern);
-            let elders = nodes.iter().map(MyNodeInfo::peer).take(elder_count);
-            let members = nodes.iter().map(|i| NodeState::joined(i.peer(), None));
-            let poly = bls::poly::Poly::random(sk_threshold_size.unwrap_or(0), rng);
-            let sks = bls::SecretKeySet::from(poly);
-            let section_auth =
-                SectionAuthorityProvider::new(elders, prefix, members, sks.public_keys(), 0);
-            (section_auth, nodes, sks)
+        pub fn elder_age_pattern(mut self, pattern: Vec<u8>) -> Self {
+            self.elder_age_pattern = Some(pattern);
+            self
         }
 
-        /// Generate a random `SectionAuthorityProvider` for testing.
+        /// Build the final SAP with the provided rng. Also returns the `SecretKeySet` used by the SAP along with the
+        /// set of elder, adult nodes.
         ///
-        /// Same as `random_sap_with_rng` but with `thread_rng`.
-        pub fn random_sap(
-            prefix: Prefix,
-            elder_count: usize,
-            adult_count: usize,
-            elder_age_pattern: Option<&[u8]>,
-            sk_threshold_size: Option<usize>,
-        ) -> (SectionAuthorityProvider, Vec<MyNodeInfo>, bls::SecretKeySet) {
-            Self::random_sap_with_rng(
-                &mut rand::thread_rng(),
-                prefix,
-                elder_count,
-                adult_count,
-                elder_age_pattern,
-                sk_threshold_size,
-            )
-        }
-
-        /// Generate a random `SectionAuthorityProvider` for testing.
-        ///
-        /// Same as `random_sap`, but instead the secret key is provided. This can be useful for
-        /// creating a section to share the same genesis key as another one.
-        pub fn random_sap_with_key(
-            prefix: Prefix,
-            elder_count: usize,
-            adult_count: usize,
-            sk_set: &bls::SecretKeySet,
-            elder_age_pattern: Option<&[u8]>,
-        ) -> (SectionAuthorityProvider, Vec<MyNodeInfo>) {
-            let nodes = gen_sorted_nodes(&prefix, elder_count, adult_count, elder_age_pattern);
-            let elders = nodes.iter().map(MyNodeInfo::peer).take(elder_count);
-            let members = nodes.iter().map(|i| NodeState::joined(i.peer(), None));
-            let section_auth =
-                SectionAuthorityProvider::new(elders, prefix, members, sk_set.public_keys(), 0);
-            (section_auth, nodes)
-        }
-
-        /// Generate a random `SectionAuthorityProvider` which is signed by itself
-        pub fn random_signed_sap(
-            prefix: Prefix,
-            elder_count: usize,
-            adult_count: usize,
-            sk_threshold_size: Option<usize>,
+        ///  Use `build` if you don't want to provide rng
+        pub fn build_rng(
+            self,
+            rng: impl RngCore,
         ) -> (
-            SectionSigned<SectionAuthorityProvider>,
+            SectionAuthorityProvider,
+            bls::SecretKeySet,
             Vec<MyNodeInfo>,
-            bls::SecretKey,
+            Vec<MyNodeInfo>,
         ) {
-            let (section_auth, nodes, secret_key_set) =
-                Self::random_sap(prefix, elder_count, adult_count, None, sk_threshold_size);
-            let signed_sap =
-                TestKeys::get_section_signed(&secret_key_set.secret_key(), section_auth);
+            // Todo: use custom rng to generate the random nodes. `gen_keypair` requires `rand-0.7`
+            // version and `SecretKeySet` requires `rand-0.8`; wait for the other one to be bumped.
+            let members = gen_sorted_nodes(
+                &self.prefix,
+                self.elder_count,
+                self.adult_count,
+                self.elder_age_pattern.as_deref(),
+            );
+            let elder_nodes = if let Some(elders) = self.elder_nodes {
+                elders
+            } else {
+                members.iter().take(self.elder_count).cloned().collect()
+            };
+            let adult_nodes = if let Some(adults) = self.adult_nodes {
+                adults
+            } else {
+                members.iter().skip(self.elder_count).cloned().collect()
+            };
+            let members = elder_nodes
+                .iter()
+                .chain(adult_nodes.iter())
+                .map(|i| NodeState::joined(i.peer(), None));
 
-            (signed_sap, nodes, secret_key_set.secret_key())
+            let sk_set = if let Some(sk) = self.sk_set {
+                sk
+            } else {
+                gen_sk_set(rng, self.elder_count, self.sk_threshold_size)
+            };
+
+            let sap = SectionAuthorityProvider::new(
+                elder_nodes.iter().map(|i| i.peer()),
+                self.prefix,
+                members,
+                sk_set.public_keys(),
+                self.membership_gen as u64,
+            );
+            (sap, sk_set, elder_nodes, adult_nodes)
+        }
+
+        /// Build the final SAP from the configs. Also returns the `SecretKeySet` used by the SAP along with the
+        /// set of elder, adult nodes.
+        ///
+        /// Use `build_rng` if you want to provide custom rng.
+        pub fn build(
+            self,
+        ) -> (
+            SectionAuthorityProvider,
+            bls::SecretKeySet,
+            Vec<MyNodeInfo>,
+            Vec<MyNodeInfo>,
+        ) {
+            self.build_rng(thread_rng())
         }
     }
 }
