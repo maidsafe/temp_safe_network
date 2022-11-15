@@ -89,7 +89,7 @@ impl Link {
             // will access only after the first one finished creating a new connection
             // thus will find a connection here:
             debug!("{msg_id:?} creating conn with {:?}", self.peer);
-            self.create_connection(msg_id).await
+            self.create_connection_if_none_exist(msg_id).await
         } else {
             debug!("{msg_id:?} connections do exist...");
             // TODO: add in simple connection check when available.
@@ -98,7 +98,7 @@ impl Link {
             let conn = connections.iter().next().map(|(_, c)| c.clone());
             // we have to drop connection read here before we attempt to create (and write) connections
             drop(connections);
-            Ok(conn.unwrap_or(self.create_connection(msg_id).await?))
+            Ok(conn.unwrap_or(self.create_connection_if_none_exist(msg_id).await?))
         }
     }
 
@@ -108,10 +108,25 @@ impl Link {
         !self.connections.read().await.is_empty()
     }
 
-    /// Uses qp2p to create a connection and stores it on Self
-    async fn create_connection(&self, msg_id: MsgId) -> Result<Connection, SendToOneError> {
+    /// Uses qp2p to create a connection and stores it on Self.
+    /// Returns early without creating a new connection if an existing connection is found (which may have been created before we can get the write lock).
+    ///
+    /// (There is a strong chance for a client writing many chunks to find no connection for each chunk and then try and create connections...
+    /// which could lead to connection after connection being created if we do not check here)
+    async fn create_connection_if_none_exist(
+        &self,
+        msg_id: MsgId,
+    ) -> Result<Connection, SendToOneError> {
         // grab write lock to prevent many many conns being opened at once
+        debug!("[CONN WRITE]: {msg_id:?}");
         let mut conns = self.connections.write().await;
+        debug!("[CONN WRITE]: lock obtained {msg_id:?}");
+
+        // let's double check we havent got a connection meanwhile
+        if let Some(conn) = conns.iter().next().map(|(_, c)| c.clone()) {
+            debug!("{msg_id:?} Connection already exists in Link, so returning that instead of creating a fresh connection");
+            return Ok(conn);
+        }
 
         debug!("{msg_id:?} creating connnnn to {:?}", self.peer);
         let (conn, _incoming_msgs) = self
