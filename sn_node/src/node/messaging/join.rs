@@ -53,7 +53,7 @@ impl MyNode {
         let our_prefix = snapshot.network_knowledge.prefix();
         if !our_prefix.matches(&peer.name()) {
             debug!("Redirecting JoinRequest from {peer} - name doesn't match our prefix {our_prefix:?}.");
-            let retry_sap = MyNode::matching_section(snapshot, &peer.name())?;
+            let retry_sap = snapshot.section_sap_matching_name(&peer.name())?;
             let msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Redirect(retry_sap)));
             trace!("Sending {:?} to {}", msg, peer);
             trace!("{}", LogMarker::SendJoinRedirected);

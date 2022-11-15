@@ -167,6 +167,18 @@ mod core {
         pub(crate) membership: Option<Membership>,
     }
 
+    impl MyNodeSnapshot {
+        /// Returns the SAP of the section matching the name.
+        pub(crate) fn section_sap_matching_name(
+            &self,
+            name: &XorName,
+        ) -> Result<SectionAuthorityProvider> {
+            self.network_knowledge
+                .section_auth_by_name(name)
+                .map_err(Error::from)
+        }
+    }
+
     impl MyNode {
         /// Generate a read only snapshot of a subset of the node's state
         /// Useful for longer running processes to avoid having to acquire

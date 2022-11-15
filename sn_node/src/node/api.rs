@@ -17,8 +17,7 @@ use crate::{
 
 use sn_interface::{
     network_knowledge::{
-        MyNodeInfo, NetworkKnowledge, SectionAuthorityProvider, SectionKeyShare, SectionsDAG,
-        GENESIS_DBC_SK,
+        MyNodeInfo, NetworkKnowledge, SectionKeyShare, SectionsDAG, GENESIS_DBC_SK,
     },
     types::log_markers::LogMarker,
 };
@@ -30,9 +29,6 @@ use sn_dbc::{
     SpentProofContent, SpentProofShare, Token, TransactionBuilder, TrueInput,
 };
 use std::{path::PathBuf, sync::Arc};
-use xor_name::XorName;
-
-use super::core::MyNodeSnapshot;
 
 impl MyNode {
     pub(crate) async fn first_node(
@@ -102,17 +98,6 @@ impl MyNode {
     /// Returns the current BLS public key set
     pub(crate) fn public_key_set(&self) -> Result<bls::PublicKeySet> {
         Ok(self.key_share()?.public_key_set)
-    }
-
-    /// Returns the SAP of the section matching the name.
-    pub(crate) fn matching_section(
-        snapshot: &MyNodeSnapshot,
-        name: &XorName,
-    ) -> Result<SectionAuthorityProvider> {
-        snapshot
-            .network_knowledge
-            .section_auth_by_name(name)
-            .map_err(Error::from)
     }
 
     /// Returns our key share in the current BLS group if this node is a member of one, or
