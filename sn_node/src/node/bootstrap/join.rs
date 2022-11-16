@@ -503,7 +503,7 @@ mod tests {
     use super::*;
     use crate::node::{messages::WireMsgUtils, Error as RoutingError, MIN_ADULT_AGE};
     use assert_matches::assert_matches;
-    use eyre::{eyre, Error, Result};
+    use eyre::{eyre, Result};
     use futures::{
         future::{self, Either},
         pin_mut,
@@ -522,7 +522,7 @@ mod tests {
     const JOIN_TIMEOUT_SEC: u64 = 15;
 
     #[tokio::test]
-    async fn join_as_adult() -> Result<()> {
+    async fn join_as_adult() {
         init_logger();
 
         let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
@@ -622,8 +622,6 @@ mod tests {
         assert_eq!(section.section_auth(), next_sap);
         assert_eq!(section.section_key(), next_section_key);
         assert_eq!(node.age(), MIN_ADULT_AGE);
-
-        Ok(())
     }
 
     #[tokio::test]
