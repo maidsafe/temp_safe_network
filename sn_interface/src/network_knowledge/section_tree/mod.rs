@@ -304,6 +304,23 @@ impl SectionTree {
         self.sections.is_empty()
     }
 
+    pub fn generate_section_tree_update(&self, prefix: &Prefix) -> Result<SectionTreeUpdate> {
+        let signed_sap = self
+            .sections
+            .get(prefix)
+            .ok_or(Error::NoMatchingSection)?
+            .clone();
+
+        let proof_chain = self
+            .sections_dag
+            .partial_dag(self.sections_dag.genesis_key(), &signed_sap.section_key())?;
+
+        Ok(SectionTreeUpdate {
+            signed_sap,
+            proof_chain,
+        })
+    }
+
     /// Returns the section authority provider for the prefix that matches `name`.
     /// In case there is no prefix matches the `name`, we shall return the one with longest
     /// common bits. i.e. for the name of `00xxx`, if we have `01` and `1`, then we shall return

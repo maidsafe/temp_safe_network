@@ -205,6 +205,17 @@ impl SectionsDAG {
     pub fn partial_dag(&self, from: &bls::PublicKey, to: &bls::PublicKey) -> Result<Self> {
         // start from the "to" key (bottom of the tree) and traverse to the root
         let mut crdt_ops: Vec<Node<SectionInfo>> = Vec::new();
+
+        // Return the singleton DAG when from == to == genesis
+        // This is a special case because the genesis entry does not have a `Node` so `get_node(to)` will fail
+        if to == &self.genesis_key {
+            if from != &self.genesis_key {
+                return Err(Error::InvalidBranch);
+            } else {
+                return Ok(Self::new(self.genesis_key));
+            }
+        }
+
         // if "to" key is genesis, returns error
         let mut node = self.get_node(to)?;
         loop {
@@ -501,6 +512,18 @@ pub(crate) mod tests {
     use rand::{rngs::StdRng, thread_rng, Rng, RngCore, SeedableRng};
     use std::collections::{BTreeMap, BTreeSet};
     use xor_name::Prefix;
+
+    #[test]
+    fn test_partial_dag_for_genesis_key() {
+        let (_, pk) = gen_keypair();
+        let dag = SectionsDAG::new(pk);
+
+        let partial_dag = dag
+            .partial_dag(&pk, &pk)
+            .expect("Should have succeeded in creating a partial dag");
+
+        assert_eq!(Vec::from_iter(partial_dag.keys()), vec![pk]);
+    }
 
     #[test]
     fn insert_last() -> Result<()> {

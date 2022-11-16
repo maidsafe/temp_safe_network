@@ -801,17 +801,31 @@ mod tests {
         let mut tree = SectionTree::new(genesis_pk);
         assert!(tree.insert_without_chain(signed_genesis_sap));
 
-        let state = Joiner::new(node, send_tx, &mut recv_rx, tree);
+        let state = Joiner::new(node, send_tx, &mut recv_rx, tree.clone());
 
         let bootstrap_task = state.try_join(join_timeout);
         let test_task = async {
-            let (wire_msg, _) = send_rx
-                .recv()
-                .await
-                .ok_or_else(|| eyre!("JoinRequest was not received"))?;
+            let (node_msg, _) = recv_node_msg(&mut send_rx).await;
+            assert_matches!(node_msg, NodeMsg::AntiEntropyProbe { .. });
 
-            assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node { msg, .. }) =>
-                                assert_matches!(msg, NodeMsg::JoinRequest{..}));
+            let section_tree_update = tree
+                .generate_section_tree_update(&prefix(""))
+                .expect("Failed to create update");
+
+            send_node_msg(
+                &recv_tx,
+                NodeMsg::AntiEntropy {
+                    section_tree_update,
+                    kind: AntiEntropyKind::Update {
+                        members: Default::default(),
+                    },
+                },
+                &genesis_nodes[0],
+                genesis_sap.section_key(),
+            );
+
+            let (node_msg, _) = recv_node_msg(&mut send_rx).await;
+            assert_matches!(node_msg, NodeMsg::JoinRequest { .. });
 
             send_join_response(
                 &recv_tx,
@@ -924,6 +938,15 @@ mod tests {
             Either::Left((res, _)) => panic!("Join task should not have completed {res:?}"),
             Either::Right((output, _)) => output,
         }
+    }
+
+    async fn recv_node_msg(
+        channel: &mut mpsc::Receiver<(WireMsg, Vec<Peer>)>,
+    ) -> (NodeMsg, Vec<Peer>) {
+        let (wire_msg, recipients) = channel.recv().await.expect("Should have received node msg");
+        let msg = wire_msg.into_msg().expect("Failed to decode msg");
+        let node_msg = assert_matches!(msg, MsgType::Node { msg, .. } => msg);
+        (node_msg, recipients)
     }
 
     fn send_join_response(
