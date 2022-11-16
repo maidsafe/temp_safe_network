@@ -518,7 +518,7 @@ mod tests {
     use super::*;
     use crate::{
         network_knowledge::sections_dag::tests::arb_sections_dag_and_proof_chains,
-        test_utils::{assert_lists, prefix, TestSAP, TestSectionTree},
+        test_utils::{assert_lists, prefix, TestKeys, TestSapBuilder, TestSectionTree},
     };
     use eyre::Result;
     use proptest::{prelude::ProptestConfig, prop_assert_eq, proptest};
@@ -876,7 +876,11 @@ mod tests {
     fn random_signed_sap(
         prefix: Prefix,
     ) -> (SectionSigned<SectionAuthorityProvider>, bls::SecretKey) {
-        let (sap, _, sk) = TestSAP::random_signed_sap(prefix, 0, 5, None);
-        (sap, sk)
+        let (sap, sk, ..) = TestSapBuilder::new(prefix)
+            .elder_count(0)
+            .adult_count(5)
+            .build();
+        let sap = TestKeys::get_section_signed(&sk.secret_key(), sap);
+        (sap, sk.secret_key())
     }
 }

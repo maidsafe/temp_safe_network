@@ -615,7 +615,7 @@ mod tests {
     use super::*;
     use sn_interface::{
         network_knowledge::SectionTree,
-        test_utils::{prefix, TestKeys, TestSAP},
+        test_utils::{prefix, TestKeys, TestSapBuilder},
     };
 
     use eyre::Result;
@@ -636,9 +636,8 @@ mod tests {
         let elders_len = 5;
 
         let prefix = prefix("0");
-        let (section_auth, _, secret_key_set) =
-            TestSAP::random_sap(prefix, elders_len, 0, None, None);
-        let sap0 = TestKeys::get_section_signed(&secret_key_set.secret_key(), section_auth);
+        let (sap, secret_key_set, ..) = TestSapBuilder::new(prefix).elder_count(elders_len).build();
+        let sap0 = TestKeys::get_section_signed(&secret_key_set.secret_key(), sap);
         let (mut network_contacts, _genesis_sk, _) = new_network_network_contacts();
         assert!(network_contacts.insert_without_chain(sap0));
 

@@ -62,7 +62,7 @@ impl Proposal {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sn_interface::test_utils::{TestKeys, TestSAP};
+    use sn_interface::test_utils::{TestKeys, TestSapBuilder};
 
     use eyre::Result;
     use serde::Serialize;
@@ -72,15 +72,17 @@ mod tests {
     #[test]
     fn serialize_for_signing() -> Result<()> {
         // Proposal::SectionInfo
-        let (section_auth, _, _) = TestSAP::random_sap(Prefix::default(), 4, 0, None, None);
-        let proposal = Proposal::SectionInfo(section_auth.clone());
-        verify_serialize_for_signing(&proposal, &section_auth)?;
+        let (sap, ..) = TestSapBuilder::new(Prefix::default())
+            .elder_count(4)
+            .build();
+        let proposal = Proposal::SectionInfo(sap.clone());
+        verify_serialize_for_signing(&proposal, &sap)?;
 
         // Proposal::NewElders
         let new_sk = bls::SecretKey::random();
         let new_pk = new_sk.public_key();
-        let section_signed_auth = TestKeys::get_section_signed(&new_sk, section_auth);
-        let proposal = Proposal::NewElders(section_signed_auth);
+        let signed_sap = TestKeys::get_section_signed(&new_sk, sap);
+        let proposal = Proposal::NewElders(signed_sap);
         verify_serialize_for_signing(&proposal, &new_pk)?;
 
         Ok(())
