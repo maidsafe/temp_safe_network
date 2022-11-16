@@ -97,6 +97,9 @@ async fn main() -> Result<()> {
             .wrap_err("Cannot create nodes directory")?;
     }
 
+    let mut node_bin_path = get_node_dir_path(None)?;
+    node_bin_path.push(SAFE_NODE_EXECUTABLE);
+
     // TODO:: Remove this conditional compilation once the issue on Windows
     // got resoved within the new version of Rust.
     #[cfg(not(target_os = "windows"))]
@@ -131,7 +134,7 @@ async fn main() -> Result<()> {
             println!("(root perms are needed to track the node processes");
         }
 
-        if !cmd_args.flame {
+        if !cmd_args.flame && !node_bin_path.exists() {
             info!("Building current sn_node");
             debug!("Building current sn_node with args: {:?}", build_args);
             Command::new("cargo")
@@ -154,27 +157,28 @@ async fn main() -> Result<()> {
                     format!("Failed to run build command with args: {:?}", build_args)
                 })?;
             info!("sn_node built successfully");
+            node_bin_path.clear();
+            node_bin_path.push("./target/release");
+            node_bin_path.push(SAFE_NODE_EXECUTABLE);
         }
     }
 
-    run_network().await?;
+    run_network(node_bin_path).await?;
 
     Ok(())
 }
 
 /// Uses SNLT to create a local network of nodes
-pub async fn run_network() -> Result<()> {
+pub async fn run_network(node_bin_path: PathBuf) -> Result<()> {
     let args = Cmd::from_args();
     let adding_nodes = args.add_nodes_to_existing_network;
 
     info!("Starting local network");
-    let node_path = Some(PathBuf::from("./target/release"));
-    let node_path = get_node_bin_path(node_path)?;
 
-    let arg_node_path = node_path.join(SAFE_NODE_EXECUTABLE).display().to_string();
+    let arg_node_path = node_bin_path.display().to_string();
     debug!("Running node from {}", arg_node_path);
 
-    let base_log_dir = get_node_bin_path(None)?;
+    let base_log_dir = get_node_dir_path(None)?;
     let node_log_dir = base_log_dir.join(NODES_DIR);
     if !node_log_dir.exists() {
         debug!("Creating '{}' folder", node_log_dir.display());
@@ -266,7 +270,7 @@ fn init_tracing() -> Result<()> {
     Ok(())
 }
 
-fn get_node_bin_path(node_path: Option<PathBuf>) -> Result<PathBuf> {
+fn get_node_dir_path(node_path: Option<PathBuf>) -> Result<PathBuf> {
     node_path.ok_or(()).or_else(|()| {
         let mut bin_path = home_dir().ok_or_else(|| eyre!("Failed to obtain user's home path"))?;
         bin_path.push(".safe/node");

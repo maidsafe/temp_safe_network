@@ -12,12 +12,26 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CARGO_INCREMENTAL: 0  # bookkeeping for incremental builds has overhead, not useful in CI.
+  CARGO_INCREMENTAL: 0 # bookkeeping for incremental builds has overhead, not useful in CI.
   SAFE_AUTH_PASSPHRASE: "x"
   SAFE_AUTH_PASSWORD: "y"
   NODE_COUNT: 15
+  BUILD_ARTIFACTS_BUCKET: s3://maidsafe-build-artifacts/safe_network
+  BUILD_ARTIFACTS_URL: https://maidsafe-build-artifacts.s3.eu-west-2.amazonaws.com/safe_network
 
 jobs:
+  # TODO: Reenable when blst has been updated and this isn't just red the whole time.
+
+  # cargo-deny:
+  #   if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - uses: actions/checkout@v2
+
+  #   - shell: bash
+  #     run: wget https://raw.githubusercontent.com/maidsafe/QA/master/misc-scripts/deny.toml
+
+  #   - uses: EmbarkStudios/cargo-deny-action@v1
   cargo-udeps:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Unused dependency check
@@ -34,41 +48,21 @@ jobs:
       - name: Run cargo-udeps
         uses: aig787/cargo-udeps-action@v1
         with:
-          version: 'latest'
-          args: '--all-targets'
-
-  # TODO: Reenable when blst has been updated and this isn't just red the whole time.
-
-  # cargo-deny:
-  #   if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #   - uses: actions/checkout@v2
-
-  #   - shell: bash
-  #     run: wget https://raw.githubusercontent.com/maidsafe/QA/master/misc-scripts/deny.toml
-
-  #   - uses: EmbarkStudios/cargo-deny-action@v1
-
-  lint:
-      runs-on: ubuntu-latest
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      steps:
-        - uses: actions/checkout@v2
-          with:
-            fetch-depth: 0
-        - uses: wagoid/commitlint-github-action@f114310111fdbd07e99f47f9ca13d62b3ec98372
+          version: "latest"
+          args: "--all-targets"
 
   checks:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Run rustfmt and clippy
+    name: Various checks
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v2
-
+        with:
+          fetch-depth: 0
+      - uses: wagoid/commitlint-github-action@v5
       - uses: actions-rs/toolchain@v1
-        id: toolchain
         with:
           profile: minimal
           toolchain: stable
@@ -85,69 +79,39 @@ jobs:
       - shell: bash
         run: cargo clippy --all-targets --all-features -- -Dwarnings
 
-
       - name: Check documentation
         # Deny certain `rustdoc` lints that are unwanted.
         # See https://doc.rust-lang.org/rustdoc/lints.html for lints that are 'warning' by default.
         run: RUSTDOCFLAGS="--deny=warnings" cargo doc --no-deps
 
-  unit:
+  build:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Unit Tests
-    runs-on: ubuntu-latest
+    name: Build node and testnet binaries (EC2)
+    runs-on: self-hosted
+    env:
+      CARGO_BUILD_TARGET: x86_64-unknown-linux-musl
+      CARGO_HOME: /mnt/data/cargo
+      TMPDIR: /mnt/data/tmp
     steps:
       - uses: actions/checkout@v2
-
-      - name: Install Rust
-        id: toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
-      - uses: Swatinem/rust-cache@v1
-        continue-on-error: true
-        with:
-          cache-on-failure: true
-          sharedKey: ${{github.run_id}}-unit
-
-      - name: Build sn_interface tests before running
-        run: cd sn_interface && cargo test --no-run --release
-        timeout-minutes: 50
-
-      - name: Run sn_interface tests
-        timeout-minutes: 25
-        run: cd sn_interface && cargo test --release
-
-      - name: Build sn_dysfunction tests before running
-        run: cd sn_dysfunction && cargo test --no-run --release
-        timeout-minutes: 50
-
-      - name: Run sn_dysfunction tests
-        timeout-minutes: 15
-        run: cd sn_dysfunction && cargo test --release
-
-      - name: Build sn_node tests before running
-        run: cd sn_node && cargo test --no-run --release
-        timeout-minutes: 50
-
-      - name: Run sn_node tests
-        timeout-minutes: 20
-        run: cd sn_node && cargo test --release
-
-      - name: Build sn_cli tests before running
-        run: cd sn_cli && cargo test --no-run --release
-        timeout-minutes: 50
-
-      - name: Run sn_cli tests
-        timeout-minutes: 25
-        run: cd sn_cli && cargo test --release --bin safe
+      - name: build sn_node and testnet
+        run: |
+          cargo build --release --bin sn_node
+          cargo build --release --bin testnet
+      - name: upload artifacts to s3
+        run: |
+          mkdir artifacts
+          cp target/x86_64-unknown-linux-musl/release/sn_node artifacts
+          cp target/x86_64-unknown-linux-musl/release/testnet artifacts
+          tar -zcvf artifacts-$GITHUB_RUN_ID.tar.gz -C artifacts/ .
+          aws s3 cp --acl public-read \
+            artifacts-$GITHUB_RUN_ID.tar.gz $BUILD_ARTIFACTS_BUCKET/artifacts-$GITHUB_RUN_ID.tar.gz
 
   e2e:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: E2E tests
     runs-on: ubuntu-latest
+    needs: build
     steps:
       - uses: actions/checkout@v2
 
@@ -165,20 +129,20 @@ jobs:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
 
-      - name: install ripgrep ubuntu
+      - name: install ripgrep
         run: sudo apt-get install ripgrep
 
-      - name: Build sn bins
-        run: cd sn_node && cargo build --release --bins
-        timeout-minutes: 60
-
-      - name: Build testnet
-        run: cd testnet && cargo build --release --bin testnet
-        timeout-minutes: 60
+      - name: download and unpack artifacts
+        run: |
+          curl -O $BUILD_ARTIFACTS_URL/artifacts-$GITHUB_RUN_ID.tar.gz
+          mkdir -p artifacts ~/.safe/node
+          tar -xvf artifacts-$GITHUB_RUN_ID.tar.gz -C artifacts/ .
+          chmod +x artifacts/sn_node
+          chmod +x artifacts/testnet
+          cp artifacts/sn_node ~/.safe/node
 
       - name: Start the network
-        run: ./target/release/testnet --interval 30000
-        id: section-startup
+        run: ./artifacts/testnet --interval 30000
         env:
           RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
 
@@ -188,19 +152,19 @@ jobs:
         timeout-minutes: 5
 
       - name: Build all tests before running non ubuntu
-        run: cd sn_client && cargo test --no-run --release --features check-replicas
+        run: cargo test --no-run --release --features check-replicas --package sn_client
         timeout-minutes: 50
 
       - name: Run client tests
         env:
           RUST_LOG: "sn_client,sn_interface"
-        run: cd sn_client && cargo test --release --features check-replicas -- --test-threads=1
+        run: cargo test --release --features check-replicas --package sn_client -- --test-threads=1
         timeout-minutes: 50
 
       - name: Run example app for file API against local network
         timeout-minutes: 10
         shell: bash
-        run: cd sn_client && cargo run --release --example client_files
+        run: cargo run --release --example client_files --package sn_client
 
       - name: Ensure no nodes have left during test runs
         timeout-minutes: 1
@@ -253,177 +217,128 @@ jobs:
         if: failure()
         continue-on-error: true
 
-  # e2e-split:
-  #   #if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-  #   # disabled temporarily since `self-hosted-ubuntu` runner not available for NodeRefactorBranch branch
-  #   if: false
-  #   name: E2E tests w/ full network
-  #   runs-on: self-hosted-ubuntu
-  #   env:
-  #     NODE_COUNT: 15
-  #   steps:
-  #     - uses: actions/checkout@v2
+  unit-tests-and-e2e-split:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Unit tests and E2E tests (EC2)
+    runs-on: self-hosted
+    needs: build
+    env:
+      CARGO_HOME: /mnt/data/cargo
+      NODE_COUNT: 15
+      TMPDIR: /mnt/data/tmp
+    steps:
+      - uses: actions/checkout@v2
 
-  #     - name: Install Rust
-  #       id: toolchain
-  #       uses: actions-rs/toolchain@v1
-  #       with:
-  #         profile: minimal
-  #         toolchain: stable
-  #         override: true
+      - uses: Swatinem/rust-cache@v1
+        continue-on-error: true
+        with:
+          cache-on-failure: true
+          sharedKey: ${{github.run_id}}
 
-  #     - uses: Swatinem/rust-cache@v1
-  #       continue-on-error: true
-  #       with:
-  #         cache-on-failure: true
-  #         sharedKey: ${{github.run_id}}
+      - name: download and unpack artifacts
+        run: |
+          curl -O $BUILD_ARTIFACTS_URL/artifacts-$GITHUB_RUN_ID.tar.gz
+          mkdir -p artifacts ~/.safe/node
+          tar -xvf artifacts-$GITHUB_RUN_ID.tar.gz -C artifacts/ .
+          chmod +x artifacts/sn_node
+          chmod +x artifacts/testnet
+          cp artifacts/sn_node ~/.safe/node
 
-      # - name: install ripgrep ubuntu
-      #   run: sudo apt-get install ripgrep
+      - name: Start the network
+        run: ./artifacts/testnet --interval 30000
+        env:
+          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
 
-  #     - name: Build sn bins
-  #       run: cd sn_node && cargo build --release --bins
-  #       timeout-minutes: 60
+      - name: Wait for all nodes to join
+        shell: bash
+        run: ./resources/scripts/wait_for_nodes_to_join.sh
+        timeout-minutes: 5
 
-  #     - name: Build testnet
-  #       run: cd testnet && cargo build  --release --bin testnet
-  #       timeout-minutes: 60
+      - name: Run sn_interface tests
+        run: cargo test --release --package sn_interface
+      - name: Run sn_dysfunction tests
+        run: cargo test --release --package sn_dysfunction
+      - name: Run sn_node tests
+        run: cargo test --release --package sn_node
+      - name: Run sn_cli tests
+        run: cargo test --release --bin safe
 
-  #     # - name: Build log_cmds_inspector
-  #     #   run: cargo build  --release --bin log_cmds_inspector
-  #     #   timeout-minutes: 60
+      # This starts a NODE_COUNT node network, and then adds 12 more nodes. We should kill before moving on to split checks
+      - name: Run network churn data integrity test
+        timeout-minutes: 35 # made 35 for now due to client slowdown. TODO: fix that!
+        shell: bash
+        run: cargo run --release --example churn
 
-  #     # This starts a NODE_COUNT node network, and then adds 12 more nodes. We should kill before moving on to split checks
-  #     - name: Run network churn data integrity test
-  #       timeout-minutes: 35 # made 35 for now due to client slowdown. TODO: fix that!
-  #       shell: bash
-  #       run: cargo run --release --example churn
-  #       env:
-  #         RUST_LOG: "sn_node,sn_client,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
+      - name: Build all tests before running
+        run: cargo test --no-run --release --package sn_client
 
+      - name: Run client tests
+        env:
+          RUST_LOG: "sn_client=trace,qp2p=debug"
+        run: cargo test --release --package sn_client -- --test-threads=1
+        timeout-minutes: 25
 
-  #     # - name: Print Network Stats after churn test
-  #     #   shell: bash
-  #     #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+      - name: Run example app for file API against local network
+        timeout-minutes: 10
+        shell: bash
+        run: cargo run --release --example client_files
 
+      - name: Ensure no nodes have left during test runs
+        timeout-minutes: 1
+        shell: bash
+        # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
+        run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
 
-  #     # - name: Cleanup churn test
-  #     #   run: |
-  #     #     killall -9 sn_node
-  #     #     sleep 10
-  #     #     rm -rf ~/.safe
+      - name: Are nodes still running...?
+        shell: bash
+        timeout-minutes: 1
+        continue-on-error: true
+        run: |
+          echo "$(pgrep sn_node | wc -l) nodes still running"
+          ls $HOME/.safe/node/local-test-network
 
-  #     # # This starts a NODE_COUNT node network, and then adds 15 _more_ nodes
-  #     # - name: Run network split data integrity test
-  #     #   timeout-minutes: 35 # made 35 for now due to client slowdown. TODO: fix that!
-  #     #   shell: bash
-  #     #   run: cargo run --release --example network_split
-  #     #   env:
-  #     #     RUST_LOG: "sn_node,sn_client,sn_consensus,sn_dysfunction=trace"
+      - name: Kill all nodes
+        shell: bash
+        timeout-minutes: 1
+        if: failure()
+        continue-on-error: true
+        run: |
+          pkill sn_node
+          echo "$(pgrep sn_node | wc -l) nodes still running"
 
+      - name: Generate StateMap
+        shell: bash
+        continue-on-error: true
+        run: |
+          cargo install --git https://github.com/TritonDataCenter/statemap.git
+          ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
 
-  #     # - name: Print Network Log Stats at start
-  #     #   shell: bash
-  #     #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+      - name: Upload StateMap
+        uses: actions/upload-artifact@main
+        with:
+          name: statemap_e2e_split_self_hosted_ubuntu.svg
+          path: safe_statemap.svg
+        continue-on-error: true
 
-  #     # - name: Wait for all nodes to join
-  #     #   shell: bash
-  #     #   # we should not have the full 33 nodes as yet.
-  #     #   run: NODE_COUNT=28 ./resources/scripts/wait_for_nodes_to_join.sh
-  #     #   timeout-minutes: 20
+      - name: Tar log files
+        shell: bash
+        continue-on-error: true
+        run: find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
+        if: failure()
 
-  #     # - name: Is the network split and ready?
-  #     #   shell: bash
-  #     #   run: ./resources/scripts/network_is_ready.sh
-  #     #   timeout-minutes: 5
-
-  #     # - name: Print Network Log Stats after nodes joined
-  #     #   shell: bash
-  #     #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-
-  #     - name: Build all tests before running
-  #       run: cd sn_client && cargo test --no-run --release -p sn_client
-  #       timeout-minutes: 50
-
-  #     - name: Run client tests
-  #       env:
-  #         RUST_LOG: "sn_client=trace,qp2p=debug"
-  #       run: cargo test --release -p sn_client -- --test-threads=1
-  #       timeout-minutes: 25
-
-  #     - name: Run example app for file API against local network
-  #       timeout-minutes: 10
-  #       shell: bash
-  #       run: cargo run --release --example client_files
-
-  #     - name: Ensure no nodes have left during test runs
-  #       timeout-minutes: 1
-  #       shell: bash
-  #       # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
-  #       run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
-
-  #     - name: Are nodes still running...?
-  #       shell: bash
-  #       timeout-minutes: 1
-  #       continue-on-error: true
-  #       run: |
-  #         echo "$(pgrep sn_node | wc -l) nodes still running"
-  #         ls $HOME/.safe/node/local-test-network
-
-  #     - name: Kill all nodes
-  #       shell: bash
-  #       timeout-minutes: 1
-  #       if: failure()
-  #       continue-on-error: true
-  #       run: |
-  #         pkill sn_node
-  #         echo "$(pgrep sn_node | wc -l) nodes still running"
-
-  #     # - name: Print Network Log Stats
-  #     #   shell: bash
-  #     #   continue-on-error: true
-  #     #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-
-  #     - name: Generate StateMap
-  #       shell: bash
-  #       continue-on-error: true
-  #       run: |
-  #         cargo install --git https://github.com/TritonDataCenter/statemap.git
-  #         ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
-
-  #     - name: Upload StateMap
-  #       uses: actions/upload-artifact@main
-  #       with:
-  #         name: statemap_e2e_split_self_hosted_ubuntu.svg
-  #         path: safe_statemap.svg
-  #       continue-on-error: true
-
-  #     - name: Tar log files
-  #       shell: bash
-  #       continue-on-error: true
-  #       run: find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
-  #       if: failure()
-
-  #     - name: Upload Node Logs
-  #       uses: actions/upload-artifact@main
-  #       with:
-  #         name: sn_node_logs_e2e_split_self_hosted_ubuntu
-  #         path: log_files.tar.gz
-  #       if: failure()
-  #       continue-on-error: true
-
-  #    # if we don't clean up, the .safe folder might persist between runs
-  #     - name: Cleanup self-hosted runner
-  #       if: always()
-  #       run: |
-  #         killall -9 sn_node
-  #         sleep 10
-  #         rm -rf ~/.safe
+      - name: Upload Node Logs
+        uses: actions/upload-artifact@main
+        with:
+          name: sn_node_logs_e2e_split_self_hosted_ubuntu
+          path: log_files.tar.gz
+        if: failure()
+        continue-on-error: true
 
   api:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Run API tests
+    name: API tests
     runs-on: ubuntu-latest
+    needs: build
     steps:
       - uses: actions/checkout@v2
 
@@ -441,22 +356,22 @@ jobs:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
 
-      - name: install ripgrep ubuntu
+      - name: install ripgrep
         run: sudo apt-get install ripgrep
 
-      - name: Build sn bins
-        run: cd sn_node && cargo build --release --bins
-        timeout-minutes: 60
-
-      - name: Build testnet
-        run: cd testnet && cargo build --release --bin testnet
-        timeout-minutes: 60
+      - name: download and unpack artifacts
+        run: |
+          curl -O $BUILD_ARTIFACTS_URL/artifacts-$GITHUB_RUN_ID.tar.gz
+          mkdir -p artifacts ~/.safe/node
+          tar -xvf artifacts-$GITHUB_RUN_ID.tar.gz -C artifacts/ .
+          chmod +x artifacts/sn_node
+          chmod +x artifacts/testnet
+          cp artifacts/sn_node ~/.safe/node
 
       - name: Start the network
-        run: ./target/release/testnet --interval 30000
-        id: section-startup
+        run: ./artifacts/testnet --interval 30000
         env:
-          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction,sn_interface"
+          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
 
       - name: Wait for all nodes to join
         shell: bash
@@ -464,13 +379,13 @@ jobs:
         timeout-minutes: 5
 
       - name: Build all tests before running
-        run: cd sn_api && cargo test --no-run --release --features check-replicas
+        run: cargo test --no-run --release --features check-replicas --package sn_api
         timeout-minutes: 50
 
       - name: Run API tests
         env:
           RUST_LOG: "sn_client,sn_interface"
-        run: cd sn_api && cargo test --release --features check-replicas -- --test-threads=1
+        run: cargo test --release --features check-replicas --package sn_api -- --test-threads=1
         timeout-minutes: 30
 
       - name: Are nodes still running...?
@@ -526,8 +441,9 @@ jobs:
 
   cli:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Run CLI tests
+    name: CLI tests
     runs-on: ubuntu-latest
+    needs: build
     steps:
       - uses: actions/checkout@v2
 
@@ -545,22 +461,22 @@ jobs:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
 
-      - name: install ripgrep ubuntu
+      - name: install ripgrep
         run: sudo apt-get install ripgrep
 
-      - name: Build sn bins
-        run: cd sn_node && cargo build --release --bins
-        timeout-minutes: 60
-
-      - name: Build testnet
-        run: cd testnet && cargo build --release --bin testnet
-        timeout-minutes: 60
+      - name: download and unpack artifacts
+        run: |
+          curl -O $BUILD_ARTIFACTS_URL/artifacts-$GITHUB_RUN_ID.tar.gz
+          mkdir -p artifacts ~/.safe/node
+          tar -xvf artifacts-$GITHUB_RUN_ID.tar.gz -C artifacts/ .
+          chmod +x artifacts/sn_node
+          chmod +x artifacts/testnet
+          cp artifacts/sn_node ~/.safe/node
 
       - name: Start the network
-        run: ./target/release/testnet --interval 30000
-        id: section-startup
+        run: ./artifacts/testnet --interval 30000
         env:
-          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction,sn_interface"
+          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
 
       - name: Wait for all nodes to join
         shell: bash
@@ -568,14 +484,10 @@ jobs:
         timeout-minutes: 5
 
       - name: Generate keys for test run
-        run: cargo run --package sn_cli --release --features check-replicas -- keys create --for-cli
-
-      - name: Build all tests before running
-        run: cd sn_cli && cargo test --no-run --release --features check-replicas
-        timeout-minutes: 50
+        run: cargo run --release --bin safe keys create --for-cli
 
       - name: Run CLI tests
-        run: cd sn_cli && cargo test --release --features check-replicas -- --test-threads=1
+        run: cargo test --release --features check-replicas --package sn_cli -- --test-threads=1
         timeout-minutes: 50
 
       - name: Are nodes still running...?
