@@ -563,8 +563,6 @@ pub(crate) mod tests {
 
         assert_lists(dag.keys(), [pk_gen, info_a1.key, info_a2.key, info_b.key]);
 
-        // cannot get partial dag till genesis
-        assert!(dag.partial_dag(&pk_gen, &pk_gen).is_err());
         assert_lists(
             dag.partial_dag(&pk_gen, &info_a2.key)?.keys(),
             [pk_gen, info_a1.key, info_a2.key],
