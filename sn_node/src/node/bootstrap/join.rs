@@ -563,14 +563,11 @@ mod tests {
             // We expect two probes, one to the genesis elders, then another to the next sap elders.
 
             for expected_recipients in [genesis_sap.elders(), next_sap.elders()] {
-                let (wire_msg, recipients) = send_rx.recv().await.expect("Expected message");
+                let (node_msg, _, recipients) = recv_node_msg(&mut send_rx).await;
 
                 itertools::assert_equal(recipients, expected_recipients);
-
-                let node_msg =
-                    assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node { msg, .. }) => msg);
-
                 assert_matches!(node_msg, NodeMsg::AntiEntropyProbe(_));
+
                 info!("Received anti-entropy probe");
 
                 let ae_update_msg = NodeMsg::AntiEntropy {
@@ -589,12 +586,9 @@ mod tests {
             }
 
             // Receive the second JoinRequest with correct section info
-            let (wire_msg, recipients) = send_rx.recv().await.expect("Expected JoinRequest");
+            let (node_msg, dst, recipients) = recv_node_msg(&mut send_rx).await;
 
             itertools::assert_equal(recipients, next_sap.elders());
-
-            let msg = wire_msg.into_msg().expect("Failed decoding message");
-            let (node_msg, dst) = assert_matches!(msg, MsgType::Node { msg, dst,.. } => (msg, dst));
 
             assert_eq!(dst.section_key, next_section_key);
             assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest{ section_key }) => {
@@ -651,15 +645,10 @@ mod tests {
         let bootstrap_task = state.try_join(join_timeout);
         let test_task = async move {
             // Receive JoinRequest
-            let (wire_msg, recipients) = send_rx
-                .recv()
-                .await
-                .ok_or_else(|| eyre!("JoinRequest was not received"))?;
-
+            let (node_msg, _, recipients) = recv_node_msg(&mut send_rx).await;
             itertools::assert_equal(recipients, genesis_sap.elders());
 
-            assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node { msg, .. }) =>
-                    assert_matches!(msg, NodeMsg::JoinRequest{..}));
+            assert_matches!(node_msg, NodeMsg::JoinRequest { .. });
 
             // Send JoinResponse::Redirect
             let (new_sap, ..) = TestSapBuilder::new(Prefix::default()).build();
@@ -674,15 +663,9 @@ mod tests {
             task::yield_now().await;
 
             // Receive new JoinRequest with redirected bootstrap contacts
-            let (wire_msg, recipients) = send_rx
-                .recv()
-                .await
-                .ok_or_else(|| eyre!("JoinRequest was not received"))?;
+            let (node_msg, dst, recipients) = recv_node_msg(&mut send_rx).await;
 
             itertools::assert_equal(recipients, new_sap.elders());
-
-            let (node_msg, dst) = assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node { msg, dst,.. }) =>
-                    (msg, dst));
 
             assert_eq!(dst.section_key, new_sap.section_key());
             assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest{ section_key }) => {
@@ -728,13 +711,9 @@ mod tests {
 
         let bootstrap_task = state.try_join(join_timeout);
         let test_task = async {
-            let (wire_msg, _) = send_rx
-                .recv()
-                .await
-                .ok_or_else(|| eyre!("JoinRequest was not received"))?;
+            let (node_msg, _, _) = recv_node_msg(&mut send_rx).await;
 
-            assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node { msg, .. }) =>
-            assert_matches!(msg, NodeMsg::JoinRequest{..}));
+            assert_matches!(node_msg, NodeMsg::JoinRequest { .. });
 
             let (new_sap, new_sk_set, ..) = TestSapBuilder::new(Prefix::default()).build();
             let new_pk_set = new_sk_set.public_keys();
@@ -761,13 +740,8 @@ mod tests {
             );
             task::yield_now().await;
 
-            let (wire_msg, _) = send_rx
-                .recv()
-                .await
-                .ok_or_else(|| eyre!("JoinRequest was not received"))?;
-
-            assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node { msg, .. }) =>
-            assert_matches!(msg, NodeMsg::JoinRequest{..}));
+            let (node_msg, _, _) = recv_node_msg(&mut send_rx).await;
+            assert_matches!(node_msg, NodeMsg::JoinRequest { .. });
 
             Ok(())
         };
@@ -805,7 +779,7 @@ mod tests {
 
         let bootstrap_task = state.try_join(join_timeout);
         let test_task = async {
-            let (node_msg, _) = recv_node_msg(&mut send_rx).await;
+            let (node_msg, _, _) = recv_node_msg(&mut send_rx).await;
             assert_matches!(node_msg, NodeMsg::AntiEntropyProbe { .. });
 
             let section_tree_update = tree
@@ -824,7 +798,7 @@ mod tests {
                 genesis_sap.section_key(),
             );
 
-            let (node_msg, _) = recv_node_msg(&mut send_rx).await;
+            let (node_msg, _, _) = recv_node_msg(&mut send_rx).await;
             assert_matches!(node_msg, NodeMsg::JoinRequest { .. });
 
             send_join_response(
@@ -880,10 +854,8 @@ mod tests {
         let join_task = state.join(join_timeout);
 
         let test_task = async {
-            let (wire_msg, _) = send_rx.recv().await.expect("NodeMsg was not received");
+            let (node_msg, _, _) = recv_node_msg(&mut send_rx).await;
 
-            let node_msg =
-                assert_matches!(wire_msg.into_msg(), Ok(MsgType::Node{ msg, .. }) => msg);
             assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest { .. }));
 
             let proof_chain = SectionsDAG::new(genesis_pk);
@@ -942,11 +914,11 @@ mod tests {
 
     async fn recv_node_msg(
         channel: &mut mpsc::Receiver<(WireMsg, Vec<Peer>)>,
-    ) -> (NodeMsg, Vec<Peer>) {
+    ) -> (NodeMsg, Dst, Vec<Peer>) {
         let (wire_msg, recipients) = channel.recv().await.expect("Should have received node msg");
         let msg = wire_msg.into_msg().expect("Failed to decode msg");
-        let node_msg = assert_matches!(msg, MsgType::Node { msg, .. } => msg);
-        (node_msg, recipients)
+        let (node_msg, dst) = assert_matches!(msg, MsgType::Node { msg, dst,.. } => (msg, dst));
+        (node_msg, dst, recipients)
     }
 
     fn send_join_response(
