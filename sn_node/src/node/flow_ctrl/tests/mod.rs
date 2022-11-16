@@ -329,10 +329,8 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
 
 #[tokio::test]
 async fn handle_agreement_on_offline_of_elder() -> Result<()> {
-    let (section_auth, mut nodes, sk_set) =
-        TestSAP::random_sap(Prefix::default(), elder_count(), 0, None, None);
-
-    let (mut section, _) = network_utils::create_section(&sk_set, &section_auth, None, None)?;
+    let (sap, sk_set, mut nodes, _) = TestSapBuilder::new(Prefix::default()).build();
+    let (mut section, _) = network_utils::create_section(&sk_set, &sap, None, None)?;
 
     let existing_peer = network_utils::create_peer(MIN_ADULT_AGE);
     let node_state = NodeState::joined(existing_peer, None);
@@ -340,8 +338,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let _updated = section.update_member(node_state);
 
     // Pick the elder to remove.
-    let auth_peers = section_auth.elders();
-    let remove_peer = auth_peers.last().expect("section_auth is empty");
+    let remove_peer = sap.elders().last().expect("sap is empty");
 
     let remove_node_state = section
         .get_section_member(&remove_peer.name())
@@ -382,8 +379,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     let sk0 = bls::SecretKey::random();
     let pk0 = sk0.public_key();
 
-    let (old_sap, mut nodes, sk_set1) =
-        TestSAP::random_sap(Prefix::default(), elder_count(), 0, None, None);
+    let (old_sap, sk_set1, mut nodes, _) = TestSapBuilder::new(Prefix::default()).build();
     let members = BTreeSet::from_iter(nodes.iter().map(|n| NodeState::joined(n.peer(), None)));
     let pk1 = sk_set1.secret_key().public_key();
 
@@ -576,17 +572,14 @@ enum RelocatedPeerRole {
 }
 
 async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
-    let prefix: Prefix = "0"
-        .parse()
-        .map_err(|_| eyre!("Failed to parse integer to Prefix"))?;
+    let prefix: Prefix = prefix("0");
     let section_size = match relocated_peer_role {
         RelocatedPeerRole::Elder => elder_count(),
         RelocatedPeerRole::NonElder => recommended_section_size(),
     };
-    let (section_auth, mut nodes, sk_set) =
-        TestSAP::random_sap(prefix, elder_count(), 0, None, None);
+    let (sap, sk_set, mut nodes, _) = TestSapBuilder::new(prefix).build();
     let (mut section, section_key_share) =
-        network_utils::create_section(&sk_set, &section_auth, None, None)?;
+        network_utils::create_section(&sk_set, &sap, None, None)?;
 
     let mut adults = section_size - elder_count();
     while adults > 0 {
@@ -617,7 +610,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
     let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)));
 
     let relocated_peer = match relocated_peer_role {
-        RelocatedPeerRole::Elder => *section_auth.elders().nth(1).expect("too few elders"),
+        RelocatedPeerRole::Elder => *sap.elders().nth(1).expect("too few elders"),
         RelocatedPeerRole::NonElder => non_elder_peer,
     };
 

@@ -7,7 +7,6 @@ use crate::node::{
 use crate::storage::UsedSpace;
 use sn_consensus::Decision;
 use sn_interface::{
-    elder_count,
     network_knowledge::{
         MyNodeInfo, NetworkKnowledge, NodeState, SectionAuthorityProvider, SectionKeyShare,
         SectionTree, SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
@@ -203,13 +202,16 @@ impl TestNodeBuilder {
         } else {
             bls::SecretKeySet::random(self.section_sk_threshold, &mut rand::thread_rng())
         };
-        let (sap, _) = TestSAP::random_sap_with_key(
-            self.prefix,
-            self.elder_count,
-            self.adult_count,
-            &section_key_set,
-            self.elder_age_pattern.as_ref().map(Vec::as_ref),
-        );
+        let sap = TestSapBuilder::new(self.prefix)
+            .elder_count(self.elder_count)
+            .adult_count(self.adult_count)
+            .sk_set(&section_key_set);
+        let (sap, ..) = if let Some(pattern) = self.elder_age_pattern {
+            sap.elder_age_pattern(pattern).build()
+        } else {
+            sap.build()
+        };
+
         let genesis_key_set = if let Some(ref genesis_sk_set) = self.genesis_sk_set {
             genesis_sk_set.clone()
         } else {
@@ -256,24 +258,21 @@ impl TestNodeBuilder {
                     sk_set,
                 )
             } else {
-                let (sap, mut nodes, sk_set) = if let Some(sk_set) = self.genesis_sk_set {
-                    let (sap, nodes) = TestSAP::random_sap_with_key(
-                        self.prefix,
-                        self.elder_count,
-                        self.adult_count,
-                        &sk_set,
-                        self.elder_age_pattern.as_ref().map(Vec::as_ref),
-                    );
-                    (sap, nodes, sk_set)
+                let sap = TestSapBuilder::new(self.prefix)
+                    .elder_count(self.elder_count)
+                    .adult_count(self.adult_count);
+                let sap = if let Some(pattern) = self.elder_age_pattern {
+                    sap.elder_age_pattern(pattern)
                 } else {
-                    TestSAP::random_sap(
-                        self.prefix,
-                        self.elder_count,
-                        self.adult_count,
-                        self.elder_age_pattern.as_ref().map(Vec::as_ref),
-                        Some(self.section_sk_threshold),
-                    )
+                    sap
                 };
+                let (sap, sk_set, mut nodes, adults) = if let Some(sk_set) = self.genesis_sk_set {
+                    sap.sk_set(&sk_set).build()
+                } else {
+                    sap.sk_threshold_size(self.section_sk_threshold).build()
+                };
+                nodes.extend(adults.into_iter());
+
                 let (section, section_key_share) = create_section(
                     &sk_set,
                     &sap,
@@ -313,7 +312,7 @@ pub(crate) fn create_section_with_key(
     prefix: Prefix,
     sk_set: &bls::SecretKeySet,
 ) -> Result<(NetworkKnowledge, SectionAuthorityProvider)> {
-    let (sap, _) = TestSAP::random_sap_with_key(prefix, elder_count(), 0, sk_set, None);
+    let (sap, ..) = TestSapBuilder::new(prefix).sk_set(sk_set).build();
     let (section, _) = create_section(sk_set, &sap, None, None)?;
     Ok((section, sap))
 }
