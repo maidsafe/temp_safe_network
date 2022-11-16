@@ -640,10 +640,29 @@ mod tests {
         let mut tree = SectionTree::new(genesis_pk);
         assert!(tree.insert_without_chain(signed_genesis_sap));
 
-        let state = Joiner::new(node, send_tx, &mut recv_rx, tree);
+        let state = Joiner::new(node, send_tx, &mut recv_rx, tree.clone());
 
         let bootstrap_task = state.try_join(join_timeout);
         let test_task = async move {
+            let (node_msg, _, _) = recv_node_msg(&mut send_rx).await;
+            assert_matches!(node_msg, NodeMsg::AntiEntropyProbe { .. });
+
+            let section_tree_update = tree
+                .generate_section_tree_update(&prefix(""))
+                .expect("Failed to create update");
+
+            send_node_msg(
+                &recv_tx,
+                NodeMsg::AntiEntropy {
+                    section_tree_update,
+                    kind: AntiEntropyKind::Update {
+                        members: Default::default(),
+                    },
+                },
+                &genesis_nodes[0],
+                genesis_sap.section_key(),
+            );
+
             // Receive JoinRequest
             let (node_msg, _, recipients) = recv_node_msg(&mut send_rx).await;
             itertools::assert_equal(recipients, genesis_sap.elders());
@@ -707,10 +726,29 @@ mod tests {
         let mut tree = SectionTree::new(genesis_pk);
         assert!(tree.insert_without_chain(signed_genesis_sap));
 
-        let state = Joiner::new(node, send_tx, &mut recv_rx, tree);
+        let state = Joiner::new(node, send_tx, &mut recv_rx, tree.clone());
 
         let bootstrap_task = state.try_join(join_timeout);
         let test_task = async {
+            let (node_msg, _, _) = recv_node_msg(&mut send_rx).await;
+            assert_matches!(node_msg, NodeMsg::AntiEntropyProbe { .. });
+
+            let section_tree_update = tree
+                .generate_section_tree_update(&prefix(""))
+                .expect("Failed to create update");
+
+            send_node_msg(
+                &recv_tx,
+                NodeMsg::AntiEntropy {
+                    section_tree_update,
+                    kind: AntiEntropyKind::Update {
+                        members: Default::default(),
+                    },
+                },
+                &genesis_nodes[0],
+                genesis_sap.section_key(),
+            );
+
             let (node_msg, _, _) = recv_node_msg(&mut send_rx).await;
 
             assert_matches!(node_msg, NodeMsg::JoinRequest { .. });
@@ -849,11 +887,30 @@ mod tests {
         let mut tree = SectionTree::new(genesis_pk);
         assert!(tree.insert_without_chain(signed_genesis_sap.clone()));
 
-        let state = Joiner::new(node, send_tx, &mut recv_rx, tree);
+        let state = Joiner::new(node, send_tx, &mut recv_rx, tree.clone());
 
         let join_task = state.join(join_timeout);
 
         let test_task = async {
+            let (node_msg, _, _) = recv_node_msg(&mut send_rx).await;
+            assert_matches!(node_msg, NodeMsg::AntiEntropyProbe { .. });
+
+            let section_tree_update = tree
+                .generate_section_tree_update(&prefix(""))
+                .expect("Failed to create update");
+
+            send_node_msg(
+                &recv_tx,
+                NodeMsg::AntiEntropy {
+                    section_tree_update,
+                    kind: AntiEntropyKind::Update {
+                        members: Default::default(),
+                    },
+                },
+                &genesis_nodes[0],
+                genesis_sap.section_key(),
+            );
+
             let (node_msg, _, _) = recv_node_msg(&mut send_rx).await;
 
             assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest { .. }));
