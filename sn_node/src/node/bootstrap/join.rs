@@ -366,7 +366,9 @@ impl<'a> Joiner<'a> {
             match msg {
                 NodeMsg::JoinResponse(resp) => return Ok((*resp, sender)),
                 _ => {
-                    trace!("Non-Bootstrap message received and discarded: sender: {sender:?} msg: {msg:?}")
+                    trace!(
+                        "Non-JoinResponse message received and discarded: sender: {sender:?} msg: {msg:?}"
+                    )
                 }
             }
         }
@@ -382,7 +384,9 @@ impl<'a> Joiner<'a> {
                     ..
                 } => return Ok(section_tree_update),
                 _ => {
-                    trace!("Bootstrap message discarded: sender: {sender:?} msg: {msg:?}")
+                    trace!(
+                        "Non-SectionTreeUpdate message discarded: sender: {sender:?} msg: {msg:?}"
+                    )
                 }
             }
         }
