@@ -653,6 +653,36 @@ impl TestNetwork {
         elder_iter.chain(adult_iter).collect()
     }
 
+    /// Get `NetworkKnowledge` and the `SecretKeySet` (for its current section) for a given `Prefix`.
+    ///
+    /// If the Prefix contains multiple churn events (multiple SAPs), provide the churn_idx to get a specific
+    /// SAP, else the latest SAP for the prefix is used.
+    pub(crate) fn get_network_knowledge(
+        &self,
+        prefix: Prefix,
+        churn_idx: Option<usize>,
+    ) -> (NetworkKnowledge, SecretKeySet) {
+        let section = self._get_section_details(prefix, churn_idx);
+        let network_knowledge = self._get_network_knowledge(&section.0, &section.1);
+        (network_knowledge, section.1.clone())
+    }
+
+    /// Get `SectionSigned<SectionAuthorityProvider>` and its `SecretKeySet` for a given `Prefix`.
+    ///
+    /// If the Prefix contains multiple churn events (multiple SAPs), provide the churn_idx to get a specific
+    /// SAP, else the latest SAP for the prefix is used.
+    pub(crate) fn get_sap(
+        &self,
+        prefix: Prefix,
+        churn_idx: Option<usize>,
+    ) -> (SectionSigned<SectionAuthorityProvider>, SecretKeySet) {
+        let section = self._get_section_details(prefix, churn_idx);
+        let sap = self
+            ._get_network_knowledge(&section.0, &section.1)
+            .signed_sap();
+        (sap, section.1.clone())
+    }
+
     /// Create set of elder, adults nodes
     ///
     /// Optionally provide `age_pattern` to create elders with specific ages.
@@ -803,6 +833,40 @@ impl TestNetwork {
         }
         my_node
     }
+
+    // Currently builds NetworkKnowledge with only a single chain i.e., from gen prefix to the
+    // provided prefix, while the other user provided prefixes are ignored. (maybe include them?)
+    fn _get_network_knowledge(
+        &self,
+        sap: &SectionSigned<SectionAuthorityProvider>,
+        sk_set: &SecretKeySet,
+    ) -> NetworkKnowledge {
+        let gen = self.section_tree.genesis_key();
+        let section_key = sap.section_key();
+        let proof_chain = if *gen == section_key {
+            SectionsDAG::new(*gen)
+        } else {
+            self.section_tree
+                .get_sections_dag()
+                .partial_dag(gen, &sap.section_key())
+                .expect("failed to create proof chain")
+        };
+        let update = SectionTreeUpdate::new(sap.clone(), proof_chain);
+
+        let mut nw = NetworkKnowledge::new(SectionTree::new(*gen), update)
+            .expect("Failed to create NetworkKnowledge");
+
+        for node_state in sap.members().cloned() {
+            let sig = TestKeys::get_section_sig(&sk_set.secret_key(), &node_state);
+            let _updated = nw.update_member(SectionSigned {
+                value: node_state,
+                sig,
+            });
+        }
+
+        nw
+    }
+
     fn _get_section_details(
         &self,
         prefix: Prefix,
