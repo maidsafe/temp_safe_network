@@ -13,9 +13,7 @@ use sn_interface::{
         JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest,
         JoinResponse, NodeMsg,
     },
-    network_knowledge::{
-        MembershipState, NodeState, SectionAuthUtils, SectionTreeUpdate, MIN_ADULT_AGE,
-    },
+    network_knowledge::{MembershipState, NodeState, SectionAuthUtils, MIN_ADULT_AGE},
     types::{log_markers::LogMarker, Peer},
 };
 
@@ -88,12 +86,8 @@ impl MyNode {
         }
 
         if !section_key_matches || !is_age_valid {
-            let signed_sap = context.network_knowledge.signed_sap();
-            let proof_chain = context.network_knowledge.section_chain();
-            let msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Retry {
-                section_tree_update: SectionTreeUpdate::new(signed_sap, proof_chain),
-            }));
-            trace!("Sending {:?} to {}", msg, peer);
+            let msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Retry));
+            trace!("Sending {msg:?} to {peer}");
             return Ok(Some(MyNode::send_system_msg(msg, Peers::Single(peer))));
         }
 

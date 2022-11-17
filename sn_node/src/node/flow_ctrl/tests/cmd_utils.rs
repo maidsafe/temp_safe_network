@@ -9,9 +9,7 @@ use sn_interface::{
         system::{JoinResponse, NodeDataCmd, NodeMsg},
         AuthorityProof, ClientAuth, MsgId,
     },
-    network_knowledge::{
-        test_utils::*, MembershipState, NodeState, RelocateDetails, SectionAuthorityProvider,
-    },
+    network_knowledge::{test_utils::*, MembershipState, NodeState, RelocateDetails},
     types::{Keypair, Peer, ReplicatedData},
 };
 use std::collections::BTreeSet;
@@ -25,7 +23,6 @@ pub(crate) async fn handle_online_cmd(
     peer: &Peer,
     sk_set: &bls::SecretKeySet,
     dispatcher: &Dispatcher,
-    section_auth: &SectionAuthorityProvider,
 ) -> Result<HandleOnlineStatus> {
     let node_state = NodeState::joined(*peer, None);
     let membership_decision = section_decision(sk_set, node_state);
@@ -51,12 +48,7 @@ pub(crate) async fn handle_online_cmd(
 
         match msg {
             NodeMsg::JoinResponse(response) => {
-                if let JoinResponse::Approved {
-                    section_tree_update,
-                    ..
-                } = *response
-                {
-                    assert_eq!(section_tree_update.signed_sap.value, *section_auth);
+                if let JoinResponse::Approved { .. } = *response {
                     assert_matches!(recipients, Peers::Multiple(peers) => {
                         assert_eq!(peers, BTreeSet::from([*peer]));
                     });

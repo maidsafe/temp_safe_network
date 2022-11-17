@@ -19,7 +19,7 @@ use bls::Signature;
 use sn_consensus::{Decision, Generation, SignedVote, VoteResponse};
 use sn_interface::{
     messaging::system::{JoinResponse, NodeMsg, SectionSig, SectionSigned},
-    network_knowledge::{MembershipState, NodeState, SectionTreeUpdate},
+    network_knowledge::{MembershipState, NodeState},
     types::{log_markers::LogMarker, Peer},
 };
 
@@ -287,13 +287,7 @@ impl MyNode {
         let prefix = self.network_knowledge.prefix();
         info!("Section {prefix:?} has approved new peers {peers:?}.");
 
-        let msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Approved {
-            section_tree_update: SectionTreeUpdate::new(
-                self.network_knowledge.signed_sap(),
-                self.network_knowledge.section_chain(),
-            ),
-            decision,
-        }));
+        let msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Approved { decision }));
 
         trace!("{}", LogMarker::SendNodeApproval);
         MyNode::send_system_msg(msg, Peers::Multiple(peers))
