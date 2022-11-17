@@ -26,7 +26,7 @@ use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
 use futures::future;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use tokio::{sync::mpsc, time::Duration};
 use tracing::Instrument;
 use xor_name::Prefix;
