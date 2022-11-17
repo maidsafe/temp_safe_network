@@ -320,7 +320,9 @@ impl<'a> Joiner<'a> {
                         .await
                         .map_err(|_| Error::JoinTimeout)??;
 
-                let _ = updates.insert(sender, section_tree_update);
+                if target_sap.elders_set().contains(&sender) {
+                    let _ = updates.insert(sender, section_tree_update);
+                }
             }
 
             let mut any_new_information = false;
