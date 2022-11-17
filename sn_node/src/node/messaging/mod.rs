@@ -120,7 +120,7 @@ impl MyNode {
                 debug!("Attempting read lock get to get node context");
 
                 // first some AntiEntropy checks...
-                if context.is_not_elder {
+                if !context.is_elder {
                     let bounced_msg = wire_msg.serialize()?;
                     let ae_msg = MyNode::generate_ae_msg(
                         &context,
@@ -200,7 +200,7 @@ impl MyNode {
     ) -> Result<Vec<Cmd>> {
         // Adult nodes don't need to carry out entropy checking,
         // however the message shall always be handled.
-        if context.is_not_elder {
+        if !context.is_elder {
             return Ok(vec![]);
         }
         // For the case of receiving a join request not matching our prefix,

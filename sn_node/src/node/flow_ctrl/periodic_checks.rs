@@ -68,7 +68,7 @@ impl FlowCtrl {
         self.enqueue_cmds_for_standard_periodic_checks(context)
             .await;
 
-        if context.is_not_elder {
+        if !context.is_elder {
             self.enqueue_cmds_for_adult_periodic_checks(context).await;
 
             // we've pushed what we have as an adult and processed incoming msgs

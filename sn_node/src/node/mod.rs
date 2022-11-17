@@ -152,7 +152,6 @@ mod core {
     pub(crate) struct NodeContext {
         pub(crate) root_storage_dir: PathBuf,
         pub(crate) is_elder: bool,
-        pub(crate) is_not_elder: bool,
         pub(crate) data_storage: DataStorage,
         pub(crate) name: XorName,
         pub(crate) info: MyNodeInfo,
@@ -186,7 +185,6 @@ mod core {
             NodeContext {
                 root_storage_dir: self.root_storage_dir.clone(),
                 is_elder: self.is_elder(),
-                is_not_elder: self.is_not_elder(),
                 name: self.name(),
                 info: self.info(),
                 full_adults: self.capacity.full_adults(),

@@ -40,7 +40,7 @@ impl MyNode {
         // Ignore `JoinRequest` if we are not elder, unless the join request
         // is outdated in which case we'll reply with `JoinResponse::Retry`
         // with the up-to-date info.
-        if context.is_not_elder && section_key_matches {
+        if !context.is_elder && section_key_matches {
             warn!("Join req received to our section key, but I am not an elder...");
             // Note: We don't bounce this message because the current bounce-resend
             // mechanism wouldn't preserve the original SocketAddr which is needed for

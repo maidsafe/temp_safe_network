@@ -283,7 +283,7 @@ impl MyNode {
                 let context = &node.read().await.context();
                 debug!("[NODE READ]: joinReqas relocated read got");
 
-                if context.is_not_elder
+                if !context.is_elder
                     && join_request.section_key == context.network_knowledge.section_key()
                 {
                     return Ok(vec![]);
@@ -432,7 +432,7 @@ impl MyNode {
                 let context = node.read().await.context();
                 debug!("[NODE READ]: could ont store data read got");
 
-                if context.is_not_elder {
+                if !context.is_elder {
                     error!("Received unexpected message while Adult");
                     return Ok(vec![]);
                 }
