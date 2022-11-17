@@ -8,9 +8,8 @@
 
 use crate::{
     node::{
-        flow_ctrl::cmds::Cmd,
-        messaging::{OutgoingMsg, Peers},
-        Event, MembershipEvent, MyNode, Proposal as CoreProposal, Result, MIN_LEVEL_WHEN_FULL,
+        flow_ctrl::cmds::Cmd, messaging::Peers, Event, MembershipEvent, MyNode,
+        Proposal as CoreProposal, Result, MIN_LEVEL_WHEN_FULL,
     },
     storage::Error as StorageError,
 };
@@ -42,7 +41,7 @@ impl MyNode {
     /// Send a (`NodeMsg`) message to a node
     pub(crate) fn send_system_msg(&self, msg: NodeMsg, recipients: Peers) -> Cmd {
         trace!("{}: {:?}", LogMarker::SendToNodes, msg);
-        Cmd::send_msg(OutgoingMsg::Node(msg), recipients)
+        Cmd::send_msg(msg, recipients)
     }
 
     pub(crate) async fn store_data_as_adult_and_respond(
@@ -559,7 +558,7 @@ impl MyNode {
 
             let dst = Peers::Multiple(self.network_knowledge.elders());
 
-            cmds.push(Cmd::send_msg(OutgoingMsg::Node(msg), dst));
+            cmds.push(Cmd::send_msg(msg, dst));
         }
 
         Ok(cmds)

@@ -18,10 +18,7 @@ use std::{collections::BTreeSet, net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 use xor_name::{Prefix, XorName};
 
-use super::{
-    flow_ctrl::cmds::Cmd,
-    messaging::{OutgoingMsg, Peers},
-};
+use super::{flow_ctrl::cmds::Cmd, messaging::Peers};
 
 /// Test interface for sending and receiving messages to and from other nodes.
 ///
@@ -96,7 +93,7 @@ impl NodeTestApi {
 
     /// Send a system msg.
     pub async fn send(&self, msg: NodeMsg, recipients: BTreeSet<Peer>) -> Result<()> {
-        let cmd = Cmd::send_msg(OutgoingMsg::Node(msg), Peers::Multiple(recipients));
+        let cmd = Cmd::send_msg(msg, Peers::Multiple(recipients));
         self.send_cmd(cmd).await
     }
 

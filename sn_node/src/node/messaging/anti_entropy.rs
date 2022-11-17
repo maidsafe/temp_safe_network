@@ -7,9 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    flow_ctrl::cmds::Cmd,
-    messaging::{OutgoingMsg, Peers},
-    Error, Event, MembershipEvent, MyNode, Result, StateSnapshot,
+    flow_ctrl::cmds::Cmd, messaging::Peers, Error, Event, MembershipEvent, MyNode, Result,
+    StateSnapshot,
 };
 
 use bls::PublicKey as BlsPublicKey;
@@ -332,16 +331,13 @@ impl MyNode {
                     if send_stream.is_some() {
                         debug!("sending repsonse over send_stream");
                         return Ok(Some(Cmd::send_msg_via_response_stream(
-                            OutgoingMsg::Node(ae_msg),
+                            ae_msg,
                             Peers::Single(*sender),
                             send_stream,
                         )));
                     } else {
                         debug!("sending repsonse over fresh conn");
-                        return Ok(Some(Cmd::send_msg(
-                            OutgoingMsg::Node(ae_msg),
-                            Peers::Single(*sender),
-                        )));
+                        return Ok(Some(Cmd::send_msg(ae_msg, Peers::Single(*sender))));
                     }
                 }
                 None => {
@@ -388,15 +384,12 @@ impl MyNode {
         // client response, so send it over stream
         if send_stream.is_some() {
             Ok(Some(Cmd::send_msg_via_response_stream(
-                OutgoingMsg::Node(ae_msg),
+                ae_msg,
                 Peers::Single(*sender),
                 send_stream,
             )))
         } else {
-            Ok(Some(Cmd::send_msg(
-                OutgoingMsg::Node(ae_msg),
-                Peers::Single(*sender),
-            )))
+            Ok(Some(Cmd::send_msg(ae_msg, Peers::Single(*sender))))
         }
     }
 
@@ -484,7 +477,7 @@ mod tests {
             .node
             .check_for_entropy(&wire_msg, &dst_section_key, dst_name, &sender, None);
 
-        let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg: OutgoingMsg::Node(msg), .. })) => {
+        let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg, .. })) => {
             msg
         });
 
@@ -505,7 +498,7 @@ mod tests {
             .node
             .check_for_entropy(&wire_msg, &dst_section_key, dst_name, &sender, None);
 
-        let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg: OutgoingMsg::Node(msg), .. })) => {
+        let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg, .. })) => {
             msg
         });
 
@@ -529,7 +522,7 @@ mod tests {
             .node
             .check_for_entropy(&msg, dst_section_key, dst_name, &sender, None)?;
 
-        let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg: OutgoingMsg::Node(msg), .. }) => {
+        let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg, .. }) => {
             msg
         });
 
@@ -556,7 +549,7 @@ mod tests {
             .node
             .check_for_entropy(&msg, dst_section_key, dst_name, &sender, None)?;
 
-        let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg: OutgoingMsg::Node(msg), .. }) => {
+        let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg, .. }) => {
             msg
         });
 
