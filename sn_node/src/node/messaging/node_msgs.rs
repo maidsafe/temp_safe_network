@@ -192,10 +192,9 @@ impl MyNode {
             // The AcceptedOnlineShare for relocation will be received here.
             NodeMsg::JoinResponse(join_response) => {
                 let mut node = node.write().await;
-                debug!("[NODE WRITE]: join response write gottt...");
                 let context = node.context();
 
-                match *join_response {
+                match join_response {
                     JoinResponse::Approved { .. } => {
                         info!(
                             "Relocation: Aggregating received ApprovalShare from {:?}",

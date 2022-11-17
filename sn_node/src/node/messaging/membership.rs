@@ -287,7 +287,7 @@ impl MyNode {
         let prefix = self.network_knowledge.prefix();
         info!("Section {prefix:?} has approved new peers {peers:?}.");
 
-        let msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Approved { decision }));
+        let msg = NodeMsg::JoinResponse(JoinResponse::Approved { decision });
 
         trace!("{}", LogMarker::SendNodeApproval);
         MyNode::send_system_msg(msg, Peers::Multiple(peers))

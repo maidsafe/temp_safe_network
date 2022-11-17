@@ -47,13 +47,11 @@ pub(crate) async fn handle_online_cmd(
         };
 
         match msg {
-            NodeMsg::JoinResponse(response) => {
-                if let JoinResponse::Approved { .. } = *response {
-                    assert_matches!(recipients, Peers::Multiple(peers) => {
-                        assert_eq!(peers, BTreeSet::from([*peer]));
-                    });
-                    status.node_approval_sent = true;
-                }
+            NodeMsg::JoinResponse(JoinResponse::Approved { .. }) => {
+                assert_matches!(recipients, Peers::Multiple(peers) => {
+                    assert_eq!(peers, BTreeSet::from([*peer]));
+                });
+                status.node_approval_sent = true;
             }
             NodeMsg::Propose {
                 proposal: sn_interface::messaging::system::Proposal::VoteNodeOffline(node_state),

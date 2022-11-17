@@ -364,7 +364,7 @@ impl<'a> Joiner<'a> {
         loop {
             let (msg, sender) = self.receive_node_msg().await?;
             match msg {
-                NodeMsg::JoinResponse(resp) => return Ok((*resp, sender)),
+                NodeMsg::JoinResponse(resp) => return Ok((resp, sender)),
                 _ => {
                     trace!(
                         "Non-JoinResponse message received and discarded: sender: {sender:?} msg: {msg:?}"
@@ -850,7 +850,7 @@ mod tests {
         sender: &MyNodeInfo,
         section_pk: BlsPublicKey,
     ) {
-        let node_msg = NodeMsg::JoinResponse(Box::new(resp));
+        let node_msg = NodeMsg::JoinResponse(resp);
         send_node_msg(recv_tx, node_msg, sender, section_pk);
     }
 
