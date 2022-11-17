@@ -311,30 +311,28 @@ impl<'a> Joiner<'a> {
             )
             .await?;
 
-            let mut updates: BTreeMap<Peer, SectionTreeUpdate> = BTreeMap::new();
+            // We wait till we receive a threshold of updates.
 
-            // Wait till we receive a threshold of update responses;
-            while updates.len() <= target_sap.public_key_set().threshold() {
-                let (sender, section_tree_update) =
+            let mut any_new_information = false;
+
+            for _ in 0..target_sap.public_key_set().threshold() {
+                let update =
                     tokio::time::timeout(response_timeout, self.receive_section_tree_update())
                         .await
                         .map_err(|_| Error::JoinTimeout)??;
 
-                if target_sap.elders_set().contains(&sender) {
-                    let _ = updates.insert(sender, section_tree_update);
+                any_new_information = self.section_tree.update(update)?;
+
+                if any_new_information {
+                    break;
                 }
             }
 
-            let mut any_new_information = false;
-            for update in updates.into_values() {
-                any_new_information |= self.section_tree.update(update)?;
-            }
-
             if any_new_information {
-                // Update the target sap and try again.
+                // Update the target sap since we've received new information and try again.
                 target_sap = self.join_target_sap()?;
             } else {
-                // We are up to date with the these nodes so we can end the bootstrap
+                // We are up to date with these nodes so we can end the bootstrap
                 return Ok(());
             }
         }
@@ -410,14 +408,14 @@ impl<'a> Joiner<'a> {
     }
 
     #[tracing::instrument(skip(self))]
-    async fn receive_section_tree_update(&mut self) -> Result<(Peer, SectionTreeUpdate)> {
+    async fn receive_section_tree_update(&mut self) -> Result<SectionTreeUpdate> {
         loop {
             let (msg, sender) = self.receive_node_msg().await?;
             match msg {
                 NodeMsg::AntiEntropy {
                     section_tree_update,
                     ..
-                } => return Ok((sender, section_tree_update)),
+                } => return Ok(section_tree_update),
                 _ => {
                     trace!("Bootstrap message discarded: sender: {sender:?} msg: {msg:?}")
                 }
@@ -499,7 +497,8 @@ mod tests {
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(10);
 
-        let (genesis_sap, genesis_sk_set, ..) = TestSapBuilder::new(Prefix::default()).build();
+        let (genesis_sap, genesis_sk_set, genesis_elders, ..) =
+            TestSapBuilder::new(Prefix::default()).build();
         let genesis_sk = genesis_sk_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
 
@@ -532,10 +531,13 @@ mod tests {
             // First the joining node bootstraps it's network knowledge.
             // We expect two probes, one to the genesis elders, then another to the next sap elders.
 
-            for expected_recipients in [genesis_sap.elders(), next_sap.elders()] {
+            for expected_elders in [genesis_elders, next_elders.clone()] {
                 let (node_msg, _, recipients) = recv_node_msg(&mut send_rx).await;
 
-                itertools::assert_equal(recipients, expected_recipients);
+                assert_eq!(
+                    BTreeSet::from_iter(recipients),
+                    BTreeSet::from_iter(expected_elders.iter().map(|e| e.peer())),
+                );
                 assert_matches!(node_msg, NodeMsg::AntiEntropyProbe(_));
 
                 info!("Received anti-entropy probe");
@@ -547,16 +549,17 @@ mod tests {
                     },
                 };
 
-                for elder in next_elders.iter() {
+                for elder in expected_elders.iter() {
                     send_node_msg(&recv_tx, ae_update_msg.clone(), elder, next_section_key);
                 }
             }
+
+            info!("Waiting on Join Request");
 
             // Receive the second JoinRequest with correct section info
             let (node_msg, dst, recipients) = recv_node_msg(&mut send_rx).await;
 
             itertools::assert_equal(recipients, next_sap.elders());
-
             assert_eq!(dst.section_key, next_section_key);
             assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest{ section_key }) => {
                 assert_eq!(section_key, next_section_key);
