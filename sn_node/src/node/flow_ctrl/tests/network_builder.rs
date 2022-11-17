@@ -217,6 +217,126 @@ impl<R: RngCore> TestNetworkBuilder<R> {
         self.sections.push((sap, nodes, sk_set));
         self
     }
+
+    /// Builds the `TestNetwork` struct.
+    ///
+    /// Will fill in the gaps in prefixes left by the user. For e.g., if the user has provided just
+    /// Prefix(100), the ancestors P() -> P(1) -> P(10) will be automatically created.
+    /// And if n_churns = 2 , then we will get SAP1() -> SAP2() -> SAP1(1) -> SAP2(1) -> SAP1(10)
+    /// -> SAP2 (10) -> user_SAP(100)
+    pub(crate) fn build(mut self) -> TestNetwork {
+        // initially we will have only the user provided saps; hence get the missing prefixes and
+        // the user provided prefixes.
+        let (missing_prefixes, max_prefixes) = {
+            let user_prefixes: BTreeSet<Prefix> =
+                self.sections.iter().map(|(sap, ..)| sap.prefix()).collect();
+
+            // missing_prefixes are used to construct saps
+            let mut missing_prefixes = BTreeSet::new();
+            // max_prefixes are used to construct the `SectionTree`
+            let mut min_prefixes = BTreeSet::new();
+
+            for prefix in user_prefixes.iter() {
+                // get all the missing ancestor
+                prefix
+                    .ancestors()
+                    .filter(|anc| !user_prefixes.contains(anc))
+                    .for_each(|missing_anc| {
+                        let _ = missing_prefixes.insert(missing_anc);
+                    });
+
+                // a prefix is min, if it is part of the ancestor_list of any prefix
+                prefix.ancestors().for_each(|anc| {
+                    if user_prefixes.contains(&anc) {
+                        _ = min_prefixes.insert(anc);
+                    }
+                });
+            }
+
+            // max_prefixes are the larget user provided prefixes
+            let max_prefixes = user_prefixes
+                .into_iter()
+                .filter(|pre| !min_prefixes.contains(pre))
+                .collect::<BTreeSet<_>>();
+            (missing_prefixes, max_prefixes)
+        };
+
+        // insert the user provided saps
+        let mut sections = BTreeMap::new();
+        let mut node_infos = BTreeMap::new();
+        let mut sk_shares = BTreeMap::new();
+        for (sap, infos, sk_set) in self.sections.iter() {
+            let sap = TestKeys::get_section_signed(&sk_set.secret_key(), sap.clone());
+            let prefix = sap.prefix();
+
+            // store the sk_shares of the elders
+            for (idx, (elder, ..)) in infos
+                .iter()
+                .enumerate()
+                .filter(|(_, (.., t))| matches!(t, TestMemberType::Elder))
+            {
+                let sk_share = TestKeys::get_section_key_share(sk_set, idx);
+                match sk_shares.entry(elder.public_key()) {
+                    Entry::Vacant(entry) => {
+                        let _ = entry.insert(vec![sk_share.clone()]);
+                    }
+                    Entry::Occupied(mut entry) => entry.get_mut().push(sk_share.clone()),
+                }
+            }
+
+            match node_infos.entry(prefix) {
+                Entry::Vacant(entry) => {
+                    let _ = entry.insert(vec![infos.clone()]);
+                }
+                Entry::Occupied(mut entry) => entry.get_mut().push(infos.clone()),
+            }
+
+            match sections.entry(prefix) {
+                Entry::Vacant(entry) => {
+                    let _ = entry.insert(vec![(sap, sk_set.clone())]);
+                }
+                Entry::Occupied(mut entry) => {
+                    // push the next sap for the same prefix
+                    entry.get_mut().push((sap, sk_set.clone()));
+                }
+            };
+        }
+
+        // build the SAPs for the missing prefixes
+        for prefix in missing_prefixes {
+            let mut s = Vec::new();
+            let mut n_i = Vec::new();
+            let n_churns = self.n_churns;
+            for _ in 0..n_churns {
+                // infos are sorted by age
+                let (sap, infos, sk, comm_rx) = self.build_sap(
+                    prefix,
+                    elder_count(),
+                    0,
+                    Some(&[50, 45, 40, 35, 30, 25, 20]),
+                    Some(supermajority(elder_count())),
+                );
+                let sap = TestKeys::get_section_signed(&sk.secret_key(), sap);
+                // the CommRx for the user provided SAPs prior to calling `build`. Hence we just
+                // need to insert the ones that we get now.
+                self.receivers.extend(comm_rx.into_iter());
+                s.push((sap, sk));
+                n_i.push(infos);
+            }
+            let _ = node_infos.insert(prefix, n_i);
+            let _ = sections.insert(prefix, s);
+        }
+
+        let section_tree = Self::build_section_tree(&sections, max_prefixes);
+        TestNetwork {
+            sections,
+            section_tree,
+            nodes: node_infos,
+            sk_shares,
+            receivers: self.receivers,
+        }
+    }
+
     fn build_sap(
         &mut self,
         prefix: Prefix,
