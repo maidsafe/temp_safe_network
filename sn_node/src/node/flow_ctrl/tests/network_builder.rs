@@ -720,6 +720,89 @@ impl TestNetwork {
         (info, comm, comm_rx)
     }
 
+    // Create a single `MyNode` instance
+    fn _get_node(
+        &self,
+        prefix: Prefix,
+        churn_idx: Option<usize>,
+        network_knowledge: &NetworkKnowledge,
+        info: &MyNodeInfo,
+        comm: &Comm,
+        sk_share: &Option<SectionKeyShare>,
+    ) -> MyNode {
+        // enter the current tokio runtime
+        let handle = Handle::current();
+        let _ = handle.enter();
+
+        let (max_capacity, root_storage_dir) =
+            create_test_max_capacity_and_root_storage().expect("Failed to create root storage");
+        let mut my_node = futures::executor::block_on(MyNode::new(
+            comm.clone(),
+            info.keypair.clone(),
+            network_knowledge.clone(),
+            sk_share.clone(),
+            event_channel::new(1).0,
+            UsedSpace::new(max_capacity),
+            root_storage_dir,
+        ))
+        .expect("Failed to create MyNode");
+
+        // the node might've been an elder in any of the ancestor section of the current prefix
+        // or the neighbouring prefix. So get the sk_shares.
+        let mut elders_in_sections = BTreeSet::new();
+
+        // check if it was an elder for any of the current prefixe's churned SAP;
+        // Obtain the sk_share of the current churn as well since we will be overriding
+        // my_node.section_keys_provider
+        let sections = self._get_sections_details(prefix);
+        let churn_idx = churn_idx.unwrap_or(sections.len() - 1);
+        (0..churn_idx + 1).rev().for_each(|idx| {
+            let sec = sections.get(idx).expect("invalid churn_idx");
+            if sec
+                .0
+                .elders()
+                .map(|peer| peer.name())
+                .contains(&info.name())
+            {
+                let _ = elders_in_sections.insert(sec.0.section_key());
+            }
+        });
+
+        // the node might've been an elder in any of the SAP of our prefix's ancestor. So get
+        // them.
+        prefix.ancestors().for_each(|anc| {
+            let sections = self._get_sections_details(anc);
+            for sec in sections {
+                if sec
+                    .0
+                    .elders()
+                    .map(|peer| peer.name())
+                    .contains(&info.name())
+                {
+                    let _ = elders_in_sections.insert(sec.0.section_key());
+                }
+            }
+        });
+
+        // deal with all other prefixes. Requires us to get max_prefixes; can be obtained from
+        // SectionTree::sections, but its private. So maybe have a extra field in our struct.
+        // Todo: implement only if any test requires it
+
+        // now that we have the details of the sections that the node is/was an elder of, get its sk_share
+        if let Some(shares) = self.sk_shares.get(&info.public_key()) {
+            let mut key_provider = SectionKeysProvider::new(None);
+            shares
+                .iter()
+                .filter(|sk_share| {
+                    elders_in_sections.contains(&sk_share.public_key_set.public_key())
+                })
+                .for_each(|sk_share| key_provider.insert(sk_share.clone()));
+            my_node.section_keys_provider = key_provider;
+        } else if !elders_in_sections.is_empty() {
+            panic!("We should have some sk_shares")
+        }
+        my_node
+    }
     fn _get_section_details(
         &self,
         prefix: Prefix,
