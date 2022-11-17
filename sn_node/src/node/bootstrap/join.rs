@@ -401,7 +401,7 @@ impl<'a> Joiner<'a> {
             match msg {
                 NodeMsg::JoinResponse(resp) => return Ok((*resp, sender)),
                 _ => {
-                    trace!("Bootstrap message discarded: sender: {sender:?} msg: {msg:?}")
+                    trace!("Non-Bootstrap message received and discarded: sender: {sender:?} msg: {msg:?}")
                 }
             }
         }
