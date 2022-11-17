@@ -29,7 +29,6 @@ use futures::future;
 use std::collections::BTreeSet;
 use tokio::{sync::mpsc, time::Duration};
 use tracing::Instrument;
-use xor_name::Prefix;
 
 /// Join the network as new node.
 ///
@@ -71,7 +70,6 @@ struct Joiner<'a> {
     // Receiver for incoming messages.
     incoming_msgs: &'a mut mpsc::Receiver<MsgFromPeer>,
     node: MyNodeInfo,
-    prefix: Prefix,
     section_tree: SectionTree,
     backoff: ExponentialBackoff,
     /// cache of retry response sending peers. When we exceed 1/3rd responses we retry
@@ -100,7 +98,6 @@ impl<'a> Joiner<'a> {
             outgoing_msgs,
             incoming_msgs,
             node,
-            prefix: Prefix::default(),
             section_tree,
             backoff,
             retry_responses_cache: Default::default(),
@@ -110,9 +107,7 @@ impl<'a> Joiner<'a> {
     // Send `JoinRequest` and wait for the response. If the response is:
     // - `Retry`: repeat with the new info.
     // - `Redirect`: repeat with the new set of addresses.
-    // - `ResourceChallenge`: carry out resource proof calculation.
-    // - `Approval`: returns the initial `Section` value to use by this node,
-    //    completing the bootstrap.
+    // - `Approval`: returns the decision proving the node was approved.
     async fn try_join(self, join_timeout: Duration) -> Result<(MyNodeInfo, NetworkKnowledge)> {
         trace!(
             "Bootstrap run, section tree as we have it: {:?}",
@@ -139,21 +134,10 @@ impl<'a> Joiner<'a> {
             .await?;
 
         let mut target_sap = self.join_target_sap()?;
-
-        // We send a first join request to obtain the resource challenge, which
-        // we will then use to generate the challenge proof and send the
-        // `JoinRequest` again with it.
-        let msg = JoinRequest {
-            section_key: target_sap.section_key(),
-        };
-
-        self.send(
-            NodeMsg::JoinRequest(msg),
-            &target_sap.elders_vec(),
-            target_sap.section_key(),
-            false,
-        )
-        .await?;
+        let section_key = target_sap.section_key();
+        let msg = NodeMsg::JoinRequest(JoinRequest { section_key });
+        self.send(msg, &target_sap.elders_vec(), section_key, false)
+            .await?;
 
         loop {
             let (response, sender) =
@@ -201,42 +185,31 @@ impl<'a> Joiner<'a> {
                 JoinResponse::Retry => {
                     trace!(
                         "My joining node with {:?} - name: {:?} ; received a Retry from {}",
-                        self.prefix,
+                        target_sap.prefix(),
                         self.node.name(),
                         sender.name(),
                     );
 
                     if self.should_retry_after_response(sender, target_sap.elders_set()) {
-                        trace!("Bootstrapping section tree for retry");
+                        self.retry_responses_cache = Default::default();
 
+                        trace!("Bootstrapping section tree for retry");
                         self.bootstrap_section_tree(target_sap, response_timeout)
                             .await?;
                         target_sap = self.join_target_sap()?;
-
-                        trace!("Re-generating name for retry");
 
                         let new_keypair = ed25519::gen_keypair(
                             &target_sap.prefix().range_inclusive(),
                             self.node.age(),
                         );
-
-                        let new_name = ed25519::name(&new_keypair.public);
-
-                        info!("Setting Node name to {new_name}");
                         self.node = MyNodeInfo::new(new_keypair, self.node.addr);
-                        self.retry_responses_cache = Default::default();
 
-                        let msg = JoinRequest {
-                            section_key: target_sap.section_key(),
-                        };
+                        info!("Retrying with new name: {}", self.node.name());
 
-                        self.send(
-                            NodeMsg::JoinRequest(msg),
-                            &target_sap.elders_vec(),
-                            target_sap.section_key(),
-                            true,
-                        )
-                        .await?;
+                        let section_key = target_sap.section_key();
+                        let msg = NodeMsg::JoinRequest(JoinRequest { section_key });
+                        self.send(msg, &target_sap.elders_vec(), section_key, true)
+                            .await?;
                     }
                 }
                 JoinResponse::Redirect(section_auth) => {
@@ -268,21 +241,13 @@ impl<'a> Joiner<'a> {
 
                     self.bootstrap_section_tree(section_auth, response_timeout)
                         .await?;
+
                     let target_sap = self.join_target_sap()?;
+                    let section_key = target_sap.section_key();
 
-                    self.prefix = target_sap.prefix();
-
-                    let msg = JoinRequest {
-                        section_key: target_sap.section_key(),
-                    };
-
-                    self.send(
-                        NodeMsg::JoinRequest(msg),
-                        &target_sap.elders_vec(),
-                        target_sap.section_key(),
-                        true,
-                    )
-                    .await?;
+                    let msg = NodeMsg::JoinRequest(JoinRequest { section_key });
+                    self.send(msg, &target_sap.elders_vec(), section_key, true)
+                        .await?;
                 }
                 JoinResponse::Rejected(JoinRejectionReason::JoinsDisallowed) => {
                     error!("Network is set to not taking any new joining node, try join later.");
@@ -485,7 +450,7 @@ mod tests {
         types::PublicKey,
     };
     use tokio::task;
-    use xor_name::XorName;
+    use xor_name::{Prefix, XorName};
 
     const JOIN_TIMEOUT_SEC: u64 = 15;
 
