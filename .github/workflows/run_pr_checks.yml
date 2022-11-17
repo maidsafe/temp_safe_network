@@ -15,7 +15,7 @@ env:
   CARGO_INCREMENTAL: 0  # bookkeeping for incremental builds has overhead, not useful in CI.
   SAFE_AUTH_PASSPHRASE: "x"
   SAFE_AUTH_PASSWORD: "y"
-  NODE_COUNT: 15
+  NODE_COUNT: 30
 
 jobs:
   cargo-udeps:
