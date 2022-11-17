@@ -545,12 +545,9 @@ mod tests {
                     },
                 };
 
-                send_node_msg(
-                    &recv_tx,
-                    ae_update_msg,
-                    next_elders.first().expect("Should have at least one elder"),
-                    next_sap.section_key(),
-                );
+                for elder in next_elders.iter() {
+                    send_node_msg(&recv_tx, ae_update_msg.clone(), elder, next_section_key);
+                }
             }
 
             // Receive the second JoinRequest with correct section info
@@ -588,8 +585,8 @@ mod tests {
         init_logger();
 
         let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
-        let (send_tx, mut send_rx) = mpsc::channel(1);
-        let (recv_tx, mut recv_rx) = mpsc::channel(1);
+        let (send_tx, mut send_rx) = mpsc::channel(10);
+        let (recv_tx, mut recv_rx) = mpsc::channel(10);
 
         let (genesis_sap, genesis_sk_set, genesis_nodes, _) =
             TestSapBuilder::new(Prefix::default()).build();
@@ -616,17 +613,16 @@ mod tests {
                 .generate_section_tree_update(&prefix(""))
                 .expect("Failed to create update");
 
-            send_node_msg(
-                &recv_tx,
-                NodeMsg::AntiEntropy {
-                    section_tree_update,
-                    kind: AntiEntropyKind::Update {
-                        members: Default::default(),
-                    },
+            let ae_msg = NodeMsg::AntiEntropy {
+                section_tree_update,
+                kind: AntiEntropyKind::Update {
+                    members: Default::default(),
                 },
-                &genesis_nodes[0],
-                genesis_sap.section_key(),
-            );
+            };
+
+            for node in genesis_nodes.iter() {
+                send_node_msg(&recv_tx, ae_msg.clone(), node, genesis_sap.section_key());
+            }
 
             // Receive JoinRequest
             let (node_msg, _, recipients) = recv_node_msg(&mut send_rx).await;
@@ -635,7 +631,7 @@ mod tests {
             assert_matches!(node_msg, NodeMsg::JoinRequest { .. });
 
             // Send JoinResponse::Redirect
-            let (new_sap, ..) = TestSapBuilder::new(Prefix::default()).build();
+            let (new_sap, sks, ..) = TestSapBuilder::new(Prefix::default()).build();
 
             send_join_response(
                 &recv_tx,
@@ -645,6 +641,42 @@ mod tests {
             );
 
             task::yield_now().await;
+
+            let mut proof_chain = SectionsDAG::new(genesis_pk);
+
+            proof_chain
+                .insert(
+                    &genesis_pk,
+                    new_sap.section_key(),
+                    TestKeys::get_section_signed(&genesis_sk, new_sap.section_key())
+                        .sig
+                        .signature,
+                )
+                .expect("Bad proof chain insert");
+
+            let section_tree_update = SectionTreeUpdate {
+                signed_sap: TestKeys::get_section_signed(&sks.secret_key(), new_sap.clone()),
+                proof_chain,
+            };
+
+            let ae_msg = NodeMsg::AntiEntropy {
+                section_tree_update,
+                kind: AntiEntropyKind::Update {
+                    members: Default::default(),
+                },
+            };
+
+            for _ in 0..2 {
+                let (node_msg, dst, recipients) = recv_node_msg(&mut send_rx).await;
+                itertools::assert_equal(recipients, new_sap.elders());
+                assert_eq!(dst.section_key, new_sap.section_key());
+
+                assert_matches!(node_msg, NodeMsg::AntiEntropyProbe { .. });
+
+                for node in genesis_nodes.iter() {
+                    send_node_msg(&recv_tx, ae_msg.clone(), node, genesis_sap.section_key());
+                }
+            }
 
             // Receive new JoinRequest with redirected bootstrap contacts
             let (node_msg, dst, recipients) = recv_node_msg(&mut send_rx).await;
@@ -674,8 +706,8 @@ mod tests {
         let _span = tracing::info_span!("join_invalid_redirect_response").entered();
 
         let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
-        let (send_tx, mut send_rx) = mpsc::channel(1);
-        let (recv_tx, mut recv_rx) = mpsc::channel(1);
+        let (send_tx, mut send_rx) = mpsc::channel(10);
+        let (recv_tx, mut recv_rx) = mpsc::channel(10);
 
         let (genesis_sap, genesis_sk_set, genesis_nodes, _) =
             TestSapBuilder::new(Prefix::default()).build();
@@ -702,17 +734,16 @@ mod tests {
                 .generate_section_tree_update(&prefix(""))
                 .expect("Failed to create update");
 
-            send_node_msg(
-                &recv_tx,
-                NodeMsg::AntiEntropy {
-                    section_tree_update,
-                    kind: AntiEntropyKind::Update {
-                        members: Default::default(),
-                    },
+            let ae_msg = NodeMsg::AntiEntropy {
+                section_tree_update,
+                kind: AntiEntropyKind::Update {
+                    members: Default::default(),
                 },
-                &genesis_nodes[0],
-                genesis_sap.section_key(),
-            );
+            };
+
+            for node in genesis_nodes.iter() {
+                send_node_msg(&recv_tx, ae_msg.clone(), node, genesis_sap.section_key());
+            }
 
             let (node_msg, _, _) = recv_node_msg(&mut send_rx).await;
 
@@ -744,6 +775,13 @@ mod tests {
             task::yield_now().await;
 
             let (node_msg, _, _) = recv_node_msg(&mut send_rx).await;
+            assert_matches!(node_msg, NodeMsg::AntiEntropyProbe { .. });
+
+            for node in genesis_nodes.iter() {
+                send_node_msg(&recv_tx, ae_msg.clone(), node, genesis_sap.section_key());
+            }
+
+            let (node_msg, _, _) = recv_node_msg(&mut send_rx).await;
             assert_matches!(node_msg, NodeMsg::JoinRequest { .. });
 
             Ok(())
@@ -761,8 +799,8 @@ mod tests {
     #[tokio::test]
     async fn join_disallowed_response() -> Result<()> {
         let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
-        let (send_tx, mut send_rx) = mpsc::channel(1);
-        let (recv_tx, mut recv_rx) = mpsc::channel(1);
+        let (send_tx, mut send_rx) = mpsc::channel(10);
+        let (recv_tx, mut recv_rx) = mpsc::channel(10);
 
         let (genesis_sap, genesis_sk_set, genesis_nodes, _) =
             TestSapBuilder::new(Prefix::default()).build();
@@ -789,17 +827,16 @@ mod tests {
                 .generate_section_tree_update(&prefix(""))
                 .expect("Failed to create update");
 
-            send_node_msg(
-                &recv_tx,
-                NodeMsg::AntiEntropy {
-                    section_tree_update,
-                    kind: AntiEntropyKind::Update {
-                        members: Default::default(),
-                    },
+            let ae_msg = NodeMsg::AntiEntropy {
+                section_tree_update,
+                kind: AntiEntropyKind::Update {
+                    members: Default::default(),
                 },
-                &genesis_nodes[0],
-                genesis_sap.section_key(),
-            );
+            };
+
+            for node in genesis_nodes.iter() {
+                send_node_msg(&recv_tx, ae_msg.clone(), node, genesis_sap.section_key());
+            }
 
             let (node_msg, _, _) = recv_node_msg(&mut send_rx).await;
             assert_matches!(node_msg, NodeMsg::JoinRequest { .. });
