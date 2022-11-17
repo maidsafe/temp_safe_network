@@ -337,6 +337,100 @@ impl<R: RngCore> TestNetworkBuilder<R> {
         }
     }
 
+    /// Helper to build the `SectionTree`
+    fn build_section_tree(
+        sections: &BTreeMap<Prefix, Vec<(SectionSigned<SectionAuthorityProvider>, SecretKeySet)>>,
+        max_prefixes: BTreeSet<Prefix>,
+    ) -> SectionTree {
+        let gen_prefix = &sections
+            .get(&Prefix::default())
+            .expect("Genesis section is absent. Provide atleast a single SAP");
+        let gen_sk = gen_prefix[0].1.secret_key();
+
+        let mut section_tree = SectionTree::new(gen_sk.public_key());
+        let mut completed = BTreeSet::new();
+        // need to insert the default prefix first
+        let prefix_iter = if max_prefixes.contains(&Prefix::default()) {
+            max_prefixes
+        } else {
+            iter::once(Prefix::default())
+                .chain(max_prefixes.into_iter())
+                .collect()
+        };
+
+        for max_prefix in prefix_iter.iter() {
+            let (first_unique_prefix, mut parent) = if *max_prefix == Prefix::default() {
+                // if we have the default prefix, then we have not inserted anything yet. So the first churn
+                // should be inserted.
+                let parent = sections
+                    .get(max_prefix)
+                    .expect("sections should contain the prefix")
+                    .first()
+                    .expect("should contain atleast one sap")
+                    .1
+                    .secret_key();
+                (*max_prefix, parent)
+            } else {
+                // if max_prefix is not the default prefix, then it means that the user has
+                // provided something greater than Prefix() and hence find ancestor that we have
+                // not inserted yet.
+                let first_unique_prefix = max_prefix
+                    .ancestors()
+                    .chain(iter::once(*max_prefix))
+                    .find(|anc| !completed.contains(anc))
+                    .expect("Ancestors starts from genesis, so it should always return something");
+                // completed_till is the smallest prefix that we have inserted from the ancestor list
+                // of our max_prefix. If the prefix has n_churns, the last key from the last chrun is
+                // considered as the parent
+                let completed_till = first_unique_prefix.popped();
+                let parent = sections
+                    .get(&completed_till)
+                    .expect("sections should contain the prefix")
+                    .last()
+                    .expect("Should contain atleast one SAP")
+                    .1
+                    .secret_key();
+                (first_unique_prefix, parent)
+            };
+
+            let mut genesis_section_skipped = false;
+            // insert from the first_unique_prefix to the max_prefix
+            for anc in max_prefix
+                .ancestors()
+                .skip_while(|anc| *anc != first_unique_prefix)
+                .chain(iter::once(*max_prefix))
+            {
+                // each anc can have multiple chruns
+                for (sap, sk) in sections
+                    .get(&anc)
+                    .expect("The ancestor {anc:?} should be present")
+                {
+                    // to skip the first iteration of Prefix() since we have used that to create the
+                    // SectionTree
+                    if !genesis_section_skipped && anc == Prefix::default() {
+                        genesis_section_skipped = true;
+                        continue;
+                    }
+                    let sk = sk.secret_key();
+                    let sig = TestKeys::sign(&parent, &sk.public_key());
+                    let mut proof_chain = SectionsDAG::new(parent.public_key());
+                    proof_chain
+                        .insert(&parent.public_key(), sk.public_key(), sig)
+                        .expect("should not fail");
+                    let update =
+                        TestSectionTree::get_section_tree_update(sap, &proof_chain, &parent);
+                    let _ = section_tree
+                        .update(update)
+                        .expect("Failed to update section_tree");
+                    parent = sk;
+                    let _ = completed.insert(anc);
+                }
+            }
+        }
+
+        section_tree
+    }
+
     fn build_sap(
         &mut self,
         prefix: Prefix,
