@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{core::MyNodeSnapshot, flow_ctrl::cmds::Cmd, messaging::Peers, MyNode};
+use crate::node::{core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Peers, MyNode};
 
 use sn_interface::{
     data_copy_count,
@@ -20,9 +20,9 @@ use std::collections::BTreeSet;
 impl MyNode {
     /// Given what data the peer has, we shall calculate what data the peer is missing that
     /// we have, and send such data to the peer.
-    #[instrument(skip(snapshot, data_sender_has))]
+    #[instrument(skip(context, data_sender_has))]
     pub(crate) async fn get_missing_data_for_node(
-        snapshot: &MyNodeSnapshot,
+        context: &NodeContext,
         sender: Peer,
         data_sender_has: Vec<DataAddress>,
     ) -> Option<Cmd> {
@@ -30,7 +30,7 @@ impl MyNode {
         // Collection of data addresses that we do not have
 
         // TODO: can cache this data stored per churn event?
-        let data_i_have = snapshot.data_storage.data_addrs().await;
+        let data_i_have = context.data_storage.data_addrs().await;
         trace!("Our data got");
 
         if data_i_have.is_empty() {
@@ -38,7 +38,7 @@ impl MyNode {
             return None;
         }
 
-        let adults = snapshot.network_knowledge.adults();
+        let adults = context.network_knowledge.adults();
         let adults_names = adults.iter().map(|p2p_node| p2p_node.name());
 
         let mut data_for_sender = vec![];
@@ -78,15 +78,15 @@ impl MyNode {
     /// Will send a list of currently known/owned data to relevant nodes.
     /// These nodes should send back anything missing (in batches).
     /// Relevant nodes should be all _prior_ neighbours + _new_ elders.
-    #[instrument(skip(snapshot))]
-    pub(crate) async fn ask_for_any_new_data(snapshot: &MyNodeSnapshot) -> Cmd {
+    #[instrument(skip(context))]
+    pub(crate) async fn ask_for_any_new_data(context: &NodeContext) -> Cmd {
         trace!("{:?}", LogMarker::DataReorganisationUnderway);
         debug!("Querying section for any new data");
-        let data_i_have = snapshot.data_storage.data_addrs().await;
+        let data_i_have = context.data_storage.data_addrs().await;
 
-        let my_name = snapshot.name;
-        let adults = snapshot.network_knowledge.adults();
-        let elders = snapshot.network_knowledge.elders();
+        let my_name = context.name;
+        let adults = context.network_knowledge.adults();
+        let elders = context.network_knowledge.elders();
 
         // find data targets that are not us.
         let mut target_members = adults

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::core::MyNodeSnapshot;
+use crate::node::core::NodeContext;
 use crate::node::{Cmd, Error, MyNode, Prefix, Result};
 
 use bytes::Bytes;
@@ -37,7 +37,7 @@ const REPONSE_TIMEOUT: Duration = Duration::from_secs(7); // w/ 6s qp2p timeout,
 impl MyNode {
     // Locate ideal holders for this data, instruct them to store the data
     pub(crate) async fn replicate_data_to_adults(
-        snapshot: &MyNodeSnapshot,
+        snapshot: &NodeContext,
         data: ReplicatedData,
         msg_id: MsgId,
         targets: BTreeSet<Peer>,
@@ -94,7 +94,7 @@ impl MyNode {
 
     // Locate ideal holders for this data, instruct them to store the data
     pub(crate) async fn replicate_data_to_adults_and_ack_to_client(
-        snapshot: &MyNodeSnapshot,
+        snapshot: &NodeContext,
         cmd: DataCmd,
         data: ReplicatedData,
         msg_id: MsgId,
@@ -155,7 +155,7 @@ impl MyNode {
 
     /// Parses WireMsg and if DataStored Ack, we send a response to the client
     async fn send_ack_to_client_on_stream(
-        snapshot: &MyNodeSnapshot,
+        snapshot: &NodeContext,
         response: WireMsg,
         msg_id: MsgId,
         send_stream: Arc<Mutex<SendStream>>,
@@ -193,7 +193,7 @@ impl MyNode {
 
     /// Find target adult, sends a bidi msg, awaiting response, and then sends this on to the client
     pub(crate) async fn read_data_from_adult_and_respond_to_client(
-        snapshot: MyNodeSnapshot,
+        snapshot: NodeContext,
         query: DataQuery,
         msg_id: MsgId,
         auth: AuthorityProof<ClientAuth>,
@@ -425,7 +425,7 @@ impl MyNode {
     /// Construct list of adults that hold target data, including full nodes.
     /// List is sorted by distance from `target`.
     fn target_data_holders_including_full(
-        snapshot: &MyNodeSnapshot,
+        snapshot: &NodeContext,
         target: &XorName,
     ) -> BTreeSet<Peer> {
         let full_adults = &snapshot.full_adults;
@@ -480,14 +480,11 @@ impl MyNode {
     }
 
     /// Used to fetch the list of holders for given name of data. Excludes full nodes
-    pub(crate) fn target_data_holders(
-        snapshot: &MyNodeSnapshot,
-        target: XorName,
-    ) -> BTreeSet<Peer> {
-        let full_adults = &snapshot.full_adults;
+    pub(crate) fn target_data_holders(context: &NodeContext, target: XorName) -> BTreeSet<Peer> {
+        let full_adults = &context.full_adults;
         trace!("full_adults = {}", full_adults.len());
         // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
-        let adults = snapshot.network_knowledge.adults();
+        let adults = context.network_knowledge.adults();
 
         trace!("Total adults known about: {:?}", adults.len());
 

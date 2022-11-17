@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    core::MyNodeSnapshot,
+    core::NodeContext,
     flow_ctrl::cmds::Cmd,
     handover::{Error as HandoverError, Handover},
     membership::{elder_candidates, try_split_dkg},
@@ -30,7 +30,7 @@ impl MyNode {
         &mut self,
         sap_candidates: SapCandidate,
     ) -> Result<Vec<Cmd>> {
-        let snapshot = &self.snapshot();
+        let context = &self.context();
         let mut cmds = vec![];
         match &self.handover_voting {
             Some(handover_voting_state) => {
@@ -39,7 +39,7 @@ impl MyNode {
                 self.handover_voting = Some(vs.clone());
 
                 debug!("{}: {:?}", LogMarker::HandoverConsensusTrigger, &vote);
-                cmds.push(MyNode::broadcast_handover_vote_msg(snapshot, vote));
+                cmds.push(MyNode::broadcast_handover_vote_msg(context, vote));
 
                 // For handover 2 elders sap, only the handover vote from genesis is required.
                 // Which make the vote state reached consensus when initialized.
@@ -61,13 +61,13 @@ impl MyNode {
 
     /// Broadcast handover Vote message to Elders
     pub(crate) fn broadcast_handover_vote_msg(
-        snapshot: &MyNodeSnapshot,
+        context: &NodeContext,
         signed_vote: SignedVote<SapCandidate>,
     ) -> Cmd {
         // Deliver each SignedVote to all current Elders
         trace!("Broadcasting Vote msg: {:?}", signed_vote);
 
-        MyNode::send_msg_to_our_elders(snapshot, NodeMsg::HandoverVotes(vec![signed_vote]))
+        MyNode::send_msg_to_our_elders(context, NodeMsg::HandoverVotes(vec![signed_vote]))
     }
 
     /// Broadcast the decision of the terminated handover consensus by proposing the NewElders SAP
@@ -106,9 +106,9 @@ impl MyNode {
     }
 
     /// helper to handle a handover vote
-    #[instrument(skip(snapshot), level = "trace")]
+    #[instrument(skip(context), level = "trace")]
     fn handle_vote(
-        snapshot: &MyNodeSnapshot,
+        context: &NodeContext,
         handover_state: &mut Handover,
         signed_vote: SignedVote<SapCandidate>,
         peer: Peer,
@@ -120,7 +120,7 @@ impl MyNode {
                     signed_vote
                 );
                 Ok(vec![MyNode::broadcast_handover_vote_msg(
-                    snapshot,
+                    context,
                     signed_vote,
                 )])
             }
@@ -301,12 +301,12 @@ impl MyNode {
         signed_vote: SignedVote<SapCandidate>,
     ) -> Result<Vec<Cmd>> {
         self.check_signed_vote_saps(&signed_vote)?;
-        let snapshot = &self.snapshot();
+        let context = &self.context();
         match &self.handover_voting {
             Some(handover_state) => {
                 let had_consensus_value = handover_state.consensus_value().is_some();
                 let mut state = handover_state.clone();
-                let mut cmds = MyNode::handle_vote(snapshot, &mut state, signed_vote, peer)?;
+                let mut cmds = MyNode::handle_vote(context, &mut state, signed_vote, peer)?;
 
                 // check for unsuccessful termination
                 state.handle_empty_set_decision();

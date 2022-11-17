@@ -8,8 +8,8 @@
 
 use crate::{
     node::{
-        core::MyNodeSnapshot, flow_ctrl::cmds::Cmd, messaging::Peers, Event, MembershipEvent,
-        MyNode, Proposal as CoreProposal, Result, MIN_LEVEL_WHEN_FULL,
+        core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Peers, Event, MembershipEvent, MyNode,
+        Proposal as CoreProposal, Result, MIN_LEVEL_WHEN_FULL,
     },
     storage::Error as StorageError,
 };
@@ -32,8 +32,8 @@ use xor_name::XorName;
 
 impl MyNode {
     /// Send a (`NodeMsg`) message to all Elders in our section
-    pub(crate) fn send_msg_to_our_elders(snapshot: &MyNodeSnapshot, msg: NodeMsg) -> Cmd {
-        let sap = snapshot.network_knowledge.section_auth();
+    pub(crate) fn send_msg_to_our_elders(context: &NodeContext, msg: NodeMsg) -> Cmd {
+        let sap = context.network_knowledge.section_auth();
         let recipients = sap.elders_set();
         MyNode::send_system_msg(msg, Peers::Multiple(recipients))
     }
@@ -45,17 +45,17 @@ impl MyNode {
     }
 
     pub(crate) async fn store_data_as_adult_and_respond(
-        snapshot: &mut MyNodeSnapshot,
+        context: &mut NodeContext,
         data: ReplicatedData,
         response_stream: Option<Arc<Mutex<SendStream>>>,
         target: Peer,
         original_msg_id: MsgId,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
-        let section_pk = PublicKey::Bls(snapshot.network_knowledge.section_key());
-        let node_keypair = Keypair::Ed25519(snapshot.keypair.clone());
+        let section_pk = PublicKey::Bls(context.network_knowledge.section_key());
+        let node_keypair = Keypair::Ed25519(context.keypair.clone());
         let data_addr = data.address();
-        let our_node_name = snapshot.name;
+        let our_node_name = context.name;
 
         trace!("About to store data from {original_msg_id:?}: {data_addr:?}");
         // TODO: Respond with errors etc over the bidi stream
@@ -63,26 +63,26 @@ impl MyNode {
         // We are an adult here, so just store away!
         // This may return a DatabaseFull error... but we should have reported storage increase
         // well before this
-        match snapshot
+        match context
             .data_storage
             .store(&data, section_pk, node_keypair.clone())
             .await
         {
             Ok(level_report) => {
                 info!("Storage level report: {:?}", level_report);
-                cmds.extend(MyNode::record_storage_level_if_any(snapshot, level_report)?);
+                cmds.extend(MyNode::record_storage_level_if_any(context, level_report)?);
             }
             Err(StorageError::NotEnoughSpace) => {
                 // storage full
                 error!("Not enough space to store more data");
-                let node_id = PublicKey::from(snapshot.keypair.public);
+                let node_id = PublicKey::from(context.keypair.public);
                 let msg = NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
                     node_id,
                     data,
                     full: true,
                 });
 
-                cmds.push(MyNode::send_msg_to_our_elders(snapshot, msg))
+                cmds.push(MyNode::send_msg_to_our_elders(context, msg))
             }
             Err(error) => {
                 // the rest seem to be non-problematic errors.. (?)
@@ -98,7 +98,7 @@ impl MyNode {
 
         if let Some(stream) = response_stream {
             MyNode::send_msg_on_stream(
-                snapshot.network_knowledge.section_key(),
+                context.network_knowledge.section_key(),
                 payload,
                 kind,
                 stream,
@@ -165,11 +165,11 @@ impl MyNode {
             // and repsonsive, as well as being a method of keeping nodes up to date.
             NodeMsg::AntiEntropyProbe(section_key) => {
                 debug!("[NODE READ]: aeprobe attempts");
-                let snapshot = node.read().await.snapshot();
+                let context = node.read().await.context();
                 debug!("[NODE READ]: aeprobe lock got");
 
                 let mut cmds = vec![];
-                if !snapshot.is_elder {
+                if !context.is_elder {
                     // early return here as we do not get health checks as adults,
                     // normal AE rules should have applied
                     return Ok(cmds);
@@ -179,7 +179,7 @@ impl MyNode {
                 let mut recipients = BTreeSet::new();
                 let _existed = recipients.insert(sender);
                 cmds.push(MyNode::send_ae_update_to_nodes(
-                    &snapshot,
+                    &context,
                     recipients,
                     section_key,
                 ));
@@ -189,7 +189,7 @@ impl MyNode {
             NodeMsg::JoinResponse(join_response) => {
                 let mut node = node.write().await;
                 debug!("[NODE WRITE]: join response write gottt...");
-                let snapshot = node.snapshot();
+                let context = node.context();
 
                 match *join_response {
                     JoinResponse::Approved {
@@ -204,7 +204,7 @@ impl MyNode {
                         if let Some(ref mut joining_as_relocated) = node.relocate_state {
                             let new_node = joining_as_relocated.node.clone();
                             let new_name = new_node.name();
-                            let previous_name = snapshot.name;
+                            let previous_name = context.name;
                             let new_keypair = new_node.keypair;
 
                             info!(
@@ -215,7 +215,7 @@ impl MyNode {
                             let recipients: Vec<_> =
                                 section_tree_update.signed_sap.elders().cloned().collect();
 
-                            let section_tree = snapshot.network_knowledge.section_tree().clone();
+                            let section_tree = context.network_knowledge.section_tree().clone();
                             let new_network_knowledge =
                                 NetworkKnowledge::new(section_tree, section_tree_update)?;
 
@@ -231,7 +231,7 @@ impl MyNode {
                             );
 
                             // move off thread to keep fn sync
-                            let event_sender = snapshot.event_sender;
+                            let event_sender = context.event_sender;
                             let _handle = tokio::spawn(async move {
                                 event_sender
                                     .send(Event::Membership(MembershipEvent::Relocated {
@@ -271,26 +271,26 @@ impl MyNode {
             }
             NodeMsg::JoinRequest(join_request) => {
                 trace!("Handling msg {:?}: JoinRequest from {}", msg_id, sender);
-                let snapshot = &node.read().await.snapshot();
+                let context = &node.read().await.context();
                 debug!("[NODE READ]: joinReq read got");
 
-                MyNode::handle_join_request(node, snapshot, sender, join_request)
+                MyNode::handle_join_request(node, context, sender, join_request)
                     .await
                     .map(|c| c.into_iter().collect())
             }
             NodeMsg::JoinAsRelocatedRequest(join_request) => {
                 trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
-                let snapshot = &node.read().await.snapshot();
+                let context = &node.read().await.context();
                 debug!("[NODE READ]: joinReqas relocated read got");
 
-                if snapshot.is_not_elder
-                    && join_request.section_key == snapshot.network_knowledge.section_key()
+                if context.is_not_elder
+                    && join_request.section_key == context.network_knowledge.section_key()
                 {
                     return Ok(vec![]);
                 }
 
                 Ok(
-                    MyNode::handle_join_as_relocated_request(node, snapshot, sender, *join_request)
+                    MyNode::handle_join_as_relocated_request(node, context, sender, *join_request)
                         .await
                         .into_iter()
                         .collect(),
@@ -305,7 +305,7 @@ impl MyNode {
             }
             NodeMsg::MembershipAE(gen) => {
                 debug!("[NODE READ]: membership ae read ");
-                let snapshopt = node.read().await.snapshot();
+                let snapshopt = node.read().await.context();
                 debug!("[NODE READ]: membership ae read got");
 
                 Ok(
@@ -429,10 +429,10 @@ impl MyNode {
                     msg_id
                 );
 
-                let snapshot = node.read().await.snapshot();
+                let context = node.read().await.context();
                 debug!("[NODE READ]: could ont store data read got");
 
-                if snapshot.is_not_elder {
+                if context.is_not_elder {
                     error!("Received unexpected message while Adult");
                     return Ok(vec![]);
                 }
@@ -448,20 +448,20 @@ impl MyNode {
                     }
                 }
 
-                let targets = MyNode::target_data_holders(&snapshot, data.name());
+                let targets = MyNode::target_data_holders(&context, data.name());
 
                 // TODO: handle responses where replication failed...
                 let _results =
-                    MyNode::replicate_data_to_adults(&snapshot, data, msg_id, targets).await?;
+                    MyNode::replicate_data_to_adults(&context, data, msg_id, targets).await?;
 
                 Ok(vec![])
             }
             NodeMsg::NodeCmd(NodeCmd::ReplicateOneData(data)) => {
                 debug!("[NODE READ]: replicate one data");
-                let mut snapshot = node.read().await.snapshot();
+                let mut context = node.read().await.context();
                 debug!("[NODE READ]: replicate one data read got");
 
-                if snapshot.is_elder {
+                if context.is_elder {
                     error!("Received unexpected message while Elder");
                     return Ok(vec![]);
                 }
@@ -472,7 +472,7 @@ impl MyNode {
 
                 // store data and respond w/ack on the response stream
                 MyNode::store_data_as_adult_and_respond(
-                    &mut snapshot,
+                    &mut context,
                     data,
                     send_stream,
                     sender,
@@ -482,22 +482,22 @@ impl MyNode {
             }
             NodeMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)) => {
                 info!("ReplicateData MsgId: {:?}", msg_id);
-                let snapshot = node.read().await.snapshot();
+                let context = node.read().await.context();
                 debug!("[NODE READ]: replicate data read got");
 
-                if snapshot.is_elder {
+                if context.is_elder {
                     error!("Received unexpected message while Elder");
                     return Ok(vec![]);
                 }
 
                 let mut cmds = vec![];
 
-                let section_pk = PublicKey::Bls(snapshot.network_knowledge.section_key());
-                let node_keypair = Keypair::Ed25519(snapshot.keypair.clone());
+                let section_pk = PublicKey::Bls(context.network_knowledge.section_key());
+                let node_keypair = Keypair::Ed25519(context.keypair.clone());
 
                 for data in data_collection {
                     // grab the write lock each time in the loop to not hold it over large data sets
-                    let store_result = snapshot
+                    let store_result = context
                         .data_storage
                         .store(&data, section_pk, node_keypair.clone())
                         .await;
@@ -509,7 +509,7 @@ impl MyNode {
                         Ok(level_report) => {
                             info!("Storage level report: {:?}", level_report);
                             cmds.extend(MyNode::record_storage_level_if_any(
-                                &snapshot,
+                                &context,
                                 level_report,
                             )?);
 
@@ -519,14 +519,14 @@ impl MyNode {
                             // storage full
                             error!("Not enough space to store more data");
 
-                            let node_id = PublicKey::from(snapshot.keypair.public);
+                            let node_id = PublicKey::from(context.keypair.public);
                             let msg = NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
                                 node_id,
                                 data,
                                 full: true,
                             });
 
-                            cmds.push(MyNode::send_msg_to_our_elders(&snapshot, msg))
+                            cmds.push(MyNode::send_msg_to_our_elders(&context, msg))
                         }
                         Err(error) => {
                             // the rest seem to be non-problematic errors.. (?)
@@ -543,11 +543,11 @@ impl MyNode {
                     LogMarker::RequestForAnyMissingData,
                     msg_id
                 );
-                let snapshot = &node.read().await.snapshot();
+                let context = &node.read().await.context();
                 debug!("[NODE READ]: send missing data read got");
 
                 Ok(
-                    MyNode::get_missing_data_for_node(snapshot, sender, known_data_addresses)
+                    MyNode::get_missing_data_for_node(context, sender, known_data_addresses)
                         .await
                         .into_iter()
                         .collect(),
@@ -563,12 +563,12 @@ impl MyNode {
                     "Handle NodeQuery with msg_id {:?}, operation_id {}",
                     msg_id, operation_id
                 );
-                let snapshot = node.read().await.snapshot();
+                let context = node.read().await.context();
 
                 debug!("[NODE READ]: node query read got");
 
                 MyNode::handle_data_query_at_adult(
-                    &snapshot,
+                    &context,
                     operation_id,
                     &query,
                     auth,
@@ -596,7 +596,7 @@ impl MyNode {
     /// Sets Cmd to locally record the storage level and send msgs to Elders
     /// Advising the same
     fn record_storage_level_if_any(
-        snapshot: &MyNodeSnapshot,
+        context: &NodeContext,
         level: Option<StorageLevel>,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
@@ -605,7 +605,7 @@ impl MyNode {
 
             // Run a SetStorageLevel Cmd to actually update the DataStorage instance
             cmds.push(Cmd::SetStorageLevel(level));
-            let node_id = PublicKey::from(snapshot.keypair.public);
+            let node_id = PublicKey::from(context.keypair.public);
             let node_xorname = XorName::from(node_id);
 
             // we ask the section to record the new level reached
@@ -615,7 +615,7 @@ impl MyNode {
                 level,
             });
 
-            let dst = Peers::Multiple(snapshot.network_knowledge.elders());
+            let dst = Peers::Multiple(context.network_knowledge.elders());
 
             cmds.push(Cmd::send_msg(msg, dst));
         }

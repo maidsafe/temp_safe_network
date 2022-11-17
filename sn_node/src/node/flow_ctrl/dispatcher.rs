@@ -46,20 +46,20 @@ impl Dispatcher {
                 send_stream,
             } => {
                 trace!("Sending msg: {msg_id:?}");
-                let snapshot = self.node.read().await.snapshot();
+                let context = self.node.read().await.context();
                 debug!("[NODE READ]: send msg lock got");
 
                 let peer_msgs = {
                     into_msg_bytes(
-                        &snapshot.network_knowledge,
-                        snapshot.name,
+                        &context.network_knowledge,
+                        context.name,
                         msg,
                         msg_id,
                         recipients,
                     )?
                 };
 
-                let comm = snapshot.comm.clone();
+                let comm = context.comm.clone();
 
                 let tasks = peer_msgs
                     .into_iter()
@@ -101,11 +101,11 @@ impl Dispatcher {
                 send_stream,
             } => {
                 debug!("Updating network knowledge before handling message");
-                let mut snapshot = self.node.read().await.snapshot();
+                let mut context = self.node.read().await.context();
                 debug!("[NODE READ]: update client knowledge got");
 
-                let name = snapshot.name;
-                let there_was_an_update = snapshot.network_knowledge.update_knowledge_if_valid(
+                let name = context.name;
+                let there_was_an_update = context.network_knowledge.update_knowledge_if_valid(
                     SectionTreeUpdate::new(signed_sap.clone(), proof_chain.clone()),
                     None,
                     &name,
@@ -125,7 +125,7 @@ impl Dispatcher {
 
                 debug!("[NODE READ]: update & validate msg lock got");
 
-                MyNode::handle_valid_client_msg(snapshot, msg_id, msg, auth, origin, send_stream)
+                MyNode::handle_valid_client_msg(context, msg_id, msg, auth, origin, send_stream)
                     .await
             }
             Cmd::HandleValidNodeMsg {

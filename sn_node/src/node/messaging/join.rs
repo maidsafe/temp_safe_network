@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{core::MyNodeSnapshot, flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, Result};
+use crate::node::{core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, Result};
 
 use sn_interface::{
     messaging::system::{
@@ -26,7 +26,7 @@ use tokio::sync::RwLock;
 impl MyNode {
     pub(crate) async fn handle_join_request(
         node: Arc<RwLock<MyNode>>,
-        snapshot: &MyNodeSnapshot,
+        context: &NodeContext,
         peer: Peer,
         join_request: JoinRequest,
     ) -> Result<Option<Cmd>> {
@@ -34,13 +34,13 @@ impl MyNode {
 
         let provided_section_key = join_request.section_key();
 
-        let our_section_key = snapshot.network_knowledge.section_key();
+        let our_section_key = context.network_knowledge.section_key();
         let section_key_matches = provided_section_key == our_section_key;
 
         // Ignore `JoinRequest` if we are not elder, unless the join request
         // is outdated in which case we'll reply with `JoinResponse::Retry`
         // with the up-to-date info.
-        if snapshot.is_not_elder && section_key_matches {
+        if context.is_not_elder && section_key_matches {
             warn!("Join req received to our section key, but I am not an elder...");
             // Note: We don't bounce this message because the current bounce-resend
             // mechanism wouldn't preserve the original SocketAddr which is needed for
@@ -50,17 +50,17 @@ impl MyNode {
             return Ok(None);
         }
 
-        let our_prefix = snapshot.network_knowledge.prefix();
+        let our_prefix = context.network_knowledge.prefix();
         if !our_prefix.matches(&peer.name()) {
             debug!("Redirecting JoinRequest from {peer} - name doesn't match our prefix {our_prefix:?}.");
-            let retry_sap = snapshot.section_sap_matching_name(&peer.name())?;
+            let retry_sap = context.section_sap_matching_name(&peer.name())?;
             let msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Redirect(retry_sap)));
             trace!("Sending {:?} to {}", msg, peer);
             trace!("{}", LogMarker::SendJoinRedirected);
             return Ok(Some(MyNode::send_system_msg(msg, Peers::Single(peer))));
         }
 
-        if !snapshot.joins_allowed {
+        if !context.joins_allowed {
             debug!("Rejecting JoinRequest from {peer} - joins currently not allowed.");
             let msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Rejected(
                 JoinRejectionReason::JoinsDisallowed,
@@ -88,8 +88,8 @@ impl MyNode {
         }
 
         if !section_key_matches || !is_age_valid {
-            let signed_sap = snapshot.network_knowledge.signed_sap();
-            let proof_chain = snapshot.network_knowledge.section_chain();
+            let signed_sap = context.network_knowledge.signed_sap();
+            let proof_chain = context.network_knowledge.section_chain();
             let msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Retry {
                 section_tree_update: SectionTreeUpdate::new(signed_sap, proof_chain),
             }));
@@ -113,21 +113,21 @@ impl MyNode {
 
     pub(crate) async fn handle_join_as_relocated_request(
         node: Arc<RwLock<MyNode>>,
-        snapshot: &MyNodeSnapshot,
+        context: &NodeContext,
         peer: Peer,
         join_request: JoinAsRelocatedRequest,
     ) -> Option<Cmd> {
         debug!("Received JoinAsRelocatedRequest {join_request:?} from {peer}",);
 
-        let comm = snapshot.comm.clone();
-        let our_prefix = snapshot.network_knowledge.prefix();
+        let comm = context.comm.clone();
+        let our_prefix = context.network_knowledge.prefix();
         if !our_prefix.matches(&peer.name())
-            || join_request.section_key != snapshot.network_knowledge.section_key()
+            || join_request.section_key != context.network_knowledge.section_key()
         {
             debug!("JoinAsRelocatedRequest from {peer} - name doesn't match our prefix {our_prefix:?}.");
 
             let msg = NodeMsg::JoinAsRelocatedResponse(Box::new(JoinAsRelocatedResponse::Retry(
-                snapshot.network_knowledge.section_auth(),
+                context.network_knowledge.section_auth(),
             )));
 
             trace!("{} b", LogMarker::SendJoinAsRelocatedResponse);
@@ -143,7 +143,7 @@ impl MyNode {
                 debug!("Ignoring JoinAsRelocatedRequest from {peer} - invalid sig.");
                 return None;
             }
-            let known_keys = snapshot.network_knowledge.known_keys();
+            let known_keys = context.network_knowledge.known_keys();
             if !known_keys.contains(&join_request.relocate_proof.sig.public_key) {
                 debug!("Ignoring JoinAsRelocatedRequest from {peer} - untrusted src.");
                 return None;

@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    core::MyNodeSnapshot, flow_ctrl::cmds::Cmd, membership, messaging::Peers, relocation::ChurnId,
+    core::NodeContext, flow_ctrl::cmds::Cmd, membership, messaging::Peers, relocation::ChurnId,
     Event, MembershipEvent, MyNode, Result,
 };
 
@@ -30,7 +30,7 @@ impl MyNode {
             node_state.state()
         );
 
-        let snapshot = &self.snapshot();
+        let context = &self.context();
         let prefix = self.network_knowledge.prefix();
         if let Some(membership) = self.membership.as_mut() {
             let membership_vote = match membership.propose(node_state, &prefix) {
@@ -41,7 +41,7 @@ impl MyNode {
                 }
             };
             Some(MyNode::send_msg_to_our_elders(
-                snapshot,
+                context,
                 NodeMsg::MembershipVotes(vec![membership_vote]),
             ))
         } else {
@@ -53,13 +53,13 @@ impl MyNode {
     /// Get our latest vote if any at this generation, and get cmds to resend to all elders
     /// (which should in turn trigger them to resend their votes)
     #[instrument(skip_all)]
-    pub(crate) async fn membership_gossip_votes(snapshot: &MyNodeSnapshot) -> Option<Cmd> {
-        let membership = snapshot.membership.clone();
+    pub(crate) async fn membership_gossip_votes(context: &NodeContext) -> Option<Cmd> {
+        let membership = context.membership.clone();
         if let Some(membership) = membership {
             trace!("{}", LogMarker::GossippingMembershipVotes);
             if let Ok(ae_votes) = membership.anti_entropy(membership.generation()) {
                 let cmd =
-                    MyNode::send_msg_to_our_elders(snapshot, NodeMsg::MembershipVotes(ae_votes));
+                    MyNode::send_msg_to_our_elders(context, NodeMsg::MembershipVotes(ae_votes));
                 return Some(cmd);
             }
         }
@@ -77,8 +77,8 @@ impl MyNode {
             LogMarker::MembershipVotesBeingHandled
         );
 
-        let snapshot = &self.snapshot();
-        let prefix = snapshot.network_knowledge.prefix();
+        let context = &self.context();
+        let prefix = context.network_knowledge.prefix();
 
         let mut cmds = vec![];
 
@@ -125,7 +125,7 @@ impl MyNode {
             };
 
             if let Some(vote_msg) = vote_broadcast {
-                cmds.push(MyNode::send_msg_to_our_elders(snapshot, vote_msg));
+                cmds.push(MyNode::send_msg_to_our_elders(context, vote_msg));
             }
         }
 
@@ -133,7 +133,7 @@ impl MyNode {
     }
 
     pub(crate) fn handle_membership_anti_entropy(
-        snapshot: &MyNodeSnapshot,
+        context: &NodeContext,
         peer: Peer,
         gen: Generation,
     ) -> Option<Cmd> {
@@ -144,7 +144,7 @@ impl MyNode {
             peer
         );
 
-        if let Some(membership) = snapshot.membership.as_ref() {
+        if let Some(membership) = context.membership.as_ref() {
             match membership.anti_entropy(gen) {
                 Ok(catchup_votes) => {
                     debug!("Sending catchup votes to {peer:?}");

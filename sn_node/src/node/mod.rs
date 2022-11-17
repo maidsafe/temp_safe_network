@@ -30,7 +30,7 @@ mod relocation;
 
 use self::{
     bootstrap::join_network,
-    core::{MyNode, MyNodeSnapshot, GENESIS_DBC_AMOUNT},
+    core::{MyNode, NodeContext, GENESIS_DBC_AMOUNT},
     data::MIN_LEVEL_WHEN_FULL,
     flow_ctrl::{cmds::Cmd, event::Elders},
     node_starter::CmdChannel,
@@ -149,7 +149,7 @@ mod core {
     }
 
     #[derive(Clone)]
-    pub(crate) struct MyNodeSnapshot {
+    pub(crate) struct NodeContext {
         pub(crate) root_storage_dir: PathBuf,
         pub(crate) is_elder: bool,
         pub(crate) is_not_elder: bool,
@@ -166,7 +166,7 @@ mod core {
         pub(crate) membership: Option<Membership>,
     }
 
-    impl MyNodeSnapshot {
+    impl NodeContext {
         /// Returns the SAP of the section matching the name.
         pub(crate) fn section_sap_matching_name(
             &self,
@@ -179,11 +179,11 @@ mod core {
     }
 
     impl MyNode {
-        /// Generate a read only snapshot of a subset of the node's state
+        /// Get the  current node state as a NodeContext
         /// Useful for longer running processes to avoid having to acquire
-        /// read locks eg
-        pub(crate) fn snapshot(&self) -> MyNodeSnapshot {
-            MyNodeSnapshot {
+        /// read locks eg.
+        pub(crate) fn context(&self) -> NodeContext {
+            NodeContext {
                 root_storage_dir: self.root_storage_dir.clone(),
                 is_elder: self.is_elder(),
                 is_not_elder: self.is_not_elder(),
@@ -285,10 +285,10 @@ mod core {
                 membership,
             };
 
-            let snapshot = &node.snapshot();
+            let context = &node.context();
 
             // Write the section tree to this node's root storage directory
-            MyNode::write_section_tree(snapshot);
+            MyNode::write_section_tree(context);
 
             Ok(node)
         }
@@ -308,19 +308,19 @@ mod core {
         ////////////////////////////////////////////////////////////////////////////
 
         /// Generates a random AE probe for _anywhere_ on the network.
-        pub(crate) fn generate_probe_msg(snapshot: &MyNodeSnapshot) -> Result<Cmd> {
+        pub(crate) fn generate_probe_msg(context: &NodeContext) -> Result<Cmd> {
             // Generate a random address not belonging to our Prefix
             let mut dst = xor_name::rand::random();
 
             // We don't probe ourselves
-            while snapshot.network_knowledge.prefix().matches(&dst) {
+            while context.network_knowledge.prefix().matches(&dst) {
                 dst = xor_name::rand::random();
             }
 
-            let matching_section = snapshot.network_knowledge.section_auth_by_name(&dst)?;
+            let matching_section = context.network_knowledge.section_auth_by_name(&dst)?;
             let recipients = matching_section.elders_set();
 
-            let probe = snapshot.network_knowledge.anti_entropy_probe();
+            let probe = context.network_knowledge.anti_entropy_probe();
 
             info!("ProbeMsg target {:?}: {probe:?}", matching_section.prefix());
 
@@ -330,8 +330,8 @@ mod core {
         /// Generates a SectionProbeMsg with our current knowledge,
         /// targetting our section elders.
         /// Even if we're up to date, we expect a response.
-        pub(crate) fn generate_section_probe_msg(snapshot: &MyNodeSnapshot) -> Cmd {
-            let our_section = snapshot.network_knowledge.section_auth();
+        pub(crate) fn generate_section_probe_msg(context: &NodeContext) -> Cmd {
+            let our_section = context.network_knowledge.section_auth();
             let recipients = our_section.elders_set();
 
             info!(
@@ -340,7 +340,7 @@ mod core {
                 recipients,
             );
 
-            let probe = snapshot.network_knowledge.anti_entropy_probe();
+            let probe = context.network_knowledge.anti_entropy_probe();
             MyNode::send_system_msg(probe, Peers::Multiple(recipients))
         }
 
@@ -528,8 +528,8 @@ mod core {
         }
 
         /// Updates various state if elders changed.
-        pub(crate) fn update_on_elder_change(&mut self, old: &MyNodeSnapshot) -> Result<Vec<Cmd>> {
-            let new = self.snapshot();
+        pub(crate) fn update_on_elder_change(&mut self, old: &NodeContext) -> Result<Vec<Cmd>> {
+            let new = self.context();
             let new_section_key = new.network_knowledge.section_key();
             let new_prefix = new.network_knowledge.prefix();
             let old_prefix = old.network_knowledge.prefix();
@@ -757,9 +757,9 @@ mod core {
             };
         }
 
-        pub(crate) fn write_section_tree(snapshot: &MyNodeSnapshot) {
-            let section_tree = snapshot.network_knowledge.section_tree().clone();
-            let path = snapshot
+        pub(crate) fn write_section_tree(context: &NodeContext) {
+            let section_tree = context.network_knowledge.section_tree().clone();
+            let path = context
                 .root_storage_dir
                 .clone()
                 .join(SECTION_TREE_FILE_NAME);

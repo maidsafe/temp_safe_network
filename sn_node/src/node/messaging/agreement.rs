@@ -132,7 +132,7 @@ impl MyNode {
         section_sig: SectionSig,
     ) -> Result<Vec<Cmd>> {
         trace!("{}", LogMarker::HandlingNewEldersAgreement);
-        let snapshot = self.snapshot();
+        let context = self.context();
         let mut section_chain = self.section_chain();
         let last_key = section_chain.last_key()?;
 
@@ -151,7 +151,7 @@ impl MyNode {
                     Ok(true) => {
                         info!("Updated our network knowledge for {:?}", prefix);
                         info!("Writing updated knowledge to disk");
-                        MyNode::write_section_tree(&snapshot);
+                        MyNode::write_section_tree(&context);
                     }
                     Err(err) => {
                         error!("Error updating our network knowledge for {prefix:?}: {err:?}")
@@ -168,6 +168,6 @@ impl MyNode {
             self.network_knowledge.section_tree()
         );
 
-        self.update_on_elder_change(&snapshot)
+        self.update_on_elder_change(&context)
     }
 }

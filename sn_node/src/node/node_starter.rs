@@ -107,18 +107,18 @@ async fn new_node(
 
     {
         debug!("[NODE WRITE]: new node...");
-        let snapshot = node.read().await.snapshot();
+        let context = node.read().await.context();
         debug!("[NODE WRITE]: new node write got");
 
         // Network keypair may have to be changed due to naming criteria or network requirements.
-        let keypair_as_bytes = snapshot.keypair.to_bytes();
+        let keypair_as_bytes = context.keypair.to_bytes();
         store_network_keypair(root_dir, keypair_as_bytes).await?;
 
         let our_pid = std::process::id();
-        let node_prefix = snapshot.network_knowledge.prefix();
-        let node_name = snapshot.name;
-        let node_age = snapshot.info.age();
-        let our_conn_info = snapshot.info.addr;
+        let node_prefix = context.network_knowledge.prefix();
+        let node_name = context.name;
+        let node_age = context.info.age();
+        let our_conn_info = context.info.addr;
         let our_conn_info_json = serde_json::to_string(&our_conn_info)
             .unwrap_or_else(|_| "Failed to serialize connection info".into());
         println!(

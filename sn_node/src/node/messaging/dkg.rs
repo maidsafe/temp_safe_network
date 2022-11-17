@@ -767,7 +767,7 @@ impl MyNode {
         // it to sign any msg that needs section agreement.
         self.section_keys_provider.insert(key_share.clone());
 
-        let snapshot = self.snapshot();
+        let context = self.context();
 
         // If we are lagging, we may have been already approved as new Elder, and
         // an AE update provided us with this same SAP but already signed by previous Elders,
@@ -776,7 +776,7 @@ impl MyNode {
             .network_knowledge
             .try_update_current_sap(key_share_pk, &sap.prefix())
         {
-            self.update_on_elder_change(&snapshot)
+            self.update_on_elder_change(&context)
         } else {
             // This proposal is sent to the current set of elders to be aggregated
             // and section signed.

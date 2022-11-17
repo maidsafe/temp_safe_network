@@ -19,7 +19,7 @@ mod relocation;
 mod serialize;
 mod update_section;
 
-use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, MyNodeSnapshot, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, NodeContext, Result};
 
 use qp2p::SendStream;
 use sn_interface::{
@@ -74,7 +74,7 @@ impl MyNode {
             }
         };
 
-        let snapshot = node.read().await.snapshot();
+        let context = node.read().await.context();
         debug!("[NODE READ]: validate msg lock got");
         match msg_type {
             MsgType::Node { msg_id, dst, msg } => {
@@ -83,7 +83,7 @@ impl MyNode {
                 // Anythign returned here means there's an issue and we should
                 // short-circuit below
                 let ae_cmds = MyNode::apply_ae(
-                    &snapshot,
+                    &context,
                     &origin,
                     &msg,
                     &wire_msg,
@@ -117,13 +117,13 @@ impl MyNode {
                     return Err(Error::NoClientResponseStream)
                 };
 
-                debug!("Attempting read lock get to get node snapshot");
+                debug!("Attempting read lock get to get node context");
 
                 // first some AntiEntropy checks...
-                if snapshot.is_not_elder {
+                if context.is_not_elder {
                     let bounced_msg = wire_msg.serialize()?;
                     let ae_msg = MyNode::generate_ae_msg(
-                        &snapshot,
+                        &context,
                         None,
                         AntiEntropyKind::Redirect { bounced_msg },
                     );
@@ -131,7 +131,7 @@ impl MyNode {
 
                     MyNode::ae_redirect_client_to_our_elders(
                         ae_msg,
-                        snapshot,
+                        context,
                         origin,
                         send_stream,
                         wire_msg.serialize()?,
@@ -153,7 +153,7 @@ impl MyNode {
                 // TODO: rework this flow to avoid a SendMsg Cmd
                 if let Some(cmd) = MyNode::check_for_entropy(
                     &wire_msg,
-                    &snapshot,
+                    &context,
                     &dst.section_key,
                     dst_name,
                     &origin,
@@ -167,7 +167,7 @@ impl MyNode {
 
                 trace!("{msg_id:?} No AE needed for client message, proceeding to handle msg");
                 MyNode::handle_valid_client_msg(
-                    snapshot,
+                    context,
                     msg_id,
                     msg,
                     auth,
@@ -191,7 +191,7 @@ impl MyNode {
     /// Returns an ae cmd if we need to halt msg validation and update the origin instead.
     #[instrument(skip_all)]
     async fn apply_ae(
-        snapshot: &MyNodeSnapshot,
+        context: &NodeContext,
         origin: &Peer,
         msg: &NodeMsg,
         wire_msg: &WireMsg,
@@ -200,7 +200,7 @@ impl MyNode {
     ) -> Result<Vec<Cmd>> {
         // Adult nodes don't need to carry out entropy checking,
         // however the message shall always be handled.
-        if snapshot.is_not_elder {
+        if context.is_not_elder {
             return Ok(vec![]);
         }
         // For the case of receiving a join request not matching our prefix,
@@ -223,7 +223,7 @@ impl MyNode {
                 debug!("Checking {:?} for entropy", wire_msg.msg_id());
                 if let Some(ae_cmd) = MyNode::check_for_entropy(
                     wire_msg,
-                    snapshot,
+                    context,
                     &dst.section_key,
                     dst.name,
                     origin,
