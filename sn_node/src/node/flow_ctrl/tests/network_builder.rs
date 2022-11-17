@@ -493,6 +493,166 @@ pub(crate) struct TestNetwork {
 }
 
 impl TestNetwork {
+    /// Get elder/adult `MyNode` instances for a given `Prefix`. The elder_count and adult_count
+    /// should be <= the actual count specified in the SAP. Also return the `SectionKeyShare` for
+    /// elder nodes.
+    ///
+    /// If the Prefix contains multiple churn events (multiple SAPs), provide the churn_idx to get
+    /// a specific SAP, else the latest SAP for the prefix is used.
+    pub(crate) fn get_nodes(
+        &self,
+        prefix: Prefix,
+        elder_count: usize,
+        adult_count: usize,
+        churn_idx: Option<usize>,
+    ) -> Vec<(MyNode, Option<SectionKeyShare>)> {
+        let nodes = self._get_node_infos(prefix, churn_idx);
+        let section = self._get_section_details(prefix, churn_idx);
+
+        if elder_count > section.0.elder_count() {
+            panic!("elder_count should be <= {}", section.0.elder_count());
+        }
+        let section_adult_count = section.0.members().count() - section.0.elder_count();
+        if adult_count > section_adult_count {
+            panic!("adult_count should be <= {}", section_adult_count);
+        }
+
+        let network_knowledge = self._get_network_knowledge(&section.0, &section.1);
+
+        let mut my_nodes = Vec::new();
+        let nodes_iter = {
+            let elder_iter = nodes
+                .iter()
+                .filter(|(.., t)| matches!(t, TestMemberType::Elder))
+                .enumerate()
+                .map(|(idx, node)| {
+                    let sk_share = TestKeys::get_section_key_share(&section.1, idx);
+                    (node, Some(sk_share))
+                })
+                .take(elder_count);
+            let adult_iter = nodes
+                .iter()
+                .filter(|(.., t)| matches!(t, TestMemberType::Adult))
+                .map(|node| (node, None))
+                .take(adult_count);
+            elder_iter.chain(adult_iter)
+        };
+
+        for ((info, comm, _), sk_share) in nodes_iter {
+            let my_node =
+                self._get_node(prefix, churn_idx, &network_knowledge, info, comm, &sk_share);
+            my_nodes.push((my_node, sk_share));
+        }
+
+        my_nodes
+    }
+
+    /// Get the `MyNode` instances and the for a given `Prefix`. Optionally returns the `SectionKeyShare` if
+    /// it's an elder
+    ///
+    /// If the Prefix contains multiple churn events (multiple SAPs), provide the churn_idx to get
+    /// a specific SAP, else the latest SAP for the prefix is used.
+    pub(crate) fn get_node_by_key(
+        &self,
+        prefix: Prefix,
+        node_pk: PublicKey,
+        churn_idx: Option<usize>,
+    ) -> (MyNode, Option<SectionKeyShare>) {
+        let nodes = self._get_node_infos(prefix, churn_idx);
+        let node_idx = nodes
+            .iter()
+            .position(|(info, ..)| info.public_key() == node_pk)
+            .expect("The node with the given pk is not present for the given prefix/churn");
+        let node = &nodes[node_idx];
+
+        let section = self._get_section_details(prefix, churn_idx);
+        let network_knowledge = self._get_network_knowledge(&section.0, &section.1);
+
+        let sk_share = if matches!(node.2, TestMemberType::Elder) {
+            Some(TestKeys::get_section_key_share(&section.1, node_idx))
+        } else {
+            None
+        };
+
+        let node = self._get_node(
+            prefix,
+            churn_idx,
+            &network_knowledge,
+            &node.0,
+            &node.1,
+            &sk_share,
+        );
+        (node, sk_share)
+    }
+
+    /// Get elder/adult `Dispatcher<MyNode>` instances for a given `Prefix`. The elder_count and adult_count
+    /// should be <= the actual count specified in the SAP. Also return the `SectionKeyShare` for
+    /// elder nodes.
+    ///
+    /// If the Prefix contains multiple churn events (multiple SAPs), provide the churn_idx to get a specific
+    /// SAP, else the latest SAP for the prefix is used.
+    pub(crate) fn get_dispatchers(
+        &self,
+        prefix: Prefix,
+        elder_count: usize,
+        adult_count: usize,
+        churn_idx: Option<usize>,
+    ) -> Vec<(Dispatcher, Option<SectionKeyShare>)> {
+        self.get_nodes(prefix, elder_count, adult_count, churn_idx)
+            .into_iter()
+            .map(|(node, sk_share)| (Dispatcher::new(Arc::new(RwLock::new(node))), sk_share))
+            .collect()
+    }
+
+    /// Retrieve the `mspc::Receiver` for a given node. The receiver will be moved out and will be set to None
+    /// since it does not implement Clone.
+    ///
+    /// Will panic if called more than once for a single node or if the `node_pk` is not part of the `TestNetwork`
+    pub(crate) fn get_comm_rx(&mut self, node_pk: PublicKey) -> Receiver<MsgFromPeer> {
+        match self.receivers.entry(node_pk) {
+            Entry::Vacant(_) => {
+                panic!("Something went wrong, the key must be present in self.receivers")
+            }
+            Entry::Occupied(entry) => {
+                let rx = entry.into_mut().take();
+                rx.expect("The receiver for the node has already been consumed")
+            }
+        }
+    }
+
+    /// Get elder/adult `Peer` for a given `Prefix`. The elder_count and adult_count
+    /// should be <= the actual count specified in the SAP. Also return the `SectionKeyShare` for
+    /// elder nodes.
+    ///
+    /// If the Prefix contains multiple churn events (multiple SAPs), provide the churn_idx to get a specific
+    /// SAP, else the latest SAP for the prefix is used.
+    pub(crate) fn get_peers(
+        &self,
+        prefix: Prefix,
+        elder_count: usize,
+        adult_count: usize,
+        churn_idx: Option<usize>,
+    ) -> Vec<Peer> {
+        let nodes = self._get_node_infos(prefix, churn_idx);
+        let section = self._get_section_details(prefix, churn_idx);
+
+        if elder_count > section.0.elder_count() {
+            panic!("elder_count should be <= {}", section.0.elder_count());
+        }
+        let section_adult_count = section.0.members().count() - section.0.elder_count();
+        if adult_count > section_adult_count {
+            panic!("adult_count should be <= {}", section_adult_count);
+        }
+
+        let elder_iter = nodes.iter().take(elder_count).map(|(node, ..)| node.peer());
+        let adult_iter = nodes
+            .iter()
+            .skip(section.0.elder_count())
+            .map(|(node, ..)| node.peer())
+            .take(adult_count);
+        elder_iter.chain(adult_iter).collect()
+    }
+
     /// Create set of elder, adults nodes
     ///
     /// Optionally provide `age_pattern` to create elders with specific ages.
@@ -558,5 +718,45 @@ impl TestNetwork {
         );
         let comm_rx = BTreeMap::from([(info.public_key(), Some(rx))]);
         (info, comm, comm_rx)
+    }
+
+    fn _get_section_details(
+        &self,
+        prefix: Prefix,
+        churn_idx: Option<usize>,
+    ) -> &(SectionSigned<SectionAuthorityProvider>, SecretKeySet) {
+        let section = self._get_sections_details(prefix);
+        // select the last churn
+        let churn_idx = churn_idx.unwrap_or(section.len() - 1);
+        section
+            .get(churn_idx)
+            .expect("invalid churn idx: {churn_idx}")
+    }
+
+    fn _get_sections_details(
+        &self,
+        prefix: Prefix,
+    ) -> &Vec<(SectionSigned<SectionAuthorityProvider>, SecretKeySet)> {
+        self.sections
+            .get(&prefix)
+            .expect("section not found for {prefix:?}")
+    }
+
+    fn _get_node_infos(
+        &self,
+        prefix: Prefix,
+        churn_idx: Option<usize>,
+    ) -> &Vec<(MyNodeInfo, Comm, TestMemberType)> {
+        let nodes = self._get_nodes_infos(prefix);
+        let churn_idx = churn_idx.unwrap_or(nodes.len() - 1);
+        nodes
+            .get(churn_idx)
+            .expect("invalid churn idx: {churn_idx}")
+    }
+
+    fn _get_nodes_infos(&self, prefix: Prefix) -> &Vec<Vec<(MyNodeInfo, Comm, TestMemberType)>> {
+        self.nodes
+            .get(&prefix)
+            .expect("nodes not found for {prefix:?}")
     }
 }
