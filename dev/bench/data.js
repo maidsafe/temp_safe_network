@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1668715959201,
+  "lastUpdate": 1668737276704,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -28846,6 +28846,144 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 405020663,
             "range": "± 10745629",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "ad2574cb7fad692c2f9924fd87130f0b0bb9e2c2",
+          "message": "Merge #1749\n\n1749: chore(node): Pass around MyNodeState to avoid holding locks r=joshuef a=joshuef\n\nFor longer running message handling, we now pass around the inital MyNodeState. This avoids a tonnnn of read locks and therefore hopefully prevents holding up write and reads needlessly.\r\n\r\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\n\nCo-authored-by: Josh Wilson <joshuef@gmail.com>",
+          "timestamp": "2022-11-18T00:25:32Z",
+          "tree_id": "1bf2470a89160194d8dc464030c60178f0499252",
+          "url": "https://github.com/maidsafe/safe_network/commit/ad2574cb7fad692c2f9924fd87130f0b0bb9e2c2"
+        },
+        "date": 1668737275297,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 1520862,
+            "range": "± 275946",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 127075628,
+            "range": "± 3362848",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 148716909,
+            "range": "± 2661665",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 584799145,
+            "range": "± 8080221",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 102668948,
+            "range": "± 1735049",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 117792173,
+            "range": "± 2563789",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 452367702,
+            "range": "± 3966785",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 60447201,
+            "range": "± 32032606",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2401209432,
+            "range": "± 210329407",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 9297166405,
+            "range": "± 1632560144",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 219386146,
+            "range": "± 9161711",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 2116775513,
+            "range": "± 122667788",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 8091927678,
+            "range": "± 275124323",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 50958900,
+            "range": "± 2749479",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 501258719,
+            "range": "± 19287229",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1915493405,
+            "range": "± 25432448",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 12900381,
+            "range": "± 253240",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 109939385,
+            "range": "± 4726649",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 383475450,
+            "range": "± 9893649",
             "unit": "ns/iter"
           }
         ]
