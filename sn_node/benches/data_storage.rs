@@ -189,7 +189,7 @@ fn bench_data_storage_reads(c: &mut Criterion) -> Result<()> {
 
     for size in &size_ranges {
         group.bench_with_input(BenchmarkId::new("chunk keys", size), size, |b, &size| {
-            let mut storage = get_new_data_store()
+            let storage = get_new_data_store()
                 .context("Could not create a temp data store")
                 .unwrap();
 

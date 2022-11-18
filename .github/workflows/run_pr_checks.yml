@@ -191,7 +191,7 @@ jobs:
 
       - name: Run client tests
         env:
-          RUST_LOG: "sn_client=trace,qp2p=debug"
+          RUST_LOG: "sn_client,sn_interface"
         run: cd sn_client && cargo test --release --features check-replicas -- --test-threads=1
         timeout-minutes: 50
 
@@ -454,7 +454,7 @@ jobs:
         run: ./target/release/testnet --interval 30000
         id: section-startup
         env:
-          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
+          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction,sn_interface"
 
       - name: Wait for all nodes to join
         shell: bash
@@ -467,7 +467,7 @@ jobs:
 
       - name: Run API tests
         env:
-          RUST_LOG: "sn_client=trace"
+          RUST_LOG: "sn_client,sn_interface"
         run: cd sn_api && cargo test --release --features check-replicas -- --test-threads=1
         timeout-minutes: 30
 
@@ -558,7 +558,7 @@ jobs:
         run: ./target/release/testnet --interval 30000
         id: section-startup
         env:
-          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
+          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction,sn_interface"
 
       - name: Wait for all nodes to join
         shell: bash

@@ -88,7 +88,8 @@ impl NodeTestApi {
 
     /// Returns the info about the section matching the name.
     pub async fn matching_section(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
-        self.node.read().await.matching_section(name)
+        let context = &self.node.read().await.context();
+        context.section_sap_matching_name(name)
     }
 
     /// Send a system msg.

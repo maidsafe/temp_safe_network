@@ -6,12 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::node::core::NodeContext;
 use crate::node::{
     flow_ctrl::cmds::Cmd, messaging::Peers, Error, Event, MembershipEvent, MyNode, Result,
-    StateSnapshot,
 };
-
 use bls::PublicKey as BlsPublicKey;
+use itertools::Itertools;
 use qp2p::{SendStream, UsrMsgBytes};
 use sn_interface::{
     messaging::{
@@ -22,13 +22,14 @@ use sn_interface::{
     types::{log_markers::LogMarker, Peer, PublicKey},
 };
 use std::{collections::BTreeSet, sync::Arc};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use xor_name::{Prefix, XorName};
 
 impl MyNode {
     /// Send `AntiEntropy` update message to all nodes in our own section.
     pub(crate) fn send_ae_update_to_our_section(&self) -> Result<Option<Cmd>> {
         let our_name = self.info().name();
+        let context = &self.context();
         let recipients: BTreeSet<_> = self
             .network_knowledge
             .section_members()
@@ -47,7 +48,9 @@ impl MyNode {
         match self.section_chain().get_parent_key(&leaf) {
             Ok(prev_pk) => {
                 let prev_pk = prev_pk.unwrap_or(*self.section_chain().genesis_key());
-                Ok(Some(self.send_ae_update_to_nodes(recipients, prev_pk)))
+                Ok(Some(MyNode::send_ae_update_to_nodes(
+                    context, recipients, prev_pk,
+                )))
             }
             Err(_) => {
                 error!("SectionsDAG fields went out of sync");
@@ -58,21 +61,25 @@ impl MyNode {
 
     /// Send `AntiEntropy` update message to the specified nodes.
     pub(crate) fn send_ae_update_to_nodes(
-        &self,
+        context: &NodeContext,
         recipients: BTreeSet<Peer>,
         section_pk: BlsPublicKey,
     ) -> Cmd {
-        let members = self.network_knowledge.section_signed_members();
+        let members = context.network_knowledge.section_signed_members();
 
-        let ae_msg = self.generate_ae_msg(Some(section_pk), AntiEntropyKind::Update { members });
+        let ae_msg = MyNode::generate_ae_msg(
+            context,
+            Some(section_pk),
+            AntiEntropyKind::Update { members },
+        );
 
-        self.send_system_msg(ae_msg, Peers::Multiple(recipients))
+        MyNode::send_system_msg(ae_msg, Peers::Multiple(recipients))
     }
 
     /// Send `MetadataExchange` packet to the specified nodes
     pub(crate) fn send_metadata_updates(&self, recipients: BTreeSet<Peer>, prefix: &Prefix) -> Cmd {
         let metadata = self.get_metadata_of(prefix);
-        self.send_system_msg(
+        MyNode::send_system_msg(
             NodeMsg::NodeCmd(NodeCmd::ReceiveMetadata { metadata }),
             Peers::Multiple(recipients),
         )
@@ -82,18 +89,18 @@ impl MyNode {
     /// Send AntiEntropy update message to the nodes in our sibling section.
     pub(crate) fn send_updates_to_sibling_section(
         &self,
-        our_prev_state: &StateSnapshot,
+        prev_context: &NodeContext,
     ) -> Result<Vec<Cmd>> {
         debug!("{}", LogMarker::AeSendUpdateToSiblings);
-        let sibling_prefix = self.network_knowledge.prefix().sibling();
-        if let Some(sibling_sap) = self
+        let sibling_prefix = prev_context.network_knowledge.prefix().sibling();
+        if let Some(sibling_sap) = prev_context
             .network_knowledge
             .section_tree()
             .get_signed(&sibling_prefix)
         {
             let promoted_sibling_elders: BTreeSet<_> = sibling_sap
                 .elders()
-                .filter(|peer| !our_prev_state.elders.contains(&peer.name()))
+                .filter(|peer| !prev_context.network_knowledge.elders().contains(peer))
                 .cloned()
                 .collect();
 
@@ -104,14 +111,18 @@ impl MyNode {
 
             // Using previous_key as dst_section_key as newly promoted
             // sibling Elders shall still in the state of pre-split.
-            let previous_section_key = our_prev_state.section_key;
+            let previous_section_key = prev_context.network_knowledge.section_key();
             let sibling_prefix = sibling_sap.prefix();
 
             let mut cmds =
                 vec![self.send_metadata_updates(promoted_sibling_elders.clone(), &sibling_prefix)];
 
             // Also send AE update to sibling section's new Elders
-            cmds.push(self.send_ae_update_to_nodes(promoted_sibling_elders, previous_section_key));
+            cmds.push(MyNode::send_ae_update_to_nodes(
+                prev_context,
+                promoted_sibling_elders,
+                previous_section_key,
+            ));
 
             Ok(cmds)
         } else {
@@ -122,20 +133,21 @@ impl MyNode {
 
     // Private helper to generate AntiEntropy message to update
     // a peer abot our SAP, with proof_chain and members list.
-    fn generate_ae_msg(
-        &self,
+    pub(crate) fn generate_ae_msg(
+        context: &NodeContext,
         dst_section_key: Option<BlsPublicKey>,
         kind: AntiEntropyKind,
     ) -> NodeMsg {
-        let signed_sap = self.network_knowledge.signed_sap();
+        let signed_sap = context.network_knowledge.signed_sap();
 
         let proof_chain = dst_section_key
             .and_then(|key| {
-                self.network_knowledge
+                context
+                    .network_knowledge
                     .get_proof_chain_to_current_section(&key)
                     .ok()
             })
-            .unwrap_or_else(|| self.network_knowledge.section_chain());
+            .unwrap_or_else(|| context.network_knowledge.section_chain());
 
         let section_tree_update = SectionTreeUpdate::new(signed_sap, proof_chain);
 
@@ -185,12 +197,13 @@ impl MyNode {
 
     #[instrument(skip_all)]
     pub(crate) async fn handle_anti_entropy_msg(
-        &mut self,
+        node: Arc<RwLock<MyNode>>,
         section_tree_update: SectionTreeUpdate,
         kind: AntiEntropyKind,
         sender: Peer,
     ) -> Result<Vec<Cmd>> {
-        let snapshot = self.state_snapshot();
+        debug!("[NODE READ]: handling AE read gottt...");
+        let starting_context = node.read().await.context();
         let sap = section_tree_update.signed_sap.value.clone();
 
         let members = if let AntiEntropyKind::Update { members } = kind.clone() {
@@ -199,30 +212,51 @@ impl MyNode {
             None
         };
 
-        let updated = self.update_network_knowledge(section_tree_update, members)?;
+        // block off the write lock
+        let (updated, mut cmds) = {
+            let mut write_locked_node = node.write().await;
+            debug!("[NODE WRITE]: handling AE write gottt...");
+            let updated =
+                write_locked_node.update_network_knowledge(section_tree_update, members)?;
 
-        // always run this, only changes will trigger events
-        let mut cmds = self.update_on_elder_change(&snapshot)?;
+            debug!("net knowledge udpated");
+            // always run this, only changes will trigger events
+            let cmds = write_locked_node.update_on_elder_change(&starting_context)?;
+            debug!("updated for elder change");
 
+            (updated, cmds)
+        };
+
+        let latest_context = node.read().await.context();
         // Only trigger reorganize data when there is a membership change happens.
-        if updated && self.is_not_elder() {
+        if updated && !latest_context.is_elder {
             // only done if adult, since as an elder we dont want to get any more
             // data for our name (elders will eventually be caching data in general)
-            cmds.push(self.ask_for_any_new_data().await);
+            cmds.push(MyNode::ask_for_any_new_data(&latest_context).await);
         }
 
         if updated {
-            self.write_section_tree();
+            MyNode::write_section_tree(&latest_context);
             let prefix = sap.prefix();
             info!("SectionTree written to disk with update for prefix {prefix:?}");
 
             // check if we've been kicked out of the section
-            if snapshot.members.contains(&self.name())
-                && !self.state_snapshot().members.contains(&self.name())
+            if starting_context
+                .network_knowledge
+                .members()
+                .iter()
+                .map(|m| m.name())
+                .contains(&latest_context.name)
+                && !latest_context
+                    .network_knowledge
+                    .members()
+                    .iter()
+                    .map(|m| m.name())
+                    .contains(&latest_context.name)
             {
                 error!("Detected that we've been removed from the section");
                 // move off thread to keep fn sync
-                let event_sender = self.event_sender.clone();
+                let event_sender = starting_context.event_sender.clone();
                 let _handle = tokio::spawn(async move {
                     event_sender
                         .send(Event::Membership(MembershipEvent::RemovedFromSection))
@@ -231,13 +265,17 @@ impl MyNode {
 
                 return Err(Error::RemovedFromSection);
             }
+        } else {
+            debug!("No update to network knowledge");
         }
 
         // Check if we need to resend any messsages and who should we send it to.
         let (bounced_msg, response_peer) = match kind {
             AntiEntropyKind::Update { .. } => {
                 // log the msg as received. Elders track this for other elders in dysfunction
-                self.dysfunction_tracking
+                node.write()
+                    .await
+                    .dysfunction_tracking
                     .ae_update_msg_received(&sender.name());
                 return Ok(cmds);
             } // Nope, bail early
@@ -282,16 +320,22 @@ impl MyNode {
             error!("Dropping bounced msg ({sender:?}) received in AE-Retry from {msg_id:?} as suggested new dst section key is the same as previously sent: {:?}", sap.section_key());
             return Ok(cmds);
         }
+
         trace!("Resend Original {msg_id:?} to {response_peer:?} with {msg_to_resend:?}");
-        cmds.push(self.send_system_msg(msg_to_resend, Peers::Single(response_peer)));
+        trace!("{}", LogMarker::AeResendAfterRedirect);
+
+        cmds.push(MyNode::send_system_msg(
+            msg_to_resend,
+            Peers::Single(response_peer),
+        ));
         Ok(cmds)
     }
 
     // If entropy is found, determine the msg to send in order to
     // bring the sender's knowledge about us up to date.
     pub(crate) fn check_for_entropy(
-        &self,
         wire_msg: &WireMsg,
+        context: &NodeContext,
         dst_section_key: &BlsPublicKey,
         dst_name: XorName,
         sender: &Peer,
@@ -299,15 +343,18 @@ impl MyNode {
     ) -> Result<Option<Cmd>> {
         // Check if the message has reached the correct section,
         // if not, we'll need to respond with AE
-        let our_prefix = self.network_knowledge.prefix();
+
+        let our_prefix = context.network_knowledge.prefix();
+        let our_section_key = context.network_knowledge.section_key();
         let msg_id = wire_msg.msg_id();
         // Let's try to find a section closer to the destination, if it's not for us.
-        if !self.network_knowledge.prefix().matches(&dst_name) {
+        if !context.network_knowledge.prefix().matches(&dst_name) {
+            let closest_sap = context.network_knowledge.closest_signed_sap(&dst_name);
             debug!(
                 "AE: {msg_id:?} prefix not matching. We are: {:?}, they sent to: {:?}",
                 our_prefix, dst_name
             );
-            return match self.network_knowledge.closest_signed_sap(&dst_name) {
+            return match closest_sap {
                 Some((signed_sap, proof_chain)) => {
                     info!(
                         "{msg_id:?} Found a better matching prefix {:?}",
@@ -356,21 +403,21 @@ impl MyNode {
             };
         }
 
-        let section_key = self.network_knowledge.section_key();
         trace!(
             "Performing AE checks on {msg_id:?}, provided pk was: {:?} ours is: {:?}",
             dst_section_key,
-            section_key
+            our_section_key
         );
 
-        if dst_section_key == &section_key {
+        if dst_section_key == &our_section_key {
             // Destination section key matches our current section key
             return Ok(None);
         }
 
         let bounced_msg = wire_msg.serialize()?;
 
-        let ae_msg = self.generate_ae_msg(
+        let ae_msg = MyNode::generate_ae_msg(
+            context,
             Some(*dst_section_key),
             AntiEntropyKind::Retry { bounced_msg },
         );
@@ -393,25 +440,33 @@ impl MyNode {
         }
     }
 
-    // Generate an AE redirect cmd for the given message
+    /// Generate an AE redirect response and send to the client on the provided stream.
+    /// This moves the rest of the operation onto a new thread to not block the dispatcher
     pub(crate) async fn ae_redirect_client_to_our_elders(
-        &self,
+        ae_msg: NodeMsg,
+        context: NodeContext,
         sender: Peer,
         client_response_stream: Arc<Mutex<SendStream>>,
-        bounced_msg: UsrMsgBytes,
+        _bounced_msg: UsrMsgBytes,
     ) -> Result<()> {
         trace!(
             "{} in ae_redirect to elders for {sender:?} ",
             LogMarker::AeSendRedirect
         );
 
-        let ae_msg = self.generate_ae_msg(None, AntiEntropyKind::Redirect { bounced_msg });
-        let (kind, payload) = self.serialize_node_msg(ae_msg)?;
+        let (kind, payload) = MyNode::serialize_node_msg(context.name, ae_msg)?;
 
         let msg_id = MsgId::new();
 
-        self.send_msg_on_stream(payload, kind, client_response_stream, Some(sender), msg_id)
-            .await
+        MyNode::send_msg_on_stream(
+            context.network_knowledge.section_key(),
+            payload,
+            kind,
+            client_response_stream,
+            Some(sender),
+            msg_id,
+        )
+        .await
     }
 }
 
@@ -451,9 +506,10 @@ mod tests {
         let dst_name = our_prefix.substituted_in(xor_name::rand::random());
         let dst_section_key = env.node.network_knowledge().section_key();
 
-        let cmd = env
-            .node
-            .check_for_entropy(&msg, &dst_section_key, dst_name, &sender, None)?;
+        let context = env.node.context();
+
+        let cmd =
+            MyNode::check_for_entropy(&msg, &context, &dst_section_key, dst_name, &sender, None)?;
 
         assert!(cmd.is_none());
         Ok(())
@@ -472,10 +528,16 @@ mod tests {
         // since it's not aware of the other prefix, it will redirect to self
         let dst_section_key = other_pk;
         let dst_name = env.other_signed_sap.prefix().name();
+        let context = env.node.context();
 
-        let cmd = env
-            .node
-            .check_for_entropy(&wire_msg, &dst_section_key, dst_name, &sender, None);
+        let cmd = MyNode::check_for_entropy(
+            &wire_msg,
+            &context,
+            &dst_section_key,
+            dst_name,
+            &sender,
+            None,
+        );
 
         let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg, .. })) => {
             msg
@@ -492,11 +554,17 @@ mod tests {
             .node
             .update_network_knowledge(section_tree_update, None,)?);
 
+        let new_context = env.node.context();
         // and it now shall give us an AE redirect msg
         // with the SAP we inserted for other prefix
-        let cmd = env
-            .node
-            .check_for_entropy(&wire_msg, &dst_section_key, dst_name, &sender, None);
+        let cmd = MyNode::check_for_entropy(
+            &wire_msg,
+            &new_context,
+            &dst_section_key,
+            dst_name,
+            &sender,
+            None,
+        );
 
         let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg, .. })) => {
             msg
@@ -512,15 +580,14 @@ mod tests {
     async fn ae_outdated_dst_key_of_our_section() -> Result<()> {
         let env = Env::new().await?;
         let our_prefix = env.node.network_knowledge().prefix();
-
+        let context = env.node.context();
         let msg = env.create_msg(&our_prefix, env.node.network_knowledge().section_key())?;
         let sender = env.node.info().peer();
         let dst_name = our_prefix.substituted_in(xor_name::rand::random());
         let dst_section_key = env.node.network_knowledge().genesis_key();
 
-        let cmd = env
-            .node
-            .check_for_entropy(&msg, dst_section_key, dst_name, &sender, None)?;
+        let cmd =
+            MyNode::check_for_entropy(&msg, &context, dst_section_key, dst_name, &sender, None)?;
 
         let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg, .. }) => {
             msg
@@ -544,10 +611,10 @@ mod tests {
 
         let bogus_env = Env::new().await?;
         let dst_section_key = bogus_env.node.network_knowledge().genesis_key();
+        let context = env.node.context();
 
-        let cmd = env
-            .node
-            .check_for_entropy(&msg, dst_section_key, dst_name, &sender, None)?;
+        let cmd =
+            MyNode::check_for_entropy(&msg, &context, dst_section_key, dst_name, &sender, None)?;
 
         let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg, .. }) => {
             msg
