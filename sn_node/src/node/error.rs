@@ -14,7 +14,7 @@ use sn_dbc::Error as DbcError;
 use sn_interface::{
     messaging::data::{DataQuery, Error as ErrorMsg},
     messaging::system::DkgSessionId,
-    types::{convert_dt_error_to_error_msg, DataAddress, Peer},
+    types::{DataAddress, Peer},
 };
 
 use ed25519::Signature;
@@ -254,7 +254,7 @@ impl From<Error> for ErrorMsg {
             Error::SpentProofUnknownSectionKey(unknown_section_key) => {
                 ErrorMsg::SpentProofUnknownSectionKey(unknown_section_key)
             }
-            Error::NetworkData(error) => convert_dt_error_to_error_msg(error),
+            Error::NetworkData(error) => error.into(),
             other => {
                 ErrorMsg::InvalidOperation(format!("Failed to perform operation: {:?}", other))
             }

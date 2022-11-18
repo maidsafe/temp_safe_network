@@ -142,9 +142,12 @@ impl Register {
     // Private helper to check the given Entry's size is within define limit,
     // as well as check the Register hasn't already reached the maximum number of entries.
     fn check_entry_and_reg_sizes(&self, entry: &Entry) -> Result<()> {
-        let entry_size = entry.len();
-        if entry_size > MAX_REG_ENTRY_SIZE {
-            return Err(Error::EntryTooBig(entry_size, MAX_REG_ENTRY_SIZE));
+        let size = entry.len();
+        if size > MAX_REG_ENTRY_SIZE {
+            return Err(Error::EntryTooBig {
+                size,
+                max: MAX_REG_ENTRY_SIZE,
+            });
         }
 
         let reg_size = self.crdt.size();
