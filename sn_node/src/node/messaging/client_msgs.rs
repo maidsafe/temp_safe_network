@@ -6,7 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result};
+use crate::node::{core::NodeContext, flow_ctrl::cmds::Cmd, Error, MyNode, Result};
+
 use bytes::Bytes;
 
 use qp2p::SendStream;
@@ -39,8 +40,8 @@ use xor_name::XorName;
 
 impl MyNode {
     /// Forms a `QueryError` msg to send back to the client on a stream
-    pub(crate) async fn query_error_response(
-        &self,
+    pub(crate) async fn send_query_error_response_on_stream(
+        context: NodeContext,
         error: Error,
         query: &DataQueryVariant,
         source_peer: Peer,
@@ -52,9 +53,10 @@ impl MyNode {
             correlation_id,
         };
 
-        let (kind, payload) = self.serialize_client_msg_response(the_error_msg)?;
+        let (kind, payload) = MyNode::serialize_client_msg_response(context.name, the_error_msg)?;
 
-        self.send_msg_on_stream(
+        MyNode::send_msg_on_stream(
+            context.network_knowledge.section_key(),
             payload,
             kind,
             send_stream,
@@ -66,7 +68,7 @@ impl MyNode {
 
     /// Forms a `CmdError` msg to send back to the client over the response stream
     pub(crate) async fn send_cmd_error_response_over_stream(
-        &self,
+        context: &NodeContext,
         cmd: DataCmd,
         error: Error,
         correlation_id: MsgId,
@@ -77,10 +79,11 @@ impl MyNode {
             correlation_id,
         };
 
-        let (kind, payload) = self.serialize_client_msg_response(client_msg)?;
+        let (kind, payload) = MyNode::serialize_client_msg_response(context.name, client_msg)?;
 
         debug!("{correlation_id:?} sending cmd response error back to client");
-        self.send_msg_on_stream(
+        MyNode::send_msg_on_stream(
+            context.network_knowledge.section_key(),
             payload,
             kind,
             send_stream,
@@ -93,7 +96,7 @@ impl MyNode {
     /// Handle data query
     #[allow(clippy::too_many_arguments)]
     pub(crate) async fn handle_data_query_at_adult(
-        &self,
+        context: &NodeContext,
         operation_id: OperationId,
         query: &DataQueryVariant,
         auth: ClientAuth,
@@ -101,7 +104,7 @@ impl MyNode {
         msg_id: MsgId,
         send_stream: Option<Arc<Mutex<SendStream>>>,
     ) -> Result<()> {
-        let response = self
+        let response = context
             .data_storage
             .query(query, User::Key(auth.public_key))
             .await;
@@ -112,10 +115,15 @@ impl MyNode {
             operation_id,
         };
 
-        let (kind, payload) = self.serialize_node_msg(msg)?;
+        let (kind, payload) = MyNode::serialize_node_msg(context.name, msg)?;
 
-        let bytes =
-            self.form_usr_msg_bytes_to_node(payload, kind, Some(requesting_elder), msg_id)?;
+        let bytes = MyNode::form_usr_msg_bytes_to_node(
+            context.network_knowledge.section_key(),
+            payload,
+            kind,
+            Some(requesting_elder),
+            msg_id,
+        )?;
 
         if let Some(send_stream) = send_stream {
             // send response on the stream
@@ -141,34 +149,31 @@ impl MyNode {
         Ok(())
     }
 
-    /// Handle incoming client msgs. Though NOT queries, as this requires
-    /// mutable access to the Node
+    /// Handle incoming client msgs.
     pub(crate) async fn handle_valid_client_msg(
-        &self,
+        context: NodeContext,
         msg_id: MsgId,
         msg: ClientMsg,
         auth: AuthorityProof<ClientAuth>,
         origin: Peer,
         send_stream: Arc<Mutex<SendStream>>,
     ) -> Result<Vec<Cmd>> {
-        if !self.is_elder() {
-            warn!("could not handle valid as not elder");
-            return Ok(vec![]);
-        }
+        debug!("Handling client {msg_id:?}");
+
         trace!("{:?}: {:?} ", LogMarker::ClientMsgToBeHandled, msg);
 
         let cmd = match msg {
             ClientMsg::Cmd(cmd) => cmd,
             ClientMsg::Query(query) => {
-                return self
-                    .read_data_from_adult_and_respond_to_client(
-                        query,
-                        msg_id,
-                        auth,
-                        origin,
-                        send_stream,
-                    )
-                    .await
+                return MyNode::read_data_from_adult_and_respond_to_client(
+                    context,
+                    query,
+                    msg_id,
+                    auth,
+                    origin,
+                    send_stream,
+                )
+                .await
             }
         };
 
@@ -210,7 +215,7 @@ impl MyNode {
                     };
                     return Ok(vec![update_command]);
                 }
-                self.extract_contents_as_replicated_data(cmd)
+                MyNode::extract_contents_as_replicated_data(&context, cmd)
             }
         };
 
@@ -218,8 +223,14 @@ impl MyNode {
             Ok(data) => data,
             Err(error) => {
                 debug!("Will send error response back to client");
-                self.send_cmd_error_response_over_stream(cmd, error, msg_id, send_stream)
-                    .await?;
+                MyNode::send_cmd_error_response_over_stream(
+                    &context,
+                    cmd,
+                    error,
+                    msg_id,
+                    send_stream,
+                )
+                .await?;
 
                 return Ok(vec![]);
             }
@@ -228,13 +239,13 @@ impl MyNode {
         trace!("{:?}: {:?}", LogMarker::DataStoreReceivedAtElder, data);
 
         let cmds = vec![];
-        let targets = self.target_data_holders(data.name());
+        let targets = MyNode::target_data_holders(&context, data.name());
 
         // make sure the expected replication factor is achieved
         if data_copy_count() > targets.len() {
             error!("InsufficientAdults for storing data reliably");
             let error = Error::InsufficientAdults {
-                prefix: self.network_knowledge().prefix(),
+                prefix: context.network_knowledge.prefix(),
                 expected: data_copy_count() as u8,
                 found: targets.len() as u8,
             };
@@ -242,7 +253,7 @@ impl MyNode {
             debug!("Will send error response back to client");
 
             // TODO: Use response stream here. This wont work anymore!
-            self.send_cmd_error_response_over_stream(cmd, error, msg_id, send_stream)
+            MyNode::send_cmd_error_response_over_stream(&context, cmd, error, msg_id, send_stream)
                 .await?;
             return Ok(vec![]);
         }
@@ -250,8 +261,15 @@ impl MyNode {
         // the replication msg sent to adults
         // cmds here may be dysfunction tracking.
         // CmdAcks are sent over the send stream herein
-        self.replicate_data_to_adults_and_ack_to_client(cmd, data, msg_id, targets, send_stream)
-            .await?;
+        MyNode::replicate_data_to_adults_and_ack_to_client(
+            &context,
+            cmd,
+            data,
+            msg_id,
+            targets,
+            send_stream,
+        )
+        .await?;
 
         // TODO: handle failed responses
         // cmds.extend();
@@ -260,7 +278,10 @@ impl MyNode {
     }
 
     // helper to extract the contents of the cmd as ReplicatedData
-    fn extract_contents_as_replicated_data(&self, cmd: SpentbookCmd) -> Result<ReplicatedData> {
+    fn extract_contents_as_replicated_data(
+        context: &NodeContext,
+        cmd: SpentbookCmd,
+    ) -> Result<ReplicatedData> {
         let SpentbookCmd::Spend {
             key_image,
             tx,
@@ -271,15 +292,20 @@ impl MyNode {
 
         info!("Processing spend request for key image: {:?}", key_image);
 
-        let spent_proof_share =
-            self.gen_spent_proof_share(&key_image, &tx, &spent_proofs, &spent_transactions)?;
-        let reg_cmd = self.gen_register_cmd(&key_image, &spent_proof_share)?;
+        let spent_proof_share = MyNode::gen_spent_proof_share(
+            context,
+            &key_image,
+            &tx,
+            &spent_proofs,
+            &spent_transactions,
+        )?;
+        let reg_cmd = MyNode::gen_register_cmd(context, &key_image, &spent_proof_share)?;
         Ok(ReplicatedData::SpentbookWrite(reg_cmd))
     }
 
     /// Generate a spent proof share from the information provided by the client.
     fn gen_spent_proof_share(
-        &self,
+        context: &NodeContext,
         key_image: &KeyImage,
         tx: &RingCtTransaction,
         spent_proofs: &BTreeSet<SpentProof>,
@@ -304,7 +330,7 @@ impl MyNode {
 
         // Verify each spent proof is signed by a known section key (or the genesis key).
         for pk in &spent_proofs_keys {
-            if !self.network_knowledge.verify_section_key_is_known(pk) {
+            if !context.network_knowledge.verify_section_key_is_known(pk) {
                 warn!(
                     "Dropping spend request: spent proof is signed by unknown section with public \
                     key {:?}",
@@ -348,8 +374,8 @@ impl MyNode {
         let spent_proof_share = build_spent_proof_share(
             key_image,
             tx,
-            &self.network_knowledge.section_auth(),
-            &self.section_keys_provider,
+            &context.network_knowledge.section_auth(),
+            &context.section_keys_provider,
             public_commitments,
         )?;
         Ok(spent_proof_share)
@@ -358,7 +384,7 @@ impl MyNode {
     /// Generate the RegisterCmd to write the SpentProofShare as an entry in the Spentbook
     /// (Register).
     fn gen_register_cmd(
-        &self,
+        context: &NodeContext,
         key_image: &KeyImage,
         spent_proof_share: &SpentProofShare,
     ) -> Result<RegisterCmd> {
@@ -366,7 +392,7 @@ impl MyNode {
         let _ = permissions.insert(User::Anyone, Permissions::new(true));
 
         // use our own keypair for generating the register command
-        let own_keypair = Keypair::Ed25519(self.info().keypair);
+        let own_keypair = Keypair::Ed25519(context.keypair.clone());
         let owner = User::Key(own_keypair.public_key());
         let policy = Policy { owner, permissions };
 

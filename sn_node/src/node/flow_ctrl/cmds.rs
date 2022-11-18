@@ -6,17 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{
-    messaging::{OutgoingMsg, Peers},
-    Proposal, XorName,
-};
+use crate::node::{messaging::Peers, Proposal, XorName};
 
 use qp2p::SendStream;
 use sn_consensus::Decision;
 use sn_dysfunction::IssueType;
 use sn_interface::{
     messaging::{
-        data::ClientMsg,
+        data::{ClientMsg, StorageLevel},
         system::{NodeMsg, SectionSig, SectionSigned},
         AuthorityProof, ClientAuth, MsgId, WireMsg,
     },
@@ -61,6 +58,8 @@ pub(crate) enum Cmd {
         wire_msg: WireMsg,
         send_stream: Option<Arc<Mutex<SendStream>>>,
     },
+    /// Update our own storage level
+    SetStorageLevel(StorageLevel),
     /// Log a Node's Punishment, this pulls dysfunction and write locks out of some functions
     TrackNodeIssueInDysfunction { name: XorName, issue: IssueType },
     HandleValidNodeMsg {
@@ -107,7 +106,7 @@ pub(crate) enum Cmd {
     },
     /// Performs serialisation and signing and sends the msg.
     SendMsg {
-        msg: OutgoingMsg,
+        msg: NodeMsg,
         msg_id: MsgId,
         recipients: Peers,
         send_stream: Option<Arc<Mutex<SendStream>>>,
@@ -117,7 +116,7 @@ pub(crate) enum Cmd {
 }
 
 impl Cmd {
-    pub(crate) fn send_msg(msg: OutgoingMsg, recipients: Peers) -> Self {
+    pub(crate) fn send_msg(msg: NodeMsg, recipients: Peers) -> Self {
         let msg_id = MsgId::new();
         debug!("Sending msg {msg_id:?} {msg:?}");
         Cmd::SendMsg {
@@ -129,7 +128,7 @@ impl Cmd {
     }
 
     pub(crate) fn send_msg_via_response_stream(
-        msg: OutgoingMsg,
+        msg: NodeMsg,
         recipients: Peers,
         send_stream: Option<Arc<Mutex<SendStream>>>,
     ) -> Self {
@@ -145,6 +144,7 @@ impl Cmd {
         use sn_interface::statemap::State;
         match self {
             Cmd::SendMsg { .. } => State::Comms,
+            Cmd::SetStorageLevel { .. } => State::Node,
             Cmd::HandleFailedSendToNode { .. } => State::Comms,
             Cmd::ValidateMsg { .. } => State::Validation,
             Cmd::HandleValidNodeMsg { msg, .. } => msg.statemap_states(),
@@ -163,6 +163,10 @@ impl Cmd {
 impl fmt::Display for Cmd {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            #[cfg(not(feature = "test-utils"))]
+            Cmd::SetStorageLevel(level) => {
+                write!(f, "SetStorageLevel {:?}", level)
+            }
             #[cfg(not(feature = "test-utils"))]
             Cmd::ValidateMsg { wire_msg, .. } => {
                 write!(f, "ValidateMsg {:?}", wire_msg.msg_id())

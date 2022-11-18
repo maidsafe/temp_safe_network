@@ -37,7 +37,9 @@ use xor_name::XorName;
 
 const BIT_TREE_DEPTH: usize = 20;
 
-/// Operations on data.
+/// Operations on data stored to disk.
+/// As data the storage struct may be cloned throughoout the node
+/// Operations here must be persisted to disk.
 #[derive(Debug, Clone)]
 // exposed as pub due to benches
 pub struct DataStorage {
@@ -58,10 +60,16 @@ impl DataStorage {
         })
     }
 
+    /// Update the storage level on data storage
+    /// (To avoid needing a write lock for general storage ops, we separate out this state operation)
+    pub fn set_storage_level(&mut self, new_level: StorageLevel) {
+        self.last_recorded_level = new_level;
+    }
+
     /// Store data in the local store
     #[instrument(skip(self))]
     pub async fn store(
-        &mut self,
+        &self,
         data: &ReplicatedData,
         section_pk: PublicKey,
         node_keypair: Keypair,
@@ -94,7 +102,6 @@ impl DataStorage {
             // every level represents 10 percentage points
             if used_space_level as u8 >= next_level.value() {
                 debug!("Next level for storage has been reached");
-                self.last_recorded_level = next_level;
                 return Ok(Some(next_level));
             }
         }
@@ -337,7 +344,7 @@ mod tests {
         let used_space = UsedSpace::new(usize::MAX);
 
         // Create instance
-        let mut storage = DataStorage::new(path, used_space)?;
+        let storage = DataStorage::new(path, used_space)?;
 
         // 5mb random data chunk
         let bytes = random_bytes(5 * 1024 * 1024);
@@ -376,7 +383,7 @@ mod tests {
         let used_space = UsedSpace::new(usize::MAX);
 
         // Create instance
-        let mut storage = DataStorage::new(path, used_space)?;
+        let storage = DataStorage::new(path, used_space)?;
 
         // create reg cmd
 

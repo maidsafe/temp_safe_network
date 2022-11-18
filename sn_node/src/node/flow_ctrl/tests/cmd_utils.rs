@@ -1,8 +1,4 @@
-use crate::node::{
-    flow_ctrl::dispatcher::Dispatcher,
-    messaging::{OutgoingMsg, Peers},
-    Cmd,
-};
+use crate::node::{flow_ctrl::dispatcher::Dispatcher, messaging::Peers, Cmd};
 use assert_matches::assert_matches;
 use eyre::eyre;
 use eyre::Result;
@@ -48,9 +44,7 @@ pub(crate) async fn handle_online_cmd(
     for cmd in all_cmds {
         let (msg, recipients) = match cmd {
             Cmd::SendMsg {
-                recipients,
-                msg: OutgoingMsg::Node(msg),
-                ..
+                recipients, msg, ..
             } => (msg, recipients),
             _ => continue,
         };
@@ -190,18 +184,16 @@ impl Cmd {
     pub(crate) fn get_replicated_data(&self) -> Result<ReplicatedData> {
         match self {
             Cmd::SendMsg { msg, .. } => match msg {
-                OutgoingMsg::Node(sys_msg) => match sys_msg {
-                    NodeMsg::NodeCmd(node_cmd) => match node_cmd {
-                        NodeCmd::ReplicateData(data) => {
-                            if data.len() != 1 {
-                                return Err(eyre!("Only 1 replicated data instance is expected"));
-                            }
-                            Ok(data[0].clone())
+                NodeMsg::NodeCmd(node_cmd) => match node_cmd {
+                    NodeCmd::ReplicateData(data) => {
+                        if data.len() != 1 {
+                            return Err(eyre!("Only 1 replicated data instance is expected"));
                         }
-                        _ => Err(eyre!("A NodeCmd::ReplicateData variant was expected")),
-                    },
-                    _ => Err(eyre!("An NodeMsg::NodeCmd variant was expected")),
+                        Ok(data[0].clone())
+                    }
+                    _ => Err(eyre!("A NodeCmd::ReplicateData variant was expected")),
                 },
+                _ => Err(eyre!("An NodeMsg::NodeCmd variant was expected")),
             },
             _ => Err(eyre!("A Cmd::SendMsg variant was expected")),
         }

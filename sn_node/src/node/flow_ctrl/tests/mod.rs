@@ -19,7 +19,7 @@ use crate::{
         core::MyNode,
         flow_ctrl::{dispatcher::Dispatcher, event_channel},
         messages::WireMsgUtils,
-        messaging::{OutgoingMsg, Peers},
+        messaging::Peers,
         Cmd, Error, Event, MembershipEvent, Proposal,
     },
     storage::UsedSpace,
@@ -224,9 +224,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     for cmd in cmds {
         let (msg, recipients) = match cmd {
             Cmd::SendMsg {
-                recipients,
-                msg: OutgoingMsg::Node(msg),
-                ..
+                recipients, msg, ..
             } => (msg, recipients),
             _ => continue,
         };
@@ -626,10 +624,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
 
     for cmd in cmds {
         let msg = match cmd {
-            Cmd::SendMsg {
-                msg: OutgoingMsg::Node(msg),
-                ..
-            } => msg,
+            Cmd::SendMsg { msg, .. } => msg,
             _ => continue,
         };
 
@@ -675,10 +670,7 @@ async fn msg_to_self() -> Result<()> {
 
     // don't use the cmd collection fn, as it skips Cmd::SendMsg
     let cmds = dispatcher
-        .process_cmd(Cmd::send_msg(
-            OutgoingMsg::Node(node_msg.clone()),
-            Peers::Single(info.peer()),
-        ))
+        .process_cmd(Cmd::send_msg(node_msg.clone(), Peers::Single(info.peer())))
         .await?;
 
     assert!(cmds.is_empty());
@@ -796,7 +788,7 @@ async fn handle_elders_update() -> Result<()> {
     for cmd in cmds {
         let (msg, recipients) = match cmd {
             Cmd::SendMsg {
-                msg: OutgoingMsg::Node(msg),
+                msg,
                 recipients: Peers::Multiple(recipients),
                 ..
             } => (msg, recipients),
@@ -978,7 +970,7 @@ async fn handle_demote_during_split() -> Result<()> {
     for cmd in cmds {
         let (msg, recipients) = match cmd {
             Cmd::SendMsg {
-                msg: OutgoingMsg::Node(msg),
+                msg,
                 recipients: Peers::Multiple(recipients),
                 ..
             } => (msg, recipients),

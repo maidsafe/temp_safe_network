@@ -63,6 +63,7 @@ impl FlowCtrl {
             // this is NOT the node's current name. It's the initial name... but will not change
             // for the entire statemap
             let node_identifier = node.read().await.info().name();
+            debug!("[NODE READ]: flowctrl start msg lock got");
 
             while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
                 cmd_ctrl
