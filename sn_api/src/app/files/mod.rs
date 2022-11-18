@@ -1205,7 +1205,6 @@ mod tests {
     use crate::{
         app::test_helpers::{new_safe_instance, random_nrs_name},
         register::EntryHash,
-        retry_loop_for_pattern,
     };
     use anyhow::{anyhow, bail, Result};
     use assert_matches::assert_matches;
@@ -1977,10 +1976,6 @@ mod tests {
         let (version1, _) =
             version1_content.ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
-        // wait for it
-        retry_loop_for_pattern!(safe
-            .files_container_get(&safe_url.to_string()), Ok(Some((version, _))) if *version == version1)?;
-
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version1));
         let new_link = safe.parse_and_resolve_url(&nrsurl).await?;
@@ -2176,8 +2171,10 @@ mod tests {
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(None);
-        let (version, _) = retry_loop_for_pattern!(safe
-            .files_container_get(&safe_url.to_string()), Ok(Some((version, _))) if *version == version1)?.ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
+        let (version, _) = safe
+            .files_container_get(&safe_url.to_string())
+            .await?
+            .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
         assert_eq!(version, version1);
 
         Ok(())
@@ -2226,8 +2223,10 @@ mod tests {
 
         // let's fetch version1
         safe_url.set_content_version(Some(version1));
-        let (version, v1_files_map) = retry_loop_for_pattern!(safe
-                .files_container_get(&safe_url.to_string()), Ok(Some((version, _))) if *version == version1)?.ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
+        let (version, v1_files_map) = safe
+            .files_container_get(&safe_url.to_string())
+            .await?
+            .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
         assert_eq!(version, version1);
         assert_eq!(new_files_map, v1_files_map);
@@ -2341,7 +2340,11 @@ mod tests {
         // └── test.md
         //
         // So, we have 6 items.
-        let (_, fetched_files_map) = retry_loop_for_pattern!(safe.files_container_get(&xorurl), Ok(Some((version, _))) if *version == version2)?.ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
+        let (version, fetched_files_map) = safe
+            .files_container_get(&xorurl)
+            .await?
+            .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
+        assert_eq!(version, version2);
         assert_eq!(fetched_files_map.len(), 6);
 
         Ok(())
