@@ -8,7 +8,11 @@
 
 use crate::node::{MyNode, Result};
 
-use sn_interface::messaging::{data::ClientMsgResponse, system::NodeMsg, MsgKind, WireMsg};
+use sn_interface::messaging::{
+    data::ClientDataResponse,
+    system::{NodeDataResponse, NodeMsg},
+    MsgKind, WireMsg,
+};
 
 use bytes::Bytes;
 use xor_name::XorName;
@@ -17,11 +21,10 @@ impl MyNode {
     /// Serialize a message for a Client
     pub(crate) fn serialize_client_msg_response(
         our_node_name: XorName,
-        msg: ClientMsgResponse,
+        msg: ClientDataResponse,
     ) -> Result<(MsgKind, Bytes)> {
         let payload = WireMsg::serialize_msg_payload(&msg)?;
-        let kind = MsgKind::ClientMsgResponse(our_node_name);
-
+        let kind = MsgKind::ClientDataResponse(our_node_name);
         Ok((kind, payload))
     }
 
@@ -32,7 +35,16 @@ impl MyNode {
     ) -> Result<(MsgKind, Bytes)> {
         let payload = WireMsg::serialize_msg_payload(&msg)?;
         let kind = MsgKind::Node(our_node_name);
+        Ok((kind, payload))
+    }
 
+    /// Serialize a message for a Node
+    pub(crate) fn serialize_node_msg_response(
+        our_node_name: XorName,
+        msg: NodeDataResponse,
+    ) -> Result<(MsgKind, Bytes)> {
+        let payload = WireMsg::serialize_msg_payload(&msg)?;
+        let kind = MsgKind::NodeDataResponse(our_node_name);
         Ok((kind, payload))
     }
 }

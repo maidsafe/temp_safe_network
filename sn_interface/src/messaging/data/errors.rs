@@ -19,7 +19,7 @@ use xor_name::Prefix;
 pub type Result<T, E = Error> = result::Result<T, E>;
 
 /// Errors that can occur when interactive with client messaging APIs.
-#[derive(Error, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+#[derive(Error, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum Error {
     /// Access denied for user

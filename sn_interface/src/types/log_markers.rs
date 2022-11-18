@@ -50,7 +50,7 @@ pub enum LogMarker {
     // Chunks
     StoringChunk,
     StoredNewChunk,
-    ChunkQueryResponseReceviedFromAdult,
+    DataResponseReceviedFromAdult,
     ChunkQueryReceviedAtElder,
     ChunkQueryReceviedAtAdult,
     // Data reorganisation

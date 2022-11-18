@@ -9,7 +9,7 @@
 #![recursion_limit = "256"]
 
 use sn_interface::{
-    messaging::system::{NodeCmd, NodeMsg},
+    messaging::system::{NodeDataCmd, NodeMsg},
     types::Cache,
 };
 use sn_node::node::{
@@ -435,7 +435,7 @@ impl Network {
         // section health to appear lower than it actually is.
 
         // just some valid message
-        let msg = NodeMsg::NodeCmd(NodeCmd::ReplicateData(vec![]));
+        let msg = NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateData(vec![]));
 
         let recipients = node.our_elders().await;
 

@@ -104,10 +104,10 @@ impl Session {
             };
 
             match result {
-                Ok(()) => {
+                Ok(address) => {
                     let preexisting = !received_acks.insert(src) || received_errors.contains(&src);
                     debug!(
-                        "ACK from {src:?} read from set for msg_id {msg_id:?} - preexisting??: {preexisting:?}",
+                        "ACK of {address:?} from {src:?} read from set for msg_id {msg_id:?} - preexisting??: {preexisting:?}",
                     );
 
                     if received_acks.len() >= expected_acks {
@@ -600,7 +600,10 @@ impl Session {
                     Err(error) => {
                         error!("Error sending {msg_id:?} bidi to {peer:?}: {error:?}");
                         session.peer_links.remove_link_from_peer_links(&peer).await;
-                        MsgResponse::Failure(peer.addr(), Error::FailedToInitateBiDiStream(msg_id))
+                        MsgResponse::Failure(
+                            peer.addr(),
+                            Box::new(Error::FailedToInitateBiDiStream(msg_id)),
+                        )
                     }
                 }
             });

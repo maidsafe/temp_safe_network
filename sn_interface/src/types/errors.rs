@@ -66,6 +66,8 @@ pub enum Error {
     /// BLS key error
     #[error(transparent)]
     BlsError(#[from] BlsError),
+    #[error("The operation is invalid in its context: {0}.")]
+    InvalidOperation(String),
 }
 
 impl From<bincode::Error> for Error {

@@ -13,7 +13,7 @@ use crate::{Error, Result};
 use qp2p::{RecvStream, UsrMsgBytes};
 use sn_interface::{
     messaging::{
-        data::{ClientMsg, ClientMsgResponse},
+        data::{ClientDataResponse, ClientMsg},
         system::{AntiEntropyKind, NodeMsg},
         AuthorityProof, ClientAuth, Dst, MsgId, MsgKind, MsgType, WireMsg,
     },
@@ -62,10 +62,10 @@ impl Session {
             if attempt > MAX_AE_RETRIES_TO_ATTEMPT {
                 break MsgResponse::Failure(
                     addr,
-                    Error::AntiEntropyMaxRetries {
+                    Box::new(Error::AntiEntropyMaxRetries {
                         msg_id: correlation_id,
                         retries: attempt - 1,
-                    },
+                    }),
                 );
             }
 
@@ -73,7 +73,7 @@ impl Session {
             debug!("Waiting for response msg on {stream_id} from {peer:?} @ index: {peer_index} for {correlation_id:?}, attempt #{attempt}");
 
             match Self::read_msg_from_recvstream(&mut recv_stream).await {
-                Ok(MsgType::ClientMsgResponse { msg_id, msg, .. }) => {
+                Ok(MsgType::ClientDataResponse { msg_id, msg, .. }) => {
                     break Self::handle_client_msg(msg_id, msg, peer, correlation_id).await;
                 }
                 Ok(MsgType::Node { msg_id, msg, .. }) => match self
@@ -90,20 +90,33 @@ impl Session {
                         attempt += 1;
                         continue;
                     }
-                    Err(err) => break MsgResponse::Failure(addr, err),
+                    Err(err) => break MsgResponse::Failure(addr, Box::new(err)),
                 },
                 Ok(msg @ MsgType::Client { .. }) => {
                     warn!("Unexpected ClientMsg type received for {correlation_id:?}: {msg:?}");
                     break MsgResponse::Failure(
                         addr,
-                        Error::UnexpectedMsgType {
+                        Box::new(Error::UnexpectedMsgType {
                             correlation_id,
                             peer,
                             msg,
-                        },
+                        }),
                     );
                 }
-                Err(err) => break MsgResponse::Failure(addr, err),
+                Ok(msg @ MsgType::NodeDataResponse { .. }) => {
+                    warn!(
+                        "Unexpected NodeDataResponse type received for {correlation_id:?}: {msg:?}"
+                    );
+                    break MsgResponse::Failure(
+                        addr,
+                        Box::new(Error::UnexpectedMsgType {
+                            correlation_id,
+                            peer,
+                            msg,
+                        }),
+                    );
+                }
+                Err(err) => break MsgResponse::Failure(addr, Box::new(err)),
             }
         };
 
@@ -150,7 +163,7 @@ impl Session {
     #[instrument(level = "debug")]
     async fn handle_client_msg(
         msg_id: MsgId,
-        msg: ClientMsgResponse,
+        msg: ClientDataResponse,
         src_peer: Peer,
         correlation_id: MsgId,
     ) -> MsgResponse {
@@ -158,22 +171,22 @@ impl Session {
         debug!("ClientMsg with id {msg_id:?} received from {src_addr:?}",);
 
         match msg {
-            ClientMsgResponse::QueryResponse {
+            ClientDataResponse::QueryResponse {
                 response,
                 correlation_id,
             } => {
                 trace!(
-                    "ClientMsgResponse with id {msg_id:?} is QueryResponse regarding correlation_id \
+                    "ClientDataResponse with id {msg_id:?} is QueryResponse regarding correlation_id \
                     {correlation_id:?} with response {response:?}"
                 );
                 MsgResponse::QueryResponse(src_addr, Box::new(response))
             }
-            ClientMsgResponse::CmdResponse {
+            ClientDataResponse::CmdResponse {
                 response,
                 correlation_id,
             } => {
                 trace!(
-                    "ClientMsgResponse with id {msg_id:?} is CmdAck regarding correlation_id \
+                    "ClientDataResponse with id {msg_id:?} is CmdAck regarding correlation_id \
                     {correlation_id:?} with response {response:?}"
                 );
                 MsgResponse::CmdResponse(src_addr, Box::new(response))
@@ -298,7 +311,9 @@ impl Session {
                 auth,
                 dst,
             } => (msg_id, msg, dst, auth),
-            msg @ MsgType::ClientMsgResponse { .. } | msg @ MsgType::Node { .. } => {
+            msg @ MsgType::ClientDataResponse { .. }
+            | msg @ MsgType::NodeDataResponse { .. }
+            | msg @ MsgType::Node { .. } => {
                 warn!("Unexpected bounced msg received in AE response: {msg:?}");
                 return Err(Error::UnexpectedMsgType {
                     correlation_id,

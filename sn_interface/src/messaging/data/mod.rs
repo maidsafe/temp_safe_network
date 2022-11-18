@@ -27,13 +27,16 @@ pub use self::{
     spentbook::{SpentbookCmd, SpentbookQuery},
 };
 
-use crate::messaging::{
-    msg_type::{CLIENT_CMD_PRIORITY, CLIENT_QUERY_PRIORITY},
-    MsgId,
-};
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register, User},
-    Chunk,
+    Chunk, DataAddress,
+};
+use crate::{
+    messaging::{
+        msg_type::{CLIENT_CMD_PRIORITY, CLIENT_QUERY_PRIORITY},
+        MsgId,
+    },
+    types::ReplicatedData,
 };
 
 use serde::{Deserialize, Serialize};
@@ -89,7 +92,7 @@ impl Display for ClientMsg {
 /// Messages sent from the nodes to the clients in response to queries or commands
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum ClientMsgResponse {
+pub enum ClientDataResponse {
     /// The response to a query, containing the query result.
     QueryResponse {
         /// The result of the query.
@@ -111,7 +114,7 @@ pub enum ClientMsgResponse {
     },
 }
 
-impl ClientMsgResponse {
+impl ClientDataResponse {
     #[cfg(any(feature = "chunks", feature = "registers"))]
     /// The priority of the message, when handled by lower level comms.
     pub fn priority(&self) -> i32 {
@@ -119,14 +122,14 @@ impl ClientMsgResponse {
     }
 }
 
-impl Display for ClientMsgResponse {
+impl Display for ClientDataResponse {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::QueryResponse { response, .. } => {
-                write!(f, "ClientMsgResponse::QueryResponse({response:?})")
+                write!(f, "ClientDataResponse::QueryResponse({response:?})")
             }
             Self::CmdResponse { response, .. } => {
-                write!(f, "ClientMsgResponse::CmdResponse({response:?})")
+                write!(f, "ClientDataResponse::CmdResponse({response:?})")
             }
         }
     }
@@ -134,7 +137,7 @@ impl Display for ClientMsgResponse {
 
 /// The response to a query, containing the query result.
 #[allow(clippy::large_enum_variant, clippy::type_complexity)]
-#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug, Hash)]
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub enum QueryResponse {
     //
     // ===== Chunk =====
@@ -205,35 +208,60 @@ impl QueryResponse {
 
 /// The response to a Cmd, containing the query result.
 #[allow(clippy::large_enum_variant, clippy::type_complexity)]
-#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug, Hash)]
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub enum CmdResponse {
     //
     // ===== Chunk =====
     //
     /// Response to DataCmd::StoreChunk
-    StoreChunk(Result<()>),
+    StoreChunk(Result<DataAddress>),
     //
     // ===== Register Data =====
     //
     /// Response to RegisterCmd::Create.
-    CreateRegister(Result<()>),
+    CreateRegister(Result<DataAddress>),
     /// Response to RegisterCmd::Edit.
-    EditRegister(Result<()>),
+    EditRegister(Result<DataAddress>),
     //
     // ===== Spentbook Data =====
     //
     /// Response to SpentbookCmd::Spend.
-    SpendKey(Result<()>),
+    SpendKey(Result<DataAddress>),
 }
 
 impl CmdResponse {
+    #[allow(clippy::result_large_err)]
+    pub fn ok(data: ReplicatedData) -> Result<CmdResponse> {
+        let res = match &data {
+            ReplicatedData::Chunk(_) => CmdResponse::StoreChunk(Ok(data.address())),
+            ReplicatedData::RegisterWrite(RegisterCmd::Create { .. }) => {
+                CmdResponse::CreateRegister(Ok(data.address()))
+            }
+            ReplicatedData::RegisterWrite(RegisterCmd::Edit { .. }) => {
+                CmdResponse::EditRegister(Ok(data.address()))
+            }
+            ReplicatedData::SpentbookWrite(_) => CmdResponse::SpendKey(Ok(data.address())),
+            ReplicatedData::RegisterLog(_) => {
+                return Err(Error::InvalidOperation(
+                    "RegisterLog is not resulting from a cmd.".to_string(),
+                ))
+            }
+            ReplicatedData::SpentbookLog(_) => {
+                return Err(Error::InvalidOperation(
+                    "SpentbookLog is not resulting from a cmd.".to_string(),
+                ))
+            }
+        };
+        Ok(res)
+    }
+
     /// Returns true if the result returned is a success or not
     pub fn is_success(&self) -> bool {
         self.result().is_ok()
     }
 
     /// Returns the result
-    pub fn result(&self) -> &Result<()> {
+    pub fn result(&self) -> &Result<DataAddress> {
         use CmdResponse::*;
         match self {
             StoreChunk(result)

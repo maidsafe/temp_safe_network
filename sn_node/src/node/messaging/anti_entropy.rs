@@ -15,7 +15,7 @@ use itertools::Itertools;
 use qp2p::{SendStream, UsrMsgBytes};
 use sn_interface::{
     messaging::{
-        system::{AntiEntropyKind, NodeCmd, NodeMsg, SectionSigned},
+        system::{AntiEntropyKind, NodeDataCmd, NodeMsg, SectionSigned},
         MsgId, MsgType, WireMsg,
     },
     network_knowledge::{NodeState, SectionTreeUpdate},
@@ -80,7 +80,7 @@ impl MyNode {
     pub(crate) fn send_metadata_updates(&self, recipients: BTreeSet<Peer>, prefix: &Prefix) -> Cmd {
         let metadata = self.get_metadata_of(prefix);
         MyNode::send_system_msg(
-            NodeMsg::NodeCmd(NodeCmd::ReceiveMetadata { metadata }),
+            NodeMsg::NodeDataCmd(NodeDataCmd::ReceiveMetadata { metadata }),
             Peers::Multiple(recipients),
         )
     }

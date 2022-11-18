@@ -9,8 +9,8 @@
 use crate::messaging::Dst;
 
 use super::{
-    data::{ClientMsg, ClientMsgResponse},
-    system::NodeMsg,
+    data::{ClientDataResponse, ClientMsg},
+    system::{NodeDataResponse, NodeMsg},
     AuthorityProof, ClientAuth, MsgId,
 };
 use std::fmt::{Display, Formatter};
@@ -25,6 +25,8 @@ pub(crate) const JOIN_RESPONSE_PRIORITY: i32 = 4;
 pub(crate) const MEMBERSHIP_PRIORITY: i32 = 4;
 // our joining to the network
 pub(crate) const JOIN_RELOCATE_MSG_PRIORITY: i32 = 2;
+// not maintaining network structure, so can wait
+pub(crate) const DATA_REPLICATION_MSG_PRIORITY: i32 = 3;
 // not maintaining network structure, so can wait
 pub(crate) const NODE_DATA_MSG_PRIORITY: i32 = -6;
 #[cfg(any(feature = "chunks", feature = "registers"))]
@@ -54,11 +56,11 @@ pub enum MsgType {
     },
     #[cfg(any(feature = "chunks", feature = "registers"))]
     /// Message response for clients sent by nodes.
-    ClientMsgResponse {
+    ClientDataResponse {
         /// Message ID
         msg_id: MsgId,
         /// the message
-        msg: ClientMsgResponse,
+        msg: ClientDataResponse,
     },
     /// System message for node<->node comms.
     Node {
@@ -68,6 +70,14 @@ pub enum MsgType {
         dst: Dst,
         /// the message
         msg: NodeMsg,
+    },
+    #[cfg(any(feature = "chunks", feature = "registers"))]
+    /// The response to a NodeDataCmd or NodeDataQuery, containing the result.
+    NodeDataResponse {
+        /// Message ID
+        msg_id: MsgId,
+        /// The message
+        msg: NodeDataResponse,
     },
 }
 
@@ -81,7 +91,9 @@ impl MsgType {
             #[cfg(any(feature = "chunks", feature = "registers"))]
             Self::Client { msg, .. } => msg.priority(),
             #[cfg(any(feature = "chunks", feature = "registers"))]
-            Self::ClientMsgResponse { msg, .. } => msg.priority(),
+            Self::ClientDataResponse { msg, .. } => msg.priority(),
+            #[cfg(any(feature = "chunks", feature = "registers"))]
+            Self::NodeDataResponse { msg, .. } => msg.priority(),
         }
     }
 }
@@ -91,7 +103,10 @@ impl Display for MsgType {
         match self {
             Self::Node { msg, .. } => write!(f, "MsgType::Node({})", msg),
             Self::Client { msg, .. } => write!(f, "MsgType::Client({})", msg),
-            Self::ClientMsgResponse { msg, .. } => write!(f, "MsgType::ClientMsgResponse({})", msg),
+            Self::ClientDataResponse { msg, .. } => {
+                write!(f, "MsgType::ClientDataResponse({})", msg)
+            }
+            Self::NodeDataResponse { msg, .. } => write!(f, "MsgType::NodeDataResponse({})", msg),
         }
     }
 }

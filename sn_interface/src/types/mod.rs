@@ -25,7 +25,11 @@ mod chunk;
 mod errors;
 mod peer;
 
-pub use crate::messaging::{data::RegisterCmd, SectionSig};
+use crate::messaging::data::CmdResponse;
+pub use crate::messaging::{
+    data::{Error as DataError, RegisterCmd},
+    SectionSig,
+};
 
 pub use address::{ChunkAddress, DataAddress, RegisterAddress, SpentbookAddress};
 pub use cache::Cache;
@@ -95,6 +99,27 @@ impl ReplicatedData {
             Self::SpentbookWrite(cmd) => {
                 DataAddress::Spentbook(SpentbookAddress::new(*cmd.dst_address().name()))
             }
+        }
+    }
+
+    pub fn error_response(&self, error: DataError) -> Result<CmdResponse> {
+        match self {
+            Self::Chunk(_) => Ok(CmdResponse::StoreChunk(Err(error))),
+            Self::RegisterWrite(RegisterCmd::Create { .. }) => {
+                Ok(CmdResponse::CreateRegister(Err(error)))
+            }
+            Self::RegisterWrite(RegisterCmd::Edit { .. }) => {
+                Ok(CmdResponse::EditRegister(Err(error)))
+            }
+            Self::SpentbookWrite(_) => Ok(CmdResponse::SpendKey(Err(error))),
+            Self::SpentbookLog(_) => Err(Error::InvalidOperation(
+                "There is no CmdResponse for the SpentbookLog variant of ReplicatedData."
+                    .to_string(),
+            )),
+            Self::RegisterLog(_) => Err(Error::InvalidOperation(
+                "There is no CmdResponse for the RegisterLog variant of ReplicatedData."
+                    .to_string(),
+            )),
         }
     }
 }

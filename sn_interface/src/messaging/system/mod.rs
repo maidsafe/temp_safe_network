@@ -13,12 +13,15 @@ mod node_msgs;
 mod op_id;
 mod section_sig;
 
+use super::{data::CmdResponse, MsgId};
+
 use crate::messaging::AuthorityProof;
 use crate::network_knowledge::{NodeState, SapCandidate, SectionTreeUpdate};
+
 pub use agreement::{DkgSessionId, Proposal, SectionSigned};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
-pub use node_msgs::{NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse};
+pub use node_msgs::{NodeDataCmd, NodeDataQuery, NodeEvent, NodeQueryResponse};
 pub use op_id::OperationId;
 pub use section_sig::{SectionSig, SectionSigShare};
 
@@ -29,7 +32,7 @@ use serde::{Deserialize, Serialize};
 use sn_consensus::{Generation, SignedVote};
 use sn_sdkg::DkgSignedVote;
 use std::collections::{BTreeMap, BTreeSet};
-use std::fmt::{Display, Formatter};
+use std::fmt::{self, Display, Formatter};
 use xor_name::XorName;
 
 /// List of peers of a section
@@ -120,30 +123,66 @@ pub enum NodeMsg {
         /// BLS signature share of an Elder
         sig_share: SectionSigShare,
     },
-    /// Events are facts about something that happened on a node.
+    #[cfg(any(feature = "chunks", feature = "registers"))]
+    /// Node events are Adult to Elder events about something that happened on an Adult.
     NodeEvent(NodeEvent),
     #[cfg(any(feature = "chunks", feature = "registers"))]
-    /// Cmds are orders to perform some operation, only sent internally in the network.
-    NodeCmd(NodeCmd),
+    /// Data cmds are orders to perform some data operation, only sent internally in the network.
+    NodeDataCmd(NodeDataCmd),
     #[cfg(any(feature = "chunks", feature = "registers"))]
-    /// Queries is a read-only operation.
-    NodeQuery(NodeQuery),
-    #[cfg(any(feature = "chunks", feature = "registers"))]
+    /// Data queries is a read-only operation.
+    NodeDataQuery(NodeDataQuery),
+}
+
+/// Messages sent from adults to the elders in response to client queries or commands
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub enum NodeDataResponse {
     /// The response to a query, containing the query result.
-    NodeQueryResponse {
-        /// QueryResponse.
+    QueryResponse {
+        /// The result of the query.
         response: NodeQueryResponse,
         /// ID of the requested operation.
         operation_id: OperationId,
     },
+    /// The response will be sent back to the client when the handling on the
+    /// receiving Elder has been finished.
+    CmdResponse {
+        /// The result of the command.
+        response: CmdResponse,
+        /// ID of causing ClientMsg::Cmd.
+        correlation_id: MsgId,
+    },
+}
+
+impl NodeDataResponse {
+    #[cfg(any(feature = "chunks", feature = "registers"))]
+    /// The priority of the message, when handled by lower level comms.
+    pub fn priority(&self) -> i32 {
+        super::msg_type::NODE_DATA_MSG_PRIORITY
+    }
+}
+
+impl Display for NodeDataResponse {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::QueryResponse { response, .. } => {
+                write!(f, "NodeDataResponse::QueryResponse({response:?})")
+            }
+            Self::CmdResponse { response, .. } => {
+                write!(f, "NodeDataResponse::CmdResponse({response:?})")
+            }
+        }
+    }
 }
 
 impl NodeMsg {
     /// The priority of the message, when handled by lower level comms.
     pub fn priority(&self) -> i32 {
         use super::msg_type::{
-            ANTIENTROPY_MSG_PRIORITY, DKG_MSG_PRIORITY, JOIN_RELOCATE_MSG_PRIORITY,
-            JOIN_RESPONSE_PRIORITY, MEMBERSHIP_PRIORITY, NODE_DATA_MSG_PRIORITY,
+            ANTIENTROPY_MSG_PRIORITY, DATA_REPLICATION_MSG_PRIORITY, DKG_MSG_PRIORITY,
+            JOIN_RELOCATE_MSG_PRIORITY, JOIN_RESPONSE_PRIORITY, MEMBERSHIP_PRIORITY,
+            NODE_DATA_MSG_PRIORITY,
         };
         match self {
             // DKG messages
@@ -170,11 +209,11 @@ impl NodeMsg {
             }
 
             #[cfg(any(feature = "chunks", feature = "registers"))]
-            // Inter-node comms related to processing client requests
-            Self::NodeCmd(_)
-            | Self::NodeEvent(_)
-            | Self::NodeQuery(_)
-            | Self::NodeQueryResponse { .. } => NODE_DATA_MSG_PRIORITY,
+            Self::NodeEvent(_) => DATA_REPLICATION_MSG_PRIORITY,
+
+            #[cfg(any(feature = "chunks", feature = "registers"))]
+            // Inter-node comms related to processing client data requests
+            Self::NodeDataCmd(_) | Self::NodeDataQuery(_) => NODE_DATA_MSG_PRIORITY,
         }
     }
 
@@ -198,9 +237,8 @@ impl NodeMsg {
             Self::HandoverAE(_) => State::Handover,
             Self::Propose { .. } => State::Propose,
             Self::NodeEvent(_) => State::Node,
-            Self::NodeCmd(_) => State::Node,
-            Self::NodeQuery(_) => State::Node,
-            Self::NodeQueryResponse { .. } => State::Node,
+            Self::NodeDataCmd(_) => State::Node,
+            Self::NodeDataQuery(_) => State::Node,
         }
     }
 }
@@ -228,13 +266,12 @@ impl Display for NodeMsg {
             Self::HandoverVotes { .. } => write!(f, "NodeMsg::HandoverVotes"),
             Self::HandoverAE { .. } => write!(f, "NodeMsg::HandoverAE"),
             Self::Propose { .. } => write!(f, "NodeMsg::Propose"),
+            #[cfg(any(feature = "chunks", feature = "registers"))]
             Self::NodeEvent { .. } => write!(f, "NodeMsg::NodeEvent"),
             #[cfg(any(feature = "chunks", feature = "registers"))]
-            Self::NodeCmd { .. } => write!(f, "NodeMsg::NodeCmd"),
+            Self::NodeDataCmd { .. } => write!(f, "NodeMsg::NodeCmd"),
             #[cfg(any(feature = "chunks", feature = "registers"))]
-            Self::NodeQuery { .. } => write!(f, "NodeMsg::NodeQuery"),
-            #[cfg(any(feature = "chunks", feature = "registers"))]
-            Self::NodeQueryResponse { .. } => write!(f, "NodeMsg::NodeQueryResponse"),
+            Self::NodeDataQuery { .. } => write!(f, "NodeMsg::NodeQuery"),
         }
     }
 }
