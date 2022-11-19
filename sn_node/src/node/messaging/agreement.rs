@@ -147,7 +147,7 @@ impl MyNode {
         match section_chain.insert(&last_key, signed_sap.section_key(), section_sig.signature) {
             Ok(()) => {
                 let section_tree_update = SectionTreeUpdate::new(signed_sap, section_chain);
-                match self.update_network_knowledge(section_tree_update, None) {
+                match self.update_network_knowledge(&self.context(), section_tree_update, None) {
                     Ok(true) => {
                         info!("Updated our network knowledge for {:?}", prefix);
                         info!("Writing updated knowledge to disk");
