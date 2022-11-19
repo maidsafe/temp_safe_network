@@ -45,7 +45,7 @@ impl MyNode {
     }
 
     pub(crate) async fn store_data_as_adult_and_respond(
-        context: &mut NodeContext,
+        context: &NodeContext,
         data: ReplicatedData,
         response_stream: Option<Arc<Mutex<SendStream>>>,
         target: Peer,
@@ -156,9 +156,11 @@ impl MyNode {
                 kind,
             } => {
                 trace!("Handling msg: AE from {sender}: {msg_id:?}");
+                let context = node.read().await.context();
                 // as we've data storage reqs inside here for reorganisation, we have async calls to
                 // the fs
-                MyNode::handle_anti_entropy_msg(node, section_tree_update, kind, sender).await
+                MyNode::handle_anti_entropy_msg(node, &context, section_tree_update, kind, sender)
+                    .await
             }
             // Respond to a probe msg
             // We always respond to probe msgs if we're an elder as health checks use this to see if a node is alive
@@ -458,7 +460,7 @@ impl MyNode {
             }
             NodeMsg::NodeCmd(NodeCmd::ReplicateOneData(data)) => {
                 debug!("[NODE READ]: replicate one data");
-                let mut context = node.read().await.context();
+                let context = node.read().await.context();
                 debug!("[NODE READ]: replicate one data read got");
 
                 if context.is_elder {
@@ -471,14 +473,8 @@ impl MyNode {
                 );
 
                 // store data and respond w/ack on the response stream
-                MyNode::store_data_as_adult_and_respond(
-                    &mut context,
-                    data,
-                    send_stream,
-                    sender,
-                    msg_id,
-                )
-                .await
+                MyNode::store_data_as_adult_and_respond(&context, data, send_stream, sender, msg_id)
+                    .await
             }
             NodeMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)) => {
                 info!("ReplicateData MsgId: {:?}", msg_id);
