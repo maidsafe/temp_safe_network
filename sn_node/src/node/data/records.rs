@@ -6,30 +6,29 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::core::NodeContext;
-use crate::node::{Cmd, Error, MyNode, Prefix, Result};
+use crate::node::{core::NodeContext, Cmd, Error, MyNode, Prefix, Result};
 
-use bytes::Bytes;
-
-use futures::FutureExt;
-use itertools::Itertools;
-use qp2p::{SendStream, UsrMsgBytes};
 use sn_dysfunction::IssueType;
-use sn_interface::messaging::{MsgType, WireMsg};
 use sn_interface::{
     data_copy_count,
     messaging::{
-        data::{
-            ClientMsgResponse, CmdResponse, DataCmd, DataQuery, MetadataExchange, StorageLevel,
-        },
-        system::{NodeCmd, NodeEvent, NodeMsg, NodeQuery, OperationId},
-        AuthorityProof, ClientAuth, Dst, MsgId, MsgKind,
+        data::{ClientDataResponse, DataCmd, DataQuery, MetadataExchange, StorageLevel},
+        system::{NodeDataCmd, NodeDataQuery, NodeDataResponse, NodeMsg, OperationId},
+        AuthorityProof, ClientAuth, Dst, MsgId, MsgKind, MsgType, WireMsg,
     },
     types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData},
 };
+
+use qp2p::{SendStream, UsrMsgBytes};
+
+use bytes::Bytes;
+use futures::FutureExt;
+use itertools::Itertools;
 use std::{cmp::Ordering, collections::BTreeSet, sync::Arc};
-use tokio::sync::Mutex;
-use tokio::time::{timeout, Duration};
+use tokio::{
+    sync::Mutex,
+    time::{timeout, Duration},
+};
 use tracing::info;
 use xor_name::XorName;
 
@@ -54,7 +53,7 @@ impl MyNode {
         // TODO: general ReplicateData flow could go bidi?
         // Right now we've a new msg for just one datum.
         // Atm that's perhaps more bother than its worth..
-        let msg = NodeMsg::NodeCmd(NodeCmd::ReplicateOneData(data));
+        let msg = NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateOneData(data));
         let mut send_tasks = vec![];
 
         let (kind, payload) = MyNode::serialize_node_msg(snapshot.name, msg)?;
@@ -126,16 +125,15 @@ impl MyNode {
         // everything went fine, tell the client that
         if success_count == targets_len {
             if let Some(response) = ack_response {
-                MyNode::send_ack_to_client_on_stream(
+                MyNode::respond_to_client_on_stream(
                     snapshot,
                     response,
-                    msg_id,
                     client_response_stream.clone(),
                 )
                 .await?;
             } else {
                 // This should not be possible with above checks
-                error!("No valid ack response to send from all responses for {msg_id:?}")
+                error!("No valid response to send from all responses for {msg_id:?}")
             }
         } else {
             error!("Storage was not completely successful for {msg_id:?}");
@@ -156,38 +154,39 @@ impl MyNode {
     }
 
     /// Parses WireMsg and if DataStored Ack, we send a response to the client
-    async fn send_ack_to_client_on_stream(
+    async fn respond_to_client_on_stream(
         snapshot: &NodeContext,
         response: WireMsg,
-        msg_id: MsgId,
         send_stream: Arc<Mutex<SendStream>>,
     ) -> Result<()> {
-        if let MsgType::Node {
-            msg: NodeMsg::NodeEvent(NodeEvent::DataStored(_address)),
+        if let MsgType::NodeDataResponse {
+            msg:
+                NodeDataResponse::CmdResponse {
+                    response,
+                    correlation_id,
+                },
             ..
         } = response.into_msg()?
         {
-            let client_msg = ClientMsgResponse::CmdResponse {
-                response: CmdResponse::StoreChunk(Ok(())),
-                correlation_id: msg_id,
+            let client_msg = ClientDataResponse::CmdResponse {
+                response,
+                correlation_id,
             };
 
             let (kind, payload) = MyNode::serialize_client_msg_response(snapshot.name, client_msg)?;
 
-            debug!("{msg_id:?} sending cmd response ack back to client");
+            debug!("{correlation_id:?} sending cmd response ack back to client");
             MyNode::send_msg_on_stream(
                 snapshot.network_knowledge.section_key(),
                 payload,
                 kind,
                 send_stream,
                 None, // we shouldn't need this...
-                msg_id,
+                correlation_id,
             )
             .await
         } else {
-            error!(
-                "Unexpected reponse to query from node. To : {msg_id:?}; response: {response:?}"
-            );
+            error!("Unexpected response to data cmd from node. Response: {response:?}");
             // TODO: handle this bad response
             Ok(())
         }
@@ -240,7 +239,7 @@ impl MyNode {
         };
 
         // Form a msg to our adult
-        let msg = NodeMsg::NodeQuery(NodeQuery::Data {
+        let msg = NodeMsg::NodeDataQuery(NodeDataQuery {
             query: query.variant,
             auth: auth.into_inner(),
             operation_id,
@@ -278,12 +277,12 @@ impl MyNode {
 
         debug!("Response in from peer for query {msg_id:?} {response:?}");
 
-        if let MsgType::Node {
-            msg: NodeMsg::NodeQueryResponse { response, .. },
+        if let MsgType::NodeDataResponse {
+            msg: NodeDataResponse::QueryResponse { response, .. },
             ..
         } = response.into_msg()?
         {
-            let client_msg = ClientMsgResponse::QueryResponse {
+            let client_msg = ClientDataResponse::QueryResponse {
                 response,
                 correlation_id: msg_id,
             };

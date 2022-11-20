@@ -32,7 +32,7 @@ use sn_interface::{
     elder_count, init_logger,
     messaging::{
         data::{ClientMsg, DataCmd, SpentbookCmd},
-        system::{AntiEntropyKind, JoinAsRelocatedRequest, NodeCmd, NodeMsg, SectionSigned},
+        system::{AntiEntropyKind, JoinAsRelocatedRequest, NodeDataCmd, NodeMsg, SectionSigned},
         Dst, MsgType, WireMsg,
     },
     network_knowledge::{
@@ -669,7 +669,7 @@ async fn msg_to_self() -> Result<()> {
     let info = node.info();
     let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)));
 
-    let node_msg = NodeMsg::NodeCmd(NodeCmd::ReplicateData(vec![]));
+    let node_msg = NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateData(vec![]));
 
     // don't use the cmd collection fn, as it skips Cmd::SendMsg
     let cmds = dispatcher

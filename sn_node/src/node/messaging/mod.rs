@@ -176,10 +176,18 @@ impl MyNode {
                 )
                 .await
             }
-            other @ MsgType::ClientMsgResponse { .. } => {
+            other @ MsgType::ClientDataResponse { .. } => {
                 error!(
-                    "Client msg response {msg_id:?}, from {}, has been dropped since it's not \
+                    "Client data response {msg_id:?}, from {}, has been dropped since it's not \
                     meant to be handled by a node: {other:?}",
+                    origin.addr()
+                );
+                Ok(vec![])
+            }
+            other @ MsgType::NodeDataResponse { .. } => {
+                error!(
+                    "Node data response {msg_id:?}, from {}, has been dropped since it's not \
+                    meant to be handled this way (it is directly forwarded to client): {other:?}",
                     origin.addr()
                 );
                 Ok(vec![])

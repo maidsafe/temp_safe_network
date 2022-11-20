@@ -14,7 +14,7 @@ use crate::node::{
 };
 
 use sn_interface::{
-    messaging::system::{NodeCmd, NodeMsg},
+    messaging::system::{NodeDataCmd, NodeMsg},
     types::log_markers::LogMarker,
 };
 
@@ -398,7 +398,7 @@ impl FlowCtrl {
                     data_recipients,
                 );
 
-                let msg = NodeMsg::NodeCmd(NodeCmd::ReplicateData(vec![data_to_send]));
+                let msg = NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateData(vec![data_to_send]));
 
                 return Ok(Some(MyNode::send_system_msg(
                     msg,

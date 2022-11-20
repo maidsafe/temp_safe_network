@@ -413,8 +413,9 @@ impl<'a> Joiner<'a> {
                 }) => return Ok((*resp, sender)),
                 Ok(
                     MsgType::Client { msg_id, .. }
-                    | MsgType::ClientMsgResponse { msg_id, .. }
-                    | MsgType::Node { msg_id, .. },
+                    | MsgType::Node { msg_id, .. }
+                    | MsgType::ClientDataResponse { msg_id, .. }
+                    | MsgType::NodeDataResponse { msg_id, .. },
                 ) => {
                     trace!("Bootstrap message discarded: sender: {sender:?} msg_id: {msg_id:?}");
                 }

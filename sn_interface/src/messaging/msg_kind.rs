@@ -22,7 +22,9 @@ pub enum MsgKind {
     /// Authority is needed to access private data, such as reading or writing a private file.
     Client(ClientAuth),
     /// A data response sent from a Node (along with its name) to the client
-    ClientMsgResponse(XorName),
+    ClientDataResponse(XorName),
     /// A message from a Node along with its name
     Node(XorName),
+    /// A data response sent from an Adult (along with its name) to Elders
+    NodeDataResponse(XorName),
 }

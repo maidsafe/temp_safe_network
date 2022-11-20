@@ -19,7 +19,7 @@ use xor_name::XorName;
 /// cmd message sent among nodes
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum NodeCmd {
+pub enum NodeDataCmd {
     /// Notify Elders on nearing max capacity
     RecordStorageLevel {
         /// Node Id
@@ -29,7 +29,7 @@ pub enum NodeCmd {
         /// The storage level reported by the node.
         level: StorageLevel,
     },
-    /// Tells an Adult to store a  data
+    /// Tells an Adult to store a data
     ReplicateOneData(ReplicatedData),
     /// Tells an Adult to store a replica of some data set
     ReplicateData(Vec<ReplicatedData>),
@@ -57,22 +57,19 @@ pub enum NodeEvent {
         /// Whether store failed due to full
         full: bool,
     },
-    DataStored(DataAddress),
 }
 
 /// Query originating at a node
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
-pub enum NodeQuery {
+pub struct NodeDataQuery {
     /// Data is handled by Adults
-    Data {
-        /// The query
-        query: DataQueryVariant,
-        /// Client signature
-        auth: ClientAuth,
-        /// The operation id that recorded in Elders for this query
-        operation_id: OperationId,
-    },
+    /// The query
+    pub query: DataQueryVariant,
+    /// Client signature
+    pub auth: ClientAuth,
+    /// The operation id that recorded in Elders for this query
+    pub operation_id: OperationId,
 }
 
 /// Responses to queries sent from Elders to Adults.

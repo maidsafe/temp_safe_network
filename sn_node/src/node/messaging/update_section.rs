@@ -10,7 +10,7 @@ use crate::node::{core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Peers, MyN
 
 use sn_interface::{
     data_copy_count,
-    messaging::system::{NodeCmd, NodeMsg},
+    messaging::system::{NodeDataCmd, NodeMsg},
     types::{log_markers::LogMarker, DataAddress, Peer},
 };
 
@@ -113,7 +113,7 @@ impl MyNode {
             trace!("Sending our data list to: {:?}", target_members);
         }
 
-        let msg = NodeMsg::NodeCmd(NodeCmd::SendAnyMissingRelevantData(data_i_have));
+        let msg = NodeMsg::NodeDataCmd(NodeDataCmd::SendAnyMissingRelevantData(data_i_have));
         MyNode::send_system_msg(msg, Peers::Multiple(target_members))
     }
 }

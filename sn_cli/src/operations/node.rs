@@ -241,7 +241,7 @@ fn kill_nodes(exec_name: &str) -> Result<()> {
 #[cfg(target_os = "windows")]
 fn kill_nodes(exec_name: &str) -> Result<()> {
     let output = Command::new("taskkill")
-        .args(&["/F", "/IM", exec_name])
+        .args(["/F", "/IM", exec_name])
         .output()
         .wrap_err_with(|| {
             format!(
