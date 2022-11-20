@@ -29,11 +29,14 @@ use sn_interface::{
 };
 use std::{cmp::Ordering, collections::BTreeSet, sync::Arc};
 use tokio::sync::Mutex;
-use tokio::time::Duration;
+use tokio::time::{timeout, Duration};
 use tracing::info;
 use xor_name::XorName;
 
-const REPONSE_TIMEOUT: Duration = Duration::from_secs(7); // w/ 6s qp2p timeout, we give it just a bit more time
+// Timeout set for data queries forwarded to Adult
+// TODO: how to determine this time? w/ 6s qp2p timeout, we give it just a bit more time
+const ADULT_REPONSE_TIMEOUT: Duration = Duration::from_secs(7);
+
 impl MyNode {
     // Locate ideal holders for this data, instruct them to store the data
     pub(crate) async fn replicate_data_to_adults(
@@ -56,7 +59,6 @@ impl MyNode {
 
         let (kind, payload) = MyNode::serialize_node_msg(snapshot.name, msg)?;
         let section_key = snapshot.network_knowledge.section_key();
-        let comm = snapshot.comm.clone();
 
         debug!("replication read locks got");
         // drop the read lock before we do anything async
@@ -70,8 +72,8 @@ impl MyNode {
                 msg_id,
             )?;
 
-            let comm = comm.clone();
-            info!("About to send {msg_id:?} to holder: {:?}", &target,);
+            let comm = snapshot.comm.clone();
+            info!("About to send {msg_id:?} to holder: {:?}", &target);
 
             send_tasks.push(
                 async move {
@@ -256,10 +258,8 @@ impl MyNode {
             msg_id,
         )?;
 
-        debug!("sending out {msg_id:?}");
-        // TODO: how to determine this time?
-        // TODO: don't use arbitrary time here. (But 3s is very realistic here under normal load)
-        let response = match tokio::time::timeout(REPONSE_TIMEOUT, async {
+        debug!("Sending out {msg_id:?} to Adult {target:?}");
+        let response = match timeout(ADULT_REPONSE_TIMEOUT, async {
             comm.send_out_bytes_to_peer_and_return_response(target, msg_id, bytes_to_adult)
                 .await
         })
@@ -267,7 +267,7 @@ impl MyNode {
         {
             Ok(resp) => resp,
             Err(_elapsed) => {
-                error!("{msg_id:?}: No response from {target:?} before arbitrary timeout. Marking adult as dysfunctional");
+                error!("{msg_id:?}: No response from {target:?} after {ADULT_REPONSE_TIMEOUT:?} timeout. Marking adult as dysfunctional");
                 return Ok(vec![Cmd::TrackNodeIssueInDysfunction {
                     name: target.name(),
                     // TODO: no need for op id tracking here, this can be a simple counter
@@ -329,14 +329,15 @@ impl MyNode {
         trace!("Sending {original_msg_id:?} to recipient over stream");
         let stream_prio = 10;
         let mut send_stream = send_stream.lock().await;
+        let stream_id = send_stream.id();
 
-        trace!("Stream locked for {original_msg_id:?} to {target_peer:?}");
+        trace!("Stream {stream_id} locked for {original_msg_id:?} to {target_peer:?}");
         send_stream.set_priority(stream_prio);
         trace!("Prio set for {original_msg_id:?} to {target_peer:?}");
         if let Err(error) = send_stream.send_user_msg(bytes).await {
             error!(
-                "Could not send query response {original_msg_id:?} to peer {target_peer:?} over response stream: {error:?}",
-
+                "Could not send query response {original_msg_id:?} to \
+                peer {target_peer:?} over response stream {stream_id}: {error:?}"
             );
             return Err(Error::from(error));
         }
@@ -344,11 +345,12 @@ impl MyNode {
         trace!("Msg away for {original_msg_id:?} to {target_peer:?}");
         if let Err(error) = send_stream.finish().await {
             error!(
-                        "Could not close response stream for {original_msg_id:?} to peer {target_peer:?}: {error:?}",
-                    );
+                "Could not close response stream {stream_id} for {original_msg_id:?} to \
+                peer {target_peer:?}: {error:?}"
+            );
         }
 
-        debug!("Sent the msg over stream {original_msg_id:?} to {target_peer:?}");
+        debug!("Sent the msg {original_msg_id:?} over stream {stream_id} to {target_peer:?}");
 
         Ok(())
     }
@@ -367,7 +369,6 @@ impl MyNode {
             section_key,
         };
 
-        #[allow(unused_mut)]
         let mut wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
         #[cfg(feature = "test-utils")]
