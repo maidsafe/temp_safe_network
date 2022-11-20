@@ -23,6 +23,7 @@ use tokio::sync::{
     RwLock,
 };
 use xor_name::XorName;
+
 // Cmd Dispatcher.
 pub(crate) struct Dispatcher {
     node: Arc<RwLock<MyNode>>,
@@ -194,25 +195,7 @@ impl Dispatcher {
                 self.data_replication_sender
                     .send((data_batch, recipient))
                     .await
-                    .map_err(|_| Error::DataReplicationChanel)?;
-
-                // // we should queue this
-                // for data in data_batch {
-                //     trace!("data being enqueued for replication {:?}", data);
-                //     let mut node = self.node.write().await;
-                //     debug!("[NODE WRITE]: data for repl write got");
-                //     if let Some(peers_set) = node.pending_data_to_replicate_to_peers.get_mut(&data)
-                //     {
-                //         debug!("data already queued, adding peer");
-                //         let _existed = peers_set.insert(recipient);
-                //     } else {
-                //         let mut peers_set = BTreeSet::new();
-                //         let _existed = peers_set.insert(recipient);
-                //         let _existed = node
-                //             .pending_data_to_replicate_to_peers
-                //             .insert(data, peers_set);
-                //     };
-                // }
+                    .map_err(|_| Error::DataReplicationChannel)?;
                 Ok(vec![])
             }
             Cmd::ProposeVoteNodesOffline(names) => {
