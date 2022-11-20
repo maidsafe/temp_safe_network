@@ -8,7 +8,7 @@
 
 use sn_interface::{
     messaging::data::Error as ErrorMsg,
-    types::{convert_dt_error_to_error_msg, ChunkAddress, DataAddress, PublicKey, RegisterAddress},
+    types::{ChunkAddress, DataAddress, PublicKey, RegisterAddress},
 };
 
 use std::{io, path::PathBuf};
@@ -84,7 +84,7 @@ impl From<Error> for ErrorMsg {
                 ErrorMsg::DataNotFound(DataAddress::Bytes(ChunkAddress(xorname)))
             }
             Error::DataExists(address) => ErrorMsg::DataExists(address),
-            Error::NetworkData(error) => convert_dt_error_to_error_msg(error),
+            Error::NetworkData(error) => error.into(),
             other => {
                 ErrorMsg::InvalidOperation(format!("Failed to perform operation: {:?}", other))
             }

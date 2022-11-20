@@ -377,8 +377,12 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     let sk0 = bls::SecretKey::random();
     let pk0 = sk0.public_key();
 
-    let (old_sap, sk_set1, mut nodes, _) = TestSapBuilder::new(Prefix::default()).build();
-    let members = BTreeSet::from_iter(nodes.iter().map(|n| NodeState::joined(n.peer(), None)));
+    let (old_sap, sk_set1, mut elder_nodes, _) = TestSapBuilder::new(Prefix::default()).build();
+    let members = BTreeSet::from_iter(
+        elder_nodes
+            .iter()
+            .map(|n| NodeState::joined(n.peer(), None)),
+    );
     let pk1 = sk_set1.secret_key().public_key();
 
     let section_tree_update = TestSectionTree::get_section_tree_update(
@@ -392,12 +396,12 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     let (event_sender, mut event_receiver) =
         event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE);
     let section_key_share = TestKeys::get_section_key_share(&sk_set1, 0);
-    let node = nodes.remove(0);
+    let node_info = elder_nodes.remove(0);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let comm = network_utils::create_comm().await?;
     let mut node = MyNode::new(
         comm,
-        node.keypair.clone(),
+        node_info.keypair.clone(),
         network_knowledge,
         Some(section_key_share),
         event_sender,
@@ -411,15 +415,14 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     let sk2 = sk_set2.secret_key();
     let pk2 = sk2.public_key();
 
-    let old_node = nodes.remove(0);
-
-    // Create the new `SectionAuthorityProvider` by replacing the last peer with a new one.
+    // Create the new `SectionAuthorityProvider` by replacing one of the peers with a new one,
+    // making sure the one we use as our `node` to receive the AE msg for the final test is included.
+    let old_node = elder_nodes.remove(0);
     let new_peer = network_utils::create_peer(MIN_ADULT_AGE);
-    let new_elders = old_sap
-        .elders()
-        .take(old_sap.elder_count() - 1)
-        .cloned()
-        .chain(vec![new_peer]);
+    let new_elders = elder_nodes
+        .iter()
+        .map(|n| n.peer())
+        .chain(vec![node_info.peer(), new_peer]);
 
     let new_sap = SectionAuthorityProvider::new(
         new_elders,

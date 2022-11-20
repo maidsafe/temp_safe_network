@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{errors::convert_bincode_error, Error, Result};
+use super::{Error, Result};
 
 use bytes::Bytes;
 use multibase::{self, Base};
@@ -16,7 +16,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// Wrapper for raw `bincode::serialise`.
 pub fn serialise<T: Serialize>(data: &T) -> Result<Vec<u8>> {
-    bincode::serialize(data).map_err(convert_bincode_error)
+    bincode::serialize(data).map_err(|err| err.into())
 }
 
 /// Wrapper for `bincode::deserialize`.
@@ -24,7 +24,7 @@ pub fn deserialise<'a, T>(bytes: &'a [u8]) -> Result<T>
 where
     T: Deserialize<'a>,
 {
-    bincode::deserialize(bytes).map_err(convert_bincode_error)
+    bincode::deserialize(bytes).map_err(|err| err.into())
 }
 
 /// Wrapper for z-Base-32 `multibase::encode`.
