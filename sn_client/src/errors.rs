@@ -6,13 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use bytes::Bytes;
 use sn_interface::{
     messaging::{
-        data::{DataQueryVariant, Error as ErrorMsg, QueryResponse},
+        data::{DataCmd, DataQueryVariant, Error as ErrorMsg, QueryResponse},
         system::NodeMsg,
         Error as MessagingError, MsgId, MsgType,
     },
-    types::{Error as DtError, Peer},
+    types::{DataAddress, Error as DtError, Peer},
 };
 
 use bls::PublicKey;
@@ -124,8 +125,18 @@ pub enum Error {
         maximum: usize,
     },
     /// Timeout occurred when trying to verify chunk was uploaded
-    #[error("Timeout occurred when trying to verify chunk at xorname address {0} was uploaded")]
+    #[error(
+        "Timeout occurred when trying to verify that chunk at xorname address {0} was uploaded"
+    )]
     ChunkUploadValidationTimeout(XorName),
+    /// Timeout occurred when trying to verify chunk was uploaded
+    #[error("Unexpected result returned when trying to verify that data was uploaded")]
+    UploadedChunkCouldNotBeVerified {
+        /// The uploaded bytes
+        uploaded: Bytes,
+        /// The retrieved bytes
+        retrieved: Bytes,
+    },
     /// Failed to obtain a response from Elders.
     #[error("Failed to obtain any response for {msg_id:?} from: {peers:?}")]
     NoResponse {
@@ -144,6 +155,26 @@ pub enum Error {
         query: DataQueryVariant,
         /// Unexpected response received
         response: QueryResponse,
+    },
+    /// Unexpected cmd ack address type received
+    #[error(
+        "Unexpected type of address ack received for {sent_cmd:?}. Received: {acked_address:?}"
+    )]
+    UnexpectedCmdAckDataType {
+        /// Cmd sent to Elders
+        sent_cmd: DataCmd,
+        /// Unexpected type of data address received
+        acked_address: DataAddress,
+    },
+    /// Unexpected cmd ack address received
+    #[error(
+        "Unexpected name of address ack received for {sent_cmd:?}. Received: {acked_address:?}"
+    )]
+    UnexpectedCmdAckDataName {
+        /// Cmd sent to Elders
+        sent_cmd: DataCmd,
+        /// Unexpected data address received
+        acked_address: DataAddress,
     },
     /// Unexpected NodeMsg received
     #[error("Unexpected type of NodeMsg received from {peer} in response to {correlation_id:?}. Received: {msg:?}")]

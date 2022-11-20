@@ -43,7 +43,7 @@ impl Client {
     #[instrument(skip(self), level = "debug")]
     pub async fn publish_register_ops(&self, wal: RegisterWriteAheadLog) -> Result<(), Error> {
         for cmd in &wal {
-            self.send_cmd(cmd.clone()).await?;
+            let _ack_addr = self.send_cmd(cmd.clone()).await?;
         }
         Ok(())
     }

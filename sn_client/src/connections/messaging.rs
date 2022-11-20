@@ -14,7 +14,7 @@ use sn_interface::{
         ClientAuth, Dst, MsgId, MsgKind, WireMsg,
     },
     network_knowledge::supermajority,
-    types::{ChunkAddress, Peer},
+    types::{ChunkAddress, DataAddress, Peer},
 };
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
@@ -39,7 +39,7 @@ impl Session {
         auth: ClientAuth,
         payload: Bytes,
         force_new_link: bool,
-    ) -> Result<()> {
+    ) -> Result<DataAddress> {
         let endpoint = self.endpoint.clone();
         // TODO: Consider other approach: Keep a session per section!
         let (section_pk, elders) = self.get_cmd_elders(dst_address).await?;
@@ -77,7 +77,7 @@ impl Session {
         msg_id: MsgId,
         elders: Vec<Peer>,
         mut send_cmd_tasks: JoinSet<MsgResponse>,
-    ) -> Result<()> {
+    ) -> Result<DataAddress> {
         debug!("----> init of check for acks for {:?}", msg_id);
         let expected_acks = elders.len();
         let mut received_acks = BTreeSet::default();
@@ -86,7 +86,7 @@ impl Session {
         while let Some(msg_resp) = send_cmd_tasks.join_next().await {
             debug!("Handling msg_resp sent to ack wait channel: {msg_resp:?}");
             let (src, result) = match msg_resp {
-                Ok(MsgResponse::CmdResponse(src, response)) => (src, response.result().clone()),
+                Ok(MsgResponse::CmdResponse(src, resp)) => (src, resp.result().clone()),
                 Ok(MsgResponse::QueryResponse(src, resp)) => {
                     debug!("Unexpected query response received from {src:?} when awaiting a CmdAck: {resp:?}");
                     let _ = received_errors.insert(src);
@@ -111,8 +111,8 @@ impl Session {
                     );
 
                     if received_acks.len() >= expected_acks {
-                        trace!("Good! We've at or above {expected_acks} expected_acks");
-                        return Ok(());
+                        trace!("Good! We're at or above {expected_acks} expected_acks");
+                        return Ok(address);
                     }
                 }
                 Err(error) => {

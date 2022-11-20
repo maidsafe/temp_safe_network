@@ -16,7 +16,7 @@ use sn_interface::{
         DataCmd, DataQueryVariant, Error as NetworkDataError, QueryResponse, SpentbookCmd,
         SpentbookQuery,
     },
-    types::SpentbookAddress,
+    types::{DataAddress, SpentbookAddress},
 };
 
 use std::collections::BTreeSet;
@@ -47,7 +47,7 @@ impl Client {
         tx: RingCtTransaction,
         spent_proofs: BTreeSet<SpentProof>,
         spent_transactions: BTreeSet<RingCtTransaction>,
-    ) -> Result<(), Error> {
+    ) -> Result<DataAddress, Error> {
         let mut network_knowledge = None;
         let mut attempts = 1;
 
@@ -201,7 +201,7 @@ mod tests {
         assert_eq!(&genesis_key_image, key_image);
 
         // Spend the key_image.
-        client
+        let _ack_addr = client
             .spend_dbc(
                 *key_image,
                 tx.clone(),
