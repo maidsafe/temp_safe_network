@@ -163,7 +163,7 @@ impl MyNode {
                 let context = node.read().await.context();
                 // as we've data storage reqs inside here for reorganisation, we have async calls to
                 // the fs
-                MyNode::handle_anti_entropy_msg(node, &context, section_tree_update, kind, sender)
+                MyNode::handle_anti_entropy_msg(node, context, section_tree_update, kind, sender)
                     .await
             }
             // Respond to a probe msg
