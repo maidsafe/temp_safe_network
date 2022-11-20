@@ -66,8 +66,10 @@ pub enum Error {
     /// BLS key error
     #[error(transparent)]
     BlsError(#[from] BlsError),
-    #[error("The operation is invalid in its context: {0}.")]
-    InvalidOperation(String),
+    #[error(
+        "There is no CmdResponse for the variant of ReplicatedData as it is not used in a cmd."
+    )]
+    NoCmdResponseForTheVariant,
 }
 
 impl From<bincode::Error> for Error {

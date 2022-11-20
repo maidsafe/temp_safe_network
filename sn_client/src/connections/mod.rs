@@ -26,7 +26,7 @@ use tokio::sync::RwLock;
 pub(super) enum MsgResponse {
     CmdResponse(SocketAddr, Box<CmdResponse>),
     QueryResponse(SocketAddr, Box<QueryResponse>),
-    Failure(SocketAddr, Box<Error>),
+    Failure(SocketAddr, Error),
 }
 
 #[derive(Debug)]

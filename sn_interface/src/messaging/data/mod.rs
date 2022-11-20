@@ -241,16 +241,8 @@ impl CmdResponse {
                 CmdResponse::EditRegister(Ok(data.address()))
             }
             ReplicatedData::SpentbookWrite(_) => CmdResponse::SpendKey(Ok(data.address())),
-            ReplicatedData::RegisterLog(_) => {
-                return Err(Error::InvalidOperation(
-                    "RegisterLog is not resulting from a cmd.".to_string(),
-                ))
-            }
-            ReplicatedData::SpentbookLog(_) => {
-                return Err(Error::InvalidOperation(
-                    "SpentbookLog is not resulting from a cmd.".to_string(),
-                ))
-            }
+            ReplicatedData::RegisterLog(_) => return Err(Error::NoCorrespondingCmdError), // this should be unreachable, since `RegisterLog` is not resulting from a cmd.
+            ReplicatedData::SpentbookLog(_) => return Err(Error::NoCorrespondingCmdError), // this should be unreachable, since `SpentbookLog` is not resulting from a cmd.
         };
         Ok(res)
     }

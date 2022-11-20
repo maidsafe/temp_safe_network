@@ -600,10 +600,7 @@ impl Session {
                     Err(error) => {
                         error!("Error sending {msg_id:?} bidi to {peer:?}: {error:?}");
                         session.peer_links.remove_link_from_peer_links(&peer).await;
-                        MsgResponse::Failure(
-                            peer.addr(),
-                            Box::new(Error::FailedToInitateBiDiStream(msg_id)),
-                        )
+                        MsgResponse::Failure(peer.addr(), Error::FailedToInitateBiDiStream(msg_id))
                     }
                 }
             });

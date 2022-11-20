@@ -112,14 +112,8 @@ impl ReplicatedData {
                 Ok(CmdResponse::EditRegister(Err(error)))
             }
             Self::SpentbookWrite(_) => Ok(CmdResponse::SpendKey(Err(error))),
-            Self::SpentbookLog(_) => Err(Error::InvalidOperation(
-                "There is no CmdResponse for the SpentbookLog variant of ReplicatedData."
-                    .to_string(),
-            )),
-            Self::RegisterLog(_) => Err(Error::InvalidOperation(
-                "There is no CmdResponse for the RegisterLog variant of ReplicatedData."
-                    .to_string(),
-            )),
+            Self::SpentbookLog(_) => Err(Error::NoCmdResponseForTheVariant), // should be unreachable, since `SpentbookLog` is not resulting from a cmd.
+            Self::RegisterLog(_) => Err(Error::NoCmdResponseForTheVariant), // should be unreachable, since `RegisterLog` is not resulting from a cmd.,
         }
     }
 }

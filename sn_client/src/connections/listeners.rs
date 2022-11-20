@@ -62,10 +62,10 @@ impl Session {
             if attempt > MAX_AE_RETRIES_TO_ATTEMPT {
                 break MsgResponse::Failure(
                     addr,
-                    Box::new(Error::AntiEntropyMaxRetries {
+                    Error::AntiEntropyMaxRetries {
                         msg_id: correlation_id,
                         retries: attempt - 1,
-                    }),
+                    },
                 );
             }
 
@@ -90,17 +90,17 @@ impl Session {
                         attempt += 1;
                         continue;
                     }
-                    Err(err) => break MsgResponse::Failure(addr, Box::new(err)),
+                    Err(err) => break MsgResponse::Failure(addr, err),
                 },
                 Ok(msg @ MsgType::Client { .. }) => {
                     warn!("Unexpected ClientMsg type received for {correlation_id:?}: {msg:?}");
                     break MsgResponse::Failure(
                         addr,
-                        Box::new(Error::UnexpectedMsgType {
+                        Error::UnexpectedMsgType {
                             correlation_id,
                             peer,
                             msg,
-                        }),
+                        },
                     );
                 }
                 Ok(msg @ MsgType::NodeDataResponse { .. }) => {
@@ -109,14 +109,14 @@ impl Session {
                     );
                     break MsgResponse::Failure(
                         addr,
-                        Box::new(Error::UnexpectedMsgType {
+                        Error::UnexpectedMsgType {
                             correlation_id,
                             peer,
                             msg,
-                        }),
+                        },
                     );
                 }
-                Err(err) => break MsgResponse::Failure(addr, Box::new(err)),
+                Err(err) => break MsgResponse::Failure(addr, err),
             }
         };
 
