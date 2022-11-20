@@ -303,7 +303,7 @@ impl TestNodeBuilder {
         )
         .await?;
         let node = Arc::new(RwLock::new(node));
-        let dispatcher = Dispatcher::new(node);
+        let (dispatcher, _) = Dispatcher::new(node);
         Ok((dispatcher, section, peer, sk_set))
     }
 }

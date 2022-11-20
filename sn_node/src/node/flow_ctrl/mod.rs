@@ -15,14 +15,13 @@ mod periodic_checks;
 #[cfg(test)]
 pub(crate) mod tests;
 
+use crate::comm::MsgFromPeer;
+use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, Result};
 pub(crate) use cmd_ctrl::CmdCtrl;
 use periodic_checks::PeriodicChecksTimestamps;
-
-use crate::comm::MsgFromPeer;
-use crate::node::{flow_ctrl::cmds::Cmd, MyNode, Result};
-
+use sn_interface::messaging::system::{NodeDataCmd, NodeMsg};
 use sn_interface::types::log_markers::LogMarker;
-
+use sn_interface::types::{DataAddress, Peer};
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 
@@ -40,6 +39,7 @@ impl FlowCtrl {
     pub(crate) fn start(
         cmd_ctrl: CmdCtrl,
         mut incoming_msg_events: mpsc::Receiver<MsgFromPeer>,
+        mut data_replication_receiver: mpsc::Receiver<(Vec<DataAddress>, Peer)>,
     ) -> mpsc::Sender<(Cmd, Vec<usize>)> {
         let (cmd_sender_channel, mut incoming_cmds_from_apis) = mpsc::channel(10_000);
         let flow_ctrl = Self {
@@ -55,8 +55,12 @@ impl FlowCtrl {
 
         let cmd_channel = cmd_sender_channel.clone();
         let cmd_channel_for_msgs = cmd_sender_channel.clone();
+        let cmd_channel_for_data_replication = cmd_sender_channel.clone();
 
         let node = cmd_ctrl.node();
+        // on init grab a data storage clone for replication processes
+        let node_for_data_replication = node.clone();
+
         // start a new thread to kick off incoming cmds
         let _ = tokio::task::spawn(async move {
             // do one read to get a stable identifier for statemap naming.
@@ -69,6 +73,56 @@ impl FlowCtrl {
                 cmd_ctrl
                     .process_cmd_job(cmd, cmd_id, node_identifier, cmd_channel.clone())
                     .await
+            }
+        });
+
+        // start a new thread to kick off data replication
+        let _ = tokio::task::spawn(async move {
+            // on init grab a data storage clone for replication processes
+            let node_data_storage = node_for_data_replication.read().await.data_storage.clone();
+            // let pending_data_to_replicate_to_peers = BTreeMap::new();
+            // is there a simple way to dedupe common data going to many peers?
+            // is any overhead reduction worth the increased complexity?
+            while let Some((data_addresses, peer)) = data_replication_receiver.recv().await {
+                // TODO: To what extent might we want to bundle these messages?
+                let data_batch_size = 10; // at most bundle 10 pieces of data together into one message
+
+                let mut data_batch = vec![];
+                debug!(
+                    "{:?} Data {:?} to: {:?}",
+                    LogMarker::SendingMissingReplicatedData,
+                    data_addresses,
+                    peer,
+                );
+
+                for (i, address) in data_addresses.iter().enumerate() {
+                    // enumerate is 0 indexed, let's correct for that for counting
+                    // and then comparing to data_addresses
+                    let iteration = i + 1;
+                    let next_data_to_send = match node_data_storage
+                        .get_from_local_store(address)
+                        .await
+                    {
+                        Ok(data) => data,
+                        Err(error) => {
+                            error!("Error getting {address:?} from local storage during data replication flow: {error:?}");
+                            continue;
+                        }
+                    };
+                    data_batch.push(next_data_to_send);
+
+                    // if we hit the batch limit or we're at the last data to send...
+                    if iteration == data_batch_size || iteration == data_addresses.len() {
+                        let msg = NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateData(data_batch));
+                        let cmd = Cmd::send_msg(msg, Peers::Single(peer));
+                        if let Err(error) =
+                            cmd_channel_for_data_replication.send((cmd, vec![])).await
+                        {
+                            error!("Failed to enqueue send msg command for replication of data batch to {peer:?}: {error:?}");
+                        }
+                        data_batch = vec![];
+                    }
+                }
             }
         });
 

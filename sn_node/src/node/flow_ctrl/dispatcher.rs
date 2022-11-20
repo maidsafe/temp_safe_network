@@ -11,23 +11,35 @@ use crate::node::{messaging::Peers, Cmd, Error, MyNode, Result};
 use sn_interface::{
     messaging::{system::NodeMsg, Dst, MsgId, MsgKind, WireMsg},
     network_knowledge::{NetworkKnowledge, SectionTreeUpdate},
-    types::Peer,
+    types::{DataAddress, Peer},
 };
 
 use qp2p::UsrMsgBytes;
 
 use bytes::Bytes;
-use std::{collections::BTreeSet, sync::Arc};
-use tokio::sync::RwLock;
+use std::sync::Arc;
+use tokio::sync::{
+    mpsc::{channel, Receiver, Sender},
+    RwLock,
+};
 use xor_name::XorName;
 // Cmd Dispatcher.
 pub(crate) struct Dispatcher {
     node: Arc<RwLock<MyNode>>,
+    data_replication_sender: Sender<(Vec<DataAddress>, Peer)>,
 }
 
 impl Dispatcher {
-    pub(crate) fn new(node: Arc<RwLock<MyNode>>) -> Self {
-        Self { node }
+    /// Creates dispatcher and returns a receiver for enqueing DataAddresses for replication to specific peers
+    pub(crate) fn new(node: Arc<RwLock<MyNode>>) -> (Self, Receiver<(Vec<DataAddress>, Peer)>) {
+        let (data_replication_sender, data_replication_receiver) = channel(1_000);
+        (
+            Self {
+                node,
+                data_replication_sender,
+            },
+            data_replication_receiver,
+        )
     }
 
     pub(crate) fn node(&self) -> Arc<RwLock<MyNode>> {
@@ -179,23 +191,28 @@ impl Dispatcher {
                 recipient,
                 data_batch,
             } => {
-                // we should queue this
-                for data in data_batch {
-                    trace!("data being enqueued for replication {:?}", data);
-                    let mut node = self.node.write().await;
-                    debug!("[NODE WRITE]: data for repl write got");
-                    if let Some(peers_set) = node.pending_data_to_replicate_to_peers.get_mut(&data)
-                    {
-                        debug!("data already queued, adding peer");
-                        let _existed = peers_set.insert(recipient);
-                    } else {
-                        let mut peers_set = BTreeSet::new();
-                        let _existed = peers_set.insert(recipient);
-                        let _existed = node
-                            .pending_data_to_replicate_to_peers
-                            .insert(data, peers_set);
-                    };
-                }
+                self.data_replication_sender
+                    .send((data_batch, recipient))
+                    .await
+                    .map_err(|_| Error::DataReplicationChanel)?;
+
+                // // we should queue this
+                // for data in data_batch {
+                //     trace!("data being enqueued for replication {:?}", data);
+                //     let mut node = self.node.write().await;
+                //     debug!("[NODE WRITE]: data for repl write got");
+                //     if let Some(peers_set) = node.pending_data_to_replicate_to_peers.get_mut(&data)
+                //     {
+                //         debug!("data already queued, adding peer");
+                //         let _existed = peers_set.insert(recipient);
+                //     } else {
+                //         let mut peers_set = BTreeSet::new();
+                //         let _existed = peers_set.insert(recipient);
+                //         let _existed = node
+                //             .pending_data_to_replicate_to_peers
+                //             .insert(data, peers_set);
+                //     };
+                // }
                 Ok(vec![])
             }
             Cmd::ProposeVoteNodesOffline(names) => {
