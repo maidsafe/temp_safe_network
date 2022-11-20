@@ -183,8 +183,6 @@ impl MyNode {
     ///   Ok(true) if the update had new valid information
     ///   Ok(false) if the update was valid but did not contain new information
     ///   Err(_) if the update was invalid
-    ///
-    /// Operates on the context mutably
     pub(crate) fn would_we_update_network_knowledge(
         context: &NodeContext,
         section_tree_update: SectionTreeUpdate,
@@ -246,7 +244,7 @@ impl MyNode {
     #[instrument(skip_all)]
     pub(crate) async fn handle_anti_entropy_msg(
         node: Arc<RwLock<MyNode>>,
-        context: &NodeContext,
+        context: NodeContext,
         section_tree_update: SectionTreeUpdate,
         kind: AntiEntropyKind,
         sender: Peer,
@@ -266,7 +264,7 @@ impl MyNode {
         // block off the write lock
         let updated = {
             let should_update = MyNode::would_we_update_network_knowledge(
-                context,
+                &context,
                 section_tree_update.clone(),
                 members.clone(),
             )?;
@@ -274,7 +272,7 @@ impl MyNode {
                 let mut write_locked_node = node.write().await;
                 debug!("[NODE WRITE]: handling AE write gottt...");
                 let updated = write_locked_node.update_network_knowledge(
-                    context,
+                    &context,
                     section_tree_update,
                     members,
                 )?;
