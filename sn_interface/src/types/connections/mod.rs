@@ -56,13 +56,18 @@ impl PeerLinks {
         false
     }
 
-    /// This method is tailored to the use-case of connecting on creation.
-    /// I.e. it will connect here.
-    /// This helps to avoid many parallel msg attempts to a peer causing strain over the
-    /// internal connection locks during initial mesage sending (when otherwise no
-    /// connection would exist)
-    pub async fn get_or_create_link(&self, peer: &Peer) -> Link {
+    /// This method is tailored to the use-case of connecting on send.
+    /// I.e. it will not connect here, but on calling send on the returned link.
+    pub async fn get_or_create_link(&self, peer: &Peer, connect_now: bool) -> Link {
         if let Some(link) = self.get(peer).await {
+            if connect_now {
+                if let Err(error) = link.create_connection_if_none_exist(None).await {
+                    error!(
+                        "Error during create connection attempt for link to {:?}: {error:?}",
+                        peer
+                    );
+                }
+            }
             return link;
         }
 
@@ -77,6 +82,14 @@ impl PeerLinks {
             // still not in list, go ahead and create + insert
             None => {
                 let link = Link::new(*peer, self.endpoint.clone());
+                if connect_now {
+                    if let Err(error) = link.create_connection_if_none_exist(None).await {
+                        error!(
+                            "Error during create connection attempt for link to {:?}: {error:?}",
+                            peer
+                        );
+                    }
+                }
                 let _ = links.insert(*peer, link.clone());
                 link
             }

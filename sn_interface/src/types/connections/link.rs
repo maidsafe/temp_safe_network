@@ -89,7 +89,7 @@ impl Link {
             // will access only after the first one finished creating a new connection
             // thus will find a connection here:
             debug!("{msg_id:?} creating conn with {:?}", self.peer);
-            self.create_connection_if_none_exist(msg_id).await
+            self.create_connection_if_none_exist(Some(msg_id)).await
         } else {
             debug!("{msg_id:?} connections do exist...");
             // TODO: add in simple connection check when available.
@@ -98,7 +98,7 @@ impl Link {
             let conn = connections.iter().next().map(|(_, c)| c.clone());
             // we have to drop connection read here before we attempt to create (and write) connections
             drop(connections);
-            Ok(conn.unwrap_or(self.create_connection_if_none_exist(msg_id).await?))
+            Ok(conn.unwrap_or(self.create_connection_if_none_exist(Some(msg_id)).await?))
         }
     }
 
@@ -113,9 +113,9 @@ impl Link {
     ///
     /// (There is a strong chance for a client writing many chunks to find no connection for each chunk and then try and create connections...
     /// which could lead to connection after connection being created if we do not check here)
-    async fn create_connection_if_none_exist(
+    pub(crate) async fn create_connection_if_none_exist(
         &self,
-        msg_id: MsgId,
+        msg_id: Option<MsgId>,
     ) -> Result<Connection, SendToOneError> {
         // grab write lock to prevent many many conns being opened at once
         debug!("[CONN WRITE]: {msg_id:?} to {:?}", self.peer);

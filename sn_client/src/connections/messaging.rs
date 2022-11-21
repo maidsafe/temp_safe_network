@@ -32,6 +32,42 @@ pub(crate) const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
 pub(crate) const NODES_TO_CONTACT_PER_STARTUP_BATCH: usize = 3;
 
 impl Session {
+    #[instrument(skip(self), level = "debug", name = "session setup conns")]
+    /// Make a best effort to pre connect to only relevant nodes for a set of dst addresses
+    /// This should reduce the number of connections attempts to the same elder set
+    pub(crate) async fn setup_connections_to_relevant_nodes(
+        &self,
+        dst_addresses: Vec<XorName>,
+    ) -> Result<()> {
+        let mut relevant_elders = BTreeSet::new();
+        // TODO: get relevant nodes
+        for address in dst_addresses {
+            let (_, elders) = self.get_cmd_elders(address).await?;
+            for elder in elders {
+                let _existed = relevant_elders.insert(elder);
+            }
+        }
+
+        let mut tasks = vec![];
+        for peer in relevant_elders {
+            let session = self.clone();
+
+            let task = async move {
+                let connect_now = true;
+                // We don't retry here.. if we fail it will be retried on a per message basis
+                let _ = session
+                    .peer_links
+                    .get_or_create_link(&peer, connect_now)
+                    .await;
+            };
+            tasks.push(task);
+        }
+
+        let _ = futures::future::join_all(tasks).await;
+
+        Ok(())
+    }
+
     #[instrument(skip(self, auth, payload), level = "debug", name = "session send cmd")]
     pub(crate) async fn send_cmd(
         &self,
@@ -571,7 +607,7 @@ impl Session {
             let bytes = bytes.clone();
 
             let _abort_handle = tasks.spawn(async move {
-                let link = session.peer_links.get_or_create_link(&peer).await;
+                let link = session.peer_links.get_or_create_link(&peer, false).await;
 
                 debug!("Trying to send msg to link {msg_id:?} to {peer:?}");
                 match link.send_bi(bytes.clone(), msg_id).await {
