@@ -336,10 +336,8 @@ mod core {
         }
 
         /// returns names that are relatively dysfunctional
-        pub(crate) fn get_dysfunctional_node_names(&mut self) -> Result<BTreeSet<XorName>> {
-            self.dysfunction_tracking
-                .get_dysfunctional_nodes()
-                .map_err(Error::from)
+        pub(crate) fn get_dysfunctional_node_names(&mut self) -> BTreeSet<XorName> {
+            self.dysfunction_tracking.get_dysfunctional_nodes()
         }
 
         /// Log an issue in dysfunction

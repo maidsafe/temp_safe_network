@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{error::Result, get_mean_of, std_deviation, DysfunctionDetection, OperationId};
+use crate::{get_mean_of, std_deviation, DysfunctionDetection, OperationId};
 
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
@@ -238,7 +238,7 @@ impl DysfunctionDetection {
         final_scores
     }
 
-    fn cleanup_time_sensistive_checks(&mut self) -> Result<()> {
+    fn cleanup_time_sensistive_checks(&mut self) {
         for issues in &mut self.communication_issues.values_mut() {
             issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
         }
@@ -254,16 +254,14 @@ impl DysfunctionDetection {
         for issues in &mut self.dkg_issues.values_mut() {
             issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
         }
-
-        Ok(())
     }
 
     /// Get a list of nodes whose score is  DYSFUNCTION_SCORE_THRESHOLD
     /// TODO: order these to act upon _most_ dysfunctional first
     /// (the nodes must all `ProposeOffline` over a dysfunctional node and then _immediately_ vote it off. So any other membershipn changes in flight could block this.
     /// thus, we need to be callling this function often until nodes are removed.)
-    pub fn get_dysfunctional_nodes(&mut self) -> Result<BTreeSet<XorName>> {
-        self.cleanup_time_sensistive_checks()?;
+    pub fn get_dysfunctional_nodes(&mut self) -> BTreeSet<XorName> {
+        self.cleanup_time_sensistive_checks();
 
         let mut dysfunctional_nodes = BTreeSet::new();
 
@@ -277,7 +275,7 @@ impl DysfunctionDetection {
             }
         }
 
-        Ok(dysfunctional_nodes)
+        dysfunctional_nodes
     }
 }
 
@@ -617,11 +615,7 @@ mod tests {
                         }
                     }
                     // now we can see what we have...
-                    let dysfunctional_nodes_found = match dysfunctional_detection
-                        .get_dysfunctional_nodes() {
-                            Ok(nodes) => nodes,
-                            Err(error) => bail!("Failed getting dysfunctional nodes from DysfunctionDetector: {error}")
-                        };
+                    let dysfunctional_nodes_found = dysfunctional_detection.get_dysfunctional_nodes();
 
                     info!("======================");
                     info!("dysf found len {:?}:, expected {:}", dysfunctional_nodes_found.len(), bad_len );
@@ -712,11 +706,7 @@ mod tests {
                     }
                 }
                 // now we can see what we have...
-                let dysfunctional_nodes_found = match dysfunctional_detection
-                    .get_dysfunctional_nodes() {
-                        Ok(nodes) => nodes,
-                        Err(error) => bail!("Failed getting dysfunctional nodes from DysfunctionDetector: {error}")
-                    };
+                    let dysfunctional_nodes_found = dysfunctional_detection.get_dysfunctional_nodes();
 
                 info!("======================");
                 info!("dysf found len {:?}:, expected {:}?", dysfunctional_nodes_found.len(), bad_len );
@@ -798,11 +788,7 @@ mod tests {
                         }
                     }
                     // now we can see what we have...
-                    let dysfunctional_nodes_found = match dysfunctional_detection
-                        .get_dysfunctional_nodes() {
-                            Ok(nodes) => nodes,
-                            Err(error) => bail!("Failed getting dysfunctional nodes from DysfunctionDetector: {error}")
-                        };
+                    let dysfunctional_nodes_found = dysfunctional_detection.get_dysfunctional_nodes();
 
                     info!("======================");
                     info!("dysf found len {:?}:, expected {:}?", dysfunctional_nodes_found.len(), bad_len );
@@ -899,7 +885,7 @@ mod ops_tests {
             }
         }
 
-        assert_eq!(dysfunctional_detection.get_dysfunctional_nodes()?.len(), 0);
+        assert_eq!(dysfunctional_detection.get_dysfunctional_nodes().len(), 0);
 
         // We now fulfill all operations except those for the nodes[0]
         // to create a deviation
@@ -907,7 +893,7 @@ mod ops_tests {
             assert!(dysfunctional_detection.request_operation_fulfilled(op.0, op.1));
         }
         // as this is normal, we should not detect anything off
-        assert_eq!(dysfunctional_detection.get_dysfunctional_nodes()?.len(), 0);
+        assert_eq!(dysfunctional_detection.get_dysfunctional_nodes().len(), 0);
 
         // adding more issues though, and we should see some dysfunction
         for _ in 0..300 {
@@ -917,7 +903,7 @@ mod ops_tests {
         }
 
         // Now we should start detecting...
-        assert_eq!(dysfunctional_detection.get_dysfunctional_nodes()?.len(), 1);
+        assert_eq!(dysfunctional_detection.get_dysfunctional_nodes().len(), 1);
         Ok(())
     }
 }
@@ -948,7 +934,7 @@ mod comm_tests {
         }
 
         assert_eq!(
-            dysfunctional_detection.get_dysfunctional_nodes()?.len(),
+            dysfunctional_detection.get_dysfunctional_nodes().len(),
             0,
             "no nodes are dysfunctional"
         );
@@ -987,7 +973,7 @@ mod knowledge_tests {
         // Assert there are not any dysfuncitonal nodes
         // This is because all of them are within the tolerance ratio of each other
         assert_eq!(
-            dysfunctional_detection.get_dysfunctional_nodes()?.len(),
+            dysfunctional_detection.get_dysfunctional_nodes().len(),
             0,
             "no nodes are dysfunctional"
         );
@@ -1017,7 +1003,7 @@ mod knowledge_tests {
             dysfunctional_detection.track_issue(new_node, IssueType::Knowledge);
         }
 
-        let dysfunctional_nodes = dysfunctional_detection.get_dysfunctional_nodes()?;
+        let dysfunctional_nodes = dysfunctional_detection.get_dysfunctional_nodes();
 
         // Assert that the new node is not dysfuncitonal
         assert!(
@@ -1052,7 +1038,7 @@ mod knowledge_tests {
         // and add one for our "bad" node, too
         dysfunctional_detection.track_issue(new_node, IssueType::AwaitingProbeResponse);
 
-        let dysfunctional_nodes = dysfunctional_detection.get_dysfunctional_nodes()?;
+        let dysfunctional_nodes = dysfunctional_detection.get_dysfunctional_nodes();
 
         // Assert that the new node is not dysfuncitonal
         assert!(
@@ -1069,7 +1055,7 @@ mod knowledge_tests {
         // to label this as dysfuncitonal
         dysfunctional_detection.track_issue(new_node, IssueType::AwaitingProbeResponse);
 
-        let dysfunctional_nodes = dysfunctional_detection.get_dysfunctional_nodes()?;
+        let dysfunctional_nodes = dysfunctional_detection.get_dysfunctional_nodes();
 
         // Assert that the new node is not dysfuncitonal
         assert!(
@@ -1087,7 +1073,7 @@ mod knowledge_tests {
             dysfunctional_detection.track_issue(new_node, IssueType::AwaitingProbeResponse);
         }
 
-        let dysfunctional_nodes = dysfunctional_detection.get_dysfunctional_nodes()?;
+        let dysfunctional_nodes = dysfunctional_detection.get_dysfunctional_nodes();
 
         // Assert that the new node is now dysfuncitonal
         assert!(
