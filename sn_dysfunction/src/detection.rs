@@ -238,7 +238,8 @@ impl DysfunctionDetection {
         final_scores
     }
 
-    fn cleanup_time_sensistive_checks(&mut self) -> Result<()> {
+    /// Cleanup those time sensitive checks
+    pub fn cleanup_time_sensistive_checks(&mut self) {
         for issues in &mut self.communication_issues.values_mut() {
             issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
         }
@@ -254,17 +255,13 @@ impl DysfunctionDetection {
         for issues in &mut self.dkg_issues.values_mut() {
             issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
         }
-
-        Ok(())
     }
 
     /// Get a list of nodes whose score is  DYSFUNCTION_SCORE_THRESHOLD
     /// TODO: order these to act upon _most_ dysfunctional first
     /// (the nodes must all `ProposeOffline` over a dysfunctional node and then _immediately_ vote it off. So any other membershipn changes in flight could block this.
     /// thus, we need to be callling this function often until nodes are removed.)
-    pub fn get_dysfunctional_nodes(&mut self) -> Result<BTreeSet<XorName>> {
-        self.cleanup_time_sensistive_checks()?;
-
+    pub fn get_dysfunctional_nodes(&self) -> Result<BTreeSet<XorName>> {
         let mut dysfunctional_nodes = BTreeSet::new();
 
         let final_scores = self.get_weighted_scores();

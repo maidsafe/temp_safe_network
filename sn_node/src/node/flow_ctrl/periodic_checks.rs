@@ -27,6 +27,8 @@ const MISSING_DKG_MSG_INTERVAL: Duration = Duration::from_secs(5);
 const SECTION_PROBE_INTERVAL: Duration = Duration::from_secs(300);
 const DATA_BATCH_INTERVAL: Duration = Duration::from_millis(50);
 const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(5);
+// How often do we clear time sensitive checks?
+const DYSFUNCTION_CLEANUP_INTERVAL: Duration = Duration::from_secs(60);
 // 30 adult nodes checked per minute., so each node should be queried 10x in 10 mins
 // Which should hopefully trigger dysfunction if we're not getting responses back
 // const ADULT_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(2);
@@ -41,6 +43,7 @@ pub(super) struct PeriodicChecksTimestamps {
     last_dkg_msg_check: Instant,
     last_data_batch_check: Instant,
     last_dysfunction_check: Instant,
+    last_dysfunction_cleanup: Instant,
 }
 
 impl PeriodicChecksTimestamps {
@@ -54,6 +57,7 @@ impl PeriodicChecksTimestamps {
             last_dkg_msg_check: Instant::now(),
             last_data_batch_check: Instant::now(),
             last_dysfunction_check: Instant::now(),
+            last_dysfunction_cleanup: Instant::now(),
         }
     }
 }
@@ -184,6 +188,13 @@ impl FlowCtrl {
             Self::check_for_missed_dkg_messages(self.node.clone(), self.cmd_sender_channel.clone())
                 .await;
             debug!(" ----> dkg msg periodics done");
+        }
+
+        if self.timestamps.last_dysfunction_cleanup.elapsed() > DYSFUNCTION_CLEANUP_INTERVAL {
+            debug!(" ----> dysfn periodic cleanup start");
+            self.timestamps.last_dysfunction_cleanup = now;
+            self.node.write().await.cleanup_time_sensitive_dysfunction();
+            debug!(" ----> dysfn periodic cleanup done");
         }
 
         if self.timestamps.last_dysfunction_check.elapsed() > DYSFUNCTION_CHECK_INTERVAL {
@@ -413,9 +424,8 @@ impl FlowCtrl {
     async fn check_for_dysfunction(node: Arc<RwLock<MyNode>>) -> Vec<Cmd> {
         info!("Performing dysfunction checking");
         let mut cmds = vec![];
-        debug!("[NODE WRITE]: periodic dysf  write ...");
-        let dysfunctional_nodes = node.write().await.get_dysfunctional_node_names();
-        debug!("[NODE WRITE]: periodic dysf write gottt...");
+        let dysfunctional_nodes = node.read().await.get_dysfunctional_node_names();
+        debug!("[NODE READ]: periodic dysf read lock obtained.");
 
         let unresponsive_nodes = match dysfunctional_nodes {
             Ok(nodes) => nodes,
