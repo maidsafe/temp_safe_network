@@ -359,7 +359,7 @@ impl MyNode {
 
                 let mut node = node.write().await;
                 debug!("[NODE WRITE]: DKGstart write gottt...");
-                node.log_dkg_session(&sender.name());
+                node.log_dkg_session(sender.name()).await;
                 node.handle_dkg_start(session_id, elder_sig)
             }
             NodeMsg::DkgEphemeralPubKey {
@@ -392,7 +392,7 @@ impl MyNode {
                 );
                 let mut node = node.write().await;
                 debug!("[NODE WRITE]: DKG Votes write gottt...");
-                node.log_dkg_session(&sender.name());
+                node.log_dkg_session(sender.name()).await;
                 node.handle_dkg_votes(&session_id, pub_keys, votes, sender)
             }
             NodeMsg::DkgAE(session_id) => {

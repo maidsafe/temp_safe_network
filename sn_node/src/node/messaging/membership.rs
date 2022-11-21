@@ -172,7 +172,7 @@ impl MyNode {
         }
     }
 
-    pub(crate) fn handle_membership_decision(
+    pub(crate) async fn handle_membership_decision(
         &mut self,
         decision: Decision<NodeState>,
     ) -> Result<Vec<Cmd>> {
@@ -192,7 +192,7 @@ impl MyNode {
         );
 
         for (new_info, signature) in joining_nodes.iter().cloned() {
-            cmds.extend(self.handle_node_joined(new_info, signature));
+            cmds.extend(self.handle_node_joined(new_info, signature).await);
         }
 
         for (new_info, signature) in leaving_nodes.iter().cloned() {
@@ -217,7 +217,7 @@ impl MyNode {
             cmds.extend(self.relocate_peers(churn_id, excluded_from_relocation)?);
         }
 
-        cmds.extend(self.trigger_dkg()?);
+        cmds.extend(self.trigger_dkg().await?);
         cmds.extend(self.send_ae_update_to_our_section()?);
 
         self.liveness_retain_only(
@@ -226,7 +226,8 @@ impl MyNode {
                 .iter()
                 .map(|peer| peer.name())
                 .collect(),
-        )?;
+        )
+        .await;
 
         if !leaving_nodes.is_empty() {
             self.joins_allowed = true;
@@ -238,7 +239,7 @@ impl MyNode {
         Ok(cmds)
     }
 
-    fn handle_node_joined(&mut self, new_info: NodeState, signature: Signature) -> Vec<Cmd> {
+    async fn handle_node_joined(&mut self, new_info: NodeState, signature: Signature) -> Vec<Cmd> {
         let sig = SectionSig {
             public_key: self.network_knowledge.section_key(),
             signature,
@@ -254,7 +255,7 @@ impl MyNode {
             return vec![];
         }
 
-        self.add_new_adult_to_trackers(new_info.name());
+        self.add_new_adult_to_trackers(new_info.name()).await;
 
         info!("handle Online: {}", new_info.peer());
 
