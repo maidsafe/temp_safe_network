@@ -272,7 +272,7 @@ impl MyNode {
                 return Ok(vec![Cmd::TrackNodeIssueInDysfunction {
                     name: target.name(),
                     // TODO: no need for op id tracking here, this can be a simple counter
-                    issue: IssueType::PendingRequestOperation(operation_id),
+                    issue: IssueType::RequestOperation(operation_id),
                 }]);
             }
         }?;

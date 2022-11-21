@@ -700,8 +700,7 @@ mod core {
         /// Log a AE update message as responded to
         pub(crate) async fn log_ae_update_msg(&self, name: XorName) {
             trace!("Logging AE update message as responded to in dysfunction for {name}");
-            self.untrack_node_issue(name, IssueType::AwaitingProbeResponse)
-                .await
+            self.untrack_node_issue(name, IssueType::AeProbeMsg).await
         }
 
         #[allow(unused)]

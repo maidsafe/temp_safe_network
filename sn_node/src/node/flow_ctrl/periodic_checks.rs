@@ -258,7 +258,7 @@ impl FlowCtrl {
             // whhich is countered when an AE-Update is
             cmds.push(Cmd::TrackNodeIssueInDysfunction {
                 name: elder.name(),
-                issue: sn_dysfunction::IssueType::AwaitingProbeResponse,
+                issue: sn_dysfunction::IssueType::AeProbeMsg,
             });
         }
 

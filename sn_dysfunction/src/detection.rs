@@ -33,8 +33,8 @@ static DYSFUNCTION_SCORE_THRESHOLD: usize = 500;
 /// system.
 /// Issues have a xorname so they can be reliable assignd to the same nodes
 pub enum IssueType {
-    /// Represents an AEProbeMsg has been sent, but we're awaiting response.
-    AwaitingProbeResponse,
+    /// Represents an AeProbeMsg to be tracked by Dysfunction Detection.
+    AeProbeMsg,
     /// Represents a Dkg issue to be tracked by Dysfunction Detection.
     Dkg,
     /// Represents a communication issue to be tracked by Dysfunction Detection.
@@ -42,7 +42,7 @@ pub enum IssueType {
     /// Represents a knowledge issue to be tracked by Dysfunction Detection.
     Knowledge,
     /// Represents a pending request operation issue to be tracked by Dysfunction Detection.
-    PendingRequestOperation(OperationId),
+    RequestOperation(OperationId),
 }
 
 #[derive(Debug)]
@@ -77,7 +77,7 @@ impl DysfunctionDetection {
             );
             let _ = probe_scores.insert(
                 *node,
-                self.calculate_node_score_for_type(node, &IssueType::AwaitingProbeResponse),
+                self.calculate_node_score_for_type(node, &IssueType::AeProbeMsg),
             );
             let _ = communication_scores.insert(
                 *node,
@@ -91,7 +91,7 @@ impl DysfunctionDetection {
                 *node,
                 self.calculate_node_score_for_type(
                     node,
-                    &IssueType::PendingRequestOperation(OperationId::random()),
+                    &IssueType::RequestOperation(OperationId::random()),
                 ),
             );
         }
@@ -143,7 +143,7 @@ impl DysfunctionDetection {
                     0
                 }
             }
-            IssueType::AwaitingProbeResponse => {
+            IssueType::AeProbeMsg => {
                 if let Some(issues) = self.probe_issues.get(node) {
                     issues.len()
                 } else {
@@ -157,7 +157,7 @@ impl DysfunctionDetection {
                     0
                 }
             }
-            IssueType::PendingRequestOperation(_) => {
+            IssueType::RequestOperation(_) => {
                 if let Some(issues) = self.unfulfilled_ops.get(node) {
                     // To avoid the case that the check get carried out just after
                     // burst of messages get inserted, only those issues has sat a
@@ -323,7 +323,7 @@ mod tests {
         prop_oneof![
         230 => Just(IssueType::Communication),
         500 => Just(IssueType::Dkg),
-        30 => Just(IssueType::AwaitingProbeResponse),
+        30 => Just(IssueType::AeProbeMsg),
         450 => Just(IssueType::Knowledge),
         ]
     }
@@ -342,10 +342,10 @@ mod tests {
         prop_oneof![
             1200 => Just(IssueType::Communication),
             0 => Just(IssueType::Dkg),
-            50 => Just(IssueType::AwaitingProbeResponse),
+            50 => Just(IssueType::AeProbeMsg),
             0 => Just(IssueType::Knowledge),
             3400 => (any::<[u8; 32]>())
-                .prop_map(|x| IssueType::PendingRequestOperation(OperationId(x)))
+                .prop_map(|x| IssueType::RequestOperation(OperationId(x)))
         ]
     }
 
@@ -447,7 +447,7 @@ mod tests {
         nodes: &[(XorName, NodeQualityScored)],
         elders_count: usize,
     ) -> Vec<(XorName, NodeQualityScored)> {
-        if matches!(issue, IssueType::Dkg) || matches!(issue, IssueType::AwaitingProbeResponse) {
+        if matches!(issue, IssueType::Dkg) || matches!(issue, IssueType::AeProbeMsg) {
             nodes
                 .iter()
                 .sorted_by(|lhs, rhs| root.clone().cmp_distance(&lhs.0, &rhs.0))
@@ -487,7 +487,7 @@ mod tests {
                     IssueType::Dkg => {
                         assert_eq!(score_results.dkg_scores.len(), node_count);
                     },
-                    IssueType::AwaitingProbeResponse => {
+                    IssueType::AeProbeMsg => {
                         assert_eq!(score_results.probe_scores.len(), node_count);
                     },
                     IssueType::Communication => {
@@ -496,7 +496,7 @@ mod tests {
                     IssueType::Knowledge => {
                         assert_eq!(score_results.knowledge_scores.len(), node_count);
                     },
-                    IssueType::PendingRequestOperation(_) => {
+                    IssueType::RequestOperation(_) => {
                         assert_eq!(score_results.op_scores.len(), node_count);
                     },
                 }
@@ -530,7 +530,7 @@ mod tests {
                     IssueType::Dkg => {
                         score_results.dkg_scores
                     },
-                    IssueType::AwaitingProbeResponse => {
+                    IssueType::AeProbeMsg => {
                         score_results.probe_scores
                     },
                     IssueType::Communication => {
@@ -539,7 +539,7 @@ mod tests {
                     IssueType::Knowledge => {
                         score_results.knowledge_scores
                     },
-                    IssueType::PendingRequestOperation(_) => {
+                    IssueType::RequestOperation(_) => {
                         score_results.op_scores
                     },
                 };
@@ -838,7 +838,7 @@ mod tests {
                     IssueType::Communication => {
                         score_results.communication_scores
                     },
-                    IssueType::AwaitingProbeResponse => {
+                    IssueType::AeProbeMsg => {
                         score_results.probe_scores
                     },
                     IssueType::Dkg => {
@@ -847,7 +847,7 @@ mod tests {
                     IssueType::Knowledge => {
                         score_results.knowledge_scores
                     },
-                    IssueType::PendingRequestOperation(_) => {
+                    IssueType::RequestOperation(_) => {
                         score_results.op_scores
                     },
                 };
@@ -880,8 +880,7 @@ mod ops_tests {
             for _ in 0..NORMAL_OPERATIONS_ISSUES {
                 let op_id = OperationId::random();
                 pending_operations.push((node, op_id));
-                dysfunctional_detection
-                    .track_issue(*node, IssueType::PendingRequestOperation(op_id));
+                dysfunctional_detection.track_issue(*node, IssueType::RequestOperation(op_id));
             }
         }
 
@@ -898,8 +897,7 @@ mod ops_tests {
         // adding more issues though, and we should see some dysfunction
         for _ in 0..300 {
             let op_id = OperationId::random();
-            dysfunctional_detection
-                .track_issue(nodes[0], IssueType::PendingRequestOperation(op_id));
+            dysfunctional_detection.track_issue(nodes[0], IssueType::RequestOperation(op_id));
         }
 
         // Now we should start detecting...
@@ -1031,11 +1029,11 @@ mod knowledge_tests {
 
         // Add just one issue to all, this gets us a baseline avg to not overly skew results
         for node in nodes {
-            dysfunctional_detection.track_issue(node, IssueType::AwaitingProbeResponse);
+            dysfunctional_detection.track_issue(node, IssueType::AeProbeMsg);
         }
 
         // and add one for our "bad" node, too
-        dysfunctional_detection.track_issue(new_node, IssueType::AwaitingProbeResponse);
+        dysfunctional_detection.track_issue(new_node, IssueType::AeProbeMsg);
 
         let dysfunctional_nodes = dysfunctional_detection.get_dysfunctional_nodes();
 
@@ -1052,7 +1050,7 @@ mod knowledge_tests {
 
         // and add another for our "bad" node, two AeProbes should not be sufficient reason
         // to label this as dysfuncitonal
-        dysfunctional_detection.track_issue(new_node, IssueType::AwaitingProbeResponse);
+        dysfunctional_detection.track_issue(new_node, IssueType::AeProbeMsg);
 
         let dysfunctional_nodes = dysfunctional_detection.get_dysfunctional_nodes();
 
@@ -1069,7 +1067,7 @@ mod knowledge_tests {
 
         // and some more issues for our "bad" node
         for _ in 0..4 {
-            dysfunctional_detection.track_issue(new_node, IssueType::AwaitingProbeResponse);
+            dysfunctional_detection.track_issue(new_node, IssueType::AeProbeMsg);
         }
 
         let dysfunctional_nodes = dysfunctional_detection.get_dysfunctional_nodes();

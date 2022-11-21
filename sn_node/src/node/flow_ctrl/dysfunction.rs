@@ -44,11 +44,9 @@ impl FlowCtrl {
                     DysCmds::UntrackIssue(node, issue) => {
                         debug!("Attempting to remove {issue:?} from {node:?}");
                         match issue {
-                            IssueType::AwaitingProbeResponse => {
-                                dysfunction.ae_update_msg_received(&node)
-                            }
+                            IssueType::AeProbeMsg => dysfunction.ae_update_msg_received(&node),
                             IssueType::Dkg => dysfunction.dkg_ack_fulfilled(&node),
-                            IssueType::PendingRequestOperation(op_id) => {
+                            IssueType::RequestOperation(op_id) => {
                                 let _ = dysfunction.request_operation_fulfilled(&node, op_id);
                             }
                             _ => {}
