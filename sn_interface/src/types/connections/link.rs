@@ -56,9 +56,9 @@ impl Link {
         bytes: UsrMsgBytes,
         msg_id: MsgId,
     ) -> Result<RecvStream, SendToOneError> {
-        debug!("sending bidi msg out... {msg_id:?} ");
+        debug!("sending bidi msg out... {msg_id:?} to {:?} ", self.peer);
         let conn = self.get_or_connect(msg_id).await?;
-        debug!("conenction got {msg_id:?}");
+        debug!("connection got {msg_id:?} to {:?}", self.peer);
         let (mut send_stream, recv_stream) =
             conn.open_bi().await.map_err(SendToOneError::Connection)?;
 
@@ -118,9 +118,9 @@ impl Link {
         msg_id: MsgId,
     ) -> Result<Connection, SendToOneError> {
         // grab write lock to prevent many many conns being opened at once
-        debug!("[CONN WRITE]: {msg_id:?}");
+        debug!("[CONN WRITE]: {msg_id:?} to {:?}", self.peer);
         let mut conns = self.connections.write().await;
-        debug!("[CONN WRITE]: lock obtained {msg_id:?}");
+        debug!("[CONN WRITE]: lock obtained {msg_id:?} to {:?}", self.peer);
 
         // let's double check we havent got a connection meanwhile
         if let Some(conn) = conns.iter().next().map(|(_, c)| c.clone()) {
