@@ -15,8 +15,9 @@ use itertools::Itertools;
 use qp2p::{SendStream, UsrMsgBytes};
 use sn_interface::{
     messaging::{
+        data::ClientDataResponse,
         system::{AntiEntropyKind, NodeDataCmd, NodeMsg, SectionSigned},
-        MsgId, MsgType, WireMsg,
+        Dst, MsgId, MsgType, WireMsg,
     },
     network_knowledge::{NodeState, SectionTreeUpdate},
     types::{log_markers::LogMarker, Peer, PublicKey},
@@ -25,7 +26,119 @@ use std::{collections::BTreeSet, sync::Arc};
 use tokio::sync::{Mutex, RwLock};
 use xor_name::{Prefix, XorName};
 
+// Returned by `check_for_entropy` private helper to indicate the
+// type of AE response that needs to be sent back to either to the client/Node
+enum AeResponseKind {
+    Retry(SectionTreeUpdate),
+    Redirect(SectionTreeUpdate),
+}
+
 impl MyNode {
+    /// Check if the origin needs to be updated on network structure/members.
+    /// Returns an ae cmd if we need to halt msg validation and update the origin instead.
+    #[instrument(skip_all)]
+    pub(crate) async fn check_ae_on_node_msg(
+        context: &NodeContext,
+        origin: &Peer,
+        msg: &NodeMsg,
+        wire_msg: &WireMsg,
+        dst: &Dst,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
+    ) -> Result<Vec<Cmd>> {
+        // Adult nodes don't need to carry out entropy checking,
+        // however the message shall always be handled.
+        if !context.is_elder {
+            return Ok(vec![]);
+        }
+        // For the case of receiving a join request not matching our prefix,
+        // we just let the join request handler to deal with it later on.
+        // We also skip AE check on Anti-Entropy messages
+        //
+        // TODO: consider changing the join and "join as relocated" flows to
+        // make use of AntiEntropy retry/redirect responses.
+        let msg_id = wire_msg.msg_id();
+        match msg {
+            NodeMsg::AntiEntropy { .. }
+            | NodeMsg::JoinRequest(_)
+            | NodeMsg::JoinAsRelocatedRequest(_) => {
+                trace!("Entropy check skipped for {msg_id:?}, handling message directly");
+                Ok(vec![])
+            }
+            _ => {
+                debug!("Checking {msg_id:?} for entropy");
+                if let Some(ae_cmd) =
+                    MyNode::check_node_msg_for_entropy(wire_msg, context, dst, origin, send_stream)?
+                {
+                    // we want to log issues with any node repeatedly out of sync here...
+                    let cmds = vec![
+                        Cmd::TrackNodeIssueInDysfunction {
+                            name: origin.name(),
+                            issue: sn_dysfunction::IssueType::Knowledge,
+                        },
+                        ae_cmd,
+                    ];
+
+                    return Ok(cmds);
+                }
+
+                trace!("Entropy check passed. Handling verified msg {msg_id:?}");
+
+                Ok(vec![])
+            }
+        }
+    }
+
+    /// Check if the client needs to be updated on network structure.
+    /// Returns `true` if an AE msg was sent to the client.
+    #[instrument(skip_all)]
+    pub(crate) async fn is_ae_sent_to_client(
+        context: &NodeContext,
+        origin: &Peer,
+        wire_msg: &WireMsg,
+        dst: &Dst,
+        send_stream: Arc<Mutex<SendStream>>,
+    ) -> Result<bool> {
+        let msg_id = wire_msg.msg_id();
+        if !context.is_elder {
+            trace!("Redirecting from Adult to our section Elders upon {msg_id:?}");
+            let section_tree_update = MyNode::generate_ae_section_tree_update(context, None);
+            MyNode::send_ae_response_to_client(
+                context,
+                origin,
+                send_stream,
+                wire_msg.serialize()?,
+                section_tree_update,
+            )
+            .await?;
+            return Ok(true);
+        }
+
+        match MyNode::check_for_entropy(context, msg_id, dst)? {
+            None => Ok(false),
+            Some(
+                AeResponseKind::Redirect(section_tree_update)
+                | AeResponseKind::Retry(section_tree_update),
+            ) => {
+                trace!(
+                    "{} {msg_id:?} entropy found. Client {origin:?} should be updated",
+                    LogMarker::AeSendRetryAsOutdated
+                );
+
+                let bounced_msg = wire_msg.serialize()?;
+                MyNode::send_ae_response_to_client(
+                    context,
+                    origin,
+                    send_stream,
+                    bounced_msg,
+                    section_tree_update,
+                )
+                .await?;
+
+                Ok(true)
+            }
+        }
+    }
+
     /// Send `AntiEntropy` update message to all nodes in our own section.
     pub(crate) fn send_ae_update_to_our_section(&self) -> Result<Option<Cmd>> {
         let our_name = self.info().name();
@@ -67,11 +180,10 @@ impl MyNode {
     ) -> Cmd {
         let members = context.network_knowledge.section_signed_members();
 
-        let ae_msg = MyNode::generate_ae_msg(
-            context,
-            Some(section_pk),
-            AntiEntropyKind::Update { members },
-        );
+        let ae_msg = NodeMsg::AntiEntropy {
+            section_tree_update: MyNode::generate_ae_section_tree_update(context, Some(section_pk)),
+            kind: AntiEntropyKind::Update { members },
+        };
 
         MyNode::send_system_msg(ae_msg, Peers::Multiple(recipients))
     }
@@ -131,13 +243,12 @@ impl MyNode {
         }
     }
 
-    // Private helper to generate AntiEntropy message to update
+    // Private helper to generate a SectionTreeUpdate to update
     // a peer abot our SAP, with proof_chain and members list.
-    pub(crate) fn generate_ae_msg(
+    fn generate_ae_section_tree_update(
         context: &NodeContext,
         dst_section_key: Option<BlsPublicKey>,
-        kind: AntiEntropyKind,
-    ) -> NodeMsg {
+    ) -> SectionTreeUpdate {
         let signed_sap = context.network_knowledge.signed_sap();
 
         let proof_chain = dst_section_key
@@ -149,12 +260,7 @@ impl MyNode {
             })
             .unwrap_or_else(|| context.network_knowledge.section_chain());
 
-        let section_tree_update = SectionTreeUpdate::new(signed_sap, proof_chain);
-
-        NodeMsg::AntiEntropy {
-            section_tree_update,
-            kind,
-        }
+        SectionTreeUpdate::new(signed_sap, proof_chain)
     }
 
     /// returns (we_have_a_share_of_this_key, we_should_become_an_elder)
@@ -253,8 +359,8 @@ impl MyNode {
         let starting_context = node.read().await.context();
         let sap = section_tree_update.signed_sap.value.clone();
 
-        let members = if let AntiEntropyKind::Update { members } = kind.clone() {
-            Some(members)
+        let members = if let AntiEntropyKind::Update { members } = &kind {
+            Some(members.clone())
         } else {
             None
         };
@@ -392,129 +498,134 @@ impl MyNode {
 
     // If entropy is found, determine the msg to send in order to
     // bring the sender's knowledge about us up to date.
-    pub(crate) fn check_for_entropy(
+    fn check_node_msg_for_entropy(
         wire_msg: &WireMsg,
         context: &NodeContext,
-        dst_section_key: &BlsPublicKey,
-        dst_name: XorName,
+        dst: &Dst,
         sender: &Peer,
         send_stream: Option<Arc<Mutex<SendStream>>>,
     ) -> Result<Option<Cmd>> {
-        // Check if the message has reached the correct section,
-        // if not, we'll need to respond with AE
-
-        let our_prefix = context.network_knowledge.prefix();
-        let our_section_key = context.network_knowledge.section_key();
         let msg_id = wire_msg.msg_id();
-        // Let's try to find a section closer to the destination, if it's not for us.
-        if !context.network_knowledge.prefix().matches(&dst_name) {
-            let closest_sap = context.network_knowledge.closest_signed_sap(&dst_name);
-            debug!(
-                "AE: {msg_id:?} prefix not matching. We are: {:?}, they sent to: {:?}",
-                our_prefix, dst_name
-            );
-            return match closest_sap {
-                Some((signed_sap, proof_chain)) => {
-                    info!(
-                        "{msg_id:?} Found a better matching prefix {:?}",
-                        signed_sap.prefix()
-                    );
-                    let bounced_msg = wire_msg.serialize()?;
-                    let section_tree_update =
-                        SectionTreeUpdate::new(signed_sap.clone(), proof_chain);
-                    // Redirect to the closest section
-                    let ae_msg = NodeMsg::AntiEntropy {
-                        section_tree_update,
-                        kind: AntiEntropyKind::Redirect { bounced_msg },
-                    };
 
-                    trace!(
-                        "{} {msg_id:?} entropy found. {sender:?} should be updated",
-                        LogMarker::AeSendRedirect
-                    );
-
-                    // client response, so send it over stream
-                    if send_stream.is_some() {
-                        debug!("sending repsonse over send_stream");
-                        return Ok(Some(Cmd::send_msg_via_response_stream(
-                            ae_msg,
-                            Peers::Single(*sender),
-                            send_stream,
-                        )));
-                    } else {
-                        debug!("sending repsonse over fresh conn");
-                        return Ok(Some(Cmd::send_msg(ae_msg, Peers::Single(*sender))));
-                    }
+        let ae_msg = match MyNode::check_for_entropy(context, msg_id, dst)? {
+            None => return Ok(None),
+            Some(AeResponseKind::Redirect(section_tree_update)) => {
+                // Redirect to the closest section
+                trace!(
+                    "{} {msg_id:?} entropy found. {sender:?} should be updated",
+                    LogMarker::AeSendRedirect
+                );
+                let bounced_msg = wire_msg.serialize()?;
+                NodeMsg::AntiEntropy {
+                    section_tree_update,
+                    kind: AntiEntropyKind::Redirect { bounced_msg },
                 }
-                None => {
-                    warn!("Our SectionTree is empty");
-                    // TODO: instead of just dropping the message, don't we actually need
-                    // to get up to date info from other Elders in our section as it may be
-                    // a section key we are not aware of yet?
-                    // ...and once we acquired new key/s we attempt AE check again?
-                    warn!(
-                        "Anti-Entropy: cannot reply with redirect msg for dst_name {:?} and key {:?} to a closest section.",
-                        dst_name, dst_section_key
-                    );
+            }
+            Some(AeResponseKind::Retry(section_tree_update)) => {
+                let bounced_msg = wire_msg.serialize()?;
+                let ae_msg = NodeMsg::AntiEntropy {
+                    section_tree_update,
+                    kind: AntiEntropyKind::Retry { bounced_msg },
+                };
+                trace!(
+                    "CMD of Sending AE message to {:?} with {:?}",
+                    sender,
+                    ae_msg
+                );
+                ae_msg
+            }
+        };
 
-                    Err(Error::NoMatchingSection)
-                }
-            };
-        }
-
-        trace!(
-            "Performing AE checks on {msg_id:?}, provided pk was: {:?} ours is: {:?}",
-            dst_section_key,
-            our_section_key
-        );
-
-        if dst_section_key == &our_section_key {
-            // Destination section key matches our current section key
-            return Ok(None);
-        }
-
-        let bounced_msg = wire_msg.serialize()?;
-
-        let ae_msg = MyNode::generate_ae_msg(
-            context,
-            Some(*dst_section_key),
-            AntiEntropyKind::Retry { bounced_msg },
-        );
-
-        trace!(
-            "CMD of Sending AE message to {:?} with {:?}",
-            sender,
-            ae_msg
-        );
-
-        // client response, so send it over stream
         if send_stream.is_some() {
+            debug!("sending repsonse over send_stream");
             Ok(Some(Cmd::send_msg_via_response_stream(
                 ae_msg,
                 Peers::Single(*sender),
                 send_stream,
             )))
         } else {
+            debug!("sending repsonse over fresh conn");
             Ok(Some(Cmd::send_msg(ae_msg, Peers::Single(*sender))))
         }
     }
 
-    /// Generate an AE redirect response and send to the client on the provided stream.
-    /// This moves the rest of the operation onto a new thread to not block the dispatcher
-    pub(crate) async fn ae_redirect_client_to_our_elders(
-        ae_msg: NodeMsg,
-        context: NodeContext,
-        sender: Peer,
-        client_response_stream: Arc<Mutex<SendStream>>,
-        _bounced_msg: UsrMsgBytes,
-    ) -> Result<()> {
+    // If entropy is found, determine the `SectionTreeUpdate` and kind of AE response
+    // to send in order to bring the sender's knowledge about us up to date.
+    fn check_for_entropy(
+        context: &NodeContext,
+        msg_id: MsgId,
+        dst: &Dst,
+    ) -> Result<Option<AeResponseKind>> {
+        // Check if the message has reached the correct section,
+        // if not, we'll need to respond with AE
+        let our_prefix = context.network_knowledge.prefix();
+        // Let's try to find a section closer to the destination, if it's not for us.
+        if !our_prefix.matches(&dst.name) {
+            debug!(
+                "AE: {msg_id:?} prefix not matching. We are: {:?}, they sent to: {:?}",
+                our_prefix, dst.name
+            );
+            let closest_sap = context.network_knowledge.closest_signed_sap(&dst.name);
+            return match closest_sap {
+                Some((signed_sap, proof_chain)) => {
+                    info!(
+                        "{msg_id:?} Found a better matching prefix {:?}",
+                        signed_sap.prefix()
+                    );
+                    let section_tree_update =
+                        SectionTreeUpdate::new(signed_sap.clone(), proof_chain);
+                    Ok(Some(AeResponseKind::Redirect(section_tree_update)))
+                }
+                None => {
+                    // TODO: instead of just dropping the message, don't we actually need
+                    // to get up to date info from other Elders in our section as it may be
+                    // a section key we are not aware of yet?
+                    // ...and once we acquired new key/s we attempt AE check again?
+                    warn!(
+                        "Anti-Entropy: cannot reply with redirect msg for dst_name {:?} and \
+                        key {:?} to a closest section. Our SectionTree is empty.",
+                        dst.name, dst.section_key
+                    );
+                    Err(Error::NoMatchingSection)
+                }
+            };
+        }
+
+        let our_section_key = context.network_knowledge.section_key();
         trace!(
-            "{} in ae_redirect to elders for {sender:?} ",
-            LogMarker::AeSendRedirect
+            "Performing AE checks on {msg_id:?}, provided pk was: {:?} ours is: {:?}",
+            dst.section_key,
+            our_section_key
         );
 
-        let (kind, payload) = MyNode::serialize_node_msg(context.name, ae_msg)?;
+        if dst.section_key == our_section_key {
+            // Destination section key matches our current section key
+            return Ok(None);
+        }
 
+        let section_tree_update =
+            MyNode::generate_ae_section_tree_update(context, Some(dst.section_key));
+        Ok(Some(AeResponseKind::Retry(section_tree_update)))
+    }
+
+    // Generate an AE response msg for the given message and send it to the client
+    async fn send_ae_response_to_client(
+        context: &NodeContext,
+        sender: &Peer,
+        client_response_stream: Arc<Mutex<SendStream>>,
+        bounced_msg: UsrMsgBytes,
+        section_tree_update: SectionTreeUpdate,
+    ) -> Result<()> {
+        trace!(
+            "{} in send_ae_response_to_client {sender:?} ",
+            LogMarker::AeSendRetryAsOutdated
+        );
+
+        let ae_msg = ClientDataResponse::AntiEntropy {
+            section_tree_update,
+            bounced_msg,
+        };
+        let (kind, payload) = MyNode::serialize_client_msg_response(context.name, ae_msg)?;
         let msg_id = MsgId::new();
 
         MyNode::send_msg_on_stream(
@@ -522,7 +633,7 @@ impl MyNode {
             payload,
             kind,
             client_response_stream,
-            Some(sender),
+            Some(*sender),
             msg_id,
         )
         .await
@@ -562,13 +673,14 @@ mod tests {
         let our_prefix = env.node.network_knowledge().prefix();
         let msg = env.create_msg(&our_prefix, env.node.network_knowledge().section_key())?;
         let sender = env.node.info().peer();
-        let dst_name = our_prefix.substituted_in(xor_name::rand::random());
-        let dst_section_key = env.node.network_knowledge().section_key();
+        let dst = Dst {
+            section_key: env.node.network_knowledge().section_key(),
+            name: our_prefix.substituted_in(xor_name::rand::random()),
+        };
 
         let context = env.node.context();
 
-        let cmd =
-            MyNode::check_for_entropy(&msg, &context, &dst_section_key, dst_name, &sender, None)?;
+        let cmd = MyNode::check_node_msg_for_entropy(&msg, &context, &dst, &sender, None)?;
 
         assert!(cmd.is_none());
         Ok(())
@@ -585,18 +697,13 @@ mod tests {
         let sender = env.node.info().peer();
 
         // since it's not aware of the other prefix, it will redirect to self
-        let dst_section_key = other_pk;
-        let dst_name = env.other_signed_sap.prefix().name();
+        let dst = Dst {
+            section_key: other_pk,
+            name: env.other_signed_sap.prefix().name(),
+        };
         let context = env.node.context();
 
-        let cmd = MyNode::check_for_entropy(
-            &wire_msg,
-            &context,
-            &dst_section_key,
-            dst_name,
-            &sender,
-            None,
-        );
+        let cmd = MyNode::check_node_msg_for_entropy(&wire_msg, &context, &dst, &sender, None);
 
         let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg, .. })) => {
             msg
@@ -616,14 +723,7 @@ mod tests {
         let new_context = env.node.context();
         // and it now shall give us an AE redirect msg
         // with the SAP we inserted for other prefix
-        let cmd = MyNode::check_for_entropy(
-            &wire_msg,
-            &new_context,
-            &dst_section_key,
-            dst_name,
-            &sender,
-            None,
-        );
+        let cmd = MyNode::check_node_msg_for_entropy(&wire_msg, &new_context, &dst, &sender, None);
 
         let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg, .. })) => {
             msg
@@ -642,11 +742,12 @@ mod tests {
         let context = env.node.context();
         let msg = env.create_msg(&our_prefix, env.node.network_knowledge().section_key())?;
         let sender = env.node.info().peer();
-        let dst_name = our_prefix.substituted_in(xor_name::rand::random());
-        let dst_section_key = env.node.network_knowledge().genesis_key();
+        let dst = Dst {
+            section_key: *env.node.network_knowledge().genesis_key(),
+            name: our_prefix.substituted_in(xor_name::rand::random()),
+        };
 
-        let cmd =
-            MyNode::check_for_entropy(&msg, &context, dst_section_key, dst_name, &sender, None)?;
+        let cmd = MyNode::check_node_msg_for_entropy(&msg, &context, &dst, &sender, None)?;
 
         let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg, .. }) => {
             msg
@@ -666,14 +767,15 @@ mod tests {
 
         let msg = env.create_msg(&our_prefix, env.node.network_knowledge().section_key())?;
         let sender = env.node.info().peer();
-        let dst_name = our_prefix.substituted_in(xor_name::rand::random());
 
         let bogus_env = Env::new().await?;
-        let dst_section_key = bogus_env.node.network_knowledge().genesis_key();
+        let dst = Dst {
+            section_key: *bogus_env.node.network_knowledge().genesis_key(),
+            name: our_prefix.substituted_in(xor_name::rand::random()),
+        };
         let context = env.node.context();
 
-        let cmd =
-            MyNode::check_for_entropy(&msg, &context, dst_section_key, dst_name, &sender, None)?;
+        let cmd = MyNode::check_node_msg_for_entropy(&msg, &context, &dst, &sender, None)?;
 
         let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg, .. }) => {
             msg

@@ -30,7 +30,7 @@ mod relocation;
 
 use self::{
     bootstrap::join_network,
-    core::{MyNode, NodeContext, GENESIS_DBC_AMOUNT},
+    core::{MyNode, GENESIS_DBC_AMOUNT},
     data::MIN_LEVEL_WHEN_FULL,
     flow_ctrl::{cmds::Cmd, event::Elders},
     node_starter::CmdChannel,
