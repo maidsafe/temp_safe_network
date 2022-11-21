@@ -104,10 +104,10 @@ impl Session {
             };
 
             match result {
-                Ok(()) => {
+                Ok(address) => {
                     let preexisting = !received_acks.insert(src) || received_errors.contains(&src);
                     debug!(
-                        "ACK from {src:?} read from set for msg_id {msg_id:?} - preexisting??: {preexisting:?}",
+                        "ACK of {address:?} from {src:?} read from set for msg_id {msg_id:?} - preexisting??: {preexisting:?}",
                     );
 
                     if received_acks.len() >= expected_acks {

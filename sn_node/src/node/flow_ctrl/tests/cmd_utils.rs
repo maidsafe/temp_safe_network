@@ -6,7 +6,7 @@ use sn_interface::{
     messaging::{
         data::ClientMsg,
         serialisation::WireMsg,
-        system::{JoinResponse, NodeCmd, NodeMsg},
+        system::{JoinResponse, NodeDataCmd, NodeMsg},
         AuthorityProof, ClientAuth, MsgId,
     },
     network_knowledge::{
@@ -184,8 +184,8 @@ impl Cmd {
     pub(crate) fn get_replicated_data(&self) -> Result<ReplicatedData> {
         match self {
             Cmd::SendMsg { msg, .. } => match msg {
-                NodeMsg::NodeCmd(node_cmd) => match node_cmd {
-                    NodeCmd::ReplicateData(data) => {
+                NodeMsg::NodeDataCmd(node_cmd) => match node_cmd {
+                    NodeDataCmd::ReplicateData(data) => {
                         if data.len() != 1 {
                             return Err(eyre!("Only 1 replicated data instance is expected"));
                         }
@@ -199,8 +199,8 @@ impl Cmd {
         }
     }
 
-    // /// Get a `ClientMsgResponse` from a `Cmd::SendMsg` enum variant.
-    // pub(crate) fn get_client_msg_resp(&self) -> Result<ClientMsgResponse> {
+    // /// Get a `ClientDataResponse` from a `Cmd::SendMsg` enum variant.
+    // pub(crate) fn get_client_msg_resp(&self) -> Result<ClientDataResponse> {
     //     match self {
     //         Cmd::SendMsg { msg, .. } => match msg {
     //             OutgoingMsg::Client(client_msg) => Ok(client_msg.clone()),
@@ -215,11 +215,11 @@ impl Cmd {
     //     match self {
     //         Cmd::SendMsg { msg, .. } => match msg {
     //             OutgoingMsg::Client(client_msg) => match client_msg {
-    //                 ClientMsgResponse::CmdResponse { response, .. } => match response.result() {
+    //                 ClientDataResponse::CmdResponse { response, .. } => match response.result() {
     //                     Ok(_) => Err(eyre!("A CmdResponse error was expected")),
     //                     Err(error) => Ok(error.clone()),
     //                 },
-    //                 _ => Err(eyre!("A ClientMsgResponse::CmdResponse variant was expected")),
+    //                 _ => Err(eyre!("A ClientDataResponse::CmdResponse variant was expected")),
     //             },
     //             _ => Err(eyre!("A OutgoingMsg::Client variant was expected")),
     //         },

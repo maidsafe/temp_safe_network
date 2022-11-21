@@ -19,7 +19,7 @@ use xor_name::Prefix;
 pub type Result<T, E = Error> = result::Result<T, E>;
 
 /// Errors that can occur when interactive with client messaging APIs.
-#[derive(Error, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+#[derive(Error, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum Error {
     /// Access denied for user
@@ -50,11 +50,13 @@ pub enum Error {
     /// User entry could not be found on the data
     #[error("Requested user not found {0:?}")]
     NoSuchUser(User),
-    /// Invalid Operation such as a POST on ImmutableData
+    /// Invalid Operation
     #[error("Invalid operation: {0}")]
     InvalidOperation(String),
     /// A DBC spend request could not be processed because the processing section was unaware of
     /// the section that signed one of the input spent proofs.
     #[error("Spent proof is signed by section key {0:?} that is unknown to the current section")]
     SpentProofUnknownSectionKey(bls::PublicKey),
+    #[error("Trying to produce a CmdResponse error for a data type not resulting from a cmd")]
+    NoCorrespondingCmdError,
 }

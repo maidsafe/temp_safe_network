@@ -8,15 +8,9 @@
 
 use super::FlowCtrl;
 
-use crate::node::{
-    core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Peers, node_starter::CmdChannel, MyNode,
-    Result,
-};
+use crate::node::{core::NodeContext, flow_ctrl::cmds::Cmd, node_starter::CmdChannel, MyNode};
 
-use sn_interface::{
-    messaging::system::{NodeCmd, NodeMsg},
-    types::log_markers::LogMarker,
-};
+use sn_interface::{messaging::system::NodeMsg, types::log_markers::LogMarker};
 
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tokio::{sync::RwLock, time::Instant};
@@ -25,7 +19,6 @@ const PROBE_INTERVAL: Duration = Duration::from_secs(30);
 const MISSING_VOTE_INTERVAL: Duration = Duration::from_secs(5);
 const MISSING_DKG_MSG_INTERVAL: Duration = Duration::from_secs(5);
 const SECTION_PROBE_INTERVAL: Duration = Duration::from_secs(300);
-const DATA_BATCH_INTERVAL: Duration = Duration::from_millis(50);
 const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 // 30 adult nodes checked per minute., so each node should be queried 10x in 10 mins
 // Which should hopefully trigger dysfunction if we're not getting responses back
@@ -39,7 +32,6 @@ pub(super) struct PeriodicChecksTimestamps {
     last_elder_health_check: Instant,
     last_vote_check: Instant,
     last_dkg_msg_check: Instant,
-    last_data_batch_check: Instant,
     last_dysfunction_check: Instant,
 }
 
@@ -52,7 +44,6 @@ impl PeriodicChecksTimestamps {
             last_elder_health_check: Instant::now(),
             last_vote_check: Instant::now(),
             last_dkg_msg_check: Instant::now(),
-            last_data_batch_check: Instant::now(),
             last_dysfunction_check: Instant::now(),
         }
     }
@@ -65,9 +56,6 @@ impl FlowCtrl {
         let context = &self.node.read().await.context();
         debug!("[NODE READ]: periodic msg lock got");
 
-        self.enqueue_cmds_for_standard_periodic_checks(context)
-            .await;
-
         if !context.is_elder {
             self.enqueue_cmds_for_adult_periodic_checks(context).await;
 
@@ -77,34 +65,6 @@ impl FlowCtrl {
         }
 
         self.enqueue_cmds_for_elder_periodic_checks(context).await;
-    }
-
-    /// Periodic tasks run for elders and adults alike
-    async fn enqueue_cmds_for_standard_periodic_checks(&mut self, context: &NodeContext) {
-        let now = Instant::now();
-        let mut cmds = vec![];
-
-        // if we've passed enough time, batch outgoing data
-        if self.timestamps.last_data_batch_check.elapsed() > DATA_BATCH_INTERVAL {
-            self.timestamps.last_data_batch_check = now;
-            if let Some(cmd) = match Self::replicate_queued_data(self.node.clone(), context).await {
-                Ok(cmd) => cmd,
-                Err(error) => {
-                    error!(
-                        "Error handling getting cmds for data queued for replication: {error:?}"
-                    );
-                    None
-                }
-            } {
-                cmds.push(cmd);
-            }
-        }
-
-        for cmd in cmds {
-            if let Err(error) = self.cmd_sender_channel.send((cmd, vec![])).await {
-                error!("Error queuing std periodic check: {error:?}");
-            }
-        }
     }
 
     /// Periodic tasks run for adults only
@@ -346,68 +306,6 @@ impl FlowCtrl {
                 }
             }
         });
-    }
-
-    /// Periodically loop over any pending data batches and queue up `send_msg` for those
-    async fn replicate_queued_data(
-        node: Arc<RwLock<MyNode>>,
-        context: &NodeContext,
-    ) -> Result<Option<Cmd>> {
-        use rand::seq::IteratorRandom;
-        let mut rng = rand::rngs::OsRng;
-        let data_queued = {
-            debug!("[NODE READ]: queued data msg lock got");
-            let node = node.read().await;
-            debug!("[NODE READ]: queued data lock got");
-
-            // choose a data to replicate at random
-            let data_queued = node
-                .pending_data_to_replicate_to_peers
-                .iter()
-                .choose(&mut rng)
-                .map(|(address, _)| *address);
-
-            data_queued
-        };
-
-        if let Some(address) = data_queued {
-            trace!("Data found in queue to send out");
-
-            let target_peer = {
-                // careful now, if we're holding any ref into the read above we'll lock here.
-                debug!("[NODE WRITE]: periodic queue data offline write...");
-
-                let mut node = node.write().await;
-                debug!("[NODE WRITE]: periodic queue data write gottt...");
-                node.pending_data_to_replicate_to_peers.remove(&address)
-            };
-
-            if let Some(data_recipients) = target_peer {
-                debug!("Data queued to be replicated");
-
-                if data_recipients.is_empty() {
-                    return Ok(None);
-                }
-
-                let data_to_send = context.data_storage.get_from_local_store(&address).await?;
-
-                debug!(
-                    "{:?} Data {:?} to: {:?}",
-                    LogMarker::SendingMissingReplicatedData,
-                    address,
-                    data_recipients,
-                );
-
-                let msg = NodeMsg::NodeCmd(NodeCmd::ReplicateData(vec![data_to_send]));
-
-                return Ok(Some(MyNode::send_system_msg(
-                    msg,
-                    Peers::Multiple(data_recipients),
-                )));
-            }
-        }
-
-        Ok(None)
     }
 
     async fn check_for_dysfunction(node: Arc<RwLock<MyNode>>) -> Vec<Cmd> {

@@ -37,6 +37,9 @@ pub enum Error {
     /// This Peer SendJob could not be sent. We should remove this peer
     #[error("Peer channel errored")]
     PeerSessionChannel,
+    /// SendChannel error for the data replication flow. This is a critical error and the node no longer functions.
+    #[error("Data replication channel could not be sent to. This means the receiver has been dropped, the node can no longer replicate data and must shut down.")]
+    DataReplicationChannel,
     /// This peer has no connections, and none will be created
     #[error("Peer link has no connections ")]
     NoConnectionsForPeer,

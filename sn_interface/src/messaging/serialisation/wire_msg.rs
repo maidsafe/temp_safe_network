@@ -8,8 +8,8 @@
 
 use super::wire_msg_header::WireMsgHeader;
 use crate::messaging::{
-    data::{ClientMsg, ClientMsgResponse},
-    system::NodeMsg,
+    data::{ClientDataResponse, ClientMsg},
+    system::{NodeDataResponse, NodeMsg},
     AuthorityProof, ClientAuth, Dst, Error, MsgId, MsgKind, MsgType, Result,
 };
 
@@ -197,13 +197,13 @@ impl WireMsg {
                 })
             }
             #[cfg(any(feature = "chunks", feature = "registers"))]
-            MsgKind::ClientMsgResponse(_) => {
-                let msg: ClientMsgResponse =
+            MsgKind::ClientDataResponse(_) => {
+                let msg: ClientDataResponse =
                     rmp_serde::from_slice(&self.payload).map_err(|err| {
                         Error::FailedToParse(format!("Data message payload as Msgpack: {}", err))
                     })?;
 
-                Ok(MsgType::ClientMsgResponse {
+                Ok(MsgType::ClientDataResponse {
                     msg_id: self.header.msg_envelope.msg_id,
                     msg,
                 })
@@ -216,6 +216,18 @@ impl WireMsg {
                 Ok(MsgType::Node {
                     msg_id: self.header.msg_envelope.msg_id,
                     dst: self.dst,
+                    msg,
+                })
+            }
+            #[cfg(any(feature = "chunks", feature = "registers"))]
+            MsgKind::NodeDataResponse(_) => {
+                let msg: NodeDataResponse =
+                    rmp_serde::from_slice(&self.payload).map_err(|err| {
+                        Error::FailedToParse(format!("Data message payload as Msgpack: {}", err))
+                    })?;
+
+                Ok(MsgType::NodeDataResponse {
+                    msg_id: self.header.msg_envelope.msg_id,
                     msg,
                 })
             }
@@ -270,7 +282,7 @@ mod tests {
     use crate::{
         messaging::{
             data::{ClientMsg, DataQuery, DataQueryVariant, StorageLevel},
-            system::{NodeCmd, NodeMsg},
+            system::{NodeDataCmd, NodeMsg},
             AuthorityProof, ClientAuth, MsgId,
         },
         types::{ChunkAddress, Keypair},
@@ -288,7 +300,7 @@ mod tests {
         let msg_id = MsgId::new();
         let pk = crate::types::PublicKey::Bls(dst.section_key);
 
-        let msg = NodeMsg::NodeCmd(NodeCmd::RecordStorageLevel {
+        let msg = NodeMsg::NodeDataCmd(NodeDataCmd::RecordStorageLevel {
             node_id: pk,
             section: pk.into(),
             level: StorageLevel::zero(),
