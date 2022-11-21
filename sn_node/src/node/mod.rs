@@ -86,7 +86,7 @@ mod core {
             supermajority, MyNodeInfo, NetworkKnowledge, NodeState, SectionAuthorityProvider,
             SectionKeyShare, SectionKeysProvider,
         },
-        types::{keys::ed25519::Digest256, log_markers::LogMarker, DataAddress, Peer},
+        types::{keys::ed25519::Digest256, log_markers::LogMarker},
     };
 
     use ed25519_dalek::Keypair;
@@ -122,10 +122,6 @@ mod core {
         root_storage_dir: PathBuf,
         pub(crate) data_storage: DataStorage, // Adult only before cache
         pub(crate) keypair: Arc<Keypair>,
-        /// queue up all batch data to be replicated (as a result of churn events atm)
-        // TODO: This can probably be reworked into the general per peer msg queue, but as
-        // we need to pull data first before we form the WireMsg, we won't do that just now
-        pub(crate) pending_data_to_replicate_to_peers: BTreeMap<DataAddress, BTreeSet<Peer>>,
         // Network resources
         pub(crate) section_keys_provider: SectionKeysProvider,
         pub(crate) network_knowledge: NetworkKnowledge,
@@ -279,7 +275,6 @@ mod core {
                 data_storage,
                 capacity: Capacity::default(),
                 dysfunction_tracking: node_dysfunction_detector,
-                pending_data_to_replicate_to_peers: BTreeMap::new(),
                 membership,
             };
 

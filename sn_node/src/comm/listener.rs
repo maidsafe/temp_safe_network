@@ -76,7 +76,9 @@ impl MsgListener {
 
                     let src_name = match wire_msg.kind() {
                         MsgKind::Client(auth) => auth.public_key.into(),
-                        MsgKind::Node(name) | MsgKind::ClientMsgResponse(name) => *name,
+                        MsgKind::Node(name)
+                        | MsgKind::ClientDataResponse(name)
+                        | MsgKind::NodeDataResponse(name) => *name,
                     };
 
                     if first {

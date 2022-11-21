@@ -13,17 +13,19 @@ use crate::{
     },
     storage::Error as StorageError,
 };
-use sn_interface::types::ReplicatedData;
 
 use qp2p::SendStream;
 use sn_interface::{
     messaging::{
-        data::StorageLevel,
-        system::{JoinResponse, NodeCmd, NodeEvent, NodeMsg, NodeQuery, Proposal as ProposalMsg},
+        data::{CmdResponse, StorageLevel},
+        system::{
+            JoinResponse, NodeDataCmd, NodeDataQuery, NodeDataResponse, NodeEvent, NodeMsg,
+            Proposal as ProposalMsg,
+        },
         MsgId,
     },
     network_knowledge::NetworkKnowledge,
-    types::{log_markers::LogMarker, Keypair, Peer, PublicKey},
+    types::{log_markers::LogMarker, Keypair, Peer, PublicKey, ReplicatedData},
 };
 use std::collections::BTreeSet;
 use std::sync::Arc;
@@ -45,7 +47,7 @@ impl MyNode {
     }
 
     pub(crate) async fn store_data_as_adult_and_respond(
-        context: &mut NodeContext,
+        context: &NodeContext,
         data: ReplicatedData,
         response_stream: Option<Arc<Mutex<SendStream>>>,
         target: Peer,
@@ -78,7 +80,7 @@ impl MyNode {
                 let node_id = PublicKey::from(context.keypair.public);
                 let msg = NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
                     node_id,
-                    data,
+                    data: data.clone(),
                     full: true,
                 });
 
@@ -86,15 +88,17 @@ impl MyNode {
             }
             Err(error) => {
                 // the rest seem to be non-problematic errors.. (?)
-
                 // this could be an "we already have it" error... so we should continue with that...
                 error!("Problem storing data, but it was ignored: {error}");
             }
         }
 
         trace!("Data has been stored: {data_addr:?}");
-        let msg = NodeMsg::NodeEvent(NodeEvent::DataStored(data_addr));
-        let (kind, payload) = MyNode::serialize_node_msg(our_node_name, msg)?;
+        let msg = NodeDataResponse::CmdResponse {
+            response: CmdResponse::ok(data)?,
+            correlation_id: original_msg_id,
+        };
+        let (kind, payload) = MyNode::serialize_node_msg_response(our_node_name, msg)?;
 
         if let Some(stream) = response_stream {
             MyNode::send_msg_on_stream(
@@ -156,9 +160,11 @@ impl MyNode {
                 kind,
             } => {
                 trace!("Handling msg: AE from {sender}: {msg_id:?}");
+                let context = node.read().await.context();
                 // as we've data storage reqs inside here for reorganisation, we have async calls to
                 // the fs
-                MyNode::handle_anti_entropy_msg(node, section_tree_update, kind, sender).await
+                MyNode::handle_anti_entropy_msg(node, context, section_tree_update, kind, sender)
+                    .await
             }
             // Respond to a probe msg
             // We always respond to probe msgs if we're an elder as health checks use this to see if a node is alive
@@ -397,7 +403,7 @@ impl MyNode {
                 trace!("Handling msg: DkgAE s{} from {}", session_id.sh(), sender);
                 node.handle_dkg_anti_entropy(session_id, sender)
             }
-            NodeMsg::NodeCmd(NodeCmd::RecordStorageLevel { node_id, level, .. }) => {
+            NodeMsg::NodeDataCmd(NodeDataCmd::RecordStorageLevel { node_id, level, .. }) => {
                 let mut node = node.write().await;
                 debug!("[NODE WRITE]: RecordStorage write gottt...");
                 let changed = node.set_storage_level(&node_id, level);
@@ -407,16 +413,11 @@ impl MyNode {
                 }
                 Ok(vec![])
             }
-            NodeMsg::NodeCmd(NodeCmd::ReceiveMetadata { metadata }) => {
+            NodeMsg::NodeDataCmd(NodeDataCmd::ReceiveMetadata { metadata }) => {
                 let mut node = node.write().await;
                 debug!("[NODE WRITE]: ReceveMeta write gottt...");
                 info!("Processing received MetadataExchange packet: {:?}", msg_id);
                 node.set_adult_levels(metadata);
-                Ok(vec![])
-            }
-            NodeMsg::NodeEvent(NodeEvent::DataStored(address)) => {
-                // data was stored. this should be sent over a response stream only.
-                warn!("Unexpected DataStore ({address:?})node event received as direct msg. It should be sent as a response over a stream...");
                 Ok(vec![])
             }
             NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
@@ -456,9 +457,9 @@ impl MyNode {
 
                 Ok(vec![])
             }
-            NodeMsg::NodeCmd(NodeCmd::ReplicateOneData(data)) => {
+            NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateOneData(data)) => {
                 debug!("[NODE READ]: replicate one data");
-                let mut context = node.read().await.context();
+                let context = node.read().await.context();
                 debug!("[NODE READ]: replicate one data read got");
 
                 if context.is_elder {
@@ -471,16 +472,10 @@ impl MyNode {
                 );
 
                 // store data and respond w/ack on the response stream
-                MyNode::store_data_as_adult_and_respond(
-                    &mut context,
-                    data,
-                    send_stream,
-                    sender,
-                    msg_id,
-                )
-                .await
+                MyNode::store_data_as_adult_and_respond(&context, data, send_stream, sender, msg_id)
+                    .await
             }
-            NodeMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)) => {
+            NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateData(data_collection)) => {
                 info!("ReplicateData MsgId: {:?}", msg_id);
                 let context = node.read().await.context();
                 debug!("[NODE READ]: replicate data read got");
@@ -537,7 +532,7 @@ impl MyNode {
 
                 Ok(cmds)
             }
-            NodeMsg::NodeCmd(NodeCmd::SendAnyMissingRelevantData(known_data_addresses)) => {
+            NodeMsg::NodeDataCmd(NodeDataCmd::SendAnyMissingRelevantData(known_data_addresses)) => {
                 info!(
                     "{:?} MsgId: {:?}",
                     LogMarker::RequestForAnyMissingData,
@@ -553,7 +548,7 @@ impl MyNode {
                         .collect(),
                 )
             }
-            NodeMsg::NodeQuery(NodeQuery::Data {
+            NodeMsg::NodeDataQuery(NodeDataQuery {
                 query,
                 auth,
                 operation_id,
@@ -579,17 +574,6 @@ impl MyNode {
                 .await?;
                 Ok(vec![])
             }
-            // TODO: refactor msging to lose this type.
-            NodeMsg::NodeQueryResponse { operation_id, .. } => {
-                error!(
-                    "This should no longer be seen aside from in a response stream! We have an issue here... This msg will not be handled.{:?}: op_id {}, sender: {sender} origin msg_id: {msg_id:?}",
-                    LogMarker::ChunkQueryResponseReceviedFromAdult,
-                    operation_id
-                );
-
-                //empty vec for now
-                Ok(vec![])
-            }
         }
     }
 
@@ -609,7 +593,7 @@ impl MyNode {
             let node_xorname = XorName::from(node_id);
 
             // we ask the section to record the new level reached
-            let msg = NodeMsg::NodeCmd(NodeCmd::RecordStorageLevel {
+            let msg = NodeMsg::NodeDataCmd(NodeDataCmd::RecordStorageLevel {
                 section: node_xorname,
                 node_id,
                 level,

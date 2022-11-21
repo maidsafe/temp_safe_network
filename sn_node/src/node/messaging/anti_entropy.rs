@@ -15,7 +15,7 @@ use itertools::Itertools;
 use qp2p::{SendStream, UsrMsgBytes};
 use sn_interface::{
     messaging::{
-        system::{AntiEntropyKind, NodeCmd, NodeMsg, SectionSigned},
+        system::{AntiEntropyKind, NodeDataCmd, NodeMsg, SectionSigned},
         MsgId, MsgType, WireMsg,
     },
     network_knowledge::{NodeState, SectionTreeUpdate},
@@ -80,7 +80,7 @@ impl MyNode {
     pub(crate) fn send_metadata_updates(&self, recipients: BTreeSet<Peer>, prefix: &Prefix) -> Cmd {
         let metadata = self.get_metadata_of(prefix);
         MyNode::send_system_msg(
-            NodeMsg::NodeCmd(NodeCmd::ReceiveMetadata { metadata }),
+            NodeMsg::NodeDataCmd(NodeDataCmd::ReceiveMetadata { metadata }),
             Peers::Multiple(recipients),
         )
     }
@@ -157,6 +157,56 @@ impl MyNode {
         }
     }
 
+    /// returns (we_have_a_share_of_this_key, we_should_become_an_elder)
+    fn does_section_tree_update_make_us_an_elder_with_key(
+        context: &NodeContext,
+        section_tree_update: &SectionTreeUpdate,
+    ) -> (bool, bool) {
+        let our_name = context.name;
+        let sap = section_tree_update.signed_sap.clone();
+
+        let we_have_a_share_of_this_key = context
+            .section_keys_provider
+            .key_share(&sap.section_key())
+            .is_ok();
+
+        // check we should be _becoming_ an elder
+        let we_should_become_an_elder = sap.contains_elder(&our_name);
+
+        trace!("we_have_a_share_of_this_key: {we_have_a_share_of_this_key}, we_should_become_an_elder: {we_should_become_an_elder}");
+
+        (we_have_a_share_of_this_key, we_should_become_an_elder)
+    }
+
+    /// Test a context to see if we would update Network Knowledge
+    /// returns
+    ///   Ok(true) if the update had new valid information
+    ///   Ok(false) if the update was valid but did not contain new information
+    ///   Err(_) if the update was invalid
+    pub(crate) fn would_we_update_network_knowledge(
+        context: &NodeContext,
+        section_tree_update: SectionTreeUpdate,
+        members: Option<BTreeSet<SectionSigned<NodeState>>>,
+    ) -> Result<bool> {
+        let mut mutable_context = context.clone();
+        let (we_have_a_share_of_this_key, we_should_become_an_elder) =
+            MyNode::does_section_tree_update_make_us_an_elder_with_key(
+                context,
+                &section_tree_update,
+            );
+
+        trace!("we_have_a_share_of_this_key: {we_have_a_share_of_this_key}, we_should_become_an_elder: {we_should_become_an_elder}");
+
+        if we_should_become_an_elder && !we_have_a_share_of_this_key {
+            warn!("We should be an elder, but we're missing the keyshare!, ignoring update to wait until we have our keyshare");
+            return Ok(false);
+        };
+
+        Ok(mutable_context
+            .network_knowledge
+            .update_knowledge_if_valid(section_tree_update, members, &context.name)?)
+    }
+
     // Update's Network Knowledge
     // returns
     //   Ok(true) if the update had new valid information
@@ -164,19 +214,15 @@ impl MyNode {
     //   Err(_) if the update was invalid
     pub(crate) fn update_network_knowledge(
         &mut self,
+        context: &NodeContext,
         section_tree_update: SectionTreeUpdate,
         members: Option<BTreeSet<SectionSigned<NodeState>>>,
     ) -> Result<bool> {
-        let our_name = self.info().name();
-        let sap = section_tree_update.signed_sap.clone();
-
-        let we_have_a_share_of_this_key = self
-            .section_keys_provider
-            .key_share(&sap.section_key())
-            .is_ok();
-
-        // check we should be _becoming_ an elder
-        let we_should_become_an_elder = sap.contains_elder(&our_name);
+        let (we_have_a_share_of_this_key, we_should_become_an_elder) =
+            MyNode::does_section_tree_update_make_us_an_elder_with_key(
+                context,
+                &section_tree_update,
+            );
 
         trace!("we_have_a_share_of_this_key: {we_have_a_share_of_this_key}, we_should_become_an_elder: {we_should_become_an_elder}");
 
@@ -191,13 +237,14 @@ impl MyNode {
         Ok(self.network_knowledge.update_knowledge_if_valid(
             section_tree_update,
             members,
-            &our_name,
+            &context.name,
         )?)
     }
 
     #[instrument(skip_all)]
     pub(crate) async fn handle_anti_entropy_msg(
         node: Arc<RwLock<MyNode>>,
+        context: NodeContext,
         section_tree_update: SectionTreeUpdate,
         kind: AntiEntropyKind,
         sender: Peer,
@@ -212,19 +259,31 @@ impl MyNode {
             None
         };
 
+        let mut cmds = vec![];
+
         // block off the write lock
-        let (updated, mut cmds) = {
-            let mut write_locked_node = node.write().await;
-            debug!("[NODE WRITE]: handling AE write gottt...");
-            let updated =
-                write_locked_node.update_network_knowledge(section_tree_update, members)?;
-
-            debug!("net knowledge udpated");
-            // always run this, only changes will trigger events
-            let cmds = write_locked_node.update_on_elder_change(&starting_context)?;
-            debug!("updated for elder change");
-
-            (updated, cmds)
+        let updated = {
+            let should_update = MyNode::would_we_update_network_knowledge(
+                &context,
+                section_tree_update.clone(),
+                members.clone(),
+            )?;
+            if should_update {
+                let mut write_locked_node = node.write().await;
+                debug!("[NODE WRITE]: handling AE write gottt...");
+                let updated = write_locked_node.update_network_knowledge(
+                    &context,
+                    section_tree_update,
+                    members,
+                )?;
+                debug!("net knowledge udpated");
+                // always run this, only changes will trigger events
+                cmds.extend(write_locked_node.update_on_elder_change(&starting_context)?);
+                debug!("updated for elder change");
+                updated
+            } else {
+                false
+            }
         };
 
         let latest_context = node.read().await.context();
@@ -552,7 +611,7 @@ mod tests {
             SectionTreeUpdate::new(env.other_signed_sap.clone(), env.proof_chain);
         assert!(env
             .node
-            .update_network_knowledge(section_tree_update, None,)?);
+            .update_network_knowledge(&context, section_tree_update, None,)?);
 
         let new_context = env.node.context();
         // and it now shall give us an AE redirect msg
@@ -670,7 +729,7 @@ mod tests {
 
             // get our Node to now be in prefix(0)
             let section_tree_update = SectionTreeUpdate::new(signed_sap, proof_chain);
-            let _ = node.update_network_knowledge(section_tree_update, None)?;
+            let _ = node.update_network_knowledge(&node.context(), section_tree_update, None)?;
 
             // generate other SAP for prefix1
             let (other_sap, secret_key_set, ..) = TestSapBuilder::new(prefix1).build();

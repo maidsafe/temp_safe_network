@@ -19,10 +19,10 @@ use sn_interface::{
     data_copy_count,
     messaging::{
         data::{
-            ClientMsg, ClientMsgResponse, DataCmd, DataQueryVariant, EditRegister,
+            ClientDataResponse, ClientMsg, DataCmd, DataQueryVariant, EditRegister,
             SignedRegisterEdit, SpentbookCmd,
         },
-        system::{NodeMsg, OperationId},
+        system::{NodeDataResponse, OperationId},
         AuthorityProof, ClientAuth, MsgId,
     },
     network_knowledge::section_keys::build_spent_proof_share,
@@ -48,7 +48,7 @@ impl MyNode {
         correlation_id: MsgId,
         send_stream: Arc<Mutex<SendStream>>,
     ) -> Result<()> {
-        let the_error_msg = ClientMsgResponse::QueryResponse {
+        let the_error_msg = ClientDataResponse::QueryResponse {
             response: query.to_error_response(error.into()),
             correlation_id,
         };
@@ -74,7 +74,7 @@ impl MyNode {
         correlation_id: MsgId,
         send_stream: Arc<Mutex<SendStream>>,
     ) -> Result<()> {
-        let client_msg = ClientMsgResponse::CmdResponse {
+        let client_msg = ClientDataResponse::CmdResponse {
             response: cmd.to_error_response(error.into()),
             correlation_id,
         };
@@ -110,12 +110,12 @@ impl MyNode {
             .await;
 
         trace!("data query response at adult is: {:?}", response);
-        let msg = NodeMsg::NodeQueryResponse {
+        let msg = NodeDataResponse::QueryResponse {
             response,
             operation_id,
         };
 
-        let (kind, payload) = MyNode::serialize_node_msg(context.name, msg)?;
+        let (kind, payload) = MyNode::serialize_node_msg_response(context.name, msg)?;
 
         let bytes = MyNode::form_usr_msg_bytes_to_node(
             context.network_knowledge.section_key(),
