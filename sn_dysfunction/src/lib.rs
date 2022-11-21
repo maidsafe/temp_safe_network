@@ -45,11 +45,9 @@
 extern crate tracing;
 
 mod detection;
-mod error;
 
 pub use detection::IssueType;
 
-pub use crate::error::Error;
 use sn_interface::messaging::system::OperationId;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},

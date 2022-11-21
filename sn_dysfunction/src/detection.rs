@@ -863,7 +863,7 @@ mod tests {
 mod ops_tests {
     use super::*;
 
-    use crate::{error::Result, tests::init_test_logger, DysfunctionDetection, IssueType};
+    use crate::{tests::init_test_logger, DysfunctionDetection, IssueType};
     use xor_name::{rand::random as random_xorname, XorName};
 
     // some example numbers as guidance
@@ -871,7 +871,7 @@ mod ops_tests {
     pub(crate) const NORMAL_OPERATIONS_ISSUES: usize = 500;
 
     #[tokio::test]
-    async fn op_dysfunction() -> Result<()> {
+    async fn op_dysfunction() {
         init_test_logger();
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
         let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
@@ -904,7 +904,6 @@ mod ops_tests {
 
         // Now we should start detecting...
         assert_eq!(dysfunctional_detection.get_dysfunctional_nodes().len(), 1);
-        Ok(())
     }
 }
 
