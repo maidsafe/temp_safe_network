@@ -198,7 +198,7 @@ impl Session {
 
             debug!("{msg_id:?} AE bounced msg going out again. Resending original message (sent to index {src_peer_index:?} peer: {src_peer:?}) to new section elder {elder:?}");
 
-            let link = self.peer_links.get_or_create_link(elder, false).await;
+            let link = self.peer_links.get_or_create_link(elder).await;
             let new_recv_stream = link
                 .send_bi(bytes, msg_id)
                 .await

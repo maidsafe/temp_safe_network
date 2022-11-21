@@ -66,8 +66,6 @@ impl Client {
         let span = info_span!("Attempting a query");
         let _ = span.enter();
         let dst = query.variant.dst_name();
-        // should we force a fresh connection to the nodes?
-        let force_new_link = false;
 
         let max_interval = self.max_backoff_interval;
 
@@ -86,10 +84,7 @@ impl Client {
             let msg = ClientMsg::Query(query.clone());
             let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
             let signature = self.keypair.sign(&serialised_query);
-            debug!(
-                "Attempting {query:?} (adult_index #{}) will force new: {force_new_link}",
-                query.adult_index
-            );
+            debug!("Attempting {query:?} (adult_index #{})", query.adult_index);
 
             // grab up to date destination section from our local network knowledge
             let (section_pk, elders) = self.session.get_query_elders(dst).await?;
@@ -101,7 +96,6 @@ impl Client {
                     serialised_query.clone(),
                     signature.clone(),
                     Some((section_pk, elders.clone())),
-                    force_new_link,
                 )
                 .await;
 
@@ -149,15 +143,8 @@ impl Client {
         signature: Signature,
     ) -> Result<QueryResult, Error> {
         debug!("Sending Query: {:?}", query);
-        self.send_signed_query_to_section(
-            query,
-            client_pk,
-            serialised_query,
-            signature,
-            None,
-            false,
-        )
-        .await
+        self.send_signed_query_to_section(query, client_pk, serialised_query, signature, None)
+            .await
     }
 
     // Private helper to send a signed query, with the option to define the destination section.
@@ -170,7 +157,6 @@ impl Client {
         serialised_query: Bytes,
         signature: Signature,
         dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
-        force_new_link: bool,
     ) -> Result<QueryResult, Error> {
         let auth = ClientAuth {
             public_key: client_pk,
@@ -178,13 +164,7 @@ impl Client {
         };
 
         self.session
-            .send_query(
-                query,
-                auth,
-                serialised_query,
-                dst_section_info,
-                force_new_link,
-            )
+            .send_query(query, auth, serialised_query, dst_section_info)
             .await
     }
 
@@ -201,7 +181,6 @@ impl Client {
 
         let client_pk = self.public_key();
         let dst = query.dst_name();
-        let force_new_link = false;
 
         // grab up to date destination section from our local network knowledge
         let (section_pk, elders) = self.session.get_query_elders(dst).await?;
@@ -229,7 +208,6 @@ impl Client {
                         serialised_query,
                         signature,
                         Some((section_pk, elders_clone)),
-                        force_new_link,
                     )
                     .await;
 

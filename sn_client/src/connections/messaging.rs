@@ -38,7 +38,6 @@ impl Session {
         dst_address: XorName,
         auth: ClientAuth,
         payload: Bytes,
-        force_new_link: bool,
     ) -> Result<()> {
         let endpoint = self.endpoint.clone();
         // TODO: Consider other approach: Keep a session per section!
@@ -59,9 +58,7 @@ impl Session {
         let kind = MsgKind::Client(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
-        let send_cmd_tasks = self
-            .send_msg(elders.clone(), wire_msg, msg_id, force_new_link)
-            .await?;
+        let send_cmd_tasks = self.send_msg(elders.clone(), wire_msg, msg_id).await?;
         trace!("Cmd msg {:?} sent", msg_id);
 
         // We wait for ALL the Acks get received.
@@ -172,7 +169,6 @@ impl Session {
         auth: ClientAuth,
         payload: Bytes,
         dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
-        force_new_link: bool,
     ) -> Result<QueryResult> {
         let endpoint = self.endpoint.clone();
 
@@ -209,9 +205,7 @@ impl Session {
         let kind = MsgKind::Client(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
-        let send_query_tasks = self
-            .send_msg(elders.clone(), wire_msg, msg_id, force_new_link)
-            .await?;
+        let send_query_tasks = self.send_msg(elders.clone(), wire_msg, msg_id).await?;
 
         // TODO:
         // We are now simply accepting the very first valid response we receive,
@@ -396,7 +390,7 @@ impl Session {
             .collect();
 
         let mut tasks = self
-            .send_msg(initial_contacts, wire_msg.clone(), msg_id, false)
+            .send_msg(initial_contacts, wire_msg.clone(), msg_id)
             .await?;
         tasks.detach_all();
 
@@ -463,7 +457,7 @@ impl Session {
 
                 trace!("Sending out another batch of initial contact msgs to new nodes");
                 let mut tasks = self
-                    .send_msg(next_contacts, wire_msg.clone(), msg_id, false)
+                    .send_msg(next_contacts, wire_msg.clone(), msg_id)
                     .await?;
                 tasks.detach_all();
 
@@ -566,9 +560,8 @@ impl Session {
         nodes: Vec<Peer>,
         wire_msg: WireMsg,
         msg_id: MsgId,
-        force_new_link: bool,
     ) -> Result<JoinSet<MsgResponse>> {
-        debug!("---> send msg {msg_id:?} going... will force new?: {force_new_link}");
+        debug!("---> send msg {msg_id:?} going out.");
         let bytes = wire_msg.serialize()?;
 
         let mut tasks = JoinSet::new();
@@ -578,10 +571,7 @@ impl Session {
             let bytes = bytes.clone();
 
             let _abort_handle = tasks.spawn(async move {
-                let link = session
-                    .peer_links
-                    .get_or_create_link(&peer, force_new_link)
-                    .await;
+                let link = session.peer_links.get_or_create_link(&peer).await;
 
                 debug!("Trying to send msg to link {msg_id:?} to {peer:?}");
                 match link.send_bi(bytes.clone(), msg_id).await {

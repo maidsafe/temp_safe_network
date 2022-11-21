@@ -56,20 +56,12 @@ impl PeerLinks {
         false
     }
 
-    /// This method is tailored to the use-case of connecting on send.
-    /// I.e. it will not connect here, but on calling send on the returned link.
-    pub async fn get_or_create_link(&self, peer: &Peer, force_new_link: bool) -> Link {
-        if force_new_link {
-            // first remove any existing link
-            self.remove_link_from_peer_links(peer).await;
-
-            let link = Link::new(*peer, self.endpoint.clone());
-            let _ = self.links.write().await.insert(*peer, link.clone());
-
-            debug!("new link forced to {peer:?}");
-            return link;
-        }
-
+    /// This method is tailored to the use-case of connecting on creation.
+    /// I.e. it will connect here.
+    /// This helps to avoid many parallel msg attempts to a peer causing strain over the
+    /// internal connection locks during initial mesage sending (when otherwise no
+    /// connection would exist)
+    pub async fn get_or_create_link(&self, peer: &Peer) -> Link {
         if let Some(link) = self.get(peer).await {
             return link;
         }
