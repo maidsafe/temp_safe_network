@@ -350,13 +350,12 @@ impl MyNode {
     #[instrument(skip_all)]
     pub(crate) async fn handle_anti_entropy_msg(
         node: Arc<RwLock<MyNode>>,
-        context: NodeContext,
+        starting_context: NodeContext,
         section_tree_update: SectionTreeUpdate,
         kind: AntiEntropyKind,
         sender: Peer,
     ) -> Result<Vec<Cmd>> {
         debug!("[NODE READ]: handling AE read gottt...");
-        let starting_context = node.read().await.context();
         let sap = section_tree_update.signed_sap.value.clone();
 
         let members = if let AntiEntropyKind::Update { members } = &kind {
@@ -370,7 +369,7 @@ impl MyNode {
         // block off the write lock
         let updated = {
             let should_update = MyNode::would_we_update_network_knowledge(
-                &context,
+                &starting_context,
                 section_tree_update.clone(),
                 members.clone(),
             )?;
@@ -378,7 +377,7 @@ impl MyNode {
                 let mut write_locked_node = node.write().await;
                 debug!("[NODE WRITE]: handling AE write gottt...");
                 let updated = write_locked_node.update_network_knowledge(
-                    &context,
+                    &starting_context,
                     section_tree_update,
                     members,
                 )?;
