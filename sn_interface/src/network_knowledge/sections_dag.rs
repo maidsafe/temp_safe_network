@@ -523,6 +523,13 @@ pub(crate) mod tests {
             .expect("Should have succeeded in creating a partial dag");
 
         assert_eq!(Vec::from_iter(partial_dag.keys()), vec![pk]);
+
+        let (_, pk_other) = gen_keypair();
+
+        assert!(matches!(
+            dag.partial_dag(&pk_other, &pk),
+            Err(Error::InvalidBranch)
+        ));
     }
 
     #[test]
