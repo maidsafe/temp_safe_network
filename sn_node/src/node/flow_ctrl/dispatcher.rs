@@ -49,8 +49,6 @@ impl Dispatcher {
 
     /// Handles a single cmd.
     pub(crate) async fn process_cmd(&self, cmd: Cmd) -> Result<Vec<Cmd>> {
-        trace!("doing actual processing cmd: {cmd:?}");
-
         match cmd {
             Cmd::SendMsg {
                 msg,
@@ -147,7 +145,6 @@ impl Dispatcher {
                 msg,
                 send_stream,
             } => {
-                debug!("handling valid msg {:?}", msg_id);
                 MyNode::handle_valid_system_msg(self.node.clone(), msg_id, msg, origin, send_stream)
                     .await
             }

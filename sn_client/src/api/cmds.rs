@@ -35,7 +35,6 @@ impl Client {
         client_pk: PublicKey,
         serialised_cmd: Bytes,
         signature: Signature,
-        force_new_link: bool,
     ) -> Result<(), Error> {
         let auth = ClientAuth {
             public_key: client_pk,
@@ -44,7 +43,7 @@ impl Client {
 
         tokio::time::timeout(self.cmd_timeout, async {
             self.session
-                .send_cmd(dst_address, auth, serialised_cmd, force_new_link)
+                .send_cmd(dst_address, auth, serialised_cmd)
                 .await
         })
         .await
@@ -67,16 +66,9 @@ impl Client {
             WireMsg::serialize_msg_payload(&msg)?
         };
         let signature = self.sign(&serialised_cmd);
-        let force_new_link = false;
 
         let res = self
-            .send_signed_cmd(
-                dst_name,
-                client_pk,
-                serialised_cmd,
-                signature,
-                force_new_link,
-            )
+            .send_signed_cmd(dst_name, client_pk, serialised_cmd, signature)
             .await;
 
         if res.is_ok() {

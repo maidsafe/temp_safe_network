@@ -58,19 +58,16 @@ impl PeerLinks {
 
     /// This method is tailored to the use-case of connecting on send.
     /// I.e. it will not connect here, but on calling send on the returned link.
-    pub async fn get_or_create_link(&self, peer: &Peer, force_new_link: bool) -> Link {
-        if force_new_link {
-            // first remove any existing link
-            self.remove_link_from_peer_links(peer).await;
-
-            let link = Link::new(*peer, self.endpoint.clone());
-            let _ = self.links.write().await.insert(*peer, link.clone());
-
-            debug!("new link forced to {peer:?}");
-            return link;
-        }
-
+    pub async fn get_or_create_link(&self, peer: &Peer, connect_now: bool) -> Link {
         if let Some(link) = self.get(peer).await {
+            if connect_now {
+                if let Err(error) = link.create_connection_if_none_exist(None).await {
+                    error!(
+                        "Error during create connection attempt for link to {:?}: {error:?}",
+                        peer
+                    );
+                }
+            }
             return link;
         }
 
@@ -85,6 +82,14 @@ impl PeerLinks {
             // still not in list, go ahead and create + insert
             None => {
                 let link = Link::new(*peer, self.endpoint.clone());
+                if connect_now {
+                    if let Err(error) = link.create_connection_if_none_exist(None).await {
+                        error!(
+                            "Error during create connection attempt for link to {:?}: {error:?}",
+                            peer
+                        );
+                    }
+                }
                 let _ = links.insert(*peer, link.clone());
                 link
             }
