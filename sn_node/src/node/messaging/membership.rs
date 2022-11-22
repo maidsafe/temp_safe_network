@@ -7,7 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    core::NodeContext, flow_ctrl::cmds::Cmd, membership, messaging::Peers, relocation::ChurnId,
+    core::NodeContext,
+    flow_ctrl::cmds::Cmd,
+    membership::{self, Membership},
+    messaging::Peers,
+    relocation::ChurnId,
     Event, MembershipEvent, MyNode, Result,
 };
 
@@ -53,9 +57,11 @@ impl MyNode {
     /// Get our latest vote if any at this generation, and get cmds to resend to all elders
     /// (which should in turn trigger them to resend their votes)
     #[instrument(skip_all)]
-    pub(crate) async fn membership_gossip_votes(context: &NodeContext) -> Option<Cmd> {
-        let membership = context.membership.clone();
-        if let Some(membership) = membership {
+    pub(crate) async fn membership_gossip_votes(
+        context: &NodeContext,
+        membership_context: &Option<Membership>,
+    ) -> Option<Cmd> {
+        if let Some(membership) = membership_context {
             trace!("{}", LogMarker::GossippingMembershipVotes);
             if let Ok(ae_votes) = membership.anti_entropy(membership.generation()) {
                 let cmd =
@@ -133,7 +139,7 @@ impl MyNode {
     }
 
     pub(crate) fn handle_membership_anti_entropy(
-        context: &NodeContext,
+        membership_context: Option<Membership>,
         peer: Peer,
         gen: Generation,
     ) -> Option<Cmd> {
@@ -144,7 +150,7 @@ impl MyNode {
             peer
         );
 
-        if let Some(membership) = context.membership.as_ref() {
+        if let Some(membership) = membership_context.as_ref() {
             match membership.anti_entropy(gen) {
                 Ok(catchup_votes) => {
                     debug!("Sending catchup votes to {peer:?}");

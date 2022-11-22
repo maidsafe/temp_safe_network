@@ -158,7 +158,6 @@ mod core {
         pub(crate) comm: Comm,
         pub(crate) event_sender: EventSender,
         pub(crate) joins_allowed: bool,
-        pub(crate) membership: Option<Membership>,
     }
 
     impl NodeContext {
@@ -190,7 +189,6 @@ mod core {
                 comm: self.comm.clone(),
                 event_sender: self.event_sender.clone(),
                 joins_allowed: self.joins_allowed,
-                membership: self.membership.clone(),
                 data_storage: self.data_storage.clone(),
             }
         }
