@@ -311,11 +311,11 @@ impl MyNode {
             }
             NodeMsg::MembershipAE(gen) => {
                 debug!("[NODE READ]: membership ae read ");
-                let snapshopt = node.read().await.context();
+                let membership_context = node.read().await.membership.clone();
                 debug!("[NODE READ]: membership ae read got");
 
                 Ok(
-                    MyNode::handle_membership_anti_entropy(&snapshopt, sender, gen)
+                    MyNode::handle_membership_anti_entropy(membership_context, sender, gen)
                         .into_iter()
                         .collect(),
                 )
