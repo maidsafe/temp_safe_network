@@ -162,7 +162,7 @@ async fn bootstrap_node(
             used_space,
             root_storage_dir,
             event_sender.clone(),
-            dysfunction_cmds_sender,
+            dysfunction_cmds_sender.clone(),
         )
         .await?
     } else {
@@ -174,7 +174,7 @@ async fn bootstrap_node(
             event_sender.clone(),
             used_space,
             root_storage_dir,
-            dysfunction_cmds_sender,
+            dysfunction_cmds_sender.clone(),
         )
         .await?
     };
@@ -186,8 +186,9 @@ async fn bootstrap_node(
         cmd_ctrl,
         connection_event_rx,
         data_replication_receiver,
-        dysfunction_cmds_receiver,
-    );
+        (dysfunction_cmds_sender, dysfunction_cmds_receiver),
+    )
+    .await;
 
     Ok((node, cmd_channel, event_receiver))
 }
