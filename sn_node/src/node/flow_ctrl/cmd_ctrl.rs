@@ -53,7 +53,7 @@ impl CmdCtrl {
 
         let dispatcher = self.dispatcher.clone();
         let _ = tokio::task::spawn(async move {
-            debug!("> spawned process for cmd {cmd:?}, id: {id:?}");
+            trace!("Spawned process for cmd {cmd:?}, id: {id:?}");
 
             #[cfg(feature = "statemap")]
             sn_interface::statemap::log_state(node_identifier.to_string(), cmd.statemap_state());

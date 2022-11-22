@@ -57,7 +57,7 @@ impl MyNode {
     ) -> Result<Vec<Cmd>> {
         // Deserialize the payload of the incoming message
         let msg_id = wire_msg.msg_id();
-        debug!("Validating msg {msg_id:?}");
+        trace!("validating msg {msg_id:?}");
 
         let msg_type = match wire_msg.into_msg() {
             Ok(msg_type) => msg_type,
@@ -68,10 +68,9 @@ impl MyNode {
         };
 
         let context = node.read().await.context();
-        debug!("[NODE READ]: validate msg lock got");
+        trace!("[NODE READ]: validate msg lock got");
         match msg_type {
             MsgType::Node { msg_id, dst, msg } => {
-                debug!("node msg");
                 // Check for entropy before we proceed further
                 // Anything returned here means there's an issue and we should
                 // short-circuit below

@@ -278,12 +278,10 @@ impl MyNode {
 
         // check we should be _becoming_ an elder
         let we_should_become_an_elder = sap.contains_elder(&our_name);
-
-        trace!("we_have_a_share_of_this_key: {we_have_a_share_of_this_key}, we_should_become_an_elder: {we_should_become_an_elder}");
-
         (we_have_a_share_of_this_key, we_should_become_an_elder)
     }
 
+    #[instrument(skip_all)]
     /// Test a context to see if we would update Network Knowledge
     /// returns
     ///   Ok(true) if the update had new valid information
