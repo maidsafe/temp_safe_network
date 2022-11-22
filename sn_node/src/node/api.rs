@@ -9,7 +9,7 @@
 use crate::comm::Comm;
 use crate::{
     node::{
-        flow_ctrl::{cmds::Cmd, event_channel::EventSender},
+        flow_ctrl::{cmds::Cmd, dysfunction::DysCmds, event_channel::EventSender},
         Error, Event, MyNode, Result, GENESIS_DBC_AMOUNT,
     },
     UsedSpace,
@@ -29,6 +29,7 @@ use sn_dbc::{
     SpentProofContent, SpentProofShare, Token, TransactionBuilder, TrueInput,
 };
 use std::{path::PathBuf, sync::Arc};
+use tokio::sync::mpsc;
 
 impl MyNode {
     pub(crate) async fn first_node(
@@ -38,6 +39,7 @@ impl MyNode {
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
         genesis_sk_set: bls::SecretKeySet,
+        dysfunction_cmds_sender: mpsc::Sender<DysCmds>,
     ) -> Result<(Self, Dbc)> {
         let our_addr = comm.socket_addr();
         let info = MyNodeInfo {
@@ -59,6 +61,7 @@ impl MyNode {
             event_sender,
             used_space,
             root_storage_dir,
+            dysfunction_cmds_sender,
         )
         .await?;
 
@@ -120,10 +123,10 @@ impl MyNode {
     // Generate a new section info based on the current set of members, but
     // excluding the ones in the provided list. And if the outcome list of candidates
     // differs from the current elders, trigger a DKG.
-    pub(crate) fn trigger_dkg(&mut self) -> Result<Vec<Cmd>> {
+    pub(crate) async fn trigger_dkg(&mut self) -> Result<Vec<Cmd>> {
         debug!("{}", LogMarker::TriggeringPromotionAndDemotion);
         let mut cmds = vec![];
-        for session_id in self.best_elder_candidates() {
+        for session_id in self.best_elder_candidates().await {
             cmds.extend(self.send_dkg_start(session_id)?);
         }
 

@@ -384,7 +384,11 @@ impl MyNode {
                 )?;
                 debug!("net knowledge udpated");
                 // always run this, only changes will trigger events
-                cmds.extend(write_locked_node.update_on_elder_change(&starting_context)?);
+                cmds.extend(
+                    write_locked_node
+                        .update_on_elder_change(&starting_context)
+                        .await?,
+                );
                 debug!("updated for elder change");
                 updated
             } else {
@@ -438,10 +442,7 @@ impl MyNode {
         let (bounced_msg, response_peer) = match kind {
             AntiEntropyKind::Update { .. } => {
                 // log the msg as received. Elders track this for other elders in dysfunction
-                node.write()
-                    .await
-                    .dysfunction_tracking
-                    .ae_update_msg_received(&sender.name());
+                node.read().await.log_ae_update_msg(sender.name()).await;
                 return Ok(cmds);
             } // Nope, bail early
             AntiEntropyKind::Retry { bounced_msg } => {
@@ -665,6 +666,7 @@ mod tests {
     use assert_matches::assert_matches;
     use bls::SecretKey;
     use eyre::{Context, Result};
+    use tokio::sync::mpsc;
     use xor_name::Prefix;
 
     #[tokio::test]
@@ -818,6 +820,7 @@ mod tests {
                 UsedSpace::new(max_capacity),
                 root_storage_dir,
                 genesis_sk_set.clone(),
+                mpsc::channel(10).0,
             )
             .await?;
 

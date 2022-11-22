@@ -15,7 +15,7 @@ use crate::node::{
 
 use sn_interface::{messaging::system::NodeMsg, types::log_markers::LogMarker};
 
-use std::{collections::BTreeSet, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 use tokio::{sync::RwLock, time::Instant};
 
 const PROBE_INTERVAL: Duration = Duration::from_secs(30);
@@ -167,7 +167,7 @@ impl FlowCtrl {
         if self.timestamps.last_dysfunction_check.elapsed() > DYSFUNCTION_CHECK_INTERVAL {
             debug!(" ----> dysfn periodics start");
             self.timestamps.last_dysfunction_check = now;
-            let dysf_cmds = Self::check_for_dysfunction(self.node.clone()).await;
+            let dysf_cmds = self.check_for_dysfunction().await;
             cmds.extend(dysf_cmds);
             debug!(" ----> dysfn periodics done");
         }
@@ -258,7 +258,7 @@ impl FlowCtrl {
             // whhich is countered when an AE-Update is
             cmds.push(Cmd::TrackNodeIssueInDysfunction {
                 name: elder.name(),
-                issue: sn_dysfunction::IssueType::AwaitingProbeResponse,
+                issue: sn_dysfunction::IssueType::AeProbeMsg,
             });
         }
 
@@ -331,24 +331,14 @@ impl FlowCtrl {
         });
     }
 
-    async fn check_for_dysfunction(node: Arc<RwLock<MyNode>>) -> Vec<Cmd> {
+    async fn check_for_dysfunction(&mut self) -> Vec<Cmd> {
         info!("Performing dysfunction checking");
         let mut cmds = vec![];
-        debug!("[NODE WRITE]: periodic dysf  write ...");
-        let dysfunctional_nodes = node.write().await.get_dysfunctional_node_names();
-        debug!("[NODE WRITE]: periodic dysf write gottt...");
+        let dysfunctional_nodes = self.get_dysfunctional_node_names().await;
 
-        let unresponsive_nodes = match dysfunctional_nodes {
-            Ok(nodes) => nodes,
-            Err(error) => {
-                error!("Error getting dysfunctional nodes: {error}");
-                BTreeSet::default()
-            }
-        };
-
-        if !unresponsive_nodes.is_empty() {
-            debug!("{:?} : {unresponsive_nodes:?}", LogMarker::ProposeOffline);
-            cmds.push(Cmd::ProposeVoteNodesOffline(unresponsive_nodes))
+        if !dysfunctional_nodes.is_empty() {
+            debug!("{:?} : {dysfunctional_nodes:?}", LogMarker::ProposeOffline);
+            cmds.push(Cmd::ProposeVoteNodesOffline(dysfunctional_nodes))
         }
 
         cmds

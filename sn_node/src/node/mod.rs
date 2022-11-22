@@ -64,7 +64,7 @@ mod core {
             bootstrap::JoiningAsRelocated,
             data::Capacity,
             dkg::DkgVoter,
-            flow_ctrl::{cmds::Cmd, event_channel::EventSender},
+            flow_ctrl::{cmds::Cmd, dysfunction::DysCmds, event_channel::EventSender},
             handover::Handover,
             membership::{elder_candidates, try_split_dkg, Membership},
             messaging::Peers,
@@ -74,7 +74,7 @@ mod core {
         UsedSpace,
     };
 
-    use sn_dysfunction::{DysfunctionDetection, IssueType};
+    use sn_dysfunction::IssueType;
 
     use sn_interface::{
         messaging::{
@@ -99,6 +99,7 @@ mod core {
         path::PathBuf,
         sync::Arc,
     };
+    use tokio::sync::mpsc;
 
     /// Amount of tokens to be owned by the Genesis DBC.
     /// At the inception of the Network a total supply of 4,525,524,120 whole tokens will be created.
@@ -141,7 +142,7 @@ mod core {
         pub(crate) joins_allowed: bool,
         // Trackers
         pub(crate) capacity: Capacity,
-        pub(crate) dysfunction_tracking: DysfunctionDetection,
+        pub(crate) dysfunction_cmds_sender: mpsc::Sender<DysCmds>,
     }
 
     #[derive(Clone)]
@@ -202,6 +203,7 @@ mod core {
             event_sender: EventSender,
             used_space: UsedSpace,
             root_storage_dir: PathBuf,
+            dysfunction_cmds_sender: mpsc::Sender<DysCmds>,
         ) -> Result<Self> {
             let addr = comm.socket_addr();
             let membership = if let Some(key) = section_key_share.clone() {
@@ -228,19 +230,6 @@ mod core {
             let section_keys_provider = SectionKeysProvider::new(section_key_share.clone());
 
             let data_storage = DataStorage::new(&root_storage_dir, used_space)?;
-
-            info!("Creating DysfunctionDetection checks");
-            let node_dysfunction_detector = DysfunctionDetection::new(
-                network_knowledge
-                    .members()
-                    .iter()
-                    .map(|peer| peer.name())
-                    .collect::<Vec<XorName>>(),
-            );
-            info!(
-                "DysfunctionDetection check: {:?}",
-                node_dysfunction_detector
-            );
 
             // create handover
             let handover = if let Some(key) = section_key_share {
@@ -272,7 +261,7 @@ mod core {
                 joins_allowed: true,
                 data_storage,
                 capacity: Capacity::default(),
-                dysfunction_tracking: node_dysfunction_detector,
+                dysfunction_cmds_sender,
                 membership,
             };
 
@@ -335,42 +324,10 @@ mod core {
             MyNode::send_system_msg(probe, Peers::Multiple(recipients))
         }
 
-        /// returns names that are relatively dysfunctional
-        pub(crate) fn get_dysfunctional_node_names(&mut self) -> Result<BTreeSet<XorName>> {
-            self.dysfunction_tracking
-                .get_dysfunctional_nodes()
-                .map_err(Error::from)
-        }
-
-        /// Log an issue in dysfunction
-        pub(crate) fn log_node_issue(&mut self, name: XorName, issue: IssueType) {
-            trace!("Logging issue {issue:?} in dysfunction for {name}");
-            self.dysfunction_tracking.track_issue(name, issue)
-        }
-
-        /// Log a communication problem
-        pub(crate) fn log_comm_issue(&mut self, name: XorName) {
-            trace!("Logging comms issue in dysfunction for {name}");
-            self.dysfunction_tracking
-                .track_issue(name, IssueType::Communication)
-        }
-
-        /// Log a dkg issue (ie, an initialised but unfinished dkg round for a given participant)
-        pub(crate) fn log_dkg_issue(&mut self, name: XorName) {
-            trace!("Logging Dkg issue in dysfunction for {name}");
-            self.dysfunction_tracking.track_issue(name, IssueType::Dkg)
-        }
-
-        /// Log a dkg session as responded to
-        pub(crate) fn log_dkg_session(&mut self, name: &XorName) {
-            trace!("Logging Dkg session as responded to in dysfunction for {name}");
-            self.dysfunction_tracking.dkg_ack_fulfilled(name);
-        }
-
         /// Generates section infos for the best elder candidate among the members at the given generation
         /// Returns a set of candidate `DkgSessionId`'s.
-        pub(crate) fn best_elder_candidates_at_gen(
-            &mut self,
+        pub(crate) async fn best_elder_candidates_at_gen(
+            &self,
             membership_gen: u64,
         ) -> Vec<DkgSessionId> {
             let sap = self.network_knowledge.section_auth();
@@ -405,11 +362,11 @@ mod core {
                 // So, shall only track the side that we are in as well.
                 if zero_dkg_id.elders.contains_key(&self.info().name()) {
                     for candidate in zero_dkg_id.elders.keys() {
-                        self.log_dkg_issue(*candidate);
+                        self.log_dkg_issue(*candidate).await;
                     }
                 } else if one_dkg_id.elders.contains_key(&self.info().name()) {
                     for candidate in one_dkg_id.elders.keys() {
-                        self.log_dkg_issue(*candidate);
+                        self.log_dkg_issue(*candidate).await;
                     }
                 }
 
@@ -462,7 +419,7 @@ mod core {
                 };
                 // track init of DKG
                 for candidate in session_id.elders.keys() {
-                    self.log_dkg_issue(*candidate);
+                    self.log_dkg_issue(*candidate).await;
                 }
 
                 vec![session_id]
@@ -471,9 +428,9 @@ mod core {
 
         /// Generates section infos for the current best elder candidate among the current members
         /// Returns a set of candidate `DkgSessionId`'s.
-        pub(crate) fn best_elder_candidates(&mut self) -> Vec<DkgSessionId> {
+        pub(crate) async fn best_elder_candidates(&self) -> Vec<DkgSessionId> {
             match self.membership.as_ref() {
-                Some(m) => self.best_elder_candidates_at_gen(m.generation()),
+                Some(m) => self.best_elder_candidates_at_gen(m.generation()).await,
                 None => {
                     error!("Attempted to find best elder candidates when we don't have a membership instance");
                     vec![]
@@ -519,7 +476,10 @@ mod core {
         }
 
         /// Updates various state if elders changed.
-        pub(crate) fn update_on_elder_change(&mut self, old: &NodeContext) -> Result<Vec<Cmd>> {
+        pub(crate) async fn update_on_elder_change(
+            &mut self,
+            old: &NodeContext,
+        ) -> Result<Vec<Cmd>> {
             let new = self.context();
             let new_section_key = new.network_knowledge.section_key();
             let new_prefix = new.network_knowledge.prefix();
@@ -583,7 +543,7 @@ mod core {
                     // The section-key has changed, we are now able to function as an elder.
                     self.initialize_elder_state()?;
 
-                    cmds.extend(self.trigger_dkg()?);
+                    cmds.extend(self.trigger_dkg().await?);
 
                     // Whenever there is an elders change, casting a round of joins_allowed
                     // proposals to sync this particular state.
@@ -654,7 +614,8 @@ mod core {
                         .iter()
                         .map(|peer| peer.name())
                         .collect(),
-                )?;
+                )
+                .await;
 
                 // During the split, sibling's SAP could be unknown to us yet.
                 // Hence, fire the SectionSplit event whenever detect a prefix change.
@@ -695,6 +656,51 @@ mod core {
             });
 
             Ok(cmds)
+        }
+
+        /// Log an issue in dysfunction
+        pub(crate) async fn log_node_issue(&self, name: XorName, issue: IssueType) {
+            trace!("Logging issue {issue:?} in dysfunction for {name}");
+            if let Err(error) = self
+                .dysfunction_cmds_sender
+                .send(DysCmds::TrackIssue(name, issue))
+                .await
+            {
+                error!("Could not send DysCmds through dysfunctional_cmds_tx: {error}");
+            }
+        }
+
+        /// Log a communication problem
+        pub(crate) async fn log_comm_issue(&self, name: XorName) {
+            self.log_node_issue(name, IssueType::Communication).await
+        }
+
+        /// Log a dkg issue (ie, an initialised but unfinished dkg round for a given participant)
+        pub(crate) async fn log_dkg_issue(&self, name: XorName) {
+            self.log_node_issue(name, IssueType::Dkg).await
+        }
+
+        /// Sends `DysCmds::UntrackIssue` cmd
+        async fn untrack_node_issue(&self, name: XorName, issue: IssueType) {
+            if let Err(error) = self
+                .dysfunction_cmds_sender
+                .send(DysCmds::UntrackIssue(name, issue))
+                .await
+            {
+                error!("Could not send DysCmds through dysfunctional_cmds_tx: {error}");
+            }
+        }
+
+        /// Log a dkg session as responded to
+        pub(crate) async fn log_dkg_session(&self, name: XorName) {
+            trace!("Logging Dkg session as responded to in dysfunction for {name}");
+            self.untrack_node_issue(name, IssueType::Dkg).await
+        }
+
+        /// Log a AE update message as responded to
+        pub(crate) async fn log_ae_update_msg(&self, name: XorName) {
+            trace!("Logging AE update message as responded to in dysfunction for {name}");
+            self.untrack_node_issue(name, IssueType::AeProbeMsg).await
         }
 
         #[allow(unused)]

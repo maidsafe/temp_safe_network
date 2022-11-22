@@ -407,6 +407,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
         event_sender,
         UsedSpace::new(max_capacity),
         root_storage_dir,
+        mpsc::channel(10).0,
     )
     .await?;
 
@@ -606,6 +607,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
         event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE).0,
         UsedSpace::new(max_capacity),
         root_storage_dir,
+        mpsc::channel(10).0,
     )
     .await?;
     let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
@@ -664,6 +666,7 @@ async fn msg_to_self() -> Result<()> {
         UsedSpace::new(max_capacity),
         root_storage_dir,
         genesis_sk_set,
+        mpsc::channel(10).0,
     )
     .await?;
     let info = node.info();
@@ -767,6 +770,7 @@ async fn handle_elders_update() -> Result<()> {
         event_sender,
         UsedSpace::new(max_capacity),
         root_storage_dir,
+        mpsc::channel(10).0,
     )
     .await?;
 
@@ -907,6 +911,7 @@ async fn handle_demote_during_split() -> Result<()> {
         event_sender,
         UsedSpace::new(max_capacity),
         root_storage_dir,
+        mpsc::channel(10).0,
     )
     .await?;
 

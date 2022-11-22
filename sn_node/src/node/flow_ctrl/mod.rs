@@ -9,43 +9,79 @@
 pub(crate) mod cmd_ctrl;
 pub(crate) mod cmds;
 pub(super) mod dispatcher;
+pub(super) mod dysfunction;
 pub(super) mod event;
 pub(super) mod event_channel;
 mod periodic_checks;
+
 #[cfg(test)]
 pub(crate) mod tests;
+pub(crate) use cmd_ctrl::CmdCtrl;
 
 use crate::comm::MsgFromPeer;
-use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, Result};
-pub(crate) use cmd_ctrl::CmdCtrl;
+use crate::node::{
+    flow_ctrl::{
+        cmds::Cmd,
+        dysfunction::{DysCmds, DysfunctionChannels},
+    },
+    messaging::Peers,
+    MyNode, Result,
+};
 use periodic_checks::PeriodicChecksTimestamps;
-use sn_interface::messaging::system::{NodeDataCmd, NodeMsg};
-use sn_interface::types::log_markers::LogMarker;
-use sn_interface::types::{DataAddress, Peer};
+use sn_dysfunction::DysfunctionDetection;
+use sn_interface::{
+    messaging::system::{NodeDataCmd, NodeMsg},
+    types::{log_markers::LogMarker, DataAddress, Peer},
+};
 
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
+use xor_name::XorName;
 
 /// Listens for incoming msgs and forms Cmds for each,
 /// Periodically triggers other Cmd Processes (eg health checks, dysfunction etc)
 pub(crate) struct FlowCtrl {
     node: Arc<RwLock<MyNode>>,
     cmd_sender_channel: mpsc::Sender<(Cmd, Vec<usize>)>,
+    dysfunction_channels: DysfunctionChannels,
     timestamps: PeriodicChecksTimestamps,
 }
 
 impl FlowCtrl {
     /// Constructs a FlowCtrl instance, spawnning a task which starts processing messages,
     /// returning the channel where it can receive commands on
-    pub(crate) fn start(
+    pub(crate) async fn start(
         cmd_ctrl: CmdCtrl,
         mut incoming_msg_events: mpsc::Receiver<MsgFromPeer>,
         mut data_replication_receiver: mpsc::Receiver<(Vec<DataAddress>, Peer)>,
+        dysfunction_cmds_channels: (mpsc::Sender<DysCmds>, mpsc::Receiver<DysCmds>),
     ) -> mpsc::Sender<(Cmd, Vec<usize>)> {
+        debug!("[NODE READ]: flowctrl node context lock got");
+        let node_context = cmd_ctrl.node().read().await.context();
         let (cmd_sender_channel, mut incoming_cmds_from_apis) = mpsc::channel(10_000);
+
+        let dysfunction_channels = {
+            let dysfunction = DysfunctionDetection::new(
+                node_context
+                    .network_knowledge
+                    .members()
+                    .iter()
+                    .map(|peer| peer.name())
+                    .collect::<Vec<XorName>>(),
+            );
+            // start DysfunctionDetection in a new thread
+            let dysfunctional_nodes_receiver =
+                Self::start_dysfunction_detection(dysfunction, dysfunction_cmds_channels.1);
+            DysfunctionChannels {
+                cmds_sender: dysfunction_cmds_channels.0,
+                dys_nodes_receiver: dysfunctional_nodes_receiver,
+            }
+        };
+
         let flow_ctrl = Self {
             node: cmd_ctrl.node(),
             cmd_sender_channel: cmd_sender_channel.clone(),
+            dysfunction_channels,
             timestamps: PeriodicChecksTimestamps::now(),
         };
 
@@ -58,18 +94,11 @@ impl FlowCtrl {
         let cmd_channel_for_msgs = cmd_sender_channel.clone();
         let cmd_channel_for_data_replication = cmd_sender_channel.clone();
 
-        let node = cmd_ctrl.node();
-        // on init grab a data storage clone for replication processes
-        let node_for_data_replication = node.clone();
-
         // start a new thread to kick off incoming cmds
         let _ = tokio::task::spawn(async move {
-            // do one read to get a stable identifier for statemap naming.
-            // this is NOT the node's current name. It's the initial name... but will not change
-            // for the entire statemap
-            let node_identifier = node.read().await.info().name();
-            debug!("[NODE READ]: flowctrl start msg lock got");
-
+            // Get a stable identifier for statemap naming. This is NOT the node's current name.
+            // It's the initial name... but will not change for the entire statemap
+            let node_identifier = node_context.info.name();
             while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
                 cmd_ctrl
                     .process_cmd_job(cmd, cmd_id, node_identifier, cmd_channel.clone())
@@ -79,8 +108,7 @@ impl FlowCtrl {
 
         // start a new thread to kick off data replication
         let _ = tokio::task::spawn(async move {
-            // on init grab a data storage clone for replication processes
-            let node_data_storage = node_for_data_replication.read().await.data_storage.clone();
+            let node_data_storage = node_context.data_storage;
             // let pending_data_to_replicate_to_peers = BTreeMap::new();
             // is there a simple way to dedupe common data going to many peers?
             // is any overhead reduction worth the increased complexity?

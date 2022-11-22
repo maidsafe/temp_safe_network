@@ -19,7 +19,7 @@ use std::collections::BTreeSet;
 // Agreement
 impl MyNode {
     #[instrument(skip(self), level = "trace")]
-    pub(crate) fn handle_general_agreements(
+    pub(crate) async fn handle_general_agreements(
         &mut self,
         proposal: Proposal,
         sig: SectionSig,
@@ -31,7 +31,7 @@ impl MyNode {
                 cmds.extend(self.handle_offline_agreement(node_state, sig))
             }
             Proposal::SectionInfo(sap) => {
-                cmds.extend(self.handle_section_info_agreement(sap, sig)?)
+                cmds.extend(self.handle_section_info_agreement(sap, sig).await?)
             }
             Proposal::NewElders(_) => {
                 error!("Elders agreement should be handled in a separate blocking fashion");
@@ -53,7 +53,7 @@ impl MyNode {
     }
 
     #[instrument(skip(self), level = "trace")]
-    fn handle_section_info_agreement(
+    async fn handle_section_info_agreement(
         &mut self,
         sap: SectionAuthorityProvider,
         sig: SectionSig,
@@ -77,7 +77,7 @@ impl MyNode {
         // check if at the given memberhip gen, the elders candidates are matching
         let membership_gen = sap.membership_gen();
         let signed_sap = SectionSigned::new(sap, sig);
-        let dkg_sessions_info = self.best_elder_candidates_at_gen(membership_gen);
+        let dkg_sessions_info = self.best_elder_candidates_at_gen(membership_gen).await;
 
         let elder_candidates = BTreeSet::from_iter(signed_sap.names());
         if dkg_sessions_info
@@ -126,7 +126,7 @@ impl MyNode {
     }
 
     #[instrument(skip(self), level = "trace")]
-    pub(crate) fn handle_new_elders_agreement(
+    pub(crate) async fn handle_new_elders_agreement(
         &mut self,
         signed_sap: SectionSigned<SectionAuthorityProvider>,
         section_sig: SectionSig,
@@ -168,6 +168,6 @@ impl MyNode {
             self.network_knowledge.section_tree()
         );
 
-        self.update_on_elder_change(&context)
+        self.update_on_elder_change(&context).await
     }
 }

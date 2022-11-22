@@ -300,6 +300,7 @@ impl TestNodeBuilder {
             self.node_event_sender,
             UsedSpace::new(max_capacity),
             root_storage_dir,
+            mpsc::channel(10).0,
         )
         .await?;
         let node = Arc::new(RwLock::new(node));
