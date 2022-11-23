@@ -38,10 +38,13 @@ use tokio::{
 use xor_name::Prefix;
 
 pub(crate) static TEST_EVENT_CHANNEL_SIZE: usize = 20;
+// The default elder age pattern
+pub(crate) const ELDER_AGE_PATTERN: &[u8] = &[50, 45, 40, 35, 30, 25, 20];
 // the Rx channel for each node
 pub(crate) type TestCommRx = BTreeMap<PublicKey, Option<Receiver<MsgFromPeer>>>;
+
 #[derive(Clone, Debug)]
-pub(crate) enum TestMemberType {
+enum TestMemberType {
     Elder,
     Adult,
 }
@@ -56,7 +59,7 @@ pub(crate) struct TestNetworkBuilder<R: RngCore> {
     )>,
     receivers: TestCommRx,
     rng: R,
-    n_churns: usize,
+    n_churns_each_section: usize,
 }
 
 impl<R: RngCore> TestNetworkBuilder<R> {
@@ -66,15 +69,15 @@ impl<R: RngCore> TestNetworkBuilder<R> {
             sections: Vec::new(),
             rng,
             receivers: BTreeMap::new(),
-            n_churns: 1,
+            n_churns_each_section: 1,
         }
     }
 
     /// The number of churn events that can happen within a single `Prefix`. This will create extra
-    /// SAPs chained to each other for the same prefix. The `n_churns` will be applied only for the
-    /// `Prefix`es for which the user has not provided the SAPs.
+    /// SAPs chained to each other for the same prefix. The n_churns_each_section will only be applied
+    /// for the Prefixes for which the user has not provided the SAPs.
     pub(crate) fn set_n_churns(mut self, churns: usize) -> TestNetworkBuilder<R> {
-        self.n_churns = churns;
+        self.n_churns_each_section = churns;
         self
     }
 
@@ -82,12 +85,12 @@ impl<R: RngCore> TestNetworkBuilder<R> {
     /// are provided for the same Prefix, they are considered to have gone through churns in the
     /// order they are provided.
     ///
-    /// The total number of members in the section will be `elder_count` + `adult_count`. A lot of
-    /// tests don't require adults in the section, so zero is an acceptable value for
+    /// The total number of members in the SAP will be `elder_count` + `adult_count`. A lot of
+    /// tests don't require adults in the SAP, so zero is an acceptable value for
     /// `adult_count`.
     ///
     /// Optionally provide `age_pattern` to create elders with specific ages.
-    /// If None = elder's age is set to `MIN_ADULT_AGE`
+    /// If None = use ELDER_AGE_PATTERN
     /// If age_pattern.len() == elder, then apply the respective ages to each node
     /// If age_pattern.len() < elder, then the last element's value is taken as the age for the remaining nodes.
     /// If age_pattern.len() > elder, then the extra elements after `count` are ignored.
@@ -105,7 +108,7 @@ impl<R: RngCore> TestNetworkBuilder<R> {
         let mut elder_age_pattern = elder_age_pattern;
         // provide default age pattern if nothing is provided
         if elder_age_pattern.is_none() {
-            elder_age_pattern = Some(&[50, 45, 40, 35, 30, 25, 20]);
+            elder_age_pattern = Some(ELDER_AGE_PATTERN);
         }
 
         let (sap, nodes, sk_set, comm_rx) = self.build_sap(
@@ -157,8 +160,8 @@ impl<R: RngCore> TestNetworkBuilder<R> {
         self
     }
 
-    /// Create a SAP with the provided list of members. This is useful if you want to just change
-    /// some the members of a previous SAP.
+    /// Create a new SAP with the provided set of members for the given Prefix. This is useful if
+    /// you want to retain some of the members from a previous churn.
     ///
     /// Use `TestNetwork::build_node_infos()` to build the nodes;
     /// Note: The `mpsc::Receiver` for the nodes are assumed to be held by the caller. Hence trying
@@ -210,7 +213,12 @@ impl<R: RngCore> TestNetworkBuilder<R> {
                 } else {
                     TestMemberType::Adult
                 };
-                let _ = self.receivers.insert(info.public_key(), None);
+                // Since we just get `(MyNodeInfo, Comm)` from the user, the user is expected to
+                // hold the `Receiver<MsgFromPeer>` (or this node might've been from a previous
+                // churn that is already inserted), hence insert None only if the entry is Vacant.
+                if let Entry::Vacant(entry) = self.receivers.entry(info.public_key()) {
+                    let _ = entry.insert(None);
+                }
                 (info, comm, t)
             })
             .collect::<Vec<(MyNodeInfo, Comm, TestMemberType)>>();
@@ -221,9 +229,12 @@ impl<R: RngCore> TestNetworkBuilder<R> {
     /// Builds the `TestNetwork` struct.
     ///
     /// Will fill in the gaps in prefixes left by the user. For e.g., if the user has provided just
-    /// Prefix(100), the ancestors P() -> P(1) -> P(10) will be automatically created.
-    /// And if n_churns = 2 , then we will get SAP1() -> SAP2() -> SAP1(1) -> SAP2(1) -> SAP1(10)
-    /// -> SAP2 (10) -> user_SAP(100)
+    /// Prefix(100), the ancestors SAP() -> SAP(1) -> SAP(10) will be automatically created.
+    /// And if n_churns_each_section = 2 , then we will get SAP1() -> SAP2() -> SAP1(1) -> SAP2(1) -> SAP1(10)
+    /// -> SAP2(10) -> user_SAP(100)
+    ///
+    /// We just need the direct ancestors to create a valid `SectionTree`, hence the sibling
+    /// prefixes are ignored, i.e., SAP(0), SAP(11) etc.
     pub(crate) fn build(mut self) -> TestNetwork {
         // initially we will have only the user provided saps; hence get the missing prefixes and
         // the user provided prefixes.
@@ -231,33 +242,36 @@ impl<R: RngCore> TestNetworkBuilder<R> {
             let user_prefixes: BTreeSet<Prefix> =
                 self.sections.iter().map(|(sap, ..)| sap.prefix()).collect();
 
-            // missing_prefixes are used to construct saps
             let mut missing_prefixes = BTreeSet::new();
-            // max_prefixes are used to construct the `SectionTree`
             let mut min_prefixes = BTreeSet::new();
 
             for prefix in user_prefixes.iter() {
-                // get all the missing ancestor
                 prefix
                     .ancestors()
-                    .filter(|anc| !user_prefixes.contains(anc))
+                    // a user prefix is min, if it is part of the ancestor_list of any
+                    // other use prefix
+                    .filter(|anc| {
+                        if user_prefixes.contains(anc) {
+                            let _ = min_prefixes.insert(*anc);
+                            false
+                        } else {
+                            true
+                        }
+                    })
+                    // get the ancestors that are not present inside user_prefixes
                     .for_each(|missing_anc| {
                         let _ = missing_prefixes.insert(missing_anc);
                     });
-
-                // a prefix is min, if it is part of the ancestor_list of any prefix
-                prefix.ancestors().for_each(|anc| {
-                    if user_prefixes.contains(&anc) {
-                        _ = min_prefixes.insert(anc);
-                    }
-                });
             }
 
-            // max_prefixes are the larget user provided prefixes
+            // max_prefixes are the largest user provided prefixes
             let max_prefixes = user_prefixes
                 .into_iter()
                 .filter(|pre| !min_prefixes.contains(pre))
                 .collect::<BTreeSet<_>>();
+
+            // missing_prefixes are used to construct saps
+            // max_prefixes are used to construct the `SectionTree`
             (missing_prefixes, max_prefixes)
         };
 
@@ -306,14 +320,14 @@ impl<R: RngCore> TestNetworkBuilder<R> {
         for prefix in missing_prefixes {
             let mut s = Vec::new();
             let mut n_i = Vec::new();
-            let n_churns = self.n_churns;
-            for _ in 0..n_churns {
+            let n_churns_each_section = self.n_churns_each_section;
+            for _ in 0..n_churns_each_section {
                 // infos are sorted by age
                 let (sap, infos, sk, comm_rx) = self.build_sap(
                     prefix,
                     elder_count(),
                     0,
-                    Some(&[50, 45, 40, 35, 30, 25, 20]),
+                    Some(ELDER_AGE_PATTERN),
                     Some(supermajority(elder_count())),
                 );
                 let sap = TestKeys::get_section_signed(&sk.secret_key(), sap);
@@ -344,7 +358,7 @@ impl<R: RngCore> TestNetworkBuilder<R> {
     ) -> SectionTree {
         let gen_prefix = &sections
             .get(&Prefix::default())
-            .expect("Genesis section is absent. Provide atleast a single SAP");
+            .expect("Genesis section is absent. Provide at-least a single SAP");
         let gen_sk = gen_prefix[0].1.secret_key();
 
         let mut section_tree = SectionTree::new(gen_sk.public_key());
@@ -360,34 +374,34 @@ impl<R: RngCore> TestNetworkBuilder<R> {
 
         for max_prefix in prefix_iter.iter() {
             let (first_unique_prefix, mut parent) = if *max_prefix == Prefix::default() {
-                // if we have the default prefix, then we have not inserted anything yet. So the first churn
+                // if we have the default prefix, then we haven't inserted anything yet. So the first churn
                 // should be inserted.
                 let parent = sections
                     .get(max_prefix)
                     .expect("sections should contain the prefix")
                     .first()
-                    .expect("should contain atleast one sap")
+                    .expect("should contain at-least one sap")
                     .1
                     .secret_key();
                 (*max_prefix, parent)
             } else {
                 // if max_prefix is not the default prefix, then it means that the user has
-                // provided something greater than Prefix() and hence find ancestor that we have
-                // not inserted yet.
+                // provided something greater than Prefix() and hence find the ancestor that
+                // we have not inserted yet.
                 let first_unique_prefix = max_prefix
                     .ancestors()
                     .chain(iter::once(*max_prefix))
                     .find(|anc| !completed.contains(anc))
                     .expect("Ancestors starts from genesis, so it should always return something");
                 // completed_till is the smallest prefix that we have inserted from the ancestor list
-                // of our max_prefix. If the prefix has n_churns, the last key from the last chrun is
+                // of our max_prefix. If the prefix has n_churns, the last key from the last churn is
                 // considered as the parent
                 let completed_till = first_unique_prefix.popped();
                 let parent = sections
                     .get(&completed_till)
                     .expect("sections should contain the prefix")
                     .last()
-                    .expect("Should contain atleast one SAP")
+                    .expect("should contain at-least one SAP")
                     .1
                     .secret_key();
                 (first_unique_prefix, parent)
@@ -400,7 +414,7 @@ impl<R: RngCore> TestNetworkBuilder<R> {
                 .skip_while(|anc| *anc != first_unique_prefix)
                 .chain(iter::once(*max_prefix))
             {
-                // each anc can have multiple chruns
+                // each anc can have multiple churns
                 for (sap, sk) in sections
                     .get(&anc)
                     .expect("The ancestor {anc:?} should be present")
@@ -488,14 +502,16 @@ pub(crate) struct TestNetwork {
     nodes: BTreeMap<Prefix, Vec<Vec<(MyNodeInfo, Comm, TestMemberType)>>>,
     // All the SectionKeyShares for a given elder node (if it is an elder more than one section)
     sk_shares: BTreeMap<PublicKey, Vec<SectionKeyShare>>,
-    // The mpsc receiver for each node. Will be moved out once retrived
+    // The mpsc receiver for each node. Will be moved out once retrieved
     receivers: TestCommRx,
 }
 
 impl TestNetwork {
     /// Get elder/adult `MyNode` instances for a given `Prefix`. The elder_count and adult_count
-    /// should be <= the actual count specified in the SAP. Also return the `SectionKeyShare` for
+    /// should be <= the actual count specified in the SAP. Optionally return the `SectionKeyShare` for
     /// elder nodes.
+    /// The created instance has knowledge about the Network only from the genesis section to its
+    /// current section.
     ///
     /// If the Prefix contains multiple churn events (multiple SAPs), provide the churn_idx to get
     /// a specific SAP, else the latest SAP for the prefix is used.
@@ -506,18 +522,18 @@ impl TestNetwork {
         adult_count: usize,
         churn_idx: Option<usize>,
     ) -> Vec<(MyNode, Option<SectionKeyShare>)> {
-        let nodes = self._get_node_infos(prefix, churn_idx);
-        let section = self._get_section_details(prefix, churn_idx);
+        let nodes = self.get_nodes_single_churn(prefix, churn_idx);
+        let sap_details = self.get_sap_single_churn(prefix, churn_idx);
 
-        if elder_count > section.0.elder_count() {
-            panic!("elder_count should be <= {}", section.0.elder_count());
+        if elder_count > sap_details.0.elder_count() {
+            panic!("elder_count should be <= {}", sap_details.0.elder_count());
         }
-        let section_adult_count = section.0.members().count() - section.0.elder_count();
-        if adult_count > section_adult_count {
-            panic!("adult_count should be <= {}", section_adult_count);
+        let sap_adult_count = sap_details.0.members().count() - sap_details.0.elder_count();
+        if adult_count > sap_adult_count {
+            panic!("adult_count should be <= {}", sap_adult_count);
         }
 
-        let network_knowledge = self._get_network_knowledge(&section.0, &section.1);
+        let network_knowledge = self.build_network_knowledge(&sap_details.0, &sap_details.1);
 
         let mut my_nodes = Vec::new();
         let nodes_iter = {
@@ -526,7 +542,7 @@ impl TestNetwork {
                 .filter(|(.., t)| matches!(t, TestMemberType::Elder))
                 .enumerate()
                 .map(|(idx, node)| {
-                    let sk_share = TestKeys::get_section_key_share(&section.1, idx);
+                    let sk_share = TestKeys::get_section_key_share(&sap_details.1, idx);
                     (node, Some(sk_share))
                 })
                 .take(elder_count);
@@ -539,16 +555,24 @@ impl TestNetwork {
         };
 
         for ((info, comm, _), sk_share) in nodes_iter {
-            let my_node =
-                self._get_node(prefix, churn_idx, &network_knowledge, info, comm, &sk_share);
+            let my_node = self.build_my_node_instance(
+                prefix,
+                churn_idx,
+                &network_knowledge,
+                info,
+                comm,
+                &sk_share,
+            );
             my_nodes.push((my_node, sk_share));
         }
 
         my_nodes
     }
 
-    /// Get the `MyNode` instances and the for a given `Prefix`. Optionally returns the `SectionKeyShare` if
-    /// it's an elder
+    /// Get the `MyNode` instance given the node's `PublicKey` for a particular `Prefix`. Optionally
+    /// return the `SectionKeyShare` if it's an Elder node.
+    /// The created instance has knowledge about the Network only from the genesis section to its
+    /// current section.
     ///
     /// If the Prefix contains multiple churn events (multiple SAPs), provide the churn_idx to get
     /// a specific SAP, else the latest SAP for the prefix is used.
@@ -558,23 +582,23 @@ impl TestNetwork {
         node_pk: PublicKey,
         churn_idx: Option<usize>,
     ) -> (MyNode, Option<SectionKeyShare>) {
-        let nodes = self._get_node_infos(prefix, churn_idx);
+        let nodes = self.get_nodes_single_churn(prefix, churn_idx);
         let node_idx = nodes
             .iter()
             .position(|(info, ..)| info.public_key() == node_pk)
             .expect("The node with the given pk is not present for the given prefix/churn");
         let node = &nodes[node_idx];
 
-        let section = self._get_section_details(prefix, churn_idx);
-        let network_knowledge = self._get_network_knowledge(&section.0, &section.1);
+        let sap_details = self.get_sap_single_churn(prefix, churn_idx);
+        let network_knowledge = self.build_network_knowledge(&sap_details.0, &sap_details.1);
 
         let sk_share = if matches!(node.2, TestMemberType::Elder) {
-            Some(TestKeys::get_section_key_share(&section.1, node_idx))
+            Some(TestKeys::get_section_key_share(&sap_details.1, node_idx))
         } else {
             None
         };
 
-        let node = self._get_node(
+        let node = self.build_my_node_instance(
             prefix,
             churn_idx,
             &network_knowledge,
@@ -586,8 +610,10 @@ impl TestNetwork {
     }
 
     /// Get elder/adult `Dispatcher<MyNode>` instances for a given `Prefix`. The elder_count and adult_count
-    /// should be <= the actual count specified in the SAP. Also return the `SectionKeyShare` for
+    /// should be <= the actual count specified in the SAP. Optionally return the `SectionKeyShare` for
     /// elder nodes.
+    /// The created instance has knowledge about the Network only from the genesis section to its
+    /// current section.
     ///
     /// If the Prefix contains multiple churn events (multiple SAPs), provide the churn_idx to get a specific
     /// SAP, else the latest SAP for the prefix is used.
@@ -600,15 +626,17 @@ impl TestNetwork {
     ) -> Vec<(Dispatcher, Option<SectionKeyShare>)> {
         self.get_nodes(prefix, elder_count, adult_count, churn_idx)
             .into_iter()
-            .map(|(node, sk_share)| (Dispatcher::new(Arc::new(RwLock::new(node))), sk_share))
+            .map(|(node, sk_share)| {
+                let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
+                (dispatcher, sk_share)
+            })
             .collect()
     }
 
-    /// Retrieve the `mspc::Receiver` for a given node. The receiver will be moved out and will be set to None
-    /// since it does not implement Clone.
+    /// Take the `mspc::Receiver` for a given node. The receiver will be moved out of the `TestNetwork`.
     ///
     /// Will panic if called more than once for a single node or if the `node_pk` is not part of the `TestNetwork`
-    pub(crate) fn get_comm_rx(&mut self, node_pk: PublicKey) -> Receiver<MsgFromPeer> {
+    pub(crate) fn take_comm_rx(&mut self, node_pk: PublicKey) -> Receiver<MsgFromPeer> {
         match self.receivers.entry(node_pk) {
             Entry::Vacant(_) => {
                 panic!("Something went wrong, the key must be present in self.receivers")
@@ -633,21 +661,21 @@ impl TestNetwork {
         adult_count: usize,
         churn_idx: Option<usize>,
     ) -> Vec<Peer> {
-        let nodes = self._get_node_infos(prefix, churn_idx);
-        let section = self._get_section_details(prefix, churn_idx);
+        let nodes = self.get_nodes_single_churn(prefix, churn_idx);
+        let sap_details = self.get_sap_single_churn(prefix, churn_idx);
 
-        if elder_count > section.0.elder_count() {
-            panic!("elder_count should be <= {}", section.0.elder_count());
+        if elder_count > sap_details.0.elder_count() {
+            panic!("elder_count should be <= {}", sap_details.0.elder_count());
         }
-        let section_adult_count = section.0.members().count() - section.0.elder_count();
-        if adult_count > section_adult_count {
-            panic!("adult_count should be <= {}", section_adult_count);
+        let sap_adult_count = sap_details.0.members().count() - sap_details.0.elder_count();
+        if adult_count > sap_adult_count {
+            panic!("adult_count should be <= {}", sap_adult_count);
         }
 
         let elder_iter = nodes.iter().take(elder_count).map(|(node, ..)| node.peer());
         let adult_iter = nodes
             .iter()
-            .skip(section.0.elder_count())
+            .skip(sap_details.0.elder_count())
             .map(|(node, ..)| node.peer())
             .take(adult_count);
         elder_iter.chain(adult_iter).collect()
@@ -662,9 +690,9 @@ impl TestNetwork {
         prefix: Prefix,
         churn_idx: Option<usize>,
     ) -> (NetworkKnowledge, SecretKeySet) {
-        let section = self._get_section_details(prefix, churn_idx);
-        let network_knowledge = self._get_network_knowledge(&section.0, &section.1);
-        (network_knowledge, section.1.clone())
+        let sap_details = self.get_sap_single_churn(prefix, churn_idx);
+        let network_knowledge = self.build_network_knowledge(&sap_details.0, &sap_details.1);
+        (network_knowledge, sap_details.1.clone())
     }
 
     /// Get `SectionSigned<SectionAuthorityProvider>` and its `SecretKeySet` for a given `Prefix`.
@@ -676,11 +704,11 @@ impl TestNetwork {
         prefix: Prefix,
         churn_idx: Option<usize>,
     ) -> (SectionSigned<SectionAuthorityProvider>, SecretKeySet) {
-        let section = self._get_section_details(prefix, churn_idx);
+        let sap_details = self.get_sap_single_churn(prefix, churn_idx);
         let sap = self
-            ._get_network_knowledge(&section.0, &section.1)
+            .build_network_knowledge(&sap_details.0, &sap_details.1)
             .signed_sap();
-        (sap, section.1.clone())
+        (sap, sap_details.1.clone())
     }
 
     /// Create set of elder, adults nodes
@@ -750,8 +778,8 @@ impl TestNetwork {
         (info, comm, comm_rx)
     }
 
-    // Create a single `MyNode` instance
-    fn _get_node(
+    // Creates a single `MyNode` instance
+    fn build_my_node_instance(
         &self,
         prefix: Prefix,
         churn_idx: Option<usize>,
@@ -774,42 +802,43 @@ impl TestNetwork {
             event_channel::new(1).0,
             UsedSpace::new(max_capacity),
             root_storage_dir,
+            mpsc::channel(10).0,
         ))
         .expect("Failed to create MyNode");
 
-        // the node might've been an elder in any of the ancestor section of the current prefix
-        // or the neighbouring prefix. So get the sk_shares.
-        let mut elders_in_sections = BTreeSet::new();
+        // the node might've been an elder in any of the ancestor saps of the current prefix
+        // or the neighboring prefix. So get the sk_shares.
+        let mut elder_in_saps = BTreeSet::new();
 
-        // check if it was an elder for any of the current prefixe's churned SAP;
+        // check if it was an elder for any of the current prefix's churned SAP;
         // Obtain the sk_share of the current churn as well since we will be overriding
         // my_node.section_keys_provider
-        let sections = self._get_sections_details(prefix);
-        let churn_idx = churn_idx.unwrap_or(sections.len() - 1);
+        let saps_of_a_section = self.get_sap_all_churns(prefix);
+        let churn_idx = churn_idx.unwrap_or(saps_of_a_section.len() - 1);
         (0..churn_idx + 1).rev().for_each(|idx| {
-            let sec = sections.get(idx).expect("invalid churn_idx");
+            let sec = saps_of_a_section.get(idx).expect("invalid churn_idx");
             if sec
                 .0
                 .elders()
                 .map(|peer| peer.name())
                 .contains(&info.name())
             {
-                let _ = elders_in_sections.insert(sec.0.section_key());
+                let _ = elder_in_saps.insert(sec.0.section_key());
             }
         });
 
         // the node might've been an elder in any of the SAP of our prefix's ancestor. So get
         // them.
         prefix.ancestors().for_each(|anc| {
-            let sections = self._get_sections_details(anc);
-            for sec in sections {
-                if sec
+            let saps_of_a_section = self.get_sap_all_churns(anc);
+            for sap in saps_of_a_section {
+                if sap
                     .0
                     .elders()
                     .map(|peer| peer.name())
                     .contains(&info.name())
                 {
-                    let _ = elders_in_sections.insert(sec.0.section_key());
+                    let _ = elder_in_saps.insert(sap.0.section_key());
                 }
             }
         });
@@ -818,25 +847,25 @@ impl TestNetwork {
         // SectionTree::sections, but its private. So maybe have a extra field in our struct.
         // Todo: implement only if any test requires it
 
-        // now that we have the details of the sections that the node is/was an elder of, get its sk_share
+        // now that we have the details of the SAPs that the node is/was an elder of, get its sk_share
         if let Some(shares) = self.sk_shares.get(&info.public_key()) {
             let mut key_provider = SectionKeysProvider::new(None);
             shares
                 .iter()
-                .filter(|sk_share| {
-                    elders_in_sections.contains(&sk_share.public_key_set.public_key())
-                })
+                .filter(|sk_share| elder_in_saps.contains(&sk_share.public_key_set.public_key()))
                 .for_each(|sk_share| key_provider.insert(sk_share.clone()));
             my_node.section_keys_provider = key_provider;
-        } else if !elders_in_sections.is_empty() {
-            panic!("We should have some sk_shares")
+        } else if !elder_in_saps.is_empty() {
+            // If the node is supposed to be an elder in some sap, then it should contain some
+            // entry in sk_shares
+            panic!("Something went wrong, the node should contain some sk_shares")
         }
         my_node
     }
 
     // Currently builds NetworkKnowledge with only a single chain i.e., from gen prefix to the
     // provided prefix, while the other user provided prefixes are ignored. (maybe include them?)
-    fn _get_network_knowledge(
+    fn build_network_knowledge(
         &self,
         sap: &SectionSigned<SectionAuthorityProvider>,
         sk_set: &SecretKeySet,
@@ -867,20 +896,22 @@ impl TestNetwork {
         nw
     }
 
-    fn _get_section_details(
+    // Get the SAP, sk_set for a particular churn of a section.
+    fn get_sap_single_churn(
         &self,
         prefix: Prefix,
         churn_idx: Option<usize>,
     ) -> &(SectionSigned<SectionAuthorityProvider>, SecretKeySet) {
-        let section = self._get_sections_details(prefix);
+        let all_sap_details = self.get_sap_all_churns(prefix);
         // select the last churn
-        let churn_idx = churn_idx.unwrap_or(section.len() - 1);
-        section
+        let churn_idx = churn_idx.unwrap_or(all_sap_details.len() - 1);
+        all_sap_details
             .get(churn_idx)
             .expect("invalid churn idx: {churn_idx}")
     }
 
-    fn _get_sections_details(
+    // Get the SAP, sk_set for all the churns of a section
+    fn get_sap_all_churns(
         &self,
         prefix: Prefix,
     ) -> &Vec<(SectionSigned<SectionAuthorityProvider>, SecretKeySet)> {
@@ -889,19 +920,24 @@ impl TestNetwork {
             .expect("section not found for {prefix:?}")
     }
 
-    fn _get_node_infos(
+    // Get the all the nodes for a particular churn of a section
+    fn get_nodes_single_churn(
         &self,
         prefix: Prefix,
         churn_idx: Option<usize>,
     ) -> &Vec<(MyNodeInfo, Comm, TestMemberType)> {
-        let nodes = self._get_nodes_infos(prefix);
+        let nodes = self.get_nodes_all_churns(prefix);
         let churn_idx = churn_idx.unwrap_or(nodes.len() - 1);
         nodes
             .get(churn_idx)
             .expect("invalid churn idx: {churn_idx}")
     }
 
-    fn _get_nodes_infos(&self, prefix: Prefix) -> &Vec<Vec<(MyNodeInfo, Comm, TestMemberType)>> {
+    // Get all the nodes for all the churns of a section
+    fn get_nodes_all_churns(
+        &self,
+        prefix: Prefix,
+    ) -> &Vec<Vec<(MyNodeInfo, Comm, TestMemberType)>> {
         self.nodes
             .get(&prefix)
             .expect("nodes not found for {prefix:?}")
