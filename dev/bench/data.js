@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1669123964325,
+  "lastUpdate": 1669162168441,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -30088,6 +30088,144 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 423274844,
             "range": "± 9668915",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "f24e622dcb53362623300bdc02d70779590964a5",
+          "message": "Merge #1777\n\n1777: move `DysfunctionDetection` to a separate task r=joshuef a=RolandSherwin\n\nFixes https://github.com/maidsafe/safe_network/issues/1772\r\n\r\n- chore(sn_dysfunction): remove unusued `Result` from methods. \r\n- chore(sn_dysfunction): remove unusued `Error` module. \r\n- chore(sn_dysfunction): move `DysfunctionDetection` to a new task\r\nDecouple the Dysfunction module from `MyNode` by moving it to a separate `tokio::task`. Use `mpsc` channels to send `DysCmds` between the main task and the \"dysfunction\" task. These are then used to execute various \"dysfunction\" methods. The methods which remove any tracked issues comes under `DysCmds::UntrackIssues` variant. Also use another `mpsc` channel to get back the set of dysfunctional nodes back from the \"dysfunction\" task.\r\n- chore(sn_dysfunction): rename `IssueType` variants \r\nThe `IssueType` is now used to track as well as untrack dysfunctional nodes. Hence modify the names to be more generic.\n\nCo-authored-by: RolandSherwin <RolandSherwin@protonmail.com>",
+          "timestamp": "2022-11-22T22:21:06Z",
+          "tree_id": "6962cd45ee11f93b428146bbfdb1b1799a607f48",
+          "url": "https://github.com/maidsafe/safe_network/commit/f24e622dcb53362623300bdc02d70779590964a5"
+        },
+        "date": 1669162166091,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 1652758,
+            "range": "± 447899",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 144877399,
+            "range": "± 4215683",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 173236577,
+            "range": "± 7633463",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 657237230,
+            "range": "± 18275140",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 117162349,
+            "range": "± 2883773",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 135683776,
+            "range": "± 2546868",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 510441582,
+            "range": "± 8270891",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 77808353,
+            "range": "± 31722919",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 3034638261,
+            "range": "± 121230904",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 12718631787,
+            "range": "± 859916537",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 399854314,
+            "range": "± 13792810",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 3546387436,
+            "range": "± 144338254",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 10639802533,
+            "range": "± 856246384",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 64269006,
+            "range": "± 16218915",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 621450498,
+            "range": "± 44499154",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 2441292259,
+            "range": "± 37696120",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 15379717,
+            "range": "± 1913574",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 132671927,
+            "range": "± 6712611",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 444567786,
+            "range": "± 12556788",
             "unit": "ns/iter"
           }
         ]
