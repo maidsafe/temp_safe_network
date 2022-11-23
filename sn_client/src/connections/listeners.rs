@@ -21,7 +21,6 @@ use sn_interface::{
 };
 
 use itertools::Itertools;
-use xor_name::XorName;
 
 // Maximum number of times we'll re-send a msg upon receiving an AE response for it
 const MAX_AE_RETRIES_TO_ATTEMPT: u8 = 5;
@@ -172,21 +171,16 @@ impl Session {
         let (msg_id, elders, client_msg, dst, auth) =
             Self::new_target_elders(src_peer, bounced_msg, &target_sap, correlation_id).await?;
 
-        // The actual order of elders doesn't really matter. All that matters is we pass each AE response
-        // we get through the same hoops, to then be able to ping a new elder on a 1-1 basis for the src_peer
+        // The actual order of Elders doesn't really matter. All that matters is we pass each AE response
+        // we get through the same hoops, to then be able to ping a new Elder on a 1-1 basis for the src_peer
         // we initially targetted.
-        let deterministic_ordering = XorName::from_content(
-            b"Arbitrary string that we use to sort new SAP elders consistently",
-        );
+        let ordered_elders: Vec<_> = elders
+            .into_iter()
+            .sorted_by(|lhs, rhs| dst.name.cmp_distance(&lhs.name(), &rhs.name()))
+            .collect();
 
-        // here we send this to only one elder for each AE message we get in. We _should_ have one per elder we sent to.
+        // We send this to only one elder for each AE message we get in. We _should_ have one per elder we sent to,
         // deterministically sent to closest elder based upon the initial sender index
-        let ordered_elders = elders
-            .iter()
-            .sorted_by(|lhs, rhs| deterministic_ordering.cmp_distance(&lhs.name(), &rhs.name()))
-            .cloned()
-            .collect_vec();
-
         let target_elder = ordered_elders.get(src_peer_index);
 
         // there should always be one
@@ -256,12 +250,12 @@ impl Session {
         received_sap: &SectionAuthorityProvider,
         correlation_id: MsgId,
     ) -> Result<(MsgId, Vec<Peer>, ClientMsg, Dst, AuthorityProof<ClientAuth>), Error> {
-        let (msg_id, client_msg, dst, auth) = match WireMsg::deserialize(bounced_msg)? {
+        let (msg_id, client_msg, bounced_msg_dst, auth) = match WireMsg::deserialize(bounced_msg)? {
             MsgType::Client {
                 msg_id,
                 msg,
-                auth,
                 dst,
+                auth,
             } => (msg_id, msg, dst, auth),
             msg => {
                 warn!("Unexpected bounced msg received in AE response: {msg:?}");
@@ -276,27 +270,15 @@ impl Session {
         trace!(
             "Bounced msg {msg_id:?} received in an AE response: {client_msg:?} from {src_peer:?}"
         );
-        let dst_address_of_bounced_msg = match &client_msg {
-            ClientMsg::Cmd(cmd) => cmd.dst_name(),
-            ClientMsg::Query(query) => query.variant.dst_name(),
-        };
 
-        let target_public_key = received_sap.section_key();
-
-        // We normally have received auth when we're in AE-Redirect
-        let target_elders: Vec<_> = received_sap
-            .elders_vec()
-            .into_iter()
-            .sorted_by(|lhs, rhs| dst_address_of_bounced_msg.cmp_distance(&lhs.name(), &rhs.name()))
-            .collect();
-
+        let target_elders: Vec<_> = received_sap.elders_vec();
         if target_elders.is_empty() {
             Err(Error::AntiEntropyNoSapElders)
         } else {
             // Let's rebuild the msg with the updated destination details
             let dst = Dst {
-                name: dst.name,
-                section_key: target_public_key,
+                name: bounced_msg_dst.name,
+                section_key: received_sap.section_key(),
             };
             debug!(
                 "Final target elders for resending {msg_id:?}: {client_msg:?} msg \
