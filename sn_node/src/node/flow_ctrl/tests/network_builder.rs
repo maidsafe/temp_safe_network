@@ -20,7 +20,6 @@ use sn_interface::{
 };
 
 use bls::SecretKeySet;
-use itertools::Itertools;
 use rand::RngCore;
 use std::{
     collections::{btree_map::Entry, BTreeMap, BTreeSet},
@@ -278,25 +277,9 @@ impl<R: RngCore> TestNetworkBuilder<R> {
         // insert the user provided saps
         let mut sections = BTreeMap::new();
         let mut node_infos = BTreeMap::new();
-        let mut sk_shares = BTreeMap::new();
         for (sap, infos, sk_set) in self.sections.iter() {
             let sap = TestKeys::get_section_signed(&sk_set.secret_key(), sap.clone());
             let prefix = sap.prefix();
-
-            // store the sk_shares of the elders
-            for (idx, (elder, ..)) in infos
-                .iter()
-                .enumerate()
-                .filter(|(_, (.., t))| matches!(t, TestMemberType::Elder))
-            {
-                let sk_share = TestKeys::get_section_key_share(sk_set, idx);
-                match sk_shares.entry(elder.public_key()) {
-                    Entry::Vacant(entry) => {
-                        let _ = entry.insert(vec![sk_share.clone()]);
-                    }
-                    Entry::Occupied(mut entry) => entry.get_mut().push(sk_share.clone()),
-                }
-            }
 
             match node_infos.entry(prefix) {
                 Entry::Vacant(entry) => {
@@ -323,18 +306,18 @@ impl<R: RngCore> TestNetworkBuilder<R> {
             let n_churns_each_section = self.n_churns_each_section;
             for _ in 0..n_churns_each_section {
                 // infos are sorted by age
-                let (sap, infos, sk, comm_rx) = self.build_sap(
+                let (sap, infos, sk_set, comm_rx) = self.build_sap(
                     prefix,
                     elder_count(),
                     0,
                     Some(ELDER_AGE_PATTERN),
                     Some(supermajority(elder_count())),
                 );
-                let sap = TestKeys::get_section_signed(&sk.secret_key(), sap);
+                let sap = TestKeys::get_section_signed(&sk_set.secret_key(), sap);
                 // the CommRx for the user provided SAPs prior to calling `build`. Hence we just
                 // need to insert the ones that we get now.
                 self.receivers.extend(comm_rx.into_iter());
-                s.push((sap, sk));
+                s.push((sap, sk_set));
                 n_i.push(infos);
             }
             let _ = node_infos.insert(prefix, n_i);
@@ -346,7 +329,6 @@ impl<R: RngCore> TestNetworkBuilder<R> {
             sections,
             section_tree,
             nodes: node_infos,
-            sk_shares,
             receivers: self.receivers,
         }
     }
@@ -500,8 +482,6 @@ pub(crate) struct TestNetwork {
     // All the Nodes per Prefix, ordered by churn_idx
     #[allow(clippy::type_complexity)]
     nodes: BTreeMap<Prefix, Vec<Vec<(MyNodeInfo, Comm, TestMemberType)>>>,
-    // All the SectionKeyShares for a given elder node (if it is an elder more than one section)
-    sk_shares: BTreeMap<PublicKey, Vec<SectionKeyShare>>,
     // The mpsc receiver for each node. Will be moved out once retrieved
     receivers: TestCommRx,
 }
@@ -593,7 +573,8 @@ impl TestNetwork {
         let network_knowledge = self.build_network_knowledge(&sap_details.0, &sap_details.1);
 
         let sk_share = if matches!(node.2, TestMemberType::Elder) {
-            Some(TestKeys::get_section_key_share(&sap_details.1, node_idx))
+            let sk_share = TestKeys::get_section_key_share(&sap_details.1, node_idx);
+            Some(sk_share)
         } else {
             None
         };
@@ -807,38 +788,42 @@ impl TestNetwork {
         .expect("Failed to create MyNode");
 
         // the node might've been an elder in any of the ancestor saps of the current prefix
-        // or the neighboring prefix. So get the sk_shares.
-        let mut elder_in_saps = BTreeSet::new();
+        // or the neighboring prefix. So insert those sk_shares.
+        let mut key_provider = SectionKeysProvider::new(None);
 
         // check if it was an elder for any of the current prefix's churned SAP;
         // Obtain the sk_share of the current churn as well since we will be overriding
         // my_node.section_keys_provider
-        let saps_of_a_section = self.get_sap_all_churns(prefix);
-        let churn_idx = churn_idx.unwrap_or(saps_of_a_section.len() - 1);
-        (0..churn_idx + 1).rev().for_each(|idx| {
-            let sec = saps_of_a_section.get(idx).expect("invalid churn_idx");
-            if sec
-                .0
-                .elders()
-                .map(|peer| peer.name())
-                .contains(&info.name())
+        let churn_idx = churn_idx.unwrap_or(self.get_sap_all_churns(prefix).len() - 1);
+        (0..churn_idx + 1).rev().for_each(|c_idx| {
+            let nodes_of_sap = self.get_nodes_single_churn(prefix, Some(c_idx));
+            if let Some(share_idx) = nodes_of_sap
+                .iter()
+                .filter(|(.., t)| matches!(t, TestMemberType::Elder))
+                .position(|(node, ..)| node.name() == info.name())
             {
-                let _ = elder_in_saps.insert(sec.0.section_key());
+                // get the respective churn's sk_set
+                let (_, sk_set) = self.get_sap_single_churn(prefix, Some(c_idx));
+                let sk_share = TestKeys::get_section_key_share(sk_set, share_idx);
+                key_provider.insert(sk_share);
             }
         });
 
         // the node might've been an elder in any of the SAP of our prefix's ancestor. So get
         // them.
         prefix.ancestors().for_each(|anc| {
-            let saps_of_a_section = self.get_sap_all_churns(anc);
-            for sap in saps_of_a_section {
-                if sap
-                    .0
-                    .elders()
-                    .map(|peer| peer.name())
-                    .contains(&info.name())
+            for (nodes_of_sap, (_, sk_set)) in self
+                .get_nodes_all_churns(anc)
+                .iter()
+                .zip(self.get_sap_all_churns(anc))
+            {
+                if let Some(share_idx) = nodes_of_sap
+                    .iter()
+                    .filter(|(.., t)| matches!(t, TestMemberType::Elder))
+                    .position(|(node, ..)| node.name() == info.name())
                 {
-                    let _ = elder_in_saps.insert(sap.0.section_key());
+                    let sk_share = TestKeys::get_section_key_share(sk_set, share_idx);
+                    key_provider.insert(sk_share);
                 }
             }
         });
@@ -847,19 +832,7 @@ impl TestNetwork {
         // SectionTree::sections, but its private. So maybe have a extra field in our struct.
         // Todo: implement only if any test requires it
 
-        // now that we have the details of the SAPs that the node is/was an elder of, get its sk_share
-        if let Some(shares) = self.sk_shares.get(&info.public_key()) {
-            let mut key_provider = SectionKeysProvider::new(None);
-            shares
-                .iter()
-                .filter(|sk_share| elder_in_saps.contains(&sk_share.public_key_set.public_key()))
-                .for_each(|sk_share| key_provider.insert(sk_share.clone()));
-            my_node.section_keys_provider = key_provider;
-        } else if !elder_in_saps.is_empty() {
-            // If the node is supposed to be an elder in some sap, then it should contain some
-            // entry in sk_shares
-            panic!("Something went wrong, the node should contain some sk_shares")
-        }
+        my_node.section_keys_provider = key_provider;
         my_node
     }
 
