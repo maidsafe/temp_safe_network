@@ -819,7 +819,7 @@ mod tests {
         collections::{BTreeMap, BTreeSet},
         sync::Arc,
     };
-    use tokio::sync::RwLock;
+    use tokio::sync::{mpsc, RwLock};
     use xor_name::{Prefix, XorName};
 
     /// Simulate an entire round of dkg till termination; The dkg round creates a new keyshare set
@@ -876,7 +876,7 @@ mod tests {
                                     .mock_dkg_outcome_proposal(section_auth, outcome)
                                     .await?;
                                 assert_matches!(msg, NodeMsg::Propose { proposal, .. } => {
-                                    assert_matches!(proposal, Proposal::SectionInfo(_))
+                                    assert_matches!(proposal, Proposal::RequestHandover(_))
                                 });
                             }
                             _ => panic!("got a different cmd {:?}", cmd),
@@ -898,7 +898,7 @@ mod tests {
         Ok(())
     }
 
-    /// If a node already has the new SAP in its `SectionTree`, then it should not propose `SectionInfo`
+    /// If a node already has the new SAP in its `SectionTree`, then it should not propose `RequestHandover`
     #[tokio::test]
     async fn lagging_node_should_not_propose_new_section_info() -> Result<()> {
         init_logger();
@@ -930,7 +930,7 @@ mod tests {
                     // If supermajority of the nodes have terminated, then the remaining nodes
                     // can be considered as 'lagging'. So use the supermajority of the shares
                     // to sign the sap and insert them into the lagging nodes, now these nodes
-                    // should not trigger `Proposal::SectionInfo`.
+                    // should not trigger `Proposal::RequestHandover`.
                     if !lagging && new_sk_shares.len() >= supermajority(node_count) {
                         let new_sk_set = TestKeys::get_sk_set_from_shares(
                             &new_sk_shares.values().cloned().collect::<Vec<_>>(),
@@ -1017,7 +1017,7 @@ mod tests {
                                         .mock_dkg_outcome_proposal(section_auth, outcome)
                                         .await?;
                                     assert_matches!(msg, NodeMsg::Propose { proposal, .. } => {
-                                        assert_matches!(proposal, Proposal::SectionInfo(_))
+                                        assert_matches!(proposal, Proposal::RequestHandover(_))
                                     });
                                 } else {
                                     // Since the dkg session is for the same prefix, the
@@ -1028,7 +1028,8 @@ mod tests {
                                     let cmds = node
                                         .write()
                                         .await
-                                        .handle_dkg_outcome(section_auth, outcome)?;
+                                        .handle_dkg_outcome(section_auth, outcome)
+                                        .await?;
                                     assert_eq!(cmds.len(), 0);
                                 }
                             }
@@ -1164,7 +1165,7 @@ mod tests {
                                     .mock_dkg_outcome_proposal(section_auth, outcome)
                                     .await?;
                                 assert_matches!(msg, NodeMsg::Propose { proposal, .. } => {
-                                    assert_matches!(proposal, Proposal::SectionInfo(_))
+                                    assert_matches!(proposal, Proposal::RequestHandover(_))
                                 });
                             }
                             _ => panic!("got a different cmd {:?}", cmd),
@@ -1262,6 +1263,7 @@ mod tests {
                 event_channel::new(1).0,
                 UsedSpace::new(max_capacity),
                 root_storage_dir.clone(),
+                mpsc::channel(10).0,
             )
             .await
             .expect("Failed to create MyNode");
@@ -1426,14 +1428,14 @@ mod tests {
             Ok((mock_system_msg, recipients))
         }
 
-        // if SectionInfo proposal is triggered, it will send out msgs to other nodes
+        // if RequestHandover proposal is triggered, it will send out msgs to other nodes
         async fn mock_dkg_outcome_proposal(
             &mut self,
             sap: SectionAuthorityProvider,
             key_share: SectionKeyShare,
         ) -> Result<(MockSystemMsg, Vec<Peer>)> {
-            let mut cmds = self.handle_dkg_outcome(sap, key_share)?;
-            // contains only the SendMsg for SectionInfo proposal
+            let mut cmds = self.handle_dkg_outcome(sap, key_share).await?;
+            // contains only the SendMsg for RequestHandover proposal
             assert_eq!(cmds.len(), 1);
             if let Cmd::SendMsg {
                 msg,
