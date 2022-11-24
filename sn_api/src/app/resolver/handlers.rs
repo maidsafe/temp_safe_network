@@ -18,9 +18,17 @@ use log::{debug, warn};
 use std::collections::BTreeSet;
 
 impl Safe {
-    pub(crate) async fn resolve_nrs_map_container(&self, input_url: SafeUrl) -> Result<SafeData> {
+    pub(crate) async fn resolve_nrs_map_container(
+        &self,
+        input_url: SafeUrl,
+        flow_name: &str,
+    ) -> Result<SafeData> {
         let (target_url, nrs_map) = self
-            .nrs_get(input_url.public_name(), input_url.content_version())
+            .nrs_get(
+                input_url.public_name(),
+                input_url.content_version(),
+                flow_name,
+            )
             .await
             .map_err(|e| {
                 warn!("NRS failed to resolve {}: {}", input_url, e);
@@ -58,13 +66,14 @@ impl Safe {
         &self,
         input_url: SafeUrl,
         retrieve_data: bool,
+        flow_name: &str,
     ) -> Result<SafeData> {
         let data: Multimap = if retrieve_data {
             match input_url.content_version() {
-                None => self.fetch_multimap(&input_url).await?,
+                None => self.fetch_multimap(&input_url, flow_name).await?,
                 Some(v) => vec![(
                     v.entry_hash(),
-                    self.fetch_multimap_value_by_hash(&input_url, v.entry_hash())
+                    self.fetch_multimap_value_by_hash(&input_url, v.entry_hash(), flow_name)
                         .await?,
                 )]
                 .into_iter()
@@ -91,6 +100,7 @@ impl Safe {
         metadata: Option<FileInfo>,
         retrieve_data: bool,
         range: Range,
+        flow_name: &str,
     ) -> Result<SafeData> {
         ensure_no_subnames(&input_url, "raw data")?;
 
@@ -104,16 +114,16 @@ impl Safe {
                 Ok(safe_data)
             }
             DataType::File => {
-                self.retrieve_data(&input_url, retrieve_data, None, &metadata, range)
+                self.retrieve_data(&input_url, retrieve_data, None, &metadata, range, flow_name)
                     .await
             }
             DataType::Register => {
                 let data = if retrieve_data {
                     match input_url.content_version() {
-                        None => self.register_fetch_entries(&input_url).await?,
+                        None => self.register_fetch_entries(&input_url, flow_name).await?,
                         Some(v) => vec![(
                             v.entry_hash(),
-                            self.register_fetch_entry(&input_url, v.entry_hash())
+                            self.register_fetch_entry(&input_url, v.entry_hash(), flow_name)
                                 .await?,
                         )]
                         .into_iter()
@@ -154,6 +164,7 @@ impl Safe {
         retrieve_data: bool,
         range: Range,
         media_type_str: String,
+        flow_name: &str,
     ) -> Result<SafeData> {
         ensure_no_subnames(&input_url, "media type")?;
 
@@ -165,6 +176,7 @@ impl Safe {
                     Some(media_type_str),
                     &metadata,
                     range,
+                    flow_name,
                 )
                 .await
             }
@@ -179,11 +191,12 @@ impl Safe {
         &self,
         mut input_url: SafeUrl,
         resolve_path: bool,
+        flow_name: &str,
     ) -> Result<SafeData> {
         ensure_no_subnames(&input_url, "file container")?;
 
         // Fetch files container
-        let (version, files_map) = match self.fetch_files_container(&input_url).await? {
+        let (version, files_map) = match self.fetch_files_container(&input_url, flow_name).await? {
             Some((version, files_map)) => (Some(version), files_map),
             None => (None, FilesMap::default()),
         };
@@ -256,6 +269,7 @@ impl Safe {
         media_type: Option<String>,
         metadata: &Option<FileInfo>,
         range: Range,
+        flow_name: &str,
     ) -> Result<SafeData> {
         if !input_url.path().is_empty() {
             return Err(Error::ContentError(format!(
@@ -265,7 +279,7 @@ impl Safe {
         };
 
         let data = if retrieve_data {
-            self.fetch_data(input_url, range).await?
+            self.fetch_data(input_url, range, flow_name).await?
         } else {
             Bytes::new()
         };

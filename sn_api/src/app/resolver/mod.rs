@@ -23,14 +23,14 @@ const INDIRECTION_LIMIT: usize = 10;
 impl Safe {
     /// Parses a string URL "safe://url" and returns a safe URL
     /// Resolves until it reaches the final URL
-    pub async fn parse_and_resolve_url(&self, url: &str) -> Result<SafeUrl> {
+    pub async fn parse_and_resolve_url(&self, url: &str, flow_name: &str) -> Result<SafeUrl> {
         let safe_url = SafeUrl::from_url(url)?;
         let orig_path = safe_url.path_decoded()?;
 
         // Obtain the resolution chain without resolving the URL's path
         let mut resolution_chain = self
             .fully_resolve_url(
-                safe_url, None, false, None, false, // don't resolve the URL's path
+                safe_url, None, false, None, false, flow_name, // don't resolve the URL's path
             )
             .await?;
 
@@ -76,12 +76,12 @@ impl Safe {
     ///     assert!(data_string.starts_with("hello tests!"));
     /// # });
     /// ```
-    pub async fn fetch(&self, url: &str, range: Range) -> Result<SafeData> {
+    pub async fn fetch(&self, url: &str, range: Range, flow_name: &str) -> Result<SafeData> {
         let safe_url = SafeUrl::from_url(url)?;
         info!("URL parsed successfully, fetching: {}", url);
 
         let mut resolution_chain = self
-            .fully_resolve_url(safe_url, None, true, range, true)
+            .fully_resolve_url(safe_url, None, true, range, true, flow_name)
             .await?;
 
         resolution_chain
@@ -130,10 +130,10 @@ impl Safe {
     ///
     /// # });
     /// ```
-    pub async fn inspect(&self, url: &str) -> Result<Vec<SafeData>> {
+    pub async fn inspect(&self, url: &str, flow_name: &str) -> Result<Vec<SafeData>> {
         let safe_url = SafeUrl::from_url(url)?;
         info!("URL parsed successfully, inspecting: {}", url);
-        self.fully_resolve_url(safe_url, None, false, None, true)
+        self.fully_resolve_url(safe_url, None, false, None, true, flow_name)
             .await
     }
 
@@ -160,6 +160,7 @@ impl Safe {
         retrieve_data: bool,
         range: Range,
         resolve_path: bool,
+        flow_name: &str,
     ) -> Result<Vec<SafeData>> {
         debug!(
             "Fetching URL: {} with content of type: {:?}, data type: {:?}",
@@ -175,7 +176,14 @@ impl Safe {
         while let Some(next_url) = next_step {
             // fetch safe_data from URL
             let safe_data = self
-                .resolve_url(next_url, metadata, retrieve_data, range, resolve_path)
+                .resolve_url(
+                    next_url,
+                    metadata,
+                    retrieve_data,
+                    range,
+                    resolve_path,
+                    flow_name,
+                )
                 .await?;
 
             next_step = safe_data.resolves_into();
@@ -201,6 +209,7 @@ impl Safe {
         retrieve_data: bool,
         range: Range,
         resolve_path: bool,
+        flow_name: &str,
     ) -> Result<SafeData> {
         debug!(
             "Resolving URL: {}, of content type: {:?}, and data type: {:?}, address {:?}",
@@ -212,13 +221,25 @@ impl Safe {
 
         match input_url.content_type() {
             ContentType::FilesContainer => {
-                self.resolve_file_container(input_url, resolve_path).await
-            }
-            ContentType::NrsMapContainer => self.resolve_nrs_map_container(input_url).await,
-            ContentType::Multimap => self.resolve_multimap(input_url, retrieve_data).await,
-            ContentType::Raw => {
-                self.resolve_raw(input_url, attached_metadata, retrieve_data, range)
+                self.resolve_file_container(input_url, resolve_path, flow_name)
                     .await
+            }
+            ContentType::NrsMapContainer => {
+                self.resolve_nrs_map_container(input_url, flow_name).await
+            }
+            ContentType::Multimap => {
+                self.resolve_multimap(input_url, retrieve_data, flow_name)
+                    .await
+            }
+            ContentType::Raw => {
+                self.resolve_raw(
+                    input_url,
+                    attached_metadata,
+                    retrieve_data,
+                    range,
+                    flow_name,
+                )
+                .await
             }
             ContentType::MediaType(media_type_str) => {
                 self.resolve_mediatype(
@@ -227,10 +248,14 @@ impl Safe {
                     retrieve_data,
                     range,
                     media_type_str,
+                    flow_name,
                 )
                 .await
             }
-            ContentType::Wallet { .. } => self.resolve_multimap(input_url, retrieve_data).await,
+            ContentType::Wallet { .. } => {
+                self.resolve_multimap(input_url, retrieve_data, flow_name)
+                    .await
+            }
         }
     }
 }
@@ -247,19 +272,22 @@ mod tests {
 
     use anyhow::{anyhow, bail, Context, Result};
     use bytes::Bytes;
+    use function_name::named;
     use std::io::Read;
 
     #[tokio::test]
+    #[named]
     async fn test_fetch_files_container() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
         let (fc_xorurl, _, original_files_map) = safe
-            .files_container_create_from("./testdata/", None, true, false)
+            .files_container_create_from("./testdata/", None, true, false, flow_name)
             .await?;
 
         let safe_url = SafeUrl::from_url(&fc_xorurl)?;
-        let content = safe.fetch(&fc_xorurl, None).await?;
+        let content = safe.fetch(&fc_xorurl, None, flow_name).await?;
         let (version0, _) = safe
-            .files_container_get(&fc_xorurl)
+            .files_container_get(&fc_xorurl, flow_name)
             .await?
             .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
@@ -296,23 +324,25 @@ mod tests {
         assert_eq!(safe_url_with_path.content_type(), safe_url.content_type());
 
         // let's also compare it with the result from inspecting the URL
-        let inspected_content = safe.inspect(&fc_xorurl).await?;
+        let inspected_content = safe.inspect(&fc_xorurl, flow_name).await?;
         assert_eq!(inspected_content.len(), 1);
         assert_eq!(content, inspected_content[0]);
         Ok(())
     }
 
     #[tokio::test]
+    #[named]
     async fn test_fetch_resolvable_container() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
 
         // create file container
         let (xorurl, _, the_files_map) = safe
-            .files_container_create_from("./testdata/", None, true, false)
+            .files_container_create_from("./testdata/", None, true, false, flow_name)
             .await?;
-        let _ = safe.fetch(&xorurl, None).await?;
+        let _ = safe.fetch(&xorurl, None, flow_name).await?;
         let (version0, _) = safe
-            .files_container_get(&xorurl)
+            .files_container_get(&xorurl, flow_name)
             .await?
             .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
@@ -320,10 +350,10 @@ mod tests {
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
         let site_name = random_nrs_name();
-        let _ = safe.nrs_add(&site_name, &safe_url).await?;
+        let _ = safe.nrs_add(&site_name, &safe_url, flow_name).await?;
         let nrs_url = format!("safe://{}", site_name);
 
-        let content = safe.fetch(&nrs_url, None).await?;
+        let content = safe.fetch(&nrs_url, None, flow_name).await?;
 
         safe_url.set_sub_names("")?;
         let xorurl_without_subname = safe_url.to_string();
@@ -357,7 +387,7 @@ mod tests {
         }
 
         // let's also compare it with the result from inspecting the URL
-        let inspected_content = safe.inspect(&nrs_url).await?;
+        let inspected_content = safe.inspect(&nrs_url, flow_name).await?;
         assert_eq!(inspected_content.len(), 2);
         assert_eq!(content, inspected_content[1]);
 
@@ -365,16 +395,18 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_fetch_resolvable_map_data() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
 
         // create file container
         let (xorurl, _, _the_files_map) = safe
-            .files_container_create_from("./testdata/", None, true, false)
+            .files_container_create_from("./testdata/", None, true, false, flow_name)
             .await?;
-        let _ = safe.fetch(&xorurl, None).await?;
+        let _ = safe.fetch(&xorurl, None, flow_name).await?;
         let (version0, _) = safe
-            .files_container_get(&xorurl)
+            .files_container_get(&xorurl, flow_name)
             .await?
             .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
@@ -383,13 +415,14 @@ mod tests {
         safe_url.set_content_version(Some(version0));
         let files_container_url = safe_url;
         let site_name = random_nrs_name();
-        let (nrs_resolution_url, did_create) =
-            safe.nrs_add(&site_name, &files_container_url).await?;
+        let (nrs_resolution_url, did_create) = safe
+            .nrs_add(&site_name, &files_container_url, flow_name)
+            .await?;
         assert!(did_create);
         let nrs_url = format!("safe://{}", site_name);
 
         // this should resolve to a FilesContainer
-        let content = safe.fetch(&nrs_url, None).await?;
+        let content = safe.fetch(&nrs_url, None, flow_name).await?;
         match &content {
             SafeData::FilesContainer {
                 xorurl,
@@ -407,7 +440,7 @@ mod tests {
         }
 
         // let's also compare it with the result from inspecting the URL
-        let inspected_content = safe.inspect(&nrs_url).await?;
+        let inspected_content = safe.inspect(&nrs_url, flow_name).await?;
         assert_eq!(inspected_content.len(), 2);
         assert_eq!(&content, &inspected_content[1]);
 
@@ -437,13 +470,17 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_fetch_public_file() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
         let data = Bytes::from("Something super immutable");
-        let xorurl = safe.store_bytes(data.clone(), Some("text/plain")).await?;
+        let xorurl = safe
+            .store_bytes(data.clone(), Some("text/plain"), flow_name)
+            .await?;
 
         let safe_url = SafeUrl::from_url(&xorurl)?;
-        let content = safe.fetch(&xorurl, None).await?;
+        let content = safe.fetch(&xorurl, None, flow_name).await?;
         assert!(
             content
                 == SafeData::PublicFile {
@@ -456,7 +493,7 @@ mod tests {
                 }
         );
 
-        let inspected_content = safe.inspect(&xorurl).await?;
+        let inspected_content = safe.inspect(&xorurl, flow_name).await?;
         assert!(
             inspected_content[0]
                 == SafeData::PublicFile {
@@ -472,17 +509,23 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_fetch_public_file_from_nrs_url() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
         let data = Bytes::from("Something super immutable");
-        let xorurl = safe.store_bytes(data.clone(), Some("text/plain")).await?;
+        let xorurl = safe
+            .store_bytes(data.clone(), Some("text/plain"), flow_name)
+            .await?;
 
         let safe_url = SafeUrl::from_url(&xorurl)?;
         let site_name = random_nrs_name();
         let public_name = format!("file.{site_name}");
-        safe.nrs_add(&public_name, &safe_url).await?;
+        safe.nrs_add(&public_name, &safe_url, flow_name).await?;
 
-        let content = safe.fetch(&format!("safe://{public_name}"), None).await?;
+        let content = safe
+            .fetch(&format!("safe://{public_name}"), None, flow_name)
+            .await?;
         assert!(
             content
                 == SafeData::PublicFile {
@@ -496,7 +539,7 @@ mod tests {
         );
 
         // let's also compare it with the result from inspecting the URL
-        let inspected_content = safe.inspect(&xorurl).await?;
+        let inspected_content = safe.inspect(&xorurl, flow_name).await?;
         assert!(
             inspected_content[0]
                 == SafeData::PublicFile {
@@ -512,17 +555,19 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_fetch_range_public_file() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
         let saved_data = Bytes::from("Something super immutable");
         let size = saved_data.len();
         let xorurl = safe
-            .store_bytes(saved_data.clone(), Some("text/plain"))
+            .store_bytes(saved_data.clone(), Some("text/plain"), flow_name)
             .await?;
 
         // Fetch first half and match
         let fetch_first_half = Some((None, Some(size as u64 / 2)));
-        let content = safe.fetch(&xorurl, fetch_first_half).await?;
+        let content = safe.fetch(&xorurl, fetch_first_half, flow_name).await?;
 
         if let SafeData::PublicFile { data, .. } = content {
             assert_eq!(data, saved_data.slice(0..size / 2));
@@ -532,7 +577,7 @@ mod tests {
 
         // Fetch second half and match
         let fetch_second_half = Some((Some(size as u64 / 2), None));
-        let content = safe.fetch(&xorurl, fetch_second_half).await?;
+        let content = safe.fetch(&xorurl, fetch_second_half, flow_name).await?;
 
         if let SafeData::PublicFile { data, .. } = content {
             assert_eq!(data, saved_data[size / 2..]);
@@ -546,17 +591,19 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_fetch_range_from_files_container() -> Result<()> {
+        let flow_name = function_name!();
         use std::fs::File;
         let safe = new_safe_instance().await?;
 
         // create file container
         let (xorurl, _, _files_map) = safe
-            .files_container_create_from("./testdata/", None, true, false)
+            .files_container_create_from("./testdata/", None, true, false, flow_name)
             .await?;
-        let _ = safe.fetch(&xorurl, None).await?;
+        let _ = safe.fetch(&xorurl, None, flow_name).await?;
         let (version0, _) = safe
-            .files_container_get(&xorurl)
+            .files_container_get(&xorurl, flow_name)
             .await?
             .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
@@ -564,7 +611,7 @@ mod tests {
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
         let site_name = random_nrs_name();
-        let _ = safe.nrs_add(&site_name, &safe_url).await?;
+        let _ = safe.nrs_add(&site_name, &safe_url, flow_name).await?;
         let nrs_url = format!("safe://{}/test.md", site_name);
 
         // read a local file content (for comparison)
@@ -576,7 +623,7 @@ mod tests {
         let file_size = file_data.len();
 
         // fetch full file and compare
-        let content = safe.fetch(&nrs_url, None).await?;
+        let content = safe.fetch(&nrs_url, None, flow_name).await?;
         if let SafeData::PublicFile { data, .. } = &content {
             assert_eq!(data.clone(), file_data.clone());
         } else {
@@ -585,7 +632,7 @@ mod tests {
 
         // fetch first half and match
         let fetch_first_half = Some((Some(0), Some(file_size as u64 / 2)));
-        let content = safe.fetch(&nrs_url, fetch_first_half).await?;
+        let content = safe.fetch(&nrs_url, fetch_first_half, flow_name).await?;
         if let SafeData::PublicFile { data, .. } = content {
             assert_eq!(data, file_data[0..file_size / 2]);
         } else {
@@ -594,7 +641,7 @@ mod tests {
 
         // fetch second half and match
         let fetch_second_half = Some((Some(file_size as u64 / 2), Some(file_size as u64)));
-        let content = safe.fetch(&nrs_url, fetch_second_half).await?;
+        let content = safe.fetch(&nrs_url, fetch_second_half, flow_name).await?;
         if let SafeData::PublicFile { data, .. } = content {
             assert_eq!(data, file_data[file_size / 2..]);
         } else {
@@ -605,7 +652,9 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_fetch_unsupported_with_media_type() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
         let xorname = xor_name::rand::random();
         let type_tag = 575_756_443;
@@ -622,7 +671,7 @@ mod tests {
         )?
         .encode(XorUrlBase::Base32z);
 
-        match safe.fetch(&xorurl, None).await {
+        match safe.fetch(&xorurl, None, flow_name).await {
             Ok(c) => {
                 bail!("Unxpected fetched content: {:?}", c)
             }
@@ -632,7 +681,7 @@ mod tests {
             other => bail!("Error returned is not the expected one: {:?}", other),
         };
 
-        match safe.inspect(&xorurl).await {
+        match safe.inspect(&xorurl, flow_name).await {
             Ok(c) => Err(anyhow!("Unxpected fetched content: {:?}", c)),
             Err(Error::ContentError(msg)) => {
                 assert_eq!(msg, "Data type 'Register' not supported yet".to_string());
@@ -646,15 +695,17 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_fetch_file_with_path() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
         let data = Bytes::from("Something super immutable");
-        let xorurl = safe.store_bytes(data.clone(), None).await?;
+        let xorurl = safe.store_bytes(data.clone(), None, flow_name).await?;
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         let path = "/some_relative_filepath";
         safe_url.set_path(path);
-        match safe.fetch(&safe_url.to_string(), None).await {
+        match safe.fetch(&safe_url.to_string(), None, flow_name).await {
             Ok(c) => {
                 bail!("Unxpected fetched content: {:?}", c)
             }
@@ -666,12 +717,14 @@ mod tests {
         };
 
         // test the same but a file with some media type
-        let xorurl = safe.store_bytes(data.clone(), Some("text/plain")).await?;
+        let xorurl = safe
+            .store_bytes(data.clone(), Some("text/plain"), flow_name)
+            .await?;
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_path("/some_relative_filepath");
         let url_with_path = safe_url.to_string();
-        match safe.fetch(&url_with_path, None).await {
+        match safe.fetch(&url_with_path, None, flow_name).await {
             Ok(c) => Err(anyhow!("Unxpected fetched content: {:?}", c)),
             Err(Error::ContentError(msg)) => {
                 assert_eq!(
@@ -696,18 +749,23 @@ mod tests {
     ///
     /// Then: `safe://<nrs map container xorurl>` resolves to the NRS map container
     #[tokio::test]
+    #[named]
     async fn test_fetch_should_resolve_nrs_map_container_when_xorurl_is_used_and_topname_has_link(
     ) -> Result<()> {
+        let flow_name = function_name!();
         let site_name = random_nrs_name();
         let safe = new_safe_instance().await?;
 
-        let files_container = TestDataFilesContainer::get_container([]).await?;
+        let files_container = TestDataFilesContainer::get_container([], flow_name).await?;
 
-        let nrs_url = safe.nrs_create(&site_name).await?;
+        let nrs_url = safe.nrs_create(&site_name, flow_name).await?;
         let nrs_container_url = SafeUrl::from_url(&nrs_url.to_xorurl_string())?;
-        safe.nrs_associate(&site_name, &files_container.url).await?;
+        safe.nrs_associate(&site_name, &files_container.url, flow_name)
+            .await?;
 
-        let content = safe.fetch(&nrs_container_url.to_string(), None).await?;
+        let content = safe
+            .fetch(&nrs_container_url.to_string(), None, flow_name)
+            .await?;
         match &content {
             SafeData::NrsMapContainer {
                 data_type,
@@ -740,22 +798,28 @@ mod tests {
     ///
     /// Then: `safe://<nrs map container xorurl>` resolves to the NRS map container
     #[tokio::test]
+    #[named]
     async fn test_fetch_should_resolve_nrs_map_container_when_xorurl_is_used_and_topname_has_no_link(
     ) -> Result<()> {
+        let flow_name = function_name!();
         let site_name = random_nrs_name();
         let safe = new_safe_instance().await?;
 
-        let files_container = TestDataFilesContainer::get_container(["/testdata/test.md"]).await?;
+        let files_container =
+            TestDataFilesContainer::get_container(["/testdata/test.md"], flow_name).await?;
 
-        let nrs_url = safe.nrs_create(&site_name).await?;
+        let nrs_url = safe.nrs_create(&site_name, flow_name).await?;
         let nrs_container_url = SafeUrl::from_url(&nrs_url.to_xorurl_string())?;
         safe.nrs_associate(
             &format!("a.{site_name}"),
             &files_container["/testdata/test.md"],
+            flow_name,
         )
         .await?;
 
-        let content = safe.fetch(&nrs_container_url.to_string(), None).await?;
+        let content = safe
+            .fetch(&nrs_container_url.to_string(), None, flow_name)
+            .await?;
         match &content {
             SafeData::NrsMapContainer {
                 data_type,
@@ -788,22 +852,26 @@ mod tests {
     ///
     /// Then: `safe://example` resolves to the NRS map container
     #[tokio::test]
+    #[named]
     async fn test_fetch_should_resolve_nrs_map_container_when_nrsurl_is_used_and_topname_has_no_link(
     ) -> Result<()> {
+        let flow_name = function_name!();
         let site_name = random_nrs_name();
         let safe = new_safe_instance().await?;
 
-        let files_container = TestDataFilesContainer::get_container(["/testdata/test.md"]).await?;
+        let files_container =
+            TestDataFilesContainer::get_container(["/testdata/test.md"], flow_name).await?;
 
-        let nrs_url = safe.nrs_create(&site_name).await?;
+        let nrs_url = safe.nrs_create(&site_name, flow_name).await?;
         let nrs_container_url = SafeUrl::from_url(&nrs_url.to_xorurl_string())?;
         safe.nrs_associate(
             &format!("a.{site_name}"),
             &files_container["/testdata/test.md"],
+            flow_name,
         )
         .await?;
 
-        let content = safe.fetch(&nrs_url.to_string(), None).await?;
+        let content = safe.fetch(&nrs_url.to_string(), None, flow_name).await?;
         match &content {
             SafeData::NrsMapContainer {
                 data_type,
@@ -836,22 +904,27 @@ mod tests {
     ///
     /// Then: `safe://example` resolves to the files container
     #[tokio::test]
+    #[named]
     async fn test_fetch_should_resolve_linked_content_when_nrsurl_is_used_and_topname_has_a_link(
     ) -> Result<()> {
+        let flow_name = function_name!();
         let site_name = random_nrs_name();
         let safe = new_safe_instance().await?;
 
-        let files_container = TestDataFilesContainer::get_container(["/testdata/test.md"]).await?;
+        let files_container =
+            TestDataFilesContainer::get_container(["/testdata/test.md"], flow_name).await?;
 
-        let nrs_url = safe.nrs_create(&site_name).await?;
-        safe.nrs_associate(&site_name, &files_container.url).await?;
+        let nrs_url = safe.nrs_create(&site_name, flow_name).await?;
+        safe.nrs_associate(&site_name, &files_container.url, flow_name)
+            .await?;
         safe.nrs_associate(
             &format!("a.{site_name}"),
             &files_container["/testdata/test.md"],
+            flow_name,
         )
         .await?;
 
-        let content = safe.fetch(&nrs_url.to_string(), None).await?;
+        let content = safe.fetch(&nrs_url.to_string(), None, flow_name).await?;
         match &content {
             SafeData::FilesContainer {
                 xorurl,
@@ -881,42 +954,51 @@ mod tests {
     ///
     /// Then: `safe://a.example` resolves to the first file it was linked to
     #[tokio::test]
+    #[named]
     async fn test_fetch_should_resolve_subname_to_specific_version() -> Result<()> {
+        let flow_name = function_name!();
         let site_name = random_nrs_name();
         let safe = new_safe_instance().await?;
 
-        let files_container = TestDataFilesContainer::get_container([
-            "/testdata/test.md",
-            "/testdata/another.md",
-            "/testdata/noextension",
-        ])
+        let files_container = TestDataFilesContainer::get_container(
+            [
+                "/testdata/test.md",
+                "/testdata/another.md",
+                "/testdata/noextension",
+            ],
+            flow_name,
+        )
         .await?;
 
-        safe.nrs_create(&site_name).await?;
+        safe.nrs_create(&site_name, flow_name).await?;
         let nrs_url = safe
             .nrs_associate(
                 &format!("a.{site_name}"),
                 &files_container["/testdata/test.md"],
+                flow_name,
             )
             .await?;
         safe.nrs_associate(
             &format!("b.{site_name}"),
             &files_container["/testdata/test.md"],
+            flow_name,
         )
         .await?;
         safe.nrs_associate(
             &format!("a.{site_name}"),
             &files_container["/testdata/another.md"],
+            flow_name,
         )
         .await?;
         safe.nrs_associate(
             &format!("a.{site_name}"),
             &files_container["/testdata/noextension"],
+            flow_name,
         )
         .await?;
 
         // This URL has a version on it.
-        let content = safe.fetch(&nrs_url.to_string(), None).await?;
+        let content = safe.fetch(&nrs_url.to_string(), None, flow_name).await?;
         match &content {
             SafeData::PublicFile { xorurl, .. } => {
                 assert_eq!(
@@ -930,7 +1012,7 @@ mod tests {
         }
 
         // This is mainly to verify that the correct version was assigned to the NRS entry.
-        let inspected_content = safe.inspect(&nrs_url.to_string()).await?;
+        let inspected_content = safe.inspect(&nrs_url.to_string(), flow_name).await?;
         match &inspected_content[0] {
             SafeData::NrsEntry {
                 xorurl,
@@ -974,17 +1056,21 @@ mod tests {
     ///
     /// Then: `safe://example/testdata/test.md` resolves to the file in the container
     #[tokio::test]
+    #[named]
     async fn test_fetch_should_resolve_nrs_url_when_input_url_has_path() -> Result<()> {
+        let flow_name = function_name!();
         let site_name = random_nrs_name();
         let safe = new_safe_instance().await?;
 
-        let files_container = TestDataFilesContainer::get_container(["/testdata/test.md"]).await?;
+        let files_container =
+            TestDataFilesContainer::get_container(["/testdata/test.md"], flow_name).await?;
 
-        let mut nrs_url = safe.nrs_create(&site_name).await?;
-        safe.nrs_associate(&site_name, &files_container.url).await?;
+        let mut nrs_url = safe.nrs_create(&site_name, flow_name).await?;
+        safe.nrs_associate(&site_name, &files_container.url, flow_name)
+            .await?;
 
         nrs_url.set_path("testdata/test.md");
-        let content = safe.fetch(&nrs_url.to_string(), None).await?;
+        let content = safe.fetch(&nrs_url.to_string(), None, flow_name).await?;
         match &content {
             SafeData::PublicFile { xorurl, .. } => {
                 assert_eq!(
@@ -1008,20 +1094,24 @@ mod tests {
     ///
     /// Then: `safe://example/test.md` resolves to the file in the container
     #[tokio::test]
+    #[named]
     async fn test_fetch_should_resolve_nrs_url_when_input_url_and_target_url_have_paths(
     ) -> Result<()> {
+        let flow_name = function_name!();
         let site_name = random_nrs_name();
         let safe = new_safe_instance().await?;
 
-        let files_container = TestDataFilesContainer::get_container(["/testdata/test.md"]).await?;
+        let files_container =
+            TestDataFilesContainer::get_container(["/testdata/test.md"], flow_name).await?;
 
         let mut target_url = files_container.url.clone();
         target_url.set_path("testdata");
-        let mut nrs_url = safe.nrs_create(&site_name).await?;
-        safe.nrs_associate(&site_name, &target_url).await?;
+        let mut nrs_url = safe.nrs_create(&site_name, flow_name).await?;
+        safe.nrs_associate(&site_name, &target_url, flow_name)
+            .await?;
 
         nrs_url.set_path("test.md");
-        let content = safe.fetch(&nrs_url.to_string(), None).await?;
+        let content = safe.fetch(&nrs_url.to_string(), None, flow_name).await?;
         match &content {
             SafeData::PublicFile { xorurl, .. } => {
                 assert_eq!(

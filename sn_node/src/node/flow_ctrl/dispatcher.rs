@@ -265,7 +265,7 @@ fn into_msg_bytes(
 
 fn wire_msg(msg_id: MsgId, payload: Bytes, auth: MsgKind, dst: Dst) -> WireMsg {
     #[allow(unused_mut)]
-    let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
+    let mut wire_msg = WireMsg::new_msg(msg_id, "NODE_MSG".to_string(), payload, auth, dst);
 
     #[cfg(feature = "test-utils")]
     let wire_msg = wire_msg.set_payload_debug(msg);

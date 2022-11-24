@@ -70,6 +70,7 @@ impl Session {
         dst_address: XorName,
         auth: ClientAuth,
         payload: Bytes,
+        flow_name: &str,
     ) -> Result<()> {
         let endpoint = self.endpoint.clone();
         // TODO: Consider other approach: Keep a session per section!
@@ -88,7 +89,7 @@ impl Session {
             section_key: section_pk,
         };
         let kind = MsgKind::Client(auth);
-        let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
+        let wire_msg = WireMsg::new_msg(msg_id, flow_name.to_string(), payload, kind, dst);
 
         let send_cmd_tasks = self.send_msg(elders.clone(), wire_msg, msg_id).await?;
         trace!("Cmd msg {:?} sent", msg_id);
@@ -201,6 +202,7 @@ impl Session {
         auth: ClientAuth,
         payload: Bytes,
         dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
+        flow_name: &str,
     ) -> Result<QueryResult> {
         let endpoint = self.endpoint.clone();
 
@@ -235,7 +237,7 @@ impl Session {
             section_key: section_pk,
         };
         let kind = MsgKind::Client(auth);
-        let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
+        let wire_msg = WireMsg::new_msg(msg_id, flow_name.to_string(), payload, kind, dst);
 
         let send_query_tasks = self.send_msg(elders.clone(), wire_msg, msg_id).await?;
 

@@ -61,7 +61,10 @@ fn criterion_benchmark(c: &mut Criterion) {
         let owner = User::Key(client.public_key());
         let policy = public_policy(owner);
 
-        let (_address, batch) = match client.create_register(name, tag, policy).await {
+        let (_address, batch) = match client
+            .create_register(name, tag, policy, "BENCH_SERIALISE")
+            .await
+        {
             Ok(x) => x,
             Err(error) => panic!("error creating register {error:?}"),
         };
@@ -95,7 +98,13 @@ fn criterion_benchmark(c: &mut Criterion) {
         name: xor_name::rand::random(),
         section_key: bls::SecretKey::random().public_key(),
     };
-    let mut the_wire_msg = WireMsg::new_msg(msg_id, payload, messaging::MsgKind::Client(auth), dst);
+    let mut the_wire_msg = WireMsg::new_msg(
+        msg_id,
+        "BENCH_SERIALISE".to_string(),
+        payload,
+        messaging::MsgKind::Client(auth),
+        dst,
+    );
     let (header, dst, payload) = match the_wire_msg.serialize_and_cache_bytes() {
         Ok(bytes) => bytes,
         Err(_erorr) => {

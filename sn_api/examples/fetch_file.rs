@@ -45,7 +45,7 @@ async fn main() -> Result<()> {
     // it will return not only the content of the file
     // but its metadata too, so we can distinguish what has
     // been fetched from the provided Safe-URL.
-    match safe.fetch(&url, None).await {
+    match safe.fetch(&url, None, "FETCH_EXAMPLE").await {
         Ok(SafeData::PublicFile { data, .. }) => {
             let data = String::from_utf8(data.chunk().to_vec())?;
             println!("File content retrieved:\n{}", data);

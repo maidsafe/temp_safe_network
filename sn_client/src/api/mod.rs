@@ -87,7 +87,13 @@ impl Client {
         let mut attempts = 1;
         loop {
             // Send the dummy message to probe the network for it's infrastructure details.
-            match self.send_query_without_retry(query.clone()).await {
+            match self
+                .send_query_without_retry(
+                    query.clone(),
+                    &format!("BOOTSTRAP-{:?}", query.dst_name()),
+                )
+                .await
+            {
                 Ok(result) if result.response.is_data_not_found() => {
                     // A data-not-found response means it comes from the right set of Elders,
                     // any AE retries should have taken place as well.

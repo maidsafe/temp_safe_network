@@ -92,7 +92,7 @@ pub async fn run_chunk_soak() -> Result<()> {
 
     for (address, known_hash) in all_data_put.read().await.iter().as_ref() {
         println!("...reading bytes at address {:?} ...", address);
-        let mut bytes = client.read_bytes(*address).await;
+        let mut bytes = client.read_bytes(*address, "PUT_GET_EXAMPLE").await;
 
         let mut attempts = 1;
         while bytes.is_err() && attempts < 10 {
@@ -104,7 +104,7 @@ pub async fn run_chunk_soak() -> Result<()> {
                 address
             );
 
-            bytes = client.read_bytes(*address).await;
+            bytes = client.read_bytes(*address, "PUT_GET_EXAMPLE").await;
         }
 
         let bytes = bytes?;
@@ -154,7 +154,7 @@ async fn upload_data_using_client(client: Client, iteration: usize) -> Result<(X
     println!("Storing bytes.len : {bytes_len:?} w/ hash {:?}", output);
 
     let start_putting = Instant::now();
-    let address = client.upload(bytes).await?;
+    let address = client.upload(bytes, "PUT_GET_EXAMPLE").await?;
     let duration = start_putting.elapsed();
 
     println!(

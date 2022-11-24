@@ -30,8 +30,12 @@ impl Client {
     /// Queries are automatically retried using exponential backoff if the timeout is hit.
     #[cfg(not(feature = "check-replicas"))]
     #[instrument(skip(self), level = "debug")]
-    pub async fn send_query(&self, query: DataQueryVariant) -> Result<QueryResult, Error> {
-        self.send_query_with_retry(query, true).await
+    pub async fn send_query(
+        &self,
+        query: DataQueryVariant,
+        flow_name: &str,
+    ) -> Result<QueryResult, Error> {
+        self.send_query_with_retry(query, true, flow_name).await
     }
 
     /// Send a Query to the network and await a response.
@@ -40,8 +44,9 @@ impl Client {
     pub async fn send_query_without_retry(
         &self,
         query: DataQueryVariant,
+        flow_name: &str,
     ) -> Result<QueryResult, Error> {
-        self.send_query_with_retry(query, false).await
+        self.send_query_with_retry(query, false, flow_name).await
     }
 
     // Send a Query to the network and await a response.
@@ -52,6 +57,7 @@ impl Client {
         &self,
         query: DataQueryVariant,
         retry: bool,
+        flow_name: &str,
     ) -> Result<QueryResult, Error> {
         let client_pk = self.public_key();
         let mut query = DataQuery {
@@ -96,6 +102,7 @@ impl Client {
                     serialised_query.clone(),
                     signature.clone(),
                     Some((section_pk, elders.clone())),
+                    flow_name,
                 )
                 .await;
 
@@ -122,7 +129,6 @@ impl Client {
 
                 // In the next attempt, try the next adult, further away.
                 query.adult_index += 1;
-                debug!("Sleeping before trying query again: {delay:?} sleep for {query:?}");
                 sleep(delay).await;
             } else {
                 warn!("Finished trying and last response to {query:?} is {res:?}");
@@ -141,10 +147,18 @@ impl Client {
         client_pk: PublicKey,
         serialised_query: Bytes,
         signature: Signature,
+        flow_name: &str,
     ) -> Result<QueryResult, Error> {
         debug!("Sending Query: {:?}", query);
-        self.send_signed_query_to_section(query, client_pk, serialised_query, signature, None)
-            .await
+        self.send_signed_query_to_section(
+            query,
+            client_pk,
+            serialised_query,
+            signature,
+            None,
+            flow_name,
+        )
+        .await
     }
 
     // Private helper to send a signed query, with the option to define the destination section.
@@ -157,6 +171,7 @@ impl Client {
         serialised_query: Bytes,
         signature: Signature,
         dst_section_info: Option<(bls::PublicKey, Vec<Peer>)>,
+        flow_name: &str,
     ) -> Result<QueryResult, Error> {
         let auth = ClientAuth {
             public_key: client_pk,
@@ -164,7 +179,7 @@ impl Client {
         };
 
         self.session
-            .send_query(query, auth, serialised_query, dst_section_info)
+            .send_query(query, auth, serialised_query, dst_section_info, flow_name)
             .await
     }
 
@@ -174,7 +189,11 @@ impl Client {
     /// is stored in each and all of the expected data replicas at section Adults.
     #[cfg(feature = "check-replicas")]
     #[instrument(skip(self), level = "debug")]
-    pub async fn send_query(&self, query: DataQueryVariant) -> Result<QueryResult, Error> {
+    pub async fn send_query(
+        &self,
+        query: DataQueryVariant,
+        flow_name: &str,
+    ) -> Result<QueryResult, Error> {
         use crate::errors::DataReplicasCheckError;
         let span = info_span!("Attempting a query");
         let _ = span.enter();
@@ -208,6 +227,7 @@ impl Client {
                         serialised_query,
                         signature,
                         Some((section_pk, elders_clone)),
+                        flow_name,
                     )
                     .await;
 

@@ -553,6 +553,7 @@ mod tests {
 
         Ok(WireMsg::new_msg(
             MsgId::new(),
+            "NODE_MSG_TEST".to_string(),
             payload,
             MsgKind::Client(auth),
             dst,

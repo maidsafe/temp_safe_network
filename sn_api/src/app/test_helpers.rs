@@ -112,6 +112,7 @@ async fn reissue_bearer_dbcs() -> Result<Vec<(Dbc, Token)>> {
             vec![GENESIS_DBC.clone()],
             output_amounts,
             Token::from_nano(change_amount),
+            "INITIAL-REISSUE",
         )
         .await?;
 
@@ -140,11 +141,12 @@ pub struct TestDataFilesContainer {
 impl TestDataFilesContainer {
     pub async fn get_container<'a>(
         files: impl IntoIterator<Item = &'a str>,
+        flow_name: &str,
     ) -> Result<TestDataFilesContainer> {
         let mut map: HashMap<String, SafeUrl> = HashMap::new();
         let safe = new_safe_instance().await?;
         let (container_xorurl, _, files_map) = safe
-            .files_container_create_from("./testdata", None, false, false)
+            .files_container_create_from("./testdata", None, false, false, flow_name)
             .await?;
         let container_url = SafeUrl::from_url(&container_xorurl)?;
         for file in files {

@@ -35,6 +35,7 @@ impl Client {
         client_pk: PublicKey,
         serialised_cmd: Bytes,
         signature: Signature,
+        flow_name: &str,
     ) -> Result<()> {
         let auth = ClientAuth {
             public_key: client_pk,
@@ -43,7 +44,7 @@ impl Client {
 
         tokio::time::timeout(self.cmd_timeout, async {
             self.session
-                .send_cmd(dst_address, auth, serialised_cmd)
+                .send_cmd(dst_address, auth, serialised_cmd, flow_name)
                 .await
         })
         .await
@@ -54,7 +55,7 @@ impl Client {
     /// The provided `DataCmd` is serialised and signed with the
     /// keypair this Client instance has been setup with.
     #[instrument(skip_all, level = "debug", name = "client-api send cmd")]
-    pub async fn send_cmd(&self, cmd: DataCmd) -> Result<()> {
+    pub async fn send_cmd(&self, cmd: DataCmd, flow_name: &str) -> Result<()> {
         let client_pk = self.public_key();
         let dst_name = cmd.dst_name();
 
@@ -68,7 +69,7 @@ impl Client {
         let signature = self.sign(&serialised_cmd);
 
         let res = self
-            .send_signed_cmd(dst_name, client_pk, serialised_cmd, signature)
+            .send_signed_cmd(dst_name, client_pk, serialised_cmd, signature, flow_name)
             .await;
 
         if res.is_ok() {

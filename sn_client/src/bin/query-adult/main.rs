@@ -62,7 +62,7 @@ async fn main() -> Result<()> {
     // Upload file to network
 
     if args.upload {
-        let xor = client.upload(bytes).await?;
+        let xor = client.upload(bytes, "QUERY_ADULT_EXAMPLE").await?;
         println!("Uploaded file with DataMap XOR: {}", xor);
 
         assert_eq!(data_map_xor, xor);
@@ -137,6 +137,7 @@ async fn send_query(client: &Client, query: DataQuery) -> Result<QueryResponse> 
             client_pk,
             serialised_query.clone(),
             signature.clone(),
+            "QUERY_ADULT_EXAMPLE",
         )
         .await?
         .response)

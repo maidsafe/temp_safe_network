@@ -54,6 +54,9 @@ pub struct CmdArgs {
     /// Base encoding to be used for XOR-URLs generated. Currently supported: base32z (default), base32 and base64
     #[clap(long = "xorurl", global(true))]
     xorurl_base: Option<XorUrlBase>,
+    /// FLOW NAME
+    #[clap(long)]
+    flow_name: Option<String>,
 }
 
 pub async fn run() -> Result<()> {
@@ -114,6 +117,8 @@ async fn process_commands(mut safe: &mut Safe, args: CmdArgs, config: &mut Confi
         OutputFmt::Pretty
     };
 
+    let flow_name = args.flow_name;
+
     match args.cmd {
         SubCommands::Config { cmd } => config_commander(cmd, config).await,
         SubCommands::Networks { cmd } => networks_commander(cmd, config).await,
@@ -145,14 +150,19 @@ async fn process_commands(mut safe: &mut Safe, args: CmdArgs, config: &mut Confi
             if let Some(cmd) = cmd {
                 xorurl_commander(cmd, output_fmt, safe.xorurl_base)
             } else {
-                xorurl_of_files(
-                    location,
-                    recursive,
-                    follow_links,
-                    output_fmt,
-                    safe.xorurl_base,
+                let flow_name = get_flow_name(flow_name);
+                called_with_flow_name(
+                    xorurl_of_files(
+                        location,
+                        recursive,
+                        follow_links,
+                        output_fmt,
+                        safe.xorurl_base,
+                        &flow_name,
+                    )
+                    .await,
+                    &flow_name,
                 )
-                .await
             }
         }
         other => {
@@ -166,15 +176,41 @@ async fn process_commands(mut safe: &mut Safe, args: CmdArgs, config: &mut Confi
                 connect(safe, config).await?;
             }
 
-            match other {
-                SubCommands::Cat(cmd) => cat_commander(cmd, output_fmt, safe).await,
-                SubCommands::Dog(cmd) => dog_commander(cmd, output_fmt, safe).await,
-                SubCommands::Files(cmd) => files_commander(cmd, output_fmt, safe).await,
-                SubCommands::Nrs(cmd) => nrs_commander(cmd, output_fmt, safe).await,
-                SubCommands::Wallet(cmd) => wallet_commander(cmd, output_fmt, safe, config).await,
+            let flow_name = get_flow_name(flow_name);
+            let result = match other {
+                SubCommands::Cat(cmd) => cat_commander(cmd, output_fmt, safe, &flow_name).await,
+                SubCommands::Dog(cmd) => dog_commander(cmd, output_fmt, safe, &flow_name).await,
+                SubCommands::Files(cmd) => files_commander(cmd, output_fmt, safe, &flow_name).await,
+                SubCommands::Nrs(cmd) => nrs_commander(cmd, output_fmt, safe, &flow_name).await,
+                SubCommands::Wallet(cmd) => {
+                    wallet_commander(cmd, output_fmt, safe, config, &flow_name).await
+                }
                 _ => Err(eyre!("Unknown safe subcommand")),
-            }
+            };
+
+            called_with_flow_name(result, &flow_name)
         }
+    }
+}
+
+fn get_flow_name(flow_name: Option<String>) -> String {
+    flow_name.unwrap_or_else(|| {
+        use rand::Rng;
+        rand::thread_rng()
+            .sample_iter(&rand::distributions::Alphanumeric)
+            .take(10)
+            .map(char::from)
+            .collect()
+    })
+}
+
+fn called_with_flow_name(result: Result<()>, flow_name: &str) -> Result<()> {
+    if let Err(err) = result {
+        Err(eyre!(
+            "CLI CMD FAILED with flow name '{flow_name}': {err:?}"
+        ))
+    } else {
+        Ok(())
     }
 }
 

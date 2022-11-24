@@ -40,6 +40,7 @@ pub struct WireMsgHeader {
 #[derive(CustomDebug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct MsgEnvelope {
     pub msg_id: MsgId,
+    pub flow_name: String,
     pub kind: MsgKind,
 }
 
@@ -76,6 +77,7 @@ impl WireMsgHeader {
     // Instantiate a WireMsgHeader as per current supported version.
     pub fn new(
         msg_id: MsgId,
+        flow_name: String,
         auth: MsgKind,
         // dst: Dst,
     ) -> Self {
@@ -84,6 +86,7 @@ impl WireMsgHeader {
             version: MESSAGING_PROTO_VERSION,
             msg_envelope: MsgEnvelope {
                 msg_id,
+                flow_name,
                 kind: auth,
                 // dst,
             },

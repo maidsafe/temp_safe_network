@@ -370,7 +370,8 @@ impl MyNode {
             section_key,
         };
 
-        let mut wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
+        let mut wire_msg =
+            WireMsg::new_msg(msg_id, "NODE_2_NODE_MSG".to_string(), payload, kind, dst);
 
         #[cfg(feature = "test-utils")]
         let wire_msg = wire_msg.set_payload_debug(msg);

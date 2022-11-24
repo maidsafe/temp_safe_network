@@ -60,18 +60,36 @@ pub enum NrsSubCommands {
     },
 }
 
-pub async fn nrs_commander(cmd: NrsSubCommands, output_fmt: OutputFmt, safe: &Safe) -> Result<()> {
+pub async fn nrs_commander(
+    cmd: NrsSubCommands,
+    output_fmt: OutputFmt,
+    safe: &Safe,
+    flow_name: &str,
+) -> Result<()> {
     match cmd {
         NrsSubCommands::Register { name, link } => {
-            run_register_subcommand(name, link, safe, output_fmt).await
+            run_register_subcommand(name, link, safe, output_fmt, flow_name).await
         }
         NrsSubCommands::Add {
             public_name: name,
             link,
             register_top_name,
             default,
-        } => run_add_subcommand(name, link, register_top_name, default, safe, output_fmt).await,
-        NrsSubCommands::Remove { name } => run_remove_subcommand(name, safe, output_fmt).await,
+        } => {
+            run_add_subcommand(
+                name,
+                link,
+                register_top_name,
+                default,
+                safe,
+                output_fmt,
+                flow_name,
+            )
+            .await
+        }
+        NrsSubCommands::Remove { name } => {
+            run_remove_subcommand(name, safe, output_fmt, flow_name).await
+        }
     }
 }
 
@@ -80,8 +98,9 @@ async fn run_register_subcommand(
     link: Option<String>,
     safe: &Safe,
     output_fmt: OutputFmt,
+    flow_name: &str,
 ) -> Result<()> {
-    match safe.nrs_create(&name).await {
+    match safe.nrs_create(&name, flow_name).await {
         Ok(topname_url) => {
             let mut summary = String::new();
             write!(
@@ -91,7 +110,7 @@ async fn run_register_subcommand(
             )?;
             if let Some(ref link) = link {
                 let url = get_target_url(link)?;
-                let _ = associate_url_with_public_name(&name, safe, &url).await?;
+                let _ = associate_url_with_public_name(&name, safe, &url, flow_name).await?;
                 write!(summary, "\nThe entry points to {link}")?;
             }
             print_summary(
@@ -138,14 +157,15 @@ async fn run_add_subcommand(
     default: bool,
     safe: &Safe,
     output_fmt: OutputFmt,
+    flow_name: &str,
 ) -> Result<()> {
     let link = get_from_arg_or_stdin(link, Some("...awaiting link URL from stdin"))?;
     let link_url = get_target_url(&link)?;
     let (url, topname_was_registered) = if register_top_name {
-        add_public_name_for_url(&name, safe, &link_url).await?
+        add_public_name_for_url(&name, safe, &link_url, flow_name).await?
     } else {
         (
-            associate_url_with_public_name(&name, safe, &link_url).await?,
+            associate_url_with_public_name(&name, safe, &link_url, flow_name).await?,
             false,
         )
     };
@@ -169,7 +189,7 @@ async fn run_add_subcommand(
 
     if default {
         let topname = get_topname_from_public_name(&name)?;
-        associate_url_with_public_name(&topname, safe, &link_url).await?;
+        associate_url_with_public_name(&topname, safe, &link_url, flow_name).await?;
         write!(
             summary_header,
             "This link was also set as the default location for {topname}."
@@ -186,8 +206,13 @@ async fn run_add_subcommand(
     Ok(())
 }
 
-async fn run_remove_subcommand(name: String, safe: &Safe, output_fmt: OutputFmt) -> Result<()> {
-    match safe.nrs_remove(&name).await {
+async fn run_remove_subcommand(
+    name: String,
+    safe: &Safe,
+    output_fmt: OutputFmt,
+    flow_name: &str,
+) -> Result<()> {
+    match safe.nrs_remove(&name, flow_name).await {
         Ok(url) => {
             let version = url
                 .content_version()
@@ -228,8 +253,9 @@ async fn associate_url_with_public_name(
     public_name: &str,
     safe: &Safe,
     url: &SafeUrl,
+    flow_name: &str,
 ) -> Result<SafeUrl> {
-    match safe.nrs_associate(public_name, url).await {
+    match safe.nrs_associate(public_name, url, flow_name).await {
         Ok(new_url) => Ok(new_url),
         Err(error) => match error {
             UnversionedContentError(_) => Err(eyre!(error)
@@ -251,8 +277,9 @@ async fn add_public_name_for_url(
     public_name: &str,
     safe: &Safe,
     url: &SafeUrl,
+    flow_name: &str,
 ) -> Result<(SafeUrl, bool)> {
-    match safe.nrs_add(public_name, url).await {
+    match safe.nrs_add(public_name, url, flow_name).await {
         Ok((new_url, topname_was_registered)) => Ok((new_url, topname_was_registered)),
         Err(error) => match error {
             UnversionedContentError(_) => Err(eyre!(error)

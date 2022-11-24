@@ -117,6 +117,7 @@ impl Default for ProgressIndicator {
 //
 // This command is really similar to cp or scp, and people are fine
 // using those without a report.  So it doesn't seem especially urgent.
+#[allow(clippy::too_many_arguments)]
 pub async fn process_get_command(
     safe: &Safe,
     source: XorUrl,
@@ -125,6 +126,7 @@ pub async fn process_get_command(
     progress: ProgressIndicator,
     _preserve: bool,
     _output_fmt: OutputFmt,
+    flow_name: &str,
 ) -> Result<()> {
     let str_path = dst.unwrap_or_else(|| ".".to_string());
     let path = Path::new(&str_path);
@@ -132,8 +134,11 @@ pub async fn process_get_command(
     let mut overwrites: u64 = 0;
     let mut preserves: u64 = 0;
 
-    let (_version, processed_files) =
-        files_container_get_files(safe, &source, &str_path, |status| {
+    let (_version, processed_files) = files_container_get_files(
+        safe,
+        &source,
+        &str_path,
+        |status| {
             let mut overwrite = true;
             let mut mystatus = status.clone();
 
@@ -200,8 +205,10 @@ pub async fn process_get_command(
                 }
             }
             overwrite
-        })
-        .await?;
+        },
+        flow_name,
+    )
+    .await?;
 
     if processed_files.is_empty() && preserves == 0 {
         bail!("Path '{}' not found", path.display());
@@ -319,6 +326,7 @@ async fn files_container_get_files(
     url: &str,
     dirpath: &str,
     callback: impl FnMut(&FilesGetStatus) -> bool,
+    flow_name: &str,
 ) -> Result<(String, BTreeMap<String, (String, String)>)> {
     // Rather than returning a VersionHash, a String is returned, because there doesn't seem to be
     // a representation of an empty VersionHash just now. Not sure that it makes sense here to
@@ -326,7 +334,7 @@ async fn files_container_get_files(
     // caller. Previously we were returning 0 or a number, so it seems reasonable to return either
     // "0" or the VersionHash as a string (it implements the Display trait).
     debug!("Getting files in container {:?}", url);
-    let (version, files_map) = match safe.fetch(url, None).await? {
+    let (version, files_map) = match safe.fetch(url, None, flow_name).await? {
         SafeData::FilesContainer {
             version, files_map, ..
         } => (version.map_or("".to_string(), |v| v.to_string()), files_map),
@@ -360,7 +368,7 @@ async fn files_container_get_files(
     // surprising users.
     ensure_parent_dir_exists(&root)?;
 
-    let processed_files = files_map_get_files(safe, &files_map, &root, callback).await?;
+    let processed_files = files_map_get_files(safe, &files_map, &root, callback, flow_name).await?;
     Ok((version, processed_files))
 }
 
@@ -448,6 +456,7 @@ async fn files_map_get_files(
     files_map: &FilesMap,
     dirpath: &str,
     mut callback: impl FnMut(&FilesGetStatus) -> bool,
+    flow_name: &str,
 ) -> Result<BTreeMap<String, (String, String)>> {
     trace!("Fetching files from FilesMap");
 
@@ -531,7 +540,7 @@ async fn files_map_get_files(
         let xorurl = &details.getattr("link")?;
 
         // Download file
-        match download_file_from_net(safe, xorurl, abspath.as_path(), size).await {
+        match download_file_from_net(safe, xorurl, abspath.as_path(), size, flow_name).await {
             Ok(file_bytes_written) => {
                 processed_files.insert(path.to_string(), ("+".to_string(), xorurl.to_string()));
                 transfer_bytes_written += file_bytes_written;
@@ -616,7 +625,13 @@ fn denormalize_slashes(p: &str) -> String {
 // Downloads a file from the network to a given file path
 // xorurl must point to a file
 // size (in bytes) must be provided
-async fn download_file_from_net(safe: &Safe, xorurl: &str, path: &Path, size: u64) -> Result<u64> {
+async fn download_file_from_net(
+    safe: &Safe,
+    xorurl: &str,
+    path: &Path,
+    size: u64,
+    flow_name: &str,
+) -> Result<u64> {
     debug!("downloading file {} to {}", xorurl, path.display());
 
     // TODO: download the file by concurrently (spawning tasks/threads) pulling chunks.
@@ -630,7 +645,7 @@ async fn download_file_from_net(safe: &Safe, xorurl: &str, path: &Path, size: u6
     let mut stream = BufWriter::new(fh);
 
     // gets public or private, based on xorurl type
-    let filedata = files_get(safe, xorurl, None).await?;
+    let filedata = files_get(safe, xorurl, None, flow_name).await?;
     bytes_written += stream_write(&mut stream, &filedata, path)? as u64;
     rcvd += filedata.len() as u64;
     trace!("received {} bytes of {}", rcvd, size,);
@@ -683,10 +698,10 @@ fn create_dir_all(dir_path: &Path) -> Result<()> {
 
 /// # Get Public or Private file
 /// Get immutable files from the network.
-pub async fn files_get(safe: &Safe, url: &str, range: Range) -> Result<Vec<u8>> {
+pub async fn files_get(safe: &Safe, url: &str, range: Range, flow_name: &str) -> Result<Vec<u8>> {
     match SafeUrl::from_url(url)?.data_type() {
         DataType::File => {
-            let bytes = safe.files_get(url, range).await?;
+            let bytes = safe.files_get(url, range, flow_name).await?;
             Ok(bytes.chunk().to_vec())
         }
         _ => Err(eyre!("URL target is not immutable data")),

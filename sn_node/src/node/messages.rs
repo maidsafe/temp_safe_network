@@ -25,7 +25,13 @@ impl WireMsgUtils for WireMsg {
         let msg_payload =
             WireMsg::serialize_msg_payload(&msg).map_err(|_| Error::InvalidMessage)?;
 
-        let wire_msg = WireMsg::new_msg(MsgId::new(), msg_payload, MsgKind::Node(node.name()), dst);
+        let wire_msg = WireMsg::new_msg(
+            MsgId::new(),
+            "NODE_MSG_SINLGE_SRC".to_string(),
+            msg_payload,
+            MsgKind::Node(node.name()),
+            dst,
+        );
 
         #[cfg(feature = "test-utils")]
         let wire_msg = wire_msg.set_payload_debug(msg);

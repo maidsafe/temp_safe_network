@@ -82,10 +82,11 @@ pub async fn wallet_commander(
     output_fmt: OutputFmt,
     safe: &Safe,
     config: &Config,
+    flow_name: &str,
 ) -> Result<()> {
     match cmd {
         WalletSubCommands::Create {} => {
-            let wallet_xorurl = safe.wallet_create().await?;
+            let wallet_xorurl = safe.wallet_create(flow_name).await?;
 
             if OutputFmt::Pretty == output_fmt {
                 println!("Wallet created at: \"{}\"", wallet_xorurl);
@@ -101,7 +102,7 @@ pub async fn wallet_commander(
                 Some("...awaiting wallet address/location from STDIN stream..."),
             )?;
 
-            let balance = safe.wallet_balance(&target).await?;
+            let balance = safe.wallet_balance(&target, flow_name).await?;
 
             if OutputFmt::Pretty == output_fmt {
                 println!(
@@ -176,7 +177,7 @@ pub async fn wallet_commander(
                     "\nWARNING: --force flag set, hence skipping verification to check if \
                 supplied DBC has been already spent.\n"
                 );
-            } else if safe.is_dbc_spent(key_image).await? {
+            } else if safe.is_dbc_spent(key_image, flow_name).await? {
                 return Err(
                     eyre!("The supplied DBC has been already spent on the network.").suggestion(
                         "Please run the command again with the --force flag if you still \
@@ -186,7 +187,7 @@ pub async fn wallet_commander(
             }
 
             let (name, balance) = safe
-                .wallet_deposit(&wallet_url, name.as_deref(), &dbc, sk)
+                .wallet_deposit(&wallet_url, name.as_deref(), &dbc, sk, flow_name)
                 .await
                 .map_err(map_invalid_sk_error)?;
 
@@ -231,7 +232,7 @@ pub async fn wallet_commander(
             } else {
                 None
             };
-            let dbc = safe.wallet_reissue(&from, &amount, pk).await?;
+            let dbc = safe.wallet_reissue(&from, &amount, pk, flow_name).await?;
             let dbc_hex = dbc.to_hex()?;
 
             // Write the DBC to a file if the user requested it, but fall

@@ -27,18 +27,29 @@ const MULTIMAP_REMOVED_MARK: &[u8] = b"";
 
 impl Safe {
     /// Create a Multimap on the network
-    pub async fn multimap_create(&self, name: Option<XorName>, type_tag: u64) -> Result<XorUrl> {
+    pub async fn multimap_create(
+        &self,
+        name: Option<XorName>,
+        type_tag: u64,
+        flow_name: &str,
+    ) -> Result<XorUrl> {
         debug!("Creating a Multimap");
-        self.register_create(name, type_tag, ContentType::Multimap)
+        self.register_create(name, type_tag, ContentType::Multimap, flow_name)
             .await
     }
 
     /// Return the value of a Multimap on the network corresponding to the key provided
-    pub async fn multimap_get_by_key(&self, url: &str, key: &[u8]) -> Result<Multimap> {
+    pub async fn multimap_get_by_key(
+        &self,
+        url: &str,
+        key: &[u8],
+        flow_name: &str,
+    ) -> Result<Multimap> {
         debug!("Getting value by key from Multimap at: {}", url);
-        let safeurl = self.parse_and_resolve_url(url).await?;
+        let safeurl = self.parse_and_resolve_url(url, flow_name).await?;
 
-        self.fetch_multimap_values_by_key(&safeurl, key).await
+        self.fetch_multimap_values_by_key(&safeurl, key, flow_name)
+            .await
     }
 
     /// Return the value of a Multimap on the network corresponding to the hash provided
@@ -46,11 +57,13 @@ impl Safe {
         &self,
         url: &str,
         hash: EntryHash,
+        flow_name: &str,
     ) -> Result<MultimapKeyValue> {
         debug!("Getting value by hash from Multimap at: {}", url);
-        let safeurl = self.parse_and_resolve_url(url).await?;
+        let safeurl = self.parse_and_resolve_url(url, flow_name).await?;
 
-        self.fetch_multimap_value_by_hash(&safeurl, hash).await
+        self.fetch_multimap_value_by_hash(&safeurl, hash, flow_name)
+            .await
     }
 
     /// Fetch a multimap without resolving the URL, then filter it for all values matching a key.
@@ -60,8 +73,9 @@ impl Safe {
         &self,
         safeurl: &SafeUrl,
         key: &[u8],
+        flow_name: &str,
     ) -> Result<Multimap> {
-        let entries = self.fetch_multimap(safeurl).await?;
+        let entries = self.fetch_multimap(safeurl, flow_name).await?;
         Ok(entries
             .into_iter()
             .filter(|(_, (entry_key, _))| entry_key == key)
@@ -74,6 +88,7 @@ impl Safe {
         multimap_url: &str,
         entry: MultimapKeyValue,
         replace: BTreeSet<EntryHash>,
+        flow_name: &str,
     ) -> Result<EntryHash> {
         debug!("Inserting '{:?}' into Multimap at {}", entry, multimap_url);
         let serialised_entry = rmp_serde::to_vec_named(&entry).map_err(|err| {
@@ -103,10 +118,10 @@ impl Safe {
         let client = self.get_safe_client()?;
 
         let (entry_hash, op_batch) = client
-            .write_to_local_register(address, data, replace)
+            .write_to_local_register(address, data, replace, flow_name)
             .await?;
 
-        client.publish_register_ops(op_batch).await?;
+        client.publish_register_ops(op_batch, flow_name).await?;
 
         Ok(entry_hash)
     }
@@ -119,6 +134,7 @@ impl Safe {
         &self,
         url: &str,
         to_remove: BTreeSet<EntryHash>,
+        flow_name: &str,
     ) -> Result<EntryHash> {
         debug!("Removing from Multimap at {}: {:?}", url, to_remove);
         let safeurl = SafeUrl::from_url(url)?;
@@ -140,10 +156,15 @@ impl Safe {
         let client = self.get_safe_client()?;
 
         let (entry_hash, op_batch) = client
-            .write_to_local_register(address, MULTIMAP_REMOVED_MARK.to_vec(), to_remove)
+            .write_to_local_register(
+                address,
+                MULTIMAP_REMOVED_MARK.to_vec(),
+                to_remove,
+                flow_name,
+            )
             .await?;
 
-        client.publish_register_ops(op_batch).await?;
+        client.publish_register_ops(op_batch, flow_name).await?;
 
         Ok(entry_hash)
     }
@@ -151,8 +172,12 @@ impl Safe {
     // Crate's helper to return the value of a Multimap on
     // the network without resolving the SafeUrl,
     // filtering by hash if a version is provided
-    pub(crate) async fn fetch_multimap(&self, safeurl: &SafeUrl) -> Result<Multimap> {
-        let entries = match self.register_fetch_entries(safeurl).await {
+    pub(crate) async fn fetch_multimap(
+        &self,
+        safeurl: &SafeUrl,
+        flow_name: &str,
+    ) -> Result<Multimap> {
+        let entries = match self.register_fetch_entries(safeurl, flow_name).await {
             Ok(data) => {
                 debug!("Multimap retrieved with {} entries...", data.len());
                 Ok(data)
@@ -195,8 +220,9 @@ impl Safe {
         &self,
         safeurl: &SafeUrl,
         hash: EntryHash,
+        flow_name: &str,
     ) -> Result<MultimapKeyValue> {
-        let entry = match self.register_fetch_entry(safeurl, hash).await {
+        let entry = match self.register_fetch_entry(safeurl, hash, flow_name).await {
             Ok(data) => {
                 debug!("Multimap retrieved...");
                 Ok(data)
@@ -233,16 +259,19 @@ impl Safe {
 mod tests {
     use crate::app::test_helpers::new_safe_instance;
     use anyhow::Result;
+    use function_name::named;
     use std::collections::BTreeSet;
 
     #[tokio::test]
+    #[named]
     async fn test_multimap_create() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
 
-        let xorurl = safe.multimap_create(None, 25_000).await?;
+        let xorurl = safe.multimap_create(None, 25_000, flow_name).await?;
 
         let key = b"".to_vec();
-        let received_data = safe.multimap_get_by_key(&xorurl, &key).await?;
+        let received_data = safe.multimap_get_by_key(&xorurl, &key, flow_name).await?;
 
         assert_eq!(received_data, Default::default());
 
@@ -250,7 +279,9 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_multimap_insert() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
         let key = b"key".to_vec();
         let val = b"value".to_vec();
@@ -259,15 +290,15 @@ mod tests {
         let val2 = b"value2".to_vec();
         let key_val2 = (key.clone(), val2.clone());
 
-        let xorurl = safe.multimap_create(None, 25_000).await?;
+        let xorurl = safe.multimap_create(None, 25_000, flow_name).await?;
 
-        let _ = safe.multimap_get_by_key(&xorurl, &key).await?;
+        let _ = safe.multimap_get_by_key(&xorurl, &key, flow_name).await?;
 
         let hash = safe
-            .multimap_insert(&xorurl, key_val.clone(), BTreeSet::new())
+            .multimap_insert(&xorurl, key_val.clone(), BTreeSet::new(), flow_name)
             .await?;
 
-        let received_data = safe.multimap_get_by_key(&xorurl, &key).await?;
+        let received_data = safe.multimap_get_by_key(&xorurl, &key, flow_name).await?;
 
         assert_eq!(
             received_data,
@@ -277,10 +308,10 @@ mod tests {
         // Let's now test an insert which replace the previous value for a key
         let hashes_to_replace = vec![hash].into_iter().collect();
         let hash2 = safe
-            .multimap_insert(&xorurl, key_val2.clone(), hashes_to_replace)
+            .multimap_insert(&xorurl, key_val2.clone(), hashes_to_replace, flow_name)
             .await?;
 
-        let received_data = safe.multimap_get_by_key(&xorurl, &key).await?;
+        let received_data = safe.multimap_get_by_key(&xorurl, &key, flow_name).await?;
 
         assert_eq!(
             received_data,
@@ -291,7 +322,9 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_multimap_get_by_hash() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
         let key = b"key".to_vec();
         let val = b"value".to_vec();
@@ -300,22 +333,22 @@ mod tests {
         let val2 = b"value2".to_vec();
         let key_val2 = (key2.clone(), val2.clone());
 
-        let xorurl = safe.multimap_create(None, 25_000).await?;
+        let xorurl = safe.multimap_create(None, 25_000, flow_name).await?;
 
-        let _ = safe.multimap_get_by_key(&xorurl, &key).await?;
+        let _ = safe.multimap_get_by_key(&xorurl, &key, flow_name).await?;
 
         let hash = safe
-            .multimap_insert(&xorurl, key_val.clone(), BTreeSet::new())
+            .multimap_insert(&xorurl, key_val.clone(), BTreeSet::new(), flow_name)
             .await?;
         let hash2 = safe
-            .multimap_insert(&xorurl, key_val2.clone(), BTreeSet::new())
+            .multimap_insert(&xorurl, key_val2.clone(), BTreeSet::new(), flow_name)
             .await?;
 
-        let received_data = safe.multimap_get_by_hash(&xorurl, hash).await?;
+        let received_data = safe.multimap_get_by_hash(&xorurl, hash, flow_name).await?;
 
         assert_eq!(received_data, key_val.clone());
 
-        let received_data = safe.multimap_get_by_hash(&xorurl, hash2).await?;
+        let received_data = safe.multimap_get_by_hash(&xorurl, hash2, flow_name).await?;
 
         assert_eq!(received_data, key_val2.clone());
 

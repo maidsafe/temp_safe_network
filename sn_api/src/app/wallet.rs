@@ -62,8 +62,10 @@ impl Safe {
     /// Create an empty wallet and return its XOR-URL.
     ///
     /// A wallet is stored on a private register.
-    pub async fn wallet_create(&self) -> Result<XorUrl> {
-        let xorurl = self.multimap_create(None, WALLET_TYPE_TAG).await?;
+    pub async fn wallet_create(&self, flow_name: &str) -> Result<XorUrl> {
+        let xorurl = self
+            .multimap_create(None, WALLET_TYPE_TAG, flow_name)
+            .await?;
 
         let mut safeurl = SafeUrl::from_url(&xorurl)?;
         safeurl.set_content_type(ContentType::Wallet)?;
@@ -85,6 +87,7 @@ impl Safe {
         spendable_name: Option<&str>,
         dbc: &Dbc,
         secret_key: Option<bls::SecretKey>,
+        flow_name: &str,
     ) -> Result<(String, Token)> {
         let dbc_to_deposit = if dbc.is_bearer() {
             if secret_key.is_some() {
@@ -128,8 +131,8 @@ impl Safe {
             .amount_secrets_bearer()
             .map(|amount_secrets| amount_secrets.amount())?;
 
-        let safeurl = self.parse_and_resolve_url(wallet_url).await?;
-        self.insert_dbc_into_wallet(&safeurl, &dbc_to_deposit, spendable_name.clone())
+        let safeurl = self.parse_and_resolve_url(wallet_url, flow_name).await?;
+        self.insert_dbc_into_wallet(&safeurl, &dbc_to_deposit, spendable_name.clone(), flow_name)
             .await?;
 
         debug!(
@@ -141,9 +144,9 @@ impl Safe {
     }
 
     /// Verify if the provided DBC's key_image has been already spent on the network.
-    pub async fn is_dbc_spent(&self, key_image: KeyImage) -> Result<bool> {
+    pub async fn is_dbc_spent(&self, key_image: KeyImage, flow_name: &str) -> Result<bool> {
         let client = self.get_safe_client()?;
-        let spent_proof_shares = client.spent_proof_shares(key_image).await?;
+        let spent_proof_shares = client.spent_proof_shares(key_image, flow_name).await?;
 
         // We obtain a set of unique spent transactions hash the shares belong to
         let spent_transactions: BTreeSet<Hash> = spent_proof_shares
@@ -176,15 +179,23 @@ impl Safe {
 
     /// Fetch a wallet from a Url performing all type of URL resolution required.
     /// Return the set of spendable DBCs found in the wallet.
-    pub async fn wallet_get(&self, wallet_url: &str) -> Result<WalletSpendableDbcs> {
-        let safeurl = self.parse_and_resolve_url(wallet_url).await?;
+    pub async fn wallet_get(
+        &self,
+        wallet_url: &str,
+        flow_name: &str,
+    ) -> Result<WalletSpendableDbcs> {
+        let safeurl = self.parse_and_resolve_url(wallet_url, flow_name).await?;
         debug!("Wallet URL was parsed and resolved to: {}", safeurl);
-        self.fetch_wallet(&safeurl).await
+        self.fetch_wallet(&safeurl, flow_name).await
     }
 
     /// Fetch a wallet from a `SafeUrl` without performing any type of URL resolution
-    pub(crate) async fn fetch_wallet(&self, safeurl: &SafeUrl) -> Result<WalletSpendableDbcs> {
-        let entries = match self.fetch_multimap(safeurl).await {
+    pub(crate) async fn fetch_wallet(
+        &self,
+        safeurl: &SafeUrl,
+        flow_name: &str,
+    ) -> Result<WalletSpendableDbcs> {
+        let entries = match self.fetch_multimap(safeurl, flow_name).await {
             Ok(entries) => entries,
             Err(Error::AccessDenied(_)) => {
                 return Err(Error::AccessDenied(format!(
@@ -210,7 +221,7 @@ impl Safe {
         for (entry_hash, (key, value)) in &entries {
             let xorurl_str = std::str::from_utf8(value)?;
             let dbc_xorurl = SafeUrl::from_xorurl(xorurl_str)?;
-            let dbc_bytes = self.fetch_data(&dbc_xorurl, None).await?;
+            let dbc_bytes = self.fetch_data(&dbc_xorurl, None, flow_name).await?;
 
             let dbc: Dbc = match rmp_serde::from_slice(&dbc_bytes) {
                 Ok(dbc) => dbc,
@@ -228,11 +239,11 @@ impl Safe {
     }
 
     /// Check the total balance of a wallet found at a given XOR-URL
-    pub async fn wallet_balance(&self, wallet_url: &str) -> Result<Token> {
+    pub async fn wallet_balance(&self, wallet_url: &str, flow_name: &str) -> Result<Token> {
         debug!("Finding total wallet balance for: {}", wallet_url);
 
         // Let's get the list of balances from the Wallet
-        let balances = self.wallet_get(wallet_url).await?;
+        let balances = self.wallet_get(wallet_url, flow_name).await?;
         debug!("Spendable balances to check: {:?}", balances);
 
         // Iterate through the DBCs adding up the amounts
@@ -279,6 +290,7 @@ impl Safe {
         wallet_url: &str,
         amount: &str,
         owner_public_key: Option<bls::PublicKey>,
+        flow_name: &str,
     ) -> Result<Dbc> {
         debug!(
             "Reissuing DBC from wallet at {} for an amount of {} tokens",
@@ -290,6 +302,7 @@ impl Safe {
                 [(amount.to_string(), owner_public_key)]
                     .into_iter()
                     .collect(),
+                flow_name,
             )
             .await?;
 
@@ -310,6 +323,7 @@ impl Safe {
         &self,
         wallet_url: &str,
         outputs: Vec<(String, Option<bls::PublicKey>)>,
+        flow_name: &str,
     ) -> Result<Vec<Dbc>> {
         let mut total_output_amount = Token::zero();
         let mut outputs_owners = Vec::<(Token, OwnerOnce)>::new();
@@ -341,8 +355,8 @@ impl Safe {
             outputs_owners.push((output_amount, output_owner));
         }
 
-        let safeurl = self.parse_and_resolve_url(wallet_url).await?;
-        let spendable_dbcs = self.fetch_wallet(&safeurl).await?;
+        let safeurl = self.parse_and_resolve_url(wallet_url, flow_name).await?;
+        let spendable_dbcs = self.fetch_wallet(&safeurl, flow_name).await?;
 
         // We'll combine one or more input DBCs and reissue:
         // - one output DBC for the recipient,
@@ -390,7 +404,12 @@ impl Safe {
 
         // We can now reissue the output DBCs
         let (output_dbcs, change_dbc) = self
-            .reissue_dbcs(input_dbcs_to_spend, outputs_owners, change_amount)
+            .reissue_dbcs(
+                input_dbcs_to_spend,
+                outputs_owners,
+                change_amount,
+                flow_name,
+            )
             .await?;
 
         if output_dbcs.is_empty() {
@@ -404,12 +423,13 @@ impl Safe {
                 &safeurl,
                 &change_dbc,
                 format!("change-dbc-{}", &hex::encode(change_dbc.hash())[0..8]),
+                flow_name,
             )
             .await?;
         }
 
         // (virtually) remove input DBCs in the source wallet
-        self.multimap_remove(&safeurl.to_string(), input_dbcs_entries_hash)
+        self.multimap_remove(&safeurl.to_string(), input_dbcs_entries_hash, flow_name)
             .await?;
 
         Ok(output_dbcs.into_iter().map(|(dbc, _, _)| dbc).collect())
@@ -425,6 +445,7 @@ impl Safe {
         safeurl: &SafeUrl,
         dbc: &Dbc,
         spendable_name: String,
+        flow_name: &str,
     ) -> Result<()> {
         if !dbc.is_bearer() {
             return Err(Error::InvalidInput("Only bearer DBC's are supported at this point by the wallet. Please deposit a bearer DBC's.".to_string()));
@@ -437,11 +458,11 @@ impl Safe {
             ))
         })?);
 
-        let dbc_xorurl = self.store_bytes(dbc_bytes, None).await?;
+        let dbc_xorurl = self.store_bytes(dbc_bytes, None, flow_name).await?;
 
         let entry = (spendable_name.into_bytes(), dbc_xorurl.into_bytes());
         let _entry_hash = self
-            .multimap_insert(&safeurl.to_string(), entry, BTreeSet::default())
+            .multimap_insert(&safeurl.to_string(), entry, BTreeSet::default(), flow_name)
             .await?;
 
         Ok(())
@@ -454,6 +475,7 @@ impl Safe {
         input_dbcs: Vec<Dbc>,
         outputs: Vec<(Token, OwnerOnce)>,
         change_amount: Token,
+        flow_name: &str,
     ) -> Result<(Vec<(Dbc, OwnerOnce, AmountSecrets)>, Option<Dbc>)> {
         // TODO: enable the use of decoys
         let mut tx_builder = TransactionBuilder::default()
@@ -497,10 +519,11 @@ impl Safe {
                         tx.clone(),
                         spent_proofs.clone(),
                         spent_transactions.clone(),
+                        flow_name,
                     )
                     .await?;
 
-                let spent_proof_shares = client.spent_proof_shares(key_image).await?;
+                let spent_proof_shares = client.spent_proof_shares(key_image, flow_name).await?;
 
                 // TODO: we temporarilly filter the spent proof shares which correspond to the TX we
                 // are spending now. This is because current implementation of Spentbook allows
@@ -574,91 +597,103 @@ mod tests {
         new_safe_instance_with_dbc, new_safe_instance_with_dbc_owner, GENESIS_DBC,
     };
     use anyhow::{anyhow, Result};
+    use function_name::named;
     use sn_client::{Error as ClientError, ErrorMsg};
     use sn_dbc::{Error as DbcError, Owner};
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_create() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
-        let wallet_xorurl = safe.wallet_create().await?;
+        let wallet_xorurl = safe.wallet_create(flow_name).await?;
         assert!(wallet_xorurl.starts_with("safe://"));
 
-        let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
+        let current_balance = safe.wallet_balance(&wallet_xorurl, flow_name).await?;
         assert_eq!(current_balance, Token::zero());
 
         Ok(())
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_deposit_with_bearer_dbc() -> Result<()> {
+        let flow_name = function_name!();
         let (safe, dbc, dbc_balance) = new_safe_instance_with_dbc().await?;
-        let wallet_xorurl = safe.wallet_create().await?;
+        let wallet_xorurl = safe.wallet_create(flow_name).await?;
 
         let (_, amount) = safe
-            .wallet_deposit(&wallet_xorurl, None, &dbc, None)
+            .wallet_deposit(&wallet_xorurl, None, &dbc, None, flow_name)
             .await?;
         assert_eq!(amount, dbc_balance);
 
-        let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
+        let wallet_balances = safe.wallet_get(&wallet_xorurl, flow_name).await?;
         assert_eq!(wallet_balances.len(), 1);
 
         Ok(())
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_deposit_with_name() -> Result<()> {
+        let flow_name = function_name!();
         let (safe, dbc, dbc_balance) = new_safe_instance_with_dbc().await?;
-        let wallet_xorurl = safe.wallet_create().await?;
+        let wallet_xorurl = safe.wallet_create(flow_name).await?;
         let (name, amount) = safe
-            .wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None)
+            .wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None, flow_name)
             .await?;
         assert_eq!(name, "my-dbc");
         assert_eq!(amount, dbc_balance);
 
-        let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
+        let wallet_balances = safe.wallet_get(&wallet_xorurl, flow_name).await?;
         assert!(wallet_balances.contains_key("my-dbc"));
 
         Ok(())
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_deposit_with_no_name() -> Result<()> {
+        let flow_name = function_name!();
         let (safe, dbc, dbc_balance) = new_safe_instance_with_dbc().await?;
-        let wallet_xorurl = safe.wallet_create().await?;
+        let wallet_xorurl = safe.wallet_create(flow_name).await?;
 
         let (name, amount) = safe
-            .wallet_deposit(&wallet_xorurl, None, &dbc, None)
+            .wallet_deposit(&wallet_xorurl, None, &dbc, None, flow_name)
             .await?;
         assert_eq!(amount, dbc_balance);
         assert_eq!(name, format!("dbc-{}", &hex::encode(dbc.hash())[0..8]));
 
-        let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
+        let wallet_balances = safe.wallet_get(&wallet_xorurl, flow_name).await?;
         assert!(wallet_balances.contains_key(&name));
 
         Ok(())
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_deposit_with_owned_dbc() -> Result<()> {
+        let flow_name = function_name!();
         let (safe, dbc, _) = new_safe_instance_with_dbc().await?;
-        let wallet_xorurl = safe.wallet_create().await?;
+        let wallet_xorurl = safe.wallet_create(flow_name).await?;
         let sk = bls::SecretKey::random();
 
-        safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None)
+        safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None, flow_name)
             .await?;
         let owned_dbc = safe
-            .wallet_reissue(&wallet_xorurl, "2.35", Some(sk.public_key()))
+            .wallet_reissue(&wallet_xorurl, "2.35", Some(sk.public_key()), flow_name)
             .await?;
         safe.wallet_deposit(
             &wallet_xorurl,
             Some("owned-dbc"),
             &owned_dbc,
             Some(sk.clone()),
+            flow_name,
         )
         .await?;
 
         let owner = Owner::from(sk);
-        let balances = safe.wallet_get(&wallet_xorurl).await?;
+        let balances = safe.wallet_get(&wallet_xorurl, flow_name).await?;
         let (owned_dbc, _) = balances
             .get("owned-dbc")
             .ok_or_else(|| anyhow!("Couldn't read DBC from wallet"))?;
@@ -668,18 +703,26 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_deposit_with_owned_dbc_without_providing_secret_key() -> Result<()> {
+        let flow_name = function_name!();
         let (safe, dbc, _) = new_safe_instance_with_dbc().await?;
-        let wallet_xorurl = safe.wallet_create().await?;
+        let wallet_xorurl = safe.wallet_create(flow_name).await?;
         let pk = bls::SecretKey::random().public_key();
 
-        safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None)
+        safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None, flow_name)
             .await?;
         let owned_dbc = safe
-            .wallet_reissue(&wallet_xorurl, "2.35", Some(pk))
+            .wallet_reissue(&wallet_xorurl, "2.35", Some(pk), flow_name)
             .await?;
         let result = safe
-            .wallet_deposit(&wallet_xorurl, Some("owned-dbc"), &owned_dbc, None)
+            .wallet_deposit(
+                &wallet_xorurl,
+                Some("owned-dbc"),
+                &owned_dbc,
+                None,
+                flow_name,
+            )
             .await;
         match result {
             Ok(_) => Err(anyhow!(
@@ -694,20 +737,28 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_deposit_with_owned_dbc_with_invalid_secret_key() -> Result<()> {
+        let flow_name = function_name!();
         let (safe, dbc, _) = new_safe_instance_with_dbc().await?;
-        let wallet_xorurl = safe.wallet_create().await?;
+        let wallet_xorurl = safe.wallet_create(flow_name).await?;
         let sk = bls::SecretKey::random();
         let sk2 = bls::SecretKey::random();
         let pk = sk.public_key();
 
-        safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None)
+        safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None, flow_name)
             .await?;
         let owned_dbc = safe
-            .wallet_reissue(&wallet_xorurl, "2.35", Some(pk))
+            .wallet_reissue(&wallet_xorurl, "2.35", Some(pk), flow_name)
             .await?;
         let result = safe
-            .wallet_deposit(&wallet_xorurl, Some("owned-dbc"), &owned_dbc, Some(sk2))
+            .wallet_deposit(
+                &wallet_xorurl,
+                Some("owned-dbc"),
+                &owned_dbc,
+                Some(sk2),
+                flow_name,
+            )
             .await;
         match result {
             Ok(_) => Err(anyhow!(
@@ -721,13 +772,15 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_deposit_with_bearer_dbc_and_secret_key() -> Result<()> {
+        let flow_name = function_name!();
         let (safe, dbc, _) = new_safe_instance_with_dbc().await?;
-        let wallet_xorurl = safe.wallet_create().await?;
+        let wallet_xorurl = safe.wallet_create(flow_name).await?;
         let sk = bls::SecretKey::random();
 
         let result = safe
-            .wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, Some(sk))
+            .wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, Some(sk), flow_name)
             .await;
         match result {
             Ok(_) => Err(anyhow!(
@@ -745,16 +798,18 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_reissue_with_deposited_owned_dbc() -> Result<()> {
+        let flow_name = function_name!();
         let (safe, dbc, _) = new_safe_instance_with_dbc().await?;
-        let wallet_xorurl = safe.wallet_create().await?;
-        let wallet2_xorurl = safe.wallet_create().await?;
+        let wallet_xorurl = safe.wallet_create(flow_name).await?;
+        let wallet2_xorurl = safe.wallet_create(flow_name).await?;
         let sk = bls::SecretKey::random();
 
-        safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None)
+        safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None, flow_name)
             .await?;
         let owned_dbc = safe
-            .wallet_reissue(&wallet_xorurl, "2.35", Some(sk.public_key()))
+            .wallet_reissue(&wallet_xorurl, "2.35", Some(sk.public_key()), flow_name)
             .await?;
         // Deposit the owned DBC in another wallet because it's easier to ensure this owned DBC
         // will be used as an input in the next reissue rather than having to be precise about
@@ -764,10 +819,13 @@ mod tests {
             Some("owned-dbc"),
             &owned_dbc,
             Some(sk.clone()),
+            flow_name,
         )
         .await?;
 
-        let result = safe.wallet_reissue(&wallet2_xorurl, "2", None).await;
+        let result = safe
+            .wallet_reissue(&wallet2_xorurl, "2", None, flow_name)
+            .await;
         match result {
             Ok(_) => {
                 // For this case, we just want to make sure the reissue went through without an
@@ -781,23 +839,31 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_balance() -> Result<()> {
+        let flow_name = function_name!();
         let (safe, dbc1, dbc1_balance) = new_safe_instance_with_dbc().await?;
         let (dbc2, dbc2_balance) = get_next_bearer_dbc().await?;
-        let wallet_xorurl = safe.wallet_create().await?;
+        let wallet_xorurl = safe.wallet_create(flow_name).await?;
 
         // We deposit the first DBC
-        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc1, None)
+        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc1, None, flow_name)
             .await?;
 
-        let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
+        let current_balance = safe.wallet_balance(&wallet_xorurl, flow_name).await?;
         assert_eq!(current_balance, dbc1_balance);
 
         // ...and a second DBC
-        safe.wallet_deposit(&wallet_xorurl, Some("my-second-dbc"), &dbc2, None)
-            .await?;
+        safe.wallet_deposit(
+            &wallet_xorurl,
+            Some("my-second-dbc"),
+            &dbc2,
+            None,
+            flow_name,
+        )
+        .await?;
 
-        let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
+        let current_balance = safe.wallet_balance(&wallet_xorurl, flow_name).await?;
         assert_eq!(
             current_balance.as_nano(),
             dbc1_balance.as_nano() + dbc2_balance.as_nano()
@@ -807,9 +873,11 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_balance_overflow() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
-        let wallet_xorurl = safe.wallet_create().await?;
+        let wallet_xorurl = safe.wallet_create(flow_name).await?;
 
         for i in 0..5 {
             safe.wallet_deposit(
@@ -817,12 +885,13 @@ mod tests {
                 Some(&format!("my-dbc-#{}", i)),
                 &GENESIS_DBC,
                 None,
+                flow_name,
             )
             .await?;
         }
 
         let genesis_balance = 4_525_524_120_000_000_000;
-        match safe.wallet_balance(&wallet_xorurl).await {
+        match safe.wallet_balance(&wallet_xorurl, flow_name).await {
             Err(Error::ContentError(msg)) => {
                 assert_eq!(
                     msg,
@@ -840,18 +909,26 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_get() -> Result<()> {
+        let flow_name = function_name!();
         let (safe, dbc1, dbc1_balance) = new_safe_instance_with_dbc().await?;
         let (dbc2, dbc2_balance) = get_next_bearer_dbc().await?;
-        let wallet_xorurl = safe.wallet_create().await?;
+        let wallet_xorurl = safe.wallet_create(flow_name).await?;
 
-        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc1, None)
+        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc1, None, flow_name)
             .await?;
 
-        safe.wallet_deposit(&wallet_xorurl, Some("my-second-dbc"), &dbc2, None)
-            .await?;
+        safe.wallet_deposit(
+            &wallet_xorurl,
+            Some("my-second-dbc"),
+            &dbc2,
+            None,
+            flow_name,
+        )
+        .await?;
 
-        let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
+        let wallet_balances = safe.wallet_get(&wallet_xorurl, flow_name).await?;
 
         let (dbc1_read, _) = wallet_balances
             .get("my-first-dbc")
@@ -879,14 +956,20 @@ mod tests {
     #[tokio::test]
     async fn test_wallet_get_not_owned_wallet() -> Result<()> {
         let (safe, dbc, _) = new_safe_instance_with_dbc().await?;
-        let wallet_xorurl = safe.wallet_create().await?;
+        let wallet_xorurl = safe.wallet_create("NONE").await?;
 
-        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc, None)
-            .await?;
+        safe.wallet_deposit(
+            &wallet_xorurl,
+            Some("my-first-dbc"),
+            &dbc,
+            None,
+            "NONE NONONO",
+        )
+        .await?;
 
         // test it fails to get a not owned wallet
         let read_only_safe = new_read_only_safe_instance().await?;
-        match read_only_safe.wallet_get(&wallet_xorurl).await {
+        match read_only_safe.wallet_get(&wallet_xorurl, "NONE NONO").await {
             Err(Error::AccessDenied(msg)) => {
                 assert_eq!(
                     msg,
@@ -900,42 +983,65 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_get_non_compatible_content() -> Result<()> {
+        let flow_name = function_name!();
         let (safe, dbc, dbc_balance) = new_safe_instance_with_dbc().await?;
-        let wallet_xorurl = safe.wallet_create().await?;
+        let wallet_xorurl = safe.wallet_create(flow_name).await?;
 
-        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc, None)
+        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc, None, flow_name)
             .await?;
 
         // We insert an entry (to its underlying data type, i.e. the Multimap) which is
         // not a valid serialised DBC, thus making part of its content incompatible/corrupted.
-        let corrupted_dbc_xorurl = safe.store_bytes(Bytes::from_static(b"bla"), None).await?;
+        let corrupted_dbc_xorurl = safe
+            .store_bytes(Bytes::from_static(b"bla"), None, flow_name)
+            .await?;
         let entry = (b"corrupted-dbc".to_vec(), corrupted_dbc_xorurl.into_bytes());
-        safe.multimap_insert(&wallet_xorurl, entry, BTreeSet::default())
+        safe.multimap_insert(&wallet_xorurl, entry, BTreeSet::default(), flow_name)
             .await?;
 
         // Now check the Wallet can still be read and the corrupted entry is ignored
-        let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
+        let current_balance = safe.wallet_balance(&wallet_xorurl, flow_name).await?;
         assert_eq!(current_balance, dbc_balance);
 
         Ok(())
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_reissue_with_multiple_input_dbcs() -> Result<()> {
+        let flow_name = function_name!();
         let (safe, dbc1, dbc1_balance) = new_safe_instance_with_dbc().await?;
         let (dbc2, dbc2_balance) = get_next_bearer_dbc().await?;
-        let wallet_xorurl = safe.wallet_create().await?;
+        let wallet_xorurl = safe.wallet_create(flow_name).await?;
 
-        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-1"), &dbc1, None)
-            .await?;
-        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-2"), &dbc2, None)
-            .await?;
+        safe.wallet_deposit(
+            &wallet_xorurl,
+            Some("deposited-dbc-1"),
+            &dbc1,
+            None,
+            flow_name,
+        )
+        .await?;
+        safe.wallet_deposit(
+            &wallet_xorurl,
+            Some("deposited-dbc-2"),
+            &dbc2,
+            None,
+            flow_name,
+        )
+        .await?;
 
         let amount_to_reissue =
             Token::from_nano(dbc1_balance.as_nano() + dbc2_balance.as_nano() - 100);
         let output_dbc = safe
-            .wallet_reissue(&wallet_xorurl, &amount_to_reissue.to_string(), None)
+            .wallet_reissue(
+                &wallet_xorurl,
+                &amount_to_reissue.to_string(),
+                None,
+                flow_name,
+            )
             .await?;
 
         let output_balance = output_dbc
@@ -943,10 +1049,10 @@ mod tests {
             .map_err(|err| anyhow!("Couldn't read balance from output DBC: {:?}", err))?;
         assert_eq!(output_balance.amount(), amount_to_reissue);
 
-        let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
+        let current_balance = safe.wallet_balance(&wallet_xorurl, flow_name).await?;
         assert_eq!(current_balance, Token::from_nano(100));
 
-        let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
+        let wallet_balances = safe.wallet_get(&wallet_xorurl, flow_name).await?;
 
         assert_eq!(wallet_balances.len(), 1);
 
@@ -963,14 +1069,24 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_reissue_with_single_input_dbc() -> Result<()> {
+        let flow_name = function_name!();
         let (safe, dbc, dbc_balance) = new_safe_instance_with_dbc().await?;
-        let wallet_xorurl = safe.wallet_create().await?;
+        let wallet_xorurl = safe.wallet_create(flow_name).await?;
 
-        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-1"), &dbc, None)
+        safe.wallet_deposit(
+            &wallet_xorurl,
+            Some("deposited-dbc-1"),
+            &dbc,
+            None,
+            flow_name,
+        )
+        .await?;
+
+        let output_dbc = safe
+            .wallet_reissue(&wallet_xorurl, "1", None, flow_name)
             .await?;
-
-        let output_dbc = safe.wallet_reissue(&wallet_xorurl, "1", None).await?;
 
         let output_balance = output_dbc
             .amount_secrets_bearer()
@@ -978,10 +1094,10 @@ mod tests {
         assert_eq!(output_balance.amount(), Token::from_nano(1_000_000_000));
 
         let change_amount = Token::from_nano(dbc_balance.as_nano() - 1_000_000_000);
-        let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
+        let current_balance = safe.wallet_balance(&wallet_xorurl, flow_name).await?;
         assert_eq!(current_balance, change_amount);
 
-        let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
+        let wallet_balances = safe.wallet_get(&wallet_xorurl, flow_name).await?;
 
         assert_eq!(wallet_balances.len(), 1);
 
@@ -998,19 +1114,29 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_reissue_with_persistent_dbc_owner() -> Result<()> {
+        let flow_name = function_name!();
         let (safe, dbc_owner) = new_safe_instance_with_dbc_owner(
             "3917ad935714cf1e71b9b5e2831684811e83acc6c10f030031fe886292152e83",
         )
         .await?;
-        let wallet_xorurl = safe.wallet_create().await?;
+        let wallet_xorurl = safe.wallet_create(flow_name).await?;
 
         let (_safe, dbc, _) = new_safe_instance_with_dbc().await?;
-        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-1"), &dbc, None)
-            .await?;
+        safe.wallet_deposit(
+            &wallet_xorurl,
+            Some("deposited-dbc-1"),
+            &dbc,
+            None,
+            flow_name,
+        )
+        .await?;
 
-        let _ = safe.wallet_reissue(&wallet_xorurl, "1", None).await?;
-        let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
+        let _ = safe
+            .wallet_reissue(&wallet_xorurl, "1", None, flow_name)
+            .await?;
+        let wallet_balances = safe.wallet_get(&wallet_xorurl, flow_name).await?;
 
         let (_, (change_dbc_read, _)) = wallet_balances
             .iter()
@@ -1022,16 +1148,26 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_reissue_with_owned_dbc() -> Result<()> {
+        let flow_name = function_name!();
         let (safe, dbc, _) = new_safe_instance_with_dbc().await?;
-        let wallet_xorurl = safe.wallet_create().await?;
+        let wallet_xorurl = safe.wallet_create(flow_name).await?;
 
-        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-1"), &dbc, None)
-            .await?;
+        safe.wallet_deposit(
+            &wallet_xorurl,
+            Some("deposited-dbc-1"),
+            &dbc,
+            None,
+            flow_name,
+        )
+        .await?;
 
         let pk = bls::SecretKey::random().public_key();
         let owner = Owner::from(pk);
-        let output_dbc = safe.wallet_reissue(&wallet_xorurl, "1", Some(pk)).await?;
+        let output_dbc = safe
+            .wallet_reissue(&wallet_xorurl, "1", Some(pk), flow_name)
+            .await?;
 
         // We have verified transaction details in other tests. In this test, we're just concerned
         // with the owner being assigned correctly.
@@ -1041,11 +1177,13 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_not_enough_balance() -> Result<()> {
+        let flow_name = function_name!();
         let (safe, dbc, dbc_balance) = new_safe_instance_with_dbc().await?;
-        let wallet_xorurl = safe.wallet_create().await?;
+        let wallet_xorurl = safe.wallet_create(flow_name).await?;
 
-        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc"), &dbc, None)
+        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc"), &dbc, None, flow_name)
             .await?;
 
         match safe
@@ -1053,6 +1191,7 @@ mod tests {
                 &wallet_xorurl,
                 &Token::from_nano(dbc_balance.as_nano() + 1).to_string(),
                 None,
+                flow_name,
             )
             .await
         {
@@ -1066,11 +1205,16 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_reissue_invalid_amount() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
-        let wallet_xorurl = safe.wallet_create().await?;
+        let wallet_xorurl = safe.wallet_create(flow_name).await?;
 
-        match safe.wallet_reissue(&wallet_xorurl, "0", None).await {
+        match safe
+            .wallet_reissue(&wallet_xorurl, "0", None, flow_name)
+            .await
+        {
             Err(Error::InvalidAmount(msg)) => {
                 assert_eq!(
                     msg,
@@ -1084,23 +1228,29 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_reissue_with_non_compatible_content() -> Result<()> {
+        let flow_name = function_name!();
         let (safe, dbc, dbc_balance) = new_safe_instance_with_dbc().await?;
-        let wallet_xorurl = safe.wallet_create().await?;
+        let wallet_xorurl = safe.wallet_create(flow_name).await?;
 
-        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc, None)
+        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc, None, flow_name)
             .await?;
 
         // We insert an entry (to its underlying data type, i.e. the Multimap) which is
         // not a valid serialised DBC, thus making part of its content incompatible/corrupted.
-        let corrupted_dbc_xorurl = safe.store_bytes(Bytes::from_static(b"bla"), None).await?;
+        let corrupted_dbc_xorurl = safe
+            .store_bytes(Bytes::from_static(b"bla"), None, flow_name)
+            .await?;
         let entry = (b"corrupted-dbc".to_vec(), corrupted_dbc_xorurl.into_bytes());
-        safe.multimap_insert(&wallet_xorurl, entry, BTreeSet::default())
+        safe.multimap_insert(&wallet_xorurl, entry, BTreeSet::default(), flow_name)
             .await?;
 
         // Now check we can still reissue from the wallet and the corrupted entry is ignored
-        let _ = safe.wallet_reissue(&wallet_xorurl, "0.4", None).await?;
-        let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
+        let _ = safe
+            .wallet_reissue(&wallet_xorurl, "0.4", None, flow_name)
+            .await?;
+        let current_balance = safe.wallet_balance(&wallet_xorurl, flow_name).await?;
         assert_eq!(
             current_balance,
             Token::from_nano(dbc_balance.as_nano() - 400_000_000)
@@ -1110,52 +1260,72 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_reissue_all_balance() -> Result<()> {
+        let flow_name = function_name!();
         let (safe, dbc, dbc_balance) = new_safe_instance_with_dbc().await?;
-        let wallet_xorurl = safe.wallet_create().await?;
+        let wallet_xorurl = safe.wallet_create(flow_name).await?;
 
-        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc, None)
+        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc, None, flow_name)
             .await?;
 
         // Now check that after reissuing with the total balance,
         // there is no change deposited in the wallet, i.e. wallet is empty with 0 balance
         let _ = safe
-            .wallet_reissue(&wallet_xorurl, &dbc_balance.to_string(), None)
+            .wallet_reissue(&wallet_xorurl, &dbc_balance.to_string(), None, flow_name)
             .await?;
 
-        let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
+        let current_balance = safe.wallet_balance(&wallet_xorurl, flow_name).await?;
         assert_eq!(current_balance, Token::zero());
 
-        let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
+        let wallet_balances = safe.wallet_get(&wallet_xorurl, flow_name).await?;
         assert!(wallet_balances.is_empty());
 
         Ok(())
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_deposit_reissued_dbc() -> Result<()> {
+        let flow_name = function_name!();
         let (safe, dbc, _) = new_safe_instance_with_dbc().await?;
-        let wallet1_xorurl = safe.wallet_create().await?;
-        let wallet2_xorurl = safe.wallet_create().await?;
+        let wallet1_xorurl = safe.wallet_create(flow_name).await?;
+        let wallet2_xorurl = safe.wallet_create(flow_name).await?;
 
-        safe.wallet_deposit(&wallet1_xorurl, Some("deposited-dbc"), &dbc, None)
+        safe.wallet_deposit(
+            &wallet1_xorurl,
+            Some("deposited-dbc"),
+            &dbc,
+            None,
+            flow_name,
+        )
+        .await?;
+
+        let output_dbc = safe
+            .wallet_reissue(&wallet1_xorurl, "0.25", None, flow_name)
             .await?;
 
-        let output_dbc = safe.wallet_reissue(&wallet1_xorurl, "0.25", None).await?;
+        safe.wallet_deposit(
+            &wallet2_xorurl,
+            Some("reissued-dbc"),
+            &output_dbc,
+            None,
+            flow_name,
+        )
+        .await?;
 
-        safe.wallet_deposit(&wallet2_xorurl, Some("reissued-dbc"), &output_dbc, None)
-            .await?;
-
-        let balance = safe.wallet_balance(&wallet2_xorurl).await?;
+        let balance = safe.wallet_balance(&wallet2_xorurl, flow_name).await?;
         assert_eq!(balance, Token::from_nano(250_000_000));
 
         Ok(())
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_deposit_dbc_verification_fails() -> Result<()> {
+        let flow_name = function_name!();
         let (safe, mut dbc, _) = new_safe_instance_with_dbc().await?;
-        let wallet_xorurl = safe.wallet_create().await?;
+        let wallet_xorurl = safe.wallet_create(flow_name).await?;
 
         // let's corrupt the pub key of the SpentProofs
         let random_pk = bls::SecretKey::random().public_key();
@@ -1169,7 +1339,7 @@ mod tests {
             .collect();
 
         match safe
-            .wallet_deposit(&wallet_xorurl, Some("deposited-dbc"), &dbc, None)
+            .wallet_deposit(&wallet_xorurl, Some("deposited-dbc"), &dbc, None, flow_name)
             .await
         {
             Err(Error::DbcError(DbcError::InvalidSpentProofSignature(_key_image))) => Ok(()),
@@ -1179,9 +1349,11 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_reissue_dbc_verification_fails() -> Result<()> {
+        let flow_name = function_name!();
         let (safe, mut dbc, _) = new_safe_instance_with_dbc().await?;
-        let wallet_xorurl = safe.wallet_create().await?;
+        let wallet_xorurl = safe.wallet_create(flow_name).await?;
 
         // let's corrupt the pub key of the SpentProofs
         let random_pk = bls::SecretKey::random().public_key();
@@ -1200,11 +1372,15 @@ mod tests {
             &SafeUrl::from_url(&wallet_xorurl)?,
             &dbc,
             "corrupted_dbc".to_string(),
+            flow_name,
         )
         .await?;
 
         // It shall detect no spent proofs for this TX, thus fail to reissue
-        match safe.wallet_reissue(&wallet_xorurl, "0.1", None).await {
+        match safe
+            .wallet_reissue(&wallet_xorurl, "0.1", None, flow_name)
+            .await
+        {
             Err(Error::ClientError(ClientError::CmdError {
                 source: ErrorMsg::InvalidOperation(msg),
                 ..
@@ -1225,37 +1401,59 @@ mod tests {
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_is_dbc_spent() -> Result<()> {
+        let flow_name = function_name!();
         let safe = new_safe_instance().await?;
 
         // the api shall confirm the genesis DBC's key_image has been spent
-        let is_genesis_spent = safe.is_dbc_spent(GENESIS_DBC.key_image_bearer()?).await?;
+        let is_genesis_spent = safe
+            .is_dbc_spent(GENESIS_DBC.key_image_bearer()?, flow_name)
+            .await?;
         assert!(is_genesis_spent);
 
         Ok(())
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_dbc_is_unspent() -> Result<()> {
+        let flow_name = function_name!();
         let (safe, unspent_dbc, _) = new_safe_instance_with_dbc().await?;
 
         // confirm the DBC's key_image has not been spent yet
-        let is_unspent_dbc_spent = safe.is_dbc_spent(unspent_dbc.key_image_bearer()?).await?;
+        let is_unspent_dbc_spent = safe
+            .is_dbc_spent(unspent_dbc.key_image_bearer()?, flow_name)
+            .await?;
         assert!(!is_unspent_dbc_spent);
 
         Ok(())
     }
 
     #[tokio::test]
+    #[named]
     async fn test_wallet_reissue_multiple_output_dbcs() -> Result<()> {
+        let flow_name = function_name!();
         let (safe, dbc1, dbc1_balance) = new_safe_instance_with_dbc().await?;
         let (dbc2, dbc2_balance) = get_next_bearer_dbc().await?;
-        let wallet_xorurl = safe.wallet_create().await?;
+        let wallet_xorurl = safe.wallet_create(flow_name).await?;
 
-        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-1"), &dbc1, None)
-            .await?;
-        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-2"), &dbc2, None)
-            .await?;
+        safe.wallet_deposit(
+            &wallet_xorurl,
+            Some("deposited-dbc-1"),
+            &dbc1,
+            None,
+            flow_name,
+        )
+        .await?;
+        safe.wallet_deposit(
+            &wallet_xorurl,
+            Some("deposited-dbc-2"),
+            &dbc2,
+            None,
+            flow_name,
+        )
+        .await?;
 
         let change_amount = Token::from_nano(1000);
         let amount_to_reissue =
@@ -1277,7 +1475,7 @@ mod tests {
             .collect();
 
         let output_dbcs = safe
-            .wallet_reissue_many(&wallet_xorurl, outputs_owners)
+            .wallet_reissue_many(&wallet_xorurl, outputs_owners, flow_name)
             .await?;
 
         assert_eq!(output_dbcs.len(), output_amounts.len());
@@ -1289,10 +1487,10 @@ mod tests {
             assert!(output_amounts.contains(&balance.amount().as_nano()));
         }
 
-        let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
+        let current_balance = safe.wallet_balance(&wallet_xorurl, flow_name).await?;
         assert_eq!(current_balance, change_amount);
 
-        let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
+        let wallet_balances = safe.wallet_get(&wallet_xorurl, flow_name).await?;
 
         assert_eq!(wallet_balances.len(), 1);
 

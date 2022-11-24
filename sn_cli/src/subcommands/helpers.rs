@@ -151,7 +151,7 @@ pub fn gen_processed_files_table(
 
 // Reads a Multimap, deserialises it as a Wallet, fetching and listing
 // each of the contained spendable balances (DBCs), returning a Table ready to print out.
-pub async fn gen_wallet_table(safe: &Safe, multimap: &Multimap) -> Result<Table> {
+pub async fn gen_wallet_table(safe: &Safe, multimap: &Multimap, flow_name: &str) -> Result<Table> {
     let mut table = Table::new();
     table.add_row(&vec![
         "Spendable balance name",
@@ -162,7 +162,7 @@ pub async fn gen_wallet_table(safe: &Safe, multimap: &Multimap) -> Result<Table>
 
     for (_, (key, value)) in multimap.iter() {
         let xorurl_str = std::str::from_utf8(value)?;
-        let dbc_bytes = safe.files_get(xorurl_str, None).await?;
+        let dbc_bytes = safe.files_get(xorurl_str, None, flow_name).await?;
 
         let dbc: Dbc = match rmp_serde::from_slice(&dbc_bytes) {
             Ok(dbc) => dbc,

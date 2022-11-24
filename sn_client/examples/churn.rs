@@ -183,7 +183,7 @@ pub async fn run_split() -> Result<()> {
 
     for (address, hash) in all_data_put {
         println!("...reading bytes at address {:?} ...", address);
-        let mut bytes = client.read_bytes(address).await;
+        let mut bytes = client.read_bytes(address, "CHURN_EXAMPLE").await;
 
         let mut attempts = 0;
         while bytes.is_err() && attempts < 10 {
@@ -194,7 +194,7 @@ pub async fn run_split() -> Result<()> {
             );
             // do some retries to ensure we're not just timing out by chance
             sleep(Duration::from_millis(100)).await;
-            bytes = client.read_bytes(address).await;
+            bytes = client.read_bytes(address, "CHURN_EXAMPLE").await;
         }
 
         let bytes = bytes?;
@@ -225,7 +225,7 @@ async fn upload_data() -> Result<(XorName, [u8; 32])> {
 
     println!("Storing bytes w/ hash {:?}", output);
 
-    let address = client.upload(bytes).await?;
+    let address = client.upload(bytes, "CHURN_EXAMPLE").await?;
     println!("Bytes stored at address: {:?}", address);
 
     let delay = 300;
@@ -233,14 +233,14 @@ async fn upload_data() -> Result<(XorName, [u8; 32])> {
     sleep(Duration::from_millis(delay)).await;
 
     println!("...reading bytes from the network now...");
-    let mut bytes = client.read_bytes(address).await;
+    let mut bytes = client.read_bytes(address, "CHURN_EXAMPLE").await;
 
     let mut attempts = 0;
     while bytes.is_err() && attempts < 10 {
         attempts += 1;
         // do some retries to ensure we're not just timing out by chance
         sleep(Duration::from_millis(100)).await;
-        bytes = client.read_bytes(address).await;
+        bytes = client.read_bytes(address, "CHURN_EXAMPLE").await;
     }
 
     let _bytes = bytes?;

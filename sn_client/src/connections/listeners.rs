@@ -176,7 +176,7 @@ impl Session {
         self.update_network_knowledge(section_tree_update, src_peer)
             .await;
 
-        let (msg_id, elders, client_msg, dst, auth) = self
+        let (msg_id, flow_name, elders, client_msg, dst, auth) = self
             .new_target_elders(src_peer, bounced_msg, correlation_id)
             .await?;
 
@@ -195,8 +195,13 @@ impl Session {
         // there should always be one
         if let Some(elder) = target_elder {
             let payload = WireMsg::serialize_msg_payload(&client_msg)?;
-            let wire_msg =
-                WireMsg::new_msg(msg_id, payload, MsgKind::Client(auth.into_inner()), dst);
+            let wire_msg = WireMsg::new_msg(
+                msg_id,
+                flow_name,
+                payload,
+                MsgKind::Client(auth.into_inner()),
+                dst,
+            );
             let bytes = wire_msg.serialize()?;
 
             debug!("{msg_id:?} AE bounced msg going out again. Resending original message (sent to index {src_peer_index:?} peer: {src_peer:?}) to new section elder {elder:?}");
@@ -258,23 +263,35 @@ impl Session {
         src_peer: Peer,
         bounced_msg: UsrMsgBytes,
         correlation_id: MsgId,
-    ) -> Result<(MsgId, Vec<Peer>, ClientMsg, Dst, AuthorityProof<ClientAuth>), Error> {
-        let (msg_id, client_msg, bounced_msg_dst, auth) = match WireMsg::deserialize(bounced_msg)? {
-            MsgType::Client {
-                msg_id,
-                msg,
-                dst,
-                auth,
-            } => (msg_id, msg, dst, auth),
-            msg => {
-                warn!("Unexpected bounced msg received in AE response: {msg:?}");
-                return Err(Error::UnexpectedMsgType {
-                    correlation_id,
-                    peer: src_peer,
+    ) -> Result<
+        (
+            MsgId,
+            String,
+            Vec<Peer>,
+            ClientMsg,
+            Dst,
+            AuthorityProof<ClientAuth>,
+        ),
+        Error,
+    > {
+        let (msg_id, flow_name, client_msg, bounced_msg_dst, auth) =
+            match WireMsg::deserialize(bounced_msg)? {
+                MsgType::Client {
+                    msg_id,
+                    flow_name,
                     msg,
-                });
-            }
-        };
+                    dst,
+                    auth,
+                } => (msg_id, flow_name, msg, dst, auth),
+                msg => {
+                    warn!("Unexpected bounced msg received in AE response: {msg:?}");
+                    return Err(Error::UnexpectedMsgType {
+                        correlation_id,
+                        peer: src_peer,
+                        msg,
+                    });
+                }
+            };
 
         trace!(
             "Bounced msg {msg_id:?} received in an AE response: {client_msg:?} from {src_peer:?}"
@@ -303,7 +320,7 @@ impl Session {
                 "Final target elders for resending {msg_id:?}: {client_msg:?} msg \
                 are {target_elders:?}"
             );
-            Ok((msg_id, target_elders, client_msg, dst, auth))
+            Ok((msg_id, flow_name, target_elders, client_msg, dst, auth))
         }
     }
 }

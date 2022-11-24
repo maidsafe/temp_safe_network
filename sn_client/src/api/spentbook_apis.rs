@@ -47,6 +47,7 @@ impl Client {
         tx: RingCtTransaction,
         spent_proofs: BTreeSet<SpentProof>,
         spent_transactions: BTreeSet<RingCtTransaction>,
+        flow_name: &str,
     ) -> Result<(), Error> {
         let mut network_knowledge = None;
         let mut attempts = 1;
@@ -64,7 +65,7 @@ impl Client {
                 network_knowledge,
             };
 
-            let result = self.send_cmd(DataCmd::Spentbook(cmd)).await;
+            let result = self.send_cmd(DataCmd::Spentbook(cmd), flow_name).await;
 
             if let Err(Error::CmdError {
                 source: NetworkDataError::SpentProofUnknownSectionKey(unknown_section_key),
@@ -109,10 +110,11 @@ impl Client {
     pub async fn spent_proof_shares(
         &self,
         key_image: KeyImage,
+        flow_name: &str,
     ) -> Result<Vec<SpentProofShare>, Error> {
         let address = SpentbookAddress::new(XorName::from_content(&key_image.to_bytes()));
         let query = DataQueryVariant::Spentbook(SpentbookQuery::SpentProofShares(address));
-        let query_result = self.send_query(query.clone()).await?;
+        let query_result = self.send_query(query.clone(), flow_name).await?;
         match query_result.response {
             QueryResponse::SpentProofShares(res) => {
                 res.map_err(|err| Error::ErrorMsg { source: err })
@@ -132,6 +134,7 @@ mod tests {
     };
     use crate::Client;
     use eyre::{bail, Result};
+    use function_name::named;
     use sn_dbc::{rng, Hash, OwnerOnce, RingCtTransaction, TransactionBuilder};
     use tokio::time::Duration;
 
@@ -142,6 +145,7 @@ mod tests {
         key_image: &bls::PublicKey,
         tx: &RingCtTransaction,
         client: &Client,
+        flow_name: &str,
     ) -> Result<()> {
         // The query could be too close to the spend which make adult only accumulated
         // part of shares. To avoid assertion faiure, more attempts are needed.
@@ -150,7 +154,7 @@ mod tests {
             attempts += 1;
 
             // Get spent proof shares for the key_image.
-            let spent_proof_shares = client.spent_proof_shares(*key_image).await?;
+            let spent_proof_shares = client.spent_proof_shares(*key_image, flow_name).await?;
 
             // Note this test could have been run more than once thus the genesis DBC
             // could have been spent a few times already, so we filter
@@ -176,7 +180,9 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[named]
     async fn test_spentbook_spend_dbc() -> Result<()> {
+        let flow_name = function_name!();
         init_logger();
 
         let genesis_dbc = read_genesis_dbc_from_first_node()?;
@@ -207,9 +213,10 @@ mod tests {
                 tx.clone(),
                 genesis_dbc.spent_proofs,
                 genesis_dbc.spent_transactions,
+                flow_name,
             )
             .await?;
 
-        verify_spent_proof_share(key_image, tx, &client).await
+        verify_spent_proof_share(key_image, tx, &client, flow_name).await
     }
 }

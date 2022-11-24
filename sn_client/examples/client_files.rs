@@ -24,7 +24,7 @@ async fn main() -> Result<()> {
     let bytes = random_bytes(self_encryption::MIN_ENCRYPTABLE_BYTES);
     println!("Storing {} bytes..", bytes.len());
 
-    let address = client.upload(bytes).await?;
+    let address = client.upload(bytes, "FILES_EXAMPLE").await?;
     println!("Bytes stored at address: {:?}", address);
 
     let delay = 5;
@@ -32,7 +32,7 @@ async fn main() -> Result<()> {
     sleep(Duration::from_secs(delay)).await;
 
     println!("...reading bytes from the network now...");
-    let _bytes = client.read_bytes(address).await?;
+    let _bytes = client.read_bytes(address, "FILES_EXAMPLE").await?;
     println!("Bytes read from {:?}", address);
 
     println!();
