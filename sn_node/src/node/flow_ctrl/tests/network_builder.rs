@@ -227,13 +227,15 @@ impl<R: RngCore> TestNetworkBuilder<R> {
 
     /// Builds the `TestNetwork` struct.
     ///
-    /// Will fill in the gaps in prefixes left by the user. For e.g., if the user has provided just
-    /// Prefix(100), the ancestors SAP() -> SAP(1) -> SAP(10) will be automatically created.
+    /// Will fill in the gap in prefixes left by the user. For e.g., if the user has provided just
+    /// Prefix(100), then all the siblings (2^max_bit_count == 2^3 siblings) and their ancestors are auto
+    /// generated to create a complete Network.
+    ///
+    /// i.e., A single sibling branch will look like this: SAP() -> SAP(0) -> SAP(01) -> SAP(010).
+    /// This is done for all the 2^max_bit_count siblings.
+    ///
     /// And if n_churns_each_section = 2 , then we will get SAP1() -> SAP2() -> SAP1(1) -> SAP2(1) -> SAP1(10)
     /// -> SAP2(10) -> user_SAP(100)
-    ///
-    /// We just need the direct ancestors to create a valid `SectionTree`, hence the sibling
-    /// prefixes are ignored, i.e., SAP(0), SAP(11) etc.
     pub(crate) fn build(mut self) -> TestNetwork {
         // initially we will have only the user provided saps; hence get the missing prefixes and
         // the user provided prefixes.
@@ -241,36 +243,38 @@ impl<R: RngCore> TestNetworkBuilder<R> {
             let user_prefixes: BTreeSet<Prefix> =
                 self.sections.iter().map(|(sap, ..)| sap.prefix()).collect();
 
-            let mut missing_prefixes = BTreeSet::new();
-            let mut min_prefixes = BTreeSet::new();
-
-            for prefix in user_prefixes.iter() {
-                prefix
-                    .ancestors()
-                    // a user prefix is min, if it is part of the ancestor_list of any
-                    // other use prefix
-                    .filter(|anc| {
-                        if user_prefixes.contains(anc) {
-                            let _ = min_prefixes.insert(*anc);
-                            false
-                        } else {
-                            true
-                        }
-                    })
-                    // get the ancestors that are not present inside user_prefixes
-                    .for_each(|missing_anc| {
-                        let _ = missing_prefixes.insert(missing_anc);
-                    });
-            }
-
-            // max_prefixes are the largest user provided prefixes
-            let max_prefixes = user_prefixes
-                .into_iter()
-                .filter(|pre| !min_prefixes.contains(pre))
-                .collect::<BTreeSet<_>>();
+            let max_bit_count = user_prefixes
+                .iter()
+                .map(|p| p.bit_count())
+                .max()
+                .expect("at-least one sap should be provided");
+            // the permutations of 0,1 with len = max_bit_count gives us the max_prefixes
+            let bits = ["0", "1"];
+            let max_prefixes: Vec<_> = (2..max_bit_count).fold(
+                bits.iter()
+                    .flat_map(|b1| bits.iter().map(|&b2| b2.to_string() + *b1))
+                    .collect(),
+                |acc, _| {
+                    acc.iter()
+                        .flat_map(|b1| bits.iter().map(|&b2| b2.to_string() + b1))
+                        .collect()
+                },
+            );
+            // max_prefixes are used to construct the `SectionTree`
+            let max_prefixes: BTreeSet<_> =
+                max_prefixes.into_iter().map(|str| prefix(&str)).collect();
 
             // missing_prefixes are used to construct saps
-            // max_prefixes are used to construct the `SectionTree`
+            let mut missing_prefixes: BTreeSet<Prefix> = BTreeSet::new();
+            for pref in max_prefixes.iter() {
+                let missing = pref
+                    .ancestors()
+                    .chain(iter::once(*pref))
+                    .filter(|anc| !user_prefixes.contains(anc))
+                    .collect::<BTreeSet<Prefix>>();
+                missing_prefixes.extend(missing);
+            }
+
             (missing_prefixes, max_prefixes)
         };
 
