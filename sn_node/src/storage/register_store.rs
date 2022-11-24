@@ -124,6 +124,7 @@ impl RegisterStore {
             return Ok(stored_reg);
         }
 
+        let mut ops_hash = vec![];
         trace!("Register log path exists: {}", path.display());
         for filepath in list_files_in(&path) {
             match read(&filepath)
@@ -133,26 +134,37 @@ impl RegisterStore {
                 Ok(Ok(reg_cmd)) => {
                     stored_reg.op_log.push(reg_cmd.clone());
 
-                    if let RegisterCmd::Create { cmd, .. } = reg_cmd {
-                        // TODO: if we already have read a RegisterCreate op, check if there
-                        // is any difference with this other one,...if so perhaps log a warning?
-                        let SignedRegisterCreate { op, .. } = cmd;
-                        if stored_reg.state.is_none() {
-                            let register =
-                                Register::new(*op.policy.owner(), op.name, op.tag, op.policy);
-                            stored_reg.state = Some(register);
+                    match reg_cmd {
+                        RegisterCmd::Create { cmd, .. } => {
+                            // TODO: if we already have read a RegisterCreate op, check if there
+                            // is any difference with this other one,...if so perhaps log a warning?
+                            let SignedRegisterCreate { op, .. } = cmd;
+                            if stored_reg.state.is_none() {
+                                let register =
+                                    Register::new(*op.policy.owner(), op.name, op.tag, op.policy);
+                                stored_reg.state = Some(register);
+                            }
+                        }
+                        RegisterCmd::Edit(edit_cmd) => {
+                            let op_hash = EntryHash(edit_cmd.op.edit.crdt_op.hash());
+                            ops_hash.push(op_hash);
                         }
                     }
                 }
                 other => {
                     warn!(
-                        "Ignoring corrupted register cmd from storage found at {}: {:?}",
+                        ">>>>> Ignoring corrupted register cmd from storage ({addr:?}) found at {}: {:?}",
                         filepath.display(),
                         other
                     )
                 }
             }
         }
+
+        warn!(
+            ">>>>> FOUND edit cmds for {addr:?} ops hash: {ops_hash:?} ===> at {}",
+            path.display()
+        );
 
         Ok(stored_reg)
     }
@@ -196,20 +208,20 @@ impl RegisterStore {
         let addr = cmd.dst_address();
 
         trace!(
-            "Writing cmd register log for {addr:?} at {}",
+            ">>>>> Writing cmd register log for {addr:?} at {}",
             path.display()
         );
 
         let entry_hash = if let RegisterCmd::Edit(edit_cmd) = cmd {
             let entry_hash = EntryHash(edit_cmd.op.edit.crdt_op.hash());
             trace!(
-                "Writing RegisterEdit cmd log for {addr:?}, entry hash: {entry_hash}, at {}",
+                ">>>>> Writing RegisterEdit cmd log for {addr:?}, entry hash: {entry_hash}, at {}",
                 path.display()
             );
             Some(entry_hash)
         } else {
             trace!(
-                "Writing RegisterCreate cmd log for {addr:?} at {}",
+                ">>>>> Writing RegisterCreate cmd log for {addr:?} at {}",
                 path.display()
             );
             None
@@ -217,7 +229,7 @@ impl RegisterStore {
 
         // it's deterministic, so they are exactly the same op so we can leave
         if path.exists() {
-            trace!("RegisterCmd exists on disk for {addr:?}, entry hash: {entry_hash:?}, so was not written: {cmd:?}");
+            trace!(">>>>> RegisterCmd exists on disk for {addr:?}, entry hash: {entry_hash:?}, so was not written: {cmd:?}");
             return Ok(());
         }
 
@@ -232,7 +244,7 @@ impl RegisterStore {
         self.used_space.increase(required_space);
 
         trace!(
-            "RegisterCmd writing successful for {addr:?}, id {reg_cmd_id}, at {}, entry hash: {entry_hash:?}",
+            ">>>>> RegisterCmd writing successful for {addr:?}, id {reg_cmd_id}, at {}, entry hash: {entry_hash:?}",
             path.display()
         );
         Ok(())

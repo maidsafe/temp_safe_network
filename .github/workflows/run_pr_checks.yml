@@ -152,7 +152,7 @@ jobs:
         timeout-minutes: 5
 
       - name: Build all tests before running non ubuntu
-        run: cargo test --no-run --release --features check-replicas --package sn_client
+        run: cargo test --no-run --release --lib --features check-replicas --package sn_client
         timeout-minutes: 50
 
       - name: Run client tests
@@ -379,7 +379,7 @@ jobs:
         timeout-minutes: 5
 
       - name: Build all tests before running
-        run: cargo test --no-run --release --features check-replicas --package sn_api
+        run: cargo test --no-run --release --lib --features check-replicas --package sn_api
         timeout-minutes: 50
 
       - name: Run API tests

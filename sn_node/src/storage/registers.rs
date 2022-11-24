@@ -192,6 +192,7 @@ impl RegisterStorage {
         hash: EntryHash,
         requester: User,
     ) -> NodeQueryResponse {
+        warn!(">>>>> ABOUTE TO READ ENTRY {hash:?} from {address:?}");
         let result = match self
             .get_register(&address, Action::Read, requester)
             .await
@@ -337,11 +338,11 @@ impl RegisterStorage {
 
                 match result {
                     Ok(()) => {
-                        trace!("Editing Register success: {:?}", addr);
+                        trace!(">>>>> Editing Register success: {:?}", addr);
                         Ok(())
                     }
                     Err(err) => {
-                        trace!("Editing Register failed {:?}: {:?}", addr, err);
+                        trace!(">>>>> Editing Register failed {:?}: {:?}", addr, err);
                         Err(err)
                     }
                 }
