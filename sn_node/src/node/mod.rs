@@ -25,7 +25,6 @@ mod messages;
 mod messaging;
 mod node_starter;
 mod node_test_api;
-mod proposal;
 mod relocation;
 
 use self::{
@@ -34,7 +33,6 @@ use self::{
     data::MIN_LEVEL_WHEN_FULL,
     flow_ctrl::{cmds::Cmd, event::Elders},
     node_starter::CmdChannel,
-    proposal::Proposal,
 };
 pub use self::{
     cfg::config_handler::Config,
@@ -52,7 +50,10 @@ pub use crate::storage::DataStorage;
 pub(crate) use relocation::{check as relocation_check, ChurnId};
 
 pub use sn_interface::network_knowledge::MIN_ADULT_AGE;
-use sn_interface::{messaging::system::NodeMsg, types::Peer};
+use sn_interface::{
+    messaging::system::{NodeMsg, Proposal},
+    types::Peer,
+};
 
 pub use qp2p::{Config as NetworkConfig, SendStream};
 pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API update
