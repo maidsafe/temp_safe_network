@@ -273,7 +273,7 @@ impl Session {
             let (peer_address, response) = match msg_resp {
                 Ok(MsgResponse::QueryResponse(src, resp)) => (src, resp),
                 Ok(MsgResponse::CmdResponse(src, resp)) => {
-                    debug!("Unexpected CmdAck response received from {src:?} when awaiting a QueryResponse: {resp:?}");
+                    debug!("Unexpected cmd response received from {src:?} when awaiting a QueryResponse: {resp:?}");
                     discarded_responses += 1;
                     continue;
                 }
@@ -338,16 +338,9 @@ impl Session {
                         valid_response = Some(*response);
                     }
                 }
-                QueryResponse::ReadRegister(Ok(ref register_set)) => {
+                QueryResponse::ReadRegister(Ok(_)) => {
                     debug!("okay _read_ register from {peer_address:?}");
-                    // TODO: properly merge all registers
-                    if let Some(QueryResponse::ReadRegister(Ok(prior_response))) = &valid_response {
-                        if register_set.len() > prior_response.len() {
-                            debug!("longer register retrieved");
-                            // keep this new register
-                            valid_response = Some(*response);
-                        }
-                    } else {
+                    if valid_response.is_none() {
                         valid_response = Some(*response);
                     }
                 }
