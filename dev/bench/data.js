@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1669352470704,
+  "lastUpdate": 1669368767923,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -30778,6 +30778,144 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 420613559,
             "range": "± 21391363",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "fe082f9a19f9838256f3bf6a16e74bb6b2e32a29",
+          "message": "Merge #1763\n\n1763: feat(test_utils): Generate functional test Network r=RolandSherwin a=RolandSherwin\n\nThis module will replace the `TestNodeBuilder`.\r\n\r\n- **feat(network_builder): define `TestNetwork` and `TestNetworkBuilder`**\r\nThe `TestNetwork` utility will facilitate setting up the environment for tests that make use of `MyNode` instances. We can tell the builder to generate a network with a specific SAP in a prefix and it will create a functional network with all the gaps filled in. It also allows us to retrieve a `MyNode` instance from any SAP with valid `Comm`, `NetworkKnowledge`, `SectionKeyProvider` etc.\r\n\r\n- **feat(network_builder): build `TestNetwork` utility**\r\nCalling the `build()` method will process the SAPs that the caller has provided and also generate SAPs for the missing prefixes. These are prefixes for which the SAPs are not provided by the caller, but are still required to generate a functional `SectionTree`.\r\n\r\n- **feat(network_builder): build a working `SectionTree`**\r\nThe `max_prefixes` can be considered as the leaves of a tree and hence inserting `max_prefix.ancestors()` will effectively insert a single branch from the root till the leaf of the tree. A single prefix can also contain multiple SAPs and these are inserted in the order in which they were provided.\r\n\r\n- **feat(network_builder): retrieve nodes from a section**\r\nThe `MyNodeInfo` along with the `Comm` structs are needed to construct a single node instance. We also return the `SectionKeyShare` if the node is an Elder.\r\nWe can also retrieve the `mspc::Receiver` used inside the `Comm` module.\r\n\r\n- **feat(network_builder): build a single `MyNode` instance**\r\nA single node could've been an elder in some older sections. Hence we retrieve all the `SectionKeyShare` from all the old sections. Currently we ignore the sibling `prefixes` for which it could've been an elder.\r\n\r\n- **feat(network_builder): build a working `NetworkKnowledge`**\r\nThe `NetworkKnowledge` can be retrieved from any section and it will contain the information from genesis section till the current one. Also the the `SectionPeers` is updated using the current section members.\n\nCo-authored-by: RolandSherwin <RolandSherwin@protonmail.com>",
+          "timestamp": "2022-11-25T07:55:26Z",
+          "tree_id": "1bf8c96fde36201f26c68ea9898d7df44573d6c4",
+          "url": "https://github.com/maidsafe/safe_network/commit/fe082f9a19f9838256f3bf6a16e74bb6b2e32a29"
+        },
+        "date": 1669368766643,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 1382222,
+            "range": "± 79750",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 88662828,
+            "range": "± 1766508",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 107677920,
+            "range": "± 4868448",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 429654149,
+            "range": "± 6369211",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 75421015,
+            "range": "± 1722225",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 87378206,
+            "range": "± 1398516",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 337063702,
+            "range": "± 4000952",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 48415004,
+            "range": "± 7204946",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2155999596,
+            "range": "± 151850953",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 7397442767,
+            "range": "± 2596696099",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 140828249,
+            "range": "± 11437633",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1368880386,
+            "range": "± 73954089",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 5283791482,
+            "range": "± 55199155",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 47350270,
+            "range": "± 3940156",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 451367488,
+            "range": "± 10846645",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1818652869,
+            "range": "± 50279372",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11048204,
+            "range": "± 246636",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 96784093,
+            "range": "± 7640722",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 334770289,
+            "range": "± 12420324",
             "unit": "ns/iter"
           }
         ]
