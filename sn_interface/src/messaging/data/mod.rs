@@ -263,6 +263,23 @@ impl CmdResponse {
         Ok(res)
     }
 
+    #[allow(clippy::result_large_err)]
+    pub fn err(data: ReplicatedData, err: Error) -> Result<CmdResponse> {
+        let res = match &data {
+            ReplicatedData::Chunk(_) => CmdResponse::StoreChunk(Err(err)),
+            ReplicatedData::RegisterWrite(RegisterCmd::Create { .. }) => {
+                CmdResponse::CreateRegister(Err(err))
+            }
+            ReplicatedData::RegisterWrite(RegisterCmd::Edit { .. }) => {
+                CmdResponse::EditRegister(Err(err))
+            }
+            ReplicatedData::SpentbookWrite(_) => CmdResponse::SpendKey(Err(err)),
+            ReplicatedData::RegisterLog(_) => return Err(Error::NoCorrespondingCmdError), // this should be unreachable, since `RegisterLog` is not resulting from a cmd.
+            ReplicatedData::SpentbookLog(_) => return Err(Error::NoCorrespondingCmdError), // this should be unreachable, since `SpentbookLog` is not resulting from a cmd.
+        };
+        Ok(res)
+    }
+
     /// Returns true if the result returned is a success or not
     pub fn is_success(&self) -> bool {
         self.result().is_ok()
