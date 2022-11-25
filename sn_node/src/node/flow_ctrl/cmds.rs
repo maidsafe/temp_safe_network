@@ -60,7 +60,7 @@ pub(crate) enum Cmd {
     },
     /// Update our own storage level
     SetStorageLevel(StorageLevel),
-    /// Log a Node's Punishment, this pulls dysfunction and write locks out of some functions
+    /// Log a Node's Punishment
     TrackNodeIssueInDysfunction { name: XorName, issue: IssueType },
     HandleValidNodeMsg {
         msg_id: MsgId,

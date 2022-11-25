@@ -751,7 +751,7 @@ impl MyNode {
         cmds
     }
 
-    pub(crate) fn handle_dkg_outcome(
+    pub(crate) async fn handle_dkg_outcome(
         &mut self,
         sap: SectionAuthorityProvider,
         key_share: SectionKeyShare,
@@ -771,16 +771,16 @@ impl MyNode {
 
         // If we are lagging, we may have been already approved as new Elder, and
         // an AE update provided us with this same SAP but already signed by previous Elders,
-        // if so we can skip the SectionInfo agreement proposal phase.
+        // if so we can skip the RequestHandover agreement proposal phase.
         if self
             .network_knowledge
             .try_update_current_sap(key_share_pk, &sap.prefix())
         {
-            self.update_on_elder_change(&context)
+            self.update_on_elder_change(&context).await
         } else {
             // This proposal is sent to the current set of elders to be aggregated
             // and section signed.
-            let proposal = Proposal::SectionInfo(sap);
+            let proposal = Proposal::RequestHandover(sap);
             let recipients: Vec<_> = self.network_knowledge.section_auth().elders_vec();
             self.send_proposal_with(recipients, proposal, &key_share)
         }

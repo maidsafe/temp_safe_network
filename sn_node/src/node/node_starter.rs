@@ -12,6 +12,7 @@ use crate::node::{
     flow_ctrl::{
         cmds::Cmd,
         dispatcher::Dispatcher,
+        dysfunction::DysCmds,
         event::{Elders, Event, MembershipEvent, NodeElderChange},
         event_channel,
         event_channel::EventReceiver,
@@ -144,6 +145,7 @@ async fn bootstrap_node(
     join_timeout: Duration,
 ) -> Result<(Arc<RwLock<MyNode>>, CmdChannel, EventReceiver)> {
     let (connection_event_tx, mut connection_event_rx) = mpsc::channel(10_000);
+    let (dysfunction_cmds_sender, dysfunction_cmds_receiver) = mpsc::channel::<DysCmds>(20);
 
     let (event_sender, event_receiver) = event_channel::new(EVENT_CHANNEL_SIZE);
 
@@ -155,7 +157,14 @@ async fn bootstrap_node(
     .await?;
 
     let node = if config.is_first() {
-        bootstrap_genesis_node(comm, used_space, root_storage_dir, event_sender.clone()).await?
+        bootstrap_genesis_node(
+            comm,
+            used_space,
+            root_storage_dir,
+            event_sender.clone(),
+            dysfunction_cmds_sender.clone(),
+        )
+        .await?
     } else {
         bootstrap_normal_node(
             config,
@@ -165,6 +174,7 @@ async fn bootstrap_node(
             event_sender.clone(),
             used_space,
             root_storage_dir,
+            dysfunction_cmds_sender.clone(),
         )
         .await?
     };
@@ -172,7 +182,13 @@ async fn bootstrap_node(
     let node = Arc::new(RwLock::new(node));
     let (dispatcher, data_replication_receiver) = Dispatcher::new(node.clone());
     let cmd_ctrl = CmdCtrl::new(dispatcher);
-    let cmd_channel = FlowCtrl::start(cmd_ctrl, connection_event_rx, data_replication_receiver);
+    let cmd_channel = FlowCtrl::start(
+        cmd_ctrl,
+        connection_event_rx,
+        data_replication_receiver,
+        (dysfunction_cmds_sender, dysfunction_cmds_receiver),
+    )
+    .await;
 
     Ok((node, cmd_channel, event_receiver))
 }
@@ -182,6 +198,7 @@ async fn bootstrap_genesis_node(
     used_space: UsedSpace,
     root_storage_dir: &Path,
     event_sender: EventSender,
+    dysfunction_cmds_sender: mpsc::Sender<DysCmds>,
 ) -> Result<MyNode> {
     // Genesis node having a fix age of 255.
     let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), 255);
@@ -203,6 +220,7 @@ async fn bootstrap_genesis_node(
         used_space.clone(),
         root_storage_dir.to_path_buf(),
         genesis_sk_set,
+        dysfunction_cmds_sender,
     )
     .await?;
 
@@ -238,6 +256,7 @@ async fn bootstrap_genesis_node(
     Ok(node)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn bootstrap_normal_node(
     config: &Config,
     comm: Comm,
@@ -246,6 +265,7 @@ async fn bootstrap_normal_node(
     event_sender: EventSender,
     used_space: UsedSpace,
     root_storage_dir: &Path,
+    dysfunction_cmds_sender: mpsc::Sender<DysCmds>,
 ) -> Result<MyNode> {
     let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE);
     let node_name = ed25519::name(&keypair.public);
@@ -278,6 +298,7 @@ async fn bootstrap_normal_node(
         event_sender,
         used_space.clone(),
         root_storage_dir.to_path_buf(),
+        dysfunction_cmds_sender,
     )
     .await?;
     info!("{} Joined the network!", node.info().name());

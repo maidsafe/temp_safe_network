@@ -11,7 +11,12 @@ use crate::messaging::{
     AuthorityProof,
 };
 use serde::{Deserialize, Serialize};
-use std::fmt::{self, Debug, Formatter};
+use std::{
+    borrow::Borrow,
+    fmt::{self, Debug, Formatter},
+    ops::Deref,
+};
+use xor_name::Prefix;
 
 /// Signature created when a quorum of the section elders has agreed on something.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -81,6 +86,32 @@ impl SectionSigShare {
         self.public_key_set
             .public_key_share(self.index)
             .verify(&self.signature_share, payload)
+    }
+}
+
+/// A section signed piece of data
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize)]
+pub struct SectionSigned<T: Serialize> {
+    /// some value agreed upon by elders
+    pub value: T,
+    /// section signature over the value
+    pub sig: SectionSig,
+}
+
+impl<T> Borrow<Prefix> for SectionSigned<T>
+where
+    T: Borrow<Prefix> + Serialize,
+{
+    fn borrow(&self) -> &Prefix {
+        self.value.borrow()
+    }
+}
+
+impl<T: Serialize> Deref for SectionSigned<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
     }
 }
 

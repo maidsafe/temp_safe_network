@@ -45,11 +45,9 @@
 extern crate tracing;
 
 mod detection;
-mod error;
 
 pub use detection::IssueType;
 
-pub use crate::error::Error;
 use sn_interface::messaging::system::OperationId;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
@@ -103,7 +101,7 @@ impl DysfunctionDetection {
                 let queue = self.dkg_issues.entry(node_id).or_default();
                 queue.push_back(Instant::now());
             }
-            IssueType::AwaitingProbeResponse => {
+            IssueType::AeProbeMsg => {
                 let queue = self.probe_issues.entry(node_id).or_default();
                 queue.push_back(Instant::now());
             }
@@ -115,7 +113,7 @@ impl DysfunctionDetection {
                 let queue = self.knowledge_issues.entry(node_id).or_default();
                 queue.push_back(Instant::now());
             }
-            IssueType::PendingRequestOperation(op_id) => {
+            IssueType::RequestOperation(op_id) => {
                 let queue = self.unfulfilled_ops.entry(node_id).or_default();
                 trace!("New issue has associated operation ID: {op_id:#?}");
                 queue.push((op_id, Instant::now()));
@@ -330,19 +328,15 @@ mod tests {
         for node in nodes.iter().take(3) {
             dysfunctional_detection.track_issue(*node, IssueType::Communication);
             dysfunctional_detection.track_issue(*node, IssueType::Knowledge);
-            dysfunctional_detection.track_issue(
-                *node,
-                IssueType::PendingRequestOperation(OperationId([1; 32])),
-            );
+            dysfunctional_detection
+                .track_issue(*node, IssueType::RequestOperation(OperationId([1; 32])));
         }
 
         // Track some issues for nodes that will be retained.
         dysfunctional_detection.track_issue(nodes[5], IssueType::Communication);
         dysfunctional_detection.track_issue(nodes[6], IssueType::Knowledge);
-        dysfunctional_detection.track_issue(
-            nodes[7],
-            IssueType::PendingRequestOperation(OperationId([1; 32])),
-        );
+        dysfunctional_detection
+            .track_issue(nodes[7], IssueType::RequestOperation(OperationId([1; 32])));
 
         let nodes_to_retain = nodes[5..10].iter().cloned().collect::<BTreeSet<XorName>>();
 
@@ -386,10 +380,8 @@ mod tests {
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
         let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
 
-        dysfunctional_detection.track_issue(
-            nodes[0],
-            IssueType::PendingRequestOperation(OperationId([1; 32])),
-        );
+        dysfunctional_detection
+            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
 
         assert_eq!(dysfunctional_detection.unfulfilled_ops.len(), 1);
         assert_eq!(dysfunctional_detection.knowledge_issues.len(), 0);
@@ -416,18 +408,12 @@ mod tests {
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
         let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
 
-        dysfunctional_detection.track_issue(
-            nodes[0],
-            IssueType::PendingRequestOperation(OperationId([1; 32])),
-        );
-        dysfunctional_detection.track_issue(
-            nodes[0],
-            IssueType::PendingRequestOperation(OperationId([2; 32])),
-        );
-        dysfunctional_detection.track_issue(
-            nodes[0],
-            IssueType::PendingRequestOperation(OperationId([3; 32])),
-        );
+        dysfunctional_detection
+            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
+        dysfunctional_detection
+            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([2; 32])));
+        dysfunctional_detection
+            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([3; 32])));
 
         let op_ids = dysfunctional_detection.get_unfulfilled_ops(nodes[0]);
 
@@ -440,18 +426,12 @@ mod tests {
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
         let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
 
-        dysfunctional_detection.track_issue(
-            nodes[0],
-            IssueType::PendingRequestOperation(OperationId([1; 32])),
-        );
-        dysfunctional_detection.track_issue(
-            nodes[0],
-            IssueType::PendingRequestOperation(OperationId([2; 32])),
-        );
-        dysfunctional_detection.track_issue(
-            nodes[0],
-            IssueType::PendingRequestOperation(OperationId([3; 32])),
-        );
+        dysfunctional_detection
+            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
+        dysfunctional_detection
+            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([2; 32])));
+        dysfunctional_detection
+            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([3; 32])));
 
         let op_ids = dysfunctional_detection.get_unfulfilled_ops(nodes[1]);
 
@@ -465,18 +445,12 @@ mod tests {
         let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
         let op_id = OperationId([2; 32]);
 
-        dysfunctional_detection.track_issue(
-            nodes[0],
-            IssueType::PendingRequestOperation(OperationId([1; 32])),
-        );
-        dysfunctional_detection.track_issue(
-            nodes[0],
-            IssueType::PendingRequestOperation(OperationId([2; 32])),
-        );
-        dysfunctional_detection.track_issue(
-            nodes[0],
-            IssueType::PendingRequestOperation(OperationId([3; 32])),
-        );
+        dysfunctional_detection
+            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
+        dysfunctional_detection
+            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([2; 32])));
+        dysfunctional_detection
+            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([3; 32])));
 
         let has_removed = dysfunctional_detection.request_operation_fulfilled(&nodes[0], op_id);
 
@@ -494,18 +468,12 @@ mod tests {
         let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
         let op_id = OperationId([2; 32]);
 
-        dysfunctional_detection.track_issue(
-            nodes[0],
-            IssueType::PendingRequestOperation(OperationId([1; 32])),
-        );
-        dysfunctional_detection.track_issue(
-            nodes[0],
-            IssueType::PendingRequestOperation(OperationId([2; 32])),
-        );
-        dysfunctional_detection.track_issue(
-            nodes[0],
-            IssueType::PendingRequestOperation(OperationId([3; 32])),
-        );
+        dysfunctional_detection
+            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
+        dysfunctional_detection
+            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([2; 32])));
+        dysfunctional_detection
+            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([3; 32])));
 
         let has_removed = dysfunctional_detection.request_operation_fulfilled(&nodes[1], op_id);
 
@@ -520,18 +488,12 @@ mod tests {
         let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
         let op_id = OperationId([4; 32]);
 
-        dysfunctional_detection.track_issue(
-            nodes[0],
-            IssueType::PendingRequestOperation(OperationId([1; 32])),
-        );
-        dysfunctional_detection.track_issue(
-            nodes[0],
-            IssueType::PendingRequestOperation(OperationId([2; 32])),
-        );
-        dysfunctional_detection.track_issue(
-            nodes[0],
-            IssueType::PendingRequestOperation(OperationId([3; 32])),
-        );
+        dysfunctional_detection
+            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
+        dysfunctional_detection
+            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([2; 32])));
+        dysfunctional_detection
+            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([3; 32])));
 
         let has_removed = dysfunctional_detection.request_operation_fulfilled(&nodes[1], op_id);
 

@@ -6,7 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{core::NodeContext, Cmd, Error, MyNode, Prefix, Result};
+use crate::node::{
+    core::NodeContext, flow_ctrl::dysfunction::DysCmds, Cmd, Error, MyNode, Prefix, Result,
+};
 
 use sn_dysfunction::IssueType;
 use sn_interface::{
@@ -270,7 +272,7 @@ impl MyNode {
                 return Ok(vec![Cmd::TrackNodeIssueInDysfunction {
                     name: target.name(),
                     // TODO: no need for op id tracking here, this can be a simple counter
-                    issue: IssueType::PendingRequestOperation(operation_id),
+                    issue: IssueType::RequestOperation(operation_id),
                 }]);
             }
         }?;
@@ -391,19 +393,30 @@ impl MyNode {
 
     /// Registered holders not present in provided list of members
     /// will be removed from `adult_storage_info` and no longer tracked for liveness.
-    pub(crate) fn liveness_retain_only(&mut self, members: BTreeSet<XorName>) -> Result<()> {
+    pub(crate) async fn liveness_retain_only(&mut self, members: BTreeSet<XorName>) {
         // full adults
         self.capacity.retain_members_only(&members);
         // stop tracking liveness of absent holders
-        self.dysfunction_tracking.retain_members_only(members);
-        Ok(())
+        if let Err(error) = self
+            .dysfunction_cmds_sender
+            .send(DysCmds::RetainNodes(members))
+            .await
+        {
+            error!("Could not send RetainNodes through dysfunctional_cmds_tx: {error}");
+        };
     }
 
     /// Adds the new adult to the Capacity and Liveness trackers.
-    pub(crate) fn add_new_adult_to_trackers(&mut self, adult: XorName) {
+    pub(crate) async fn add_new_adult_to_trackers(&mut self, adult: XorName) {
         info!("Adding new Adult: {adult} to trackers");
         self.capacity.add_new_adult(adult);
-        self.dysfunction_tracking.add_new_node(adult);
+        if let Err(error) = self
+            .dysfunction_cmds_sender
+            .send(DysCmds::AddNode(adult))
+            .await
+        {
+            error!("Could not send AddNode through dysfunctional_cmds_tx: {error}");
+        };
     }
 
     /// Set storage level of a given node.

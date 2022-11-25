@@ -6,11 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod agreement;
+mod dkg;
 mod join;
 mod join_as_relocated;
 mod node_msgs;
 mod op_id;
+mod proposal;
 mod section_sig;
 
 use super::{data::CmdResponse, MsgId};
@@ -18,12 +19,13 @@ use super::{data::CmdResponse, MsgId};
 use crate::messaging::AuthorityProof;
 use crate::network_knowledge::{NodeState, SapCandidate, SectionTreeUpdate};
 
-pub use agreement::{DkgSessionId, Proposal, SectionSigned};
+pub use dkg::DkgSessionId;
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use node_msgs::{NodeDataCmd, NodeDataQuery, NodeEvent, NodeQueryResponse};
 pub use op_id::OperationId;
-pub use section_sig::{SectionSig, SectionSigShare};
+pub use proposal::Proposal;
+pub use section_sig::{SectionSig, SectionSigShare, SectionSigned};
 
 use bls::PublicKey as BlsPublicKey;
 use ed25519::Signature;

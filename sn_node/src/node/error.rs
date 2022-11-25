@@ -172,9 +172,6 @@ pub enum Error {
     /// Invalid node authority for a query response.
     #[error("Invalid node authority received for a QueryResponse message")]
     InvalidQueryResponseAuthority,
-    /// DysfunctionDetection error.
-    #[error("DysfunctionDetection error:: {0}")]
-    DysfunctionDetection(#[from] sn_dysfunction::Error),
     /// Elder Handover related errors
     #[error("Handover Error:: {0}")]
     HandoverError(#[from] HandoverError),

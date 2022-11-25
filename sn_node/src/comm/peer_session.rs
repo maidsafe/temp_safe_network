@@ -147,7 +147,7 @@ impl PeerSessionWorker {
         Self { queue, link }
     }
 
-    async fn run(#[allow(unused_mut)] mut self, mut channel: mpsc::Receiver<SessionCmd>) {
+    async fn run(mut self, mut channel: mpsc::Receiver<SessionCmd>) {
         while let Some(session_cmd) = channel.recv().await {
             trace!(
                 "Processing session {:?} cmd: {:?}",
@@ -189,7 +189,6 @@ impl PeerSessionWorker {
                         SessionStatus::Ok
                     } else {
                         //another
-                        debug!("Sending a fresh msg flow over a connection");
                         match self.send_over_peer_connection(job).await {
                             Ok(s) => s,
                             Err(error) => {

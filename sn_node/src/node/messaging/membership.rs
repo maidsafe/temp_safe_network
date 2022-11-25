@@ -7,7 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    core::NodeContext, flow_ctrl::cmds::Cmd, membership, messaging::Peers, relocation::ChurnId,
+    core::NodeContext,
+    flow_ctrl::cmds::Cmd,
+    membership::{self, Membership},
+    messaging::Peers,
+    relocation::ChurnId,
     Event, MembershipEvent, MyNode, Result,
 };
 
@@ -53,9 +57,11 @@ impl MyNode {
     /// Get our latest vote if any at this generation, and get cmds to resend to all elders
     /// (which should in turn trigger them to resend their votes)
     #[instrument(skip_all)]
-    pub(crate) async fn membership_gossip_votes(context: &NodeContext) -> Option<Cmd> {
-        let membership = context.membership.clone();
-        if let Some(membership) = membership {
+    pub(crate) async fn membership_gossip_votes(
+        context: &NodeContext,
+        membership_context: &Option<Membership>,
+    ) -> Option<Cmd> {
+        if let Some(membership) = membership_context {
             trace!("{}", LogMarker::GossippingMembershipVotes);
             if let Ok(ae_votes) = membership.anti_entropy(membership.generation()) {
                 let cmd =
@@ -133,7 +139,7 @@ impl MyNode {
     }
 
     pub(crate) fn handle_membership_anti_entropy(
-        context: &NodeContext,
+        membership_context: Option<Membership>,
         peer: Peer,
         gen: Generation,
     ) -> Option<Cmd> {
@@ -144,7 +150,7 @@ impl MyNode {
             peer
         );
 
-        if let Some(membership) = context.membership.as_ref() {
+        if let Some(membership) = membership_context.as_ref() {
             match membership.anti_entropy(gen) {
                 Ok(catchup_votes) => {
                     debug!("Sending catchup votes to {peer:?}");
@@ -166,7 +172,7 @@ impl MyNode {
         }
     }
 
-    pub(crate) fn handle_membership_decision(
+    pub(crate) async fn handle_membership_decision(
         &mut self,
         decision: Decision<NodeState>,
     ) -> Result<Vec<Cmd>> {
@@ -186,7 +192,7 @@ impl MyNode {
         );
 
         for (new_info, signature) in joining_nodes.iter().cloned() {
-            cmds.extend(self.handle_node_joined(new_info, signature));
+            cmds.extend(self.handle_node_joined(new_info, signature).await);
         }
 
         for (new_info, signature) in leaving_nodes.iter().cloned() {
@@ -211,7 +217,7 @@ impl MyNode {
             cmds.extend(self.relocate_peers(churn_id, excluded_from_relocation)?);
         }
 
-        cmds.extend(self.trigger_dkg()?);
+        cmds.extend(self.trigger_dkg().await?);
         cmds.extend(self.send_ae_update_to_our_section()?);
 
         self.liveness_retain_only(
@@ -220,7 +226,8 @@ impl MyNode {
                 .iter()
                 .map(|peer| peer.name())
                 .collect(),
-        )?;
+        )
+        .await;
 
         if !leaving_nodes.is_empty() {
             self.joins_allowed = true;
@@ -232,7 +239,7 @@ impl MyNode {
         Ok(cmds)
     }
 
-    fn handle_node_joined(&mut self, new_info: NodeState, signature: Signature) -> Vec<Cmd> {
+    async fn handle_node_joined(&mut self, new_info: NodeState, signature: Signature) -> Vec<Cmd> {
         let sig = SectionSig {
             public_key: self.network_knowledge.section_key(),
             signature,
@@ -248,7 +255,7 @@ impl MyNode {
             return vec![];
         }
 
-        self.add_new_adult_to_trackers(new_info.name());
+        self.add_new_adult_to_trackers(new_info.name()).await;
 
         info!("handle Online: {}", new_info.peer());
 

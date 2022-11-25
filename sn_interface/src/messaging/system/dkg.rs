@@ -6,17 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{NodeState, SectionSig};
+use super::NodeState;
 use crate::types::keys::ed25519::Digest256;
-use crate::{network_knowledge::SectionAuthorityProvider, types::Peer};
+use crate::types::Peer;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use sn_consensus::Generation;
 use std::{
-    borrow::Borrow,
     collections::{BTreeMap, BTreeSet},
     net::SocketAddr,
-    ops::Deref,
 };
 use tiny_keccak::{Hasher, Sha3};
 use xor_name::{Prefix, XorName};
@@ -102,59 +100,4 @@ impl DkgSessionId {
     pub fn contains_elder(&self, elder: XorName) -> bool {
         self.elder_names().any(|e| e == elder)
     }
-}
-
-/// A section signed piece of data
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize)]
-pub struct SectionSigned<T: Serialize> {
-    /// some value agreed upon by elders
-    pub value: T,
-    /// section signature over the value
-    pub sig: SectionSig,
-}
-
-impl<T> Borrow<Prefix> for SectionSigned<T>
-where
-    T: Borrow<Prefix> + Serialize,
-{
-    fn borrow(&self) -> &Prefix {
-        self.value.borrow()
-    }
-}
-
-impl<T: Serialize> Deref for SectionSigned<T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.value
-    }
-}
-
-/// A step in the Propose-Broadcast-Aggregate-Execute workflow.
-#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-#[allow(clippy::large_enum_variant)]
-/// A proposal about the state of the network
-/// This can be a result of seeing a node come online, go offline, changes to section info etc.
-/// Anything where we need section authority before action can be taken
-pub enum Proposal {
-    /// Proposal to remove a node from our section
-    VoteNodeOffline(NodeState),
-    /// Proposal to update info about a section.
-    ///
-    /// It signals the completion of a DKG by the elder candidates to the current elders.
-    /// This proposal is then signed by the newly generated section key.
-    SectionInfo(SectionAuthorityProvider),
-    /// Proposal to change the elders (and possibly the prefix) of our section.
-    /// NOTE: the `SectionAuthorityProvider` is already signed with the new key. This proposal is only to signs the
-    /// new key with the current key. That way, when it aggregates, we obtain all the following
-    /// pieces of information at the same time:
-    ///   1. the new section authority provider
-    ///   2. the new key
-    ///   3. the signature of the new section authority provider using the new key
-    ///   4. the signature of the new key using the current key
-    /// Which we can use to update the section section authority provider and the section chain at
-    /// the same time as a single atomic operation without needing to cache anything.
-    NewElders(SectionSigned<SectionAuthorityProvider>),
-    /// Proposal to change whether new nodes are allowed to join our section.
-    JoinsAllowed(bool),
 }

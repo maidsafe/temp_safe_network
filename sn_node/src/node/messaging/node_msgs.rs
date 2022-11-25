@@ -9,7 +9,7 @@
 use crate::{
     node::{
         core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Peers, Event, MembershipEvent, MyNode,
-        Proposal as CoreProposal, Result, MIN_LEVEL_WHEN_FULL,
+        Result, MIN_LEVEL_WHEN_FULL,
     },
     storage::Error as StorageError,
 };
@@ -18,10 +18,7 @@ use qp2p::SendStream;
 use sn_interface::{
     messaging::{
         data::{CmdResponse, StorageLevel},
-        system::{
-            JoinResponse, NodeDataCmd, NodeDataQuery, NodeDataResponse, NodeEvent, NodeMsg,
-            Proposal as ProposalMsg,
-        },
+        system::{JoinResponse, NodeDataCmd, NodeDataQuery, NodeDataResponse, NodeEvent, NodeMsg},
         MsgId,
     },
     network_knowledge::NetworkKnowledge,
@@ -311,11 +308,11 @@ impl MyNode {
             }
             NodeMsg::MembershipAE(gen) => {
                 debug!("[NODE READ]: membership ae read ");
-                let snapshopt = node.read().await.context();
+                let membership_context = node.read().await.membership.clone();
                 debug!("[NODE READ]: membership ae read got");
 
                 Ok(
-                    MyNode::handle_membership_anti_entropy(&snapshopt, sender, gen)
+                    MyNode::handle_membership_anti_entropy(membership_context, sender, gen)
                         .into_iter()
                         .collect(),
                 )
@@ -336,17 +333,7 @@ impl MyNode {
                     msg_id
                 );
 
-                // lets convert our message into a usable proposal for core
-                let core_proposal = match proposal {
-                    ProposalMsg::VoteNodeOffline(node_state) => {
-                        CoreProposal::VoteNodeOffline(node_state)
-                    }
-                    ProposalMsg::SectionInfo(sap) => CoreProposal::SectionInfo(sap),
-                    ProposalMsg::NewElders(sap) => CoreProposal::NewElders(sap),
-                    ProposalMsg::JoinsAllowed(allowed) => CoreProposal::JoinsAllowed(allowed),
-                };
-
-                node.handle_proposal(msg_id, core_proposal, sig_share, sender)
+                node.handle_proposal(msg_id, proposal, sig_share, sender)
             }
             NodeMsg::DkgStart(session_id, elder_sig) => {
                 trace!(
@@ -359,7 +346,7 @@ impl MyNode {
 
                 let mut node = node.write().await;
                 debug!("[NODE WRITE]: DKGstart write gottt...");
-                node.log_dkg_session(&sender.name());
+                node.log_dkg_session(sender.name()).await;
                 node.handle_dkg_start(session_id, elder_sig)
             }
             NodeMsg::DkgEphemeralPubKey {
@@ -392,7 +379,7 @@ impl MyNode {
                 );
                 let mut node = node.write().await;
                 debug!("[NODE WRITE]: DKG Votes write gottt...");
-                node.log_dkg_session(&sender.name());
+                node.log_dkg_session(sender.name()).await;
                 node.handle_dkg_votes(&session_id, pub_keys, votes, sender)
             }
             NodeMsg::DkgAE(session_id) => {

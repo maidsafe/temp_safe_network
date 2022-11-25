@@ -14,7 +14,6 @@ use qp2p::{RecvStream, UsrMsgBytes};
 use sn_interface::{
     messaging::{
         data::{ClientDataResponse, ClientMsg},
-        system::{AntiEntropyKind, NodeMsg},
         AuthorityProof, ClientAuth, Dst, MsgId, MsgKind, MsgType, WireMsg,
     },
     network_knowledge::{SectionAuthorityProvider, SectionTreeUpdate},
@@ -22,8 +21,6 @@ use sn_interface::{
 };
 
 use itertools::Itertools;
-use rand::{rngs::OsRng, seq::SliceRandom};
-use xor_name::XorName;
 
 // Maximum number of times we'll re-send a msg upon receiving an AE response for it
 const MAX_AE_RETRIES_TO_ATTEMPT: u8 = 5;
@@ -37,12 +34,27 @@ struct MsgResent {
 
 impl Session {
     #[instrument(skip_all, level = "debug")]
-    async fn read_msg_from_recvstream(recv_stream: &mut RecvStream) -> Result<MsgType, Error> {
+    async fn read_resp_from_recvstream(
+        recv_stream: &mut RecvStream,
+        peer: Peer,
+        correlation_id: MsgId,
+    ) -> Result<(MsgId, ClientDataResponse), Error> {
         let bytes = recv_stream.next().await?;
-        let wire_msg = WireMsg::from(bytes)?;
-        let msg_type = wire_msg.into_msg()?;
-
-        Ok(msg_type)
+        match WireMsg::deserialize(bytes)? {
+            MsgType::ClientDataResponse { msg_id, msg } => Ok((msg_id, msg)),
+            msg => {
+                warn!(
+                    "Unexpected msg type received on {} from {peer:?} in response \
+                    to {correlation_id:?}: {msg:?}",
+                    recv_stream.id()
+                );
+                Err(Error::UnexpectedMsgType {
+                    correlation_id,
+                    peer,
+                    msg,
+                })
+            }
+        }
     }
 
     // Wait for a msg response incoming on the provided RecvStream
@@ -71,127 +83,72 @@ impl Session {
 
             let stream_id = recv_stream.id();
             debug!("Waiting for response msg on {stream_id} from {peer:?} @ index: {peer_index} for {correlation_id:?}, attempt #{attempt}");
-
-            match Self::read_msg_from_recvstream(&mut recv_stream).await {
-                Ok(MsgType::ClientDataResponse { msg_id, msg, .. }) => {
-                    break Self::handle_client_msg(msg_id, msg, peer, correlation_id).await;
-                }
-                Ok(MsgType::Node { msg_id, msg, .. }) => match self
-                    .handle_system_msg(msg_id, msg, peer, peer_index, correlation_id)
-                    .await
+            let (msg_id, resp_msg) =
+                match Self::read_resp_from_recvstream(&mut recv_stream, peer, correlation_id).await
                 {
-                    Ok(MsgResent {
-                        new_peer,
-                        new_recv_stream,
-                    }) => {
-                        recv_stream = new_recv_stream;
-                        trace!("{} to {}", LogMarker::StreamClosed, addr);
-                        peer = new_peer;
-                        attempt += 1;
-                        continue;
-                    }
+                    Ok(resp_info) => resp_info,
                     Err(err) => break MsgResponse::Failure(addr, err),
-                },
-                Ok(msg @ MsgType::Client { .. }) => {
-                    warn!("Unexpected ClientMsg type received for {correlation_id:?}: {msg:?}");
-                    break MsgResponse::Failure(
-                        addr,
-                        Error::UnexpectedMsgType {
-                            correlation_id,
-                            peer,
-                            msg,
-                        },
+                };
+
+            match resp_msg {
+                ClientDataResponse::QueryResponse {
+                    response,
+                    correlation_id,
+                } => {
+                    trace!(
+                        "QueryResponse with id {msg_id:?} regarding correlation_id \
+                        {correlation_id:?} with response: {response:?}"
                     );
+                    break MsgResponse::QueryResponse(addr, Box::new(response));
                 }
-                Ok(msg @ MsgType::NodeDataResponse { .. }) => {
-                    warn!(
-                        "Unexpected NodeDataResponse type received for {correlation_id:?}: {msg:?}"
+                ClientDataResponse::CmdResponse {
+                    response,
+                    correlation_id,
+                } => {
+                    trace!(
+                        "CmdResponse with id {msg_id:?} regarding correlation_id \
+                        {correlation_id:?} with response {response:?}"
                     );
-                    break MsgResponse::Failure(
-                        addr,
-                        Error::UnexpectedMsgType {
-                            correlation_id,
-                            peer,
-                            msg,
-                        },
-                    );
+                    break MsgResponse::CmdResponse(addr, Box::new(response));
                 }
-                Err(err) => break MsgResponse::Failure(addr, err),
+                ClientDataResponse::AntiEntropy {
+                    section_tree_update,
+                    bounced_msg,
+                } => {
+                    debug!(
+                        "AntiEntropy msg with id {msg_id:?} received for {correlation_id:?} \
+                        from {peer:?}@{peer_index:?}"
+                    );
+
+                    let ae_resp_outcome = self
+                        .handle_ae_msg(
+                            section_tree_update,
+                            bounced_msg,
+                            peer,
+                            peer_index,
+                            correlation_id,
+                        )
+                        .await;
+
+                    match ae_resp_outcome {
+                        Err(err) => break MsgResponse::Failure(addr, err),
+                        Ok(MsgResent {
+                            new_peer,
+                            new_recv_stream,
+                        }) => {
+                            recv_stream = new_recv_stream;
+                            trace!("{} to {}", LogMarker::StreamClosed, addr);
+                            peer = new_peer;
+                            attempt += 1;
+                            continue;
+                        }
+                    }
+                }
             }
         };
 
         trace!("{} to {}", LogMarker::StreamClosed, peer.addr());
         result
-    }
-
-    async fn handle_system_msg(
-        &self,
-        msg_id: MsgId,
-        msg: NodeMsg,
-        src_peer: Peer,
-        src_peer_index: usize,
-        correlation_id: MsgId,
-    ) -> Result<MsgResent> {
-        match msg {
-            NodeMsg::AntiEntropy {
-                section_tree_update,
-                kind:
-                    AntiEntropyKind::Redirect { bounced_msg } | AntiEntropyKind::Retry { bounced_msg },
-            } => {
-                debug!("AE Redirect/Retry msg with id {msg_id:?} received for {correlation_id:?} from {src_peer:?}@{src_peer_index:?}");
-                self.handle_ae_msg(
-                    section_tree_update,
-                    bounced_msg,
-                    src_peer,
-                    src_peer_index,
-                    correlation_id,
-                )
-                .await
-            }
-            other_msg => {
-                warn!("Unexpected NodeMsg type with id {msg_id:?} received for {correlation_id:?}: {other_msg:?}");
-                Err(Error::UnexpectedNodeMsg {
-                    correlation_id,
-                    peer: src_peer,
-                    msg: other_msg,
-                })
-            }
-        }
-    }
-
-    // Handle msgs intended for client consumption (re: queries + cmds)
-    #[instrument(level = "debug")]
-    async fn handle_client_msg(
-        msg_id: MsgId,
-        msg: ClientDataResponse,
-        src_peer: Peer,
-        correlation_id: MsgId,
-    ) -> MsgResponse {
-        let src_addr = src_peer.addr();
-        debug!("ClientMsg with id {msg_id:?} received from {src_addr:?}",);
-
-        match msg {
-            ClientDataResponse::QueryResponse {
-                response,
-                correlation_id,
-            } => {
-                trace!(
-                    "ClientDataResponse with id {msg_id:?} is QueryResponse regarding correlation_id \
-                    {correlation_id:?} with response {response:?}"
-                );
-                MsgResponse::QueryResponse(src_addr, Box::new(response))
-            }
-            ClientDataResponse::CmdResponse {
-                response,
-                correlation_id,
-            } => {
-                trace!(
-                    "ClientDataResponse with id {msg_id:?} is CmdAck regarding correlation_id \
-                    {correlation_id:?} with response {response:?}"
-                );
-                MsgResponse::CmdResponse(src_addr, Box::new(response))
-            }
-        }
     }
 
     // Handle Anti-Entropy Redirect or Retry msgs
@@ -205,36 +162,30 @@ impl Session {
         correlation_id: MsgId,
     ) -> Result<MsgResent> {
         let target_sap = section_tree_update.signed_sap.value.clone();
-        debug!("Received Anti-Entropy from {src_peer} (index:{src_peer_index:?}), with SAP: {target_sap:?}");
+        debug!("Received Anti-Entropy msg from {src_peer} (index:{src_peer_index:?}), with SAP: {target_sap:?}");
 
         // Try to update our network knowledge first
         self.update_network_knowledge(section_tree_update, src_peer)
             .await;
 
-        let (msg_id, elders, service_msg, dst, auth) =
-            Self::new_target_elders(src_peer, bounced_msg.clone(), &target_sap, correlation_id)
-                .await?;
+        let (msg_id, elders, client_msg, dst, auth) =
+            Self::new_target_elders(src_peer, bounced_msg, &target_sap, correlation_id).await?;
 
-        // The actual order of elders doesn't really matter. All that matters is we pass each AE response
-        // we get through the same hoops, to then be able to ping a new elder on a 1-1 basis for the src_peer
+        // The actual order of Elders doesn't really matter. All that matters is we pass each AE response
+        // we get through the same hoops, to then be able to ping a new Elder on a 1-1 basis for the src_peer
         // we initially targetted.
-        let deterministic_ordering = XorName::from_content(
-            b"Arbitrary string that we use to sort new SAP elders consistently",
-        );
+        let ordered_elders: Vec<_> = elders
+            .into_iter()
+            .sorted_by(|lhs, rhs| dst.name.cmp_distance(&lhs.name(), &rhs.name()))
+            .collect();
 
-        // here we send this to only one elder for each AE message we get in. We _should_ have one per elder we sent to.
+        // We send this to only one elder for each AE message we get in. We _should_ have one per elder we sent to,
         // deterministically sent to closest elder based upon the initial sender index
-        let ordered_elders = elders
-            .iter()
-            .sorted_by(|lhs, rhs| deterministic_ordering.cmp_distance(&lhs.name(), &rhs.name()))
-            .cloned()
-            .collect_vec();
-
         let target_elder = ordered_elders.get(src_peer_index);
 
         // there should always be one
         if let Some(elder) = target_elder {
-            let payload = WireMsg::serialize_msg_payload(&service_msg)?;
+            let payload = WireMsg::serialize_msg_payload(&client_msg)?;
             let wire_msg =
                 WireMsg::new_msg(msg_id, payload, MsgKind::Client(auth.into_inner()), dst);
             let bytes = wire_msg.serialize()?;
@@ -263,32 +214,27 @@ impl Session {
         section_tree_update: SectionTreeUpdate,
         src_peer: Peer,
     ) {
-        debug!("Attempting to update our knowledge...");
+        debug!("Attempting to update our network knowledge...");
         let sap = section_tree_update.signed_sap.value.clone();
+        let prefix = sap.prefix();
         let mut network = self.network.write().await;
-        debug!("Attempting to update our knowledge... WRITE LOCK GOT");
+        debug!("Attempting to update our network knowledge... WRITE LOCK GOT");
         // Update our network SectionTree based upon passed in knowledge
         match network.update(section_tree_update) {
             Ok(true) => {
-                debug!(
-                    "Anti-Entropy: updated remote section SAP updated for {:?}",
-                    sap.prefix()
-                );
+                debug!("Anti-Entropy: updated remote section SAP for {prefix:?}")
             }
             Ok(false) => {
                 debug!(
-                    "Anti-Entropy: discarded SAP for {:?} since it's the same as \
+                    "Anti-Entropy: discarded SAP for {prefix:?} since it's the same as \
                     the one in our records: {sap:?}",
-                    sap.prefix()
                 );
             }
             Err(err) => {
                 warn!(
-                    "Anti-Entropy: failed to update remote section SAP and section DAG w/ err: {err:?}"
-                );
-                warn!(
-                    "Anti-Entropy: bounced msg dropped. Failed section auth was {:?} sent by: {src_peer:?}",
-                    sap.section_key(),
+                    "Anti-Entropy: failed to update remote section SAP and DAG \
+                    sent by: {src_peer:?}, section key: {:?}, w/ err: {err:?}",
+                    sap.section_key()
                 );
             }
         }
@@ -301,19 +247,17 @@ impl Session {
     async fn new_target_elders(
         src_peer: Peer,
         bounced_msg: UsrMsgBytes,
-        received_auth: &SectionAuthorityProvider,
+        received_sap: &SectionAuthorityProvider,
         correlation_id: MsgId,
     ) -> Result<(MsgId, Vec<Peer>, ClientMsg, Dst, AuthorityProof<ClientAuth>), Error> {
-        let (msg_id, service_msg, dst, auth) = match WireMsg::deserialize(bounced_msg)? {
+        let (msg_id, client_msg, bounced_msg_dst, auth) = match WireMsg::deserialize(bounced_msg)? {
             MsgType::Client {
                 msg_id,
                 msg,
-                auth,
                 dst,
+                auth,
             } => (msg_id, msg, dst, auth),
-            msg @ MsgType::ClientDataResponse { .. }
-            | msg @ MsgType::NodeDataResponse { .. }
-            | msg @ MsgType::Node { .. } => {
+            msg => {
                 warn!("Unexpected bounced msg received in AE response: {msg:?}");
                 return Err(Error::UnexpectedMsgType {
                     correlation_id,
@@ -324,38 +268,23 @@ impl Session {
         };
 
         trace!(
-            "Bounced msg {msg_id:?} received in an AE response: {service_msg:?} from {src_peer:?}"
+            "Bounced msg {msg_id:?} received in an AE response: {client_msg:?} from {src_peer:?}"
         );
-        let dst_address_of_bounced_msg = match service_msg.clone() {
-            ClientMsg::Cmd(cmd) => cmd.dst_name(),
-            ClientMsg::Query(query) => query.variant.dst_name(),
-        };
 
-        let target_public_key = received_auth.section_key();
-
-        // We normally have received auth when we're in AE-Redirect
-        let mut target_elders: Vec<_> = received_auth
-            .elders_vec()
-            .into_iter()
-            .sorted_by(|lhs, rhs| dst_address_of_bounced_msg.cmp_distance(&lhs.name(), &rhs.name()))
-            .collect();
-
+        let target_elders: Vec<_> = received_sap.elders_vec();
         if target_elders.is_empty() {
             Err(Error::AntiEntropyNoSapElders)
         } else {
-            // shuffle so elders sent to is random for better availability
-            target_elders.shuffle(&mut OsRng);
-
             // Let's rebuild the msg with the updated destination details
             let dst = Dst {
-                name: dst.name,
-                section_key: target_public_key,
+                name: bounced_msg_dst.name,
+                section_key: received_sap.section_key(),
             };
             debug!(
-                "Final target elders for resending {msg_id:?}: {service_msg:?} msg \
+                "Final target elders for resending {msg_id:?}: {client_msg:?} msg \
                 are {target_elders:?}"
             );
-            Ok((msg_id, target_elders, service_msg, dst, auth))
+            Ok((msg_id, target_elders, client_msg, dst, auth))
         }
     }
 }

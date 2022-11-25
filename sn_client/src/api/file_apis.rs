@@ -187,7 +187,13 @@ impl Client {
     async fn upload_large(&self, large: LargeFile, verify: bool) -> Result<XorName> {
         let (head_address, all_chunks) = Self::encrypt_large(large)?;
 
+        self.session
+            .setup_connections_to_relevant_nodes(all_chunks.iter().map(|c| *c.name()).collect())
+            .await?;
+
         let tasks = all_chunks.into_iter().map(|chunk| {
+            // TODO: connect to all relevant elders before we fire off all msgs...
+
             let client_clone = self.clone();
             task::spawn(async move {
                 let chunk_addr = *chunk.address().name();

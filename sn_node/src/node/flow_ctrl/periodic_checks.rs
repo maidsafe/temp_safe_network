@@ -8,11 +8,14 @@
 
 use super::FlowCtrl;
 
-use crate::node::{core::NodeContext, flow_ctrl::cmds::Cmd, node_starter::CmdChannel, MyNode};
+use crate::node::{
+    core::NodeContext, flow_ctrl::cmds::Cmd, membership::Membership, node_starter::CmdChannel,
+    MyNode,
+};
 
 use sn_interface::{messaging::system::NodeMsg, types::log_markers::LogMarker};
 
-use std::{collections::BTreeSet, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 use tokio::{sync::RwLock, time::Instant};
 
 const PROBE_INTERVAL: Duration = Duration::from_secs(30);
@@ -53,7 +56,14 @@ impl FlowCtrl {
     /// Generate and fire commands for all types of periodic checks
     pub(super) async fn perform_periodic_checks(&mut self) {
         debug!("[NODE READ]: periodic msg lock attempt...");
-        let context = &self.node.read().await.context();
+        let (context, membership_context) = {
+            let read_locked_node = self.node.read().await;
+            (
+                &read_locked_node.context(),
+                read_locked_node.membership.clone(),
+            )
+        };
+
         debug!("[NODE READ]: periodic msg lock got");
 
         if !context.is_elder {
@@ -64,7 +74,8 @@ impl FlowCtrl {
             return;
         }
 
-        self.enqueue_cmds_for_elder_periodic_checks(context).await;
+        self.enqueue_cmds_for_elder_periodic_checks(context, membership_context)
+            .await;
     }
 
     /// Periodic tasks run for adults only
@@ -85,7 +96,11 @@ impl FlowCtrl {
     }
 
     /// Periodic tasks run for elders only
-    async fn enqueue_cmds_for_elder_periodic_checks(&mut self, context: &NodeContext) {
+    async fn enqueue_cmds_for_elder_periodic_checks(
+        &mut self,
+        context: &NodeContext,
+        membership_context: Option<Membership>,
+    ) {
         debug!(" ----> elder periodics START");
 
         let now = Instant::now();
@@ -132,7 +147,10 @@ impl FlowCtrl {
         if self.timestamps.last_vote_check.elapsed() > MISSING_VOTE_INTERVAL {
             debug!(" ----> vote periodics start");
             self.timestamps.last_vote_check = now;
-            for cmd in self.check_for_missed_votes(context).await {
+            for cmd in self
+                .check_for_missed_votes(context, membership_context)
+                .await
+            {
                 cmds.push(cmd);
             }
             debug!(" ----> vote periodics done");
@@ -149,7 +167,7 @@ impl FlowCtrl {
         if self.timestamps.last_dysfunction_check.elapsed() > DYSFUNCTION_CHECK_INTERVAL {
             debug!(" ----> dysfn periodics start");
             self.timestamps.last_dysfunction_check = now;
-            let dysf_cmds = Self::check_for_dysfunction(self.node.clone()).await;
+            let dysf_cmds = self.check_for_dysfunction().await;
             cmds.extend(dysf_cmds);
             debug!(" ----> dysfn periodics done");
         }
@@ -240,7 +258,7 @@ impl FlowCtrl {
             // whhich is countered when an AE-Update is
             cmds.push(Cmd::TrackNodeIssueInDysfunction {
                 name: elder.name(),
-                issue: sn_dysfunction::IssueType::AwaitingProbeResponse,
+                issue: sn_dysfunction::IssueType::AeProbeMsg,
             });
         }
 
@@ -251,18 +269,23 @@ impl FlowCtrl {
     }
 
     /// Checks the interval since last vote received during a generation
-    async fn check_for_missed_votes(&self, context: &NodeContext) -> Vec<Cmd> {
+    async fn check_for_missed_votes(
+        &self,
+        context: &NodeContext,
+        membership_context: Option<Membership>,
+    ) -> Vec<Cmd> {
         info!("Checking for missed votes");
-        let membership = &context.membership;
         let mut cmds = vec![];
-        if let Some(membership) = &membership {
+        if let Some(membership) = &membership_context {
             let last_received_vote_time = membership.last_received_vote_time();
 
             if let Some(time) = last_received_vote_time {
                 // we want to resend the prev vote
                 if time.elapsed() >= MISSING_VOTE_INTERVAL {
                     debug!("Vote consensus appears stalled...");
-                    if let Some(cmd) = MyNode::membership_gossip_votes(context).await {
+                    if let Some(cmd) =
+                        MyNode::membership_gossip_votes(context, &membership_context).await
+                    {
                         trace!("Vote resending cmd: {cmd:?}");
 
                         cmds.push(cmd);
@@ -308,24 +331,14 @@ impl FlowCtrl {
         });
     }
 
-    async fn check_for_dysfunction(node: Arc<RwLock<MyNode>>) -> Vec<Cmd> {
+    async fn check_for_dysfunction(&mut self) -> Vec<Cmd> {
         info!("Performing dysfunction checking");
         let mut cmds = vec![];
-        debug!("[NODE WRITE]: periodic dysf  write ...");
-        let dysfunctional_nodes = node.write().await.get_dysfunctional_node_names();
-        debug!("[NODE WRITE]: periodic dysf write gottt...");
+        let dysfunctional_nodes = self.get_dysfunctional_node_names().await;
 
-        let unresponsive_nodes = match dysfunctional_nodes {
-            Ok(nodes) => nodes,
-            Err(error) => {
-                error!("Error getting dysfunctional nodes: {error}");
-                BTreeSet::default()
-            }
-        };
-
-        if !unresponsive_nodes.is_empty() {
-            debug!("{:?} : {unresponsive_nodes:?}", LogMarker::ProposeOffline);
-            cmds.push(Cmd::ProposeVoteNodesOffline(unresponsive_nodes))
+        if !dysfunctional_nodes.is_empty() {
+            debug!("{:?} : {dysfunctional_nodes:?}", LogMarker::ProposeOffline);
+            cmds.push(Cmd::ProposeVoteNodesOffline(dysfunctional_nodes))
         }
 
         cmds
