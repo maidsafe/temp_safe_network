@@ -64,10 +64,12 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
     init_logger();
     let _span = tracing::info_span!("receive_join_request_from_relocated_node").entered();
 
-    let (dispatcher, _, _, sk_set) =
-        network_utils::TestNodeBuilder::new(Prefix::default(), elder_count())
-            .build()
-            .await?;
+    let prefix = Prefix::default();
+    let env = TestNetworkBuilder::new(thread_rng())
+        .sap(prefix, elder_count(), 0, None, None)
+        .build();
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0).0;
+    let (_, sk_set) = env.get_network_knowledge(prefix, None);
     let section_key = sk_set.public_keys().public_key();
     let node = dispatcher.node();
     let node_info = node.read().await.info();
@@ -75,7 +77,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
     let relocated_node_old_keypair = node_info.keypair.clone();
 
     let relocated_node = MyNodeInfo::new(
-        ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE + 1),
+        ed25519::gen_keypair(&prefix.range_inclusive(), MIN_ADULT_AGE + 1),
         gen_addr(),
     );
 
@@ -132,12 +134,13 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
 
 #[tokio::test]
 async fn handle_agreement_on_online() -> Result<()> {
-    let (dispatcher, _, _, sk_set) =
-        network_utils::TestNodeBuilder::new(Prefix::default(), elder_count())
-            .build()
-            .await?;
-
-    let new_peer = network_utils::create_peer(MIN_ADULT_AGE);
+    let prefix = Prefix::default();
+    let env = TestNetworkBuilder::new(thread_rng())
+        .sap(prefix, elder_count(), 0, None, None)
+        .build();
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0).0;
+    let (_, sk_set) = env.get_network_knowledge(prefix, None);
+    let new_peer = gen_peer(MIN_ADULT_AGE);
     let status = handle_online_cmd(&new_peer, &sk_set, &dispatcher).await?;
     assert!(status.node_approval_sent);
 
@@ -259,13 +262,13 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
 async fn handle_join_request_of_rejoined_node() -> Result<()> {
     init_logger();
     let prefix = Prefix::default();
-    let (dispatcher, _, _, _) =
-        network_utils::TestNodeBuilder::new(Prefix::default(), elder_count())
-            .build()
-            .await?;
+    let env = TestNetworkBuilder::new(thread_rng())
+        .sap(prefix, elder_count(), 0, None, None)
+        .build();
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0).0;
 
     // Make a left peer.
-    let peer = network_utils::create_peer_in_prefix(&prefix, MIN_ADULT_AGE);
+    let peer = gen_peer_in_prefix(MIN_ADULT_AGE, prefix);
     dispatcher
         .node()
         .write()
@@ -300,15 +303,17 @@ async fn handle_join_request_of_rejoined_node() -> Result<()> {
 async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     init_logger();
     let _span = tracing::info_span!("handle_agreement_on_offline_of_non_elder").entered();
-    let existing_peer = network_utils::create_peer(MIN_ADULT_AGE);
+    let prefix = Prefix::default();
+    let env = TestNetworkBuilder::new(thread_rng())
+        .sap(prefix, elder_count(), 1, None, None)
+        .build();
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0).0;
+    let (_, sk_set) = env.get_network_knowledge(prefix, None);
 
-    let (dispatcher, _, _, sk_set) =
-        network_utils::TestNodeBuilder::new(Prefix::default(), elder_count())
-            .custom_peer(existing_peer)
-            .build()
-            .await?;
+    // get the node state of the non_elder node
+    let node_state = env.get_nodes(prefix, 0, 1, None).remove(0).0.info().peer();
+    let node_state = NodeState::left(node_state, None);
 
-    let node_state = NodeState::left(existing_peer, None);
     let proposal = Proposal::VoteNodeOffline(node_state.clone());
     let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
@@ -326,30 +331,19 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
 
 #[tokio::test]
 async fn handle_agreement_on_offline_of_elder() -> Result<()> {
-    let (sap, sk_set, mut nodes, _) = TestSapBuilder::new(Prefix::default()).build();
-    let (mut section, _) = network_utils::create_section(&sk_set, &sap, None, None)?;
+    let prefix = Prefix::default();
+    let env = TestNetworkBuilder::new(thread_rng())
+        .sap(prefix, elder_count(), 0, None, None)
+        .build();
+    let mut elders = env.get_dispatchers(prefix, 2, 0, None);
+    let dispatcher = elders.remove(0).0;
+    let (_, sk_set) = env.get_network_knowledge(prefix, None);
 
-    let existing_peer = network_utils::create_peer(MIN_ADULT_AGE);
-    let node_state = NodeState::joined(existing_peer, None);
-    let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state);
-    let _updated = section.update_member(node_state);
+    let remove_elder = elders.remove(0).0.node().read().await.info().peer();
+    let remove_elder = NodeState::left(remove_elder, None);
 
-    // Pick the elder to remove.
-    let remove_peer = sap.elders().last().expect("sap is empty");
-
-    let remove_node_state = section
-        .get_section_member(&remove_peer.name())
-        .expect("member not found")
-        .leave()?;
-
-    let node = nodes.remove(0);
-    let (dispatcher, _, _, _) =
-        network_utils::TestNodeBuilder::new(Prefix::default(), elder_count())
-            .section(section.clone(), sk_set.clone(), node.clone())
-            .build()
-            .await?;
     // Handle agreement on the Offline proposal
-    let proposal = Proposal::VoteNodeOffline(remove_node_state.clone());
+    let proposal = Proposal::VoteNodeOffline(remove_elder.clone());
     let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
     let _cmds = run_and_collect_cmds(Cmd::HandleAgreement { proposal, sig }, &dispatcher).await?;
@@ -480,10 +474,12 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
     init_logger();
     let _span = tracing::info_span!("untrusted_ae_msg_errors").entered();
 
-    let (dispatcher, section, _, sk_set) =
-        network_utils::TestNodeBuilder::new(Prefix::default(), elder_count())
-            .build()
-            .await?;
+    let prefix = Prefix::default();
+    let env = TestNetworkBuilder::new(thread_rng())
+        .sap(prefix, elder_count(), 0, None, None)
+        .build();
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0).0;
+    let (section, sk_set) = env.get_network_knowledge(prefix, None);
     let pk = sk_set.secret_key().public_key();
 
     // a valid AE msg but with a non-verifiable SAP...
@@ -499,7 +495,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
         },
     };
 
-    let sender = network_utils::gen_info(MIN_ADULT_AGE, None);
+    let sender = gen_info(MIN_ADULT_AGE, None);
     let wire_msg = WireMsg::single_src(
         &sender,
         Dst {
@@ -591,45 +587,28 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
         RelocatedPeerRole::Elder => elder_count(),
         RelocatedPeerRole::NonElder => recommended_section_size(),
     };
-    let (sap, sk_set, mut nodes, _) = TestSapBuilder::new(prefix).build();
-    let (mut section, section_key_share) =
-        network_utils::create_section(&sk_set, &sap, None, None)?;
-
-    let mut adults = section_size - elder_count();
-    while adults > 0 {
-        adults -= 1;
-        let non_elder_peer = network_utils::create_peer(MIN_ADULT_AGE);
-        let node_state = NodeState::joined(non_elder_peer, None);
-        let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state);
-        assert!(section.update_member(node_state));
-    }
-
-    let non_elder_peer = network_utils::create_peer(MIN_ADULT_AGE - 1);
-    let node_state = NodeState::joined(non_elder_peer, None);
-    let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state);
-    assert!(section.update_member(node_state));
-    let node = nodes.remove(0);
-    let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-    let comm = network_utils::create_comm().await?;
-    let node = MyNode::new(
-        comm,
-        node.keypair.clone(),
-        section,
-        Some(section_key_share),
-        UsedSpace::new(max_capacity),
-        root_storage_dir,
-        mpsc::channel(10).0,
-    )
-    .await?;
-    let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
+    let adults = section_size - elder_count();
+    let env = TestNetworkBuilder::new(thread_rng())
+        .sap(prefix, elder_count(), adults, None, None)
+        .build();
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0).0;
+    let (mut section, sk_set) = env.get_network_knowledge(prefix, None);
 
     let relocated_peer = match relocated_peer_role {
-        RelocatedPeerRole::Elder => *sap.elders().nth(1).expect("too few elders"),
-        RelocatedPeerRole::NonElder => non_elder_peer,
+        // our node is elder idx 0, so remove the second elder
+        RelocatedPeerRole::Elder => env.get_peers(prefix, 2, 0, None).remove(1),
+        RelocatedPeerRole::NonElder => {
+            let non_elder_peer = gen_peer(MIN_ADULT_AGE - 1);
+            let node_state = NodeState::joined(non_elder_peer, None);
+            let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state);
+            assert!(section.update_member(node_state));
+            // update our node with the new network_knowledge
+            dispatcher.node().write().await.network_knowledge = section.clone();
+            non_elder_peer
+        }
     };
 
-    let membership_decision =
-        network_utils::create_relocation_trigger(&sk_set, relocated_peer.age());
+    let membership_decision = create_relocation_trigger(&sk_set, relocated_peer.age());
     let cmds = run_and_collect_cmds(
         Cmd::HandleMembershipDecision(membership_decision),
         &dispatcher,
@@ -645,7 +624,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
         };
 
         if let NodeMsg::Propose {
-            proposal: sn_interface::messaging::system::Proposal::VoteNodeOffline(node_state),
+            proposal: system::Proposal::VoteNodeOffline(node_state),
             ..
         } = msg
         {
@@ -663,21 +642,13 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
 
 #[tokio::test]
 async fn msg_to_self() -> Result<()> {
-    let info = network_utils::gen_info(MIN_ADULT_AGE, None);
-    let (comm_tx, mut comm_rx) = mpsc::channel(network_utils::TEST_EVENT_CHANNEL_SIZE);
-    let comm = Comm::new((Ipv4Addr::LOCALHOST, 0).into(), Default::default(), comm_tx).await?;
-    let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
+    let prefix = Prefix::default();
+    let mut env = TestNetworkBuilder::new(thread_rng())
+        .sap(prefix, 1, 0, None, None)
+        .build();
 
-    let genesis_sk_set = bls::SecretKeySet::random(0, &mut thread_rng());
-    let (node, _) = MyNode::first_node(
-        comm,
-        info.keypair.clone(),
-        UsedSpace::new(max_capacity),
-        root_storage_dir,
-        genesis_sk_set,
-        mpsc::channel(10).0,
-    )
-    .await?;
+    let node = env.get_nodes(prefix, 1, 0, None).remove(0).0;
+    let mut comm_rx = env.take_comm_rx(node.info().public_key());
     let context = node.context();
     let info = node.info();
     let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
@@ -1012,14 +983,16 @@ async fn handle_demote_during_split() -> Result<()> {
 #[ignore = "This needs to be refactored away from Cmd handling, as we need/use a client response stream therein"]
 async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack() -> Result<()> {
     init_logger();
+    let prefix = Prefix::default();
     let replication_count = 5;
-    let (dispatcher, _, peer, sk_set) =
-        network_utils::TestNodeBuilder::new(Prefix::default().pushed(true), elder_count())
-            .adult_count(6)
-            .section_sk_threshold(0)
-            .data_copy_count(replication_count)
-            .build()
-            .await?;
+    std::env::set_var("SN_DATA_COPY_COUNT", replication_count.to_string());
+
+    let env = TestNetworkBuilder::new(thread_rng())
+        .sap(prefix, elder_count(), 6, None, Some(0))
+        .build();
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0).0;
+    let peer = dispatcher.node().read().await.info().peer();
+    let sk_set = env.get_network_knowledge(prefix, None).1;
 
     let (key_image, tx, spent_proofs, spent_transactions) =
         dbc_utils::get_genesis_dbc_spend_info(&sk_set)?;
@@ -1063,14 +1036,16 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
 #[ignore = "This needs to be refactored away from Cmd handling, as we need/use a client response stream therein"]
 async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_error() -> Result<()> {
     init_logger();
+    let prefix = prefix("1");
     let replication_count = 5;
-    let (dispatcher, section, peer, sk_set) =
-        network_utils::TestNodeBuilder::new(Prefix::default().pushed(true), elder_count())
-            .adult_count(6)
-            .section_sk_threshold(0)
-            .data_copy_count(replication_count)
-            .build()
-            .await?;
+    std::env::set_var("SN_DATA_COPY_COUNT", replication_count.to_string());
+
+    let env = TestNetworkBuilder::new(thread_rng())
+        .sap(prefix, elder_count(), 6, None, Some(0))
+        .build();
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0).0;
+    let peer = dispatcher.node().read().await.info().peer();
+    let (section, sk_set) = env.get_network_knowledge(prefix, None);
 
     // These conditions will produce a failure on `tx.verify` in the message handler.
     let sap = section.section_auth();
