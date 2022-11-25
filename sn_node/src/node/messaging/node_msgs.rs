@@ -57,47 +57,48 @@ impl MyNode {
         let our_node_name = context.name;
 
         trace!("About to store data from {original_msg_id:?}: {data_addr:?}");
-        // TODO: Respond with errors etc over the bidi stream
 
         // We are an adult here, so just store away!
-        // This may return a DatabaseFull error... but we should have reported storage increase
+        // This may return a NotEnoughSpace error... but we should have reported storage increase
         // well before this
-        match context
+        let response = match context
             .data_storage
             .store(&data, section_pk, node_keypair.clone())
             .await
         {
             Ok(level_report) => {
+                trace!("Data has been stored: {data_addr:?}");
                 info!("Storage level report: {:?}", level_report);
                 cmds.extend(MyNode::record_storage_level_if_any(context, level_report)?);
+                CmdResponse::ok(data)?
             }
             Err(StorageError::NotEnoughSpace) => {
                 // storage full
-                error!("Not enough space to store more data");
-                let node_id = PublicKey::from(context.keypair.public);
+                error!("Not enough space to store data {data_addr:?}");
                 let msg = NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
-                    node_id,
+                    node_id: PublicKey::from(context.keypair.public),
                     data: data.clone(),
                     full: true,
                 });
 
-                cmds.push(MyNode::send_msg_to_our_elders(context, msg))
+                cmds.push(MyNode::send_msg_to_our_elders(context, msg));
+                CmdResponse::err(data, StorageError::NotEnoughSpace.into())?
             }
             Err(error) => {
                 // the rest seem to be non-problematic errors.. (?)
                 // this could be an "we already have it" error... so we should continue with that...
-                error!("Problem storing data, but it was ignored: {error}");
+                error!("Problem storing data {data_addr:?}, but it was ignored: {error}");
+                CmdResponse::ok(data)?
             }
-        }
-
-        trace!("Data has been stored: {data_addr:?}");
-        let msg = NodeDataResponse::CmdResponse {
-            response: CmdResponse::ok(data)?,
-            correlation_id: original_msg_id,
         };
-        let (kind, payload) = MyNode::serialize_node_msg_response(our_node_name, msg)?;
 
         if let Some(stream) = response_stream {
+            let msg = NodeDataResponse::CmdResponse {
+                response,
+                correlation_id: original_msg_id,
+            };
+            let (kind, payload) = MyNode::serialize_node_msg_response(our_node_name, msg)?;
+
             MyNode::send_msg_on_stream(
                 context.network_knowledge.section_key(),
                 payload,
