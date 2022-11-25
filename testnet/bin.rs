@@ -269,7 +269,8 @@ fn init_tracing() -> Result<()> {
 fn get_node_bin_path(node_path: Option<PathBuf>) -> Result<PathBuf> {
     node_path.ok_or(()).or_else(|()| {
         let mut bin_path = home_dir().ok_or_else(|| eyre!("Failed to obtain user's home path"))?;
-        bin_path.push(".safe/node");
+        bin_path.push(".safe");
+        bin_path.push("node");
         Ok(bin_path)
     })
 }
