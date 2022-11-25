@@ -9,33 +9,40 @@
 #![allow(dead_code)]
 pub(crate) mod cmd_utils;
 pub(crate) mod dbc_utils;
-pub(crate) mod network_utils;
+pub(crate) mod network_builder;
 
+use self::network_builder::TEST_EVENT_CHANNEL_SIZE;
 use crate::{
-    comm::{Comm, MsgFromPeer},
+    comm::MsgFromPeer,
     node::{
-        cfg::create_test_max_capacity_and_root_storage, core::MyNode,
-        flow_ctrl::dispatcher::Dispatcher, messages::WireMsgUtils, messaging::Peers, Cmd, Error,
-        Proposal,
+        flow_ctrl::{
+            dispatcher::Dispatcher,
+            tests::network_builder::{TestNetwork, TestNetworkBuilder},
+        },
+        messages::WireMsgUtils,
+        messaging::Peers,
+        relocation_check, ChurnId, Cmd, Error, Proposal,
     },
-    storage::UsedSpace,
 };
 use cmd_utils::{
     handle_online_cmd, run_and_collect_cmds, run_node_handle_client_msg_and_collect_cmds,
 };
+use sn_consensus::Decision;
 use sn_dbc::Hash;
 use sn_interface::{
     dbcs::gen_genesis_dbc,
     elder_count, init_logger,
     messaging::{
         data::{ClientMsg, DataCmd, SpentbookCmd},
-        system::{AntiEntropyKind, JoinAsRelocatedRequest, NodeDataCmd, NodeMsg, SectionSigned},
+        system::{
+            self, AntiEntropyKind, JoinAsRelocatedRequest, NodeDataCmd, NodeMsg, SectionSigned,
+        },
         Dst, MsgType, WireMsg,
     },
     network_knowledge::{
         recommended_section_size, supermajority, Error as NetworkKnowledgeError, MembershipState,
-        MyNodeInfo, NetworkKnowledge, NodeState, RelocateDetails, SectionAuthorityProvider,
-        SectionKeysProvider, SectionTree, SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
+        MyNodeInfo, NodeState, RelocateDetails, SectionAuthorityProvider, SectionKeysProvider,
+        SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
     },
     test_utils::*,
     types::{keys::ed25519, PublicKey, ReplicatedData},
@@ -43,14 +50,13 @@ use sn_interface::{
 
 use assert_matches::assert_matches;
 use eyre::{bail, eyre, Result};
-use rand::thread_rng;
+use rand::{rngs::StdRng, thread_rng, SeedableRng};
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
     iter,
-    net::Ipv4Addr,
     sync::Arc,
 };
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::RwLock;
 use xor_name::{Prefix, XorName};
 
 #[tokio::test]
@@ -545,6 +551,29 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
 #[tokio::test]
 async fn relocation_of_non_elder() -> Result<()> {
     relocation(RelocatedPeerRole::NonElder).await
+}
+
+/// Create a `Proposal::Online` whose agreement handling triggers relocation of a node with the
+/// given age.
+///
+/// NOTE: recommended to call this with low `age` (4 or 5), otherwise it might take very long time
+/// to complete because it needs to generate a signature with the number of trailing zeroes equal
+/// to (or greater that) `age`.
+pub(crate) fn create_relocation_trigger(
+    sk_set: &bls::SecretKeySet,
+    age: u8,
+) -> Decision<NodeState> {
+    loop {
+        let node_state = NodeState::joined(gen_peer(MIN_ADULT_AGE), Some(xor_name::rand::random()));
+        let decision = section_decision(sk_set, node_state.clone());
+
+        let sig: bls::Signature = decision.proposals[&node_state].clone();
+        let churn_id = ChurnId(sig.to_bytes());
+
+        if relocation_check(age, &churn_id) && !relocation_check(age + 1, &churn_id) {
+            return decision;
+        }
+    }
 }
 
 fn threshold() -> usize {

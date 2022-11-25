@@ -1,6 +1,7 @@
 use super::SectionKeysProvider;
 use crate::{
     network_knowledge::{section_keys::build_spent_proof_share, Error, MyNodeInfo, MIN_ADULT_AGE},
+    types::{keys::ed25519, Peer},
     SectionAuthorityProvider,
 };
 use eyre::{eyre, Result};
@@ -31,6 +32,26 @@ pub fn gen_addr() -> SocketAddr {
     let port = NEXT_PORT.with(|cell| cell.replace(cell.get().wrapping_add(1)));
 
     ([192, 0, 2, 0], port).into()
+}
+
+// Generate a Peer with the given age
+pub fn gen_peer(age: u8) -> Peer {
+    let name = ed25519::gen_name_with_age(age);
+    Peer::new(name, gen_addr())
+}
+
+// Generate a Peer with the given age and prefix
+pub fn gen_peer_in_prefix(age: u8, prefix: Prefix) -> Peer {
+    let name = ed25519::gen_name_with_age(age);
+    Peer::new(prefix.substituted_in(name), gen_addr())
+}
+
+// Generate `MyNodeInfo` with the given age and prefix
+pub fn gen_info(age: u8, prefix: Option<Prefix>) -> MyNodeInfo {
+    MyNodeInfo::new(
+        ed25519::gen_keypair(&prefix.unwrap_or_default().range_inclusive(), age),
+        gen_addr(),
+    )
 }
 
 /// Create `elder+adult` Nodes sorted by their names.
@@ -67,17 +88,9 @@ pub fn gen_sorted_nodes(
             } else {
                 MIN_ADULT_AGE
             };
-            MyNodeInfo::new(
-                crate::types::keys::ed25519::gen_keypair(&prefix.range_inclusive(), age),
-                gen_addr(),
-            )
+            gen_info(age, Some(*prefix))
         })
-        .chain((0..adult).map(|_| {
-            MyNodeInfo::new(
-                crate::types::keys::ed25519::gen_keypair(&prefix.range_inclusive(), MIN_ADULT_AGE),
-                gen_addr(),
-            )
-        }))
+        .chain((0..adult).map(|_| gen_info(MIN_ADULT_AGE, Some(*prefix))))
         .sorted_by_key(|node| node.age())
         .rev()
         .collect()
