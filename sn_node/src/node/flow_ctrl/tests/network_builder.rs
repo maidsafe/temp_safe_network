@@ -137,6 +137,13 @@ impl<R: RngCore> TestNetworkBuilder<R> {
 
         let mut nodes = Vec::new();
         for node in node_infos {
+            // check MemberType
+            let mem_type = if sap.elders_set().contains(&node.peer()) {
+                TestMemberType::Elder
+            } else {
+                TestMemberType::Adult
+            };
+
             let (tx, rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
             let socket_addr: SocketAddr = (Ipv4Addr::LOCALHOST, 0).into();
             let comm = futures::executor::block_on(Comm::new(socket_addr, Default::default(), tx))
@@ -144,15 +151,9 @@ impl<R: RngCore> TestNetworkBuilder<R> {
             let mut node = node.clone();
             node.addr = comm.socket_addr();
 
-            // check MemberType
-            let memb_type = if sap.elders_set().contains(&node.peer()) {
-                TestMemberType::Elder
-            } else {
-                TestMemberType::Adult
-            };
             // insert the commRx
             let _ = self.receivers.insert(node.public_key(), Some(rx));
-            nodes.push((node, comm, memb_type));
+            nodes.push((node, comm, mem_type));
         }
         self.sections
             .push((sap.clone(), nodes, secret_key_set.clone()));
