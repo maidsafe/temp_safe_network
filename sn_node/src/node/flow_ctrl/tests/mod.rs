@@ -157,48 +157,30 @@ async fn handle_agreement_on_online() -> Result<()> {
 #[tokio::test]
 async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     init_logger();
-    let sk_set = bls::SecretKeySet::random(0, &mut thread_rng());
-    let pk = sk_set.secret_key().public_key();
-    let section_chain = SectionsDAG::new(pk);
-
     // Creates nodes where everybody has age 6 except one has 5.
-    let mut nodes: Vec<_> = gen_sorted_nodes(&Prefix::default(), elder_count(), 0, Some(&[5, 6]));
+    let prefix = Prefix::default();
+    let env = TestNetworkBuilder::new(thread_rng())
+        .sap(
+            prefix,
+            elder_count(),
+            0,
+            Some(&[MIN_ADULT_AGE, MIN_ADULT_AGE + 1]),
+            None,
+        )
+        .build();
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0).0;
+    let node_name = dispatcher.node().read().await.name();
+    let (section, sk_set) = env.get_network_knowledge(prefix, None);
 
-    let elders = nodes.iter().map(MyNodeInfo::peer);
-    let members = nodes.iter().map(|n| NodeState::joined(n.peer(), None));
-    let section_auth =
-        SectionAuthorityProvider::new(elders, Prefix::default(), members, sk_set.public_keys(), 0);
-    let section_tree_update = {
-        let signed_sap = TestKeys::get_section_signed(&sk_set.secret_key(), section_auth.clone());
-        SectionTreeUpdate::new(signed_sap, section_chain)
-    };
-
-    let mut section = NetworkKnowledge::new(SectionTree::new(pk), section_tree_update)?;
-    let mut expected_new_elders = BTreeSet::new();
-
-    for peer in section_auth.elders() {
-        let node_state = NodeState::joined(*peer, None);
-        let sig = TestKeys::get_section_sig(&sk_set.secret_key(), &node_state);
-        let _updated = section.update_member(SectionSigned {
-            value: node_state,
-            sig,
-        });
-        if peer.age() == MIN_ADULT_AGE + 1 {
-            let _changed = expected_new_elders.insert(peer);
-        }
-    }
-
-    let node = nodes.remove(0);
-    let node_name = node.name();
-    let (dispatcher, _, _, _) =
-        network_utils::TestNodeBuilder::new(Prefix::default(), elder_count())
-            .section(section.clone(), sk_set.clone(), node.clone())
-            .build()
-            .await?;
+    let mut expected_new_elders = section
+        .elders()
+        .into_iter()
+        .filter(|peer| peer.age() == MIN_ADULT_AGE + 1)
+        .collect::<BTreeSet<_>>();
 
     // Handle agreement on Online of a peer that is older than the youngest
     // current elder - that means this peer is going to be promoted.
-    let new_peer = network_utils::create_peer(MIN_ADULT_AGE + 1);
+    let new_peer = gen_peer(MIN_ADULT_AGE + 1);
     let node_state = NodeState::joined(new_peer, Some(xor_name::rand::random()));
 
     let membership_decision = section_decision(&sk_set, node_state.clone());
@@ -221,7 +203,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
 
     // Verify we sent a `DkgStart` message with the expected participants.
     let mut dkg_start_sent = false;
-    let _changed = expected_new_elders.insert(&new_peer);
+    let _changed = expected_new_elders.insert(new_peer);
 
     for cmd in cmds {
         let (msg, recipients) = match cmd {
@@ -241,8 +223,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         );
 
         let expected_dkg_start_recipients: BTreeSet<_> = expected_new_elders
-            .clone()
-            .into_iter()
+            .iter()
             .filter(|peer| peer.name() != node_name)
             .cloned()
             .collect();
