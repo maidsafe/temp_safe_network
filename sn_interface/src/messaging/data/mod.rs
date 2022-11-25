@@ -30,7 +30,7 @@ pub use self::{
 use crate::network_knowledge::SectionTreeUpdate;
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register, User},
-    Chunk, DataAddress,
+    Chunk,
 };
 use crate::{
     messaging::{
@@ -230,33 +230,33 @@ pub enum CmdResponse {
     // ===== Chunk =====
     //
     /// Response to DataCmd::StoreChunk
-    StoreChunk(Result<DataAddress>),
+    StoreChunk(Result<()>),
     //
     // ===== Register Data =====
     //
     /// Response to RegisterCmd::Create.
-    CreateRegister(Result<DataAddress>),
+    CreateRegister(Result<()>),
     /// Response to RegisterCmd::Edit.
-    EditRegister(Result<DataAddress>),
+    EditRegister(Result<()>),
     //
     // ===== Spentbook Data =====
     //
     /// Response to SpentbookCmd::Spend.
-    SpendKey(Result<DataAddress>),
+    SpendKey(Result<()>),
 }
 
 impl CmdResponse {
     #[allow(clippy::result_large_err)]
     pub fn ok(data: ReplicatedData) -> Result<CmdResponse> {
         let res = match &data {
-            ReplicatedData::Chunk(_) => CmdResponse::StoreChunk(Ok(data.address())),
+            ReplicatedData::Chunk(_) => CmdResponse::StoreChunk(Ok(())),
             ReplicatedData::RegisterWrite(RegisterCmd::Create { .. }) => {
-                CmdResponse::CreateRegister(Ok(data.address()))
+                CmdResponse::CreateRegister(Ok(()))
             }
             ReplicatedData::RegisterWrite(RegisterCmd::Edit { .. }) => {
-                CmdResponse::EditRegister(Ok(data.address()))
+                CmdResponse::EditRegister(Ok(()))
             }
-            ReplicatedData::SpentbookWrite(_) => CmdResponse::SpendKey(Ok(data.address())),
+            ReplicatedData::SpentbookWrite(_) => CmdResponse::SpendKey(Ok(())),
             ReplicatedData::RegisterLog(_) => return Err(Error::NoCorrespondingCmdError), // this should be unreachable, since `RegisterLog` is not resulting from a cmd.
             ReplicatedData::SpentbookLog(_) => return Err(Error::NoCorrespondingCmdError), // this should be unreachable, since `SpentbookLog` is not resulting from a cmd.
         };
@@ -286,7 +286,7 @@ impl CmdResponse {
     }
 
     /// Returns the result
-    pub fn result(&self) -> &Result<DataAddress> {
+    pub fn result(&self) -> &Result<()> {
         use CmdResponse::*;
         match self {
             StoreChunk(result)
