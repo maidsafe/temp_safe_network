@@ -63,8 +63,6 @@ impl FlowCtrl {
             )
         };
 
-        debug!("[NODE READ]: periodic msg lock got");
-
         if !context.is_elder {
             self.enqueue_cmds_for_adult_periodic_checks(context).await;
 
