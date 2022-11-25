@@ -6,14 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use criterion::Throughput;
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 
 use eyre::Result;
 
 use sn_client::{Client, Error};
 use sn_interface::{
-    messaging::{self, data::ClientMsg, ClientAuth, Dst, MsgId, WireMsg},
+    messaging::{
+        self,
+        data::{ClientMsg, DataCmd},
+        ClientAuth, Dst, MsgId, WireMsg,
+    },
     types::register::{Policy, User},
 };
 use tokio::runtime::Runtime;
@@ -71,7 +74,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         let msg_id = MsgId::new();
 
         let payload = {
-            let msg = ClientMsg::Cmd(batch[0].clone());
+            let msg = ClientMsg::Cmd(DataCmd::Register(batch[0].clone()));
             match WireMsg::serialize_msg_payload(&msg) {
                 Ok(payload) => payload,
                 Err(error) => panic!("failed to serialise msg payload: {error:?}"),

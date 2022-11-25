@@ -8,7 +8,7 @@
 
 use super::Client;
 
-use crate::Error;
+use crate::{Error, Result};
 
 use sn_dbc::{KeyImage, RingCtTransaction, SpentProof, SpentProofShare};
 use sn_interface::{
@@ -16,7 +16,7 @@ use sn_interface::{
         DataCmd, DataQueryVariant, Error as NetworkDataError, QueryResponse, SpentbookCmd,
         SpentbookQuery,
     },
-    types::SpentbookAddress,
+    types::{DataAddress, SpentbookAddress},
 };
 
 use std::collections::BTreeSet;
@@ -47,7 +47,7 @@ impl Client {
         tx: RingCtTransaction,
         spent_proofs: BTreeSet<SpentProof>,
         spent_transactions: BTreeSet<RingCtTransaction>,
-    ) -> Result<(), Error> {
+    ) -> Result<DataAddress> {
         let mut network_knowledge = None;
         let mut attempts = 1;
 
@@ -64,38 +64,39 @@ impl Client {
                 network_knowledge,
             };
 
-            let result = self.send_cmd(DataCmd::Spentbook(cmd)).await;
+            let result = self.send_cmd(DataCmd::Spentbook(cmd.clone())).await;
 
-            if let Err(Error::CmdError {
-                source: NetworkDataError::SpentProofUnknownSectionKey(unknown_section_key),
-                ..
-            }) = result
-            {
-                debug!(
-                    "Encountered unknown section key during spend request. \
-                        Will obtain updated network knowledge and retry. \
-                        Attempts made: {attempts}"
-                );
-                if attempts >= MAX_SPEND_DBC_ATTEMPS {
-                    error!("DBC spend request failed after {attempts} attempts");
-                    return Err(Error::DbcSpendRetryAttemptsExceeded {
-                        attempts,
-                        key_image,
-                    });
+            match result {
+                Ok(acked_address) => return verify_ack(cmd, acked_address),
+                Err(Error::CmdError {
+                    source: NetworkDataError::SpentProofUnknownSectionKey(unknown_section_key),
+                    ..
+                }) => {
+                    debug!(
+                        "Encountered unknown section key during spend request. \
+                            Will obtain updated network knowledge and retry. \
+                            Attempts made: {attempts}"
+                    );
+                    if attempts >= MAX_SPEND_DBC_ATTEMPS {
+                        error!("DBC spend request failed after {attempts} attempts");
+                        return Err(Error::DbcSpendRetryAttemptsExceeded {
+                            attempts,
+                            key_image,
+                        });
+                    }
+                    let network = self.session.network.read().await;
+                    let (proof_chain, _) = network
+                        .get_sections_dag()
+                        .single_branch_dag_for_key(&unknown_section_key)
+                        .map_err(|_| Error::SectionsDagKeyNotFound(unknown_section_key))?;
+                    let signed_sap = network
+                        .get_signed_by_key(&unknown_section_key)
+                        .ok_or(Error::SignedSapNotFound(unknown_section_key))?;
+
+                    network_knowledge = Some((proof_chain, signed_sap.clone()));
+                    attempts += 1;
                 }
-                let network = self.session.network.read().await;
-                let (proof_chain, _) = network
-                    .get_sections_dag()
-                    .single_branch_dag_for_key(&unknown_section_key)
-                    .map_err(|_| Error::SectionsDagKeyNotFound(unknown_section_key))?;
-                let signed_sap = network
-                    .get_signed_by_key(&unknown_section_key)
-                    .ok_or(Error::SignedSapNotFound(unknown_section_key))?;
-
-                network_knowledge = Some((proof_chain, signed_sap.clone()));
-                attempts += 1;
-            } else {
-                return result;
+                other => return other,
             }
         }
     }
@@ -106,10 +107,7 @@ impl Client {
 
     /// Return the set of spent proof shares if the provided DBC's key image is spent
     #[instrument(skip(self), level = "debug")]
-    pub async fn spent_proof_shares(
-        &self,
-        key_image: KeyImage,
-    ) -> Result<Vec<SpentProofShare>, Error> {
+    pub async fn spent_proof_shares(&self, key_image: KeyImage) -> Result<Vec<SpentProofShare>> {
         let address = SpentbookAddress::new(XorName::from_content(&key_image.to_bytes()));
         let query = DataQueryVariant::Spentbook(SpentbookQuery::SpentProofShares(address));
         let query_result = self.send_query(query.clone()).await?;
@@ -122,6 +120,28 @@ impl Client {
                 response: other,
             }),
         }
+    }
+}
+
+// helper to verify the ack type and content
+fn verify_ack(sent_cmd: SpentbookCmd, acked_address: DataAddress) -> Result<DataAddress> {
+    match acked_address {
+        DataAddress::Spentbook(address) => {
+            // verify the ack address
+            let acked_name = *address.name();
+            if acked_name == sent_cmd.name() {
+                Ok(acked_address)
+            } else {
+                Err(Error::UnexpectedCmdAckDataName {
+                    sent_cmd: DataCmd::Spentbook(sent_cmd),
+                    acked_address,
+                })
+            }
+        }
+        other => Err(Error::UnexpectedCmdAckDataType {
+            sent_cmd: DataCmd::Spentbook(sent_cmd),
+            acked_address: other,
+        }),
     }
 }
 
@@ -201,7 +221,7 @@ mod tests {
         assert_eq!(&genesis_key_image, key_image);
 
         // Spend the key_image.
-        client
+        let _ack_addr = client
             .spend_dbc(
                 *key_image,
                 tx.clone(),

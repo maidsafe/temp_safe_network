@@ -8,7 +8,7 @@
 
 use super::Client;
 
-use crate::Error;
+use crate::{Error, Result};
 
 use sn_interface::{
     messaging::data::{
@@ -17,7 +17,7 @@ use sn_interface::{
     },
     types::{
         register::{Action, Entry, EntryHash, Permissions, Policy, Register, User},
-        RegisterAddress as Address,
+        DataAddress, RegisterAddress as Address,
     },
 };
 
@@ -30,7 +30,7 @@ use xor_name::XorName;
 /// Can also be used as a way to implement dry runs:
 /// nothing is uploaded to the network as long as the WAL is not published.
 /// Batches can be republished without duplication risks thanks to the CRDT nature of registers.
-pub type RegisterWriteAheadLog = Vec<DataCmd>;
+pub type RegisterWriteAheadLog = Vec<RegisterCmd>;
 
 impl Client {
     //----------------------
@@ -41,9 +41,10 @@ impl Client {
     /// Incrementing the WAL index as successful writes are sent out. Stops at the first error.
     /// Starts publishing from the index when called again with the same WAL.
     #[instrument(skip(self), level = "debug")]
-    pub async fn publish_register_ops(&self, wal: RegisterWriteAheadLog) -> Result<(), Error> {
+    pub async fn publish_register_ops(&self, wal: RegisterWriteAheadLog) -> Result<()> {
         for cmd in &wal {
-            self.send_cmd(cmd.clone()).await?;
+            let acked_addr = self.send_cmd(DataCmd::Register(cmd.clone())).await?;
+            verify_ack(cmd, acked_addr)?;
         }
         Ok(())
     }
@@ -67,7 +68,7 @@ impl Client {
         let op = CreateRegister { name, tag, policy };
         let signature = self.keypair.sign(&bincode::serialize(&op)?);
 
-        let cmd = DataCmd::Register(RegisterCmd::Create {
+        let cmd = RegisterCmd::Create {
             cmd: SignedRegisterCreate {
                 op,
                 auth: sn_interface::messaging::ClientAuth {
@@ -76,7 +77,7 @@ impl Client {
                 },
             },
             section_sig: section_sig(), // obtained after presenting a valid payment to the network
-        });
+        };
 
         debug!("Creating Register: {:?}", cmd);
 
@@ -119,7 +120,7 @@ impl Client {
         };
 
         // Finally we package the mutation for the network's replicas (it's now ready to be sent)
-        let cmd = DataCmd::Register(RegisterCmd::Edit(edit));
+        let cmd = RegisterCmd::Edit(edit);
         let batch = vec![cmd];
         Ok((hash, batch))
     }
@@ -240,6 +241,28 @@ impl Client {
                 response: other,
             }),
         }
+    }
+}
+
+// helper to verify the ack type and content
+fn verify_ack(sent_cmd: &RegisterCmd, acked_address: DataAddress) -> Result<()> {
+    match acked_address {
+        DataAddress::Register(address) => {
+            // verify the ack address
+            let acked_name = *address.name();
+            if acked_name == sent_cmd.name() {
+                Ok(())
+            } else {
+                Err(Error::UnexpectedCmdAckDataName {
+                    sent_cmd: DataCmd::Register(sent_cmd.clone()),
+                    acked_address,
+                })
+            }
+        }
+        other => Err(Error::UnexpectedCmdAckDataType {
+            sent_cmd: DataCmd::Register(sent_cmd.clone()),
+            acked_address: other,
+        }),
     }
 }
 

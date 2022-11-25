@@ -14,7 +14,7 @@ use sn_interface::{
         data::{ClientMsg, DataCmd},
         ClientAuth, WireMsg,
     },
-    types::{PublicKey, Signature},
+    types::{DataAddress, PublicKey, Signature},
 };
 
 use bytes::Bytes;
@@ -35,7 +35,7 @@ impl Client {
         client_pk: PublicKey,
         serialised_cmd: Bytes,
         signature: Signature,
-    ) -> Result<(), Error> {
+    ) -> Result<DataAddress, Error> {
         let auth = ClientAuth {
             public_key: client_pk,
             signature,
@@ -54,7 +54,7 @@ impl Client {
     /// The provided `DataCmd` is serialised and signed with the
     /// keypair this Client instance has been setup with.
     #[instrument(skip_all, level = "debug", name = "client-api send cmd")]
-    pub async fn send_cmd(&self, cmd: DataCmd) -> Result<(), Error> {
+    pub async fn send_cmd(&self, cmd: DataCmd) -> Result<DataAddress, Error> {
         let client_pk = self.public_key();
         let dst_name = cmd.dst_name();
 
