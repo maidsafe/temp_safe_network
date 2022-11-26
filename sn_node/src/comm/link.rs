@@ -173,7 +173,11 @@ impl Link {
             self.peer
         );
 
-        recv_stream.next().await.map_err(SendToOneError::Recv)
+        recv_stream
+            .next()
+            .await
+            .map_err(SendToOneError::Recv)?
+            .ok_or(SendToOneError::RecvClosed(self.peer))
     }
 
     // Gets an existing connection or creates a new one to the Link's Peer
@@ -272,6 +276,8 @@ pub(crate) enum SendToOneError {
     Send(qp2p::SendError),
     ///
     Recv(qp2p::RecvError),
+    /// Remote peer closed the bi-stream we expected a msg on
+    RecvClosed(Peer),
 }
 
 impl SendToOneError {

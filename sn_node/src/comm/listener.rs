@@ -14,8 +14,13 @@ use sn_interface::{
 };
 
 use qp2p::ConnectionIncoming;
-use tokio::{sync::mpsc, task};
+use std::sync::Arc;
+use tokio::{
+    sync::{mpsc, Mutex},
+    task,
+};
 use tracing::Instrument;
+
 #[derive(Debug)]
 pub(crate) enum ListenerEvent {
     Connected {
@@ -57,19 +62,17 @@ impl MsgListener {
             match result {
                 Ok((msg_bytes, send_stream)) => {
                     let stream_info = if let Some(stream) = &send_stream {
-                        format!(" on {}", stream.lock().await.id())
+                        format!(" on {}", stream.id())
                     } else {
                         "".to_string()
                     };
+                    debug!("New msg arrived from {remote_address:?}{stream_info}");
 
                     let wire_msg = match WireMsg::from(msg_bytes) {
                         Ok(wire_msg) => wire_msg,
                         Err(error) => {
                             // TODO: should perhaps rather drop this connection.. as it is a spam vector
-                            debug!(
-                                "Failed to deserialize message received{stream_info}: {:?}",
-                                error
-                            );
+                            debug!("Failed to deserialize message received from {remote_address:?}{stream_info}: {error:?}");
                             continue;
                         }
                     };
@@ -92,9 +95,9 @@ impl MsgListener {
                             .await;
                     }
 
+                    let msg_id = wire_msg.msg_id();
                     debug!(
-                        "MsgEvent received from: {src_name:?}{stream_info} was: {:?}",
-                        wire_msg
+                        "Msg {msg_id:?} received from: {src_name:?}{stream_info} was: {wire_msg:?}"
                     );
 
                     if let Err(error) = self
@@ -102,16 +105,18 @@ impl MsgListener {
                         .send(MsgFromPeer {
                             sender: Peer::new(src_name, remote_address),
                             wire_msg,
-                            send_stream,
+                            send_stream: send_stream.map(|s| Arc::new(Mutex::new(s))),
                         })
                         .await
                     {
-                        error!("Error pushing msg onto internal msg channel... {error:?}");
+                        error!(
+                            "Error pushing msg {msg_id:?} onto internal msg channel... {error:?}"
+                        );
                     }
                 }
                 Err(error) => {
                     // TODO: should we propagate this?
-                    warn!("error on connection with {}: {:?}", remote_address, error);
+                    warn!("Error on connection with {remote_address}: {error:?}");
                 }
             }
         }
