@@ -59,6 +59,8 @@ impl FlowCtrl {
         debug!("[NODE READ]: flowctrl node context lock got");
         let node_context = cmd_ctrl.node().read().await.context();
         let (cmd_sender_channel, mut incoming_cmds_from_apis) = mpsc::channel(10_000);
+        let node_identifier = node_context.info.name();
+        let node_data_storage = node_context.data_storage.clone();
 
         let dysfunction_channels = {
             let dysfunction = DysfunctionDetection::new(
@@ -98,7 +100,6 @@ impl FlowCtrl {
         let _ = tokio::task::spawn(async move {
             // Get a stable identifier for statemap naming. This is NOT the node's current name.
             // It's the initial name... but will not change for the entire statemap
-            let node_identifier = node_context.info.name();
             while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
                 cmd_ctrl
                     .process_cmd_job(cmd, cmd_id, node_identifier, cmd_channel.clone())
@@ -108,7 +109,6 @@ impl FlowCtrl {
 
         // start a new thread to kick off data replication
         let _ = tokio::task::spawn(async move {
-            let node_data_storage = node_context.data_storage;
             // let pending_data_to_replicate_to_peers = BTreeMap::new();
             // is there a simple way to dedupe common data going to many peers?
             // is any overhead reduction worth the increased complexity?
@@ -143,7 +143,7 @@ impl FlowCtrl {
                     // if we hit the batch limit or we're at the last data to send...
                     if iteration == data_batch_size || iteration == data_addresses.len() {
                         let msg = NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateData(data_batch));
-                        let cmd = Cmd::send_msg(msg, Peers::Single(peer));
+                        let cmd = Cmd::send_msg(msg, Peers::Single(peer), node_context.clone());
                         if let Err(error) =
                             cmd_channel_for_data_replication.send((cmd, vec![])).await
                         {

@@ -101,7 +101,11 @@ impl MyNode {
                         // We'll send a membership AE request to see if they can help us catch up.
                         debug!("{:?}", LogMarker::MembershipSendingAeUpdateRequest);
                         let msg = NodeMsg::MembershipAE(membership.generation());
-                        cmds.push(MyNode::send_system_msg(msg, Peers::Single(peer)));
+                        cmds.push(MyNode::send_system_msg(
+                            msg,
+                            Peers::Single(peer),
+                            self.context(),
+                        ));
                         // return the vec w/ the AE cmd there so as not to loop and generate AE for
                         // any subsequent commands
                         return Ok(cmds);
@@ -140,6 +144,7 @@ impl MyNode {
 
     pub(crate) fn handle_membership_anti_entropy(
         membership_context: Option<Membership>,
+        node_context: NodeContext,
         peer: Peer,
         gen: Generation,
     ) -> Option<Cmd> {
@@ -157,6 +162,7 @@ impl MyNode {
                     Some(MyNode::send_system_msg(
                         NodeMsg::MembershipVotes(catchup_votes),
                         Peers::Single(peer),
+                        node_context,
                     ))
                 }
                 Err(e) => {
@@ -290,7 +296,7 @@ impl MyNode {
         let msg = NodeMsg::JoinResponse(JoinResponse::Approved { decision });
 
         trace!("{}", LogMarker::SendNodeApproval);
-        MyNode::send_system_msg(msg, Peers::Multiple(peers))
+        MyNode::send_system_msg(msg, Peers::Multiple(peers), self.context())
     }
 
     pub(crate) fn handle_node_left(
@@ -322,7 +328,11 @@ impl MyNode {
         if node_state.is_relocated() {
             let peer = *node_state.peer();
             let msg = NodeMsg::Relocate(node_state);
-            Some(MyNode::send_system_msg(msg, Peers::Single(peer)))
+            Some(MyNode::send_system_msg(
+                msg,
+                Peers::Single(peer),
+                self.context(),
+            ))
         } else {
             None
         }

@@ -208,7 +208,7 @@ impl JoiningAsRelocated {
         info!("Sending {:?} to {:?}", join_request, recipients);
 
         let msg = NodeMsg::JoinAsRelocatedRequest(Box::new(join_request));
-        let cmd = Cmd::send_msg(msg, Peers::Multiple(recipients));
+        let cmd = Cmd::send_join_msg(msg, Peers::Multiple(recipients));
 
         Ok(cmd)
     }
@@ -274,7 +274,7 @@ mod tests {
         )?;
 
         match cmd {
-            Cmd::SendMsg {
+            Cmd::SendLockingJoinMsg {
                 msg, recipients, ..
             } => {
                 match recipients {

@@ -34,13 +34,14 @@ impl MyNode {
     pub(crate) fn send_msg_to_our_elders(context: &NodeContext, msg: NodeMsg) -> Cmd {
         let sap = context.network_knowledge.section_auth();
         let recipients = sap.elders_set();
-        MyNode::send_system_msg(msg, Peers::Multiple(recipients))
+        MyNode::send_system_msg(msg, Peers::Multiple(recipients), context.clone())
     }
 
     /// Send a (`NodeMsg`) message to a node
-    pub(crate) fn send_system_msg(msg: NodeMsg, recipients: Peers) -> Cmd {
+    /// Context is consumed and passed into the SendMsg command
+    pub(crate) fn send_system_msg(msg: NodeMsg, recipients: Peers, context: NodeContext) -> Cmd {
         trace!("{}: {:?}", LogMarker::SendToNodes, msg);
-        Cmd::send_msg(msg, recipients)
+        Cmd::send_msg(msg, recipients, context)
     }
 
     pub(crate) async fn store_data_as_adult_and_respond(
@@ -300,15 +301,25 @@ impl MyNode {
                 Ok(cmds)
             }
             NodeMsg::MembershipAE(gen) => {
-                debug!("[NODE READ]: membership ae read ");
-                let membership_context = node.read().await.membership.clone();
-                debug!("[NODE READ]: membership ae read got");
+                let (node_context, membership_context) = {
+                    debug!("[NODE READ]: membership ae read ");
+                    let node = node.read().await;
+                    debug!("[NODE READ]: membership ae read got");
 
-                Ok(
-                    MyNode::handle_membership_anti_entropy(membership_context, sender, gen)
-                        .into_iter()
-                        .collect(),
+                    let membership = node.membership.clone();
+                    let context = node.context();
+
+                    (context, membership)
+                };
+
+                Ok(MyNode::handle_membership_anti_entropy(
+                    membership_context,
+                    node_context,
+                    sender,
+                    gen,
                 )
+                .into_iter()
+                .collect())
             }
             NodeMsg::Propose {
                 proposal,
@@ -581,7 +592,7 @@ impl MyNode {
 
             let dst = Peers::Multiple(context.network_knowledge.elders());
 
-            cmds.push(Cmd::send_msg(msg, dst));
+            cmds.push(Cmd::send_msg(msg, dst, context.clone()));
         }
 
         Ok(cmds)

@@ -50,15 +50,32 @@ impl Dispatcher {
     /// Handles a single cmd.
     pub(crate) async fn process_cmd(&self, cmd: Cmd) -> Result<Vec<Cmd>> {
         match cmd {
-            Cmd::SendMsg {
+            // Used purely for locking Join process
+            Cmd::SendLockingJoinMsg {
                 msg,
                 msg_id,
                 recipients,
                 send_stream,
             } => {
+                info!("[NODE READ]: getting lock for joins endmsg");
+                let context = self.node().read().await.context();
+                info!("[NODE READ]: got lock for join sendmsg");
+                Ok(vec![Cmd::SendMsg {
+                    msg,
+                    msg_id,
+                    recipients,
+                    send_stream,
+                    context,
+                }])
+            }
+            Cmd::SendMsg {
+                msg,
+                msg_id,
+                recipients,
+                send_stream,
+                context,
+            } => {
                 trace!("Sending msg: {msg_id:?}");
-                let context = self.node.read().await.context();
-                debug!("[NODE READ]: send msg lock got");
 
                 let peer_msgs = {
                     into_msg_bytes(

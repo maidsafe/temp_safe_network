@@ -357,6 +357,7 @@ impl MyNode {
                     cmds.push(MyNode::send_system_msg(
                         NodeMsg::HandoverAE(gen),
                         Peers::Single(peer),
+                        self.context(),
                     ));
                     // return the vec w/ the AE cmd there so as not to loop and generate AE for
                     // any subsequent commands
@@ -384,6 +385,7 @@ impl MyNode {
                 Ok(catchup_votes) => Some(MyNode::send_system_msg(
                     NodeMsg::HandoverVotes(catchup_votes),
                     Peers::Single(peer),
+                    self.context(),
                 )),
                 Err(e) => {
                     error!("Handover - Error while processing anti-entropy {:?}", e);

@@ -56,7 +56,11 @@ impl MyNode {
             let msg = NodeMsg::JoinResponse(JoinResponse::Redirect(retry_sap));
             trace!("Sending {:?} to {}", msg, peer);
             trace!("{}", LogMarker::SendJoinRedirected);
-            return Ok(Some(MyNode::send_system_msg(msg, Peers::Single(peer))));
+            return Ok(Some(MyNode::send_system_msg(
+                msg,
+                Peers::Single(peer),
+                context.clone(),
+            )));
         }
 
         if !context.joins_allowed {
@@ -65,7 +69,11 @@ impl MyNode {
                 NodeMsg::JoinResponse(JoinResponse::Rejected(JoinRejectionReason::JoinsDisallowed));
             trace!("{}", LogMarker::SendJoinsDisallowed);
             trace!("Sending {:?} to {}", msg, peer);
-            return Ok(Some(MyNode::send_system_msg(msg, Peers::Single(peer))));
+            return Ok(Some(MyNode::send_system_msg(
+                msg,
+                Peers::Single(peer),
+                context.clone(),
+            )));
         }
 
         let is_age_valid = MyNode::verify_joining_node_age(&peer);
@@ -88,7 +96,11 @@ impl MyNode {
         if !section_key_matches || !is_age_valid {
             let msg = NodeMsg::JoinResponse(JoinResponse::Retry);
             trace!("Sending {msg:?} to {peer}");
-            return Ok(Some(MyNode::send_system_msg(msg, Peers::Single(peer))));
+            return Ok(Some(MyNode::send_system_msg(
+                msg,
+                Peers::Single(peer),
+                context.clone(),
+            )));
         }
 
         // It's reachable, let's then propose membership
@@ -127,7 +139,11 @@ impl MyNode {
             trace!("{} b", LogMarker::SendJoinAsRelocatedResponse);
 
             trace!("Sending {msg:?} to {peer}");
-            return Some(MyNode::send_system_msg(msg, Peers::Single(peer)));
+            return Some(MyNode::send_system_msg(
+                msg,
+                Peers::Single(peer),
+                context.clone(),
+            ));
         }
 
         let state = join_request.relocate_proof.value.state();
@@ -162,7 +178,11 @@ impl MyNode {
             trace!("{}", LogMarker::SendJoinAsRelocatedResponse);
 
             trace!("Sending {:?} to {}", msg, peer);
-            return Some(MyNode::send_system_msg(msg, Peers::Single(peer)));
+            return Some(MyNode::send_system_msg(
+                msg,
+                Peers::Single(peer),
+                context.clone(),
+            ));
         };
 
         debug!("[NODE WRITE]: join as relocated write...");
