@@ -126,6 +126,14 @@ pub enum Error {
     /// Timeout occurred when trying to verify chunk was uploaded
     #[error("Timeout occurred when trying to verify chunk at xorname address {0} was uploaded")]
     ChunkUploadValidationTimeout(XorName),
+    /// Remote peer closed the bi-stream we expected a response on
+    #[error("The bi-stream we expected a msg response on, for {msg_id:?}, was closed by remote peer: {peer:?}")]
+    ResponseStreamClosed {
+        /// MsgId of the msg sent
+        msg_id: MsgId,
+        /// Peer the msg was sent to
+        peer: Peer,
+    },
     /// Failed to obtain a response from Elders.
     #[error("Failed to obtain any response for {msg_id:?} from: {peers:?}")]
     NoResponse {
