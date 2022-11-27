@@ -10,6 +10,16 @@ on:
         description: number of nodes for the testnet
         required: true
         default: 15
+      testnet-tool-repo-branch:
+        description: >
+          The branch for the testnet tool repository. This is to enable using forks to test changes to
+          the testnet tool. Will default to the `main` branch.
+        default: main
+      testnet-tool-repo-user:
+        description: >
+          The user or organisation for the testnet tool repository. This is to enable using forks to
+          test changes to the testnet tool. Will default to the `maidsafe` organisation.
+        default: maidsafe
 
 env:
   AWS_ACCESS_KEY_ID: ${{ secrets.S3_DEPLOY_AWS_ACCESS_KEY_ID }}
@@ -19,6 +29,7 @@ env:
   POWERSHELL_INSTALL_SCRIPT_URL: https://raw.githubusercontent.com/maidsafe/safe_network/main/resources/scripts/install.ps1
   TESTNET_NIGHTLY_LOGS_BUCKET: s3://sn-node/nightly_testnet_logs
   TESTNET_NIGHTLY_LOGS_BUCKET_URL: https://sn-node.s3.eu-west-2.amazonaws.com/nightly_testnet_logs
+  TESTNET_TOOL_BUCKET_URL: https://sn-node.s3.eu-west-2.amazonaws.com/testnet_tool
   WORKFLOW_URL: https://github.com/maidsafe/safe_network/actions/runs
 
 jobs:
@@ -166,6 +177,8 @@ jobs:
           node-count: ${{ github.event.inputs.node-count || 30 }}
           node-path: /tmp/sn_node
           testnet-id: ${{ env.TESTNET_ID }}
+          testnet-tool-repo-branch: ${{ github.event.inputs.testnet-tool-repo-branch }}
+          testnet-tool-repo-user: ${{ github.event.inputs.testnet-tool-repo-user }}
       # The other jobs in the workflow have the testnet launch as a dependency, but they go ahead
       # even if this job fails. It would be better if the whole workflow is abandoned if we don't
       # have a testnet to run the tests against.
@@ -208,10 +221,11 @@ jobs:
         shell: bash
         run: |
           mkdir -p ~/.safe/network_contacts
-          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-network-contacts > ~/.safe/network_contacts/default
+          curl $TESTNET_TOOL_BUCKET_URL/${{ env.TESTNET_ID }}-network-contacts > \
+            ~/.safe/network_contacts/default
 
       - name: Build all client tests before running
-        run: cd sn_client && cargo test --no-run --release
+        run: cargo test --no-run --release --package sn_client
         timeout-minutes: 25
 
       - name: Run client tests
@@ -249,12 +263,13 @@ jobs:
       - name: Set TESTNET_ID env
         shell: bash
         run: echo "TESTNET_ID=gha-testnet-$(echo ${{ github.event.pull_request.head.sha || github.sha }} | cut -c 1-7)" >> $GITHUB_ENV
-      - name: Download network contacts file
+
+      - name: Download network config
         shell: bash
         run: |
           mkdir -p ~/.safe/network_contacts
-          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-network-contacts \
-            > ~/.safe/network_contacts/default
+          curl $TESTNET_TOOL_BUCKET_URL/${{ env.TESTNET_ID }}-network-contacts > \
+            ~/.safe/network_contacts/default
 
       - uses: Swatinem/rust-cache@v1
         continue-on-error: true
@@ -263,13 +278,13 @@ jobs:
           sharedKey: ${{github.run_id}}
 
       - name: Build all sn_api tests
-        run: cd sn_api && cargo test --no-run --release --lib
+        run: cargo test --no-run --release --lib --package sn_api
         timeout-minutes: 25
 
       - name: Download genesis DBC
         shell: bash
         run: |
-          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-genesis-dbc \
+          curl $TESTNET_TOOL_BUCKET_URL/${{ env.TESTNET_ID }}-genesis-dbc \
             > /tmp/genesis_dbc
 
       - name: Run API tests
@@ -313,11 +328,12 @@ jobs:
         shell: bash
         run: |
           mkdir -p ~/.safe/network_contacts
-          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-network-contacts > ~/.safe/network_contacts/default
+          curl $TESTNET_TOOL_BUCKET_URL/${{ env.TESTNET_ID }}-network-contacts > \
+            ~/.safe/network_contacts/default
       - name: Download genesis DBC
         shell: bash
         run: |
-          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-genesis-dbc \
+          curl $TESTNET_TOOL_BUCKET_URL/${{ env.TESTNET_ID }}-genesis-dbc \
             > /tmp/genesis_dbc
 
       - name: Build all CLI tests
