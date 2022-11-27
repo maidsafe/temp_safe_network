@@ -3,7 +3,7 @@ name: Nightly Release Run
 on:
   schedule:
     # * is a special character in YAML so you have to quote this string
-    - cron:  '30 4 * * *'
+    - cron: "30 4 * * *"
   workflow_dispatch:
     inputs:
       node-count:
@@ -12,12 +12,13 @@ on:
         default: 15
 
 env:
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  AWS_DEFAULT_REGION: 'eu-west-2'
+  AWS_ACCESS_KEY_ID: ${{ secrets.S3_DEPLOY_AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_DEPLOY_AWS_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: "eu-west-2"
   INSTALL_SCRIPT_URL: https://raw.githubusercontent.com/maidsafe/safe_network/main/resources/scripts/install.sh
   POWERSHELL_INSTALL_SCRIPT_URL: https://raw.githubusercontent.com/maidsafe/safe_network/main/resources/scripts/install.ps1
-  TESTNET_BUCKET_URL: https://safe-testnet-tool.s3.eu-west-2.amazonaws.com
+  TESTNET_NIGHTLY_LOGS_BUCKET: s3://sn-node/nightly_testnet_logs
+  TESTNET_NIGHTLY_LOGS_BUCKET_URL: https://sn-node.s3.eu-west-2.amazonaws.com/nightly_testnet_logs
   WORKFLOW_URL: https://github.com/maidsafe/safe_network/actions/runs
 
 jobs:
@@ -159,8 +160,8 @@ jobs:
         uses: maidsafe/sn_testnet_action@main
         with:
           do-token: ${{ secrets.DO_TOKEN }}
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-access-key-secret: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.S3_DEPLOY_AWS_ACCESS_KEY_ID }}
+          aws-access-key-secret: ${{ secrets.S3_DEPLOY_AWS_SECRET_ACCESS_KEY }}
           ssh-secret-key: ${{ secrets.SSH_SECRET_KEY  }}
           node-count: ${{ github.event.inputs.node-count || 30 }}
           node-path: /tmp/sn_node
@@ -352,9 +353,9 @@ jobs:
         uses: maidsafe/sn_testnet_action@main
         with:
           do-token: ${{ secrets.DO_TOKEN }}
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-access-key-secret: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          action: 'destroy'
+          aws-access-key-id: ${{ secrets.S3_DEPLOY_AWS_ACCESS_KEY_ID }}
+          aws-access-key-secret: ${{ secrets.S3_DEPLOY_AWS_SECRET_ACCESS_KEY }}
+          action: "destroy"
           testnet-id: ${{ env.TESTNET_ID }}
 
   bump_version:
@@ -363,7 +364,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with:
-          fetch-depth: '0'
+          fetch-depth: "0"
           token: ${{ secrets.VERSION_BUMP_COMMIT_PAT }}
       - uses: actions-rs/toolchain@v1
         id: toolchain
@@ -417,16 +418,16 @@ jobs:
           chmod 0600 ~/.ssh/id_rsa
           cd /tmp
           aws s3 cp \
-            "s3://safe-testnet-tool/$TESTNET_ID-ip-list" \
+            "$TESTNET_NIGHTLY_LOGS_BUCKET/$TESTNET_ID-ip-list" \
             "$TESTNET_ID-ip-list"
           aws s3 cp \
-            "s3://safe-testnet-tool/$TESTNET_ID-genesis-dbc" \
+            "$TESTNET_NIGHTLY_LOGS_BUCKET/$TESTNET_ID-genesis-dbc" \
             "$TESTNET_ID-genesis-dbc"
           aws s3 cp \
-            "s3://safe-testnet-tool/$TESTNET_ID-genesis-key" \
+            "$TESTNET_NIGHTLY_LOGS_BUCKET/$TESTNET_ID-genesis-key" \
             "$TESTNET_ID-genesis-key"
           aws s3 cp \
-            "s3://safe-testnet-tool/$TESTNET_ID-network-contacts" \
+            "$TESTNET_NIGHTLY_LOGS_BUCKET/$TESTNET_ID-network-contacts" \
             "$TESTNET_ID-network-contacts"
 
           wget https://raw.githubusercontent.com/maidsafe/sn_testnet_tool/main/scripts/logs-sync.sh
@@ -440,24 +441,24 @@ jobs:
             "$TESTNET_ID-run.tar.gz" \
             "s3://safe-testnet-tool/$TESTNET_ID-run.tar.gz" \
             --acl public-read
-          echo "The logs should be available at $TESTNET_BUCKET_URL/$TESTNET_ID-run.tar.gz"
+          echo "The logs should be available at $TESTNET_NIGHTLY_LOGS_BUCKET_URL/$TESTNET_ID-run.tar.gz"
 
       - name: post notification to slack
         if: always()
         uses: bryannice/gitactions-slack-notification@2.0.0
         env:
           SLACK_INCOMING_WEBHOOK: ${{ secrets.SLACK_GH_ACTIONS_WEBHOOK_URL }}
-          SLACK_MESSAGE: 'Please check the logs for the run at ${{ env.WORKFLOW_URL }}/${{ github.run_id }}'
-          SLACK_TITLE: 'Nightly Run Failed'
+          SLACK_MESSAGE: "Please check the logs for the run at ${{ env.WORKFLOW_URL }}/${{ github.run_id }}"
+          SLACK_TITLE: "Nightly Run Failed"
 
       - name: Kill testnet
         if: always()
         uses: maidsafe/sn_testnet_action@main
         with:
           do-token: ${{ secrets.DO_TOKEN }}
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-access-key-secret: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          action: 'destroy'
+          aws-access-key-id: ${{ secrets.S3_DEPLOY_AWS_ACCESS_KEY_ID }}
+          aws-access-key-secret: ${{ secrets.S3_DEPLOY_AWS_SECRET_ACCESS_KEY }}
+          action: "destroy"
           testnet-id: ${{ env.TESTNET_ID }}
       - name: Upload event file
         uses: actions/upload-artifact@main

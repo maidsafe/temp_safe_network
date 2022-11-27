@@ -136,20 +136,20 @@ jobs:
       - uses: shallwefootball/s3-upload-action@master
         name: upload sn_node artifacts to s3
         with:
-          aws_key_id: AKIAVVODCRMSJ5MV63VB
-          aws_secret_access_key: ${{ secrets.DEPLOY_USER_SECRET_ACCESS_KEY }}
+          aws_key_id: ${{ secrets.S3_DEPLOY_AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.S3_DEPLOY_AWS_SECRET_ACCESS_KEY }}
           aws_bucket: sn-node
           source_dir: deploy/prod/sn_node
-          destination_dir: ''
+          destination_dir: ""
 
       - uses: shallwefootball/s3-upload-action@master
         name: upload safe artifacts to s3
         with:
-          aws_key_id: AKIAVVODCRMSJ5MV63VB
-          aws_secret_access_key: ${{ secrets.DEPLOY_USER_SECRET_ACCESS_KEY }}
+          aws_key_id: ${{ secrets.S3_DEPLOY_AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.S3_DEPLOY_AWS_SECRET_ACCESS_KEY }}
           aws_bucket: sn-cli
           source_dir: deploy/prod/safe
-          destination_dir: ''
+          destination_dir: ""
 
       # Now repackage and upload the artifacts using 'latest' for the version.
       - shell: bash
@@ -163,20 +163,20 @@ jobs:
       - uses: shallwefootball/s3-upload-action@master
         name: upload sn_node artifacts to s3
         with:
-          aws_key_id: AKIAVVODCRMSJ5MV63VB
-          aws_secret_access_key: ${{ secrets.DEPLOY_USER_SECRET_ACCESS_KEY }}
+          aws_key_id: ${{ secrets.S3_DEPLOY_AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.S3_DEPLOY_AWS_SECRET_ACCESS_KEY }}
           aws_bucket: sn-node
           source_dir: deploy/prod/sn_node
-          destination_dir: ''
+          destination_dir: ""
 
       - uses: shallwefootball/s3-upload-action@master
         name: upload safe artifacts to s3
         with:
-          aws_key_id: AKIAVVODCRMSJ5MV63VB
-          aws_secret_access_key: ${{ secrets.DEPLOY_USER_SECRET_ACCESS_KEY }}
+          aws_key_id: ${{ secrets.S3_DEPLOY_AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.S3_DEPLOY_AWS_SECRET_ACCESS_KEY }}
           aws_bucket: sn-cli
           source_dir: deploy/prod/safe
-          destination_dir: ''
+          destination_dir: ""
 
   publish:
     name: publish
@@ -188,7 +188,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with:
-          fetch-depth: '0'
+          fetch-depth: "0"
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
