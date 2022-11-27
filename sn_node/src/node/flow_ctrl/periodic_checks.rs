@@ -55,7 +55,6 @@ impl PeriodicChecksTimestamps {
 impl FlowCtrl {
     /// Generate and fire commands for all types of periodic checks
     pub(super) async fn perform_periodic_checks(&mut self) {
-        debug!("[NODE READ]: periodic msg lock attempt...");
         let (context, membership_context) = {
             let read_locked_node = self.node.read().await;
             (
@@ -63,8 +62,6 @@ impl FlowCtrl {
                 read_locked_node.membership.clone(),
             )
         };
-
-        debug!("[NODE READ]: periodic msg lock got");
 
         if !context.is_elder {
             self.enqueue_cmds_for_adult_periodic_checks(context).await;
@@ -101,18 +98,14 @@ impl FlowCtrl {
         context: &NodeContext,
         membership_context: Option<Membership>,
     ) {
-        debug!(" ----> elder periodics START");
-
         let now = Instant::now();
         let mut cmds = vec![];
 
         if self.timestamps.last_probe.elapsed() > PROBE_INTERVAL {
-            debug!(" ----> probe periodics start");
             self.timestamps.last_probe = now;
             if let Some(cmd) = Self::probe_the_network(context).await {
                 cmds.push(cmd);
             }
-            debug!(" ----> probe periodics done");
         }
 
         // TODO: reevaluate health checks. Does this make sense mocking a client req?
