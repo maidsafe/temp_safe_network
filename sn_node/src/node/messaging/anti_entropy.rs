@@ -645,42 +645,43 @@ impl MyNode {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use crate::node::{
-        cfg::create_test_max_capacity_and_root_storage,
-        flow_ctrl::tests::network_utils::create_comm, MIN_ADULT_AGE,
-    };
-    use crate::UsedSpace;
+    use crate::node::{flow_ctrl::tests::network_builder::TestNetworkBuilder, MIN_ADULT_AGE};
     use sn_interface::{
-        messaging::{system::SectionSigned, MsgKind},
-        network_knowledge::SectionAuthorityProvider,
-    };
-
-    use sn_interface::{
-        messaging::{Dst, MsgId},
-        network_knowledge::{MyNodeInfo, SectionKeyShare, SectionKeysProvider, SectionsDAG},
-        test_utils::{gen_addr, TestKeys, TestSapBuilder},
+        elder_count,
+        messaging::{Dst, MsgId, MsgKind},
+        network_knowledge::MyNodeInfo,
+        test_utils::{gen_addr, prefix},
         types::keys::ed25519,
     };
 
     use assert_matches::assert_matches;
     use bls::SecretKey;
-    use eyre::{Context, Result};
-    use tokio::sync::mpsc;
+    use eyre::Result;
     use xor_name::Prefix;
 
     #[tokio::test]
     async fn ae_everything_up_to_date() -> Result<()> {
-        let env = Env::new().await?;
-        let our_prefix = env.node.network_knowledge().prefix();
-        let msg = env.create_msg(&our_prefix, env.node.network_knowledge().section_key())?;
-        let sender = env.node.info().peer();
+        // create an env with 3 churns in prefix0. And a single chrun in prefix1
+        let our_prefix = prefix("0");
+        let other_prefix = prefix("1");
+        let env = TestNetworkBuilder::new(rand::thread_rng())
+            .sap(our_prefix, elder_count(), 0, None, None)
+            .sap(our_prefix, elder_count(), 0, None, None)
+            .sap(our_prefix, elder_count(), 0, None, None)
+            .sap(other_prefix, elder_count(), 0, None, None)
+            .build();
+        // get node from the latest section of our_prefix
+        let node = env.get_nodes(our_prefix, 1, 0, None).remove(0).0;
+
+        let dst_section_key = node.network_knowledge().section_key();
+        let msg = create_msg(&our_prefix, dst_section_key)?;
+        let sender = node.info().peer();
         let dst = Dst {
-            section_key: env.node.network_knowledge().section_key(),
             name: our_prefix.substituted_in(xor_name::rand::random()),
+            section_key: dst_section_key,
         };
 
-        let context = env.node.context();
+        let context = node.context();
 
         let cmd = MyNode::check_node_msg_for_entropy(&msg, &context, &dst, &sender, None)?;
 
@@ -690,20 +691,33 @@ mod tests {
 
     #[tokio::test]
     async fn ae_redirect_to_other_section() -> Result<()> {
-        let mut env = Env::new().await?;
+        // create an env with 3 churns in prefix0. And a single chrun in prefix1
+        let our_prefix = prefix("0");
+        let other_prefix = prefix("1");
+        let env = TestNetworkBuilder::new(rand::thread_rng())
+            .sap(our_prefix, elder_count(), 0, None, None)
+            .sap(our_prefix, elder_count(), 0, None, None)
+            .sap(our_prefix, elder_count(), 0, None, None)
+            .sap(other_prefix, elder_count(), 0, None, None)
+            .build();
+        let other_section = env.get_network_knowledge(other_prefix, None).0;
+        let other_sap = other_section.signed_sap();
+
+        // get node from the latest section of our_prefix
+        let mut node = env.get_nodes(our_prefix, 1, 0, None).remove(0).0;
 
         let other_sk = bls::SecretKey::random();
         let other_pk = other_sk.public_key();
 
-        let wire_msg = env.create_msg(&env.other_signed_sap.prefix(), other_pk)?;
-        let sender = env.node.info().peer();
+        let wire_msg = create_msg(&other_prefix, other_pk)?;
+        let sender = node.info().peer();
 
         // since it's not aware of the other prefix, it will redirect to self
         let dst = Dst {
             section_key: other_pk,
-            name: env.other_signed_sap.prefix().name(),
+            name: other_sap.prefix().name(),
         };
-        let context = env.node.context();
+        let context = node.context();
 
         let cmd = MyNode::check_node_msg_for_entropy(&wire_msg, &context, &dst, &sender, None);
 
@@ -712,17 +726,15 @@ mod tests {
         });
 
         assert_matches!(msg, NodeMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Redirect {..}, .. } => {
-            assert_eq!(section_tree_update.signed_sap, env.node.network_knowledge().signed_sap());
+            assert_eq!(section_tree_update.signed_sap, node.network_knowledge().signed_sap());
         });
 
         // now let's insert the other SAP to make it aware of the other prefix
         let section_tree_update =
-            SectionTreeUpdate::new(env.other_signed_sap.clone(), env.proof_chain);
-        assert!(env
-            .node
-            .update_network_knowledge(&context, section_tree_update, None,)?);
+            SectionTreeUpdate::new(other_sap.clone(), other_section.section_chain());
+        assert!(node.update_network_knowledge(&context, section_tree_update, None,)?);
 
-        let new_context = env.node.context();
+        let new_context = node.context();
         // and it now shall give us an AE redirect msg
         // with the SAP we inserted for other prefix
         let cmd = MyNode::check_node_msg_for_entropy(&wire_msg, &new_context, &dst, &sender, None);
@@ -732,20 +744,30 @@ mod tests {
         });
 
         assert_matches!(msg, NodeMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Redirect {..}, .. } => {
-            assert_eq!(section_tree_update.signed_sap, env.other_signed_sap);
+            assert_eq!(section_tree_update.signed_sap, other_sap);
         });
         Ok(())
     }
 
     #[tokio::test]
     async fn ae_outdated_dst_key_of_our_section() -> Result<()> {
-        let env = Env::new().await?;
-        let our_prefix = env.node.network_knowledge().prefix();
-        let context = env.node.context();
-        let msg = env.create_msg(&our_prefix, env.node.network_knowledge().section_key())?;
-        let sender = env.node.info().peer();
+        // create an env with 3 churns in prefix0. And a single chrun in prefix1
+        let our_prefix = prefix("0");
+        let other_prefix = prefix("1");
+        let env = TestNetworkBuilder::new(rand::thread_rng())
+            .sap(our_prefix, elder_count(), 0, None, None)
+            .sap(our_prefix, elder_count(), 0, None, None)
+            .sap(our_prefix, elder_count(), 0, None, None)
+            .sap(other_prefix, elder_count(), 0, None, None)
+            .build();
+        // get node from the latest section of our_prefix
+        let node = env.get_nodes(our_prefix, 1, 0, None).remove(0).0;
+
+        let context = node.context();
+        let msg = create_msg(&our_prefix, node.network_knowledge().section_key())?;
+        let sender = node.info().peer();
         let dst = Dst {
-            section_key: *env.node.network_knowledge().genesis_key(),
+            section_key: *node.network_knowledge().genesis_key(),
             name: our_prefix.substituted_in(xor_name::rand::random()),
         };
 
@@ -756,26 +778,35 @@ mod tests {
         });
 
         assert_matches!(&msg, NodeMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Retry{..}, .. } => {
-            assert_eq!(section_tree_update.signed_sap, env.node.network_knowledge().signed_sap());
-            assert_eq!(section_tree_update.proof_chain, env.node.section_chain());
+            assert_eq!(section_tree_update.signed_sap, node.network_knowledge().signed_sap());
+            assert_eq!(section_tree_update.proof_chain, node.section_chain());
         });
         Ok(())
     }
 
     #[tokio::test]
     async fn ae_wrong_dst_key_of_our_section_returns_retry() -> Result<()> {
-        let env = Env::new().await?;
-        let our_prefix = env.node.network_knowledge().prefix();
+        // create an env with 3 churns in prefix0. And a single chrun in prefix1
+        let our_prefix = prefix("0");
+        let other_prefix = prefix("1");
+        let env = TestNetworkBuilder::new(rand::thread_rng())
+            .sap(our_prefix, elder_count(), 0, None, None)
+            .sap(our_prefix, elder_count(), 0, None, None)
+            .sap(our_prefix, elder_count(), 0, None, None)
+            .sap(other_prefix, elder_count(), 0, None, None)
+            .build();
+        // get node from the latest section of our_prefix
+        let node = env.get_nodes(our_prefix, 1, 0, None).remove(0).0;
 
-        let msg = env.create_msg(&our_prefix, env.node.network_knowledge().section_key())?;
-        let sender = env.node.info().peer();
+        let msg = create_msg(&our_prefix, node.network_knowledge().section_key())?;
+        let sender = node.info().peer();
 
-        let bogus_env = Env::new().await?;
+        let bogus_network_gen = bls::SecretKey::random();
         let dst = Dst {
-            section_key: *bogus_env.node.network_knowledge().genesis_key(),
+            section_key: bogus_network_gen.public_key(),
             name: our_prefix.substituted_in(xor_name::rand::random()),
         };
-        let context = env.node.context();
+        let context = node.context();
 
         let cmd = MyNode::check_node_msg_for_entropy(&msg, &context, &dst, &sender, None)?;
 
@@ -784,121 +815,32 @@ mod tests {
         });
 
         assert_matches!(&msg, NodeMsg::AntiEntropy { section_tree_update, kind: AntiEntropyKind::Retry {..}, .. } => {
-            assert_eq!(section_tree_update.signed_sap, env.node.network_knowledge().signed_sap());
-            assert_eq!(section_tree_update.proof_chain, env.node.section_chain());
+            assert_eq!(section_tree_update.signed_sap, node.network_knowledge().signed_sap());
+            assert_eq!(section_tree_update.proof_chain, node.section_chain());
         });
         Ok(())
     }
 
-    struct Env {
-        node: MyNode,
-        other_signed_sap: SectionSigned<SectionAuthorityProvider>,
-        proof_chain: SectionsDAG,
-    }
+    fn create_msg(src_section_prefix: &Prefix, src_section_pk: BlsPublicKey) -> Result<WireMsg> {
+        let sender = MyNodeInfo::new(
+            ed25519::gen_keypair(&src_section_prefix.range_inclusive(), MIN_ADULT_AGE),
+            gen_addr(),
+        );
 
-    impl Env {
-        async fn new() -> Result<Self> {
-            let prefix0 = Prefix::default().pushed(false);
-            let prefix1 = Prefix::default().pushed(true);
+        // just some message we can construct easily
+        let payload_msg = NodeMsg::AntiEntropyProbe(src_section_pk);
+        let payload = WireMsg::serialize_msg_payload(&payload_msg)?;
 
-            // generate a SAP for prefix0
-            let (sap, secret_key_set, mut nodes, _) = TestSapBuilder::new(prefix0).build();
-            let info = nodes.remove(0);
-            let sap_sk = secret_key_set.secret_key();
-            let signed_sap = TestKeys::get_section_signed(&sap_sk, sap);
-
-            let (proof_chain, genesis_sk_set) = create_proof_chain(signed_sap.section_key())
-                .context("failed to create section chain")?;
-            let genesis_pk = genesis_sk_set.public_keys().public_key();
-            assert_eq!(genesis_pk, *proof_chain.genesis_key());
-
-            let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-            let (mut node, _) = MyNode::first_node(
-                create_comm().await?,
-                info.keypair.clone(),
-                UsedSpace::new(max_capacity),
-                root_storage_dir,
-                genesis_sk_set.clone(),
-                mpsc::channel(10).0,
-            )
-            .await?;
-
-            let section_key_share = SectionKeyShare {
-                public_key_set: secret_key_set.public_keys(),
-                index: 0,
-                secret_key_share: secret_key_set.secret_key_share(0),
-            };
-
-            node.section_keys_provider = SectionKeysProvider::new(Some(section_key_share));
-
-            // get our Node to now be in prefix(0)
-            let section_tree_update = SectionTreeUpdate::new(signed_sap, proof_chain);
-            let _ = node.update_network_knowledge(&node.context(), section_tree_update, None)?;
-
-            // generate other SAP for prefix1
-            let (other_sap, secret_key_set, ..) = TestSapBuilder::new(prefix1).build();
-            let other_sap_sk = secret_key_set.secret_key();
-            let other_sap = TestKeys::get_section_signed(&other_sap_sk, other_sap);
-            // generate a proof chain for this other SAP
-            let mut proof_chain = SectionsDAG::new(genesis_pk);
-            let sig = TestKeys::sign(&genesis_sk_set.secret_key(), &other_sap_sk.public_key());
-            proof_chain.insert(&genesis_pk, other_sap_sk.public_key(), sig)?;
-
-            Ok(Self {
-                node,
-                other_signed_sap: other_sap,
-                proof_chain,
-            })
-        }
-
-        fn create_msg(
-            &self,
-            src_section_prefix: &Prefix,
-            src_section_pk: BlsPublicKey,
-        ) -> Result<WireMsg> {
-            let sender = MyNodeInfo::new(
-                ed25519::gen_keypair(&src_section_prefix.range_inclusive(), MIN_ADULT_AGE),
-                gen_addr(),
-            );
-
-            // just some message we can construct easily
-            let payload_msg = NodeMsg::AntiEntropyProbe(src_section_pk);
-
-            let payload = WireMsg::serialize_msg_payload(&payload_msg)?;
-
-            let dst = Dst {
-                name: xor_name::rand::random(),
-                section_key: SecretKey::random().public_key(),
-            };
-
-            let msg_id = MsgId::new();
-
-            Ok(WireMsg::new_msg(
-                msg_id,
-                payload,
-                MsgKind::Node(sender.name()),
-                dst,
-            ))
-        }
-    }
-
-    // Creates a proof chain with three blocks
-    fn create_proof_chain(last_key: BlsPublicKey) -> Result<(SectionsDAG, bls::SecretKeySet)> {
-        // create chain with random genesis key
-        let genesis_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
-        let genesis_pk = genesis_sk_set.public_keys().public_key();
-        let mut proof_chain = SectionsDAG::new(genesis_pk);
-
-        // insert random second section key
-        let second_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
-        let second_pk = second_sk_set.public_keys().public_key();
-        let sig = TestKeys::sign(&genesis_sk_set.secret_key(), &second_pk);
-        proof_chain.insert(&genesis_pk, second_pk, sig)?;
-
-        // insert third key which is provided `last_key`
-        let last_sig = TestKeys::sign(&second_sk_set.secret_key(), &last_key);
-        proof_chain.insert(&second_pk, last_key, last_sig)?;
-
-        Ok((proof_chain, genesis_sk_set))
+        let dst = Dst {
+            name: xor_name::rand::random(),
+            section_key: SecretKey::random().public_key(),
+        };
+        let msg_id = MsgId::new();
+        Ok(WireMsg::new_msg(
+            msg_id,
+            payload,
+            MsgKind::Node(sender.name()),
+            dst,
+        ))
     }
 }
