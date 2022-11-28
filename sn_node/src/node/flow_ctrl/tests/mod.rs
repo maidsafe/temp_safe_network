@@ -19,7 +19,7 @@ use crate::{
         flow_ctrl::{dispatcher::Dispatcher, event_channel},
         messages::WireMsgUtils,
         messaging::Peers,
-        Cmd, Error, Event, MembershipEvent, Proposal,
+        Cmd, Error, Proposal,
     },
     storage::UsedSpace,
 };
@@ -129,11 +129,8 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
 
 #[tokio::test]
 async fn handle_agreement_on_online() -> Result<()> {
-    let (event_sender, mut event_receiver) =
-        event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE);
     let (dispatcher, _, _, sk_set) =
         network_utils::TestNodeBuilder::new(Prefix::default(), elder_count())
-            .event_sender(event_sender)
             .build()
             .await?;
 
@@ -141,12 +138,12 @@ async fn handle_agreement_on_online() -> Result<()> {
     let status = handle_online_cmd(&new_peer, &sk_set, &dispatcher).await?;
     assert!(status.node_approval_sent);
 
-    assert_matches!(
-        event_receiver.next().await,
-        Some(Event::Membership(MembershipEvent::MemberJoined { name, age, .. })) => {
-            assert_eq!(name, new_peer.name());
-            assert_eq!(age, MIN_ADULT_AGE);
-    });
+    assert!(dispatcher
+        .node()
+        .read()
+        .await
+        .network_knowledge()
+        .is_adult(&new_peer.name()));
 
     Ok(())
 }
@@ -392,8 +389,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     let network_knowledge = NetworkKnowledge::new(SectionTree::new(pk0), section_tree_update)?;
 
     // Create our node
-    let (event_sender, mut event_receiver) =
-        event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE);
+    let (event_sender, _) = event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE);
     let section_key_share = TestKeys::get_section_key_share(&sk_set1, 0);
     let node_info = elder_nodes.remove(0);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
@@ -412,8 +408,6 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
     // Create new `Section` as a successor to the previous one.
     let sk_set2 = bls::SecretKeySet::random(0, &mut thread_rng());
-    let sk2 = sk_set2.secret_key();
-    let pk2 = sk2.public_key();
 
     // Create the new `SectionAuthorityProvider` by replacing one of the peers with a new one,
     // making sure the one we use as our `node` to receive the AE msg for the final test is included.
@@ -431,9 +425,9 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
         sk_set2.public_keys(),
         0,
     );
-    let new_section_elders: BTreeSet<_> = new_sap.names();
+    let new_section_elders: BTreeSet<_> = new_sap.elders_set();
     let section_tree_update = TestSectionTree::get_section_tree_update(
-        &TestKeys::get_section_signed(&sk2, new_sap.clone()),
+        &TestKeys::get_section_signed(&sk_set2.secret_key(), new_sap.clone()),
         &node.section_chain(),
         &sk_set1.secret_key(),
     );
@@ -471,14 +465,9 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     .await?;
 
     // Verify our `Section` got updated.
-    assert_matches!(
-        event_receiver.next().await,
-        Some(Event::Membership(MembershipEvent::EldersChanged { elders, .. })) => {
-            assert_eq!(elders.key, pk2);
-            assert!(elders.added.iter().all(|a| new_section_elders.contains(a)));
-            assert!(elders.remaining.iter().all(|a| new_section_elders.contains(a)));
-            assert!(elders.removed.iter().all(|r| !new_section_elders.contains(r)));
-        }
+    assert_lists(
+        dispatcher.node().read().await.network_knowledge().elders(),
+        new_section_elders,
     );
     Ok(())
 }
@@ -755,15 +744,14 @@ async fn handle_elders_update() -> Result<()> {
         sk_set1.public_keys(),
         0,
     );
-    let elder_names1: BTreeSet<_> = sap1.names();
+    let elders_1: BTreeSet<_> = sap1.elders_set();
 
     let signed_sap1 = TestKeys::get_section_signed(&sk_set1.secret_key(), sap1);
     let proposal = Proposal::NewElders(signed_sap1.clone());
     let sig =
         TestKeys::get_section_sig_bytes(&sk_set0.secret_key(), &proposal.as_signable_bytes()?);
 
-    let (event_sender, mut event_receiver) =
-        event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE);
+    let (event_sender, _) = event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let comm = network_utils::create_comm().await?;
     let mut node = MyNode::new(
@@ -834,13 +822,9 @@ async fn handle_elders_update() -> Result<()> {
 
     assert_eq!(update_actual_recipients, update_expected_recipients);
 
-    assert_matches!(
-        event_receiver.next().await,
-        Some(Event::Membership(MembershipEvent::EldersChanged { elders, .. })) => {
-            assert_eq!(elders.key, pk1);
-            assert_eq!(elder_names1, elders.added.union(&elders.remaining).copied().collect());
-            assert!(elders.removed.iter().all(|r| !elder_names1.contains(r)));
-        }
+    assert_lists(
+        dispatcher.node().read().await.network_knowledge().elders(),
+        elders_1,
     );
 
     Ok(())
