@@ -14,12 +14,9 @@ pub(crate) mod network_utils;
 use crate::{
     comm::{Comm, MsgFromPeer},
     node::{
-        cfg::create_test_max_capacity_and_root_storage,
-        core::MyNode,
-        flow_ctrl::{dispatcher::Dispatcher, event_channel},
-        messages::WireMsgUtils,
-        messaging::Peers,
-        Cmd, Error, Proposal,
+        cfg::create_test_max_capacity_and_root_storage, core::MyNode,
+        flow_ctrl::dispatcher::Dispatcher, messages::WireMsgUtils, messaging::Peers, Cmd, Error,
+        Proposal,
     },
     storage::UsedSpace,
 };
@@ -389,7 +386,6 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     let network_knowledge = NetworkKnowledge::new(SectionTree::new(pk0), section_tree_update)?;
 
     // Create our node
-    let (event_sender, _) = event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE);
     let section_key_share = TestKeys::get_section_key_share(&sk_set1, 0);
     let node_info = elder_nodes.remove(0);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
@@ -399,7 +395,6 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
         node_info.keypair.clone(),
         network_knowledge,
         Some(section_key_share),
-        event_sender,
         UsedSpace::new(max_capacity),
         root_storage_dir,
         mpsc::channel(10).0,
@@ -592,7 +587,6 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
         node.keypair.clone(),
         section,
         Some(section_key_share),
-        event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE).0,
         UsedSpace::new(max_capacity),
         root_storage_dir,
         mpsc::channel(10).0,
@@ -641,7 +635,6 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
 #[tokio::test]
 async fn msg_to_self() -> Result<()> {
     let info = network_utils::gen_info(MIN_ADULT_AGE, None);
-    let (event_sender, _) = event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE);
     let (comm_tx, mut comm_rx) = mpsc::channel(network_utils::TEST_EVENT_CHANNEL_SIZE);
     let comm = Comm::new((Ipv4Addr::LOCALHOST, 0).into(), Default::default(), comm_tx).await?;
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
@@ -650,7 +643,6 @@ async fn msg_to_self() -> Result<()> {
     let (node, _) = MyNode::first_node(
         comm,
         info.keypair.clone(),
-        event_sender,
         UsedSpace::new(max_capacity),
         root_storage_dir,
         genesis_sk_set,
@@ -751,7 +743,6 @@ async fn handle_elders_update() -> Result<()> {
     let sig =
         TestKeys::get_section_sig_bytes(&sk_set0.secret_key(), &proposal.as_signable_bytes()?);
 
-    let (event_sender, _) = event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let comm = network_utils::create_comm().await?;
     let mut node = MyNode::new(
@@ -759,7 +750,6 @@ async fn handle_elders_update() -> Result<()> {
         info.keypair.clone(),
         section0.clone(),
         Some(section_key_share),
-        event_sender,
         UsedSpace::new(max_capacity),
         root_storage_dir,
         mpsc::channel(10).0,
@@ -888,7 +878,6 @@ async fn handle_demote_during_split() -> Result<()> {
     }
 
     // we make a new full node from info, to see what it does
-    let (event_sender, _) = event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let comm = network_utils::create_comm().await?;
     let mut node = MyNode::new(
@@ -896,7 +885,6 @@ async fn handle_demote_during_split() -> Result<()> {
         info.keypair.clone(),
         section,
         Some(section_key_share),
-        event_sender,
         UsedSpace::new(max_capacity),
         root_storage_dir,
         mpsc::channel(10).0,

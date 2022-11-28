@@ -797,7 +797,7 @@ mod tests {
     use crate::{
         node::{
             cfg::create_test_max_capacity_and_root_storage,
-            flow_ctrl::{cmds::Cmd, event_channel, tests::network_utils::create_comm},
+            flow_ctrl::{cmds::Cmd, tests::network_utils::create_comm},
             messaging::Peers,
         },
         UsedSpace,
@@ -1294,7 +1294,6 @@ mod tests {
                 info.keypair.clone(),
                 network_knowledge.clone(),
                 Some(section_key_share),
-                event_channel::new(1).0,
                 UsedSpace::new(max_capacity),
                 root_storage_dir.clone(),
                 mpsc::channel(10).0,

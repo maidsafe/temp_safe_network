@@ -10,8 +10,6 @@ pub(crate) mod cmd_ctrl;
 pub(crate) mod cmds;
 pub(super) mod dispatcher;
 pub(super) mod dysfunction;
-pub(super) mod event;
-pub(super) mod event_channel;
 mod periodic_checks;
 
 #[cfg(test)]

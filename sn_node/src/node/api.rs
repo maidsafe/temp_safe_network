@@ -9,8 +9,8 @@
 use crate::comm::Comm;
 use crate::{
     node::{
-        flow_ctrl::{cmds::Cmd, dysfunction::DysCmds, event_channel::EventSender},
-        Error, Event, MyNode, Result,
+        flow_ctrl::{cmds::Cmd, dysfunction::DysCmds},
+        Error, MyNode, Result,
     },
     UsedSpace,
 };
@@ -32,7 +32,6 @@ impl MyNode {
     pub(crate) async fn first_node(
         comm: Comm,
         keypair: Arc<Keypair>,
-        event_sender: EventSender,
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
         genesis_sk_set: bls::SecretKeySet,
@@ -55,7 +54,6 @@ impl MyNode {
             keypair.clone(),
             network_knowledge,
             Some(section_key_share),
-            event_sender,
             used_space,
             root_storage_dir,
             dysfunction_cmds_sender,
@@ -107,10 +105,6 @@ impl MyNode {
         self.section_keys_provider
             .key_share(&section_key)
             .map_err(Error::from)
-    }
-
-    pub(crate) async fn send_event(&self, event: Event) {
-        self.event_sender.send(event).await
     }
 
     // ----------------------------------------------------------------------------------------

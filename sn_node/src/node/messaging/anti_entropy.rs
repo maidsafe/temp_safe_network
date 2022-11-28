@@ -642,8 +642,7 @@ mod tests {
 
     use crate::node::{
         cfg::create_test_max_capacity_and_root_storage,
-        flow_ctrl::{event_channel, tests::network_utils::create_comm},
-        MIN_ADULT_AGE,
+        flow_ctrl::tests::network_utils::create_comm, MIN_ADULT_AGE,
     };
     use crate::UsedSpace;
     use sn_interface::{
@@ -811,7 +810,6 @@ mod tests {
             let (mut node, _) = MyNode::first_node(
                 create_comm().await?,
                 info.keypair.clone(),
-                event_channel::new(1).0,
                 UsedSpace::new(max_capacity),
                 root_storage_dir,
                 genesis_sk_set.clone(),

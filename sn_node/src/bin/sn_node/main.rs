@@ -116,7 +116,7 @@ async fn run_node(config: &Config) -> Result<()> {
         "unknown".to_string()
     };
 
-    let (_node, _) = loop {
+    let _node = loop {
         match start_node(config, join_timeout).await {
             Ok(result) => break result,
             Err(NodeError::CannotConnectEndpoint(qp2p::EndpointError::Upnp(error))) => {

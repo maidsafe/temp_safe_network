@@ -1,7 +1,6 @@
 use crate::comm::Comm;
 use crate::node::{
-    cfg::create_test_max_capacity_and_root_storage,
-    flow_ctrl::{dispatcher::Dispatcher, event_channel, event_channel::EventSender},
+    cfg::create_test_max_capacity_and_root_storage, flow_ctrl::dispatcher::Dispatcher,
     relocation_check, ChurnId, MyNode,
 };
 use crate::storage::UsedSpace;
@@ -33,7 +32,6 @@ pub(crate) struct TestNodeBuilder {
     pub(crate) adult_count: usize,
     pub(crate) section_sk_threshold: usize,
     pub(crate) data_copy_count: usize,
-    pub(crate) node_event_sender: EventSender,
     pub(crate) section: Option<NetworkKnowledge>,
     pub(crate) first_node: Option<MyNodeInfo>,
     pub(crate) genesis_sk_set: Option<bls::SecretKeySet>,
@@ -56,14 +54,12 @@ impl TestNodeBuilder {
     /// functions to set them.
     pub(crate) fn new(prefix: Prefix, elder_count: usize) -> TestNodeBuilder {
         let supermajority = 1 + elder_count * 2 / 3;
-        let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
         Self {
             prefix,
             elder_count,
             adult_count: 0,
             section_sk_threshold: supermajority - 1,
             data_copy_count: 4,
-            node_event_sender: event_sender,
             section: None,
             first_node: None,
             genesis_sk_set: None,
@@ -132,16 +128,6 @@ impl TestNodeBuilder {
     /// generated.
     pub(crate) fn data_copy_count(mut self, count: usize) -> TestNodeBuilder {
         self.data_copy_count = count;
-        self
-    }
-
-    /// Specify a custom event sender.
-    ///
-    /// The event sender and receiver is a pair. If you need to access the receiver in the test,
-    /// create the pair in the test setup and then pass the sender in here and then access the
-    /// receiver as needed.
-    pub(crate) fn event_sender(mut self, event_sender: EventSender) -> TestNodeBuilder {
-        self.node_event_sender = event_sender;
         self
     }
 
@@ -297,7 +283,6 @@ impl TestNodeBuilder {
             keypair,
             section.clone(),
             Some(section_key_share),
-            self.node_event_sender,
             UsedSpace::new(max_capacity),
             root_storage_dir,
             mpsc::channel(10).0,

@@ -34,10 +34,6 @@ use self::{
 pub use self::{
     cfg::config_handler::Config,
     error::{Error, Result},
-    flow_ctrl::{
-        event::{Event, MembershipEvent, MessagingEvent, NodeElderChange},
-        event_channel::EventReceiver,
-    },
     node_starter::{new_test_api, start_node},
     node_test_api::NodeTestApi,
 };
@@ -61,7 +57,7 @@ mod core {
             bootstrap::JoiningAsRelocated,
             data::Capacity,
             dkg::DkgVoter,
-            flow_ctrl::{cmds::Cmd, dysfunction::DysCmds, event_channel::EventSender},
+            flow_ctrl::{cmds::Cmd, dysfunction::DysCmds},
             handover::Handover,
             membership::{elder_candidates, try_split_dkg, Membership},
             messaging::Peers,
@@ -109,7 +105,6 @@ mod core {
     pub(crate) struct MyNode {
         pub(crate) comm: Comm,
         pub(crate) addr: SocketAddr, // does this change? if so... when? only at node start atm?
-        pub(crate) event_sender: EventSender,
         root_storage_dir: PathBuf,
         pub(crate) data_storage: DataStorage, // Adult only before cache
         pub(crate) keypair: Arc<Keypair>,
@@ -148,8 +143,6 @@ mod core {
         pub(crate) full_adults: BTreeSet<XorName>,
         #[debug(skip)]
         pub(crate) comm: Comm,
-        #[debug(skip)]
-        pub(crate) event_sender: EventSender,
         pub(crate) joins_allowed: bool,
     }
 
@@ -180,7 +173,6 @@ mod core {
                 network_knowledge: self.network_knowledge().clone(),
                 section_keys_provider: self.section_keys_provider.clone(),
                 comm: self.comm.clone(),
-                event_sender: self.event_sender.clone(),
                 joins_allowed: self.joins_allowed,
                 data_storage: self.data_storage.clone(),
             }
@@ -192,7 +184,6 @@ mod core {
             keypair: Arc<Keypair>,
             network_knowledge: NetworkKnowledge,
             section_key_share: Option<SectionKeyShare>,
-            event_sender: EventSender,
             used_space: UsedSpace,
             root_storage_dir: PathBuf,
             dysfunction_cmds_sender: mpsc::Sender<DysCmds>,
@@ -248,7 +239,6 @@ mod core {
                 dkg_start_aggregator: SignatureAggregator::default(),
                 dkg_voter: DkgVoter::default(),
                 relocate_state: None,
-                event_sender,
                 handover_voting: handover,
                 joins_allowed: true,
                 data_storage,
