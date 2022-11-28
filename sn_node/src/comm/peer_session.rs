@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use std::sync::Arc;
-use std::time::Duration;
 
 use super::Link;
 
@@ -34,67 +33,21 @@ const MAX_SENDJOB_RETRIES: usize = 3;
 #[derive(Debug)]
 enum SessionCmd {
     Send(SendJob),
-    AddConnection(qp2p::Connection),
     Terminate,
 }
 
 #[derive(Clone)]
 pub(crate) struct PeerSession {
     channel: mpsc::Sender<SessionCmd>,
-    link: Link,
 }
 
 impl PeerSession {
     pub(crate) fn new(link: Link) -> PeerSession {
         let (sender, receiver) = mpsc::channel(1000);
 
-        let _ =
-            tokio::task::spawn(PeerSessionWorker::new(link.clone(), sender.clone()).run(receiver));
+        let _ = tokio::task::spawn(PeerSessionWorker::new(link, sender.clone()).run(receiver));
 
-        PeerSession {
-            channel: sender,
-            link,
-        }
-    }
-
-    // this must be restricted somehow, we can't allow an unbounded inflow
-    // of connections from a peer...
-    pub(crate) async fn add(&self, conn: qp2p::Connection) {
-        let cmd = SessionCmd::AddConnection(conn.clone());
-        if let Err(e) = self.channel.send(cmd).await {
-            error!("Error while sending AddConnection {e:?}");
-        }
-    }
-
-    /// Sends out a UsrMsg on a bidi connection and awaits response bytes
-    /// As such this may be long running if response is returned slowly.
-    /// This manages retries over bidi connection attempts
-    pub(crate) async fn send_with_bi_return_response(
-        &mut self,
-        bytes: UsrMsgBytes,
-        msg_id: MsgId,
-    ) -> Result<UsrMsgBytes> {
-        // TODO: make a real error here
-        let mut attempts = 0;
-        let mut response = self
-            .link
-            .send_on_new_bi_di_stream(bytes.clone(), msg_id)
-            .await;
-        while response.is_err() && attempts <= 2 {
-            error!(
-                "Error sending to {:?} on bi conn: {response:?}, attempt # {attempts}",
-                self.link.peer()
-            );
-            response = self
-                .link
-                .send_on_new_bi_di_stream(bytes.clone(), msg_id)
-                .await;
-            attempts += 1;
-            // wee sleep
-            tokio::time::sleep(Duration::from_millis(100)).await;
-        }
-
-        response.map_err(|_e| Error::CmdSendError)
+        PeerSession { channel: sender }
     }
 
     #[instrument(skip(self, bytes))]
@@ -200,10 +153,6 @@ impl PeerSessionWorker {
                         }
                     }
                 }
-                SessionCmd::AddConnection(conn) => {
-                    self.link.add(conn);
-                    SessionStatus::Ok
-                }
                 SessionCmd::Terminate => SessionStatus::Terminating,
             };
 
@@ -227,7 +176,7 @@ impl PeerSessionWorker {
         info!("Finished peer session shutdown");
     }
 
-    async fn send_over_peer_connection(&mut self, mut job: SendJob) -> Result<SessionStatus> {
+    async fn send_over_peer_connection(&mut self, job: SendJob) -> Result<SessionStatus> {
         let id = job.msg_id;
         trace!("Sending to peer over connection: {id:?}");
 
@@ -238,32 +187,22 @@ impl PeerSessionWorker {
         }
 
         let queue = self.queue.clone();
-        let link_connections = self.link.connections.clone();
-        let conns_count = self.link.connections.len();
-        let the_peer = *self.link.peer();
-
-        let mut link = self.link.clone();
+        let link = self.link.clone();
 
         let _handle = tokio::spawn(async move {
             // Attempt to get a connection or make one to another node.
             // if there's no connection here yet, we requeue the job after a wait
             // incase there's been a delay adding the connection to Comms
-            let conn = match link.get_or_connect(id).await {
+            let conn = match link.connect(id).await {
                 Ok(conn) => conn,
                 Err(error) => {
                     error!("Error when attempting to send to peer. Job will be reenqueued for another attempt after a small timeout");
-
-                    // only increment connection attempts if our connections set is empty
-                    // and so we'll be trying to create a fresh connection
-                    if link.connections.is_empty() {
-                        job.connection_retries += 1;
-                    }
 
                     job.reporter
                         .send(SendStatus::TransientError(format!("{error:?}")));
 
                     // we await here in case the connection is fresh and has not yet been added
-                    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                     if let Err(e) = queue.send(SessionCmd::Send(job)).await {
                         warn!("Failed to re-enqueue job {id:?} after failed connection retrieval error {e:?}");
                     }
@@ -275,39 +214,21 @@ impl PeerSessionWorker {
             let connection_id = conn.id();
             debug!("Connection exists for sendjob: {id:?}, and has conn_id: {connection_id:?}");
 
-            let send_resp = Link::send_with_connection(
-                job.bytes.clone(),
-                0,
-                Some(&RetryConfig::default()),
-                conn,
-                link_connections,
-            )
-            .await;
+            let send_resp = conn
+                .send_with(job.bytes.clone(), 0, Some(&RetryConfig::default()))
+                .await;
 
             match send_resp {
                 Ok(_) => {
                     job.reporter.send(SendStatus::Sent);
                 }
                 Err(err) => {
-                    if err.is_local_close() {
-                        debug!("Peer linked dropped when trying to send {:?}. But link has {:?} connections", id, conns_count );
-                        error!("the error on send :{err:?}");
-                        // we can retry if we've more connections!
-                        if conns_count <= 1 {
-                            debug!(
-                                "No connections left on this link to {:?}, terminating session.",
-                                the_peer
-                            );
-                            job.connection_retries += 1;
-                        }
-                    }
-
                     warn!(
                         "Transient error while attempting to send, re-enqueing job {id:?} {err:?}. Connection id was {:?}",connection_id
                     );
 
-                    // we await here in case the connection is fresh and has not yet been added
-                    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+                    // we await here in case the connectee needs a few millis
+                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
                     job.reporter
                         .send(SendStatus::TransientError(format!("{err:?}")));
@@ -315,8 +236,6 @@ impl PeerSessionWorker {
                     if let Err(e) = queue.send(SessionCmd::Send(job)).await {
                         warn!("Failed to re-enqueue job {id:?} after transient error {e:?}");
                     }
-
-                    // Ok(())
                 }
             }
         });

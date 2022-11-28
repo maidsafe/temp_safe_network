@@ -12,12 +12,12 @@ mod peer_session;
 
 use self::{
     link::Link,
-    listener::{ListenerEvent, MsgListener},
+    listener::MsgListener,
     peer_session::{PeerSession, SendStatus, SendWatcher},
 };
 
 use crate::node::{Error, Result};
-use qp2p::{Connection, SendStream, UsrMsgBytes};
+use qp2p::{SendStream, UsrMsgBytes};
 
 use sn_interface::{
     messaging::{MsgId, WireMsg},
@@ -28,10 +28,7 @@ use dashmap::DashMap;
 use qp2p::{Endpoint, IncomingConnections};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
-    sync::{
-        mpsc::{self, Receiver, Sender},
-        Mutex,
-    },
+    sync::{mpsc::Sender, Mutex},
     task,
 };
 
@@ -164,7 +161,7 @@ impl Comm {
         Ok(())
     }
 
-    // TODO: tweak messaging to just allow passthrough
+    /// Send a message using a bi-di stream and await response
     #[tracing::instrument(skip(self, bytes))]
     pub(crate) async fn send_out_bytes_to_peer_and_return_response(
         &self,
@@ -172,16 +169,43 @@ impl Comm {
         msg_id: MsgId,
         bytes: UsrMsgBytes,
     ) -> Result<WireMsg> {
-        debug!("trying to get peer session in order to send: {msg_id:?}");
-        if let Some(mut peer) = self.get_or_create(&peer) {
-            debug!("Peer session retrieved for {msg_id:?}");
-            let adult_response_bytes = peer.send_with_bi_return_response(bytes, msg_id).await?;
-            debug!("peer response is in for {msg_id:?}");
-            WireMsg::from(adult_response_bytes).map_err(|_| Error::InvalidMessage)
+        trace!("Sending {msg_id:?} via a bi stream");
+
+        debug!("{msg_id:?} create conn attempt to {:?}", peer);
+        let (conn, _incoming_msgs) = self.our_endpoint.connect_to(&peer.addr()).await?;
+
+        trace!("connection got to: {:?} {msg_id:?}", peer);
+        let (mut send_stream, mut recv_stream) = conn.open_bi().await?;
+
+        let stream_id = send_stream.id();
+        trace!("bidi {stream_id} openeed for {msg_id:?} to: {:?}", peer);
+        send_stream.set_priority(10);
+        match send_stream.send_user_msg(bytes.clone()).await {
+            Ok(_) => {}
+            Err(err) => {
+                error!(
+                    "Error sending bytes {msg_id:?} over stream {stream_id}: {:?}",
+                    err
+                );
+            }
+        }
+
+        trace!("{msg_id:?} sent on {stream_id} to: {:?}", peer);
+        send_stream.finish().await.or_else(|err| match err {
+            qp2p::SendError::StreamLost(qp2p::StreamError::Stopped(_)) => Ok(()),
+            _ => {
+                error!("{msg_id:?} Error finishing up stream {stream_id}: {err:?}");
+                Err(Error::FailedSend(peer))
+            }
+        })?;
+
+        trace!("bidi {stream_id} finished for {msg_id:?} to: {:?}", peer);
+
+        let usr_msg = recv_stream.next().await?;
+        if let Some(bytes) = usr_msg {
+            Ok(WireMsg::from(bytes)?)
         } else {
-            debug!("No client conn exists or could be created to send this msg on.... {msg_id:?}");
-            // TODO: real error here....
-            Err(Error::PeerSessionChannel)
+            Err(Error::NoBytesReturnedInResponse)
         }
     }
 
@@ -257,31 +281,6 @@ impl Comm {
         Some(session)
     }
 
-    /// Any number of incoming qp2p:Connections can be added.
-    /// We will eventually converge to the same one in our comms with the peer.
-    async fn add_incoming(&self, peer: &Peer, conn: Connection) {
-        debug!(
-            "Adding incoming conn to {peer:?} w/ conn_id : {:?}",
-            conn.id()
-        );
-        if let Some(entry) = self.sessions.get(peer) {
-            // peer already exists
-            let peer_session = entry.value();
-            // add to it
-            peer_session.add(conn).await;
-        } else {
-            let link = Link::new_with(
-                *peer,
-                self.our_endpoint.clone(),
-                self.msg_listener.clone(),
-                conn,
-            )
-            .await;
-            let session = PeerSession::new(link);
-            let _ = self.sessions.insert(*peer, session);
-        }
-    }
-
     // Helper to send a message to a single recipient.
     #[instrument(skip(self, bytes))]
     async fn send_to_one(
@@ -332,9 +331,7 @@ fn setup_comms(
 
 #[tracing::instrument(skip_all)]
 fn setup(our_endpoint: Endpoint, receive_msg: Sender<MsgFromPeer>) -> (Comm, MsgListener) {
-    let (add_connection, conn_receiver) = mpsc::channel(10_000);
-
-    let msg_listener = MsgListener::new(add_connection, receive_msg);
+    let msg_listener = MsgListener::new(receive_msg);
 
     let comm = Comm {
         our_endpoint,
@@ -342,16 +339,7 @@ fn setup(our_endpoint: Endpoint, receive_msg: Sender<MsgFromPeer>) -> (Comm, Msg
         sessions: Arc::new(DashMap::new()),
     };
 
-    let _ = task::spawn(receive_conns(comm.clone(), conn_receiver));
-
     (comm, msg_listener)
-}
-
-#[tracing::instrument(skip_all)]
-async fn receive_conns(comm: Comm, mut conn_receiver: Receiver<ListenerEvent>) {
-    while let Some(ListenerEvent::Connected { peer, connection }) = conn_receiver.recv().await {
-        comm.add_incoming(&peer, connection).await;
-    }
 }
 
 #[tracing::instrument(skip_all)]
@@ -396,7 +384,11 @@ mod tests {
     use futures::future;
     use qp2p::Config;
     use std::{net::Ipv4Addr, time::Duration};
-    use tokio::{net::UdpSocket, sync::mpsc, time};
+    use tokio::{
+        net::UdpSocket,
+        sync::mpsc::{self, Receiver},
+        time,
+    };
 
     const TIMEOUT: Duration = Duration::from_secs(1);
 

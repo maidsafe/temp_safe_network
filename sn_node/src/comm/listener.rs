@@ -21,29 +21,14 @@ use tokio::{
 };
 use tracing::Instrument;
 
-#[derive(Debug)]
-pub(crate) enum ListenerEvent {
-    Connected {
-        peer: Peer,
-        connection: qp2p::Connection,
-    },
-}
-
 #[derive(Clone)]
 pub(crate) struct MsgListener {
-    add_connection: mpsc::Sender<ListenerEvent>,
     receive_msg: mpsc::Sender<MsgFromPeer>,
 }
 
 impl MsgListener {
-    pub(crate) fn new(
-        add_connection: mpsc::Sender<ListenerEvent>,
-        receive_msg: mpsc::Sender<MsgFromPeer>,
-    ) -> Self {
-        Self {
-            add_connection,
-            receive_msg,
-        }
+    pub(crate) fn new(receive_msg: mpsc::Sender<MsgFromPeer>) -> Self {
+        Self { receive_msg }
     }
 
     #[tracing::instrument(skip_all)]
@@ -56,7 +41,6 @@ impl MsgListener {
     async fn listen_internal(self, conn: qp2p::Connection, mut incoming_msgs: ConnectionIncoming) {
         let conn_id = conn.id();
         let remote_address = conn.remote_address();
-        let mut first = true;
 
         while let Some(result) = incoming_msgs.next_with_stream().await.transpose() {
             match result {
@@ -82,17 +66,6 @@ impl MsgListener {
                         | MsgKind::ClientDataResponse(name)
                         | MsgKind::NodeDataResponse(name) => *name,
                     };
-
-                    if first {
-                        first = false;
-                        let _ = self
-                            .add_connection
-                            .send(ListenerEvent::Connected {
-                                peer: Peer::new(src_name, remote_address),
-                                connection: conn.clone(),
-                            })
-                            .await;
-                    }
 
                     let msg_id = wire_msg.msg_id();
                     debug!(

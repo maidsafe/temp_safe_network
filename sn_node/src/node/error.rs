@@ -29,6 +29,9 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Debug, Error)]
 #[allow(missing_docs)]
 pub enum Error {
+    /// Qp2p stream did not give us any response as expected.
+    #[error("Receive stream received no bytes before close.")]
+    NoBytesReturnedInResponse,
     /// Client messages always need a response, so should come in on bidi streams
     #[error("No client response stream. Client message came in on a unidirectional stream. All client messages should be bidirectional.")]
     NoClientResponseStream,
@@ -217,6 +220,15 @@ pub enum Error {
     CannotHandleQuery(DataQuery),
     #[error("BLS error: {0}")]
     BlsError(#[from] bls::Error),
+    #[error("Qp2p recv error: {0}")]
+    Qp2pRecv(#[from] qp2p::RecvError),
+    /// Remote peer closed the bi-stream we expected a msg on
+    #[error("Remove {0} closed bidi stream.")]
+    RecvClosed(Peer),
+    #[error("Qp2p send error: {0}")]
+    Qp2pSend(#[from] qp2p::SendError),
+    #[error("Qp2p connection error: {0}")]
+    Qp2pConnection(#[from] qp2p::ConnectionError),
 }
 
 impl From<qp2p::ClientEndpointError> for Error {
@@ -228,12 +240,6 @@ impl From<qp2p::ClientEndpointError> for Error {
         };
 
         Self::CannotConnectEndpoint(endpoint_err)
-    }
-}
-
-impl From<qp2p::SendError> for Error {
-    fn from(error: qp2p::SendError) -> Self {
-        Self::AddressNotReachable(qp2p::RpcError::Send(error))
     }
 }
 

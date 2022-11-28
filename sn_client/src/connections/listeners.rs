@@ -285,8 +285,10 @@ impl Session {
         // Get the best sap we know of now.
         // We don't just rely on the returned SAP, as we should be updating the knowledge if it's valid, before we get here.
         let best_sap = knowlege
-        .closest(&bounced_msg_dst.name, None)
-        .ok_or(Error::NoCloseSapFound(bounced_msg_dst.name))?;
+            .closest(&bounced_msg_dst.name, None)
+            .ok_or(Error::NoCloseSapFound(bounced_msg_dst.name))?;
+
+        trace!("{msg_id:?} from  {src_peer:?}. New SAP of for bounced msg: {best_sap:?}");
 
         trace!("{msg_id:?} from  {src_peer:?}. New SAP of for bounced msg: {best_sap:?}");
 
