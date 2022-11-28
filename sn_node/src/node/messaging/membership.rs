@@ -12,7 +12,7 @@ use crate::node::{
     membership::{self, Membership},
     messaging::Peers,
     relocation::ChurnId,
-    Event, MembershipEvent, MyNode, Result,
+    MyNode, Result,
 };
 
 use bls::Signature;
@@ -263,21 +263,7 @@ impl MyNode {
 
         self.add_new_adult_to_trackers(new_info.name()).await;
 
-        info!("handle Online: {}", new_info.peer());
-
-        // move this off thread to make the containing func sync
-        let event_sender = self.event_sender.clone();
-
-        let _handle = tokio::spawn(async move {
-            // still used for testing
-            event_sender
-                .send(Event::Membership(MembershipEvent::MemberJoined {
-                    name: new_info.name(),
-                    previous_name: new_info.previous_name(),
-                    age: new_info.age(),
-                }))
-                .await;
-        });
+        info!("handle Online: {:?}", new_info.value);
 
         vec![]
     }

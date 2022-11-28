@@ -7,9 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::core::NodeContext;
-use crate::node::{
-    flow_ctrl::cmds::Cmd, messaging::Peers, Error, Event, MembershipEvent, MyNode, Result,
-};
+use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Error, MyNode, Result};
 use bls::PublicKey as BlsPublicKey;
 use itertools::Itertools;
 use qp2p::{SendStream, UsrMsgBytes};
@@ -421,14 +419,7 @@ impl MyNode {
                     .map(|m| m.name())
                     .contains(&latest_context.name)
             {
-                error!("Detected that we've been removed from the section");
-                // move off thread to keep fn sync
-                let event_sender = starting_context.event_sender.clone();
-                let _handle = tokio::spawn(async move {
-                    event_sender
-                        .send(Event::Membership(MembershipEvent::RemovedFromSection))
-                        .await;
-                });
+                error!("We've been removed from the section");
 
                 return Err(Error::RemovedFromSection);
             }

@@ -28,10 +28,7 @@ mod node_test_api;
 mod relocation;
 
 use self::{
-    bootstrap::join_network,
-    core::MyNode,
-    data::MIN_LEVEL_WHEN_FULL,
-    flow_ctrl::{cmds::Cmd, event::Elders},
+    bootstrap::join_network, core::MyNode, data::MIN_LEVEL_WHEN_FULL, flow_ctrl::cmds::Cmd,
     node_starter::CmdChannel,
 };
 pub use self::{
@@ -68,8 +65,7 @@ mod core {
             handover::Handover,
             membership::{elder_candidates, try_split_dkg, Membership},
             messaging::Peers,
-            DataStorage, Elders, Error, Event, MembershipEvent, NodeElderChange, Proposal, Result,
-            XorName,
+            DataStorage, Error, Proposal, Result, XorName,
         },
         UsedSpace,
     };
@@ -569,36 +565,26 @@ mod core {
                 .iter()
                 .map(|e| e.name())
                 .collect();
+            let current_elders: BTreeSet<_> = self.network_knowledge.section_auth().names();
+            let added_elders: BTreeSet<_> =
+                current_elders.difference(&old_elders).copied().collect();
+            let removed_elders: BTreeSet<_> =
+                old_elders.difference(&current_elders).copied().collect();
+            let remaining_elders: BTreeSet<_> =
+                old_elders.intersection(&current_elders).copied().collect();
 
-            let current: BTreeSet<_> = self.network_knowledge.section_auth().names();
-            let added = current.difference(&old_elders).copied().collect();
-            let removed = old_elders.difference(&current).copied().collect();
-            let remaining = old_elders.intersection(&current).copied().collect();
+            let new_elders = !added_elders.is_empty();
+            let section_split = new_prefix != old_prefix;
+            let elders_changed = !added_elders.is_empty() || !removed_elders.is_empty();
 
-            let elders = Elders {
-                prefix: new_prefix,
-                key: new.network_knowledge.section_key(),
-                remaining,
-                added,
-                removed,
-            };
-
-            let self_status_change = if !old.is_elder && new.is_elder {
+            if !old.is_elder && new.is_elder {
+                debug!("Node has been promoted to Elder");
                 info!("{}: {:?}", LogMarker::PromotedToElder, new_prefix);
-                NodeElderChange::Promoted
             } else if old.is_elder && !new.is_elder {
+                debug!("Node has been demoted from Elder");
                 info!("{}", LogMarker::DemotedFromElder);
                 self.section_keys_provider.wipe();
-                NodeElderChange::Demoted
-            } else {
-                NodeElderChange::None
-            };
-
-            let mut events = vec![];
-
-            let new_elders = !elders.added.is_empty();
-            let section_split = new_prefix != old_prefix;
-            let elders_changed = !elders.added.is_empty() || !elders.removed.is_empty();
+            }
 
             if section_split && new.is_elder {
                 info!("{}: {:?}", LogMarker::SplitSuccess, new_prefix);
@@ -617,19 +603,27 @@ mod core {
                 )
                 .await;
 
-                // During the split, sibling's SAP could be unknown to us yet.
-                // Hence, fire the SectionSplit event whenever detect a prefix change.
-                events.push(Event::Membership(MembershipEvent::SectionSplit {
-                    elders: elders.clone(),
-                    self_status_change,
-                }))
+                debug!(
+                    "Section has been split, new_prefix: {:?}, section_key {:?}, remaining elders\
+                    in our section {:?}, new elders {:?} removed elders {:?}",
+                    new_prefix,
+                    new.network_knowledge.section_key(),
+                    remaining_elders,
+                    new_elders,
+                    removed_elders
+                );
             };
 
             if !section_split && elders_changed {
-                events.push(Event::Membership(MembershipEvent::EldersChanged {
-                    elders,
-                    self_status_change,
-                }))
+                debug!(
+                    "Elders has been changed. prefix: {:?}, section_key {:?},  remaining elders\
+                    in our section {:?}, new elders {:?} removed elders {:?}",
+                    new_prefix,
+                    new.network_knowledge.section_key(),
+                    remaining_elders,
+                    new_elders,
+                    removed_elders
+                );
             }
 
             // update new elders if we were an elder (regardless if still or not)
@@ -646,14 +640,6 @@ mod core {
                     ),
                 );
             };
-
-            // push this off thread to make containing func sync
-            let event_sender = self.event_sender.clone();
-            let _handle = tokio::spawn(async move {
-                for event in events {
-                    event_sender.send(event).await
-                }
-            });
 
             Ok(cmds)
         }

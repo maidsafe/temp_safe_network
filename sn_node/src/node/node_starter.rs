@@ -10,13 +10,8 @@ use crate::comm::{Comm, MsgFromPeer};
 use crate::node::{
     cfg::keypair_storage::{get_reward_pk, store_network_keypair, store_new_reward_keypair},
     flow_ctrl::{
-        cmds::Cmd,
-        dispatcher::Dispatcher,
-        dysfunction::DysCmds,
-        event::{Elders, Event, MembershipEvent, NodeElderChange},
-        event_channel,
-        event_channel::EventReceiver,
-        CmdCtrl, FlowCtrl,
+        cmds::Cmd, dispatcher::Dispatcher, dysfunction::DysCmds, event_channel,
+        event_channel::EventReceiver, CmdCtrl, FlowCtrl,
     },
     join_network,
     logging::{log_ctx::LogCtx, run_system_logger},
@@ -30,7 +25,7 @@ use sn_interface::{
 };
 
 use rand_07::rngs::OsRng;
-use std::{collections::BTreeSet, path::Path, sync::Arc, time::Duration};
+use std::{path::Path, sync::Arc, time::Duration};
 use tokio::{
     fs,
     sync::{mpsc, RwLock},
@@ -228,24 +223,9 @@ async fn bootstrap_genesis_node(
     let path = root_storage_dir.join(GENESIS_DBC_FILENAME);
     fs::write(path, genesis_dbc.to_hex()?).await?;
 
-    let network_knowledge = node.network_knowledge();
-
-    let elders = Elders {
-        prefix: network_knowledge.prefix(),
-        key: network_knowledge.section_key(),
-        remaining: BTreeSet::new(),
-        added: network_knowledge.section_auth().names(),
-        removed: BTreeSet::new(),
-    };
-
     info!("{}", LogMarker::PromotedToElder);
-    node.send_event(Event::Membership(MembershipEvent::EldersChanged {
-        elders,
-        self_status_change: NodeElderChange::Promoted,
-    }))
-    .await;
 
-    let genesis_key = network_knowledge.genesis_key();
+    let genesis_key = node.network_knowledge.genesis_key();
     info!(
         "{} Genesis node started!. Genesis key {:?}, hex: {}",
         node_name,
