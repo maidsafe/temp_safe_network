@@ -174,14 +174,14 @@ impl MyNode {
 
                 let mut cmds = vec![];
                 if !context.is_elder {
+                    info!("Dropping AEProbe since we are not an elder");
                     // early return here as we do not get health checks as adults,
                     // normal AE rules should have applied
                     return Ok(cmds);
                 }
 
                 trace!("Received Probe message from {}: {:?}", sender, msg_id);
-                let mut recipients = BTreeSet::new();
-                let _existed = recipients.insert(sender);
+                let recipients = BTreeSet::from_iter([sender]);
                 cmds.push(MyNode::send_ae_update_to_nodes(
                     &context,
                     recipients,

@@ -281,11 +281,13 @@ impl<'a> Joiner<'a> {
 
             let mut any_new_information = false;
 
-            for _ in 0..target_sap.public_key_set().threshold() {
+            for _ in 0..=target_sap.public_key_set().threshold() {
                 let update =
                     tokio::time::timeout(response_timeout, self.receive_section_tree_update())
                         .await
                         .map_err(|_| Error::JoinTimeout)??;
+
+                info!("Received section tree update: {update:?}");
 
                 any_new_information = self.section_tree.update(update)?;
 
@@ -297,8 +299,10 @@ impl<'a> Joiner<'a> {
             if any_new_information {
                 // Update the target sap since we've received new information and try again.
                 target_sap = self.join_target_sap()?;
+                info!("Received new information in last AEProbe, updating target sap to {target_sap:?}");
             } else {
                 // We are up to date with these nodes so we can end the bootstrap
+                info!("No new information was learned in last AEProbe, ending tree bootstrap");
                 return Ok(());
             }
         }
