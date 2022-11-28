@@ -50,6 +50,7 @@ impl MyNode {
 
         let our_prefix = context.network_knowledge.prefix();
         if !our_prefix.matches(&peer.name()) {
+            // TODO: Replace Redirect with a Retry + AEProbe.
             debug!("Redirecting JoinRequest from {peer} - name doesn't match our prefix {our_prefix:?}.");
             let retry_sap = context.section_sap_matching_name(&peer.name())?;
             let msg = NodeMsg::JoinResponse(JoinResponse::Redirect(retry_sap));

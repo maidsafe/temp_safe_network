@@ -35,6 +35,7 @@ impl JoinRequest {
 pub enum JoinResponse {
     /// Tell the joining node to retry
     Retry,
+    // TODO: Replace Redirect with a Retry + AEProbe.
     /// Response redirecting a joining peer to join a different section,
     /// containing addresses of nodes that are closer (than the recipient) to the
     /// requested name. The `JoinRequest` should be re-sent to these addresses.

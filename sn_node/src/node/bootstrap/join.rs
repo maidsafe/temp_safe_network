@@ -213,6 +213,7 @@ impl<'a> Joiner<'a> {
                     }
                 }
                 JoinResponse::Redirect(section_auth) => {
+                    // TODO: Replace Redirect with a Retry + AEProbe.
                     trace!("Received a redirect JoinResponse from {}. Sending request to the latest contacts", sender);
                     if section_auth.elders().next().is_none() {
                         error!(
