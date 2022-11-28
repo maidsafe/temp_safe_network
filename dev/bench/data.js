@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1669443188308,
+  "lastUpdate": 1669607141231,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -31606,6 +31606,144 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 332810304,
             "range": "± 5547770",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "8ee12567e9a3ec8f0065e2a9e12ce9a004241401",
+          "message": "Merge #1794\n\n1794: ci: use s3_deploy user for nightly and release workflows r=joshuef a=jacderida\n\n- 590df4d1b **ci: use s3_deploy user for nightly and release workflows**\r\n\r\n  In the nightly workflow, this user gets used to launch the testnet (really just reading the tfstate\r\n  file) and to upload node logs to the `sn-node` bucket when a run fails.\r\n\r\n  In the release workflow it's used to upload the built artifacts to the same `sn-node` bucket.\r\n\r\n  The names of the variables were changed to make it more specific about which user we were referring\r\n  to.\r\n\r\n  The keys being used previously have been deleted.\r\n\r\n- f6d4cdd32 **ci: specify branch/user for testnet tool on nightly**\r\n\r\n  This allows forks of the testnet tool to be tried and tested.\r\n\r\n  Also fix references to S3 buckets in the nightly workflow.\r\n\r\n\n\nCo-authored-by: Chris O'Neil <chriso83@protonmail.com>",
+          "timestamp": "2022-11-28T01:51:34Z",
+          "tree_id": "4fa5022a52734ab28e36fd730725ee10a14bc514",
+          "url": "https://github.com/maidsafe/safe_network/commit/8ee12567e9a3ec8f0065e2a9e12ce9a004241401"
+        },
+        "date": 1669607139069,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 1357949,
+            "range": "± 192687",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 105054615,
+            "range": "± 2817016",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 125562718,
+            "range": "± 9579853",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 508405454,
+            "range": "± 17489115",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 83154873,
+            "range": "± 1761104",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 99924950,
+            "range": "± 3543508",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 399381785,
+            "range": "± 7230718",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 62847399,
+            "range": "± 38864239",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2661336077,
+            "range": "± 202586197",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 11615770932,
+            "range": "± 888669735",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 380769909,
+            "range": "± 14367184",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 3422877650,
+            "range": "± 196551316",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 10141394716,
+            "range": "± 975019404",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 46812727,
+            "range": "± 3166919",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 479538614,
+            "range": "± 32771001",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1864145764,
+            "range": "± 61913132",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 12327653,
+            "range": "± 437771",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 105593372,
+            "range": "± 9945669",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 365532035,
+            "range": "± 7950393",
             "unit": "ns/iter"
           }
         ]
