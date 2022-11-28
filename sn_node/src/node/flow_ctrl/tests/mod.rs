@@ -997,13 +997,24 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
 async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node() -> Result<()> {
     init_logger();
     let replication_count = 5;
-    let (dispatcher, section, peer, genesis_sk_set) =
-        network_utils::TestNodeBuilder::new(Prefix::default().pushed(false), elder_count())
-            .adult_count(6)
-            .section_sk_threshold(0)
-            .data_copy_count(replication_count)
-            .build()
-            .await?;
+    let prefix1 = prefix("1");
+    std::env::set_var("SN_DATA_COPY_COUNT", replication_count.to_string());
+
+    let env = TestNetworkBuilder::new(thread_rng())
+        .sap(prefix("0"), elder_count(), 6, None, Some(0))
+        .sap(prefix1, elder_count(), 6, None, Some(0))
+        .build();
+    let dispatcher = env
+        .get_dispatchers(Prefix::default(), 1, 0, None)
+        .remove(0)
+        .0;
+    let info = dispatcher.node().read().await.info();
+    let genesis_sk_set = env.get_network_knowledge(Prefix::default(), None).1;
+    let other_section_key_share = env
+        .get_node_by_key(prefix1, info.public_key(), None)
+        .1
+        .expect("info should be present");
+    let (other_section, other_section_key) = env.get_network_knowledge(prefix1, None);
 
     // At this point, only the genesis key should be in the proof chain on this node.
     let tree = dispatcher
@@ -1016,20 +1027,8 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
     let proof_chain = tree.get_sections_dag().clone();
     assert_eq!(proof_chain.keys().into_iter().count(), 1);
 
-    // This will create a section with the following proof chain:
-    // genesis_key -> other_section_key
     // The key share also needs to be added to the section keys provider, which is stored
     // on the node.
-    let other_section_key = bls::SecretKey::random();
-    let (other_section, _, other_section_key_share) =
-        network_utils::TestNodeBuilder::new(Prefix::default().pushed(true), elder_count())
-            .genesis_sk_set(genesis_sk_set.clone())
-            .parent_section_tree(section.section_tree().clone())
-            .adult_count(6)
-            .section_sk_threshold(0)
-            .other_section_keys(vec![other_section_key.clone()])
-            .build_section()
-            .await?;
     dispatcher
         .node()
         .write()
@@ -1053,7 +1052,7 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
         .ok_or_else(|| eyre!("This DBC should have been reissued with a spent proof"))?;
     assert_eq!(
         new_dbc2_spent_proof.spentbook_pub_key,
-        other_section_key.public_key()
+        other_section_key.secret_key().public_key()
     );
 
     // Finally, spend new_dbc2 as part of the input for another reissue.
@@ -1071,7 +1070,7 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
             spent_transactions: new_dbc2.spent_transactions,
             network_knowledge: Some((proof_chain, sap)),
         })),
-        peer,
+        info.peer(),
         &dispatcher,
     )
     .await?;
@@ -1102,7 +1101,7 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
             .ok_or_else(|| eyre!("The proof chain should include the genesis key"))?
     );
     assert_eq!(
-        other_section_key.public_key(),
+        other_section_key.secret_key().public_key(),
         proof_chain_iter
             .next()
             .ok_or_else(|| eyre!("The proof chain should include the other section key"))?
