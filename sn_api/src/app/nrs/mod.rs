@@ -366,7 +366,7 @@ mod tests {
     use super::*;
     use crate::{
         app::test_helpers::{new_safe_instance, random_nrs_name, TestDataFilesContainer},
-        retry_loop_for_pattern, Error, SafeUrl,
+        Error, SafeUrl,
     };
     use anyhow::{anyhow, bail, Context, Result};
     use assert_matches::assert_matches;
@@ -424,7 +424,7 @@ mod tests {
 
         assert_eq!(url.public_name(), site_name);
         assert!(url.content_version().is_some());
-        let nrs_map = retry_loop_for_pattern!(safe.nrs_get_subnames_map(&site_name, None), Ok(nrs_map) if !nrs_map.map.is_empty())?;
+        let nrs_map = safe.nrs_get_subnames_map(&site_name, None).await?;
         assert_eq!(nrs_map.map.len(), 1);
         assert_eq!(
             *nrs_map.map.get(&site_name).ok_or_else(|| anyhow!(format!(
@@ -460,7 +460,7 @@ mod tests {
         assert_eq!(url.public_name(), public_name);
         assert!(url.content_version().is_some());
         // we're retrying until an adult returns with the data we've just put.
-        let nrs_map = retry_loop_for_pattern!(safe.nrs_get_subnames_map(&site_name, None), Ok(nrs_map) if nrs_map.map.len() == 1)?;
+        let nrs_map = safe.nrs_get_subnames_map(&site_name, None).await?;
 
         assert_eq!(nrs_map.map.len(), 1, "expected map len to be 1");
         assert_eq!(
@@ -498,7 +498,7 @@ mod tests {
 
         // The last couple of tests verified the returned URLs are correct; for this test we don't
         // need that.
-        let nrs_map = retry_loop_for_pattern!(safe.nrs_get_subnames_map(&site_name, None), Ok(nrs_map) if nrs_map.map.len() > 1)?;
+        let nrs_map = safe.nrs_get_subnames_map(&site_name, None).await?;
         assert_eq!(nrs_map.map.len(), 2);
         assert_eq!(
             *nrs_map
@@ -622,7 +622,7 @@ mod tests {
         assert!(topname_registered);
 
         // we're retrying until an adult returns with the data we've just put.
-        let nrs_map = retry_loop_for_pattern!(safe.nrs_get_subnames_map(&site_name, None), Ok(nrs_map) if !nrs_map.map.is_empty())?;
+        let nrs_map = safe.nrs_get_subnames_map(&site_name, None).await?;
 
         assert_eq!(nrs_map.map.len(), 1, "nrs map has len 1");
         assert_eq!(
@@ -657,7 +657,7 @@ mod tests {
         .await?;
 
         // we're retrying until an adult returns with the data we've just put.
-        let nrs_map = retry_loop_for_pattern!(safe.nrs_get_subnames_map(&site_name, None), Ok(nrs_map) if nrs_map.map.len() > 1)?;
+        let nrs_map = safe.nrs_get_subnames_map(&site_name, None).await?;
         assert_eq!(nrs_map.map.len(), 2);
 
         let url = safe.nrs_remove(&format!("another.{site_name}")).await?;
@@ -665,7 +665,7 @@ mod tests {
         assert_eq!(url.public_name(), &format!("another.{site_name}"));
         assert!(url.content_version().is_some());
 
-        let nrs_map = retry_loop_for_pattern!(safe.nrs_get_subnames_map(&site_name, None), Ok(nrs_map) if !nrs_map.map.is_empty())?;
+        let nrs_map = safe.nrs_get_subnames_map(&site_name, None).await?;
         assert_eq!(nrs_map.map.len(), 1);
         assert_eq!(
             *nrs_map
@@ -690,7 +690,7 @@ mod tests {
         safe.nrs_associate(&site_name, &files_container.url).await?;
 
         // we're retrying until an adult returns with the data we've just put.
-        let nrs_map = retry_loop_for_pattern!(safe.nrs_get_subnames_map(&site_name, None), Ok(nrs_map) if !nrs_map.map.is_empty())?;
+        let nrs_map = safe.nrs_get_subnames_map(&site_name, None).await?;
         assert_eq!(nrs_map.map.len(), 1);
 
         let url = safe.nrs_remove(&site_name).await?;
@@ -698,7 +698,7 @@ mod tests {
         assert_eq!(url.public_name(), site_name);
         assert!(url.content_version().is_some());
         // we're retrying until an adult returns with the data we've just put.
-        let nrs_map = retry_loop_for_pattern!(safe.nrs_get_subnames_map(&site_name, None), Ok(nrs_map) if nrs_map.map.is_empty())?;
+        let nrs_map = safe.nrs_get_subnames_map(&site_name, None).await?;
         assert_eq!(nrs_map.map.len(), 0);
         Ok(())
     }
@@ -776,8 +776,7 @@ mod tests {
         );
 
         // get of conflicting name should error out
-        let conflict_error =
-            retry_loop_for_pattern!( safe.nrs_get(&site_name, None), res if res.is_err() );
+        let conflict_error = safe.nrs_get(&site_name, None).await;
         assert!(
             matches!(conflict_error, Err(Error::ConflictingNrsEntries { .. }),),
             "error was not expected {conflict_error:?}"

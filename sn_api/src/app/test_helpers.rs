@@ -226,29 +226,3 @@ pub fn random_nrs_name() -> String {
         .map(char::from)
         .collect()
 }
-
-#[macro_export]
-macro_rules! retry_loop_for_pattern {
-    ($n:literal, $async_func:expr, $pattern:pat $(if $cond:expr)?) => {{
-        // initial delay as we usually call this right after the data was stored on the network
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-
-        let mut retries: u64 = $n;
-        loop {
-            let result = $async_func.await;
-            match &result {
-                $pattern $(if $cond)? => break result,
-                Ok(_) | Err(_) if retries > 0 => {
-                    retries -= 1;
-                    tokio::time::sleep(std::time::Duration::from_secs(20)).await;
-                },
-                Err(e) => anyhow::bail!("Failed after {} retries: {:?}", $n, e),
-                Ok(_) => anyhow::bail!("Failed to match pattern after {} retries", $n),
-            }
-        }
-    }};
-    // Defaults to 10 retries if n is not provided
-    ($async_func:expr, $pattern:pat $(if $cond:expr)?) => {{
-        retry_loop_for_pattern!(10, $async_func, $pattern $(if $cond)?)
-    }};
-}

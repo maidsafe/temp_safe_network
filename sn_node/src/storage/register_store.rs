@@ -13,7 +13,7 @@ use crate::UsedSpace;
 use sn_interface::{
     messaging::data::SignedRegisterCreate,
     types::{
-        register::Register,
+        register::{EntryHash, Register},
         utils::{deserialise, serialise},
         RegisterAddress, RegisterCmd,
     },
@@ -193,15 +193,35 @@ impl RegisterStore {
 
         let reg_cmd_id = register_operation_id(cmd)?;
         let path = path.join(reg_cmd_id.clone());
+        let addr = cmd.dst_address();
 
-        trace!("Writing cmd register log at {}", path.display());
+        trace!(
+            "Writing cmd register log for {addr:?} at {}",
+            path.display()
+        );
+
+        let entry_hash = if let RegisterCmd::Edit(edit_cmd) = cmd {
+            let entry_hash = EntryHash(edit_cmd.op.edit.crdt_op.hash());
+            trace!(
+                "Writing RegisterEdit cmd log for {addr:?}, entry hash: {entry_hash}, at {}",
+                path.display()
+            );
+            Some(entry_hash)
+        } else {
+            trace!(
+                "Writing RegisterCreate cmd log for {addr:?} at {}",
+                path.display()
+            );
+            None
+        };
+
         // it's deterministic, so they are exactly the same op so we can leave
         if path.exists() {
-            trace!("RegisterCmd exists on disk, so was not written: {cmd:?}");
+            trace!("RegisterCmd exists on disk for {addr:?}, entry hash: {entry_hash:?}, so was not written: {cmd:?}");
             return Ok(());
         }
 
-        let mut file = File::create(path).await?;
+        let mut file = File::create(&path).await?;
 
         let serialized_data = serialise(cmd)?;
         file.write_all(&serialized_data).await?;
@@ -211,7 +231,10 @@ impl RegisterStore {
 
         self.used_space.increase(required_space);
 
-        trace!("RegisterCmd writing successful for id {reg_cmd_id}");
+        trace!(
+            "RegisterCmd writing successful for {addr:?}, id {reg_cmd_id}, at {}, entry hash: {entry_hash:?}",
+            path.display()
+        );
         Ok(())
     }
 }

@@ -74,7 +74,7 @@ impl Client {
         if res.is_ok() {
             debug!("{debug_cmd} sent okay: {res:?}");
         } else {
-            trace!("Failed response on {debug_cmd} cmd: {res:?}");
+            trace!("Failed response on {debug_cmd}, response: {:?}", res);
         }
 
         res

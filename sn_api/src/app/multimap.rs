@@ -231,7 +231,7 @@ impl Safe {
 
 #[cfg(test)]
 mod tests {
-    use crate::{app::test_helpers::new_safe_instance, retry_loop_for_pattern};
+    use crate::app::test_helpers::new_safe_instance;
     use anyhow::Result;
     use std::collections::BTreeSet;
 
@@ -267,7 +267,7 @@ mod tests {
             .multimap_insert(&xorurl, key_val.clone(), BTreeSet::new())
             .await?;
 
-        let received_data = retry_loop_for_pattern!(safe.multimap_get_by_key(&xorurl, &key), Ok(v) if !v.is_empty())?;
+        let received_data = safe.multimap_get_by_key(&xorurl, &key).await?;
 
         assert_eq!(
             received_data,
@@ -280,8 +280,7 @@ mod tests {
             .multimap_insert(&xorurl, key_val2.clone(), hashes_to_replace)
             .await?;
 
-        let received_data = retry_loop_for_pattern!(safe.multimap_get_by_key(&xorurl, &key),
-                                                    Ok(v) if v.iter().all(|(_, kv)| *kv != key_val))?;
+        let received_data = safe.multimap_get_by_key(&xorurl, &key).await?;
 
         assert_eq!(
             received_data,

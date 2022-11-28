@@ -602,10 +602,10 @@ impl Session {
             let _abort_handle = tasks.spawn(async move {
                 let link = session.peer_links.get_or_create_link(&peer, false).await;
 
-                debug!("Trying to send msg to link {msg_id:?} to {peer:?}");
+                debug!("Trying to send msg {msg_id:?} to {peer:?}");
                 match link.send_bi(bytes.clone(), msg_id).await {
                     Ok(recv_stream) => {
-                        debug!("That's {msg_id:?} sent to {peer:?}... starting recieve listener");
+                        debug!("That's {msg_id:?} sent to {peer:?}... starting receive listener");
                         // let's listen for responses on the bi-stream
                         session
                             .recv_stream_listener(msg_id, peer, peer_index, recv_stream)
