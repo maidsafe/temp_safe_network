@@ -166,8 +166,8 @@ impl SignedRegisterCreate {
 
 impl SignedRegisterEdit {
     /// Returns the dst address of the register.
-    pub fn dst_address(&self) -> &RegisterAddress {
-        &self.op.address
+    pub fn dst_address(&self) -> RegisterAddress {
+        self.op.address
     }
 }
 
@@ -223,7 +223,7 @@ impl RegisterCmd {
     pub fn dst_address(&self) -> RegisterAddress {
         match self {
             Self::Create { cmd, .. } => cmd.dst_address(),
-            Self::Edit(cmd) => *cmd.dst_address(),
+            Self::Edit(cmd) => cmd.dst_address(),
         }
     }
 

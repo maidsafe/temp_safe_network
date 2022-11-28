@@ -103,7 +103,7 @@ impl Session {
                 } => {
                     trace!(
                         "QueryResponse with id {msg_id:?} regarding correlation_id \
-                        {correlation_id:?} with response: {response:?}"
+                        {correlation_id:?} from {peer:?} with response: {response:?}"
                     );
                     break MsgResponse::QueryResponse(addr, Box::new(response));
                 }
@@ -113,7 +113,7 @@ impl Session {
                 } => {
                     trace!(
                         "CmdResponse with id {msg_id:?} regarding correlation_id \
-                        {correlation_id:?} with response {response:?}"
+                        {correlation_id:?} from {peer:?} with response {response:?}"
                     );
                     break MsgResponse::CmdResponse(addr, Box::new(response));
                 }
@@ -123,7 +123,7 @@ impl Session {
                 } => {
                     debug!(
                         "AntiEntropy msg with id {msg_id:?} received for {correlation_id:?} \
-                        from {peer:?}@{peer_index:?}"
+                        from {peer:?}@{peer_index}"
                     );
 
                     let ae_resp_outcome = self
@@ -168,7 +168,9 @@ impl Session {
         correlation_id: MsgId,
     ) -> Result<MsgResent> {
         let target_sap = section_tree_update.signed_sap.value.clone();
-        debug!("Received Anti-Entropy msg from {src_peer} (index:{src_peer_index:?}), with SAP: {target_sap:?}");
+        debug!(
+            "Received Anti-Entropy msg from {src_peer}@{src_peer_index}, with SAP: {target_sap:?}"
+        );
 
         // Try to update our network knowledge first
         self.update_network_knowledge(section_tree_update, src_peer)
