@@ -6,13 +6,16 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::flow_ctrl::{cmds::Cmd, dispatcher::Dispatcher};
+use crate::node::{
+    flow_ctrl::{cmds::Cmd, dispatcher::Dispatcher, RejoinNetwork},
+    Error,
+};
 
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
-use tokio::sync::RwLock;
+use tokio::sync::{mpsc, RwLock};
 use xor_name::XorName;
 
 /// Takes care of spawning a new task for the processing of a cmd,
@@ -45,7 +48,8 @@ impl CmdCtrl {
         cmd: Cmd,
         mut id: Vec<usize>,
         node_identifier: XorName,
-        cmd_process_api: tokio::sync::mpsc::Sender<(Cmd, Vec<usize>)>,
+        cmd_process_api: mpsc::Sender<(Cmd, Vec<usize>)>,
+        rejoin_network_sender: mpsc::Sender<RejoinNetwork>,
     ) {
         if id.is_empty() {
             id.push(self.id_counter.fetch_add(1, Ordering::SeqCst));
@@ -76,6 +80,11 @@ impl CmdCtrl {
                 }
                 Err(error) => {
                     debug!("Error when processing cmd: {:?}", error);
+                    if let Error::RemovedFromSection = error {
+                        if rejoin_network_sender.send(RejoinNetwork).await.is_err() {
+                            error!("Could not send RejoinNetwork through channel");
+                        }
+                    }
                 }
             }
 

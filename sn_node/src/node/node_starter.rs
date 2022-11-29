@@ -9,7 +9,9 @@
 use crate::comm::{Comm, MsgFromPeer};
 use crate::node::{
     cfg::keypair_storage::{get_reward_pk, store_network_keypair, store_new_reward_keypair},
-    flow_ctrl::{cmds::Cmd, dispatcher::Dispatcher, dysfunction::DysCmds, CmdCtrl, FlowCtrl},
+    flow_ctrl::{
+        cmds::Cmd, dispatcher::Dispatcher, dysfunction::DysCmds, CmdCtrl, FlowCtrl, RejoinNetwork,
+    },
     join_network,
     logging::{log_ctx::LogCtx, run_system_logger},
     Config, Error, MyNode, Result,
@@ -42,7 +44,7 @@ pub(crate) type CmdChannel = mpsc::Sender<(Cmd, Vec<usize>)>;
 
 /// Test only
 pub async fn new_test_api(config: &Config, join_timeout: Duration) -> Result<super::NodeTestApi> {
-    let (node, cmd_channel) = new_node(config, join_timeout).await?;
+    let (node, cmd_channel, _) = new_node(config, join_timeout).await?;
     Ok(super::NodeTestApi::new(node, cmd_channel))
 }
 
@@ -58,17 +60,24 @@ pub struct NodeRef {
 }
 
 /// Start a new node.
-pub async fn start_node(config: &Config, join_timeout: Duration) -> Result<NodeRef> {
-    let (node, cmd_channel) = new_node(config, join_timeout).await?;
+pub async fn start_node(
+    config: &Config,
+    join_timeout: Duration,
+) -> Result<(NodeRef, mpsc::Receiver<RejoinNetwork>)> {
+    let (node, cmd_channel, rejoin_network_rx) = new_node(config, join_timeout).await?;
 
-    Ok(NodeRef { node, cmd_channel })
+    Ok((NodeRef { node, cmd_channel }, rejoin_network_rx))
 }
 
 // Private helper to create a new node using the given config and bootstraps it to the network.
 async fn new_node(
     config: &Config,
     join_timeout: Duration,
-) -> Result<(Arc<RwLock<MyNode>>, CmdChannel)> {
+) -> Result<(
+    Arc<RwLock<MyNode>>,
+    CmdChannel,
+    mpsc::Receiver<RejoinNetwork>,
+)> {
     let root_dir_buf = config.root_dir()?;
     let root_dir = root_dir_buf.as_path();
     fs::create_dir_all(root_dir).await?;
@@ -85,7 +94,8 @@ async fn new_node(
 
     let used_space = UsedSpace::new(config.max_capacity());
 
-    let (node, cmd_channel) = bootstrap_node(config, used_space, root_dir, join_timeout).await?;
+    let (node, cmd_channel, rejoin_network_rx) =
+        bootstrap_node(config, used_space, root_dir, join_timeout).await?;
 
     {
         debug!("[NODE WRITE]: new node...");
@@ -115,7 +125,7 @@ async fn new_node(
 
     run_system_logger(LogCtx::new(node.clone()), config.resource_logs).await;
 
-    Ok((node, cmd_channel))
+    Ok((node, cmd_channel, rejoin_network_rx))
 }
 
 // Private helper to create a new node using the given config and bootstraps it to the network.
@@ -124,7 +134,11 @@ async fn bootstrap_node(
     used_space: UsedSpace,
     root_storage_dir: &Path,
     join_timeout: Duration,
-) -> Result<(Arc<RwLock<MyNode>>, CmdChannel)> {
+) -> Result<(
+    Arc<RwLock<MyNode>>,
+    CmdChannel,
+    mpsc::Receiver<RejoinNetwork>,
+)> {
     let (connection_event_tx, mut connection_event_rx) = mpsc::channel(10_000);
     let (dysfunction_cmds_sender, dysfunction_cmds_receiver) = mpsc::channel::<DysCmds>(20);
 
@@ -159,7 +173,7 @@ async fn bootstrap_node(
     let node = Arc::new(RwLock::new(node));
     let (dispatcher, data_replication_receiver) = Dispatcher::new(node.clone());
     let cmd_ctrl = CmdCtrl::new(dispatcher);
-    let cmd_channel = FlowCtrl::start(
+    let (cmd_channel, rejoin_network_rx) = FlowCtrl::start(
         cmd_ctrl,
         connection_event_rx,
         data_replication_receiver,
@@ -167,7 +181,7 @@ async fn bootstrap_node(
     )
     .await;
 
-    Ok((node, cmd_channel))
+    Ok((node, cmd_channel, rejoin_network_rx))
 }
 
 async fn bootstrap_genesis_node(

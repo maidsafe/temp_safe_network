@@ -116,7 +116,7 @@ async fn run_node(config: &Config) -> Result<()> {
         "unknown".to_string()
     };
 
-    let _node = loop {
+    let (_node, mut rejoin_network_rx) = loop {
         match start_node(config, join_timeout).await {
             Ok(result) => break result,
             Err(NodeError::CannotConnectEndpoint(qp2p::EndpointError::Upnp(error))) => {
@@ -194,9 +194,10 @@ async fn run_node(config: &Config) -> Result<()> {
     }
 
     // this keeps node running
-    loop {
-        sleep(Duration::from_millis(10)).await;
+    if rejoin_network_rx.recv().await.is_some() {
+        return Err(NodeError::RemovedFromSection).map_err(ErrReport::msg);
     }
+    Ok(())
 }
 
 fn update() -> Result<Status, Box<dyn (::std::error::Error)>> {
