@@ -131,8 +131,11 @@ mod tests {
         create_test_client_with, init_logger, read_genesis_dbc_from_first_node,
     };
     use crate::Client;
-    use eyre::{bail, Result};
+
     use sn_dbc::{rng, Hash, OwnerOnce, RingCtTransaction, TransactionBuilder};
+    use sn_interface::messaging::data::Error as ErrorMsg;
+
+    use eyre::{bail, Result};
     use tokio::time::Duration;
 
     const MAX_ATTEMPTS: u8 = 5;
@@ -244,14 +247,19 @@ mod tests {
 
         match result {
             Ok(_) => bail!("We expected an error to be returned"),
-            Err(error) => {
-                let msg = format!("Spent proof signature {invalid_pk:?} is invalid");
+            Err(crate::Error::CmdError {
+                source: ErrorMsg::InvalidOperation(error_string),
+                ..
+            }) => {
+                let correct_error_str =
+                    format!("SpentbookError(\"Spent proof signature {invalid_pk:?} is invalid\"");
                 assert!(
-                    error.to_string().contains(&msg),
-                    "A different error was expected for this case: {error:?}"
+                    error_string.contains(&correct_error_str),
+                    "A different SpentbookError error was expected for this case. What we got: {error_string:?}"
                 );
                 Ok(())
             }
+            Err(error) => bail!("We expected a different error to be returned. Actual: {error:?}"),
         }
     }
 
