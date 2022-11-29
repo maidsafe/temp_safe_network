@@ -212,7 +212,47 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn spentbook_spend_spent_proof_with_invalid_pk_should_return_spentbook_error(
     ) -> Result<()> {
-        Ok(())
+        let (
+            client,
+            SpendDetails {
+                key_image,
+                genesis_dbc,
+                tx,
+            },
+        ) = setup().await?;
+
+        // insert the invalid pk to proofs
+        let invalid_pk = bls::SecretKey::random().public_key();
+        let invalid_spent_proofs = genesis_dbc
+            .spent_proofs
+            .into_iter()
+            .map(|mut proof| {
+                proof.spentbook_pub_key = invalid_pk;
+                proof
+            })
+            .collect();
+
+        // Spend the key_image.
+        let result = client
+            .spend_dbc(
+                key_image,
+                tx.clone(),
+                invalid_spent_proofs,
+                genesis_dbc.spent_transactions,
+            )
+            .await;
+
+        match result {
+            Ok(_) => bail!("We expected an error to be returned"),
+            Err(error) => {
+                let msg = format!("Spent proof signature {invalid_pk:?} is invalid");
+                assert!(
+                    error.to_string().contains(&msg),
+                    "A different error was expected for this case: {error:?}"
+                );
+                Ok(())
+            }
+        }
     }
 
     #[tokio::test(flavor = "multi_thread")]
