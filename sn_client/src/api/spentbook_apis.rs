@@ -429,10 +429,12 @@ mod tests {
         }
     }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node() -> Result<()> {
-        Ok(())
-    }
+    // Skip spentbook_spend_with_updated_network_knowledge_should_update_the_node as this should be an sn_node unit test.
+    // This just needs the state of a node ready to accept the state from the msg.
+    // #[tokio::test(flavor = "multi_thread")]
+    // async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node() -> Result<()> {
+    //     Ok(())
+    // }
 
     struct SpendDetails {
         genesis_dbc: sn_dbc::Dbc,
