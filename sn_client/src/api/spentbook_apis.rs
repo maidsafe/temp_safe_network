@@ -212,4 +212,48 @@ mod tests {
 
         verify_spent_proof_share(key_image, tx, &client).await
     }
+
+    // Skip spentbook_spend_client_message_should_replicate_to_adults_and_send_ack for now.
+    // Since the ack part is already covered in a test there, and the [..should_replicate_to_adults..] part
+    // can be implemented under check-replicas feat (as a separate PR, with some change to how cmds are sent,
+    // which would be a partial touch of Elder happy path-task).
+    // #[tokio::test(flavor = "multi_thread")]
+    // async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack() -> Result<()>
+    // {
+    //     Ok(())
+    // }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn spentbook_spend_spent_proof_with_invalid_pk_should_return_spentbook_error(
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn spentbook_spend_spent_proof_with_key_not_in_section_chain_should_return_cmd_error_response(
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn spentbook_spend_spent_proofs_do_not_relate_to_input_dbcs_should_return_spentbook_error(
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_error() -> Result<()>
+    {
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn spentbook_spend_with_random_key_image_should_return_spentbook_error() -> Result<()> {
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node() -> Result<()> {
+        Ok(())
+    }
 }
