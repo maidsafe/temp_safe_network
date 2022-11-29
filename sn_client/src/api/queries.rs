@@ -101,7 +101,7 @@ impl Client {
 
             // There should not be more than a certain amount of adults holding
             // copies of the data. Retry the closest adult again.
-            if query.adult_index >= data_copy_count() - 1 {
+            if !retry || query.adult_index >= data_copy_count() - 1 {
                 // we don't want to retry beyond data_copy_count Adults
                 return res;
             }

@@ -17,19 +17,15 @@ use sn_interface::{
     types::{ChunkAddress, Peer},
 };
 
-use backoff::{backoff::Backoff, ExponentialBackoff};
 use bytes::Bytes;
 use rand::{rngs::OsRng, seq::SliceRandom};
-use std::{collections::BTreeSet, time::Duration};
+use std::collections::BTreeSet;
 use tokio::task::JoinSet;
 use tracing::{debug, error, trace, warn};
 use xor_name::XorName;
 
 // Number of Elders subset to send queries to
 pub(crate) const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
-
-// Number of bootstrap nodes to attempt to contact per batch (if provided by the node_config)
-pub(crate) const NODES_TO_CONTACT_PER_STARTUP_BATCH: usize = 3;
 
 impl Session {
     #[instrument(skip(self), level = "debug", name = "session setup conns")]
@@ -383,139 +379,6 @@ impl Session {
             msg_id,
             peers: elders,
         })
-    }
-
-    #[instrument(skip_all, level = "debug")]
-    pub(crate) async fn make_contact_with_nodes(
-        &self,
-        nodes: Vec<Peer>,
-        section_pk: bls::PublicKey,
-        dst_address: XorName,
-        auth: ClientAuth,
-        payload: Bytes,
-    ) -> Result<(), Error> {
-        let endpoint = self.endpoint.clone();
-        let msg_id = MsgId::new();
-
-        debug!(
-            "Making initial contact with nodes. Our PublicAddr: {:?}. Using {:?} to {} nodes: {:?}",
-            endpoint.public_addr(),
-            msg_id,
-            nodes.len(),
-            nodes
-        );
-
-        let dst = Dst {
-            name: dst_address,
-            section_key: section_pk,
-        };
-        let kind = MsgKind::Client(auth);
-        let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
-
-        let initial_contacts = nodes
-            .clone()
-            .into_iter()
-            .take(NODES_TO_CONTACT_PER_STARTUP_BATCH)
-            .collect();
-
-        let mut tasks = self
-            .send_msg(initial_contacts, wire_msg.clone(), msg_id)
-            .await?;
-        tasks.detach_all();
-
-        let mut knowledge_checks = 0;
-        let mut outgoing_msg_rounds = 1;
-        let mut last_start_pos = 0;
-        let mut tried_every_contact = false;
-
-        let mut backoff = ExponentialBackoff {
-            initial_interval: Duration::from_millis(1500),
-            max_interval: Duration::from_secs(5),
-            max_elapsed_time: Some(Duration::from_secs(60)),
-            ..Default::default()
-        };
-
-        // this seems needed for custom settings to take effect
-        backoff.reset();
-
-        info!("Client startup... awaiting some network knowledge");
-
-        let mut known_sap = self
-            .network
-            .read()
-            .await
-            .closest(&dst_address, None)
-            .cloned();
-
-        // wait until we have sufficient network knowledge
-        while known_sap.is_none() {
-            if tried_every_contact {
-                return Err(Error::NetworkContact(nodes));
-            }
-
-            let stats = self.network.read().await.known_sections_count();
-            debug!("Client still has not received a complete section's AE-Retry message... Current sections known: {:?}", stats);
-            knowledge_checks += 1;
-
-            // only after a couple of waits do we try contacting more nodes...
-            // This just gives the initial contacts more time.
-            if knowledge_checks > 2 {
-                let mut start_pos = outgoing_msg_rounds * NODES_TO_CONTACT_PER_STARTUP_BATCH;
-                outgoing_msg_rounds += 1;
-
-                // if we'd run over known contacts, then we just go to the end
-                if start_pos > nodes.len() {
-                    start_pos = last_start_pos;
-                }
-
-                last_start_pos = start_pos;
-
-                let next_batch_end = start_pos + NODES_TO_CONTACT_PER_STARTUP_BATCH;
-
-                // if we'd run over known contacts, then we just go to the end
-                let next_contacts = if next_batch_end > nodes.len() {
-                    // but incase we _still_ dont know anything after this
-                    let next = nodes[start_pos..].to_vec();
-                    // mark as tried all
-                    tried_every_contact = true;
-
-                    next
-                } else {
-                    nodes[start_pos..start_pos + NODES_TO_CONTACT_PER_STARTUP_BATCH].to_vec()
-                };
-
-                trace!("Sending out another batch of initial contact msgs to new nodes");
-                let mut tasks = self
-                    .send_msg(next_contacts, wire_msg.clone(), msg_id)
-                    .await?;
-                tasks.detach_all();
-
-                let next_wait = backoff.next_backoff();
-                trace!(
-                    "Awaiting a duration of {:?} before trying new nodes",
-                    next_wait
-                );
-
-                // wait here to give a chance for AE responses to come in and be parsed
-                if let Some(wait) = next_wait {
-                    tokio::time::sleep(wait).await;
-                }
-
-                known_sap = self
-                    .network
-                    .read()
-                    .await
-                    .closest(&dst_address, None)
-                    .cloned();
-
-                debug!("Known sap: {known_sap:?}");
-            }
-        }
-
-        let stats = self.network.read().await.known_sections_count();
-        debug!("Client has received updated network knowledge. Current sections known: {:?}. Sap for our startup-query: {:?}", stats, known_sap);
-
-        Ok(())
     }
 
     /// Get DataSection elders details. Resort to own section if DataSection is not available.
