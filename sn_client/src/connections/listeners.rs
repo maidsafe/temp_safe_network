@@ -16,7 +16,7 @@ use sn_interface::{
         data::{ClientDataResponse, ClientMsg},
         AuthorityProof, ClientAuth, Dst, MsgId, MsgKind, MsgType, WireMsg,
     },
-    network_knowledge::{SectionAuthorityProvider, SectionTreeUpdate},
+    network_knowledge::SectionTreeUpdate,
     types::{log_markers::LogMarker, Peer},
 };
 
@@ -176,8 +176,9 @@ impl Session {
         self.update_network_knowledge(section_tree_update, src_peer)
             .await;
 
-        let (msg_id, elders, client_msg, dst, auth) =
-            Self::new_target_elders(src_peer, bounced_msg, &target_sap, correlation_id).await?;
+        let (msg_id, elders, client_msg, dst, auth) = self
+            .new_target_elders(src_peer, bounced_msg, correlation_id)
+            .await?;
 
         // The actual order of Elders doesn't really matter. All that matters is we pass each AE response
         // we get through the same hoops, to then be able to ping a new Elder on a 1-1 basis for the src_peer
@@ -248,14 +249,14 @@ impl Session {
         }
     }
 
-    /// Checks AE cache to see if we should be forwarding this msg (and to whom)
-    /// or if it has already been dealt with
+    /// Finds new target elders based on current network knowledge
+    /// (to be used after applying a new SectionTreeUpdate)
     #[instrument(skip_all, level = "debug")]
     #[allow(clippy::type_complexity)]
     async fn new_target_elders(
+        &self,
         src_peer: Peer,
         bounced_msg: UsrMsgBytes,
-        received_sap: &SectionAuthorityProvider,
         correlation_id: MsgId,
     ) -> Result<(MsgId, Vec<Peer>, ClientMsg, Dst, AuthorityProof<ClientAuth>), Error> {
         let (msg_id, client_msg, bounced_msg_dst, auth) = match WireMsg::deserialize(bounced_msg)? {
@@ -279,14 +280,22 @@ impl Session {
             "Bounced msg {msg_id:?} received in an AE response: {client_msg:?} from {src_peer:?}"
         );
 
-        let target_elders: Vec<_> = received_sap.elders_vec();
+        let knowlege = self.network.read().await;
+
+        // Get the best sap we know of now.
+        // We don't just rely on the returned SAP, as we should be updating the knowledge if it's valid, before we get here.
+        let best_sap = knowlege
+            .closest(&bounced_msg_dst.name, None)
+            .ok_or(Error::NoCloseSapFound(bounced_msg_dst.name))?;
+
+        let target_elders = best_sap.elders_vec();
         if target_elders.is_empty() {
             Err(Error::AntiEntropyNoSapElders)
         } else {
             // Let's rebuild the msg with the updated destination details
             let dst = Dst {
                 name: bounced_msg_dst.name,
-                section_key: received_sap.section_key(),
+                section_key: best_sap.section_key(),
             };
             debug!(
                 "Final target elders for resending {msg_id:?}: {client_msg:?} msg \

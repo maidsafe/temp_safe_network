@@ -29,6 +29,10 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
+    /// No section was found to be closest for given dataname/
+    /// This is indicative of some larger problem
+    #[error("No SAP for data name: {0}")]
+    NoCloseSapFound(XorName),
     /// No elder was found to be closest from provided SAP. (The sap must therefore be empty)
     #[error("No elders found in AntiEntropy msg SAP")]
     AntiEntropyNoSapElders,
