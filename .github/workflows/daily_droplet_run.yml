@@ -9,7 +9,7 @@ on:
       node-count:
         description: number of nodes for the testnet
         required: true
-        default: 15
+        default: 30
       testnet-tool-repo-branch:
         description: >
           The branch for the testnet tool repository. This is to enable using forks to test changes to
@@ -174,11 +174,11 @@ jobs:
           aws-access-key-id: ${{ secrets.S3_DEPLOY_AWS_ACCESS_KEY_ID }}
           aws-access-key-secret: ${{ secrets.S3_DEPLOY_AWS_SECRET_ACCESS_KEY }}
           ssh-secret-key: ${{ secrets.SSH_SECRET_KEY  }}
-          node-count: ${{ github.event.inputs.node-count || 30 }}
+          node-count: ${{ inputs.node-count }}
           node-path: /tmp/sn_node
           testnet-id: ${{ env.TESTNET_ID }}
-          testnet-tool-repo-branch: ${{ github.event.inputs.testnet-tool-repo-branch }}
-          testnet-tool-repo-user: ${{ github.event.inputs.testnet-tool-repo-user }}
+          testnet-tool-repo-branch: ${{ inputs.testnet-tool-repo-branch }}
+          testnet-tool-repo-user: ${{ inputs.testnet-tool-repo-user }}
       # The other jobs in the workflow have the testnet launch as a dependency, but they go ahead
       # even if this job fails. It would be better if the whole workflow is abandoned if we don't
       # have a testnet to run the tests against.
