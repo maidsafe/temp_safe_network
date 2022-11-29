@@ -391,7 +391,42 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn spentbook_spend_with_random_key_image_should_return_spentbook_error() -> Result<()> {
-        Ok(())
+        let (
+            client,
+            SpendDetails {
+                genesis_dbc, tx, ..
+            },
+        ) = setup(false).await?;
+
+        // insert the invalid pk to proofs
+        let random_key_image = bls::SecretKey::random().public_key();
+
+        // Spend the key_image.
+        let result = client
+            .spend_dbc(
+                random_key_image,
+                tx.clone(),
+                genesis_dbc.spent_proofs.clone(),
+                genesis_dbc.spent_transactions,
+            )
+            .await;
+
+        match result {
+            Ok(_) => bail!("We expected an error to be returned"),
+            Err(crate::Error::CmdError {
+                source: ErrorMsg::InvalidOperation(error_string),
+                ..
+            }) => {
+                let correct_error_str =
+                    format!("SpentbookError(\"There are no commitments for the given key image {random_key_image:?}\"");
+                assert!(
+                    error_string.contains(&correct_error_str),
+                    "A different SpentbookError error was expected for this case. What we got: {error_string:?}"
+                );
+                Ok(())
+            }
+            Err(error) => bail!("We expected a different error to be returned. Actual: {error:?}"),
+        }
     }
 
     #[tokio::test(flavor = "multi_thread")]
