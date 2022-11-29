@@ -29,7 +29,7 @@ mod relocation;
 
 use self::{
     bootstrap::join_network,
-    core::{MyNode, GENESIS_DBC_AMOUNT},
+    core::MyNode,
     data::MIN_LEVEL_WHEN_FULL,
     flow_ctrl::{cmds::Cmd, event::Elders},
     node_starter::CmdChannel,
@@ -100,12 +100,6 @@ mod core {
         sync::Arc,
     };
     use tokio::sync::mpsc;
-
-    /// Amount of tokens to be owned by the Genesis DBC.
-    /// At the inception of the Network a total supply of 4,525,524,120 whole tokens will be created.
-    /// Each whole token can be subdivided 10^9 times,
-    /// thus creating a total of 4,525,524,120,000,000,000 available units.
-    pub(crate) const GENESIS_DBC_AMOUNT: u64 = 4_525_524_120 * u64::pow(10, 9);
 
     // File name where to cache this node's section tree (stored at this node's set root storage dir)
     const SECTION_TREE_FILE_NAME: &str = "section_tree";

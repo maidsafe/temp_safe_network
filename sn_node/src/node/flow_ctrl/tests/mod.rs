@@ -14,7 +14,6 @@ pub(crate) mod network_utils;
 use crate::{
     comm::{Comm, MsgFromPeer},
     node::{
-        api::gen_genesis_dbc,
         cfg::create_test_max_capacity_and_root_storage,
         core::MyNode,
         flow_ctrl::{dispatcher::Dispatcher, event_channel},
@@ -29,6 +28,7 @@ use cmd_utils::{
 };
 use sn_dbc::Hash;
 use sn_interface::{
+    dbcs::gen_genesis_dbc,
     elder_count, init_logger,
     messaging::{
         data::{ClientMsg, DataCmd, SpentbookCmd},
