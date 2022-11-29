@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1669725586665,
+  "lastUpdate": 1669731436758,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -32710,6 +32710,144 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 333997992,
             "range": "± 13456008",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "24c019cf6996bbe05caead1639a3f34083246015",
+          "message": "Merge #1747\n\n1747: tests: DKG r=joshuef a=RolandSherwin\n\n- https://github.com/maidsafe/safe_network/commit/fed9eed1b4459a5c7f6e6ba97b31f678cae2d5db Simulate a DKG round from start till termination and verify the newly generated `SecretKeyShare` for each node. The test bypasses the comm module and passes the `NodeMsgs` directly to the corresponding peers.\r\n- https://github.com/maidsafe/safe_network/commit/6868415191ae8bed30b42da31f90b9775db47b09 After DKG termination, each node proposes a new `SectionInfo` to denote the change in the `SectionKey`. But if a lagging node (DKG in-progress) has received the `SectionAuthorityProvider` from a terminated node through AE, then the lagging node should not propose `SectionInfo`.\r\n- https://github.com/maidsafe/safe_network/commit/e81b205339275a8f18122ecf97bdeabbe55403bc DKG requires all the votes from the participants to progress\r\n- https://github.com/maidsafe/safe_network/commit/94805d0c511cd5542004721c332e82c1c3343686 Simulate nodes dropping some `NodeMsgs` directed at them. This will cause the DKG to stall since they missed some votes. Send DKG gossip from a random node to the participants whenever the DKG is stalled. This should allow the participant to catchup and terminated.\n\nCo-authored-by: RolandSherwin <RolandSherwin@protonmail.com>",
+          "timestamp": "2022-11-29T12:36:27Z",
+          "tree_id": "cdea5cf19562385bd274aa70c1f8218c79d2daaa",
+          "url": "https://github.com/maidsafe/safe_network/commit/24c019cf6996bbe05caead1639a3f34083246015"
+        },
+        "date": 1669731435169,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 1278849,
+            "range": "± 182051",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 97876954,
+            "range": "± 3361618",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 113914052,
+            "range": "± 6425794",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 454039581,
+            "range": "± 7022202",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 76063980,
+            "range": "± 1295461",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 88629066,
+            "range": "± 1336106",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 356920960,
+            "range": "± 3589506",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 47478122,
+            "range": "± 15642746",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2059981535,
+            "range": "± 212433594",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 10186278059,
+            "range": "± 1980798755",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 171775705,
+            "range": "± 10182150",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1739002896,
+            "range": "± 91093854",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 6525158589,
+            "range": "± 97328528",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 43045235,
+            "range": "± 1606342",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 412839663,
+            "range": "± 28215479",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1595219626,
+            "range": "± 59514755",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11308961,
+            "range": "± 653900",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 100589985,
+            "range": "± 7701902",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 343266408,
+            "range": "± 5484893",
             "unit": "ns/iter"
           }
         ]
