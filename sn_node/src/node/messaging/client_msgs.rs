@@ -128,19 +128,16 @@ impl MyNode {
         if let Some(send_stream) = send_stream {
             // send response on the stream
             let stream_prio = 10;
+            error!(">>>>> GET LOCK FOR send msg {msg_id:?} over response stream to {requesting_elder:?}");
             let mut send_stream = send_stream.lock().await;
+            error!(">>>>> GOT!!! LOCK FOR send msg {msg_id:?} over response stream to {requesting_elder:?}");
             send_stream.set_priority(stream_prio);
+            let stream_id = send_stream.id();
             if let Err(error) = send_stream.send_user_msg(bytes).await {
-                error!(
-                    "Could not send msg {:?} over response stream: {error:?}",
-                    msg_id
-                );
+                error!("Could not send msg {msg_id:?} over response {stream_id} to {requesting_elder:?}: {error:?}");
             }
             if let Err(error) = send_stream.finish().await {
-                error!(
-                    "Could not close response stream for {:?}: {error:?}",
-                    msg_id
-                );
+                error!("Could not close response {stream_id} with {requesting_elder:?}, for {msg_id:?}: {error:?}");
             }
         } else {
             error!("Send stream missing from {requesting_elder:?}, data request response was not sent out.")
