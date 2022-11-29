@@ -209,16 +209,6 @@ mod tests {
         verify_spent_proof_share(key_image, tx, &client).await
     }
 
-    // Skip spentbook_spend_client_message_should_replicate_to_adults_and_send_ack for now.
-    // Since the ack part is already covered in a test there, and the [..should_replicate_to_adults..] part
-    // can be implemented under check-replicas feat (as a separate PR, with some change to how cmds are sent,
-    // which would be a partial touch of Elder happy path-task).
-    // #[tokio::test(flavor = "multi_thread")]
-    // async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack() -> Result<()>
-    // {
-    //     Ok(())
-    // }
-
     #[tokio::test(flavor = "multi_thread")]
     async fn spentbook_spend_spent_proof_with_invalid_pk_should_return_spentbook_error(
     ) -> Result<()> {
@@ -242,7 +232,7 @@ mod tests {
             })
             .collect();
 
-        // Spend the key_image.
+        // Try spend the key_image.
         let result = client
             .spend_dbc(
                 key_image,
@@ -280,11 +270,11 @@ mod tests {
                 genesis_dbc,
                 tx,
             },
-        ) = setup(true).await?;
+        ) = setup(true).await?; // pass in true, for getting an invalid genesis
 
         let genesis_dbc_owner_pk = genesis_dbc.owner_base().public_key();
 
-        // Spend the key_image.
+        // Try spend the key_image.
         let result = client
             .spend_dbc(
                 key_image,
@@ -353,7 +343,7 @@ mod tests {
 
         let (output_dbc_2, output_owneronce_2, _amount_secrects_2) = output_dbcs_2[0].clone();
 
-        // Spend the key_image.
+        // Try spend the dbc.
         let result = client
             .spend_dbc(
                 output_owneronce_2.as_owner().public_key(),
@@ -381,14 +371,6 @@ mod tests {
         }
     }
 
-    // Skip spentbook_spend_transaction_with_no_inputs_should_return_spentbook_error as this cannot be tested
-    // from sn_client. This is a "Spentbook"-api unit test.
-    // #[tokio::test(flavor = "multi_thread")]
-    // async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_error() -> Result<()>
-    // {
-    //     Ok(())
-    // }
-
     #[tokio::test(flavor = "multi_thread")]
     async fn spentbook_spend_with_random_key_image_should_return_spentbook_error() -> Result<()> {
         let (
@@ -398,10 +380,10 @@ mod tests {
             },
         ) = setup(false).await?;
 
-        // insert the invalid pk to proofs
+        // generate the random key image
         let random_key_image = bls::SecretKey::random().public_key();
 
-        // Spend the key_image.
+        // Try spend the random_key_image.
         let result = client
             .spend_dbc(
                 random_key_image,
@@ -428,13 +410,6 @@ mod tests {
             Err(error) => bail!("We expected a different error to be returned. Actual: {error:?}"),
         }
     }
-
-    // Skip spentbook_spend_with_updated_network_knowledge_should_update_the_node as this should be an sn_node unit test.
-    // This just needs the state of a node ready to accept the state from the msg.
-    // #[tokio::test(flavor = "multi_thread")]
-    // async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node() -> Result<()> {
-    //     Ok(())
-    // }
 
     struct SpendDetails {
         genesis_dbc: sn_dbc::Dbc,
