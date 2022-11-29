@@ -80,7 +80,7 @@ fn grows_vec_to_bytes(seed: &[u8]) -> Bytes {
     let mut rng = OsRng;
     bytes.iter_mut().take(8).for_each(|b| *b = rng.gen::<u8>());
 
-    Bytes::from(bytes)
+    bytes.freeze()
 }
 
 fn main() -> Result<()> {

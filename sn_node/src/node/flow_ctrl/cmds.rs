@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{messaging::Peers, Proposal, XorName};
+use crate::node::{core::NodeContext, messaging::Peers, Proposal, XorName};
 
 use qp2p::SendStream;
 use sn_consensus::Decision;
@@ -110,16 +110,43 @@ pub(crate) enum Cmd {
         msg_id: MsgId,
         recipients: Peers,
         send_stream: Option<Arc<Mutex<SendStream>>>,
+        #[debug(skip)]
+        context: NodeContext,
+    },
+    /// Performs serialisation and signing and sends the msg after reading NodeContext
+    /// from the node
+    ///
+    /// Currently only used during Join process where Node is not readily available
+    /// DO NOT USE ELSEWHERE
+    SendLockingJoinMsg {
+        msg: NodeMsg,
+        msg_id: MsgId,
+        recipients: Peers,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
     },
     /// Proposes peers as offline
     ProposeVoteNodesOffline(BTreeSet<XorName>),
 }
 
 impl Cmd {
-    pub(crate) fn send_msg(msg: NodeMsg, recipients: Peers) -> Self {
+    pub(crate) fn send_msg(msg: NodeMsg, recipients: Peers, context: NodeContext) -> Self {
         let msg_id = MsgId::new();
         debug!("Sending msg {msg_id:?} {msg:?}");
         Cmd::SendMsg {
+            msg,
+            msg_id,
+            recipients,
+            send_stream: None,
+            context,
+        }
+    }
+
+    /// Special wrapper to trigger SendLockingJoinMsg as NodeContext is unavailable
+    /// during the join process
+    pub(crate) fn send_join_msg(msg: NodeMsg, recipients: Peers) -> Self {
+        let msg_id = MsgId::new();
+        debug!("Sending locking join msg {msg_id:?} {msg:?}");
+        Cmd::SendLockingJoinMsg {
             msg,
             msg_id,
             recipients,
@@ -131,12 +158,14 @@ impl Cmd {
         msg: NodeMsg,
         recipients: Peers,
         send_stream: Option<Arc<Mutex<SendStream>>>,
+        context: NodeContext,
     ) -> Self {
         Cmd::SendMsg {
             msg,
             msg_id: MsgId::new(),
             recipients,
             send_stream,
+            context,
         }
     }
 
@@ -144,6 +173,7 @@ impl Cmd {
         use sn_interface::statemap::State;
         match self {
             Cmd::SendMsg { .. } => State::Comms,
+            Cmd::SendLockingJoinMsg { .. } => State::Comms,
             Cmd::SetStorageLevel { .. } => State::Node,
             Cmd::HandleFailedSendToNode { .. } => State::Comms,
             Cmd::ValidateMsg { .. } => State::Validation,
@@ -194,6 +224,7 @@ impl fmt::Display for Cmd {
             Cmd::HandleMembershipDecision(_) => write!(f, "HandleMembershipDecision"),
             Cmd::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
             Cmd::SendMsg { .. } => write!(f, "SendMsg"),
+            Cmd::SendLockingJoinMsg { .. } => write!(f, "SendLockingJoinMsg"),
             Cmd::EnqueueDataForReplication { .. } => write!(f, "ThrottledSendBatchMsgs"),
             Cmd::TrackNodeIssueInDysfunction { name, issue } => {
                 write!(f, "TrackNodeIssueInDysfunction {:?}, {:?}", name, issue)

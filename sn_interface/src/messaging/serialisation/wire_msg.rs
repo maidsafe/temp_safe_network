@@ -13,7 +13,7 @@ use crate::messaging::{
     AuthorityProof, ClientAuth, Dst, Error, MsgId, MsgKind, MsgType, Result,
 };
 
-use bytes::Bytes;
+use bytes::{BufMut, Bytes, BytesMut};
 use custom_debug::Debug;
 use qp2p::UsrMsgBytes;
 use serde::Serialize;
@@ -56,25 +56,28 @@ impl WireMsg {
     /// Once the caller obtains both the serialized payload and `MsgKind`,
     /// it can invoke the `new_msg` function to instantiate a `WireMsg`.
     pub fn serialize_msg_payload<T: Serialize>(msg: &T) -> Result<Bytes> {
-        let payload_vec = rmp_serde::to_vec_named(&msg).map_err(|err| {
+        let mut bytes = BytesMut::new().writer();
+        rmp_serde::encode::write(&mut bytes, &msg).map_err(|err| {
             Error::Serialisation(format!(
                 "could not serialize message payload with Msgpack: {}",
                 err
             ))
         })?;
 
-        Ok(Bytes::from(payload_vec))
+        Ok(bytes.into_inner().freeze())
     }
     /// Serializes the dst provided.
     fn serialize_dst_payload(dst: &Dst) -> Result<Bytes> {
-        let dst_vec = rmp_serde::to_vec_named(dst).map_err(|err| {
+        let mut bytes = BytesMut::new().writer();
+
+        rmp_serde::encode::write(&mut bytes, dst).map_err(|err| {
             Error::Serialisation(format!(
                 "could not serialize dst payload with Msgpack: {}",
                 err
             ))
         })?;
 
-        Ok(Bytes::from(dst_vec))
+        Ok(bytes.into_inner().freeze())
     }
     /// Serializes the dst on the WireMsg
     pub fn serialize_msg_dst(&self) -> Result<Bytes> {

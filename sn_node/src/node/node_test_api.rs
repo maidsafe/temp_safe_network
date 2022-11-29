@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{CmdChannel, Error, MyNode, Peer, Result};
+use crate::node::{core::NodeContext, CmdChannel, Error, MyNode, Peer, Result};
 
 use sn_interface::{
     messaging::system::NodeMsg,
@@ -39,6 +39,11 @@ impl NodeTestApi {
     /// Returns the current age of this node.
     pub async fn age(&self) -> u8 {
         self.node.read().await.info().age()
+    }
+
+    /// Returns the current NodeContext
+    pub async fn context(&self) -> NodeContext {
+        self.node.read().await.context()
     }
 
     /// Returns the ed25519 public key of this node.
@@ -94,7 +99,7 @@ impl NodeTestApi {
 
     /// Send a system msg.
     pub async fn send(&self, msg: NodeMsg, recipients: BTreeSet<Peer>) -> Result<()> {
-        let cmd = Cmd::send_msg(msg, Peers::Multiple(recipients));
+        let cmd = Cmd::send_msg(msg, Peers::Multiple(recipients), self.context().await);
         self.send_cmd(cmd).await
     }
 

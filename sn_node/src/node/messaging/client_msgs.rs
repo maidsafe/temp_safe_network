@@ -8,7 +8,7 @@
 
 use crate::node::{core::NodeContext, flow_ctrl::cmds::Cmd, Error, MyNode, Result};
 
-use bytes::Bytes;
+use bytes::BufMut;
 
 use qp2p::SendStream;
 use sn_dbc::{
@@ -402,15 +402,15 @@ impl MyNode {
             SPENTBOOK_TYPE_TAG,
             policy,
         );
-
-        let entry = Bytes::from(rmp_serde::to_vec_named(spent_proof_share).map_err(|err| {
+        let mut entry = vec![].writer();
+        rmp_serde::encode::write(&mut entry, spent_proof_share).map_err(|err| {
             Error::SpentbookError(format!(
                 "Failed to serialise SpentProofShare to insert it into the spentbook (Register): {:?}",
                 err
             ))
-        })?);
+        })?;
 
-        let (_, op) = register.write(entry.to_vec(), BTreeSet::default())?;
+        let (_, op) = register.write(entry.into_inner(), BTreeSet::default())?;
         let op = EditRegister {
             address: *register.address(),
             edit: op,

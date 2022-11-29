@@ -129,12 +129,10 @@ impl FlowCtrl {
         // here we specifically ask for AE prob msgs and manually
         // track dysfunction
         if self.timestamps.last_elder_health_check.elapsed() > ELDER_HEALTH_CHECK_INTERVAL {
-            debug!(" ----> elder health periodics start");
             self.timestamps.last_elder_health_check = now;
             for cmd in Self::health_check_elders_in_section(context).await {
                 cmds.push(cmd);
             }
-            debug!(" ----> elder health periodics done");
         }
 
         if self.timestamps.last_vote_check.elapsed() > MISSING_VOTE_INTERVAL {
@@ -158,21 +156,16 @@ impl FlowCtrl {
         }
 
         if self.timestamps.last_dysfunction_check.elapsed() > DYSFUNCTION_CHECK_INTERVAL {
-            debug!(" ----> dysfn periodics start");
             self.timestamps.last_dysfunction_check = now;
             let dysf_cmds = self.check_for_dysfunction().await;
             cmds.extend(dysf_cmds);
-            debug!(" ----> dysfn periodics done");
         }
-
-        debug!(" ----> all elder periodics cmds ready to push ");
 
         for cmd in cmds {
             if let Err(error) = self.cmd_sender_channel.send((cmd, vec![])).await {
                 error!("Error queuing std periodic check: {error:?}");
             }
         }
-        debug!(" ----> all elder periodics cmds pushed ");
     }
 
     // /// Initiates and generates all the subsequent Cmds to perform a healthcheck

@@ -231,7 +231,7 @@ impl Session {
         // Update our network SectionTree based upon passed in knowledge
         match network.update(section_tree_update) {
             Ok(true) => {
-                debug!("Anti-Entropy: updated remote section SAP for {prefix:?}")
+                debug!("Anti-Entropy: updated remote section SAP for {prefix:?} to {sap:?}");
             }
             Ok(false) => {
                 debug!(
@@ -287,6 +287,8 @@ impl Session {
         let best_sap = knowlege
             .closest(&bounced_msg_dst.name, None)
             .ok_or(Error::NoCloseSapFound(bounced_msg_dst.name))?;
+
+        trace!("{msg_id:?} from  {src_peer:?}. New SAP of for bounced msg: {best_sap:?}");
 
         let target_elders = best_sap.elders_vec();
         if target_elders.is_empty() {

@@ -102,7 +102,11 @@ impl MyNode {
 
         // send it to the other participants
         if !others.is_empty() {
-            cmds.push(MyNode::send_system_msg(node_msg, Peers::Multiple(others)))
+            cmds.push(MyNode::send_system_msg(
+                node_msg,
+                Peers::Multiple(others),
+                self.context(),
+            ))
         }
 
         // handle our own
@@ -156,12 +160,12 @@ impl MyNode {
             pub_keys,
             votes,
         };
-        MyNode::send_system_msg(node_msg, Peers::Multiple(recipients))
+        MyNode::send_system_msg(node_msg, Peers::Multiple(recipients), self.context())
     }
 
     fn request_dkg_ae(&self, session_id: &DkgSessionId, sender: Peer) -> Cmd {
         let node_msg = NodeMsg::DkgAE(session_id.clone());
-        MyNode::send_system_msg(node_msg, Peers::Single(sender))
+        MyNode::send_system_msg(node_msg, Peers::Single(sender), self.context())
     }
 
     fn aggregate_dkg_start(
@@ -287,7 +291,7 @@ impl MyNode {
             sig,
         };
 
-        let cmd = MyNode::send_system_msg(node_msg, Peers::Multiple(peers));
+        let cmd = MyNode::send_system_msg(node_msg, Peers::Multiple(peers), self.context());
         Ok(vec![cmd])
     }
 
@@ -554,7 +558,7 @@ impl MyNode {
                 pub_keys,
                 votes: our_votes,
             };
-            let cmd = MyNode::send_system_msg(node_msg, Peers::Single(sender));
+            let cmd = MyNode::send_system_msg(node_msg, Peers::Single(sender), self.context());
             Ok(vec![cmd])
         } else {
             Ok(vec![])
@@ -578,7 +582,7 @@ impl MyNode {
             pub_keys,
             votes,
         };
-        let cmd = MyNode::send_system_msg(node_msg, Peers::Single(sender));
+        let cmd = MyNode::send_system_msg(node_msg, Peers::Single(sender), self.context());
         Ok(vec![cmd])
     }
 
@@ -664,7 +668,7 @@ impl MyNode {
             pub_key: *pub_key,
             sig: *sig,
         };
-        let cmd = MyNode::send_system_msg(node_msg, Peers::Multiple(peers));
+        let cmd = MyNode::send_system_msg(node_msg, Peers::Multiple(peers), self.context());
         vec![cmd]
     }
 

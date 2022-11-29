@@ -45,7 +45,6 @@ pub use self::{
     node_test_api::NodeTestApi,
 };
 pub use crate::storage::DataStorage;
-
 #[cfg(test)]
 pub(crate) use relocation::{check as relocation_check, ChurnId};
 
@@ -146,8 +145,8 @@ mod core {
         pub(crate) dysfunction_cmds_sender: mpsc::Sender<DysCmds>,
     }
 
-    #[derive(Clone)]
-    pub(crate) struct NodeContext {
+    #[derive(custom_debug::Debug, Clone)]
+    pub struct NodeContext {
         pub(crate) root_storage_dir: PathBuf,
         pub(crate) is_elder: bool,
         pub(crate) data_storage: DataStorage,
@@ -157,7 +156,9 @@ mod core {
         pub(crate) network_knowledge: NetworkKnowledge,
         pub(crate) section_keys_provider: SectionKeysProvider,
         pub(crate) full_adults: BTreeSet<XorName>,
+        #[debug(skip)]
         pub(crate) comm: Comm,
+        #[debug(skip)]
         pub(crate) event_sender: EventSender,
         pub(crate) joins_allowed: bool,
     }
@@ -305,7 +306,11 @@ mod core {
 
             info!("ProbeMsg target {:?}: {probe:?}", matching_section.prefix());
 
-            Ok(MyNode::send_system_msg(probe, Peers::Multiple(recipients)))
+            Ok(MyNode::send_system_msg(
+                probe,
+                Peers::Multiple(recipients),
+                context.clone(),
+            ))
         }
 
         /// Generates a SectionProbeMsg with our current knowledge,
@@ -322,7 +327,7 @@ mod core {
             );
 
             let probe = context.network_knowledge.anti_entropy_probe();
-            MyNode::send_system_msg(probe, Peers::Multiple(recipients))
+            MyNode::send_system_msg(probe, Peers::Multiple(recipients), context.clone())
         }
 
         /// Generates section infos for the best elder candidate among the members at the given generation

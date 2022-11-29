@@ -668,6 +668,7 @@ async fn msg_to_self() -> Result<()> {
         mpsc::channel(10).0,
     )
     .await?;
+    let context = node.context();
     let info = node.info();
     let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
 
@@ -675,7 +676,11 @@ async fn msg_to_self() -> Result<()> {
 
     // don't use the cmd collection fn, as it skips Cmd::SendMsg
     let cmds = dispatcher
-        .process_cmd(Cmd::send_msg(node_msg.clone(), Peers::Single(info.peer())))
+        .process_cmd(Cmd::send_msg(
+            node_msg.clone(),
+            Peers::Single(info.peer()),
+            context,
+        ))
         .await?;
 
     assert!(cmds.is_empty());
