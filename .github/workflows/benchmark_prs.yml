@@ -18,7 +18,11 @@ jobs:
     # right now only ubuntu, running on multiple systems would require many pushes...\
     # perhaps this can be done with one consolidation action in the future, pulling down all results and pushing
     # once to the branch..
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    env:
+      # CARGO_BUILD_TARGET: x86_64-unknown-linux-musl
+      CARGO_HOME: /mnt/data/cargo
+      TMPDIR: /mnt/data/tmp
     steps:
       - uses: actions/checkout@v2
 
@@ -109,7 +113,6 @@ jobs:
           comment-on-alert: true
           # 200% regression will result in alert
           alert-threshold: '200%'
-
 
       ###############
       ### Cleanup ###
