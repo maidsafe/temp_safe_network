@@ -139,8 +139,8 @@ mod tests {
     const SLEEP_DURATION: Duration = Duration::from_secs(3);
 
     async fn verify_spent_proof_share(
-        key_image: &bls::PublicKey,
-        tx: &RingCtTransaction,
+        key_image: bls::PublicKey,
+        tx: RingCtTransaction,
         client: &Client,
     ) -> Result<()> {
         // The query could be too close to the spend which make adult only accumulated
@@ -150,7 +150,7 @@ mod tests {
             attempts += 1;
 
             // Get spent proof shares for the key_image.
-            let spent_proof_shares = client.spent_proof_shares(*key_image).await?;
+            let spent_proof_shares = client.spent_proof_shares(key_image).await?;
 
             // Note this test could have been run more than once thus the genesis DBC
             // could have been spent a few times already, so we filter
@@ -177,33 +177,19 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_spentbook_spend_dbc() -> Result<()> {
-        init_logger();
-
-        let genesis_dbc = read_genesis_dbc_from_first_node()?;
-        let dbc_owner = genesis_dbc.owner_base().clone();
-        let client = create_test_client_with(None, Some(dbc_owner.clone()), None).await?;
-
-        let genesis_key_image = genesis_dbc.key_image_bearer()?;
-
-        let output_owner = OwnerOnce::from_owner_base(dbc_owner, &mut rng::thread_rng());
-        let dbc_builder = TransactionBuilder::default()
-            .set_decoys_per_input(0)
-            .set_require_all_decoys(false)
-            .add_input_dbc_bearer(&genesis_dbc)?;
-
-        let inputs_amount_sum = dbc_builder.inputs_amount_sum();
-        let dbc_builder = dbc_builder
-            .add_output_by_amount(inputs_amount_sum, output_owner)
-            .build(&mut rng::thread_rng())?;
-
-        assert_eq!(dbc_builder.inputs().len(), 1);
-        let (key_image, tx) = &dbc_builder.inputs()[0];
-        assert_eq!(&genesis_key_image, key_image);
+        let (
+            client,
+            SpendDetails {
+                key_image,
+                genesis_dbc,
+                tx,
+            },
+        ) = setup().await?;
 
         // Spend the key_image.
         client
             .spend_dbc(
-                *key_image,
+                key_image,
                 tx.clone(),
                 genesis_dbc.spent_proofs,
                 genesis_dbc.spent_transactions,
@@ -255,5 +241,48 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node() -> Result<()> {
         Ok(())
+    }
+
+    struct SpendDetails {
+        genesis_dbc: sn_dbc::Dbc,
+        tx: RingCtTransaction,
+        key_image: sn_dbc::PublicKey,
+    }
+
+    // returns a client which is the owner to the genesis dbc,
+    // we can do this since our genesis dbc is currently generated as a bearer dbc, and stored locally
+    // so we can fetch that owner key from the first node, and pass it to the client
+    async fn setup() -> Result<(Client, SpendDetails)> {
+        init_logger();
+
+        let genesis_dbc = read_genesis_dbc_from_first_node()?;
+        let dbc_owner = genesis_dbc.owner_base().clone();
+        let client = create_test_client_with(None, Some(dbc_owner.clone()), None).await?;
+
+        let genesis_key_image = genesis_dbc.key_image_bearer()?;
+
+        let output_owner = OwnerOnce::from_owner_base(dbc_owner, &mut rng::thread_rng());
+        let dbc_builder = TransactionBuilder::default()
+            .set_decoys_per_input(0)
+            .set_require_all_decoys(false)
+            .add_input_dbc_bearer(&genesis_dbc)?;
+
+        let inputs_amount_sum = dbc_builder.inputs_amount_sum();
+        let dbc_builder = dbc_builder
+            .add_output_by_amount(inputs_amount_sum, output_owner)
+            .build(&mut rng::thread_rng())?;
+
+        assert_eq!(dbc_builder.inputs().len(), 1);
+        let (key_image, tx) = dbc_builder.inputs()[0].clone();
+        assert_eq!(genesis_key_image, key_image);
+
+        Ok((
+            client,
+            SpendDetails {
+                genesis_dbc,
+                tx,
+                key_image,
+            },
+        ))
     }
 }
