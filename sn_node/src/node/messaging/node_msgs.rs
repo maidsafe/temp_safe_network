@@ -27,7 +27,7 @@ use sn_interface::{
 use std::collections::BTreeSet;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
-use xor_name::XorName;
+use xor_name::{Prefix, XorName};
 
 impl MyNode {
     /// Send a (`NodeMsg`) message to all Elders in our section
@@ -174,14 +174,14 @@ impl MyNode {
 
                 let mut cmds = vec![];
                 if !context.is_elder {
+                    info!("Dropping AEProbe since we are not an elder");
                     // early return here as we do not get health checks as adults,
                     // normal AE rules should have applied
                     return Ok(cmds);
                 }
 
                 trace!("Received Probe message from {}: {:?}", sender, msg_id);
-                let mut recipients = BTreeSet::new();
-                let _existed = recipients.insert(sender);
+                let recipients = BTreeSet::from_iter([sender]);
                 cmds.push(MyNode::send_ae_update_to_nodes(
                     &context,
                     recipients,
@@ -192,14 +192,10 @@ impl MyNode {
             // The AcceptedOnlineShare for relocation will be received here.
             NodeMsg::JoinResponse(join_response) => {
                 let mut node = node.write().await;
-                debug!("[NODE WRITE]: join response write gottt...");
                 let context = node.context();
 
-                match *join_response {
-                    JoinResponse::Approved {
-                        section_tree_update,
-                        ..
-                    } => {
+                match join_response {
+                    JoinResponse::Approved { .. } => {
                         info!(
                             "Relocation: Aggregating received ApprovalShare from {:?}",
                             sender
@@ -216,10 +212,11 @@ impl MyNode {
                                 previous_name, new_name
                             );
 
-                            let recipients: Vec<_> =
-                                section_tree_update.signed_sap.elders().cloned().collect();
-
-                            let section_tree = context.network_knowledge.section_tree().clone();
+                            let section_tree = node.network_knowledge.section_tree().clone();
+                            let section_tree_update = node
+                                .network_knowledge
+                                .section_tree()
+                                .generate_section_tree_update(&Prefix::default())?; // TODO: remove this dummy update
                             let new_network_knowledge =
                                 NetworkKnowledge::new(section_tree, section_tree_update)?;
 
@@ -228,11 +225,6 @@ impl MyNode {
                             //       As the sending of the JoinRequest as notification
                             //       may require the `node` to be switched to new already.
                             node.relocate(new_keypair.clone(), new_network_knowledge)?;
-
-                            trace!(
-                                "Relocation: Sending aggregated JoinRequest to {:?}",
-                                recipients
-                            );
 
                             // move off thread to keep fn sync
                             let event_sender = context.event_sender;

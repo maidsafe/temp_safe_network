@@ -131,15 +131,14 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
 async fn handle_agreement_on_online() -> Result<()> {
     let (event_sender, mut event_receiver) =
         event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE);
-    let (dispatcher, section, _, sk_set) =
+    let (dispatcher, _, _, sk_set) =
         network_utils::TestNodeBuilder::new(Prefix::default(), elder_count())
             .event_sender(event_sender)
             .build()
             .await?;
 
     let new_peer = network_utils::create_peer(MIN_ADULT_AGE);
-    let status =
-        handle_online_cmd(&new_peer, &sk_set, &dispatcher, &section.section_auth()).await?;
+    let status = handle_online_cmd(&new_peer, &sk_set, &dispatcher).await?;
     assert!(status.node_approval_sent);
 
     assert_matches!(

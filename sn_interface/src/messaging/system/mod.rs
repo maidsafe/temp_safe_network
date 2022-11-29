@@ -85,7 +85,7 @@ pub enum NodeMsg {
     /// Sent from a bootstrapping peer to the section requesting to join as a new member
     JoinRequest(JoinRequest),
     /// Response to a `JoinRequest`
-    JoinResponse(Box<JoinResponse>),
+    JoinResponse(JoinResponse),
     /// Sent from a peer to the section requesting to join as relocated from another section
     JoinAsRelocatedRequest(Box<JoinAsRelocatedRequest>),
     /// Response to a `JoinAsRelocatedRequest`

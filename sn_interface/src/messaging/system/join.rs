@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::NodeState;
-use crate::network_knowledge::{SectionAuthorityProvider, SectionTreeUpdate};
+use crate::network_knowledge::SectionAuthorityProvider;
 use serde::{Deserialize, Serialize};
 use sn_consensus::Decision;
 use std::net::SocketAddr;
@@ -32,14 +32,10 @@ impl JoinRequest {
 
 /// Response to a request to join a section
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[allow(clippy::large_enum_variant)]
 pub enum JoinResponse {
-    /// Up to date section information for a joining peer to retry its join request with
-    Retry {
-        /// The update to our NetworkKnowledge containing the current `SectionAuthorityProvider`
-        /// and the section chain truncated from the section key found in the join request.
-        section_tree_update: SectionTreeUpdate,
-    },
+    /// Tell the joining node to retry
+    Retry,
+    // TODO: Replace Redirect with a Retry + AEProbe.
     /// Response redirecting a joining peer to join a different section,
     /// containing addresses of nodes that are closer (than the recipient) to the
     /// requested name. The `JoinRequest` should be re-sent to these addresses.
@@ -47,9 +43,6 @@ pub enum JoinResponse {
     /// Message sent to joining peer containing the necessary
     /// info to become a member of the section.
     Approved {
-        /// The update to our NetworkKnowledge containing the current `SectionAuthorityProvider`
-        /// and a fully verifiable section chain
-        section_tree_update: SectionTreeUpdate,
         /// Current node's state
         decision: Decision<NodeState>,
     },
