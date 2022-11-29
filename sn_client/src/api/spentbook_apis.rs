@@ -381,11 +381,13 @@ mod tests {
         }
     }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_error() -> Result<()>
-    {
-        Ok(())
-    }
+    // Skip spentbook_spend_transaction_with_no_inputs_should_return_spentbook_error as this cannot be tested
+    // from sn_client. This is a "Spentbook"-api unit test.
+    // #[tokio::test(flavor = "multi_thread")]
+    // async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_error() -> Result<()>
+    // {
+    //     Ok(())
+    // }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn spentbook_spend_with_random_key_image_should_return_spentbook_error() -> Result<()> {
