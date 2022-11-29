@@ -53,7 +53,7 @@ pub(crate) struct CmdJob {
 pub(crate) enum Cmd {
     /// Validate `wire_msg` from `sender`.
     /// Holding the WireMsg that has been received from the network,
-    ValidateMsg {
+    HandleMsg {
         origin: Peer,
         wire_msg: WireMsg,
         send_stream: Option<Arc<Mutex<SendStream>>>,
@@ -62,12 +62,6 @@ pub(crate) enum Cmd {
     SetStorageLevel(StorageLevel),
     /// Log a Node's Punishment
     TrackNodeIssueInDysfunction { name: XorName, issue: IssueType },
-    HandleValidNodeMsg {
-        msg_id: MsgId,
-        msg: NodeMsg,
-        origin: Peer,
-        send_stream: Option<Arc<Mutex<SendStream>>>,
-    },
     UpdateNetworkAndHandleValidClientMsg {
         proof_chain: SectionsDAG,
         signed_sap: SectionSigned<SectionAuthorityProvider>,
@@ -176,8 +170,7 @@ impl Cmd {
             Cmd::SendLockingJoinMsg { .. } => State::Comms,
             Cmd::SetStorageLevel { .. } => State::Node,
             Cmd::HandleFailedSendToNode { .. } => State::Comms,
-            Cmd::ValidateMsg { .. } => State::Validation,
-            Cmd::HandleValidNodeMsg { msg, .. } => msg.statemap_states(),
+            Cmd::HandleMsg { .. } => State::HandleMsg,
             Cmd::UpdateNetworkAndHandleValidClientMsg { .. } => State::ClientMsg,
             Cmd::TrackNodeIssueInDysfunction { .. } => State::Dysfunction,
             Cmd::HandleAgreement { .. } => State::Agreement,
@@ -198,20 +191,17 @@ impl fmt::Display for Cmd {
                 write!(f, "SetStorageLevel {:?}", level)
             }
             #[cfg(not(feature = "test-utils"))]
-            Cmd::ValidateMsg { wire_msg, .. } => {
-                write!(f, "ValidateMsg {:?}", wire_msg.msg_id())
+            Cmd::HandleMsg { wire_msg, .. } => {
+                write!(f, "HandleMsg {:?}", wire_msg.msg_id())
             }
             #[cfg(feature = "test-utils")]
-            Cmd::ValidateMsg { wire_msg, .. } => {
+            Cmd::HandleMsg { wire_msg, .. } => {
                 write!(
                     f,
-                    "ValidateMsg {:?} {:?}",
+                    "HandleMsg {:?} {:?}",
                     wire_msg.msg_id(),
                     wire_msg.payload_debug
                 )
-            }
-            Cmd::HandleValidNodeMsg { msg_id, msg, .. } => {
-                write!(f, "HandleValidNodeMsg {:?}: {:?}", msg_id, msg)
             }
             Cmd::UpdateNetworkAndHandleValidClientMsg { msg_id, msg, .. } => {
                 write!(f, "UpdateAndHandleValidClientMsg {:?}: {:?}", msg_id, msg)

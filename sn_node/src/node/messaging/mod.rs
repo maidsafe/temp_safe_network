@@ -49,7 +49,7 @@ impl Peers {
 // Message handling
 impl MyNode {
     #[instrument(skip(node))]
-    pub(crate) async fn validate_msg(
+    pub(crate) async fn handle_msg(
         node: Arc<RwLock<MyNode>>,
         origin: Peer,
         wire_msg: WireMsg,
@@ -89,13 +89,7 @@ impl MyNode {
                     return Ok(ae_cmds);
                 }
 
-                // this needs write access...
-                Ok(vec![Cmd::HandleValidNodeMsg {
-                    origin,
-                    msg_id,
-                    msg,
-                    send_stream,
-                }])
+                MyNode::handle_valid_node_msg(node, msg_id, msg, origin, send_stream).await
             }
             MsgType::Client {
                 msg_id,

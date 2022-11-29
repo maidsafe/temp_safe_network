@@ -211,7 +211,7 @@ impl FlowCtrl {
             wire_msg
         };
 
-        Ok(Cmd::ValidateMsg {
+        Ok(Cmd::HandleMsg {
             origin: sender,
             wire_msg,
             send_stream,

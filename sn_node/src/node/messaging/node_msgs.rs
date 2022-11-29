@@ -118,7 +118,7 @@ impl MyNode {
 
     // Handler for data messages which have successfully
     // passed all signature checks and msg verifications
-    pub(crate) async fn handle_valid_system_msg(
+    pub(crate) async fn handle_valid_node_msg(
         node: Arc<RwLock<MyNode>>,
         msg_id: MsgId,
         msg: NodeMsg,
