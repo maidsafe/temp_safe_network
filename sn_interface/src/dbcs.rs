@@ -19,7 +19,7 @@ use thiserror::Error;
 /// At the inception of the Network a total supply of 4,525,524,120 whole tokens will be created.
 /// Each whole token can be subdivided 10^9 times,
 /// thus creating a total of 4,525,524,120,000,000,000 available units.
-pub(crate) const GENESIS_DBC_AMOUNT: u64 = 4_525_524_120 * u64::pow(10, 9);
+pub const GENESIS_DBC_AMOUNT: u64 = 4_525_524_120 * u64::pow(10, 9);
 
 /// A specialised `Result` type for types crate.
 pub type Result<T> = result::Result<T, Error>;
