@@ -158,7 +158,7 @@ jobs:
       - name: Run client tests
         env:
           RUST_LOG: "sn_client,sn_interface"
-        run: cargo test --release --lib --features check-replicas --package sn_client -- --test-threads=1
+        run: cargo test --release --lib --features check-replicas --package sn_client
         timeout-minutes: 50
 
       - name: Run example app for file API against local network
@@ -385,7 +385,7 @@ jobs:
       - name: Run API tests
         env:
           RUST_LOG: "sn_client,sn_interface"
-        run: cargo test --release --lib --features check-replicas --package sn_api -- --test-threads=1
+        run: cargo test --release --lib --features check-replicas --package sn_api
         timeout-minutes: 30
 
       - name: Are nodes still running...?
