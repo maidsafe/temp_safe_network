@@ -45,7 +45,7 @@ pub fn log_state(entity: String, state: State) {
 /// States used for generating statemaps
 pub enum State {
     Idle,
-    Validation,
+    HandleMsg,
     Comms,
     Dysfunction,
     BackPressure,
@@ -67,7 +67,7 @@ impl State {
         // Colors generated with https://mokole.com/palette.html
         serde_json::json!({
             "Idle": { "value": Self::Idle as usize, "color": "#f9f9f9" },
-            "Validation": { "value": Self::Validation as usize, "color": "#7f0000" },
+            "HandleMsg": { "value": Self::HandleMsg as usize, "color": "#7f0000" },
             "Comms": { "value": Self::Comms as usize, "color": "#808000" },
             "Dysfunction": { "value": Self::Dysfunction as usize, "color": "#000080" },
             "BackPressure": { "value": Self::BackPressure as usize, "color": "#ff0000" },

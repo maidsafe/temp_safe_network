@@ -851,7 +851,7 @@ mod tests {
                 info!("\n\n NODE: {}", node.read().await.name());
                 while let Some((msg_id, msg, sender)) = mock_node.msg_queue.write().await.pop() {
                     let cmds =
-                        MyNode::handle_valid_system_msg(node.clone(), msg_id, msg, sender, None)
+                        MyNode::handle_valid_node_msg(node.clone(), msg_id, msg, sender, None)
                             .await?;
 
                     for cmd in cmds {
@@ -928,7 +928,7 @@ mod tests {
                 info!("\n\n NODE: {}", name);
                 while let Some((msg_id, msg, sender)) = mock_node.msg_queue.write().await.pop() {
                     let cmds =
-                        MyNode::handle_valid_system_msg(node.clone(), msg_id, msg, sender, None)
+                        MyNode::handle_valid_node_msg(node.clone(), msg_id, msg, sender, None)
                             .await?;
 
                     // If supermajority of the nodes have terminated, then the remaining nodes
@@ -1080,7 +1080,7 @@ mod tests {
                 info!("\n\n NODE: {}", node.read().await.name());
                 while let Some((msg_id, msg, sender)) = mock_node.msg_queue.write().await.pop() {
                     let cmds =
-                        MyNode::handle_valid_system_msg(node.clone(), msg_id, msg, sender, None)
+                        MyNode::handle_valid_node_msg(node.clone(), msg_id, msg, sender, None)
                             .await?;
 
                     for cmd in cmds {
@@ -1138,7 +1138,7 @@ mod tests {
 
                 while let Some((msg_id, msg, sender)) = mock_node.msg_queue.write().await.pop() {
                     let cmds =
-                        MyNode::handle_valid_system_msg(node.clone(), msg_id, msg, sender, None)
+                        MyNode::handle_valid_node_msg(node.clone(), msg_id, msg, sender, None)
                             .await?;
 
                     for cmd in cmds {
