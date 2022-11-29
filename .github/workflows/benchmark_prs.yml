@@ -7,36 +7,26 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CARGO_INCREMENTAL: '0'
-  RUST_BACKTRACE: 1
+  CARGO_INCREMENTAL: 0 # bookkeeping for incremental builds has overhead, not useful in CI.
   NODE_COUNT: 15
 
 jobs:
   benchmarks:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Run performance regression check
+    name: Run performance regression check (EC2)
     # right now only ubuntu, running on multiple systems would require many pushes...\
     # perhaps this can be done with one consolidation action in the future, pulling down all results and pushing
     # once to the branch..
     runs-on: self-hosted
     env:
-      # CARGO_BUILD_TARGET: x86_64-unknown-linux-musl
+      CARGO_BUILD_TARGET: x86_64-unknown-linux-musl
       CARGO_HOME: /mnt/data/cargo
       TMPDIR: /mnt/data/tmp
     steps:
       - uses: actions/checkout@v2
-
-      - uses: actions-rs/toolchain@v1
-        id: toolchain
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
       - uses: Swatinem/rust-cache@v1
         with:
           cache-on-failure: true
-
       - run: cargo install cargo-criterion
 
       # Download previous benchmark result from cache (if exists)
