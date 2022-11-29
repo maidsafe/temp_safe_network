@@ -187,7 +187,7 @@ mod tests {
                 genesis_dbc,
                 tx,
             },
-        ) = setup().await?;
+        ) = setup(false).await?;
 
         // Spend the key_image.
         client
@@ -222,7 +222,7 @@ mod tests {
                 genesis_dbc,
                 tx,
             },
-        ) = setup().await?;
+        ) = setup(false).await?;
 
         // insert the invalid pk to proofs
         let invalid_pk = bls::SecretKey::random().public_key();
@@ -266,7 +266,38 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn spentbook_spend_spent_proof_with_key_not_in_section_chain_should_return_cmd_error_response(
     ) -> Result<()> {
-        Ok(())
+        let (
+            client,
+            SpendDetails {
+                key_image,
+                genesis_dbc,
+                tx,
+            },
+        ) = setup(true).await?;
+
+        let genesis_dbc_owner_pk = genesis_dbc.owner_base().public_key();
+
+        // Spend the key_image.
+        let result = client
+            .spend_dbc(
+                key_image,
+                tx.clone(),
+                genesis_dbc.spent_proofs,
+                genesis_dbc.spent_transactions,
+            )
+            .await;
+
+        match result {
+            Ok(_) => bail!("We expected an error to be returned"),
+            Err(crate::Error::SectionsDagKeyNotFound(section_key)) => {
+                assert_eq!(
+                    section_key, genesis_dbc_owner_pk,
+                    "We expected {genesis_dbc_owner_pk:?} in the error but got {section_key:?}"
+                );
+                Ok(())
+            }
+            Err(error) => bail!("We expected a different error to be returned. Actual: {error:?}"),
+        }
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -300,10 +331,15 @@ mod tests {
     // returns a client which is the owner to the genesis dbc,
     // we can do this since our genesis dbc is currently generated as a bearer dbc, and stored locally
     // so we can fetch that owner key from the first node, and pass it to the client
-    async fn setup() -> Result<(Client, SpendDetails)> {
+    async fn setup(invalid_genesis_dbc: bool) -> Result<(Client, SpendDetails)> {
         init_logger();
 
-        let genesis_dbc = read_genesis_dbc_from_first_node()?;
+        let genesis_dbc = if invalid_genesis_dbc {
+            let sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
+            sn_interface::dbcs::gen_genesis_dbc(&sk_set, &sk_set.secret_key())?
+        } else {
+            read_genesis_dbc_from_first_node()?
+        };
         let dbc_owner = genesis_dbc.owner_base().clone();
         let client = create_test_client_with(None, Some(dbc_owner.clone()), None).await?;
 
