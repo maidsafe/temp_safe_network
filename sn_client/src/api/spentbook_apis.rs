@@ -187,6 +187,9 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_spentbook_spend_dbc() -> Result<()> {
+        init_logger();
+        let _outer_span = tracing::info_span!("test__spentbook_spend_dbc").entered();
+
         let (
             client,
             SpendDetails {
@@ -212,6 +215,12 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn spentbook_spend_spent_proof_with_invalid_pk_should_return_spentbook_error(
     ) -> Result<()> {
+        init_logger();
+        let _outer_span = tracing::info_span!(
+            "test__spentbook_spend_spent_proof_with_invalid_pk_should_return_spentbook_error"
+        )
+        .entered();
+
         let (
             client,
             SpendDetails {
@@ -263,6 +272,9 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn spentbook_spend_spent_proof_with_key_not_in_section_chain_should_return_cmd_error_response(
     ) -> Result<()> {
+        init_logger();
+        let _outer_span = tracing::info_span!("test__spentbook_spend_spent_proof_with_key_not_in_section_chain_should_return_cmd_error_response").entered();
+
         let (
             client,
             SpendDetails {
@@ -300,6 +312,9 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn spentbook_spend_spent_proofs_do_not_relate_to_input_dbcs_should_return_spentbook_error(
     ) -> Result<()> {
+        init_logger();
+        let _outer_span = tracing::info_span!("test__spentbook_spend_spent_proofs_do_not_relate_to_input_dbcs_should_return_spentbook_error").entered();
+
         let (client, SpendDetails { genesis_dbc, .. }) = setup(false).await?;
 
         // The idea for this test case is to pass the wrong spent proofs and transactions for
@@ -373,6 +388,12 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn spentbook_spend_with_random_key_image_should_return_spentbook_error() -> Result<()> {
+        init_logger();
+        let _outer_span = tracing::info_span!(
+            "test__spentbook_spend_with_random_key_image_should_return_spentbook_error"
+        )
+        .entered();
+
         let (
             client,
             SpendDetails {

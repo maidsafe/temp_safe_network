@@ -149,11 +149,8 @@ impl PeerSessionWorker {
 
     async fn run(mut self, mut channel: mpsc::Receiver<SessionCmd>) {
         while let Some(session_cmd) = channel.recv().await {
-            trace!(
-                "Processing session {:?} cmd: {:?}",
-                self.link.peer(),
-                session_cmd
-            );
+            let peer = *self.link.peer();
+            trace!("Processing session {peer:?} cmd: {session_cmd:?}");
 
             let status = match session_cmd {
                 SessionCmd::Send(job) => {
@@ -164,23 +161,25 @@ impl PeerSessionWorker {
                             let stream_prio = 10;
                             let mut send_stream = send_stream.lock().await;
                             send_stream.set_priority(stream_prio);
+                            let stream_id = send_stream.id();
                             if let Err(error) = send_stream.send_user_msg(job.bytes).await {
                                 error!(
-                                    "Could not send msg {:?} over response stream: {error:?}",
+                                    "Could not send msg {:?} over response {stream_id} to {peer:?}: {error:?}",
                                     job.msg_id
                                 );
 
-                                job.reporter.send(SendStatus::TransientError(
-                                    "Could not send msg on stream".to_string(),
-                                ));
+                                job.reporter.send(SendStatus::TransientError(format!(
+                                    "Could not send msg on response {stream_id} to {peer:?} for {:?}", job.msg_id
+                                )));
                             } else if let Err(error) = send_stream.finish().await {
                                 error!(
-                                    "Could not close response stream for {:?}: {error:?}",
+                                    "Could not close response {stream_id} with {peer:?}, for {:?}: {error:?}",
                                     job.msg_id
                                 );
-                                job.reporter.send(SendStatus::TransientError(
-                                    "Could not close stream".to_string(),
-                                ));
+                                job.reporter.send(SendStatus::TransientError(format!(
+                                    "Could not close response {stream_id} with {peer:?} for {:?}",
+                                    job.msg_id
+                                )));
                             } else {
                                 job.reporter.send(SendStatus::Sent);
                             }
