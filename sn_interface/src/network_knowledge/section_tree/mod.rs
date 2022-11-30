@@ -213,7 +213,6 @@ impl SectionTree {
         // So we check the incoming elder count vs what we know of for
         // the incoming prefix. If elder_count() is smaller at _all_ we
         // should warn! something so we can track this.
-        if !incoming_prefix.is_empty() {
             match self.section_by_prefix(incoming_prefix) {
                 Ok(sap) => {
                     let current_sap_elder_count = sap.elder_count();
@@ -229,7 +228,6 @@ impl SectionTree {
                     warn!("Error on prefix search: {e}");
                 }
             };
-        }
 
         match self.get_signed(incoming_prefix) {
             Some(sap) if sap == &signed_sap => {

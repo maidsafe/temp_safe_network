@@ -105,16 +105,30 @@ impl MyNode {
 
                 // Check for entropy before we proceed further, if AE response was sent
                 // to the client we should just short-circuit
-                if MyNode::is_ae_sent_to_client(
+                match MyNode::is_ae_sent_to_client(
                     &context,
                     &origin,
                     &wire_msg,
                     &dst,
                     send_stream.clone(),
                 )
-                .await?
+                .await
                 {
-                    return Ok(vec![]);
+                    Ok(ae_away) => {
+                        if ae_away {
+                            return Ok(vec![]);
+                        }
+                    }
+                    Err(error) => {
+                        if let Error::MissingSiblingNetworkKnowledge = error {
+                            error!("Cannot update client, we're missing sibling section knowledge");
+                            return Ok(vec![MyNode::generate_section_and_sibling_probe_msg(
+                                &context,
+                            )?]);
+                        } else {
+                            return Err(error);
+                        }
+                    }
                 }
 
                 trace!("{msg_id:?} No AE needed for client message, proceeding to handle msg");

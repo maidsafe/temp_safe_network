@@ -115,10 +115,34 @@ impl MyNode {
 
         match MyNode::check_for_entropy(context, msg_id, dst)? {
             None => Ok(false),
-            Some(
-                AeResponseKind::Redirect(section_tree_update)
-                | AeResponseKind::Retry(section_tree_update),
-            ) => {
+            Some(AeResponseKind::Redirect(section_tree_update)) => {
+                trace!(
+                        "{} {msg_id:?} entropy found. Client {origin:?} should be updated and redirected",
+                        LogMarker::AeSendRetryAsOutdated
+                    );
+                let update_sap = section_tree_update.clone().signed_sap.value;
+                let our_current_sap = context.network_knowledge.signed_sap().value;
+
+                // we're missing some knowledge!
+                if update_sap == our_current_sap {
+                    debug!("udpate: {update_sap:?}");
+                    debug!("udpate: {our_current_sap:?}");
+                    return Err(Error::MissingSiblingNetworkKnowledge);
+                }
+
+                let bounced_msg = wire_msg.serialize()?;
+                MyNode::send_ae_response_to_client(
+                    context,
+                    origin,
+                    send_stream,
+                    bounced_msg,
+                    section_tree_update,
+                )
+                .await?;
+
+                Ok(true)
+            }
+            Some(AeResponseKind::Retry(section_tree_update)) => {
                 trace!(
                     "{} {msg_id:?} entropy found. Client {origin:?} should be updated",
                     LogMarker::AeSendRetryAsOutdated
