@@ -264,19 +264,9 @@ impl Comm {
             "Adding incoming conn to {peer:?} w/ conn_id : {:?}",
             conn.id()
         );
-        if let Some(entry) = self.sessions.get(peer) {
-            // peer already exists
-            let peer_session = entry.value();
-            // add to it
-            peer_session.add(conn).await;
-        } else {
-            let link = Link::new_with(
-                *peer,
-                self.our_endpoint.clone(),
-                self.msg_listener.clone(),
-                conn,
-            )
-            .await;
+        if self.sessions.get(peer).is_none() {
+            let link =
+                Link::new_with(*peer, self.our_endpoint.clone(), self.msg_listener.clone()).await;
             let session = PeerSession::new(link);
             let _ = self.sessions.insert(*peer, session);
         }
