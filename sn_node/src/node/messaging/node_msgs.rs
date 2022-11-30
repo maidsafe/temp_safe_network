@@ -313,6 +313,7 @@ impl MyNode {
             NodeMsg::Propose {
                 proposal,
                 sig_share,
+                optional_sig_share,
             } => {
                 let mut node = node.write().await;
                 debug!("[NODE WRITE]: PROPOSE write gottt...");
@@ -326,7 +327,7 @@ impl MyNode {
                     msg_id
                 );
 
-                node.handle_proposal(msg_id, proposal, sig_share, sender)
+                node.handle_proposal(msg_id, proposal, sig_share, optional_sig_share, sender)
             }
             NodeMsg::DkgStart(session_id, elder_sig) => {
                 trace!(

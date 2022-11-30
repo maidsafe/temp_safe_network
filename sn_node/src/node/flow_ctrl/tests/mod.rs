@@ -310,7 +310,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
 
     let node_state = NodeState::left(existing_peer, None);
     let proposal = Proposal::VoteNodeOffline(node_state.clone());
-    let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &proposal.as_signable_bytes()?);
+    let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &get_single_sig(&proposal)?);
 
     let _cmds = run_and_collect_cmds(Cmd::HandleAgreement { proposal, sig }, &dispatcher).await?;
 
@@ -350,7 +350,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
             .await?;
     // Handle agreement on the Offline proposal
     let proposal = Proposal::VoteNodeOffline(remove_node_state.clone());
-    let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &proposal.as_signable_bytes()?);
+    let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &get_single_sig(&proposal)?);
 
     let _cmds = run_and_collect_cmds(Cmd::HandleAgreement { proposal, sig }, &dispatcher).await?;
 
@@ -759,8 +759,7 @@ async fn handle_elders_update() -> Result<()> {
 
     let signed_sap1 = TestKeys::get_section_signed(&sk_set1.secret_key(), sap1);
     let proposal = Proposal::NewElders(signed_sap1.clone());
-    let sig =
-        TestKeys::get_section_sig_bytes(&sk_set0.secret_key(), &proposal.as_signable_bytes()?);
+    let sig = TestKeys::get_section_sig_bytes(&sk_set0.secret_key(), &get_single_sig(&proposal)?);
 
     let (event_sender, mut event_receiver) =
         event_channel::new(network_utils::TEST_EVENT_CHANNEL_SIZE);
@@ -937,10 +936,8 @@ async fn handle_demote_during_split() -> Result<()> {
     // Create agreement on `OurElder` for both sub-sections
     let create_our_elders_cmd = |signed_sap: SectionSigned<SectionAuthorityProvider>| -> Result<_> {
         let proposal = Proposal::NewElders(signed_sap.clone());
-        let sig = TestKeys::get_section_sig_bytes(
-            &sk_set_v0.secret_key(),
-            &proposal.as_signable_bytes()?,
-        );
+        let sig =
+            TestKeys::get_section_sig_bytes(&sk_set_v0.secret_key(), &get_single_sig(&proposal)?);
 
         Ok(Cmd::HandleNewEldersAgreement {
             new_elders: signed_sap,
@@ -1250,4 +1247,11 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
     );
 
     Ok(())
+}
+
+fn get_single_sig(proposal: &Proposal) -> Result<Vec<u8>> {
+    match proposal.as_signable_bytes()? {
+        itertools::Either::Left(bytes) => Ok(bytes),
+        itertools::Either::Right(_) => bail!("Invalid expectations! Use another proposal variant."),
+    }
 }

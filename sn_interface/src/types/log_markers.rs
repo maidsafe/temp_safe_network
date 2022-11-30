@@ -80,6 +80,7 @@ pub enum LogMarker {
     DkgComplete,
     HandlingDkgSuccessfulOutcome,
     HandlingNewEldersAgreement,
+    HandlingNewSectionsAgreement,
     NewSignedSap,
     NewKeyShareStored,
     TriggeringPromotionAndDemotion,
