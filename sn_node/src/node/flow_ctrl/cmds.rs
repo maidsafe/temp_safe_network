@@ -83,6 +83,13 @@ pub(crate) enum Cmd {
         new_elders: SectionSigned<SectionAuthorityProvider>,
         sig: SectionSig,
     },
+    /// Handle agree on new sections. This blocks node message processing until complete.
+    HandleNewSectionsAgreement {
+        sap1: SectionSigned<SectionAuthorityProvider>,
+        sig1: SectionSig,
+        sap2: SectionSigned<SectionAuthorityProvider>,
+        sig2: SectionSig,
+    },
     /// Handle the outcome of a DKG session where we are one of the participants (that is, one of
     /// the proposed new elders).
     HandleDkgOutcome {
@@ -177,6 +184,7 @@ impl Cmd {
             Cmd::HandleMembershipDecision(_) => State::Membership,
             Cmd::ProposeVoteNodesOffline(_) => State::Membership,
             Cmd::HandleNewEldersAgreement { .. } => State::Handover,
+            Cmd::HandleNewSectionsAgreement { .. } => State::Handover,
             Cmd::HandleDkgOutcome { .. } => State::Dkg,
             Cmd::EnqueueDataForReplication { .. } => State::Replication,
         }
@@ -211,6 +219,7 @@ impl fmt::Display for Cmd {
             }
             Cmd::HandleAgreement { .. } => write!(f, "HandleAgreement"),
             Cmd::HandleNewEldersAgreement { .. } => write!(f, "HandleNewEldersAgreement"),
+            Cmd::HandleNewSectionsAgreement { .. } => write!(f, "HandleNewSectionsAgreement"),
             Cmd::HandleMembershipDecision(_) => write!(f, "HandleMembershipDecision"),
             Cmd::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
             Cmd::SendMsg { .. } => write!(f, "SendMsg"),

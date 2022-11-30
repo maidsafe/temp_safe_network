@@ -28,12 +28,12 @@ impl MyNode {
         let mut cmds = Vec::new();
         match proposal {
             Proposal::VoteNodeOffline(node_state) => {
-                cmds.extend(self.handle_offline_agreement(node_state, sig))
+                cmds.extend(self.handle_offline_agreement(node_state, sig));
             }
             Proposal::RequestHandover(sap) => {
-                cmds.extend(self.handle_request_handover_agreement(sap, sig).await?)
+                cmds.extend(self.handle_request_handover_agreement(sap, sig).await?);
             }
-            Proposal::NewElders(_) => {
+            Proposal::NewElders(_) | Proposal::NewSections { .. } => {
                 error!("Elders agreement should be handled in a separate blocking fashion");
             }
             Proposal::JoinsAllowed(joins_allowed) => {
@@ -123,6 +123,80 @@ impl MyNode {
             debug!("Waiting for more split handover candidates");
             Ok(vec![])
         }
+    }
+
+    #[instrument(skip(self), level = "trace")]
+    pub(crate) async fn handle_new_sections_agreement(
+        &mut self,
+        sap1: SectionSigned<SectionAuthorityProvider>,
+        sig1: SectionSig,
+        sap2: SectionSigned<SectionAuthorityProvider>,
+        sig2: SectionSig,
+    ) -> Result<Vec<Cmd>> {
+        if sap1.members().any(|m| m.name() == self.name()) {
+            self.update_us(sap1, sig1, sap2, sig2).await
+        } else if sap2.members().any(|m| m.name() == self.name()) {
+            self.update_us(sap2, sig2, sap1, sig1).await
+        } else {
+            // Should not be possible..
+            error!(
+                "Error handling sections agreement, we are not a member in either section {}, {}",
+                sap1.prefix(),
+                sap2.prefix()
+            );
+            Ok(vec![])
+        }
+    }
+
+    async fn update_us(
+        &mut self,
+        our_sap: SectionSigned<SectionAuthorityProvider>,
+        sig_over_us: SectionSig,
+        their_sap: SectionSigned<SectionAuthorityProvider>,
+        sig_over_them: SectionSig,
+    ) -> Result<Vec<Cmd>> {
+        trace!("{}", LogMarker::HandlingNewSectionsAgreement);
+        let context = self.context();
+
+        // First we snapshot the section chain
+        let mut parent_section_chain = self.section_chain();
+        let parent_key = parent_section_chain.last_key()?;
+
+        // Then we apply the add of our own new section
+        let cmds = self
+            .handle_new_elders_agreement(our_sap, sig_over_us)
+            .await?;
+
+        // Finally we update our network knowledge with our sibling
+        // section SAP and chain if the new SAP's prefix matches our name
+        // We need to generate the proof chain to connect our current chain to new SAP.
+        match parent_section_chain.insert(
+            &parent_key,
+            their_sap.section_key(),
+            sig_over_them.signature,
+        ) {
+            Ok(()) => {
+                let their_prefix = their_sap.prefix();
+                let section_tree_update = SectionTreeUpdate::new(their_sap, parent_section_chain);
+                match self.network_knowledge.update_knowledge_if_valid(
+                    section_tree_update,
+                    None,
+                    &context.name,
+                ) {
+                    Ok(true) => {
+                        info!("Updated our network knowledge for {:?}", their_prefix);
+                        info!("Writing updated knowledge to disk");
+                        MyNode::write_section_tree(&context);
+                    }
+                    Err(err) => {
+                        error!("Error updating our network knowledge for {their_prefix:?}: {err:?}")
+                    }
+                    _ => {}
+                }
+            }
+            Err(err) => error!("Failed to generate proof chain for a newly received SAP: {err:?}"),
+        }
+        Ok(cmds)
     }
 
     #[instrument(skip(self), level = "trace")]
