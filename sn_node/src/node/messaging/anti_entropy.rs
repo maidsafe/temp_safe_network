@@ -661,7 +661,7 @@ mod tests {
 
     #[tokio::test]
     async fn ae_everything_up_to_date() -> Result<()> {
-        // create an env with 3 churns in prefix0. And a single chrun in prefix1
+        // create an env with 3 churns in prefix0. And a single churn in prefix1
         let our_prefix = prefix("0");
         let other_prefix = prefix("1");
         let env = TestNetworkBuilder::new(rand::thread_rng())
@@ -691,7 +691,7 @@ mod tests {
 
     #[tokio::test]
     async fn ae_redirect_to_other_section() -> Result<()> {
-        // create an env with 3 churns in prefix0. And a single chrun in prefix1
+        // create an env with 3 churns in prefix0. And a single churn in prefix1
         let our_prefix = prefix("0");
         let other_prefix = prefix("1");
         let env = TestNetworkBuilder::new(rand::thread_rng())
@@ -751,7 +751,7 @@ mod tests {
 
     #[tokio::test]
     async fn ae_outdated_dst_key_of_our_section() -> Result<()> {
-        // create an env with 3 churns in prefix0. And a single chrun in prefix1
+        // create an env with 3 churns in prefix0. And a single churn in prefix1
         let our_prefix = prefix("0");
         let other_prefix = prefix("1");
         let env = TestNetworkBuilder::new(rand::thread_rng())
@@ -786,7 +786,7 @@ mod tests {
 
     #[tokio::test]
     async fn ae_wrong_dst_key_of_our_section_returns_retry() -> Result<()> {
-        // create an env with 3 churns in prefix0. And a single chrun in prefix1
+        // create an env with 3 churns in prefix0. And a single churn in prefix1
         let our_prefix = prefix("0");
         let other_prefix = prefix("1");
         let env = TestNetworkBuilder::new(rand::thread_rng())

@@ -1,9 +1,8 @@
 use crate::{
     comm::{Comm, MsgFromPeer},
     node::{
-        cfg::create_test_max_capacity_and_root_storage,
-        core::MyNode,
-        flow_ctrl::{dispatcher::Dispatcher, event_channel},
+        cfg::create_test_max_capacity_and_root_storage, core::MyNode,
+        flow_ctrl::dispatcher::Dispatcher,
     },
     UsedSpace,
 };
@@ -138,7 +137,7 @@ impl<R: RngCore> TestNetworkBuilder<R> {
         let mut nodes = Vec::new();
         for node in node_infos {
             // check MemberType
-            let mem_type = if sap.elders_set().contains(&node.peer()) {
+            let memb_type = if sap.elders_set().contains(&node.peer()) {
                 TestMemberType::Elder
             } else {
                 TestMemberType::Adult
@@ -153,7 +152,7 @@ impl<R: RngCore> TestNetworkBuilder<R> {
 
             // insert the commRx
             let _ = self.receivers.insert(node.public_key(), Some(rx));
-            nodes.push((node, comm, mem_type));
+            nodes.push((node, comm, memb_type));
         }
         self.sections
             .push((sap.clone(), nodes, secret_key_set.clone()));
@@ -785,7 +784,6 @@ impl TestNetwork {
             info.keypair.clone(),
             network_knowledge.clone(),
             sk_share.clone(),
-            event_channel::new(1).0,
             UsedSpace::new(max_capacity),
             root_storage_dir,
             mpsc::channel(10).0,

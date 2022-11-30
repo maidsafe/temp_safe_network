@@ -11,7 +11,6 @@ pub(crate) mod cmd_utils;
 pub(crate) mod dbc_utils;
 pub(crate) mod network_builder;
 
-use self::network_builder::TEST_EVENT_CHANNEL_SIZE;
 use crate::{
     comm::MsgFromPeer,
     node::{
@@ -661,7 +660,7 @@ async fn handle_elders_update() -> Result<()> {
     let (section1, sk_set1) = env.get_network_knowledge(prefix, Some(1));
     let sap1 = section1.signed_sap();
 
-    // node from sap0 will process `HandleNewEldersAgreement` of sap1
+    // node from sap0 will process `HandleNewEldersAgreement` to update its knowledge about sap1
     let mut node = env.get_nodes(prefix, 1, 0, Some(0)).remove(0).0;
     let info = node.info();
     // Simulate DKG round finished successfully by adding
