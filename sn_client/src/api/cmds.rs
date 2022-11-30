@@ -47,7 +47,10 @@ impl Client {
                 .await
         })
         .await
-        .map_err(|_| Error::CmdAckValidationTimeout(dst_address))?
+        .map_err(|_| Error::CmdAckValidationTimeout {
+            elapsed: self.cmd_timeout,
+            dst_address,
+        })?
     }
 
     /// Public API to send a `DataCmd` to the network.
