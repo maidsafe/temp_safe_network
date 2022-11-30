@@ -666,7 +666,7 @@ mod core {
                 .send(DysCmds::TrackIssue(name, issue))
                 .await
             {
-                error!("Could not send DysCmds through dysfunctional_cmds_tx: {error}");
+                warn!("Could not send DysCmds through dysfunctional_cmds_tx: {error}");
             }
         }
 
@@ -687,7 +687,7 @@ mod core {
                 .send(DysCmds::UntrackIssue(name, issue))
                 .await
             {
-                error!("Could not send DysCmds through dysfunctional_cmds_tx: {error}");
+                warn!("Could not send DysCmds through dysfunctional_cmds_tx: {error}");
             }
         }
 
