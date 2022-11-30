@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1669772633925,
+  "lastUpdate": 1669780392398,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -33262,6 +33262,144 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 393426168,
             "range": "± 19714763",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "e15180b53d1daaec76b7eba4637ffc16076c80af",
+          "message": "Merge #1796\n\n1796: Move node spendbook unittests to client e2e r=joshuef a=oetyng\n\nAs a first round over this, with skipped tests to be implemented in follow up PRs.\r\n\r\n- tests(spentbook): add the test stubs in sn_client\r\n- tests(spentbook): reuse code with setup fn\r\n- tests(spentbook): add test 1\r\n-> `spent proof with invalid pk should return spentbook error`\r\n- tests(spentbook): do more detailed error matching\r\n- refactor(dbc_genesis): move to sn_interfaces\r\n- tests(spentbook): add test 2\r\n-> `spent proof with key not in section chain should return cmd error\r\nresponse`\r\n- tests(spentbook): add test 3\r\n-> `spent proofs do not relate to input dbcs should return spentbook error`\r\n-> (NB: this can probably be simplified)\r\n- tests(spentbook): disable test 4\r\n-> `transaction with no inputs should return spentbook error`\r\n-> This test cannot be tested from `sn_client`, this is a \"Spentbook\"-api\r\nunit test.\r\n- tests(spentbook): add test 5\r\n-> `spend with random key image should return spentbook error`\r\n- tests(spentbook): disable test 6\r\n-> `spend with updated network knowledge should update the node`\r\n-> This test should not be tested from `sn_client`, instead this should be\r\nan `sn_node` unit test. It just needs the state of a node ready to accept\r\nthe state from the msg.\r\n- tests(spentbook): remove old tests\r\n- tests(spentbook): remove commented out code\r\n-> Cleanup of tests that will not be implemented there.\n\nCo-authored-by: oetyng <oetyng@gmail.com>",
+          "timestamp": "2022-11-30T02:09:19Z",
+          "tree_id": "cbad04fc9d02e9247bb4e5eb4dbc3df0a4526769",
+          "url": "https://github.com/maidsafe/safe_network/commit/e15180b53d1daaec76b7eba4637ffc16076c80af"
+        },
+        "date": 1669780390094,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2716543,
+            "range": "± 664602",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 107002696,
+            "range": "± 2669182",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 134815137,
+            "range": "± 6872376",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 519562327,
+            "range": "± 10689824",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 86854821,
+            "range": "± 1914856",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 107245616,
+            "range": "± 2039991",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 414329135,
+            "range": "± 10019993",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 65917281,
+            "range": "± 14776098",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2706845272,
+            "range": "± 201025554",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 10810333311,
+            "range": "± 849877542",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 382474290,
+            "range": "± 20742309",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 3418152742,
+            "range": "± 106220329",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 9489126905,
+            "range": "± 1600336718",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 52819368,
+            "range": "± 2331093",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 509356732,
+            "range": "± 48669185",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1869423452,
+            "range": "± 86836807",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 13270764,
+            "range": "± 1750808",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 110454825,
+            "range": "± 7773903",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 377513871,
+            "range": "± 22776413",
             "unit": "ns/iter"
           }
         ]
