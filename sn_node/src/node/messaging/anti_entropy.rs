@@ -118,7 +118,7 @@ impl MyNode {
             Some(AeResponseKind::Redirect(section_tree_update)) => {
                 trace!(
                         "{} {msg_id:?} entropy found. Client {origin:?} should be updated and redirected",
-                        LogMarker::AeSendRetryAsOutdated
+                        LogMarker::AeSendUpdateAndRedirect
                     );
                 let update_sap = section_tree_update.clone().signed_sap.value;
                 let our_current_sap = context.network_knowledge.signed_sap().value;
@@ -126,7 +126,7 @@ impl MyNode {
                 // we're missing some knowledge!
                 if update_sap == our_current_sap {
                     debug!("udpate: {update_sap:?}");
-                    debug!("udpate: {our_current_sap:?}");
+                    debug!("our current: {our_current_sap:?}");
                     return Err(Error::MissingSiblingNetworkKnowledge);
                 }
 

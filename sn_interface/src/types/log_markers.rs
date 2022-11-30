@@ -88,6 +88,7 @@ pub enum LogMarker {
     AeResendAfterRedirect,
     AeSendRedirect,
     AeSendRetryAsOutdated,
+    AeSendUpdateAndRedirect,
     AeSendRetryDstPkFail,
     // Sending messages
     SendToNodes,
