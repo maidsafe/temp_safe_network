@@ -168,46 +168,6 @@ jobs:
           workflow_id: ${{ github.run_id }}
           access_token: ${{ github.token }}
 
-  #launch-testnet:
-  #name: launch testnet
-  #needs: build-node
-  #runs-on: ubuntu-latest
-  #steps:
-  #- uses: actions/download-artifact@master
-  #with:
-  #name: sn_node-x86_64-unknown-linux-musl
-  #path: sn_node
-  #- shell: bash
-  #name: copy node to temp location
-  #run: cp sn_node/sn_node /tmp
-  #- name: Set TESTNET_ID env
-  #shell: bash
-  #run: |
-  #short_commit_hash=$(echo "${{ github.event.pull_request.head.sha || github.sha }}" | cut -c 1-7)
-  #echo "TESTNET_ID=gha-testnet-$short_commit_hash" >> $GITHUB_ENV
-  #- name: launch testnet
-  #uses: maidsafe/sn_testnet_action@main
-  #with:
-  #do-token: ${{ secrets.DO_TOKEN }}
-  #aws-access-key-id: ${{ secrets.S3_DEPLOY_AWS_ACCESS_KEY_ID }}
-  #aws-access-key-secret: ${{ secrets.S3_DEPLOY_AWS_SECRET_ACCESS_KEY }}
-  #ssh-secret-key: ${{ secrets.SSH_SECRET_KEY  }}
-  #node-count: ${{ inputs.node-count }}
-  #node-path: /tmp/sn_node
-  #testnet-id: ${{ env.TESTNET_ID }}
-  #testnet-tool-repo-branch: ${{ inputs.testnet-tool-repo-branch }}
-  #testnet-tool-repo-user: ${{ inputs.testnet-tool-repo-user }}
-  ## The other jobs in the workflow have the testnet launch as a dependency, but they go ahead
-  ## even if this job fails. It would be better if the whole workflow is abandoned if we don't
-  ## have a testnet to run the tests against.
-  #- name: cancel workflow if testnet launch fails
-  #uses: vishnudxb/cancel-workflow@v1.2
-  #if: failure()
-  #with:
-  #repo: octocat/hello-world
-  #workflow_id: ${{ github.run_id }}
-  #access_token: ${{ github.token }}
-
   client:
     name: client tests
     runs-on: ${{ matrix.os }}
@@ -255,6 +215,7 @@ jobs:
           package: sn_client
           release: true
           filters: client
+          features: check-replicas
           test-threads: 2
         timeout-minutes: 25
 
@@ -313,7 +274,8 @@ jobs:
           junit-path: junit.xml
           package: sn_api
           release: true
-          test-threads: 10
+          test-threads: 1
+          features: check-replicas
         timeout-minutes: 60
         env:
           TEST_ENV_GENESIS_DBC_PATH: /tmp/genesis_dbc
@@ -368,7 +330,8 @@ jobs:
           junit-path: junit.xml
           package: sn_cli
           release: true
-          test-threads: 10
+          test-threads: 1
+          features: check-replicas
         timeout-minutes: 60
         env:
           TEST_ENV_GENESIS_DBC_PATH: /tmp/genesis_dbc
@@ -393,6 +356,7 @@ jobs:
           testnet-id: ${{ env.TESTNET_ID }}
 
   bump_version:
+    if: github.repository_owner == 'maidsafe' && github.ref_name == 'main'
     runs-on: ubuntu-22.04
     needs: kill-testnet
     steps:
