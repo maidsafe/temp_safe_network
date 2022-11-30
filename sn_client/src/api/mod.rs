@@ -22,20 +22,15 @@ use crate::{connections::Session, errors::Error};
 
 use sn_dbc::Owner;
 use sn_interface::{
-    messaging::{
-        data::{ClientMsg, DataQuery, DataQueryVariant, RegisterQuery},
-        ClientAuth, WireMsg,
-    },
+    messaging::data::{DataQueryVariant, RegisterQuery},
     network_knowledge::SectionTree,
     types::{Chunk, Keypair, PublicKey, RegisterAddress},
 };
 
-use bytes::Bytes;
 use std::sync::Arc;
 use tokio::{sync::RwLock, time::Duration};
 use tracing::debug;
 use uluru::LRUCache;
-use xor_name::XorName;
 
 /// Name of the default network contacts file the Client uses. The file is
 /// expected to be found at user's OS home directory, e.g. in Linux this
@@ -46,8 +41,8 @@ pub const DEFAULT_NETWORK_CONTACTS_FILE_NAME: &str = "default";
 // Each Chunk is maximum types::MAX_CHUNK_SIZE_IN_BYTES, i.e. ~1MB
 const CHUNK_CACHE_SIZE: usize = 50;
 
-// Number of times to retry network probe on client startup
-const NETWORK_PROBE_RETRY_COUNT: usize = 5; // 5 x 5 second wait in between = ~25 seconds (plus ~ 3 seconds in between attempts internal to `make_contact`)
+// Number of times to try network probe on client startup
+const NETWORK_PROBE_MAX_ATTEMPTS: usize = 3;
 
 // LRU cache to keep the Chunks we retrieve.
 type ChunksCache = LRUCache<Chunk, CHUNK_CACHE_SIZE>;
@@ -71,100 +66,57 @@ pub struct Client {
 impl Client {
     /// Bootstrap this client to the network.
     ///
-    /// In case of an existing SecretKey the client will attempt to retrieve the history of the key's balance in order to be ready for any token operations.
+    /// In case of an existing SecretKey the client will attempt to retrieve the history
+    /// of the key's balance in order to be ready for any token operations.
     #[instrument(skip_all, level = "debug")]
     pub async fn connect(&self) -> Result<(), Error> {
         // TODO: The message being sent below is a temporary solution to fetch network info for
-        // the client. Ideally the client should be able to send proper AE-Probe messages to the
+        // the client. Ideally the client should be able to send proper AE-Probe messages to
         // trigger the AE flows.
 
-        fn generate_probe_msg(
-            client: &Client,
-            pk: PublicKey,
-        ) -> Result<(XorName, ClientAuth, Bytes), Error> {
-            // Generate a random query to send a dummy message
-            let random_dst_addr = xor_name::rand::random();
-            let serialised_cmd = {
-                let msg = ClientMsg::Query(DataQuery {
-                    adult_index: 0,
-                    variant: DataQueryVariant::Register(RegisterQuery::Get(RegisterAddress {
-                        name: random_dst_addr,
-                        tag: 1,
-                    })),
-                });
-                WireMsg::serialize_msg_payload(&msg)?
-            };
-            let signature = client.keypair.sign(&serialised_cmd);
-            let auth = ClientAuth {
-                public_key: pk,
-                signature,
-            };
-
-            Ok((random_dst_addr, auth, serialised_cmd))
-        }
-
-        let client_pk = self.public_key();
-        let (random_dst_addr, auth, serialised_cmd) = generate_probe_msg(self, client_pk)?;
-
-        // get bootstrap nodes
-        let (bootstrap_nodes, section_pk) = {
-            let sap = self
-                .session
-                .network
-                .read()
-                .await
-                .closest(&random_dst_addr, None)
-                .cloned()
-                .ok_or(Error::NoNetworkKnowledge(random_dst_addr))?;
-            (sap.elders_vec(), sap.section_key())
-        };
+        // Generate a random query to send a dummy message
+        let query = DataQueryVariant::Register(RegisterQuery::Get(RegisterAddress {
+            name: xor_name::rand::random(),
+            tag: 1,
+        }));
         debug!(
-            "Make contact with the bootstrap nodes: {:?}",
-            bootstrap_nodes
+            "Making initial contact with network. Our public addr: {:?}. Probe msg: {query:?}",
+            self.session.endpoint.public_addr()
         );
 
-        let mut attempts = 0;
-        let mut initial_probe = self
-            .session
-            .make_contact_with_nodes(
-                bootstrap_nodes.clone(),
-                section_pk,
-                random_dst_addr,
-                auth.clone(),
-                serialised_cmd,
-            )
-            .await;
-        // Send the dummy message to probe the network for it's infrastructure details.
-        while attempts < NETWORK_PROBE_RETRY_COUNT && initial_probe.is_err() {
-            warn!(
-                "Initial probe msg to network failed. Trying again (attempt {}): {:?}",
-                attempts, initial_probe
-            );
+        let mut attempts = 1;
+        loop {
+            // Send the dummy message to probe the network for it's infrastructure details.
+            match self.send_query_without_retry(query.clone()).await {
+                Ok(result) if result.response.is_data_not_found() => {
+                    // A data-not-found response means it comes from the right set of Elders,
+                    // any AE retries should have taken place as well.
+                    let network_knowledge = self.session.network.read().await;
+                    let sections_count = network_knowledge.known_sections_count();
+                    let known_sap = network_knowledge.closest(&query.dst_name(), None);
+                    debug!(
+                        "Client has some network knowledge. Current sections \
+                        known: {sections_count}. SAP for our startup-query: {known_sap:?}"
+                    );
+                    break Ok(());
+                }
+                result => {
+                    if attempts == NETWORK_PROBE_MAX_ATTEMPTS {
+                        // we've failed
+                        break Err(Error::NetworkContacts(format!(
+                            "failed to make initial contact with network to bootstrap to \
+                            after {attempts} attempts, result in last attempt: {result:?}"
+                        )));
+                    }
 
-            if attempts == NETWORK_PROBE_RETRY_COUNT {
-                // we've failed
-                return Err(Error::NetworkContact(bootstrap_nodes));
+                    attempts += 1;
+                    warn!(
+                        "Initial probe msg to network failed. Trying again (attempt #{}): {:?}",
+                        attempts, result
+                    );
+                }
             }
-
-            attempts += 1;
-
-            tokio::time::sleep(Duration::from_secs(5)).await;
-
-            let (random_dst_addr, auth, serialised_cmd) = generate_probe_msg(self, client_pk)?;
-
-            initial_probe = self
-                .session
-                .make_contact_with_nodes(
-                    bootstrap_nodes.clone(),
-                    section_pk,
-                    random_dst_addr,
-                    auth,
-                    serialised_cmd,
-                )
-                .await;
         }
-
-        Ok(())
     }
 
     /// Return the client's keypair.

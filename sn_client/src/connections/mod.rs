@@ -48,7 +48,7 @@ impl QueryResult {
 #[derive(Clone, Debug)]
 pub(super) struct Session {
     // Session endpoint.
-    endpoint: Endpoint,
+    pub(super) endpoint: Endpoint,
     /// All elders we know about from AE messages
     pub(super) network: Arc<RwLock<SectionTree>>,
     /// Links to nodes
