@@ -1289,7 +1289,7 @@ mod tests {
             let node_instances = env
                 .get_nodes(Prefix::default(), node_count, 0, None)
                 .into_iter()
-                .map(|(node, _)| {
+                .map(|node| {
                     let name = node.name();
                     let mock = MyNodeInstance {
                         node: Arc::new(RwLock::new(node)),
@@ -1298,7 +1298,7 @@ mod tests {
                     (name, mock)
                 })
                 .collect::<BTreeMap<_, _>>();
-            let (_, sk_set) = env.get_sap(Prefix::default(), None);
+            let sk_set = env.get_secret_key_set(Prefix::default(), None);
             (node_instances, sk_set)
         }
 

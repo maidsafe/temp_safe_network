@@ -671,7 +671,7 @@ mod tests {
             .sap(other_prefix, elder_count(), 0, None, None)
             .build();
         // get node from the latest section of our_prefix
-        let node = env.get_nodes(our_prefix, 1, 0, None).remove(0).0;
+        let node = env.get_nodes(our_prefix, 1, 0, None).remove(0);
 
         let dst_section_key = node.network_knowledge().section_key();
         let msg = create_msg(&our_prefix, dst_section_key)?;
@@ -700,11 +700,11 @@ mod tests {
             .sap(our_prefix, elder_count(), 0, None, None)
             .sap(other_prefix, elder_count(), 0, None, None)
             .build();
-        let other_section = env.get_network_knowledge(other_prefix, None).0;
+        let other_section = env.get_network_knowledge(other_prefix, None);
         let other_sap = other_section.signed_sap();
 
         // get node from the latest section of our_prefix
-        let mut node = env.get_nodes(our_prefix, 1, 0, None).remove(0).0;
+        let mut node = env.get_nodes(our_prefix, 1, 0, None).remove(0);
 
         let other_sk = bls::SecretKey::random();
         let other_pk = other_sk.public_key();
@@ -761,7 +761,7 @@ mod tests {
             .sap(other_prefix, elder_count(), 0, None, None)
             .build();
         // get node from the latest section of our_prefix
-        let node = env.get_nodes(our_prefix, 1, 0, None).remove(0).0;
+        let node = env.get_nodes(our_prefix, 1, 0, None).remove(0);
 
         let context = node.context();
         let msg = create_msg(&our_prefix, node.network_knowledge().section_key())?;
@@ -796,7 +796,7 @@ mod tests {
             .sap(other_prefix, elder_count(), 0, None, None)
             .build();
         // get node from the latest section of our_prefix
-        let node = env.get_nodes(our_prefix, 1, 0, None).remove(0).0;
+        let node = env.get_nodes(our_prefix, 1, 0, None).remove(0);
 
         let msg = create_msg(&our_prefix, node.network_knowledge().section_key())?;
         let sender = node.info().peer();

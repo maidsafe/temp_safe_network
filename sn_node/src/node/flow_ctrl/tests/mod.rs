@@ -67,8 +67,8 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
     let env = TestNetworkBuilder::new(thread_rng())
         .sap(prefix, elder_count(), 0, None, None)
         .build();
-    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0).0;
-    let (_, sk_set) = env.get_network_knowledge(prefix, None);
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
+    let sk_set = env.get_secret_key_set(prefix, None);
     let section_key = sk_set.public_keys().public_key();
     let node = dispatcher.node();
     let node_info = node.read().await.info();
@@ -137,8 +137,8 @@ async fn handle_agreement_on_online() -> Result<()> {
     let env = TestNetworkBuilder::new(thread_rng())
         .sap(prefix, elder_count(), 0, None, None)
         .build();
-    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0).0;
-    let (_, sk_set) = env.get_network_knowledge(prefix, None);
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
+    let sk_set = env.get_secret_key_set(prefix, None);
     let new_peer = gen_peer(MIN_ADULT_AGE);
     let status = handle_online_cmd(&new_peer, &sk_set, &dispatcher).await?;
     assert!(status.node_approval_sent);
@@ -167,9 +167,10 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             None,
         )
         .build();
-    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0).0;
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
     let node_name = dispatcher.node().read().await.name();
-    let (section, sk_set) = env.get_network_knowledge(prefix, None);
+    let section = env.get_network_knowledge(prefix, None);
+    let sk_set = env.get_secret_key_set(prefix, None);
 
     let mut expected_new_elders = section
         .elders()
@@ -245,7 +246,7 @@ async fn handle_join_request_of_rejoined_node() -> Result<()> {
     let env = TestNetworkBuilder::new(thread_rng())
         .sap(prefix, elder_count(), 0, None, None)
         .build();
-    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0).0;
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
 
     // Make a left peer.
     let peer = gen_peer_in_prefix(MIN_ADULT_AGE, prefix);
@@ -287,11 +288,11 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let env = TestNetworkBuilder::new(thread_rng())
         .sap(prefix, elder_count(), 1, None, None)
         .build();
-    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0).0;
-    let (_, sk_set) = env.get_network_knowledge(prefix, None);
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
+    let sk_set = env.get_secret_key_set(prefix, None);
 
     // get the node state of the non_elder node
-    let node_state = env.get_nodes(prefix, 0, 1, None).remove(0).0.info().peer();
+    let node_state = env.get_nodes(prefix, 0, 1, None).remove(0).info().peer();
     let node_state = NodeState::left(node_state, None);
 
     let proposal = Proposal::VoteNodeOffline(node_state.clone());
@@ -316,10 +317,10 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
         .sap(prefix, elder_count(), 0, None, None)
         .build();
     let mut elders = env.get_dispatchers(prefix, 2, 0, None);
-    let dispatcher = elders.remove(0).0;
-    let (_, sk_set) = env.get_network_knowledge(prefix, None);
+    let dispatcher = elders.remove(0);
+    let sk_set = env.get_secret_key_set(prefix, None);
 
-    let remove_elder = elders.remove(0).0.node().read().await.info().peer();
+    let remove_elder = elders.remove(0).node().read().await.info().peer();
     let remove_elder = NodeState::left(remove_elder, None);
 
     // Handle agreement on the Offline proposal
@@ -360,13 +361,13 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
         .sap_with_members(prefix, elders0.clone(), elders0)
         .sap_with_members(prefix, elders1.clone(), elders1)
         .build();
-    let (_, sk_set0) = env.get_sap(prefix, Some(0));
-    let (sap1, sk_set1) = env.get_sap(prefix, Some(1));
+    let sk_set0 = env.get_secret_key_set(prefix, Some(0));
+    let sap1 = env.get_sap(prefix, Some(1));
+    let sk_set1 = env.get_secret_key_set(prefix, Some(1));
     let pk_0 = sk_set0.public_keys().public_key();
-    let pk_1 = sk_set1.public_keys().public_key();
 
     // Our node does not know about SAP1
-    let mut node = env.get_nodes(prefix, 1, 0, Some(0)).remove(0).0;
+    let mut node = env.get_nodes(prefix, 1, 0, Some(0)).remove(0);
 
     let new_section_elders: BTreeSet<_> = sap1.elders_set();
     let section_tree_update = TestSectionTree::get_section_tree_update(
@@ -427,8 +428,9 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
     let env = TestNetworkBuilder::new(thread_rng())
         .sap(prefix, elder_count(), 0, None, None)
         .build();
-    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0).0;
-    let (section, sk_set) = env.get_network_knowledge(prefix, None);
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
+    let section = env.get_network_knowledge(prefix, None);
+    let sk_set = env.get_secret_key_set(prefix, None);
     let pk = sk_set.secret_key().public_key();
 
     // a valid AE msg but with a non-verifiable SAP...
@@ -540,8 +542,9 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
     let env = TestNetworkBuilder::new(thread_rng())
         .sap(prefix, elder_count(), adults, None, None)
         .build();
-    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0).0;
-    let (mut section, sk_set) = env.get_network_knowledge(prefix, None);
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
+    let mut section = env.get_network_knowledge(prefix, None);
+    let sk_set = env.get_secret_key_set(prefix, None);
 
     let relocated_peer = match relocated_peer_role {
         // our node is elder idx 0, so remove the second elder
@@ -596,7 +599,7 @@ async fn msg_to_self() -> Result<()> {
         .sap(prefix, 1, 0, None, None)
         .build();
 
-    let node = env.get_nodes(prefix, 1, 0, None).remove(0).0;
+    let node = env.get_nodes(prefix, 1, 0, None).remove(0);
     let mut comm_rx = env.take_comm_rx(node.info().public_key());
     let context = node.context();
     let info = node.info();
@@ -656,12 +659,13 @@ async fn handle_elders_update() -> Result<()> {
         .sap_with_members(prefix, elders0, members.clone())
         .sap_with_members(prefix, elders1, members)
         .build();
-    let (section0, sk_set0) = env.get_network_knowledge(prefix, Some(0));
-    let (section1, sk_set1) = env.get_network_knowledge(prefix, Some(1));
-    let sap1 = section1.signed_sap();
+    let section0 = env.get_network_knowledge(prefix, Some(0));
+    let sk_set0 = env.get_secret_key_set(prefix, Some(0));
+    let sap1 = env.get_sap(prefix, Some(1));
+    let sk_set1 = env.get_secret_key_set(prefix, Some(1));
 
     // node from sap0 will process `HandleNewEldersAgreement` to update its knowledge about sap1
-    let mut node = env.get_nodes(prefix, 1, 0, Some(0)).remove(0).0;
+    let mut node = env.get_nodes(prefix, 1, 0, Some(0)).remove(0);
     let info = node.info();
     // Simulate DKG round finished successfully by adding
     // the new section key share to our cache
@@ -787,14 +791,14 @@ async fn handle_demote_during_split() -> Result<()> {
         .sap_with_members(prefix1, peers_b.clone(), members)
         .build();
 
-    let (_, sk_set_gen) = env.get_network_knowledge(Prefix::default(), None);
-    let (sap0, sk_set0) = env.get_network_knowledge(prefix0, None);
-    let sap0 = sap0.section_auth();
-    let (sap1, sk_set1) = env.get_network_knowledge(prefix1, None);
-    let sap1 = sap1.section_auth();
+    let sk_set_gen = env.get_secret_key_set(Prefix::default(), None);
+    let sap0 = env.get_sap(prefix0, None).value;
+    let sk_set0 = env.get_secret_key_set(prefix0, None);
+    let sap1 = env.get_sap(prefix1, None).value;
+    let sk_set1 = env.get_secret_key_set(prefix1, None);
 
     // get the `info` node from pre-split section
-    let (mut node, _) = env.get_node_by_key(Prefix::default(), info.0.public_key(), None);
+    let mut node = env.get_node_by_key(Prefix::default(), info.0.public_key(), None);
 
     // Simulate DKG round finished successfully by adding the new section
     // key share to our cache (according to which split section we'll belong to).
@@ -872,9 +876,9 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
     let env = TestNetworkBuilder::new(thread_rng())
         .sap(prefix, elder_count(), 6, None, Some(0))
         .build();
-    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0).0;
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
     let peer = dispatcher.node().read().await.info().peer();
-    let sk_set = env.get_network_knowledge(prefix, None).1;
+    let sk_set = env.get_secret_key_set(prefix, None);
 
     let (key_image, tx, spent_proofs, spent_transactions) =
         dbc_utils::get_genesis_dbc_spend_info(&sk_set)?;
@@ -925,9 +929,10 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
     let env = TestNetworkBuilder::new(thread_rng())
         .sap(prefix, elder_count(), 6, None, Some(0))
         .build();
-    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0).0;
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
     let peer = dispatcher.node().read().await.info().peer();
-    let (section, sk_set) = env.get_network_knowledge(prefix, None);
+    let section = env.get_network_knowledge(prefix, None);
+    let sk_set = env.get_secret_key_set(prefix, None);
 
     // These conditions will produce a failure on `tx.verify` in the message handler.
     let sap = section.section_auth();
@@ -1003,17 +1008,12 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
         .sap(prefix("0"), elder_count(), 6, None, Some(0))
         .sap(prefix1, elder_count(), 6, None, Some(0))
         .build();
-    let dispatcher = env
-        .get_dispatchers(Prefix::default(), 1, 0, None)
-        .remove(0)
-        .0;
+    let dispatcher = env.get_dispatchers(Prefix::default(), 1, 0, None).remove(0);
     let info = dispatcher.node().read().await.info();
-    let genesis_sk_set = env.get_network_knowledge(Prefix::default(), None).1;
-    let other_section_key_share = env
-        .get_node_by_key(prefix1, info.public_key(), None)
-        .1
-        .expect("info should be present");
-    let (other_section, other_section_key) = env.get_network_knowledge(prefix1, None);
+    let genesis_sk_set = env.get_secret_key_set(Prefix::default(), None);
+    let other_section_key_share = env.get_section_key_share(prefix1, info.public_key(), None);
+    let other_section = env.get_network_knowledge(prefix1, None);
+    let other_section_key = env.get_secret_key_set(prefix1, None);
 
     // At this point, only the genesis key should be in the proof chain on this node.
     let tree = dispatcher

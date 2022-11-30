@@ -491,9 +491,8 @@ pub(crate) struct TestNetwork {
 }
 
 impl TestNetwork {
-    /// Get elder/adult `MyNode` instances for a given `Prefix`. The elder_count and adult_count
-    /// should be <= the actual count specified in the SAP. Optionally return the `SectionKeyShare` for
-    /// elder nodes.
+    /// Build elder/adult `MyNode` instances for a given `Prefix`. The elder_count and adult_count
+    /// should be <= the actual count specified in the SAP.
     /// The created instance has knowledge about the Network only from the genesis section to its
     /// current section.
     ///
@@ -505,7 +504,7 @@ impl TestNetwork {
         elder_count: usize,
         adult_count: usize,
         churn_idx: Option<usize>,
-    ) -> Vec<(MyNode, Option<SectionKeyShare>)> {
+    ) -> Vec<MyNode> {
         let nodes = self.get_nodes_single_churn(prefix, churn_idx);
         let sap_details = self.get_sap_single_churn(prefix, churn_idx);
 
@@ -547,14 +546,13 @@ impl TestNetwork {
                 comm,
                 &sk_share,
             );
-            my_nodes.push((my_node, sk_share));
+            my_nodes.push(my_node);
         }
 
         my_nodes
     }
 
-    /// Get the `MyNode` instance given the node's `PublicKey` for a particular `Prefix`. Optionally
-    /// return the `SectionKeyShare` if it's an Elder node.
+    /// Build the `MyNode` instance given the node's `PublicKey` for a particular `Prefix`.
     /// The created instance has knowledge about the Network only from the genesis section to its
     /// current section.
     ///
@@ -565,7 +563,7 @@ impl TestNetwork {
         prefix: Prefix,
         node_pk: PublicKey,
         churn_idx: Option<usize>,
-    ) -> (MyNode, Option<SectionKeyShare>) {
+    ) -> MyNode {
         let nodes = self.get_nodes_single_churn(prefix, churn_idx);
         let node_idx = nodes
             .iter()
@@ -583,20 +581,18 @@ impl TestNetwork {
             None
         };
 
-        let node = self.build_my_node_instance(
+        self.build_my_node_instance(
             prefix,
             churn_idx,
             &network_knowledge,
             &node.0,
             &node.1,
             &sk_share,
-        );
-        (node, sk_share)
+        )
     }
 
-    /// Get elder/adult `Dispatcher<MyNode>` instances for a given `Prefix`. The elder_count and adult_count
-    /// should be <= the actual count specified in the SAP. Optionally return the `SectionKeyShare` for
-    /// elder nodes.
+    /// Build elder/adult `Dispatcher<MyNode>` instances for a given `Prefix`. The elder_count and adult_count
+    /// should be <= the actual count specified in the SAP.
     /// The created instance has knowledge about the Network only from the genesis section to its
     /// current section.
     ///
@@ -608,12 +604,12 @@ impl TestNetwork {
         elder_count: usize,
         adult_count: usize,
         churn_idx: Option<usize>,
-    ) -> Vec<(Dispatcher, Option<SectionKeyShare>)> {
+    ) -> Vec<Dispatcher> {
         self.get_nodes(prefix, elder_count, adult_count, churn_idx)
             .into_iter()
-            .map(|(node, sk_share)| {
+            .map(|node| {
                 let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
-                (dispatcher, sk_share)
+                dispatcher
             })
             .collect()
     }
@@ -666,7 +662,42 @@ impl TestNetwork {
         elder_iter.chain(adult_iter).collect()
     }
 
-    /// Get `NetworkKnowledge` and the `SecretKeySet` (for its current section) for a given `Prefix`.
+    /// Get the `SectionKeyShare` given the elder node's `PublicKey` for a particular `Prefix`.
+    ///
+    /// If the Prefix contains multiple churn events (multiple SAPs), provide the churn_idx to get
+    /// a specific SAP, else the latest SAP for the prefix is used.
+    pub(crate) fn get_section_key_share(
+        &self,
+        prefix: Prefix,
+        node_pk: PublicKey,
+        churn_idx: Option<usize>,
+    ) -> SectionKeyShare {
+        let nodes = self.get_nodes_single_churn(prefix, churn_idx);
+        let sap_details = self.get_sap_single_churn(prefix, churn_idx);
+
+        // the node_pk should be an elder
+        let share_idx = nodes
+            .iter()
+            .filter(|(.., t)| matches!(t, TestMemberType::Elder))
+            .position(|(info, ..)| info.public_key() == node_pk)
+            .expect("The elder with the given node_pk is not present for the given prefix/churn");
+
+        TestKeys::get_section_key_share(&sap_details.1, share_idx)
+    }
+
+    /// Get the `SecretKeySet` for a given `Prefix`
+    ///
+    /// If the Prefix contains multiple churn events (multiple SAPs), provide the churn_idx to get
+    /// a specific SAP, else the latest SAP for the prefix is used.
+    pub(crate) fn get_secret_key_set(
+        &self,
+        prefix: Prefix,
+        churn_idx: Option<usize>,
+    ) -> SecretKeySet {
+        self.get_sap_single_churn(prefix, churn_idx).1.clone()
+    }
+
+    /// Get the `NetworkKnowledge` for a given `Prefix`
     ///
     /// If the Prefix contains multiple churn events (multiple SAPs), provide the churn_idx to get a specific
     /// SAP, else the latest SAP for the prefix is used.
@@ -674,13 +705,12 @@ impl TestNetwork {
         &self,
         prefix: Prefix,
         churn_idx: Option<usize>,
-    ) -> (NetworkKnowledge, SecretKeySet) {
+    ) -> NetworkKnowledge {
         let sap_details = self.get_sap_single_churn(prefix, churn_idx);
-        let network_knowledge = self.build_network_knowledge(&sap_details.0, &sap_details.1);
-        (network_knowledge, sap_details.1.clone())
+        self.build_network_knowledge(&sap_details.0, &sap_details.1)
     }
 
-    /// Get `SectionSigned<SectionAuthorityProvider>` and its `SecretKeySet` for a given `Prefix`.
+    /// Get `SectionSigned<SectionAuthorityProvider>` for a given `Prefix`.
     ///
     /// If the Prefix contains multiple churn events (multiple SAPs), provide the churn_idx to get a specific
     /// SAP, else the latest SAP for the prefix is used.
@@ -688,12 +718,10 @@ impl TestNetwork {
         &self,
         prefix: Prefix,
         churn_idx: Option<usize>,
-    ) -> (SectionSigned<SectionAuthorityProvider>, SecretKeySet) {
+    ) -> SectionSigned<SectionAuthorityProvider> {
         let sap_details = self.get_sap_single_churn(prefix, churn_idx);
-        let sap = self
-            .build_network_knowledge(&sap_details.0, &sap_details.1)
-            .signed_sap();
-        (sap, sap_details.1.clone())
+        self.build_network_knowledge(&sap_details.0, &sap_details.1)
+            .signed_sap()
     }
 
     /// Create set of elder, adults nodes
