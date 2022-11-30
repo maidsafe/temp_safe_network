@@ -19,7 +19,6 @@ use tokio::{
     sync::{mpsc, Mutex},
     task,
 };
-use tracing::Instrument;
 
 #[derive(Debug)]
 pub(crate) enum ListenerEvent {
@@ -46,17 +45,15 @@ impl MsgListener {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     pub(crate) fn listen(&self, conn: qp2p::Connection, incoming_msgs: ConnectionIncoming) {
         let clone = self.clone();
-        let _ = task::spawn(clone.listen_internal(conn, incoming_msgs).in_current_span());
+        let _ = task::spawn(clone.listen_internal(conn, incoming_msgs));
     }
 
     #[tracing::instrument(skip_all)]
     async fn listen_internal(self, conn: qp2p::Connection, mut incoming_msgs: ConnectionIncoming) {
         let conn_id = conn.id();
         let remote_address = conn.remote_address();
-        let mut first = true;
 
         while let Some(result) = incoming_msgs.next_with_stream().await.transpose() {
             match result {
@@ -83,16 +80,16 @@ impl MsgListener {
                         | MsgKind::NodeDataResponse(name) => *name,
                     };
 
-                    if first {
-                        first = false;
-                        let _ = self
-                            .add_connection
-                            .send(ListenerEvent::Connected {
-                                peer: Peer::new(src_name, remote_address),
-                                connection: conn.clone(),
-                            })
-                            .await;
-                    }
+                    // if first {
+                    //     first = false;
+                    //     let _ = self
+                    //         .add_connection
+                    //         .send(ListenerEvent::Connected {
+                    //             peer: Peer::new(src_name, remote_address),
+                    //             connection: conn.clone(),
+                    //         })
+                    //         .await;
+                    // }
 
                     let msg_id = wire_msg.msg_id();
                     debug!(
@@ -114,6 +111,7 @@ impl MsgListener {
                 Err(error) => {
                     // TODO: should we propagate this?
                     warn!("Error on connection with {remote_address}: {error:?}");
+                    break;
                 }
             }
         }
