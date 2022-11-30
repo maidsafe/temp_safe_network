@@ -19,6 +19,7 @@ use tokio::{
     sync::{mpsc, Mutex},
     task,
 };
+use tracing::Instrument;
 
 #[derive(Debug)]
 pub(crate) enum ListenerEvent {
@@ -54,6 +55,7 @@ impl MsgListener {
     async fn listen_internal(self, conn: qp2p::Connection, mut incoming_msgs: ConnectionIncoming) {
         let conn_id = conn.id();
         let remote_address = conn.remote_address();
+        let mut first = true;
 
         while let Some(result) = incoming_msgs.next_with_stream().await.transpose() {
             match result {
@@ -80,16 +82,16 @@ impl MsgListener {
                         | MsgKind::NodeDataResponse(name) => *name,
                     };
 
-                    // if first {
-                    //     first = false;
-                    //     let _ = self
-                    //         .add_connection
-                    //         .send(ListenerEvent::Connected {
-                    //             peer: Peer::new(src_name, remote_address),
-                    //             connection: conn.clone(),
-                    //         })
-                    //         .await;
-                    // }
+                    if first {
+                        first = false;
+                        let _ = self
+                            .add_connection
+                            .send(ListenerEvent::Connected {
+                                peer: Peer::new(src_name, remote_address),
+                                connection: conn.clone(),
+                            })
+                            .await;
+                    }
 
                     let msg_id = wire_msg.msg_id();
                     debug!(

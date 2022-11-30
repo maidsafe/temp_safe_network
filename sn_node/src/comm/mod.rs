@@ -261,15 +261,15 @@ impl Comm {
     /// We will eventually converge to the same one in our comms with the peer.
     async fn add_incoming(&self, peer: &Peer, conn: Connection) {
         debug!(
-            "Adding incoming conn to {peer:?} w/ conn_id : {:?}",
+            "Would be adding incoming conn to {peer:?} w/ conn_id : {:?}, but we're not storing those anymore",
             conn.id()
         );
-        if self.sessions.get(peer).is_none() {
-            let link =
-                Link::new_with(*peer, self.our_endpoint.clone(), self.msg_listener.clone()).await;
-            let session = PeerSession::new(link);
-            let _ = self.sessions.insert(*peer, session);
-        }
+        // if self.sessions.get(peer).is_none() {
+        //     let link =
+        //         Link::new_with(*peer, self.our_endpoint.clone(), self.msg_listener.clone()).await;
+        //     let session = PeerSession::new(link);
+        //     let _ = self.sessions.insert(*peer, session);
+        // }
     }
 
     // Helper to send a message to a single recipient.
@@ -322,7 +322,7 @@ fn setup_comms(
 
 #[tracing::instrument(skip_all)]
 fn setup(our_endpoint: Endpoint, receive_msg: Sender<MsgFromPeer>) -> (Comm, MsgListener) {
-    let (add_connection, conn_receiver) = mpsc::channel(10_000);
+    let (add_connection, conn_receiver) = mpsc::channel(100_000);
 
     let msg_listener = MsgListener::new(add_connection, receive_msg);
 
