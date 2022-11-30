@@ -794,13 +794,9 @@ impl MyNode {
 #[cfg(test)]
 mod tests {
     use super::MyNode;
-    use crate::{
-        node::{
-            cfg::create_test_max_capacity_and_root_storage,
-            flow_ctrl::{cmds::Cmd, tests::network_utils::create_comm},
-            messaging::Peers,
-        },
-        UsedSpace,
+    use crate::node::{
+        flow_ctrl::{cmds::Cmd, tests::network_builder::TestNetworkBuilder},
+        messaging::Peers,
     };
     use sn_interface::{
         init_logger,
@@ -810,7 +806,7 @@ mod tests {
             MsgId, SectionSigShare,
         },
         network_knowledge::{supermajority, NodeState, SectionKeyShare, SectionsDAG},
-        test_utils::{TestKeys, TestNetworkKnowledge, TestSectionTree},
+        test_utils::{TestKeys, TestSectionTree},
         types::Peer,
         SectionAuthorityProvider,
     };
@@ -823,7 +819,7 @@ mod tests {
         collections::{BTreeMap, BTreeSet},
         sync::Arc,
     };
-    use tokio::sync::{mpsc, RwLock};
+    use tokio::sync::RwLock;
     use xor_name::{Prefix, XorName};
 
     /// Simulate an entire round of dkg till termination; The dkg round creates a new keyshare set
@@ -1272,39 +1268,6 @@ mod tests {
     }
 
     // Test helpers
-
-    /// Generate a set of `MyNode` instances
-    async fn gen_my_nodes<R: RngCore>(elders: usize, rng: &mut R) -> (Vec<MyNode>, SecretKeySet) {
-        let mut nodes = Vec::new();
-        let (max_capacity, root_storage_dir) =
-            create_test_max_capacity_and_root_storage().expect("Failed to create root_storage_dir");
-        // threshold = 4 if elders = 7; ie, we need supermajority(7) = 5 shares to form a valid sig
-        let gen_section_key_set = SecretKeySet::random(supermajority(elders) - 1, rng);
-        let (network_knowledge, node_infos) = TestNetworkKnowledge::random_section_with_key(
-            Prefix::default(),
-            elders,
-            0,
-            &gen_section_key_set,
-        );
-
-        for (idx, info) in node_infos.into_iter().enumerate() {
-            let section_key_share = TestKeys::get_section_key_share(&gen_section_key_set, idx);
-            let node = MyNode::new(
-                create_comm().await.expect("Failed to create Comm"),
-                info.keypair.clone(),
-                network_knowledge.clone(),
-                Some(section_key_share),
-                UsedSpace::new(max_capacity),
-                root_storage_dir.clone(),
-                mpsc::channel(10).0,
-            )
-            .await
-            .expect("Failed to create MyNode");
-            nodes.push(node);
-        }
-        (nodes, gen_section_key_set)
-    }
-
     type MockSystemMsg = (MsgId, NodeMsg, Peer);
 
     struct MyNodeInstance {
@@ -1319,11 +1282,14 @@ mod tests {
             node_count: usize,
             rng: &mut R,
         ) -> (BTreeMap<XorName, MyNodeInstance>, SecretKeySet) {
-            let (nodes, sk_set) = gen_my_nodes(node_count, rng).await;
+            let env = TestNetworkBuilder::new(rng)
+                .sap(Prefix::default(), node_count, 0, None, None)
+                .build();
 
-            let node_instances = nodes
+            let node_instances = env
+                .get_nodes(Prefix::default(), node_count, 0, None)
                 .into_iter()
-                .map(|node| {
+                .map(|(node, _)| {
                     let name = node.name();
                     let mock = MyNodeInstance {
                         node: Arc::new(RwLock::new(node)),
@@ -1332,6 +1298,7 @@ mod tests {
                     (name, mock)
                 })
                 .collect::<BTreeMap<_, _>>();
+            let (_, sk_set) = env.get_sap(Prefix::default(), None);
             (node_instances, sk_set)
         }
 
