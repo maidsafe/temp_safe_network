@@ -143,7 +143,11 @@ impl Session {
                             new_recv_stream,
                         }) => {
                             recv_stream = new_recv_stream;
-                            trace!("{} to {}", LogMarker::StreamClosed, addr);
+                            trace!(
+                                "{} of correlation {correlation_id:?} to {}",
+                                LogMarker::ReceiveCompleted,
+                                addr
+                            );
                             peer = new_peer;
                             attempt += 1;
                             continue;
@@ -153,7 +157,11 @@ impl Session {
             }
         };
 
-        trace!("{} to {}", LogMarker::StreamClosed, peer.addr());
+        trace!(
+            "{} of correlation {correlation_id:?} to {} with {result:?}",
+            LogMarker::ReceiveCompleted,
+            peer.addr()
+        );
         result
     }
 
