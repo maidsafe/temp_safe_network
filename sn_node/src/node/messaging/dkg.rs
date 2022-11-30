@@ -849,10 +849,18 @@ mod tests {
             for mock_node in node_instances.values() {
                 let node = mock_node.node.clone();
                 info!("\n\n NODE: {}", node.read().await.name());
+                let context = node.read().await.context();
+
                 while let Some((msg_id, msg, sender)) = mock_node.msg_queue.write().await.pop() {
-                    let cmds =
-                        MyNode::handle_valid_node_msg(node.clone(), msg_id, msg, sender, None)
-                            .await?;
+                    let cmds = MyNode::handle_valid_node_msg(
+                        node.clone(),
+                        context.clone(),
+                        msg_id,
+                        msg,
+                        sender,
+                        None,
+                    )
+                    .await?;
 
                     for cmd in cmds {
                         info!("Got cmd {}", cmd);
@@ -926,10 +934,18 @@ mod tests {
                 let node = mock_node.node.clone();
                 let name = node.read().await.name();
                 info!("\n\n NODE: {}", name);
+                let context = node.read().await.context();
+
                 while let Some((msg_id, msg, sender)) = mock_node.msg_queue.write().await.pop() {
-                    let cmds =
-                        MyNode::handle_valid_node_msg(node.clone(), msg_id, msg, sender, None)
-                            .await?;
+                    let cmds = MyNode::handle_valid_node_msg(
+                        node.clone(),
+                        context.clone(),
+                        msg_id,
+                        msg,
+                        sender,
+                        None,
+                    )
+                    .await?;
 
                     // If supermajority of the nodes have terminated, then the remaining nodes
                     // can be considered as 'lagging'. So use the supermajority of the shares
@@ -1077,11 +1093,18 @@ mod tests {
             let mut msgs_to_other_nodes = Vec::new();
             for mock_node in node_instances.values() {
                 let node = mock_node.node.clone();
+                let context = node.read().await.context();
                 info!("\n\n NODE: {}", node.read().await.name());
                 while let Some((msg_id, msg, sender)) = mock_node.msg_queue.write().await.pop() {
-                    let cmds =
-                        MyNode::handle_valid_node_msg(node.clone(), msg_id, msg, sender, None)
-                            .await?;
+                    let cmds = MyNode::handle_valid_node_msg(
+                        node.clone(),
+                        context.clone(),
+                        msg_id,
+                        msg,
+                        sender,
+                        None,
+                    )
+                    .await?;
 
                     for cmd in cmds {
                         info!("Got cmd {}", cmd);
@@ -1135,11 +1158,18 @@ mod tests {
             for mock_node in node_instances.values() {
                 let node = mock_node.node.clone();
                 info!("\n\n NODE: {}", node.read().await.name());
+                let context = node.read().await.context();
 
                 while let Some((msg_id, msg, sender)) = mock_node.msg_queue.write().await.pop() {
-                    let cmds =
-                        MyNode::handle_valid_node_msg(node.clone(), msg_id, msg, sender, None)
-                            .await?;
+                    let cmds = MyNode::handle_valid_node_msg(
+                        node.clone(),
+                        context.clone(),
+                        msg_id,
+                        msg,
+                        sender,
+                        None,
+                    )
+                    .await?;
 
                     for cmd in cmds {
                         info!("Got cmd {}", cmd);

@@ -140,11 +140,11 @@ impl Session {
                 Ok(()) => {
                     let preexisting = !received_acks.insert(src) || received_errors.contains(&src);
                     debug!(
-                        "ACK from {src:?} read from set for msg_id {msg_id:?} - preexisting??: {preexisting:?}",
+                        "ACK from {src:?} read from set for {msg_id:?} - preexisting??: {preexisting:?}",
                     );
 
                     if received_acks.len() >= expected_acks {
-                        trace!("Good! We're at or above {expected_acks} expected_acks");
+                        trace!("{msg_id:?} Good! We're at or above {expected_acks} expected_acks");
                         return Ok(());
                     }
                 }

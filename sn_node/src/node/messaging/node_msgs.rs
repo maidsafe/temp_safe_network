@@ -120,6 +120,7 @@ impl MyNode {
     // passed all signature checks and msg verifications
     pub(crate) async fn handle_valid_node_msg(
         node: Arc<RwLock<MyNode>>,
+        context: NodeContext,
         msg_id: MsgId,
         msg: NodeMsg,
         sender: Peer,
@@ -159,7 +160,6 @@ impl MyNode {
                 kind,
             } => {
                 trace!("Handling msg: AE from {sender}: {msg_id:?}");
-                let context = node.read().await.context();
                 // as we've data storage reqs inside here for reorganisation, we have async calls to
                 // the fs
                 MyNode::handle_anti_entropy_msg(node, context, section_tree_update, kind, sender)
@@ -169,9 +169,7 @@ impl MyNode {
             // We always respond to probe msgs if we're an elder as health checks use this to see if a node is alive
             // and repsonsive, as well as being a method of keeping nodes up to date.
             NodeMsg::AntiEntropyProbe(section_key) => {
-                debug!("[NODE READ]: aeprobe attempts");
-                let context = node.read().await.context();
-                debug!("[NODE READ]: aeprobe lock got");
+                debug!("Aeprobe in");
 
                 let mut cmds = vec![];
                 if !context.is_elder {
@@ -193,7 +191,6 @@ impl MyNode {
             // The AcceptedOnlineShare for relocation will be received here.
             NodeMsg::JoinResponse(join_response) => {
                 let mut node = node.write().await;
-                let context = node.context();
 
                 match join_response {
                     JoinResponse::Approved { .. } => {
@@ -268,17 +265,13 @@ impl MyNode {
             }
             NodeMsg::JoinRequest(join_request) => {
                 trace!("Handling msg {:?}: JoinRequest from {}", msg_id, sender);
-                let context = &node.read().await.context();
-                debug!("[NODE READ]: joinReq read got");
 
-                MyNode::handle_join_request(node, context, sender, join_request)
+                MyNode::handle_join_request(node, &context, sender, join_request)
                     .await
                     .map(|c| c.into_iter().collect())
             }
             NodeMsg::JoinAsRelocatedRequest(join_request) => {
                 trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
-                let context = &node.read().await.context();
-                debug!("[NODE READ]: joinReqas relocated read got");
 
                 if !context.is_elder
                     && join_request.section_key == context.network_knowledge.section_key()
@@ -287,7 +280,7 @@ impl MyNode {
                 }
 
                 Ok(
-                    MyNode::handle_join_as_relocated_request(node, context, sender, *join_request)
+                    MyNode::handle_join_as_relocated_request(node, &context, sender, *join_request)
                         .await
                         .into_iter()
                         .collect(),
@@ -303,12 +296,8 @@ impl MyNode {
             NodeMsg::MembershipAE(gen) => {
                 let (node_context, membership_context) = {
                     debug!("[NODE READ]: membership ae read ");
-                    let node = node.read().await;
+                    let membership = node.read().await.membership.clone();
                     debug!("[NODE READ]: membership ae read got");
-
-                    let membership = node.membership.clone();
-                    let context = node.context();
-
                     (context, membership)
                 };
 
@@ -421,9 +410,6 @@ impl MyNode {
                     msg_id
                 );
 
-                let context = node.read().await.context();
-                debug!("[NODE READ]: could ont store data read got");
-
                 if !context.is_elder {
                     error!("Received unexpected message while Adult");
                     return Ok(vec![]);
@@ -449,9 +435,7 @@ impl MyNode {
                 Ok(vec![])
             }
             NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateOneData(data)) => {
-                debug!("[NODE READ]: replicate one data");
-                let context = node.read().await.context();
-                debug!("[NODE READ]: replicate one data read got");
+                debug!("Replicate one data");
 
                 if context.is_elder {
                     error!("Received unexpected message while Elder");
@@ -467,9 +451,7 @@ impl MyNode {
                     .await
             }
             NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateData(data_collection)) => {
-                info!("ReplicateData MsgId: {:?}", msg_id);
-                let context = node.read().await.context();
-                debug!("[NODE READ]: replicate data read got");
+                info!("ReplicateData collection MsgId: {:?}", msg_id);
 
                 if context.is_elder {
                     error!("Received unexpected message while Elder");
@@ -529,11 +511,9 @@ impl MyNode {
                     LogMarker::RequestForAnyMissingData,
                     msg_id
                 );
-                let context = &node.read().await.context();
-                debug!("[NODE READ]: send missing data read got");
 
                 Ok(
-                    MyNode::get_missing_data_for_node(context, sender, known_data_addresses)
+                    MyNode::get_missing_data_for_node(&context, sender, known_data_addresses)
                         .await
                         .into_iter()
                         .collect(),
@@ -549,9 +529,6 @@ impl MyNode {
                     "Handle NodeQuery with msg_id {:?}, operation_id {}",
                     msg_id, operation_id
                 );
-                let context = node.read().await.context();
-
-                debug!("[NODE READ]: node query read got");
 
                 MyNode::handle_data_query_at_adult(
                     &context,

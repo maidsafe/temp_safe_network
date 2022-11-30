@@ -84,6 +84,60 @@ jobs:
         # See https://doc.rust-lang.org/rustdoc/lints.html for lints that are 'warning' by default.
         run: RUSTDOCFLAGS="--deny=warnings" cargo doc --no-deps
 
+  unit:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Rust
+        id: toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - uses: Swatinem/rust-cache@v1
+        continue-on-error: true
+        with:
+          cache-on-failure: true
+          sharedKey: ${{github.run_id}}-unit
+
+      - name: Build sn_interface tests before running
+        run: cd sn_interface && cargo test --no-run --release
+        timeout-minutes: 50
+
+      - name: Run sn_interface tests
+        timeout-minutes: 25
+        run: cd sn_interface && cargo test --release
+
+      - name: Build sn_dysfunction tests before running
+        run: cd sn_dysfunction && cargo test --no-run --release
+        timeout-minutes: 50
+
+      - name: Run sn_dysfunction tests
+        timeout-minutes: 15
+        run: cd sn_dysfunction && cargo test --release
+
+      - name: Build sn_node tests before running
+        run: cd sn_node && cargo test --no-run --release
+        timeout-minutes: 50
+
+      - name: Run sn_node tests
+        timeout-minutes: 20
+        run: cd sn_node && cargo test --release
+
+      - name: Build sn_cli tests before running
+        run: cd sn_cli && cargo test --no-run --release
+        timeout-minutes: 50
+
+      - name: Run sn_cli tests
+        timeout-minutes: 25
+        run: cd sn_cli && cargo test --release --bin safe
+
+
   build:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Build node and testnet binaries (EC2)
