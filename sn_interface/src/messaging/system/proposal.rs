@@ -12,6 +12,7 @@ use crate::{
     network_knowledge::{NodeState, SectionAuthorityProvider},
 };
 
+use itertools::Either;
 use serde::{Deserialize, Serialize};
 
 /// A Proposal about the state of the section
@@ -29,6 +30,12 @@ pub enum Proposal {
     /// After Handover consensus, the elders inform the candidates that they are promoted (elder->candidates)
     /// Contains the candidate's SAP signed by the current elder's section key
     NewElders(SectionSigned<SectionAuthorityProvider>),
+    /// After Handover consensus, the elders inform the candidates that they are promoted (elder->candidates)
+    /// Contains the candidate's SAP signed by the current elder's section key
+    NewSections {
+        sap1: SectionSigned<SectionAuthorityProvider>,
+        sap2: SectionSigned<SectionAuthorityProvider>,
+    },
     /// Proposal to change whether new nodes are allowed to join our section (elder->elder)
     JoinsAllowed(bool),
 }
@@ -40,20 +47,45 @@ impl Proposal {
         public_key_set: bls::PublicKeySet,
         index: usize,
         secret_key_share: &bls::SecretKeyShare,
-    ) -> Result<SectionSigShare> {
-        Ok(SectionSigShare::new(
-            public_key_set,
-            index,
-            secret_key_share,
-            &self.as_signable_bytes()?,
-        ))
+    ) -> Result<Either<SectionSigShare, (SectionSigShare, SectionSigShare)>> {
+        match &self.as_signable_bytes()? {
+            Either::Left(bytes) => Ok(Either::Left(SectionSigShare::new(
+                public_key_set,
+                index,
+                secret_key_share,
+                bytes,
+            ))),
+            Either::Right((bytes_1, bytes_2)) => {
+                let sig_1 =
+                    SectionSigShare::new(public_key_set.clone(), index, secret_key_share, bytes_1);
+                let sig_2 = SectionSigShare::new(public_key_set, index, secret_key_share, bytes_2);
+                Ok(Either::Right((sig_1, sig_2)))
+            }
+        }
     }
 
-    pub fn as_signable_bytes(&self) -> Result<Vec<u8>> {
+    #[allow(clippy::type_complexity)]
+    pub fn as_signable_bytes(&self) -> Result<Either<Vec<u8>, (Vec<u8>, Vec<u8>)>> {
         let bytes = match self {
             Self::VoteNodeOffline(node_state) => bincode::serialize(node_state),
             Self::RequestHandover(sap) => bincode::serialize(sap),
-            Self::NewElders(info) => bincode::serialize(&info.sig.public_key), // the pub key of the new elders
+            Self::NewElders(signed_sap) => bincode::serialize(&signed_sap.sig.public_key), // the pub key of the new elders
+            Self::NewSections { sap1, sap2 } => {
+                // the pub key of the new elders
+                let sap1_sig = bincode::serialize(&sap1.sig.public_key).map_err(|err| {
+                    Error::Serialisation(format!(
+                        "Couldn't serialise the Proposal '{:?}': {:?}",
+                        self, err
+                    ))
+                })?;
+                let sap2_sig = bincode::serialize(&sap2.sig.public_key).map_err(|err| {
+                    Error::Serialisation(format!(
+                        "Couldn't serialise the Proposal '{:?}': {:?}",
+                        self, err
+                    ))
+                })?;
+                return Ok(Either::Right((sap1_sig, sap2_sig)));
+            }
             Self::JoinsAllowed(joins_allowed) => bincode::serialize(&joins_allowed),
         }
         .map_err(|err| {
@@ -62,7 +94,7 @@ impl Proposal {
                 self, err
             ))
         })?;
-        Ok(bytes)
+        Ok(Either::Left(bytes))
     }
 }
 
@@ -100,7 +132,12 @@ mod tests {
     where
         T: Serialize + Debug,
     {
-        let actual = proposal.as_signable_bytes()?;
+        let actual = match proposal.as_signable_bytes()? {
+            itertools::Either::Left(bytes) => bytes,
+            itertools::Either::Right(_) => {
+                eyre::bail!("Invalid expectations! Wrong proposal used!")
+            }
+        };
         let expected = bincode::serialize(should_serialize_as)?;
 
         assert_eq!(

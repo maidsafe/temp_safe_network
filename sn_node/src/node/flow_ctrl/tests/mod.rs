@@ -296,7 +296,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let node_state = NodeState::left(node_state, None);
 
     let proposal = Proposal::VoteNodeOffline(node_state.clone());
-    let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &proposal.as_signable_bytes()?);
+    let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &get_single_sig(&proposal)?);
 
     let _cmds = run_and_collect_cmds(Cmd::HandleAgreement { proposal, sig }, &dispatcher).await?;
 
@@ -325,7 +325,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
 
     // Handle agreement on the Offline proposal
     let proposal = Proposal::VoteNodeOffline(remove_elder.clone());
-    let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &proposal.as_signable_bytes()?);
+    let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &get_single_sig(&proposal)?);
 
     let _cmds = run_and_collect_cmds(Cmd::HandleAgreement { proposal, sig }, &dispatcher).await?;
 
@@ -677,8 +677,7 @@ async fn handle_elders_update() -> Result<()> {
     // current elders and promote the oldest peer.
     let elders_1: BTreeSet<_> = sap1.elders_set();
     let proposal = Proposal::NewElders(sap1.clone());
-    let sig =
-        TestKeys::get_section_sig_bytes(&sk_set0.secret_key(), &proposal.as_signable_bytes()?);
+    let sig = TestKeys::get_section_sig_bytes(&sk_set0.secret_key(), &get_single_sig(&proposal)?);
 
     let cmds = run_and_collect_cmds(
         Cmd::HandleNewEldersAgreement {
@@ -815,10 +814,8 @@ async fn handle_demote_during_split() -> Result<()> {
     // Create agreement on `OurElder` for both sub-sections
     let create_our_elders_cmd = |signed_sap: SectionSigned<SectionAuthorityProvider>| -> Result<_> {
         let proposal = Proposal::NewElders(signed_sap.clone());
-        let sig = TestKeys::get_section_sig_bytes(
-            &sk_set_gen.secret_key(),
-            &proposal.as_signable_bytes()?,
-        );
+        let sig =
+            TestKeys::get_section_sig_bytes(&sk_set_gen.secret_key(), &get_single_sig(&proposal)?);
         Ok(Cmd::HandleNewEldersAgreement {
             new_elders: signed_sap,
             sig,
@@ -1107,4 +1104,11 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
     );
 
     Ok(())
+}
+
+fn get_single_sig(proposal: &Proposal) -> Result<Vec<u8>> {
+    match proposal.as_signable_bytes()? {
+        itertools::Either::Left(bytes) => Ok(bytes),
+        itertools::Either::Right(_) => bail!("Invalid expectations! Use another proposal variant."),
+    }
 }
