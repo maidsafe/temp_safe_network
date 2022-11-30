@@ -12,6 +12,7 @@ use crate::node::handover::Error as HandoverError;
 
 use sn_dbc::Error as DbcError;
 use sn_interface::{
+    dbcs::Error as GenesisError,
     messaging::data::{DataQuery, Error as ErrorMsg},
     messaging::system::DkgSessionId,
     types::{DataAddress, Peer},
@@ -208,7 +209,7 @@ pub enum Error {
     SpentProofUnknownSectionKey(bls::PublicKey),
     /// Error occurred when minting the Genesis DBC.
     #[error("Genesis DBC error:: {0}")]
-    GenesisDbcError(String),
+    GenesisDbcError(#[from] GenesisError),
     /// Error thrown by DBC public API
     #[error("DbcError: {0}")]
     DbcError(#[from] DbcError),
