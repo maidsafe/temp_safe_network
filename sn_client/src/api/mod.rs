@@ -84,7 +84,7 @@ impl Client {
             self.session.endpoint.public_addr()
         );
 
-        let mut attempts = 1;
+        let mut attempts = 0;
         loop {
             // Send the dummy message to probe the network for it's infrastructure details.
             match self.send_query_without_retry(query.clone()).await {
@@ -114,6 +114,10 @@ impl Client {
                         "Initial probe msg to network failed. Trying again (attempt #{}): {:?}",
                         attempts, result
                     );
+
+                    // do a tiny sleep to not hammer the network and allow any AE flows there
+                    // time to complete
+                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await
                 }
             }
         }

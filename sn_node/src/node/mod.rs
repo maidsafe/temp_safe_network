@@ -308,10 +308,11 @@ mod core {
         }
 
         /// Generates a SectionProbeMsg with our current knowledge,
-        /// targetting our section elders.
+        /// targetting our section elders
         /// Even if we're up to date, we expect a response.
         pub(crate) fn generate_section_probe_msg(context: &NodeContext) -> Cmd {
             let our_section = context.network_knowledge.section_auth();
+
             let recipients = our_section.elders_set();
 
             info!(
@@ -322,6 +323,59 @@ mod core {
 
             let probe = context.network_knowledge.anti_entropy_probe();
             MyNode::send_system_msg(probe, Peers::Multiple(recipients), context.clone())
+        }
+
+        /// Generates a SectionProbeMsg with our current knowledge,
+        /// targetting our section elders and sibling section
+        /// Even if we're up to date, we expect a response.
+        pub(crate) fn generate_section_and_sibling_probe_msg(context: &NodeContext) -> Result<Cmd> {
+            let our_prefix = context.network_knowledge.prefix();
+            let our_section = context.network_knowledge.section_auth();
+
+            let mut recipients = our_section.elders_set();
+
+            debug!("gen for sibling and section: {our_prefix:?}");
+            // of we've a parent section, lets stay in touch with our siblings too.
+            if !our_prefix.is_empty() {
+                let parent_section_prefix = our_prefix.ancestors().last();
+                debug!("Parent prefix was: {parent_section_prefix:?}");
+                // now also send to parent section/sibling nodes too.
+                let dag = context.network_knowledge.section_tree().get_sections_dag();
+                let branch = dag.get_ancestors(&context.network_knowledge.section_key())?;
+                debug!("branch isss////.... {branch:?}");
+
+                let parent_key = branch.iter().last();
+                if let Some(key) = parent_key {
+                    debug!("parent key isss////.... {parent_key:?}");
+                    let parent_sap = context
+                        .network_knowledge
+                        .section_tree()
+                        .get_signed_by_key(key);
+                    debug!("Parent sap was: {parent_sap:?}");
+
+                    if let Some(sap) = parent_sap {
+                        for elder in sap.elders_set() {
+                            let _already_in_set = recipients.insert(elder);
+                        }
+                    } else {
+                        // TODO: confirm this means we're in genesis section
+                        warn!("No parent sap found for our section when we are not the null prefix! {our_prefix:?}");
+                    }
+                }
+            }
+
+            info!(
+                "ProbeMsg target our section and siblings {:?} recipients {:?}",
+                our_section.prefix(),
+                recipients,
+            );
+
+            let probe = context.network_knowledge.anti_entropy_probe();
+            Ok(MyNode::send_system_msg(
+                probe,
+                Peers::Multiple(recipients),
+                context.clone(),
+            ))
         }
 
         /// Generates section infos for the best elder candidate among the members at the given generation
