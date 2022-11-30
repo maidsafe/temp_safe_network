@@ -120,8 +120,8 @@ impl MyNode {
                         }
                     }
                     Err(error) => {
-                        if let Error::MissingSiblingNetworkKnowledge = error {
-                            error!("Cannot update client, we're missing sibling section knowledge");
+                        if let Error::MissingSiblingNetworkKnowledge(prefix) = error {
+                            error!("Cannot update client, we're missing the sibling section of {prefix:?}");
                             return Ok(vec![MyNode::generate_section_and_sibling_probe_msg(
                                 &context,
                             )?]);

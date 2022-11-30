@@ -127,7 +127,9 @@ impl MyNode {
                 if update_sap == our_current_sap {
                     debug!("udpate: {update_sap:?}");
                     debug!("udpate: {our_current_sap:?}");
-                    return Err(Error::MissingSiblingNetworkKnowledge);
+                    return Err(Error::MissingSiblingNetworkKnowledge(
+                        our_current_sap.prefix(),
+                    ));
                 }
 
                 let bounced_msg = wire_msg.serialize()?;

@@ -32,8 +32,8 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 pub enum Error {
     /// Client message response would have redirected to ourselves _again_.
     /// So we bail and attempt to update our knowledge instead
-    #[error("Node is missing network knowledge of sibling section. We should trigger AntiEntropy probe to update.")]
-    MissingSiblingNetworkKnowledge,
+    #[error("Our node (in section {0}) is missing network knowledge of sibling section. We should trigger AntiEntropy probe to update.")]
+    MissingSiblingNetworkKnowledge(Prefix),
     /// Client messages always need a response, so should come in on bidi streams
     #[error("No client response stream. Client message came in on a unidirectional stream. All client messages should be bidirectional.")]
     NoClientResponseStream,
