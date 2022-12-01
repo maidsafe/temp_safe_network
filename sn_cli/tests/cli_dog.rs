@@ -123,7 +123,7 @@ fn calling_safe_dog_with_wallet_xorurl() -> Result<()> {
     safe_cmd(["dog", &wallet_xorurl], Some(0))?
         .assert()
         .stdout(predicate::str::contains("= Wallet ="))
-        .stdout(predicate::str::contains(&format!(
+        .stdout(predicate::str::contains(format!(
             "XOR-URL: {}",
             wallet_xorurl
         )))
@@ -186,15 +186,15 @@ fn calling_safe_dog_with_nrs_map_container_link() -> Result<()> {
 
     safe_cmd(["dog", &container_xorurl], Some(0))?
         .assert()
-        .stdout(predicate::str::contains(&format!(
+        .stdout(predicate::str::contains(format!(
             "{site_name}: {}",
             files_container_xor
         )))
-        .stdout(predicate::str::contains(&format!(
+        .stdout(predicate::str::contains(format!(
             "test.{site_name}: {}",
             test_file_link
         )))
-        .stdout(predicate::str::contains(&format!(
+        .stdout(predicate::str::contains(format!(
             "another.{site_name}: {}",
             another_file_link
         )));

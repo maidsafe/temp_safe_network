@@ -137,7 +137,7 @@ impl MyNode {
         Ok(SectionSigShare {
             public_key_set: key_share.public_key_set.clone(),
             index: key_share.index,
-            signature_share: key_share.secret_key_share.sign(&serialized_session_id),
+            signature_share: key_share.secret_key_share.sign(serialized_session_id),
         })
     }
 

@@ -402,7 +402,7 @@ fn section_sig() -> SectionSig {
     let sk = bls::SecretKey::random();
     let public_key = sk.public_key();
     let data = "TODO-spentbook".to_string();
-    let signature = sk.sign(&data);
+    let signature = sk.sign(data);
     SectionSig {
         public_key,
         signature,

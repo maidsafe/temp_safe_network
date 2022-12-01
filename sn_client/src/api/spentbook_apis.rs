@@ -464,7 +464,7 @@ mod tests {
         let inputs_amount_sum = dbc_builder.inputs_amount_sum();
         let dbc_builder = dbc_builder
             .add_output_by_amount(inputs_amount_sum, output_owner)
-            .build(&mut rng::thread_rng())?;
+            .build(rng::thread_rng())?;
 
         assert_eq!(dbc_builder.inputs().len(), 1);
         let (key_image, tx) = dbc_builder.inputs()[0].clone();

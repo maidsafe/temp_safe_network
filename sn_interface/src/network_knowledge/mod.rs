@@ -593,7 +593,7 @@ fn create_first_sig<T: Serialize>(
     payload: &T,
 ) -> Result<SectionSig> {
     let bytes = bincode::serialize(payload).map_err(|_| Error::InvalidPayload)?;
-    let signature_share = sk_share.sign(&bytes);
+    let signature_share = sk_share.sign(bytes);
     let signature = pk_set
         .combine_signatures(iter::once((0, &signature_share)))
         .map_err(|_| Error::InvalidSignatureShare)?;
