@@ -3081,7 +3081,7 @@ dependencies = [
 [[package]]
 name = "qp2p"
 version = "0.31.1"
-source = "git+https://github.com/joshuef/qp2p?branch=ResetStreamsAfterSend#236eba5d72934b7f368b4fd92ded62a33832b51a"
+source = "git+https://github.com/joshuef/qp2p?branch=ResetStreamsAfterSend#5742bb0e70335b2df203784f0b01c6b0054a5645"
 dependencies = [
  "backoff 0.3.0",
  "bincode",
