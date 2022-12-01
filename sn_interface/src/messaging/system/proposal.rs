@@ -7,9 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    messaging::system::{SectionSigShare, SectionSigned},
+    messaging::system::SectionSigShare,
     messaging::{Error, Result},
-    network_knowledge::{NodeState, SectionAuthorityProvider},
+    network_knowledge::{NodeState, SapCandidate, SectionAuthorityProvider},
 };
 
 use itertools::Either;
@@ -29,13 +29,7 @@ pub enum Proposal {
     RequestHandover(SectionAuthorityProvider),
     /// After Handover consensus, the elders inform the candidates that they are promoted (elder->candidates)
     /// Contains the candidate's SAP signed by the current elder's section key
-    NewElders(SectionSigned<SectionAuthorityProvider>),
-    /// After Handover consensus, the elders inform the candidates that they are promoted (elder->candidates)
-    /// Contains the candidate's SAP signed by the current elder's section key
-    NewSections {
-        sap1: SectionSigned<SectionAuthorityProvider>,
-        sap2: SectionSigned<SectionAuthorityProvider>,
-    },
+    HandoverCompleted(SapCandidate),
     /// Proposal to change whether new nodes are allowed to join our section (elder->elder)
     JoinsAllowed(bool),
 }
@@ -69,9 +63,11 @@ impl Proposal {
         let bytes = match self {
             Self::VoteNodeOffline(node_state) => bincode::serialize(node_state),
             Self::RequestHandover(sap) => bincode::serialize(sap),
-            Self::NewElders(signed_sap) => bincode::serialize(&signed_sap.sig.public_key), // the pub key of the new elders
-            Self::NewSections { sap1, sap2 } => {
+            Self::HandoverCompleted(SapCandidate::ElderHandover(signed_sap)) => {
                 // the pub key of the new elders
+                bincode::serialize(&signed_sap.sig.public_key)
+            }
+            Self::HandoverCompleted(SapCandidate::SectionSplit(sap1, sap2)) => {
                 let sap1_sig = bincode::serialize(&sap1.sig.public_key).map_err(|err| {
                     Error::Serialisation(format!(
                         "Couldn't serialise the Proposal '{:?}': {:?}",
@@ -104,6 +100,7 @@ mod tests {
     use crate::test_utils::{TestKeys, TestSapBuilder};
 
     use eyre::Result;
+    use itertools::Either;
     use serde::Serialize;
     use std::fmt::Debug;
     use xor_name::Prefix;
@@ -115,30 +112,45 @@ mod tests {
             .elder_count(4)
             .build();
         let proposal = Proposal::RequestHandover(sap.clone());
-        verify_serialize_for_signing(&proposal, &sap)?;
+        verify_serialize_for_signing(&proposal, Either::Left(&sap))?;
 
-        // Proposal::NewElders
+        // Proposal::HandoverCompleted, SapCandidate::ElderHandover
         let new_sk = bls::SecretKey::random();
         let new_pk = new_sk.public_key();
         let signed_sap = TestKeys::get_section_signed(&new_sk, sap);
-        let proposal = Proposal::NewElders(signed_sap);
-        verify_serialize_for_signing(&proposal, &new_pk)?;
+        let candidate = SapCandidate::ElderHandover(signed_sap.clone());
+        let proposal = Proposal::HandoverCompleted(candidate);
+        verify_serialize_for_signing(&proposal, Either::Left(&new_pk))?;
+
+        // Proposal::HandoverCompleted, SapCandidate::SectionSplit
+        let new_sk_2 = bls::SecretKey::random();
+        let new_pk_2 = new_sk_2.public_key();
+        let (sap2, ..) = TestSapBuilder::new(Prefix::default())
+            .elder_count(4)
+            .build();
+        let signed_sap2 = TestKeys::get_section_signed(&new_sk_2, sap2);
+        let candidate = SapCandidate::SectionSplit(signed_sap, signed_sap2);
+        let proposal = Proposal::HandoverCompleted(candidate);
+        verify_serialize_for_signing(&proposal, Either::Right((&new_pk, &new_pk_2)))?;
 
         Ok(())
     }
 
     // Verify that `SignableView(proposal)` serializes the same as `should_serialize_as`.
-    fn verify_serialize_for_signing<T>(proposal: &Proposal, should_serialize_as: &T) -> Result<()>
+    fn verify_serialize_for_signing<T>(
+        proposal: &Proposal,
+        should_serialize_as: Either<&T, (&T, &T)>,
+    ) -> Result<()>
     where
         T: Serialize + Debug,
     {
-        let actual = match proposal.as_signable_bytes()? {
-            itertools::Either::Left(bytes) => bytes,
-            itertools::Either::Right(_) => {
-                eyre::bail!("Invalid expectations! Wrong proposal used!")
+        let actual = proposal.as_signable_bytes()?;
+        let expected = match should_serialize_as {
+            Either::Left(item) => Either::Left(bincode::serialize(item)?),
+            Either::Right((item1, item2)) => {
+                Either::Right((bincode::serialize(item1)?, bincode::serialize(item2)?))
             }
         };
-        let expected = bincode::serialize(should_serialize_as)?;
 
         assert_eq!(
             actual, expected,

@@ -8,11 +8,12 @@
 
 use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, Proposal, Result};
 use itertools::Either;
-use sn_interface::messaging::system::SectionSigShare;
-
 use sn_interface::{
-    messaging::{system::NodeMsg, MsgId},
-    network_knowledge::SectionKeyShare,
+    messaging::{
+        system::{NodeMsg, SectionSigShare},
+        MsgId,
+    },
+    network_knowledge::{SapCandidate, SectionKeyShare},
     types::Peer,
 };
 
@@ -160,7 +161,7 @@ impl MyNode {
                     .try_aggregate(&serialised_proposal, sig_share)
                 {
                     Ok(Some(sig)) => match proposal {
-                        Proposal::NewElders(new_elders) => {
+                        Proposal::HandoverCompleted(SapCandidate::ElderHandover(new_elders)) => {
                             cmds.push(Cmd::HandleNewEldersAgreement { new_elders, sig })
                         }
                         _ => cmds.push(Cmd::HandleAgreement { proposal, sig }),
@@ -198,14 +199,13 @@ impl MyNode {
 
                 match res {
                     (Ok(Some(sig1)), Ok(Some(sig2))) => match proposal {
-                        Proposal::NewSections { sap1, sap2 } => {
-                            cmds.push(Cmd::HandleNewSectionsAgreement {
+                        Proposal::HandoverCompleted(SapCandidate::SectionSplit(sap1, sap2)) => cmds
+                            .push(Cmd::HandleNewSectionsAgreement {
                                 sap1,
                                 sig1,
                                 sap2,
                                 sig2,
-                            })
-                        }
+                            }),
                         _ => error!(
                             "Inconsistent results when aggregating proposal from {}, {:?}",
                             sender, msg_id,
