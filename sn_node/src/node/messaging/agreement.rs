@@ -33,8 +33,8 @@ impl MyNode {
             Proposal::RequestHandover(sap) => {
                 cmds.extend(self.handle_request_handover_agreement(sap, sig).await?);
             }
-            Proposal::NewElders(_) | Proposal::NewSections { .. } => {
-                error!("Elders agreement should be handled in a separate blocking fashion");
+            Proposal::HandoverCompleted(_) => {
+                error!("Handover completed should be handled in a separate blocking fashion");
             }
             Proposal::JoinsAllowed(joins_allowed) => {
                 self.joins_allowed = joins_allowed;
@@ -167,9 +167,8 @@ impl MyNode {
             .handle_new_elders_agreement(our_sap, sig_over_us)
             .await?;
 
-        // Finally we update our network knowledge with our sibling
-        // section SAP and chain if the new SAP's prefix matches our name
-        // We need to generate the proof chain to connect our current chain to new SAP.
+        // Finally we update our network knowledge with our sibling section SAP.
+        // We use the parent proof chain to connect our current chain to sibling SAP.
         match parent_section_chain.insert(
             &parent_key,
             their_sap.section_key(),
