@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1669834557500,
+  "lastUpdate": 1669887171650,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -33814,6 +33814,144 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 331309172,
             "range": "± 9805602",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "949458280b567aa6dce387b276c06c2cb55d7ca4",
+          "message": "Merge #1824\n\n1824: style: applied clippy nightly r=davidrusu a=b-zee\n\nRan nightly by accident so made use of it to apply some fixes anyway.\n\nMainly lints `iter_kv_map` (e.g. use `keys()`, instead of `iter()`, which iterates over both keys and values where the value is not used) and `needless_borrow`.\n\n<!--\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\n\nWrite your comment below this line: -->\n\n\nCo-authored-by: Benno Zeeman <bzeeman@live.nl>",
+          "timestamp": "2022-12-01T07:56:46Z",
+          "tree_id": "30654b7f6b9edba4952fb39f67ae33066f4485ac",
+          "url": "https://github.com/maidsafe/safe_network/commit/949458280b567aa6dce387b276c06c2cb55d7ca4"
+        },
+        "date": 1669887170358,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2307593,
+            "range": "± 257715",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 93340786,
+            "range": "± 3038332",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 113086986,
+            "range": "± 5039252",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 458424115,
+            "range": "± 12111983",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 76537132,
+            "range": "± 1929601",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 91336196,
+            "range": "± 1595730",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 364553712,
+            "range": "± 9362980",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 58005457,
+            "range": "± 38464316",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2770823159,
+            "range": "± 132425487",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 11134762742,
+            "range": "± 1328045131",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 262645127,
+            "range": "± 15783750",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 2466101831,
+            "range": "± 139728869",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 9582293685,
+            "range": "± 450174968",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 45447474,
+            "range": "± 2132257",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 432836728,
+            "range": "± 13550558",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1676843878,
+            "range": "± 33571478",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11698790,
+            "range": "± 482976",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 98989538,
+            "range": "± 14220504",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 350327026,
+            "range": "± 12453355",
             "unit": "ns/iter"
           }
         ]
