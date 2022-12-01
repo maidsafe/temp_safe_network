@@ -3081,8 +3081,7 @@ dependencies = [
 [[package]]
 name = "qp2p"
 version = "0.31.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9451fee7e656f8aaed7f78c4e70b3a20cec20ef874a96e6f4e3427d7e64a1a1f"
+source = "git+https://github.com/joshuef/qp2p?branch=ResetStreamsAfterSend#3bef3845a238977d8876f908642d0a787205956a"
 dependencies = [
  "backoff 0.3.0",
  "bincode",
