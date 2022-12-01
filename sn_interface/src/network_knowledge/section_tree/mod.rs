@@ -233,7 +233,7 @@ impl SectionTree {
         match self.get_signed(incoming_prefix) {
             Some(sap) if sap == &signed_sap => {
                 // It's the same SAP we are already aware of
-                info!("Dropping SectionTree update since the SAP we have for prefix '{incoming_prefix}' is not new");
+                info!("Dropping SectionTree update since the incoming SAP for prefix '{incoming_prefix}' is not new");
                 return Ok(false);
             }
             Some(sap) => {

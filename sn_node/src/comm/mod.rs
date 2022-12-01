@@ -179,7 +179,7 @@ impl Comm {
             debug!("peer response is in for {msg_id:?}");
             WireMsg::from(adult_response_bytes).map_err(|_| Error::InvalidMessage)
         } else {
-            debug!("No client conn exists or could be created to send this msg on.... {msg_id:?}");
+            debug!("No conn exists or could be created to send this msg on.... {msg_id:?}");
             // TODO: real error here....
             Err(Error::PeerSessionChannel)
         }
