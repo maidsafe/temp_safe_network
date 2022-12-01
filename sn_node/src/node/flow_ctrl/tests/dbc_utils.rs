@@ -60,7 +60,7 @@ pub(crate) fn get_genesis_dbc_spend_info(
     let inputs_amount_sum = tx_builder.inputs_amount_sum();
     let dbc_builder = tx_builder
         .add_output_by_amount(inputs_amount_sum, output_owner)
-        .build(&mut rand::thread_rng())?;
+        .build(rand::thread_rng())?;
     let (key_image, tx) = &dbc_builder.inputs()[0];
     Ok((
         *key_image,

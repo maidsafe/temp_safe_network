@@ -70,7 +70,7 @@ pub fn gen_genesis_dbc(
     let mut dbc_builder = TransactionBuilder::default()
         .add_input(mlsag_material)
         .add_output_by_amount(Token::from_nano(GENESIS_DBC_AMOUNT), output_owner)
-        .build(&mut rng::thread_rng())
+        .build(rng::thread_rng())
         .map_err(|err| {
             Error::GenesisDbcError(format!(
                 "Failed to build the ringct transaction for genesis DBC: {}",

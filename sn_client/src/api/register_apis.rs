@@ -250,7 +250,7 @@ fn section_sig() -> sn_interface::messaging::SectionSig {
     let sk = bls::SecretKey::random();
     let public_key = sk.public_key();
     let data = "hello".to_string();
-    let signature = sk.sign(&data);
+    let signature = sk.sign(data);
     SectionSig {
         public_key,
         signature,

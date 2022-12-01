@@ -789,14 +789,14 @@ fn calling_files_ls() -> Result<()> {
         Some(&files_map["sub2.md"]["link"]),
     );
 
-    let sub2_len = get_file_len(&format!("{}/{}", TEST_FOLDER_SUBFOLDER, "sub2.md"))?;
+    let sub2_len = get_file_len(format!("{}/{}", TEST_FOLDER_SUBFOLDER, "sub2.md"))?;
     assert_eq!(files_map["sub2.md"]["size"], sub2_len.to_string());
     assert_eq!(
         processed_files[Path::new(&format!("{}subexists.md", TEST_FOLDER_SUBFOLDER))].link(),
         Some(&files_map["subexists.md"]["link"]),
     );
 
-    let subexists_len = get_file_len(&format!("{}/{}", TEST_FOLDER_SUBFOLDER, "subexists.md"))?;
+    let subexists_len = get_file_len(format!("{}/{}", TEST_FOLDER_SUBFOLDER, "subexists.md"))?;
     assert_eq!(files_map["subexists.md"]["size"], subexists_len.to_string());
     Ok(())
 }
@@ -839,7 +839,7 @@ fn calling_files_ls_on_single_file() -> Result<()> {
     let files_ls_output = safe_cmd_stdout(["files", "ls", &single_file_url, "--json"], Some(0))?;
 
     let (_xorurl, files_map) = parse_files_container_output(&files_ls_output)?;
-    let subexists_len = get_file_len(&format!("{}/subexists.md", TEST_FOLDER_SUBFOLDER))?;
+    let subexists_len = get_file_len(format!("{}/subexists.md", TEST_FOLDER_SUBFOLDER))?;
     assert_eq!(files_map.len(), 1);
     assert_eq!(files_map["subexists.md"]["size"], subexists_len.to_string());
 

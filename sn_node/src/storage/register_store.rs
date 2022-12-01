@@ -92,7 +92,7 @@ impl RegisterStore {
         }
 
         trace!("Listening all register addrs done");
-        addrs.into_iter().map(|(_, addr)| addr).collect()
+        addrs.into_values().collect()
     }
 
     pub(super) async fn delete_data(&self, addr: &RegisterAddress) -> Result<()> {

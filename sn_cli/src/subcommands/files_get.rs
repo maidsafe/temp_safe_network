@@ -640,7 +640,7 @@ async fn download_file_from_net(safe: &Safe, xorurl: &str, path: &Path, size: u6
     let fh = bufwriter_into_inner(stream, path)?;
     file_sync_all(&fh, path)?;
 
-    Ok(bytes_written as u64)
+    Ok(bytes_written)
 }
 
 // syncs file to filesystem.
