@@ -60,6 +60,13 @@ impl Proposal {
 
     #[allow(clippy::type_complexity)]
     pub fn as_signable_bytes(&self) -> Result<Either<Vec<u8>, (Vec<u8>, Vec<u8>)>> {
+        let error = |err| {
+            Error::Serialisation(format!(
+                "Couldn't serialise the Proposal '{:?}': {:?}",
+                self, err
+            ))
+        };
+
         let bytes = match self {
             Self::VoteNodeOffline(node_state) => bincode::serialize(node_state),
             Self::RequestHandover(sap) => bincode::serialize(sap),
@@ -68,28 +75,14 @@ impl Proposal {
                 bincode::serialize(&signed_sap.sig.public_key)
             }
             Self::HandoverCompleted(SapCandidate::SectionSplit(sap1, sap2)) => {
-                let sap1_sig = bincode::serialize(&sap1.sig.public_key).map_err(|err| {
-                    Error::Serialisation(format!(
-                        "Couldn't serialise the Proposal '{:?}': {:?}",
-                        self, err
-                    ))
-                })?;
-                let sap2_sig = bincode::serialize(&sap2.sig.public_key).map_err(|err| {
-                    Error::Serialisation(format!(
-                        "Couldn't serialise the Proposal '{:?}': {:?}",
-                        self, err
-                    ))
-                })?;
+                let sap1_sig = bincode::serialize(&sap1.sig.public_key).map_err(error)?;
+                let sap2_sig = bincode::serialize(&sap2.sig.public_key).map_err(error)?;
                 return Ok(Either::Right((sap1_sig, sap2_sig)));
             }
             Self::JoinsAllowed(joins_allowed) => bincode::serialize(&joins_allowed),
         }
-        .map_err(|err| {
-            Error::Serialisation(format!(
-                "Couldn't serialise the Proposal '{:?}': {:?}",
-                self, err
-            ))
-        })?;
+        .map_err(error)?;
+
         Ok(Either::Left(bytes))
     }
 }
