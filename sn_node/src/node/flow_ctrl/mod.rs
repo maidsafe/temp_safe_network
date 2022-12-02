@@ -10,8 +10,6 @@ pub(crate) mod cmd_ctrl;
 pub(crate) mod cmds;
 pub(super) mod dispatcher;
 pub(super) mod dysfunction;
-pub(super) mod event;
-pub(super) mod event_channel;
 mod periodic_checks;
 
 #[cfg(test)]
@@ -38,6 +36,10 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use xor_name::XorName;
 
+/// Sent via the rejoin_network_tx to start the bootstrap process again
+#[derive(Debug)]
+pub struct RejoinNetwork;
+
 /// Listens for incoming msgs and forms Cmds for each,
 /// Periodically triggers other Cmd Processes (eg health checks, dysfunction etc)
 pub(crate) struct FlowCtrl {
@@ -55,10 +57,14 @@ impl FlowCtrl {
         mut incoming_msg_events: mpsc::Receiver<MsgFromPeer>,
         mut data_replication_receiver: mpsc::Receiver<(Vec<DataAddress>, Peer)>,
         dysfunction_cmds_channels: (mpsc::Sender<DysCmds>, mpsc::Receiver<DysCmds>),
-    ) -> mpsc::Sender<(Cmd, Vec<usize>)> {
+    ) -> (
+        mpsc::Sender<(Cmd, Vec<usize>)>,
+        mpsc::Receiver<RejoinNetwork>,
+    ) {
         debug!("[NODE READ]: flowctrl node context lock got");
         let node_context = cmd_ctrl.node().read().await.context();
         let (cmd_sender_channel, mut incoming_cmds_from_apis) = mpsc::channel(10_000);
+        let (rejoin_network_tx, rejoin_network_rx) = mpsc::channel(10);
         let node_identifier = node_context.info.name();
         let node_data_storage = node_context.data_storage.clone();
 
@@ -102,7 +108,13 @@ impl FlowCtrl {
             // It's the initial name... but will not change for the entire statemap
             while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
                 cmd_ctrl
-                    .process_cmd_job(cmd, cmd_id, node_identifier, cmd_channel.clone())
+                    .process_cmd_job(
+                        cmd,
+                        cmd_id,
+                        node_identifier,
+                        cmd_channel.clone(),
+                        rejoin_network_tx.clone(),
+                    )
                     .await
             }
         });
@@ -172,7 +184,7 @@ impl FlowCtrl {
             }
         });
 
-        cmd_sender_channel
+        (cmd_sender_channel, rejoin_network_rx)
     }
 
     /// This is a never ending loop as long as the node is live.
