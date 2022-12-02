@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1669949056057,
+  "lastUpdate": 1669955249665,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -34228,6 +34228,144 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 339688656,
             "range": "± 21325230",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "1514a15b4cf4e82af8038b720d0bdf32cce4e182",
+          "message": "Merge #1807\n\n1807: refactor: remove event sender r=joshuef a=RolandSherwin\n\nFixes #1778 \r\n- refactor(event_sender): remove `EventSender` and `Event`\r\n  - Also removes the `routing_minimal` and `routing_stress` examples. They were broken prior to this, as most of the `Event` logic was not present in sn_node. Creating an issue to re-enable them.\r\n- feat(node): try to rejoin network if removed\r\n    - Restart the node bootstrap process if we've been removed from a section. Use `Receiver<RejoinNetwork>` to listen for the command.\r\n\r\n\r\n\r\n\n\nCo-authored-by: RolandSherwin <RolandSherwin@protonmail.com>",
+          "timestamp": "2022-12-02T02:46:55Z",
+          "tree_id": "f3de30fc56a5dc95f80f181dfb1b7961a465746c",
+          "url": "https://github.com/maidsafe/safe_network/commit/1514a15b4cf4e82af8038b720d0bdf32cce4e182"
+        },
+        "date": 1669955247524,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2256319,
+            "range": "± 297743",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 88890901,
+            "range": "± 1818772",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 103828511,
+            "range": "± 4891661",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 433419857,
+            "range": "± 4059736",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 73022714,
+            "range": "± 918879",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 82493672,
+            "range": "± 1523301",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 334956620,
+            "range": "± 3779909",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 46273275,
+            "range": "± 21000736",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2289307372,
+            "range": "± 231842067",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 11619270072,
+            "range": "± 1637134151",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 196989691,
+            "range": "± 15409034",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1989629554,
+            "range": "± 89614088",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 7598882337,
+            "range": "± 310725837",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 42071402,
+            "range": "± 2341903",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 404572819,
+            "range": "± 22230147",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1617155200,
+            "range": "± 56685910",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 10909111,
+            "range": "± 803062",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 96558176,
+            "range": "± 8157965",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 330089698,
+            "range": "± 4253276",
             "unit": "ns/iter"
           }
         ]
