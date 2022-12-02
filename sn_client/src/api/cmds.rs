@@ -47,7 +47,10 @@ impl Client {
                 .await
         })
         .await
-        .map_err(|_| Error::CmdAckValidationTimeout(dst_address))?
+        .map_err(|_| Error::CmdAckValidationTimeout {
+            elapsed: self.cmd_timeout,
+            dst_address,
+        })?
     }
 
     /// Public API to send a `DataCmd` to the network.
@@ -74,7 +77,7 @@ impl Client {
         if res.is_ok() {
             debug!("{debug_cmd} sent okay: {res:?}");
         } else {
-            trace!("Failed response on {debug_cmd} cmd: {res:?}");
+            trace!("Failed response on {debug_cmd}, response: {:?}", res);
         }
 
         res

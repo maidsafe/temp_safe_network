@@ -26,6 +26,8 @@
 
 //! SAFE network data types.
 
+// Dbcs on the safe network.
+pub mod dbcs;
 // Standardised messaging interface
 pub mod messaging;
 // Knowledge of the safe network

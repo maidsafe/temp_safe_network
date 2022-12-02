@@ -27,20 +27,21 @@ use sn_interface::{
 use std::collections::BTreeSet;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
-use xor_name::XorName;
+use xor_name::{Prefix, XorName};
 
 impl MyNode {
     /// Send a (`NodeMsg`) message to all Elders in our section
     pub(crate) fn send_msg_to_our_elders(context: &NodeContext, msg: NodeMsg) -> Cmd {
         let sap = context.network_knowledge.section_auth();
         let recipients = sap.elders_set();
-        MyNode::send_system_msg(msg, Peers::Multiple(recipients))
+        MyNode::send_system_msg(msg, Peers::Multiple(recipients), context.clone())
     }
 
     /// Send a (`NodeMsg`) message to a node
-    pub(crate) fn send_system_msg(msg: NodeMsg, recipients: Peers) -> Cmd {
+    /// Context is consumed and passed into the SendMsg command
+    pub(crate) fn send_system_msg(msg: NodeMsg, recipients: Peers, context: NodeContext) -> Cmd {
         trace!("{}: {:?}", LogMarker::SendToNodes, msg);
-        Cmd::send_msg(msg, recipients)
+        Cmd::send_msg(msg, recipients, context)
     }
 
     pub(crate) async fn store_data_as_adult_and_respond(
@@ -117,8 +118,9 @@ impl MyNode {
 
     // Handler for data messages which have successfully
     // passed all signature checks and msg verifications
-    pub(crate) async fn handle_valid_system_msg(
+    pub(crate) async fn handle_valid_node_msg(
         node: Arc<RwLock<MyNode>>,
+        context: NodeContext,
         msg_id: MsgId,
         msg: NodeMsg,
         sender: Peer,
@@ -158,7 +160,6 @@ impl MyNode {
                 kind,
             } => {
                 trace!("Handling msg: AE from {sender}: {msg_id:?}");
-                let context = node.read().await.context();
                 // as we've data storage reqs inside here for reorganisation, we have async calls to
                 // the fs
                 MyNode::handle_anti_entropy_msg(node, context, section_tree_update, kind, sender)
@@ -168,20 +169,18 @@ impl MyNode {
             // We always respond to probe msgs if we're an elder as health checks use this to see if a node is alive
             // and repsonsive, as well as being a method of keeping nodes up to date.
             NodeMsg::AntiEntropyProbe(section_key) => {
-                debug!("[NODE READ]: aeprobe attempts");
-                let context = node.read().await.context();
-                debug!("[NODE READ]: aeprobe lock got");
+                debug!("Aeprobe in");
 
                 let mut cmds = vec![];
                 if !context.is_elder {
+                    info!("Dropping AEProbe since we are not an elder");
                     // early return here as we do not get health checks as adults,
                     // normal AE rules should have applied
                     return Ok(cmds);
                 }
 
                 trace!("Received Probe message from {}: {:?}", sender, msg_id);
-                let mut recipients = BTreeSet::new();
-                let _existed = recipients.insert(sender);
+                let recipients = BTreeSet::from_iter([sender]);
                 cmds.push(MyNode::send_ae_update_to_nodes(
                     &context,
                     recipients,
@@ -192,14 +191,9 @@ impl MyNode {
             // The AcceptedOnlineShare for relocation will be received here.
             NodeMsg::JoinResponse(join_response) => {
                 let mut node = node.write().await;
-                debug!("[NODE WRITE]: join response write gottt...");
-                let context = node.context();
 
-                match *join_response {
-                    JoinResponse::Approved {
-                        section_tree_update,
-                        ..
-                    } => {
+                match join_response {
+                    JoinResponse::Approved { .. } => {
                         info!(
                             "Relocation: Aggregating received ApprovalShare from {:?}",
                             sender
@@ -216,10 +210,11 @@ impl MyNode {
                                 previous_name, new_name
                             );
 
-                            let recipients: Vec<_> =
-                                section_tree_update.signed_sap.elders().cloned().collect();
-
-                            let section_tree = context.network_knowledge.section_tree().clone();
+                            let section_tree = node.network_knowledge.section_tree().clone();
+                            let section_tree_update = node
+                                .network_knowledge
+                                .section_tree()
+                                .generate_section_tree_update(&Prefix::default())?; // TODO: remove this dummy update
                             let new_network_knowledge =
                                 NetworkKnowledge::new(section_tree, section_tree_update)?;
 
@@ -228,11 +223,6 @@ impl MyNode {
                             //       As the sending of the JoinRequest as notification
                             //       may require the `node` to be switched to new already.
                             node.relocate(new_keypair.clone(), new_network_knowledge)?;
-
-                            trace!(
-                                "Relocation: Sending aggregated JoinRequest to {:?}",
-                                recipients
-                            );
 
                             // move off thread to keep fn sync
                             let event_sender = context.event_sender;
@@ -275,17 +265,13 @@ impl MyNode {
             }
             NodeMsg::JoinRequest(join_request) => {
                 trace!("Handling msg {:?}: JoinRequest from {}", msg_id, sender);
-                let context = &node.read().await.context();
-                debug!("[NODE READ]: joinReq read got");
 
-                MyNode::handle_join_request(node, context, sender, join_request)
+                MyNode::handle_join_request(node, &context, sender, join_request)
                     .await
                     .map(|c| c.into_iter().collect())
             }
             NodeMsg::JoinAsRelocatedRequest(join_request) => {
                 trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
-                let context = &node.read().await.context();
-                debug!("[NODE READ]: joinReqas relocated read got");
 
                 if !context.is_elder
                     && join_request.section_key == context.network_knowledge.section_key()
@@ -294,7 +280,7 @@ impl MyNode {
                 }
 
                 Ok(
-                    MyNode::handle_join_as_relocated_request(node, context, sender, *join_request)
+                    MyNode::handle_join_as_relocated_request(node, &context, sender, *join_request)
                         .await
                         .into_iter()
                         .collect(),
@@ -308,15 +294,21 @@ impl MyNode {
                 Ok(cmds)
             }
             NodeMsg::MembershipAE(gen) => {
-                debug!("[NODE READ]: membership ae read ");
-                let membership_context = node.read().await.membership.clone();
-                debug!("[NODE READ]: membership ae read got");
+                let (node_context, membership_context) = {
+                    debug!("[NODE READ]: membership ae read ");
+                    let membership = node.read().await.membership.clone();
+                    debug!("[NODE READ]: membership ae read got");
+                    (context, membership)
+                };
 
-                Ok(
-                    MyNode::handle_membership_anti_entropy(membership_context, sender, gen)
-                        .into_iter()
-                        .collect(),
+                Ok(MyNode::handle_membership_anti_entropy(
+                    membership_context,
+                    node_context,
+                    sender,
+                    gen,
                 )
+                .into_iter()
+                .collect())
             }
             NodeMsg::Propose {
                 proposal,
@@ -418,9 +410,6 @@ impl MyNode {
                     msg_id
                 );
 
-                let context = node.read().await.context();
-                debug!("[NODE READ]: could ont store data read got");
-
                 if !context.is_elder {
                     error!("Received unexpected message while Adult");
                     return Ok(vec![]);
@@ -446,9 +435,7 @@ impl MyNode {
                 Ok(vec![])
             }
             NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateOneData(data)) => {
-                debug!("[NODE READ]: replicate one data");
-                let context = node.read().await.context();
-                debug!("[NODE READ]: replicate one data read got");
+                debug!("Replicate one data");
 
                 if context.is_elder {
                     error!("Received unexpected message while Elder");
@@ -464,9 +451,7 @@ impl MyNode {
                     .await
             }
             NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateData(data_collection)) => {
-                info!("ReplicateData MsgId: {:?}", msg_id);
-                let context = node.read().await.context();
-                debug!("[NODE READ]: replicate data read got");
+                info!("ReplicateData collection MsgId: {:?}", msg_id);
 
                 if context.is_elder {
                     error!("Received unexpected message while Elder");
@@ -526,11 +511,9 @@ impl MyNode {
                     LogMarker::RequestForAnyMissingData,
                     msg_id
                 );
-                let context = &node.read().await.context();
-                debug!("[NODE READ]: send missing data read got");
 
                 Ok(
-                    MyNode::get_missing_data_for_node(context, sender, known_data_addresses)
+                    MyNode::get_missing_data_for_node(&context, sender, known_data_addresses)
                         .await
                         .into_iter()
                         .collect(),
@@ -546,9 +529,6 @@ impl MyNode {
                     "Handle NodeQuery with msg_id {:?}, operation_id {}",
                     msg_id, operation_id
                 );
-                let context = node.read().await.context();
-
-                debug!("[NODE READ]: node query read got");
 
                 MyNode::handle_data_query_at_adult(
                     &context,
@@ -589,7 +569,7 @@ impl MyNode {
 
             let dst = Peers::Multiple(context.network_knowledge.elders());
 
-            cmds.push(Cmd::send_msg(msg, dst));
+            cmds.push(Cmd::send_msg(msg, dst, context.clone()));
         }
 
         Ok(cmds)

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{messaging::Peers, Proposal, XorName};
+use crate::node::{core::NodeContext, messaging::Peers, Proposal, XorName};
 
 use qp2p::SendStream;
 use sn_consensus::Decision;
@@ -53,7 +53,7 @@ pub(crate) struct CmdJob {
 pub(crate) enum Cmd {
     /// Validate `wire_msg` from `sender`.
     /// Holding the WireMsg that has been received from the network,
-    ValidateMsg {
+    HandleMsg {
         origin: Peer,
         wire_msg: WireMsg,
         send_stream: Option<Arc<Mutex<SendStream>>>,
@@ -62,12 +62,6 @@ pub(crate) enum Cmd {
     SetStorageLevel(StorageLevel),
     /// Log a Node's Punishment
     TrackNodeIssueInDysfunction { name: XorName, issue: IssueType },
-    HandleValidNodeMsg {
-        msg_id: MsgId,
-        msg: NodeMsg,
-        origin: Peer,
-        send_stream: Option<Arc<Mutex<SendStream>>>,
-    },
     UpdateNetworkAndHandleValidClientMsg {
         proof_chain: SectionsDAG,
         signed_sap: SectionSigned<SectionAuthorityProvider>,
@@ -110,16 +104,43 @@ pub(crate) enum Cmd {
         msg_id: MsgId,
         recipients: Peers,
         send_stream: Option<Arc<Mutex<SendStream>>>,
+        #[debug(skip)]
+        context: NodeContext,
+    },
+    /// Performs serialisation and signing and sends the msg after reading NodeContext
+    /// from the node
+    ///
+    /// Currently only used during Join process where Node is not readily available
+    /// DO NOT USE ELSEWHERE
+    SendLockingJoinMsg {
+        msg: NodeMsg,
+        msg_id: MsgId,
+        recipients: Peers,
+        send_stream: Option<Arc<Mutex<SendStream>>>,
     },
     /// Proposes peers as offline
     ProposeVoteNodesOffline(BTreeSet<XorName>),
 }
 
 impl Cmd {
-    pub(crate) fn send_msg(msg: NodeMsg, recipients: Peers) -> Self {
+    pub(crate) fn send_msg(msg: NodeMsg, recipients: Peers, context: NodeContext) -> Self {
         let msg_id = MsgId::new();
         debug!("Sending msg {msg_id:?} {msg:?}");
         Cmd::SendMsg {
+            msg,
+            msg_id,
+            recipients,
+            send_stream: None,
+            context,
+        }
+    }
+
+    /// Special wrapper to trigger SendLockingJoinMsg as NodeContext is unavailable
+    /// during the join process
+    pub(crate) fn send_join_msg(msg: NodeMsg, recipients: Peers) -> Self {
+        let msg_id = MsgId::new();
+        debug!("Sending locking join msg {msg_id:?} {msg:?}");
+        Cmd::SendLockingJoinMsg {
             msg,
             msg_id,
             recipients,
@@ -131,12 +152,14 @@ impl Cmd {
         msg: NodeMsg,
         recipients: Peers,
         send_stream: Option<Arc<Mutex<SendStream>>>,
+        context: NodeContext,
     ) -> Self {
         Cmd::SendMsg {
             msg,
             msg_id: MsgId::new(),
             recipients,
             send_stream,
+            context,
         }
     }
 
@@ -144,10 +167,10 @@ impl Cmd {
         use sn_interface::statemap::State;
         match self {
             Cmd::SendMsg { .. } => State::Comms,
+            Cmd::SendLockingJoinMsg { .. } => State::Comms,
             Cmd::SetStorageLevel { .. } => State::Node,
             Cmd::HandleFailedSendToNode { .. } => State::Comms,
-            Cmd::ValidateMsg { .. } => State::Validation,
-            Cmd::HandleValidNodeMsg { msg, .. } => msg.statemap_states(),
+            Cmd::HandleMsg { .. } => State::HandleMsg,
             Cmd::UpdateNetworkAndHandleValidClientMsg { .. } => State::ClientMsg,
             Cmd::TrackNodeIssueInDysfunction { .. } => State::Dysfunction,
             Cmd::HandleAgreement { .. } => State::Agreement,
@@ -168,20 +191,17 @@ impl fmt::Display for Cmd {
                 write!(f, "SetStorageLevel {:?}", level)
             }
             #[cfg(not(feature = "test-utils"))]
-            Cmd::ValidateMsg { wire_msg, .. } => {
-                write!(f, "ValidateMsg {:?}", wire_msg.msg_id())
+            Cmd::HandleMsg { wire_msg, .. } => {
+                write!(f, "HandleMsg {:?}", wire_msg.msg_id())
             }
             #[cfg(feature = "test-utils")]
-            Cmd::ValidateMsg { wire_msg, .. } => {
+            Cmd::HandleMsg { wire_msg, .. } => {
                 write!(
                     f,
-                    "ValidateMsg {:?} {:?}",
+                    "HandleMsg {:?} {:?}",
                     wire_msg.msg_id(),
                     wire_msg.payload_debug
                 )
-            }
-            Cmd::HandleValidNodeMsg { msg_id, msg, .. } => {
-                write!(f, "HandleValidNodeMsg {:?}: {:?}", msg_id, msg)
             }
             Cmd::UpdateNetworkAndHandleValidClientMsg { msg_id, msg, .. } => {
                 write!(f, "UpdateAndHandleValidClientMsg {:?}: {:?}", msg_id, msg)
@@ -194,6 +214,7 @@ impl fmt::Display for Cmd {
             Cmd::HandleMembershipDecision(_) => write!(f, "HandleMembershipDecision"),
             Cmd::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
             Cmd::SendMsg { .. } => write!(f, "SendMsg"),
+            Cmd::SendLockingJoinMsg { .. } => write!(f, "SendLockingJoinMsg"),
             Cmd::EnqueueDataForReplication { .. } => write!(f, "ThrottledSendBatchMsgs"),
             Cmd::TrackNodeIssueInDysfunction { name, issue } => {
                 write!(f, "TrackNodeIssueInDysfunction {:?}, {:?}", name, issue)

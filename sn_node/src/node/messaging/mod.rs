@@ -49,7 +49,7 @@ impl Peers {
 // Message handling
 impl MyNode {
     #[instrument(skip(node))]
-    pub(crate) async fn validate_msg(
+    pub(crate) async fn handle_msg(
         node: Arc<RwLock<MyNode>>,
         origin: Peer,
         wire_msg: WireMsg,
@@ -57,7 +57,7 @@ impl MyNode {
     ) -> Result<Vec<Cmd>> {
         // Deserialize the payload of the incoming message
         let msg_id = wire_msg.msg_id();
-        trace!("validating msg {msg_id:?}");
+        trace!("Handling msg {msg_id:?}. Validating first...");
 
         let msg_type = match wire_msg.into_msg() {
             Ok(msg_type) => msg_type,
@@ -68,7 +68,7 @@ impl MyNode {
         };
 
         let context = node.read().await.context();
-        trace!("[NODE READ]: validate msg lock got");
+        trace!("[NODE READ]: Handle msg lock got");
         match msg_type {
             MsgType::Node { msg_id, dst, msg } => {
                 // Check for entropy before we proceed further
@@ -89,13 +89,7 @@ impl MyNode {
                     return Ok(ae_cmds);
                 }
 
-                // this needs write access...
-                Ok(vec![Cmd::HandleValidNodeMsg {
-                    origin,
-                    msg_id,
-                    msg,
-                    send_stream,
-                }])
+                MyNode::handle_valid_node_msg(node, context, msg_id, msg, origin, send_stream).await
             }
             MsgType::Client {
                 msg_id,

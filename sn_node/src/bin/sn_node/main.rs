@@ -33,7 +33,7 @@ use sn_node::node::{start_node, Config, Error as NodeError, Event, MembershipEve
 use clap::{CommandFactory, Parser};
 use clap_complete::{generate, Shell};
 use color_eyre::{Section, SectionExt};
-use eyre::{eyre, Context, ErrReport, Result};
+use eyre::{eyre, ErrReport, Result};
 use self_update::{cargo_crate_version, Status};
 use std::{io::Write, process::exit};
 use tokio::time::{sleep, Duration};
@@ -48,15 +48,6 @@ mod log;
 async fn main() -> Result<()> {
     color_eyre::install()?;
 
-    // Create a new runtime for a node
-    // let rt = tokio::runtime::new();
-    // .enable_all()
-    // .thread_name("sn_node")
-    // // 16mb here for windows stack size, which was being exceeded previously
-    // .thread_stack_size(16 * 1024 * 1024)
-    // .build()?;
-
-    // rt.block_on(async {
     let mut config = Config::new().await?;
     let _guard = log::init_node_logging(&config)?;
     trace!("Initial node config: {config:?}");
@@ -68,16 +59,10 @@ async fn main() -> Result<()> {
         // pull config again in case it has been updated meanwhile
         config = Config::new().await?;
     }
-    // })
 }
 
 /// Create a tokio runtime per `run_node` instance.
 async fn create_runtime_and_node(config: &Config) -> Result<()> {
-    // let local = tokio::task::LocalSet::new();
-
-    // local
-    //     .run_until(async move {
-    // loops ready to catch any ChurnJoinMiss
     match run_node(config).await {
         Ok(_) => {
             info!("Node has finished running, no runtime errors were reported");
@@ -86,8 +71,6 @@ async fn create_runtime_and_node(config: &Config) -> Result<()> {
             warn!("Node instance finished with an error: {error:?}");
         }
     };
-    // })
-    // .await;
 
     Ok(())
 }
@@ -125,11 +108,13 @@ async fn run_node(config: &Config) -> Result<()> {
     info!("\n{}\n{}", message, "=".repeat(message.len()));
 
     let our_pid = std::process::id();
-
-    let log = format!("The network is not accepting nodes right now. Retrying after {BOOTSTRAP_RETRY_TIME_SEC} seconds");
-
     let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
     let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME_SEC);
+    let log_path = if let Some(path) = config.log_dir() {
+        format!("{}", path.display())
+    } else {
+        "unknown".to_string()
+    };
 
     let (_node, mut event_stream) = loop {
         match start_node(config, join_timeout).await {
@@ -148,40 +133,39 @@ async fn run_node(config: &Config) -> Result<()> {
                 );
             }
             Err(NodeError::TryJoinLater) => {
-                println!("{}", log);
-                info!("{}", log);
+                let message = format!(
+                    "The network is not accepting nodes right now. \
+                    Retrying after {BOOTSTRAP_RETRY_TIME_SEC} seconds."
+                );
+                println!("{message} Node log path: {log_path}");
+                info!("{message}");
             }
-            Err(NodeError::NodeNotReachable(addr)) => {
-                let err_msg = format!(
-                    "Unfortunately we are unable to establish a connection to your machine ({}) either through a \
+            Err(error @ NodeError::NodeNotReachable(_)) => {
+                let err = Err(error).suggestion(
+                    "Unfortunately we are unable to establish a connection to your machine either through a \
                     public IP address, or via IGD on your router. Please ensure that IGD is enabled on your router - \
                     if it is and you are still unable to add your node to the testnet, then skip adding a node for this \
                     testnet iteration. You can still use the testnet as a client, uploading and downloading content, etc. \
-                    https://safenetforum.org/",
-                    addr
+                    https://safenetforum.org/"
+                        .header("Please ensure that IGD is enabled on your router")
                 );
-                println!("{}", err_msg);
-                error!("{}", err_msg);
-                exit(1);
+
+                println!("{err:?}");
+                error!("{err:?}");
+                return err;
             }
             Err(NodeError::JoinTimeout) => {
                 let message = format!("(PID: {our_pid}): Encountered a timeout while trying to join the network. Retrying after {BOOTSTRAP_RETRY_TIME_SEC} seconds.");
-                println!("{}", &message);
-                error!("{}", &message);
+                println!("{message} Node log path: {log_path}");
+                error!("{message}");
             }
-            Err(e) => {
-                let log_path = if let Some(path) = config.log_dir() {
-                    format!("{}", path.display())
-                } else {
-                    "unknown".to_string()
-                };
-
-                error!("{}", &message);
-
-                return Err(e).wrap_err(format!(
-                    "Cannot start node (log path: {}). If this is the first node on the network pass the local \
-                    address to be used using --first", log_path)
-                );
+            Err(error) => {
+                let err = Err(error)
+                    .suggestion(format!("Cannot start node. Node log path: {log_path}").header(
+                    "If this is the first node on the network pass the local address to be used using --first",
+                ));
+                error!("{err:?}");
+                return err;
             }
         }
         // The sleep shall only need to be carried out when being asked to join later?
@@ -209,7 +193,7 @@ async fn run_node(config: &Config) -> Result<()> {
         }
     }
 
-    // this keeps node running
+    // This keeps the node running
     while let Some(event) = event_stream.next().await {
         trace!("Node event! {}", event);
         if let Event::Membership(MembershipEvent::RemovedFromSection) = event {

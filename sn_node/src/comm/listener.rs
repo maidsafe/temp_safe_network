@@ -76,7 +76,6 @@ impl MsgListener {
                             continue;
                         }
                     };
-
                     let src_name = match wire_msg.kind() {
                         MsgKind::Client(auth) => auth.public_key.into(),
                         MsgKind::Node(name)
@@ -109,9 +108,7 @@ impl MsgListener {
                         })
                         .await
                     {
-                        error!(
-                            "Error pushing msg {msg_id:?} onto internal msg channel... {error:?}"
-                        );
+                        error!("Error pushing msg {msg_id:?} onto internal msg handling channel: {error:?}");
                     }
                 }
                 Err(error) => {

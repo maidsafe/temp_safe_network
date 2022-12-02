@@ -250,7 +250,7 @@ fn section_sig() -> sn_interface::messaging::SectionSig {
     let sk = bls::SecretKey::random();
     let public_key = sk.public_key();
     let data = "hello".to_string();
-    let signature = sk.sign(&data);
+    let signature = sk.sign(data);
     SectionSig {
         public_key,
         signature,
@@ -282,15 +282,6 @@ mod tests {
     use tokio::time::{sleep, Duration};
     use tracing::Instrument;
 
-    // Helper function used by all tests to always wait the same amount of time
-    // before trying to query for published Register ops. The amount of secs shall
-    // be based or directly determined by how much we are stressing the testnet, e.g. if we
-    // are using many test-threads we may need to sleep for a longer period of time.
-    async fn delay_before_we_query_pubished_data() {
-        let duration = Duration::from_secs(1);
-        sleep(duration).await;
-    }
-
     #[tokio::test(flavor = "multi_thread")]
     async fn test_register_batching() -> Result<()> {
         init_logger();
@@ -312,7 +303,6 @@ mod tests {
 
         // publish that batch to the network
         client.publish_register_ops(batch).await?;
-        delay_before_we_query_pubished_data().await;
 
         // check they're both there
         let register1 = client.get_register(address).await?;
@@ -413,7 +403,6 @@ mod tests {
         // store a Register
         let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
         client.publish_register_ops(batch).await?;
-        delay_before_we_query_pubished_data().await;
 
         let register = client.get_register(address).await?;
 
@@ -425,7 +414,6 @@ mod tests {
         // store a second Register
         let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
         client.publish_register_ops(batch).await?;
-        delay_before_we_query_pubished_data().await;
 
         let register = client.get_register(address).await?;
 
@@ -455,7 +443,6 @@ mod tests {
             .publish_register_ops(batch)
             .await
             .context("publish ops failed")?;
-        delay_before_we_query_pubished_data().await;
 
         let permissions = client
             .get_register_permissions_for_user(address, owner)
@@ -501,7 +488,6 @@ mod tests {
 
         let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
         client.publish_register_ops(batch).await?;
-        delay_before_we_query_pubished_data().await;
 
         let value_1 = random_register_entry();
 
@@ -564,7 +550,6 @@ mod tests {
             .write_to_local_register(address, value_1.clone(), BTreeSet::new())
             .await?;
         client.publish_register_ops(batch).await?;
-        delay_before_we_query_pubished_data().await;
 
         // now check last entry
         let hashes = client.read_register(address).await?;
@@ -587,7 +572,6 @@ mod tests {
         assert!(batch.len() == 1);
 
         client.publish_register_ops(batch).await?;
-        delay_before_we_query_pubished_data().await;
 
         // and then lets check all entries are returned
         // NB: these will not be ordered according to insertion order,
@@ -646,7 +630,6 @@ mod tests {
 
         let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
         client.publish_register_ops(batch).await?;
-        delay_before_we_query_pubished_data().await;
 
         // Assert that the data is stored.
         let current_owner = client.get_register_owner(address).await?;
@@ -677,7 +660,6 @@ mod tests {
             .publish_register_ops(batch)
             .await
             .context("publishing reg failed")?;
-        delay_before_we_query_pubished_data().await;
 
         let _register = client
             .get_register(address)

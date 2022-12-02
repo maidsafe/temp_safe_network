@@ -106,7 +106,7 @@ pub enum LogMarker {
     // Connections
     ConnectionOpened,
     ConnectionClosed,
-    StreamClosed,
+    ReceiveCompleted,
     ConnectionReused,
     // Relocation
     RelocateStart,

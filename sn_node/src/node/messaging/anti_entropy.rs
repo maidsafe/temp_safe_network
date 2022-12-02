@@ -185,7 +185,7 @@ impl MyNode {
             kind: AntiEntropyKind::Update { members },
         };
 
-        MyNode::send_system_msg(ae_msg, Peers::Multiple(recipients))
+        MyNode::send_system_msg(ae_msg, Peers::Multiple(recipients), context.clone())
     }
 
     /// Send `MetadataExchange` packet to the specified nodes
@@ -194,6 +194,7 @@ impl MyNode {
         MyNode::send_system_msg(
             NodeMsg::NodeDataCmd(NodeDataCmd::ReceiveMetadata { metadata }),
             Peers::Multiple(recipients),
+            self.context(),
         )
     }
 
@@ -490,6 +491,7 @@ impl MyNode {
         cmds.push(MyNode::send_system_msg(
             msg_to_resend,
             Peers::Single(response_peer),
+            latest_context,
         ));
         Ok(cmds)
     }
@@ -540,10 +542,15 @@ impl MyNode {
                 ae_msg,
                 Peers::Single(*sender),
                 send_stream,
+                context.clone(),
             )))
         } else {
             debug!("sending repsonse over fresh conn");
-            Ok(Some(Cmd::send_msg(ae_msg, Peers::Single(*sender))))
+            Ok(Some(Cmd::send_msg(
+                ae_msg,
+                Peers::Single(*sender),
+                context.clone(),
+            )))
         }
     }
 
@@ -567,7 +574,7 @@ impl MyNode {
             return match closest_sap {
                 Some((signed_sap, proof_chain)) => {
                     info!(
-                        "{msg_id:?} Found a better matching prefix {:?}",
+                        "{msg_id:?} Found a better matching prefix {:?}: {signed_sap:?}",
                         signed_sap.prefix()
                     );
                     let section_tree_update =

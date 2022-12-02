@@ -29,7 +29,7 @@ mod relocation;
 
 use self::{
     bootstrap::join_network,
-    core::{MyNode, GENESIS_DBC_AMOUNT},
+    core::MyNode,
     data::MIN_LEVEL_WHEN_FULL,
     flow_ctrl::{cmds::Cmd, event::Elders},
     node_starter::CmdChannel,
@@ -45,7 +45,6 @@ pub use self::{
     node_test_api::NodeTestApi,
 };
 pub use crate::storage::DataStorage;
-
 #[cfg(test)]
 pub(crate) use relocation::{check as relocation_check, ChurnId};
 
@@ -102,12 +101,6 @@ mod core {
     };
     use tokio::sync::mpsc;
 
-    /// Amount of tokens to be owned by the Genesis DBC.
-    /// At the inception of the Network a total supply of 4,525,524,120 whole tokens will be created.
-    /// Each whole token can be subdivided 10^9 times,
-    /// thus creating a total of 4,525,524,120,000,000,000 available units.
-    pub(crate) const GENESIS_DBC_AMOUNT: u64 = 4_525_524_120 * u64::pow(10, 9);
-
     // File name where to cache this node's section tree (stored at this node's set root storage dir)
     const SECTION_TREE_FILE_NAME: &str = "section_tree";
 
@@ -146,8 +139,8 @@ mod core {
         pub(crate) dysfunction_cmds_sender: mpsc::Sender<DysCmds>,
     }
 
-    #[derive(Clone)]
-    pub(crate) struct NodeContext {
+    #[derive(custom_debug::Debug, Clone)]
+    pub struct NodeContext {
         pub(crate) root_storage_dir: PathBuf,
         pub(crate) is_elder: bool,
         pub(crate) data_storage: DataStorage,
@@ -157,7 +150,9 @@ mod core {
         pub(crate) network_knowledge: NetworkKnowledge,
         pub(crate) section_keys_provider: SectionKeysProvider,
         pub(crate) full_adults: BTreeSet<XorName>,
+        #[debug(skip)]
         pub(crate) comm: Comm,
+        #[debug(skip)]
         pub(crate) event_sender: EventSender,
         pub(crate) joins_allowed: bool,
     }
@@ -305,7 +300,11 @@ mod core {
 
             info!("ProbeMsg target {:?}: {probe:?}", matching_section.prefix());
 
-            Ok(MyNode::send_system_msg(probe, Peers::Multiple(recipients)))
+            Ok(MyNode::send_system_msg(
+                probe,
+                Peers::Multiple(recipients),
+                context.clone(),
+            ))
         }
 
         /// Generates a SectionProbeMsg with our current knowledge,
@@ -322,7 +321,7 @@ mod core {
             );
 
             let probe = context.network_knowledge.anti_entropy_probe();
-            MyNode::send_system_msg(probe, Peers::Multiple(recipients))
+            MyNode::send_system_msg(probe, Peers::Multiple(recipients), context.clone())
         }
 
         /// Generates section infos for the best elder candidate among the members at the given generation
@@ -667,7 +666,7 @@ mod core {
                 .send(DysCmds::TrackIssue(name, issue))
                 .await
             {
-                error!("Could not send DysCmds through dysfunctional_cmds_tx: {error}");
+                warn!("Could not send DysCmds through dysfunctional_cmds_tx: {error}");
             }
         }
 
@@ -688,7 +687,7 @@ mod core {
                 .send(DysCmds::UntrackIssue(name, issue))
                 .await
             {
-                error!("Could not send DysCmds through dysfunctional_cmds_tx: {error}");
+                warn!("Could not send DysCmds through dysfunctional_cmds_tx: {error}");
             }
         }
 

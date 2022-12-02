@@ -8,7 +8,7 @@
 
 use crate::node::{core::NodeContext, flow_ctrl::cmds::Cmd, Error, MyNode, Result};
 
-use bytes::Bytes;
+use bytes::BufMut;
 
 use qp2p::SendStream;
 use sn_dbc::{
@@ -130,17 +130,12 @@ impl MyNode {
             let stream_prio = 10;
             let mut send_stream = send_stream.lock().await;
             send_stream.set_priority(stream_prio);
+            let stream_id = send_stream.id();
             if let Err(error) = send_stream.send_user_msg(bytes).await {
-                error!(
-                    "Could not send msg {:?} over response stream: {error:?}",
-                    msg_id
-                );
+                error!("Could not send msg {msg_id:?} over response {stream_id} to {requesting_elder:?}: {error:?}");
             }
             if let Err(error) = send_stream.finish().await {
-                error!(
-                    "Could not close response stream for {:?}: {error:?}",
-                    msg_id
-                );
+                error!("Could not close response {stream_id} with {requesting_elder:?}, for {msg_id:?}: {error:?}");
             }
         } else {
             error!("Send stream missing from {requesting_elder:?}, data request response was not sent out.")
@@ -402,15 +397,15 @@ impl MyNode {
             SPENTBOOK_TYPE_TAG,
             policy,
         );
-
-        let entry = Bytes::from(rmp_serde::to_vec_named(spent_proof_share).map_err(|err| {
+        let mut entry = vec![].writer();
+        rmp_serde::encode::write(&mut entry, spent_proof_share).map_err(|err| {
             Error::SpentbookError(format!(
                 "Failed to serialise SpentProofShare to insert it into the spentbook (Register): {:?}",
                 err
             ))
-        })?);
+        })?;
 
-        let (_, op) = register.write(entry.to_vec(), BTreeSet::default())?;
+        let (_, op) = register.write(entry.into_inner(), BTreeSet::default())?;
         let op = EditRegister {
             address: *register.address(),
             edit: op,

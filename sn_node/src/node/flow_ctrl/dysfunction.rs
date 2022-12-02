@@ -76,7 +76,7 @@ impl FlowCtrl {
             .send(DysCmds::GetDysfunctionalNodes)
             .await
         {
-            error!("Could not send DysCmds through dysfunctional_cmds_tx: {error}");
+            warn!("Could not send DysCmds through dysfunctional_cmds_tx: {error}");
             BTreeSet::new()
         } else {
             // read the rx channel to get the dysfunctional nodes

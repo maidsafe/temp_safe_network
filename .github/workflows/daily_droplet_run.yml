@@ -9,7 +9,7 @@ on:
       node-count:
         description: number of nodes for the testnet
         required: true
-        default: 15
+        default: 30
       testnet-tool-repo-branch:
         description: >
           The branch for the testnet tool repository. This is to enable using forks to test changes to
@@ -127,41 +127,19 @@ jobs:
           }
 
   build-node:
-    name: build node
-    runs-on: ubuntu-latest
+    name: build node and launch testnet
+    runs-on: self-hosted
+    env:
+      CARGO_BUILD_TARGET: x86_64-unknown-linux-musl
+      CARGO_HOME: /mnt/data/cargo
+      TMPDIR: /mnt/data/tmp
     steps:
       - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        id: toolchain
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
       - shell: bash
         name: build node
         run: |
-          sudo apt update -y
-          sudo apt install -y musl-tools
-          rustup target add x86_64-unknown-linux-musl
-          cargo build --release --target x86_64-unknown-linux-musl --bin sn_node
-      - uses: actions/upload-artifact@main
-        with:
-          name: sn_node-x86_64-unknown-linux-musl
-          path: |
-            target/x86_64-unknown-linux-musl/release
-
-  launch-testnet:
-    name: launch testnet
-    needs: build-node
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@master
-        with:
-          name: sn_node-x86_64-unknown-linux-musl
-          path: sn_node
-      - shell: bash
-        name: copy node to temp location
-        run: cp sn_node/sn_node /tmp
+          cargo build --release --bin sn_node
+          cp ./target/x86_64-unknown-linux-musl/release/sn_node /tmp/sn_node
       - name: Set TESTNET_ID env
         shell: bash
         run: |
@@ -174,11 +152,11 @@ jobs:
           aws-access-key-id: ${{ secrets.S3_DEPLOY_AWS_ACCESS_KEY_ID }}
           aws-access-key-secret: ${{ secrets.S3_DEPLOY_AWS_SECRET_ACCESS_KEY }}
           ssh-secret-key: ${{ secrets.SSH_SECRET_KEY  }}
-          node-count: ${{ github.event.inputs.node-count || 30 }}
+          node-count: ${{ inputs.node-count }}
           node-path: /tmp/sn_node
           testnet-id: ${{ env.TESTNET_ID }}
-          testnet-tool-repo-branch: ${{ github.event.inputs.testnet-tool-repo-branch }}
-          testnet-tool-repo-user: ${{ github.event.inputs.testnet-tool-repo-user }}
+          testnet-tool-repo-branch: ${{ inputs.testnet-tool-repo-branch }}
+          testnet-tool-repo-user: ${{ inputs.testnet-tool-repo-user }}
       # The other jobs in the workflow have the testnet launch as a dependency, but they go ahead
       # even if this job fails. It would be better if the whole workflow is abandoned if we don't
       # have a testnet to run the tests against.
@@ -196,7 +174,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-    needs: launch-testnet
+    needs: build-node
     steps:
       - uses: actions/checkout@v2
         with:
@@ -237,6 +215,7 @@ jobs:
           package: sn_client
           release: true
           filters: client
+          features: check-replicas
           test-threads: 2
         timeout-minutes: 25
 
@@ -247,7 +226,7 @@ jobs:
   api:
     name: api tests
     runs-on: ${{ matrix.os }}
-    needs: [client, launch-testnet]
+    needs: [client, build-node]
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
@@ -295,7 +274,8 @@ jobs:
           junit-path: junit.xml
           package: sn_api
           release: true
-          test-threads: 10
+          test-threads: 1
+          features: check-replicas
         timeout-minutes: 60
         env:
           TEST_ENV_GENESIS_DBC_PATH: /tmp/genesis_dbc
@@ -303,7 +283,7 @@ jobs:
   cli:
     name: cli tests
     runs-on: ${{ matrix.os }}
-    needs: [api, launch-testnet]
+    needs: [api, build-node]
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
@@ -350,7 +330,8 @@ jobs:
           junit-path: junit.xml
           package: sn_cli
           release: true
-          test-threads: 10
+          test-threads: 1
+          features: check-replicas
         timeout-minutes: 60
         env:
           TEST_ENV_GENESIS_DBC_PATH: /tmp/genesis_dbc
@@ -358,7 +339,7 @@ jobs:
   kill-testnet:
     name: kill testnet
     runs-on: ubuntu-latest
-    needs: [launch-testnet, client, api, cli]
+    needs: [build-node, client, api, cli]
     steps:
       - name: Set TESTNET_ID env
         shell: bash
@@ -375,6 +356,7 @@ jobs:
           testnet-id: ${{ env.TESTNET_ID }}
 
   bump_version:
+    if: github.repository_owner == 'maidsafe' && github.ref_name == 'main'
     runs-on: ubuntu-22.04
     needs: kill-testnet
     steps:
@@ -417,7 +399,7 @@ jobs:
        needs.client.result=='failure' ||
        needs.api.result=='failure' ||
        needs.cli.result=='failure')
-    needs: [launch-testnet, client, api, cli]
+    needs: [build-node, client, api, cli]
     env:
       SSH_SECRET_KEY: ${{ secrets.SSH_SECRET_KEY  }}
     steps:

@@ -20,7 +20,6 @@ use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
 /// [`Register`] read operations.
-#[allow(clippy::large_enum_variant)]
 #[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
 pub enum RegisterQuery {
     /// Retrieve the [`Register`] at the given address.
@@ -166,8 +165,8 @@ impl SignedRegisterCreate {
 
 impl SignedRegisterEdit {
     /// Returns the dst address of the register.
-    pub fn dst_address(&self) -> &RegisterAddress {
-        &self.op.address
+    pub fn dst_address(&self) -> RegisterAddress {
+        self.op.address
     }
 }
 
@@ -223,7 +222,7 @@ impl RegisterCmd {
     pub fn dst_address(&self) -> RegisterAddress {
         match self {
             Self::Create { cmd, .. } => cmd.dst_address(),
-            Self::Edit(cmd) => *cmd.dst_address(),
+            Self::Edit(cmd) => cmd.dst_address(),
         }
     }
 

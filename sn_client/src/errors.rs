@@ -17,7 +17,7 @@ use sn_interface::{
 
 use bls::PublicKey;
 use sn_dbc::KeyImage;
-use std::io;
+use std::{io, time::Duration};
 use thiserror::Error;
 use xor_name::XorName;
 
@@ -29,6 +29,10 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
+    /// No section was found to be closest for given dataname/
+    /// This is indicative of some larger problem
+    #[error("No SAP for data name: {0}")]
+    NoCloseSapFound(XorName),
     /// No elder was found to be closest from provided SAP. (The sap must therefore be empty)
     #[error("No elders found in AntiEntropy msg SAP")]
     AntiEntropyNoSapElders,
@@ -143,8 +147,13 @@ pub enum Error {
         peers: Vec<Peer>,
     },
     /// Timeout when awaiting command ACK from Elders.
-    #[error("Timeout when awaiting command ACK from Elders for data address {0}")]
-    CmdAckValidationTimeout(XorName),
+    #[error("Timeout after {elapsed:?} when awaiting command ACK from Elders for data address {dst_address}")]
+    CmdAckValidationTimeout {
+        /// Time elapsed before timing out
+        elapsed: Duration,
+        /// Address name of the data the ACK was expected for
+        dst_address: XorName,
+    },
     /// Unexpected query response received
     #[error("Unexpected response received for {query:?}. Received: {response:?}")]
     UnexpectedQueryResponse {

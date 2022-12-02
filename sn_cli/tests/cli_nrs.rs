@@ -173,7 +173,7 @@ fn nrs_add_should_add_a_subname_to_versioned_content() -> Result<()> {
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let test_md_file = tmp_data_path.child("test.md");
-    let (files_container_xor, _processed_files, _) = upload_path(&test_md_file, false)?;
+    let (files_container_xor, _processed_files, _) = upload_path(test_md_file, false)?;
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
@@ -198,7 +198,7 @@ fn nrs_add_should_add_a_subname_to_immutable_content() -> Result<()> {
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let test_md_file = tmp_data_path.child("test.md");
-    let (_, processed_files, _) = upload_path(&test_md_file, false)?;
+    let (_, processed_files, _) = upload_path(test_md_file, false)?;
     let test_md_entry = processed_files
         .iter()
         .last()
@@ -231,7 +231,7 @@ fn nrs_add_should_add_a_subname_and_set_it_as_the_default_for_the_topname() -> R
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let test_md_file = tmp_data_path.child("test.md");
-    let (files_container_xor, _processed_files, _) = upload_path(&test_md_file, false)?;
+    let (files_container_xor, _processed_files, _) = upload_path(test_md_file, false)?;
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
@@ -274,7 +274,7 @@ fn nrs_add_should_add_a_subname_and_a_new_topname() -> Result<()> {
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let test_md_file = tmp_data_path.child("test.md");
-    let (files_container_xor, _processed_files, _) = upload_path(&test_md_file, false)?;
+    let (files_container_xor, _processed_files, _) = upload_path(test_md_file, false)?;
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
@@ -305,7 +305,7 @@ fn nrs_add_should_add_a_subname_and_behave_idempotently_for_existing_topname() -
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let test_md_file = tmp_data_path.child("test.md");
-    let (files_container_xor, _processed_files, _) = upload_path(&test_md_file, false)?;
+    let (files_container_xor, _processed_files, _) = upload_path(test_md_file, false)?;
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
@@ -337,7 +337,7 @@ fn nrs_add_should_update_an_existing_subname() -> Result<()> {
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let test_md_file = tmp_data_path.child("test.md");
-    let (files_container_xor, _processed_files, _) = upload_path(&test_md_file, false)?;
+    let (files_container_xor, _processed_files, _) = upload_path(test_md_file, false)?;
     let mut test_md_url = SafeUrl::from_url(&files_container_xor)?;
     test_md_url.set_path("test.md");
     let mut another_md_url = SafeUrl::from_url(&files_container_xor)?;
@@ -492,7 +492,7 @@ fn nrs_remove_should_remove_a_subname() -> Result<()> {
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let test_md_file = tmp_data_path.child("test.md");
-    let (files_container_xor, _processed_files, _) = upload_path(&test_md_file, false)?;
+    let (files_container_xor, _processed_files, _) = upload_path(test_md_file, false)?;
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 

@@ -515,15 +515,15 @@ fn calling_safe_cat_nrs_map_container() -> Result<()> {
 
     safe_cmd(["cat", &container_xorurl], Some(0))?
         .assert()
-        .stdout(predicate::str::contains(&format!(
+        .stdout(predicate::str::contains(format!(
             "{site_name}: {}",
             files_container_xor
         )))
-        .stdout(predicate::str::contains(&format!(
+        .stdout(predicate::str::contains(format!(
             "test.{site_name}: {}",
             test_file_link
         )))
-        .stdout(predicate::str::contains(&format!(
+        .stdout(predicate::str::contains(format!(
             "another.{site_name}: {}",
             another_file_link
         )));

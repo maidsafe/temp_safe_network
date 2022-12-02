@@ -30,7 +30,7 @@ where
 /// Wrapper for z-Base-32 `multibase::encode`.
 pub fn encode<T: Serialize>(data: &T) -> Result<String> {
     let bytes = serialise(&data)?;
-    Ok(multibase::encode(Base::Base32Z, &bytes))
+    Ok(multibase::encode(Base::Base32Z, bytes))
 }
 
 /// Wrapper for z-Base-32 `multibase::decode`.

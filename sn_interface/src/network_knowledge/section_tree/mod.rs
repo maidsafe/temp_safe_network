@@ -144,7 +144,7 @@ impl SectionTree {
 
     /// Returns all known sections SAP.
     pub fn all(&self) -> impl Iterator<Item = &SectionAuthorityProvider> {
-        self.sections.iter().map(|(_, sap)| &sap.value)
+        self.sections.values().map(|sap| &sap.value)
     }
 
     /// Get `SectionAuthorityProvider` of a known section with the given prefix.
@@ -164,8 +164,7 @@ impl SectionTree {
         section_key: &bls::PublicKey,
     ) -> Option<&SectionSigned<SectionAuthorityProvider>> {
         self.sections
-            .iter()
-            .map(|(_, signed_sap)| signed_sap)
+            .values()
             .find(|&signed_sap| signed_sap.public_key_set().public_key() == *section_key)
     }
 
@@ -234,7 +233,7 @@ impl SectionTree {
         match self.get_signed(incoming_prefix) {
             Some(sap) if sap == &signed_sap => {
                 // It's the same SAP we are already aware of
-                info!("Dropping SectionTree update since the SAP we have for prefix '{incoming_prefix}' is not new");
+                info!("Dropping SectionTree update since the incoming SAP for prefix '{incoming_prefix}' is not new");
                 return Ok(false);
             }
             Some(sap) => {
@@ -289,8 +288,8 @@ impl SectionTree {
     /// Returns the known section public keys.
     pub fn section_keys(&self) -> Vec<bls::PublicKey> {
         self.sections
-            .iter()
-            .map(|(_, sap)| sap.section_key())
+            .values()
+            .map(|sap| sap.section_key())
             .collect()
     }
 
@@ -302,6 +301,23 @@ impl SectionTree {
     /// Is the section tree empty?
     pub fn is_empty(&self) -> bool {
         self.sections.is_empty()
+    }
+
+    pub fn generate_section_tree_update(&self, prefix: &Prefix) -> Result<SectionTreeUpdate> {
+        let signed_sap = self
+            .sections
+            .get(prefix)
+            .ok_or(Error::NoMatchingSection)?
+            .clone();
+
+        let proof_chain = self
+            .sections_dag
+            .partial_dag(self.sections_dag.genesis_key(), &signed_sap.section_key())?;
+
+        Ok(SectionTreeUpdate {
+            signed_sap,
+            proof_chain,
+        })
     }
 
     /// Returns the section authority provider for the prefix that matches `name`.
@@ -331,7 +347,7 @@ impl SectionTree {
     pub fn network_stats(&self, our: &SectionAuthorityProvider) -> NetworkStats {
         // Let's compute an estimate of the total number of elders in the network
         // from the size of our routing table.
-        let section_prefixes = self.sections.iter().map(|(prefix, _)| *prefix);
+        let section_prefixes = self.sections.keys().copied();
         let known_prefixes: Vec<_> = section_prefixes.chain(iter::once(our.prefix())).collect();
 
         let total_elders_exact = Prefix::default().is_covered_by(&known_prefixes);
@@ -343,8 +359,7 @@ impl SectionTree {
             .map(|p| 1.0 / (p.bit_count() as f64).exp2())
             .sum();
 
-        let network_elders_count: usize =
-            self.sections.iter().map(|(_, sap)| sap.elder_count()).sum();
+        let network_elders_count: usize = self.sections.values().map(|sap| sap.elder_count()).sum();
         let total = network_elders_count as f64 / network_fraction;
 
         // `total_elders_exact` indicates whether `total_elders` is

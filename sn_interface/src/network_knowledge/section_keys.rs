@@ -40,7 +40,7 @@ impl SectionKeysProvider {
     /// Constructor.
     pub fn new(current: Option<SectionKeyShare>) -> Self {
         let mut section_keys_provider = Self {
-            cache: Box::new(LRUCache::default()),
+            cache: Box::default(),
         };
 
         if let Some(share) = current {

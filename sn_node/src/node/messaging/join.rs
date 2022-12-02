@@ -13,9 +13,7 @@ use sn_interface::{
         JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest,
         JoinResponse, NodeMsg,
     },
-    network_knowledge::{
-        MembershipState, NodeState, SectionAuthUtils, SectionTreeUpdate, MIN_ADULT_AGE,
-    },
+    network_knowledge::{MembershipState, NodeState, SectionAuthUtils, MIN_ADULT_AGE},
     types::{log_markers::LogMarker, Peer},
 };
 
@@ -52,22 +50,30 @@ impl MyNode {
 
         let our_prefix = context.network_knowledge.prefix();
         if !our_prefix.matches(&peer.name()) {
+            // TODO: Replace Redirect with a Retry + AEProbe.
             debug!("Redirecting JoinRequest from {peer} - name doesn't match our prefix {our_prefix:?}.");
             let retry_sap = context.section_sap_matching_name(&peer.name())?;
-            let msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Redirect(retry_sap)));
+            let msg = NodeMsg::JoinResponse(JoinResponse::Redirect(retry_sap));
             trace!("Sending {:?} to {}", msg, peer);
             trace!("{}", LogMarker::SendJoinRedirected);
-            return Ok(Some(MyNode::send_system_msg(msg, Peers::Single(peer))));
+            return Ok(Some(MyNode::send_system_msg(
+                msg,
+                Peers::Single(peer),
+                context.clone(),
+            )));
         }
 
         if !context.joins_allowed {
             debug!("Rejecting JoinRequest from {peer} - joins currently not allowed.");
-            let msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Rejected(
-                JoinRejectionReason::JoinsDisallowed,
-            )));
+            let msg =
+                NodeMsg::JoinResponse(JoinResponse::Rejected(JoinRejectionReason::JoinsDisallowed));
             trace!("{}", LogMarker::SendJoinsDisallowed);
             trace!("Sending {:?} to {}", msg, peer);
-            return Ok(Some(MyNode::send_system_msg(msg, Peers::Single(peer))));
+            return Ok(Some(MyNode::send_system_msg(
+                msg,
+                Peers::Single(peer),
+                context.clone(),
+            )));
         }
 
         let is_age_valid = MyNode::verify_joining_node_age(&peer);
@@ -88,13 +94,13 @@ impl MyNode {
         }
 
         if !section_key_matches || !is_age_valid {
-            let signed_sap = context.network_knowledge.signed_sap();
-            let proof_chain = context.network_knowledge.section_chain();
-            let msg = NodeMsg::JoinResponse(Box::new(JoinResponse::Retry {
-                section_tree_update: SectionTreeUpdate::new(signed_sap, proof_chain),
-            }));
-            trace!("Sending {:?} to {}", msg, peer);
-            return Ok(Some(MyNode::send_system_msg(msg, Peers::Single(peer))));
+            let msg = NodeMsg::JoinResponse(JoinResponse::Retry);
+            trace!("Sending {msg:?} to {peer}");
+            return Ok(Some(MyNode::send_system_msg(
+                msg,
+                Peers::Single(peer),
+                context.clone(),
+            )));
         }
 
         // It's reachable, let's then propose membership
@@ -133,7 +139,11 @@ impl MyNode {
             trace!("{} b", LogMarker::SendJoinAsRelocatedResponse);
 
             trace!("Sending {msg:?} to {peer}");
-            return Some(MyNode::send_system_msg(msg, Peers::Single(peer)));
+            return Some(MyNode::send_system_msg(
+                msg,
+                Peers::Single(peer),
+                context.clone(),
+            ));
         }
 
         let state = join_request.relocate_proof.value.state();
@@ -168,7 +178,11 @@ impl MyNode {
             trace!("{}", LogMarker::SendJoinAsRelocatedResponse);
 
             trace!("Sending {:?} to {}", msg, peer);
-            return Some(MyNode::send_system_msg(msg, Peers::Single(peer)));
+            return Some(MyNode::send_system_msg(
+                msg,
+                Peers::Single(peer),
+                context.clone(),
+            ));
         };
 
         debug!("[NODE WRITE]: join as relocated write...");
