@@ -209,11 +209,14 @@ impl Session {
 
             debug!("{msg_id:?} AE bounced msg going out again. Resending original message (sent to index {src_peer_index:?} peer: {src_peer:?}) to new section elder {elder:?}");
 
-            let link = self.peer_links.get_or_create_link(elder, false).await;
+            let link = self
+                .peer_links
+                .get_or_create_link(elder, false, Some(correlation_id))
+                .await;
             let new_recv_stream = link
                 .send_bi(bytes, msg_id)
                 .await
-                .map_err(|_| Error::FailedToInitateBiDiStream(msg_id))?;
+                .map_err(|error| Error::FailedToInitateBiDiStream { msg_id, error })?;
 
             Ok(MsgResent {
                 new_peer: *elder,
