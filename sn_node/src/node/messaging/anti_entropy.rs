@@ -11,6 +11,7 @@ use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Error, MyNode, Result}
 use bls::PublicKey as BlsPublicKey;
 use itertools::Itertools;
 use qp2p::{SendStream, UsrMsgBytes};
+use sn_dysfunction::IssueType;
 use sn_interface::{
     messaging::{
         data::ClientDataResponse,
@@ -431,7 +432,10 @@ impl MyNode {
         let (bounced_msg, response_peer) = match kind {
             AntiEntropyKind::Update { .. } => {
                 // log the msg as received. Elders track this for other elders in dysfunction
-                node.read().await.log_ae_update_msg(sender.name()).await;
+                node.read()
+                    .await
+                    .untrack_node_issue(sender.name(), IssueType::AeProbeMsg);
+                debug!("[NODE READ]: ae update lock received");
                 return Ok(cmds);
             } // Nope, bail early
             AntiEntropyKind::Retry { bounced_msg } => {
