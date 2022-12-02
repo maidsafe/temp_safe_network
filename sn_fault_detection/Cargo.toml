@@ -1,11 +1,11 @@
 [package]
 authors = ["MaidSafe Developers <dev@maidsafe.net>"]
-description = "The Safe Network Node Dysfunctional Detection."
+description = "The Safe Network Node Fault Detection."
 documentation = "https://docs.rs/sn_node"
 edition = "2021"
 homepage = "https://maidsafe.net"
 license = "GPL-3.0"
-name = "sn_dysfunction"
+name = "sn_fault_detection"
 readme = "README.md"
 repository = "https://github.com/maidsafe/safe_network"
 version = "0.15.0"

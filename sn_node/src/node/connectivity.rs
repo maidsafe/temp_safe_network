@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{flow_ctrl::cmds::Cmd, MyNode, Proposal, Result};
-use sn_dysfunction::IssueType;
+use sn_fault_detection::IssueType;
 use std::{collections::BTreeSet, net::SocketAddr};
 use xor_name::XorName;
 

@@ -11,7 +11,7 @@ use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Error, MyNode, Result}
 use bls::PublicKey as BlsPublicKey;
 use itertools::Itertools;
 use qp2p::{SendStream, UsrMsgBytes};
-use sn_dysfunction::IssueType;
+use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
         data::ClientDataResponse,
@@ -70,9 +70,9 @@ impl MyNode {
                 {
                     // we want to log issues with any node repeatedly out of sync here...
                     let cmds = vec![
-                        Cmd::TrackNodeIssueInDysfunction {
+                        Cmd::TrackNodeIssue {
                             name: origin.name(),
-                            issue: sn_dysfunction::IssueType::Knowledge,
+                            issue: sn_fault_detection::IssueType::Knowledge,
                         },
                         ae_cmd,
                     ];
@@ -357,7 +357,7 @@ impl MyNode {
         // Check if we need to resend any messsages and who should we send it to.
         let (bounced_msg, response_peer) = match kind {
             AntiEntropyKind::Update { .. } => {
-                // log the msg as received. Elders track this for other elders in dysfunction
+                // log the msg as received. Elders track this for other elders in fault detection
                 node.read()
                     .await
                     .untrack_node_issue(sender.name(), IssueType::AeProbeMsg);

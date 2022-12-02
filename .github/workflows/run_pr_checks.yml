@@ -113,13 +113,13 @@ jobs:
         timeout-minutes: 25
         run: cd sn_interface && cargo test --release
 
-      - name: Build sn_dysfunction tests before running
-        run: cd sn_dysfunction && cargo test --no-run --release
+      - name: Build sn_fault_detection tests before running
+        run: cd sn_fault_detection && cargo test --no-run --release
         timeout-minutes: 50
 
-      - name: Run sn_dysfunction tests
+      - name: Run sn_fault_detection tests
         timeout-minutes: 15
-        run: cd sn_dysfunction && cargo test --release
+        run: cd sn_fault_detection && cargo test --release
 
       - name: Build sn_node tests before running
         run: cd sn_node && cargo test --no-run --release
@@ -197,7 +197,7 @@ jobs:
       - name: Start the network
         run: ./artifacts/testnet --interval 30000
         env:
-          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
+          RUST_LOG: "sn_node,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
 
       - name: Wait for all nodes to join
         shell: bash
@@ -385,7 +385,7 @@ jobs:
       - name: Start the network
         run: ./artifacts/testnet --interval 30000
         env:
-          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
+          RUST_LOG: "sn_node,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
 
       - name: Wait for all nodes to join
         shell: bash
@@ -490,7 +490,7 @@ jobs:
       - name: Start the network
         run: ./artifacts/testnet --interval 30000
         env:
-          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
+          RUST_LOG: "sn_node,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
 
       - name: Wait for all nodes to join
         shell: bash

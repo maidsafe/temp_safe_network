@@ -9,7 +9,7 @@
 use crate::comm::Comm;
 use crate::{
     node::{
-        flow_ctrl::{cmds::Cmd, dysfunction::DysCmds},
+        flow_ctrl::{cmds::Cmd, fault_detection::FaultsCmd},
         Error, MyNode, Result,
     },
     UsedSpace,
@@ -36,7 +36,7 @@ impl MyNode {
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
         genesis_sk_set: bls::SecretKeySet,
-        dysfunction_cmds_sender: mpsc::Sender<DysCmds>,
+        fault_cmds_sender: mpsc::Sender<FaultsCmd>,
     ) -> Result<(Self, Dbc)> {
         let our_addr = comm.socket_addr();
         let info = MyNodeInfo {
@@ -57,7 +57,7 @@ impl MyNode {
             Some(section_key_share),
             used_space,
             root_storage_dir,
-            dysfunction_cmds_sender,
+            fault_cmds_sender,
         )
         .await?;
 

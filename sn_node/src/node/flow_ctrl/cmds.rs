@@ -10,7 +10,7 @@ use crate::node::{core::NodeContext, messaging::Peers, Proposal, XorName};
 
 use qp2p::SendStream;
 use sn_consensus::Decision;
-use sn_dysfunction::IssueType;
+use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
         data::{ClientMsg, StorageLevel},
@@ -60,8 +60,8 @@ pub(crate) enum Cmd {
     },
     /// Update our own storage level
     SetStorageLevel(StorageLevel),
-    /// Log a Node's Punishment
-    TrackNodeIssueInDysfunction { name: XorName, issue: IssueType },
+    /// Add an issue to the tracking of a node's faults
+    TrackNodeIssue { name: XorName, issue: IssueType },
     UpdateNetworkAndHandleValidClientMsg {
         proof_chain: SectionsDAG,
         signed_sap: SectionSigned<SectionAuthorityProvider>,
@@ -179,7 +179,7 @@ impl Cmd {
             Cmd::HandleFailedSendToNode { .. } => State::Comms,
             Cmd::HandleMsg { .. } => State::HandleMsg,
             Cmd::UpdateNetworkAndHandleValidClientMsg { .. } => State::ClientMsg,
-            Cmd::TrackNodeIssueInDysfunction { .. } => State::Dysfunction,
+            Cmd::TrackNodeIssue { .. } => State::FaultDetection,
             Cmd::HandleAgreement { .. } => State::Agreement,
             Cmd::HandleMembershipDecision(_) => State::Membership,
             Cmd::ProposeVoteNodesOffline(_) => State::Membership,
@@ -215,8 +215,8 @@ impl fmt::Display for Cmd {
             Cmd::SendMsg { .. } => write!(f, "SendMsg"),
             Cmd::SendLockingJoinMsg { .. } => write!(f, "SendLockingJoinMsg"),
             Cmd::EnqueueDataForReplication { .. } => write!(f, "EnqueueDataForReplication"),
-            Cmd::TrackNodeIssueInDysfunction { name, issue } => {
-                write!(f, "TrackNodeIssueInDysfunction {:?}, {:?}", name, issue)
+            Cmd::TrackNodeIssue { name, issue } => {
+                write!(f, "TrackNodeIssue {:?}, {:?}", name, issue)
             }
             Cmd::ProposeVoteNodesOffline(_) => write!(f, "ProposeOffline"),
         }

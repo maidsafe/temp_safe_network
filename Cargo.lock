@@ -4012,7 +4012,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sn_dysfunction"
+name = "sn_fault_detection"
 version = "0.15.0"
 dependencies = [
  "eyre",
@@ -4140,7 +4140,7 @@ dependencies = [
  "signature",
  "sn_consensus",
  "sn_dbc",
- "sn_dysfunction",
+ "sn_fault_detection",
  "sn_interface",
  "sn_sdkg",
  "strum",
