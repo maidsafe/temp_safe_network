@@ -23,7 +23,7 @@ use crate::node::{
         dysfunction::{DysCmds, DysfunctionChannels},
     },
     messaging::Peers,
-    MyNode, Result,
+    MyNode, Result, STANDARD_CHANNEL_SIZE,
 };
 use periodic_checks::PeriodicChecksTimestamps;
 use sn_dysfunction::DysfunctionDetection;
@@ -63,8 +63,10 @@ impl FlowCtrl {
     ) {
         debug!("[NODE READ]: flowctrl node context lock got");
         let node_context = cmd_ctrl.node().read().await.context();
-        let (cmd_sender_channel, mut incoming_cmds_from_apis) = mpsc::channel(10_000);
-        let (rejoin_network_tx, rejoin_network_rx) = mpsc::channel(10);
+        let (cmd_sender_channel, mut incoming_cmds_from_apis) =
+            mpsc::channel(STANDARD_CHANNEL_SIZE);
+        let (rejoin_network_tx, rejoin_network_rx) = mpsc::channel(STANDARD_CHANNEL_SIZE);
+
         let node_identifier = node_context.info.name();
         let node_data_storage = node_context.data_storage.clone();
 
