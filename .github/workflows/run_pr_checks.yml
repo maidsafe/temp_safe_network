@@ -220,6 +220,11 @@ jobs:
         shell: bash
         run: cargo run --release --example client_files --package sn_client
 
+      - name: Run network churn data integrity test
+        timeout-minutes: 35 # made 35 for now due to client slowdown. TODO: fix that!
+        shell: bash
+        run: cargo run --release --example churn
+
       - name: Ensure no nodes have left during test runs
         timeout-minutes: 1
         shell: bash
