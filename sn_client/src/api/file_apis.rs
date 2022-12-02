@@ -253,7 +253,10 @@ impl Client {
             response
         })
         .await
-        .map_err(|_| Error::ChunkUploadValidationTimeout(address))??;
+        .map_err(|_| Error::ChunkUploadValidationTimeout {
+            elapsed: self.query_timeout,
+            address,
+        })??;
 
         Ok(())
     }

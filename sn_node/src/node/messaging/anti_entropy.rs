@@ -7,12 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::core::NodeContext;
-use crate::node::{
-    flow_ctrl::cmds::Cmd, messaging::Peers, Error, Event, MembershipEvent, MyNode, Result,
-};
+use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Error, MyNode, Result};
 use bls::PublicKey as BlsPublicKey;
 use itertools::Itertools;
 use qp2p::{SendStream, UsrMsgBytes};
+use sn_dysfunction::IssueType;
 use sn_interface::{
     messaging::{
         data::ClientDataResponse,
@@ -394,7 +393,9 @@ impl MyNode {
             }
         };
 
+        debug!("[NODE READ] Latest context read");
         let latest_context = node.read().await.context();
+        debug!("[NODE READ] Latest context got.");
         // Only trigger reorganize data when there is a membership change happens.
         if updated && !latest_context.is_elder {
             // only done if adult, since as an elder we dont want to get any more
@@ -421,14 +422,7 @@ impl MyNode {
                     .map(|m| m.name())
                     .contains(&latest_context.name)
             {
-                error!("Detected that we've been removed from the section");
-                // move off thread to keep fn sync
-                let event_sender = starting_context.event_sender.clone();
-                let _handle = tokio::spawn(async move {
-                    event_sender
-                        .send(Event::Membership(MembershipEvent::RemovedFromSection))
-                        .await;
-                });
+                error!("We've been removed from the section");
 
                 return Err(Error::RemovedFromSection);
             }
@@ -440,7 +434,10 @@ impl MyNode {
         let (bounced_msg, response_peer) = match kind {
             AntiEntropyKind::Update { .. } => {
                 // log the msg as received. Elders track this for other elders in dysfunction
-                node.read().await.log_ae_update_msg(sender.name()).await;
+                node.read()
+                    .await
+                    .untrack_node_issue(sender.name(), IssueType::AeProbeMsg);
+                debug!("[NODE READ]: ae update lock received");
                 return Ok(cmds);
             } // Nope, bail early
             AntiEntropyKind::Retry { bounced_msg } => {
@@ -651,8 +648,7 @@ mod tests {
 
     use crate::node::{
         cfg::create_test_max_capacity_and_root_storage,
-        flow_ctrl::{event_channel, tests::network_utils::create_comm},
-        MIN_ADULT_AGE,
+        flow_ctrl::tests::network_utils::create_comm, MIN_ADULT_AGE,
     };
     use crate::UsedSpace;
     use sn_interface::{
@@ -820,7 +816,6 @@ mod tests {
             let (mut node, _) = MyNode::first_node(
                 create_comm().await?,
                 info.keypair.clone(),
-                event_channel::new(1).0,
                 UsedSpace::new(max_capacity),
                 root_storage_dir,
                 genesis_sk_set.clone(),

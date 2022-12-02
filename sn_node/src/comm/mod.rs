@@ -16,7 +16,7 @@ use self::{
     peer_session::{PeerSession, SendStatus, SendWatcher},
 };
 
-use crate::node::{Error, Result};
+use crate::node::{Error, Result, STANDARD_CHANNEL_SIZE};
 use qp2p::{Connection, SendStream, UsrMsgBytes};
 
 use sn_interface::{
@@ -112,6 +112,10 @@ impl Comm {
         let watcher = self.send_to_one(peer, msg_id, bytes, send_stream).await;
 
         let sessions = self.sessions.clone();
+
+        // TODO: Is there an optimium we should actually have.
+        // Assuming we dont store clients... can we test for this
+        trace!("Sessions known of: {:?}", sessions.len());
 
         // TODO: we could cache the handles above and check them as part of loop...
         let _handle = tokio::spawn(async move {
@@ -332,7 +336,7 @@ fn setup_comms(
 
 #[tracing::instrument(skip_all)]
 fn setup(our_endpoint: Endpoint, receive_msg: Sender<MsgFromPeer>) -> (Comm, MsgListener) {
-    let (add_connection, conn_receiver) = mpsc::channel(10_000);
+    let (add_connection, conn_receiver) = mpsc::channel(STANDARD_CHANNEL_SIZE);
 
     let msg_listener = MsgListener::new(add_connection, receive_msg);
 

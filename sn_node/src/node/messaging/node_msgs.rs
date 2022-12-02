@@ -8,13 +8,13 @@
 
 use crate::{
     node::{
-        core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Peers, Event, MembershipEvent, MyNode,
-        Result, MIN_LEVEL_WHEN_FULL,
+        core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, Result,
+        MIN_LEVEL_WHEN_FULL,
     },
     storage::Error as StorageError,
 };
-
 use qp2p::SendStream;
+use sn_dysfunction::IssueType;
 use sn_interface::{
     messaging::{
         data::{CmdResponse, StorageLevel},
@@ -206,8 +206,8 @@ impl MyNode {
                             let new_keypair = new_node.keypair;
 
                             info!(
-                                "Relocation: switching from {:?} to {:?}",
-                                previous_name, new_name
+                                "Relocation: switching from {:?} to {:?} with keypair {:?}",
+                                previous_name, new_name, new_keypair
                             );
 
                             let section_tree = node.network_knowledge.section_tree().clone();
@@ -222,18 +222,7 @@ impl MyNode {
                             //       or still using the cmd pattern.
                             //       As the sending of the JoinRequest as notification
                             //       may require the `node` to be switched to new already.
-                            node.relocate(new_keypair.clone(), new_network_knowledge)?;
-
-                            // move off thread to keep fn sync
-                            let event_sender = context.event_sender;
-                            let _handle = tokio::spawn(async move {
-                                event_sender
-                                    .send(Event::Membership(MembershipEvent::Relocated {
-                                        previous_name,
-                                        new_keypair,
-                                    }))
-                                    .await;
-                            });
+                            node.relocate(new_keypair, new_network_knowledge)?;
 
                             trace!("{}", LogMarker::RelocateEnd);
                         } else {
@@ -339,7 +328,7 @@ impl MyNode {
 
                 let mut node = node.write().await;
                 debug!("[NODE WRITE]: DKGstart write gottt...");
-                node.log_dkg_session(sender.name()).await;
+                node.untrack_node_issue(sender.name(), IssueType::Dkg);
                 node.handle_dkg_start(session_id, elder_sig)
             }
             NodeMsg::DkgEphemeralPubKey {
@@ -372,7 +361,9 @@ impl MyNode {
                 );
                 let mut node = node.write().await;
                 debug!("[NODE WRITE]: DKG Votes write gottt...");
-                node.log_dkg_session(sender.name()).await;
+
+                node.untrack_node_issue(sender.name(), IssueType::Dkg);
+
                 node.handle_dkg_votes(&session_id, pub_keys, votes, sender)
             }
             NodeMsg::DkgAE(session_id) => {

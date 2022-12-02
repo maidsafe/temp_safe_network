@@ -14,10 +14,11 @@ use sn_interface::{
         ClientAuth, Dst, MsgId, MsgKind, WireMsg,
     },
     network_knowledge::supermajority,
-    types::{ChunkAddress, Peer},
+    types::{ChunkAddress, Peer, SendToOneError},
 };
 
 use bytes::Bytes;
+use qp2p::SendError;
 use rand::{rngs::OsRng, seq::SliceRandom};
 use std::collections::BTreeSet;
 use tokio::task::JoinSet;
@@ -53,7 +54,7 @@ impl Session {
                 // We don't retry here.. if we fail it will be retried on a per message basis
                 let _ = session
                     .peer_links
-                    .get_or_create_link(&peer, connect_now)
+                    .get_or_create_link(&peer, connect_now, None)
                     .await;
             };
             tasks.push(task);
@@ -90,7 +91,7 @@ impl Session {
         let kind = MsgKind::Client(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
-        let send_cmd_tasks = self.send_msg(elders.clone(), wire_msg, msg_id).await?;
+        let send_cmd_tasks = self.send_msg(elders.clone(), wire_msg).await?;
         trace!("Cmd msg {:?} sent", msg_id);
 
         // We wait for ALL the Acks get received.
@@ -237,7 +238,7 @@ impl Session {
         let kind = MsgKind::Client(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
-        let send_query_tasks = self.send_msg(elders.clone(), wire_msg, msg_id).await?;
+        let send_query_tasks = self.send_msg(elders.clone(), wire_msg).await?;
 
         // TODO:
         // We are now simply accepting the very first valid response we receive,
@@ -451,8 +452,8 @@ impl Session {
         &self,
         nodes: Vec<Peer>,
         wire_msg: WireMsg,
-        msg_id: MsgId,
     ) -> Result<JoinSet<MsgResponse>> {
+        let msg_id = wire_msg.msg_id();
         debug!("---> send msg {msg_id:?} going out.");
         let bytes = wire_msg.serialize()?;
 
@@ -463,26 +464,49 @@ impl Session {
             let bytes = bytes.clone();
 
             let _abort_handle = tasks.spawn(async move {
-                let link = session.peer_links.get_or_create_link(&peer, false).await;
-
+                let mut connect_now = false;
                 debug!("Trying to send msg {msg_id:?} to {peer:?}");
-                match link.send_bi(bytes.clone(), msg_id).await {
-                    Ok(recv_stream) => {
-                        debug!("That's {msg_id:?} sent to {peer:?}... starting receive listener");
-                        // let's listen for responses on the bi-stream
-                        session
-                            .recv_stream_listener(msg_id, peer, peer_index, recv_stream)
-                            .await
-                    }
-                    #[cfg(features = "chaos")]
-                    Err(SendToOneError::ChaosNoConnection) => {
-                        session.peer_links.remove_link_from_peer_links(peer).await;
-                        MsgResponse::Failure(peer.addr(), Error::ChoasSendFail)
-                    }
-                    Err(error) => {
-                        error!("Error sending {msg_id:?} bidi to {peer:?}: {error:?}");
-                        session.peer_links.remove_link_from_peer_links(&peer).await;
-                        MsgResponse::Failure(peer.addr(), Error::FailedToInitateBiDiStream(msg_id))
+                loop {
+                    let link = session
+                        .peer_links
+                        .get_or_create_link(&peer, connect_now, Some(msg_id))
+                        .await;
+                    match link.send_bi(bytes.clone(), msg_id).await {
+                        Ok(recv_stream) => {
+                            debug!(
+                                "That's {msg_id:?} sent to {peer:?}... starting receive listener"
+                            );
+                            // let's listen for responses on the bi-stream
+                            break session
+                                .recv_stream_listener(msg_id, peer, peer_index, recv_stream)
+                                .await;
+                        }
+                        Err(SendToOneError::Send(error @ SendError::ConnectionLost(_)))
+                            if !connect_now =>
+                        {
+                            warn!("Connection lost to {peer:?}: {error}");
+                            // Let's retry (only once) to reconnect to this peer and send the msg.
+                            session.peer_links.remove_link_from_peer_links(&peer).await;
+                            error!(
+                                "Failed to send {msg_id:?} bidi to {peer:?}: {error:?}. \
+                                   Creating a new connection to retry once ..."
+                            );
+                            connect_now = true;
+                            continue;
+                        }
+                        #[cfg(features = "chaos")]
+                        Err(SendToOneError::ChaosNoConnection) => {
+                            session.peer_links.remove_link_from_peer_links(peer).await;
+                            break MsgResponse::Failure(peer.addr(), Error::ChoasSendFail);
+                        }
+                        Err(error) => {
+                            error!("Error sending {msg_id:?} bidi to {peer:?}: {error:?}");
+                            session.peer_links.remove_link_from_peer_links(&peer).await;
+                            break MsgResponse::Failure(
+                                peer.addr(),
+                                Error::FailedToInitateBiDiStream { msg_id, error },
+                            );
+                        }
                     }
                 }
             });

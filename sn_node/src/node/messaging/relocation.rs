@@ -10,7 +10,7 @@ use crate::node::{
     bootstrap::JoiningAsRelocated,
     flow_ctrl::cmds::Cmd,
     relocation::{find_nodes_to_relocate, ChurnId},
-    Event, MembershipEvent, MyNode, Proposal, Result,
+    MyNode, Proposal, Result,
 };
 
 use sn_interface::{
@@ -87,26 +87,13 @@ impl MyNode {
 
         debug!("Received Relocate message to join the section at {dst_xorname}");
 
-        match self.relocate_state {
-            Some(_) => {
-                trace!("Ignore Relocate - relocation already in progress");
-                return Ok(None);
-            }
-            None => {
-                trace!("{}", LogMarker::RelocateStart);
-
-                // move off thread to keep fn sync
-                let event_sender = self.event_sender.clone();
-                let previous_name = node.name();
-                let _handle = tokio::spawn(async move {
-                    event_sender
-                        .send(Event::Membership(MembershipEvent::RelocationStarted {
-                            previous_name,
-                        }))
-                        .await;
-                });
-            }
+        if self.relocate_state.is_some() {
+            trace!("Ignore Relocate - relocation already in progress");
+            return Ok(None);
         }
+
+        trace!("Relocation has started. previous_name: {:?}", node.name());
+        trace!("{}", LogMarker::RelocateStart);
 
         // Create a new instance of JoiningAsRelocated to start the relocation
         // flow. This same instance will handle responses till relocation is complete.
