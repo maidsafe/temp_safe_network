@@ -12,6 +12,8 @@ pub use link::{Link, SendToOneError};
 
 use super::Peer;
 
+use crate::messaging::MsgId;
+
 use qp2p::Endpoint;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -58,10 +60,15 @@ impl PeerLinks {
 
     /// This method is tailored to the use-case of connecting on send.
     /// I.e. it will not connect here, but on calling send on the returned link.
-    pub async fn get_or_create_link(&self, peer: &Peer, connect_now: bool) -> Link {
+    pub async fn get_or_create_link(
+        &self,
+        peer: &Peer,
+        connect_now: bool,
+        msg_id: Option<MsgId>,
+    ) -> Link {
         if let Some(link) = self.get(peer).await {
             if connect_now {
-                if let Err(error) = link.create_connection_if_none_exist(None).await {
+                if let Err(error) = link.create_connection_if_none_exist(msg_id).await {
                     error!(
                         "Error during create connection attempt for link to {:?}: {error:?}",
                         peer
@@ -83,11 +90,8 @@ impl PeerLinks {
             None => {
                 let link = Link::new(*peer, self.endpoint.clone());
                 if connect_now {
-                    if let Err(error) = link.create_connection_if_none_exist(None).await {
-                        error!(
-                            "Error during create connection attempt for link to {:?}: {error:?}",
-                            peer
-                        );
+                    if let Err(error) = link.create_connection_if_none_exist(msg_id).await {
+                        error!("Error during create connection attempt for link to {peer:?}: {error:?}");
                     }
                 }
                 let _ = links.insert(*peer, link.clone());

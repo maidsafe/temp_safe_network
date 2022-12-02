@@ -12,7 +12,7 @@ use sn_interface::{
         system::NodeMsg,
         Error as MessagingError, MsgId, MsgType,
     },
-    types::{Error as DtError, Peer},
+    types::{Error as DtError, Peer, SendToOneError},
 };
 
 use bls::PublicKey;
@@ -128,8 +128,13 @@ pub enum Error {
         maximum: usize,
     },
     /// Timeout occurred when trying to verify chunk was uploaded
-    #[error("Timeout occurred when trying to verify chunk at xorname address {0} was uploaded")]
-    ChunkUploadValidationTimeout(XorName),
+    #[error("Timeout occurred after {elapsed:?} when trying to verify chunk at xorname address {address} was uploaded")]
+    ChunkUploadValidationTimeout {
+        /// Time elapsed before timing out
+        elapsed: Duration,
+        /// Address name of the chunk
+        address: XorName,
+    },
     /// Remote peer closed the bi-stream we expected a response on
     #[error("The bi-stream we expected a msg response on, for {msg_id:?}, was closed by remote peer: {peer:?}")]
     ResponseStreamClosed {
@@ -245,9 +250,14 @@ pub enum Error {
         /// Number of Chunks retrieved
         retrieved: usize,
     },
-    /// All attempts to initiate bi di streams via Link Connections failed
-    #[error("Could no initiate bi di stream via Link Connections for: {0:?}")]
-    FailedToInitateBiDiStream(MsgId),
+    /// All attempts to initiate a bi-stream failed
+    #[error("Could no initiate bi-stream for {msg_id:?}: {error:?}")]
+    FailedToInitateBiDiStream {
+        /// Id of the message to be sent
+        msg_id: MsgId,
+        /// The error encountered when trying to initiate a bi-stream
+        error: SendToOneError,
+    },
     /// Could not chunk all the data required to encrypt the data. (Expected, Actual)
     #[error("Not all data was chunked, expected {expected}, but we have {chunked}.)")]
     NotAllDataWasChunked {

@@ -135,7 +135,7 @@ impl Link {
             .await
             .map_err(SendToOneError::Connection)?;
 
-        debug!("conn creating done {:?}", self.peer);
+        debug!("{msg_id:?} conn creating done {:?}", self.peer);
         trace!(
             "{} to {} (id: {})",
             LogMarker::ConnectionOpened,
