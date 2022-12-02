@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1669938326459,
+  "lastUpdate": 1669949056057,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -34090,6 +34090,144 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 387845630,
             "range": "± 14261219",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "chriso83@protonmail.com",
+            "name": "Chris O'Neil",
+            "username": "jacderida"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "51fd8e2a9df533b30cb21a01b6ed950e66084b54",
+          "message": "ci: use single thread for cli/api tests\n\nThere are issues on Windows with the `fs::rename` function when the test suite is running with\nmultiple threads.\n\nCode in the CLI related to the config file is calling this API to rename a temporary file to\n`config.json` and on Windows you get an access denied error when there are multiple threads doing\nthis in quick succession.\n\nThe real solution here is probably to isolate the config directory for each test, because I don't\nthink it's a realistic user scenario for multiple instances of the CLI to be running at the same\ntime on the same machine in such close time proximity that a user would actually run into issues\nhere.\n\nThere are also issues with ACK messages not being returned correctly that may have something to do\nwith running the test suite with multiple threads, so the API tests are also set to use a single\nthread.",
+          "timestamp": "2022-12-02T09:05:41+07:00",
+          "tree_id": "2e1f3ae1330e1a1fb0594ad9656bae2a50e79002",
+          "url": "https://github.com/maidsafe/safe_network/commit/51fd8e2a9df533b30cb21a01b6ed950e66084b54"
+        },
+        "date": 1669949054508,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2345127,
+            "range": "± 180177",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 90998066,
+            "range": "± 2433990",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 104847517,
+            "range": "± 5127520",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 419681686,
+            "range": "± 4813550",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 71328752,
+            "range": "± 1379351",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 83895013,
+            "range": "± 743888",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 327850804,
+            "range": "± 3839868",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 54292634,
+            "range": "± 20891705",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 1988685870,
+            "range": "± 238840869",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 10617195412,
+            "range": "± 1961601692",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 169264970,
+            "range": "± 17671152",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1613003863,
+            "range": "± 56891989",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 6448409412,
+            "range": "± 165968001",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 46402312,
+            "range": "± 1508737",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 450062545,
+            "range": "± 27176395",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1797918705,
+            "range": "± 39537319",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11269378,
+            "range": "± 575567",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 94669332,
+            "range": "± 4905875",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 339688656,
+            "range": "± 21325230",
             "unit": "ns/iter"
           }
         ]
