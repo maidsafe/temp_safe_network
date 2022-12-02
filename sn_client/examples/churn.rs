@@ -139,14 +139,14 @@ pub async fn run_split() -> Result<()> {
         .parse::<u64>()
         .context("Error parsing Interval argument")?;
 
-    debug!("Running testnet with args: {:?}", sn_launch_tool_args);
+    // debug!("Running testnet with args: {:?}", sn_launch_tool_args);
 
-    // We can now call the tool with the args
-    info!("Launching local Safe network...");
-    Launch::from_iter_safe(&sn_launch_tool_args)
-        .map_err(|error| eyre!(error))
-        .and_then(|launch| launch.run())
-        .wrap_err("Error starting the testnet")?;
+    // // We can now call the tool with the args
+    // info!("Launching local Safe network...");
+    // Launch::from_iter_safe(&sn_launch_tool_args)
+    //     .map_err(|error| eyre!(error))
+    //     .and_then(|launch| launch.run())
+    //     .wrap_err("Error starting the testnet")?;
 
     // leave a longer interval with more nodes to allow for splits if using split amounts
     let _interval_duration = Duration::from_millis(*interval_as_int_in_ms * 10);
