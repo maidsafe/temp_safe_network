@@ -338,7 +338,7 @@ impl MyNode {
         if let Err(error) = send_stream.send_user_msg(bytes).await {
             error!(
                 "Could not send query response {original_msg_id:?} to \
-                peer {target_peer:?} over response stream {stream_id}: {error:?}"
+                peer {target_peer:?} over response {stream_id}: {error:?}"
             );
             return Err(error.into());
         }
@@ -347,13 +347,13 @@ impl MyNode {
         if let Err(error) = send_stream.finish().await {
             // Let's report the error since we cannot guarantee the msg was received/acknowledged by recipient
             error!(
-                "Could not close response stream {stream_id} for {original_msg_id:?} to \
+                "Could not close response {stream_id} for {original_msg_id:?} to \
                 peer {target_peer:?}: {error:?}"
             );
             return Err(error.into());
         }
 
-        debug!("Sent the msg {original_msg_id:?} over stream {stream_id} to {target_peer:?}");
+        debug!("Sent the msg {original_msg_id:?} over {stream_id} to {target_peer:?}");
 
         Ok(())
     }
