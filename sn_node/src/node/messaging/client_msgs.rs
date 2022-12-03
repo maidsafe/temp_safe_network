@@ -134,9 +134,12 @@ impl MyNode {
             let stream_id = send_stream.id();
             if let Err(error) = send_stream.send_user_msg(bytes).await {
                 error!("Could not send msg {msg_id:?} over response {stream_id} to {requesting_elder:?}: {error:?}");
+                return Err(error.into());
             }
             if let Err(error) = send_stream.finish().await {
+                // Let's report the error since we cannot guarantee the msg was received/acknowledged by recipient
                 error!("Could not close response {stream_id} with {requesting_elder:?}, for {msg_id:?}: {error:?}");
+                return Err(error.into());
             }
             trace!("{msg_id:?} Response sent: to {requesting_elder:?}");
         } else {
