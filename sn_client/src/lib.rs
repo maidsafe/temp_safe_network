@@ -51,11 +51,15 @@
 #[macro_use]
 extern crate tracing;
 
+// Sessions with the network to send msgs, and receive the responses
+mod sessions;
+// Connections handling utilities
 mod connections;
 mod errors;
 
 // Export public API.
 pub use api::{Client, RegisterWriteAheadLog, DEFAULT_NETWORK_CONTACTS_FILE_NAME};
+pub use connections::LinkError;
 pub use errors::{Error, Result};
 pub use qp2p::Config as QuicP2pConfig;
 pub use sn_interface::messaging::data::Error as ErrorMsg;
