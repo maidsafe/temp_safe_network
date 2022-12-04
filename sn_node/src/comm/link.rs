@@ -13,7 +13,6 @@ use qp2p::{Connection, Endpoint, RetryConfig, UsrMsgBytes};
 use sn_interface::messaging::MsgId;
 use sn_interface::types::{log_markers::LogMarker, Peer};
 use std::sync::Arc;
-type ConnId = String;
 
 /// A link to a peer in our network.
 ///
@@ -29,18 +28,16 @@ type ConnId = String;
 pub(crate) struct Link {
     peer: Peer,
     endpoint: Endpoint,
-    pub(crate) connections: LinkConnections,
+    // pub(crate) connections: LinkConnections,
     listener: MsgListener,
 }
-
-pub(crate) type LinkConnections = Arc<DashMap<ConnId, Connection>>;
 
 impl Link {
     pub(crate) fn new(peer: Peer, endpoint: Endpoint, listener: MsgListener) -> Self {
         Self {
             peer,
             endpoint,
-            connections: Arc::new(DashMap::new()),
+            // connections: Arc::new(DashMap::new()),
             listener,
         }
     }
@@ -51,17 +48,11 @@ impl Link {
         listener: MsgListener,
         conn: Connection,
     ) -> Self {
-        let mut instance = Self::new(peer, endpoint, listener);
-        instance.insert(conn);
-        instance
+        Self::new(peer, endpoint, listener)
     }
 
     pub(crate) fn peer(&self) -> &Peer {
         &self.peer
-    }
-
-    pub(crate) fn add(&mut self, conn: Connection) {
-        self.insert(conn);
     }
 
     /// Send a message to the peer using the given configuration.
@@ -73,32 +64,13 @@ impl Link {
         priority: i32,
         retry_config: Option<&RetryConfig>,
         conn: Connection,
-        connections: LinkConnections,
+        // connections: LinkConnections,
     ) -> Result<(), SendToOneError> {
-        trace!(
-            "We have {} open connections to node {:?}.",
-            connections.len(),
-            conn.id()
-        );
-
         match conn.send_with(bytes, priority, retry_config).await {
             Ok(()) => Ok(()),
             Err(error) => {
-                error!(
-                    "Error sending out from link... We have {} open connections to node {:?}.",
-                    connections.len(),
-                    conn.id()
-                );
-                // clean up failing connections at once, no nead to leak it outside of here
-                // next send (e.g. when retrying) will use/create a new connection
-                let id = &conn.id();
-                // We could write just `self.connections.remove(id)`, but the library warns for `unused_results`.
-                {
-                    // Timeouts etc should register instantly so we should clean those up fair fast
-                    let _ = connections.remove(id);
-                }
+                error!("Error sending out from link.. {}.", conn.id());
 
-                debug!("Connection remove from link: {id:?}");
                 // dont close just let the conn timeout incase msgs are coming in...
                 // it's removed from out Peer tracking, so wont be used again for sending.
                 Err(SendToOneError::Send(error))
@@ -132,8 +104,6 @@ impl Link {
                 Ok(streams) => streams,
                 Err(stream_opening_err) => {
                     error!("{msg_id:?} Error opening streams {stream_opening_err:?}");
-                    // remove that broken conn
-                    let _conn = self.connections.remove(&conn_id);
 
                     return Err(stream_opening_err);
                 }
@@ -152,8 +122,6 @@ impl Link {
                     "Error sending bytes {msg_id:?} over stream {stream_id}: {:?}",
                     err
                 );
-                // remove that broken conn
-                let _conn = self.connections.remove(&conn_id);
             }
         }
 
@@ -162,8 +130,6 @@ impl Link {
             qp2p::SendError::StreamLost(qp2p::StreamError::Stopped(_)) => Ok(()),
             _ => {
                 error!("{msg_id:?} Error finishing up stream {stream_id}: {err:?}");
-                // remove that broken conn
-                let _conn = self.connections.remove(&conn_id);
                 Err(SendToOneError::Send(err))
             }
         })?;
@@ -186,54 +152,54 @@ impl Link {
         &mut self,
         msg_id: MsgId,
     ) -> Result<Connection, SendToOneError> {
-        if self.connections.is_empty() {
-            debug!(
-                "{msg_id:?} attempting to create a connection to {:?}",
-                self.peer
-            );
-            self.create_connection(msg_id).await
-        } else {
-            trace!(
-                "{msg_id:?} Grabbing a connection from link.. {:?}",
-                self.peer()
-            );
-            // TODO: add in simple connection check when available.
-            // we can then remove dead conns easily and return only valid conns
-            let connections = &self.connections;
-            let mut dead_conns = vec![];
-            let mut live_conn = None;
+        // if self.connections.is_empty() {
+        //     debug!(
+        //         "{msg_id:?} attempting to create a connection to {:?}",
+        //         self.peer
+        //     );
+        self.create_connection(msg_id).await
+        // } else {
+        //     trace!(
+        //         "{msg_id:?} Grabbing a connection from link.. {:?}",
+        //         self.peer()
+        //     );
+        //     // TODO: add in simple connection check when available.
+        //     // we can then remove dead conns easily and return only valid conns
+        //     let connections = &self.connections;
+        //     let mut dead_conns = vec![];
+        //     let mut live_conn = None;
 
-            for entry in connections.iter() {
-                let conn = entry.value().clone();
-                let conn_id = conn.id();
+        //     for entry in connections.iter() {
+        //         let conn = entry.value().clone();
+        //         let conn_id = conn.id();
 
-                let is_valid = conn.open_bi().await.is_ok();
+        //         let is_valid = conn.open_bi().await.is_ok();
 
-                if !is_valid {
-                    dead_conns.push(conn_id);
-                    continue;
-                }
-                //we have a conn
-                live_conn = Some(conn);
-                break;
-            }
+        //         if !is_valid {
+        //             dead_conns.push(conn_id);
+        //             continue;
+        //         }
+        //         //we have a conn
+        //         live_conn = Some(conn);
+        //         break;
+        //     }
 
-            // cleanup dead conns
-            for dead_conn in dead_conns {
-                let _gone = self.connections.remove(&dead_conn);
-            }
+        //     // cleanup dead conns
+        //     for dead_conn in dead_conns {
+        //         let _gone = self.connections.remove(&dead_conn);
+        //     }
 
-            if let Some(conn) = live_conn {
-                trace!("{msg_id:?} live connection found to {:?}", self.peer());
-                Ok(conn)
-            } else {
-                trace!(
-                    "{msg_id:?} No live connection found to {:?}, creating a new one.",
-                    self.peer()
-                );
-                self.create_connection(msg_id).await
-            }
-        }
+        //     if let Some(conn) = live_conn {
+        //         trace!("{msg_id:?} live connection found to {:?}", self.peer());
+        //         Ok(conn)
+        //     } else {
+        //         trace!(
+        //             "{msg_id:?} No live connection found to {:?}, creating a new one.",
+        //             self.peer()
+        //         );
+        //         self.create_connection(msg_id).await
+        //     }
+        // }
     }
 
     async fn create_connection(&mut self, msg_id: MsgId) -> Result<Connection, SendToOneError> {
@@ -251,20 +217,20 @@ impl Link {
             conn.id()
         );
 
-        self.insert(conn.clone());
+        // self.insert(conn.clone());
 
         self.listener.listen(conn.clone(), incoming_msgs);
 
         Ok(conn)
     }
 
-    fn insert(&mut self, conn: Connection) {
-        let id = conn.id();
-        debug!("Inserting connection into link store: {id:?}");
+    // fn insert(&mut self, conn: Connection) {
+    //     let id = conn.id();
+    //     debug!("Inserting connection into link store: {id:?}");
 
-        let _ = self.connections.insert(id.clone(), conn);
-        debug!("Connection INSERTED into link store: {id:?}");
-    }
+    //     // let _ = self.connections.insert(id.clone(), conn);
+    //     debug!("Connection INSERTED into link store: {id:?}");
+    // }
 }
 
 /// Errors that can be returned from `Comm::send_to_one`.

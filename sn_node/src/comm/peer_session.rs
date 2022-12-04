@@ -34,7 +34,6 @@ const MAX_SENDJOB_RETRIES: usize = 3;
 #[derive(Debug)]
 enum SessionCmd {
     Send(SendJob),
-    AddConnection(qp2p::Connection),
     Terminate,
 }
 
@@ -54,15 +53,6 @@ impl PeerSession {
         PeerSession {
             channel: sender,
             link,
-        }
-    }
-
-    // this must be restricted somehow, we can't allow an unbounded inflow
-    // of connections from a peer...
-    pub(crate) async fn add(&self, conn: qp2p::Connection) {
-        let cmd = SessionCmd::AddConnection(conn.clone());
-        if let Err(e) = self.channel.send(cmd).await {
-            error!("Error while sending AddConnection {e:?}");
         }
     }
 
@@ -199,10 +189,6 @@ impl PeerSessionWorker {
                         }
                     }
                 }
-                SessionCmd::AddConnection(conn) => {
-                    self.link.add(conn);
-                    SessionStatus::Ok
-                }
                 SessionCmd::Terminate => SessionStatus::Terminating,
             };
 
@@ -237,8 +223,6 @@ impl PeerSessionWorker {
         }
 
         let queue = self.queue.clone();
-        let link_connections = self.link.connections.clone();
-        let conns_count = self.link.connections.len();
         let the_peer = *self.link.peer();
 
         let mut link = self.link.clone();
@@ -251,12 +235,6 @@ impl PeerSessionWorker {
                 Ok(conn) => conn,
                 Err(error) => {
                     error!("Error when attempting to send to peer. Job will be reenqueued for another attempt after a small timeout");
-
-                    // only increment connection attempts if our connections set is empty
-                    // and so we'll be trying to create a fresh connection
-                    if link.connections.is_empty() {
-                        job.connection_retries += 1;
-                    }
 
                     job.reporter
                         .send(SendStatus::TransientError(format!("{error:?}")));
@@ -271,15 +249,15 @@ impl PeerSessionWorker {
                 }
             };
 
-            let connection_id = conn.id();
-            debug!("Connection exists for sendjob: {id:?}, and has conn_id: {connection_id:?}");
+            // let connection_id = conn.id();
+            // debug!("Connection exists for sendjob: {id:?}, ");
 
             let send_resp = Link::send_with_connection(
                 job.bytes.clone(),
                 0,
                 Some(&RetryConfig::default()),
                 conn,
-                link_connections,
+                // link_connections,
             )
             .await;
 
@@ -289,20 +267,14 @@ impl PeerSessionWorker {
                 }
                 Err(err) => {
                     if err.is_local_close() {
-                        debug!("Peer linked dropped when trying to send {:?}. But link has {:?} connections", id, conns_count );
+                        debug!("Peer linked dropped when trying to send {:?}.", id);
                         error!("the error on send :{err:?}");
                         // we can retry if we've more connections!
-                        if conns_count <= 1 {
-                            debug!(
-                                "No connections left on this link to {:?}, terminating session.",
-                                the_peer
-                            );
-                            job.connection_retries += 1;
-                        }
+                        job.connection_retries += 1;
                     }
 
                     warn!(
-                        "Transient error while attempting to send, re-enqueing job {id:?} {err:?}. Connection id was {:?}",connection_id
+                        "Transient error while attempting to send, re-enqueing job {id:?} {err:?}."
                     );
 
                     // we await here in case the connection is fresh and has not yet been added

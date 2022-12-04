@@ -271,8 +271,6 @@ impl Comm {
         if let Some(entry) = self.sessions.get(peer) {
             // peer already exists
             let peer_session = entry.value();
-            // add to it
-            peer_session.add(conn).await;
         } else {
             let link = Link::new_with(
                 *peer,
