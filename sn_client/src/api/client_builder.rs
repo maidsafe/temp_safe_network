@@ -14,7 +14,7 @@
 //! # Ok(())
 //! # }
 //! ```
-use crate::{connections::Session, Client, Error, DEFAULT_NETWORK_CONTACTS_FILE_NAME};
+use crate::{sessions::Session, Client, Error, DEFAULT_NETWORK_CONTACTS_FILE_NAME};
 
 use qp2p::Config as Qp2pConfig;
 use sn_dbc::Owner;

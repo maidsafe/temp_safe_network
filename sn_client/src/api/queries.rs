@@ -9,7 +9,7 @@
 // use std::collections::BTreeSet;
 
 use super::Client;
-use crate::{connections::QueryResult, errors::Error};
+use crate::{errors::Error, sessions::QueryResult};
 
 use sn_interface::{
     data_copy_count,

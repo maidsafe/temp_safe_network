@@ -7,14 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{MsgResponse, QueryResult, Session};
-use crate::{Error, Result};
+use crate::{Error, LinkError, Result};
 use sn_interface::{
     messaging::{
         data::{DataQuery, DataQueryVariant, QueryResponse},
         ClientAuth, Dst, MsgId, MsgKind, WireMsg,
     },
     network_knowledge::supermajority,
-    types::{ChunkAddress, Peer, SendToOneError},
+    types::{ChunkAddress, Peer},
 };
 
 use bytes::Bytes;
@@ -481,7 +481,7 @@ impl Session {
                                 .recv_stream_listener(msg_id, peer, peer_index, recv_stream)
                                 .await;
                         }
-                        Err(SendToOneError::Send(error @ SendError::ConnectionLost(_)))
+                        Err(LinkError::Send(error @ SendError::ConnectionLost(_)))
                             if !connect_now =>
                         {
                             warn!("Connection lost to {peer:?}: {error}");
@@ -495,7 +495,7 @@ impl Session {
                             continue;
                         }
                         #[cfg(features = "chaos")]
-                        Err(SendToOneError::ChaosNoConnection) => {
+                        Err(LinkError::ChaosNoConnection) => {
                             session.peer_links.remove_link_from_peer_links(peer).await;
                             break MsgResponse::Failure(peer.addr(), Error::ChoasSendFail);
                         }

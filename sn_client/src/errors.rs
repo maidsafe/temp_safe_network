@@ -6,13 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::LinkError;
+
 use sn_interface::{
     messaging::{
         data::{DataQueryVariant, Error as ErrorMsg, QueryResponse},
         system::NodeMsg,
         Error as MessagingError, MsgId, MsgType,
     },
-    types::{Error as DtError, Peer, SendToOneError},
+    types::{Error as DtError, Peer},
 };
 
 use bls::PublicKey;
@@ -256,7 +258,7 @@ pub enum Error {
         /// Id of the message to be sent
         msg_id: MsgId,
         /// The error encountered when trying to initiate a bi-stream
-        error: SendToOneError,
+        error: LinkError,
     },
     /// Could not chunk all the data required to encrypt the data. (Expected, Actual)
     #[error("Not all data was chunked, expected {expected}, but we have {chunked}.)")]
@@ -317,6 +319,6 @@ pub enum DataReplicasCheckError {
         /// Query sent to data replicas
         query: DataQueryVariant,
         /// List of responses received with their corresponding replica/Adult index
-        responses: Vec<(crate::connections::QueryResult, usize)>,
+        responses: Vec<(crate::sessions::QueryResult, usize)>,
     },
 }
