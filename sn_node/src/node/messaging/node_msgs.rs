@@ -376,7 +376,7 @@ impl MyNode {
             }
             NodeMsg::NodeDataCmd(NodeDataCmd::RecordStorageLevel { node_id, level, .. }) => {
                 let mut node = node.write().await;
-                debug!("[NODE WRITE]: RecordStorage write gottt...");
+                debug!("[NODE WRITE]: RecordStorage write got for {node_id} : {level:?}.");
                 let changed = node.set_storage_level(&node_id, level);
                 if changed && level.value() == MIN_LEVEL_WHEN_FULL {
                     // ..then we accept a new node in place of the full node

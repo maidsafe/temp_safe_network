@@ -41,7 +41,7 @@ const ADULT_REPONSE_TIMEOUT: Duration = Duration::from_secs(7);
 impl MyNode {
     // Locate ideal holders for this data, instruct them to store the data
     pub(crate) async fn replicate_data_to_adults(
-        snapshot: &NodeContext,
+        context: &NodeContext,
         data: ReplicatedData,
         msg_id: MsgId,
         targets: BTreeSet<Peer>,
@@ -58,8 +58,8 @@ impl MyNode {
         let msg = NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateOneData(data));
         let mut send_tasks = vec![];
 
-        let (kind, payload) = MyNode::serialize_node_msg(snapshot.name, msg)?;
-        let section_key = snapshot.network_knowledge.section_key();
+        let (kind, payload) = MyNode::serialize_node_msg(context.name, msg)?;
+        let section_key = context.network_knowledge.section_key();
 
         debug!("replication read locks got");
         // drop the read lock before we do anything async
@@ -73,7 +73,7 @@ impl MyNode {
                 msg_id,
             )?;
 
-            let comm = snapshot.comm.clone();
+            let comm = context.comm.clone();
             info!("About to send {msg_id:?} to holder: {:?}", &target);
 
             send_tasks.push(
@@ -97,7 +97,7 @@ impl MyNode {
 
     // Locate ideal holders for this data, instruct them to store the data
     pub(crate) async fn replicate_data_to_adults_and_ack_to_client(
-        snapshot: &NodeContext,
+        context: &NodeContext,
         cmd: DataCmd,
         data: ReplicatedData,
         msg_id: MsgId,
@@ -106,7 +106,7 @@ impl MyNode {
     ) -> Result<()> {
         let targets_len = targets.len();
 
-        let responses = MyNode::replicate_data_to_adults(snapshot, data, msg_id, targets).await?;
+        let responses = MyNode::replicate_data_to_adults(context, data, msg_id, targets).await?;
         let mut success_count = 0;
         let mut ack_response = None;
         let mut last_error = None;
@@ -128,7 +128,7 @@ impl MyNode {
         if success_count == targets_len {
             if let Some(response) = ack_response {
                 MyNode::respond_to_client_on_stream(
-                    snapshot,
+                    context,
                     response,
                     client_response_stream.clone(),
                 )
@@ -142,7 +142,7 @@ impl MyNode {
 
             if let Some(error) = last_error {
                 MyNode::send_cmd_error_response_over_stream(
-                    snapshot,
+                    context,
                     cmd,
                     error,
                     msg_id,
@@ -157,7 +157,7 @@ impl MyNode {
 
     /// Parses WireMsg and if DataStored Ack, we send a response to the client
     async fn respond_to_client_on_stream(
-        snapshot: &NodeContext,
+        context: &NodeContext,
         response: WireMsg,
         send_stream: Arc<Mutex<SendStream>>,
     ) -> Result<()> {
@@ -175,11 +175,11 @@ impl MyNode {
                 correlation_id,
             };
 
-            let (kind, payload) = MyNode::serialize_client_msg_response(snapshot.name, client_msg)?;
+            let (kind, payload) = MyNode::serialize_client_msg_response(context.name, client_msg)?;
 
             debug!("{correlation_id:?} sending cmd response ack back to client");
             MyNode::send_msg_on_stream(
-                snapshot.network_knowledge.section_key(),
+                context.network_knowledge.section_key(),
                 payload,
                 kind,
                 send_stream,
@@ -196,7 +196,7 @@ impl MyNode {
 
     /// Find target adult, sends a bidi msg, awaiting response, and then sends this on to the client
     pub(crate) async fn read_data_from_adult_and_respond_to_client(
-        snapshot: NodeContext,
+        context: NodeContext,
         query: DataQuery,
         msg_id: MsgId,
         auth: AuthorityProof<ClientAuth>,
@@ -214,7 +214,11 @@ impl MyNode {
             operation_id
         );
 
-        let targets = MyNode::target_data_holders_including_full(&snapshot, address.name());
+        let targets = MyNode::target_data_holders_including_full(
+            &context.full_adults,
+            context.network_knowledge.adults(),
+            address.name(),
+        );
 
         // Query only the nth adult
         let target = if let Some(peer) = targets.iter().nth(query.adult_index) {
@@ -222,13 +226,13 @@ impl MyNode {
         } else {
             debug!("No targets found for {msg_id:?}");
             let error = Error::InsufficientAdults {
-                prefix: snapshot.network_knowledge.prefix(),
+                prefix: context.network_knowledge.prefix(),
                 expected: query.adult_index as u8 + 1,
                 found: targets.len() as u8,
             };
 
             MyNode::send_query_error_response_on_stream(
-                snapshot,
+                context,
                 error,
                 &query.variant,
                 source_client,
@@ -247,12 +251,12 @@ impl MyNode {
             operation_id,
         });
 
-        let (kind, payload) = MyNode::serialize_node_msg(snapshot.name, msg)?;
+        let (kind, payload) = MyNode::serialize_node_msg(context.name, msg)?;
 
-        let comm = snapshot.comm.clone();
+        let comm = context.comm.clone();
 
         let bytes_to_adult = MyNode::form_usr_msg_bytes_to_node(
-            snapshot.network_knowledge.section_key(),
+            context.network_knowledge.section_key(),
             payload,
             kind,
             Some(target),
@@ -289,10 +293,10 @@ impl MyNode {
                 correlation_id: msg_id,
             };
 
-            let (kind, payload) = MyNode::serialize_client_msg_response(snapshot.name, client_msg)?;
+            let (kind, payload) = MyNode::serialize_client_msg_response(context.name, client_msg)?;
 
             MyNode::send_msg_on_stream(
-                snapshot.network_knowledge.section_key(),
+                context.network_knowledge.section_key(),
                 payload,
                 kind,
                 client_response_stream,
@@ -440,13 +444,11 @@ impl MyNode {
     /// Construct list of adults that hold target data, including full nodes.
     /// List is sorted by distance from `target`.
     fn target_data_holders_including_full(
-        snapshot: &NodeContext,
+        full_adults: &BTreeSet<XorName>,
+        all_adults: BTreeSet<Peer>,
         target: &XorName,
     ) -> BTreeSet<Peer> {
-        let full_adults = &snapshot.full_adults;
-        let adults = snapshot.network_knowledge.adults();
-
-        let mut candidates = adults
+        let mut candidates = all_adults
             .clone()
             .into_iter()
             .sorted_by(|lhs, rhs| target.cmp_distance(&lhs.name(), &rhs.name()))
@@ -464,31 +466,41 @@ impl MyNode {
         // Full adults that are close to the chunk, shall still be considered as candidates
         // to allow chunks stored to non-full adults can be queried when nodes become full.
         let candidates_clone = candidates.clone();
-        let close_full_adults = if let Some(closest_not_full) = candidates_clone.iter().next() {
-            full_adults
-                .iter()
-                .filter_map(|name| {
-                    if target.cmp_distance(name, &closest_not_full.name()) == Ordering::Less {
-                        // get the actual peer if closer
-                        let mut the_closer_peer = None;
-                        for adult in &adults {
-                            if &adult.name() == name {
-                                the_closer_peer = Some(adult)
+
+        // here we want to be closer than the _farthest_ "close" node.
+        // Nodes ABCDEF exist, data is targetting Cc/D (ie, slightly closer to C than D), it would originally be at BCDE
+        // So now nodes BC and E are full.
+        // We want all four to be included as well as any new nodes.
+        // The prev check had to be closer than the closest. (Only C was so close). So our only node actually storing
+        // data would have been D.
+
+        // nth is 0 indexed, hence -1 to account for that
+        let close_full_adults =
+            if let Some(closest_not_full) = candidates_clone.iter().nth(data_copy_count() - 1) {
+                full_adults
+                    .iter()
+                    .filter_map(|name| {
+                        if target.cmp_distance(name, &closest_not_full.name()) == Ordering::Less {
+                            // get the actual peer if closer
+                            let mut the_closer_peer = None;
+                            for adult in &all_adults {
+                                if &adult.name() == name {
+                                    the_closer_peer = Some(adult)
+                                }
                             }
+                            the_closer_peer
+                        } else {
+                            None
                         }
-                        the_closer_peer
-                    } else {
-                        None
-                    }
-                })
-                .collect::<BTreeSet<_>>()
-        } else {
-            // In case there is no empty candidates, query all full_adults
-            adults
-                .iter()
-                .filter(|peer| !full_adults.contains(&peer.name()))
-                .collect::<BTreeSet<_>>()
-        };
+                    })
+                    .collect::<BTreeSet<_>>()
+            } else {
+                // In case there is no empty candidates, query all full_adults
+                all_adults
+                    .iter()
+                    .filter(|peer| !full_adults.contains(&peer.name()))
+                    .collect::<BTreeSet<_>>()
+            };
 
         candidates.extend(close_full_adults);
         candidates
@@ -520,3 +532,106 @@ impl MyNode {
         candidates
     }
 }
+
+// #[cfg(test)]
+// mod tests {
+
+//     use sn_interface::types::Peer;
+//     use proptest::prelude::*;
+//     // use rand_07::{rngs::OsRng, seq::SliceRandom, thread_rng, Rng};
+//     use std::{
+//         collections::{BTreeMap, BTreeSet},
+//         sync::Arc, net::SocketAddr,
+//     };
+//     use xor_name::XorName;
+
+//     fn generate_xorname() -> impl Strategy<Value = XorName> {
+//         // get a random string
+//         let str_val = "[1-9]{32}[a-zA-Z]{32}[1-9]{32}[a-zA-Z]{32}[1-9]{32}[a-zA-Z]{32}";
+
+//         str_val.prop_map(|s| XorName::from_content(s.as_bytes()))
+//     }
+
+//     1, 2, 3, 4, 5, 6, 7, 8, 9
+
+//     4.5
+
+//     /// Generate proptest nodes, each a Xorname, this will generate nodes with different `NodeQualities`
+//     fn generate_peers(
+//         min: usize,
+//         max: usize,
+//     ) ->
+
+//     // bool isFull
+//     impl Strategy<Value = Vec<(bool, Peer)>> {
+
+//         // socket doesnt really matter for us here...
+//         let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+//         let peer = Peer::new(generate_xorname(), socket)
+//         prop::collection::vec(
+//             (
+//                 (),
+//                 peer
+//             ),
+//             min..max,
+//         )
+//         .prop_filter(
+//             "there should be at least two good and one bad node",
+//             |nodes| {
+//                 let mut good_len: f32 = 0.0;
+//                 let mut bad_len: f32 = 0.0;
+
+//                 for (_name, quality) in nodes {
+//                     match quality {
+//                         NodeQualityScored::Good(_) => good_len += 1.0,
+//                         NodeQualityScored::Bad(_) => bad_len += 1.0,
+//                     }
+//                 }
+
+//                 let byzantine_level = good_len / 3.0;
+
+//                 // we have at least one bad node
+//                 bad_len >= 1.0 &&
+//                 // at least two good
+//                 good_len >=2.0 &&
+//                 // we're not overly byzantine (ie no more than 30% bad)
+//                 byzantine_level >= 1.0 &&
+//                 // otherwise, 3 good and 2 bad nodes
+//                 byzantine_level > bad_len
+//             },
+//         )
+//     }
+//     proptest! {
+//         #[test]
+//         fn proptest_get_adults_with_data(
+//             data in generate_nodes_storing_data()
+//         ) {
+//             // Instantiate the same Register on two replicas
+//             let name = xor_name::rand::random();
+//             let tag = 45_000u64;
+//             let owner_keypair = Keypair::new_ed25519();
+//             let policy = Policy {
+//                 owner: User::Key(owner_keypair.public_key()),
+//                 permissions: BTreeMap::default(),
+//             };
+
+//             let mut replicas = gen_reg_replicas(
+//                 Some(owner_keypair.clone()),
+//                 name,
+//                 tag,
+//                 Some(policy),
+//                 2);
+//             let (_, mut replica1) = replicas.remove(0);
+//             let (_, mut replica2) = replicas.remove(0);
+
+//             // Write an item on replicas
+//             let (_, op) = replica1.write(random_register_entry(), BTreeSet::new())?;
+//             let write_op = sign_register_op(op, &owner_keypair)?;
+//             replica2.apply_op(write_op)?;
+
+//             verify_data_convergence(vec![replica1, replica2], 1)?;
+//         }
+
+//     }
+
+// }
