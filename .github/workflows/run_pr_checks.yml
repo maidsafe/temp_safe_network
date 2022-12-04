@@ -196,7 +196,7 @@ jobs:
           cp artifacts/sn_node ~/.safe/node
 
       - name: Start the network
-        run: ./artifacts/testnet --interval 30000
+        run: ./artifacts/testnet --interval 3000
         env:
           RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
 
@@ -299,7 +299,7 @@ jobs:
   #         cp artifacts/sn_node ~/.safe/node
 
   #     - name: Start the network
-  #       run: ./artifacts/testnet --interval 30000
+  #       run: ./artifacts/testnet --interval 3000
   #       env:
   #         RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
 
@@ -423,7 +423,7 @@ jobs:
           cp artifacts/sn_node ~/.safe/node
 
       - name: Start the network
-        run: ./artifacts/testnet --interval 30000
+        run: ./artifacts/testnet --interval 3000
         env:
           RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
 
@@ -528,7 +528,7 @@ jobs:
           cp artifacts/sn_node ~/.safe/node
 
       - name: Start the network
-        run: ./artifacts/testnet --interval 30000
+        run: ./artifacts/testnet --interval 3000
         env:
           RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
 
