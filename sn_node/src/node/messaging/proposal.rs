@@ -207,28 +207,12 @@ impl MyNode {
                                 sig2,
                             }),
                         _ => error!(
-                            "Inconsistent results when aggregating proposal from {}, {:?}",
-                            sender, msg_id,
-                        ),
+                            "Inconsistent results when aggregating proposal from {sender}, {msg_id:?}"),
                     },
-                    (Ok(None), Ok(None)) => {
-                        trace!(
-                            "Proposals from {} inserted in aggregator, not enough sig shares yet: {serialised_proposal_1:?} and {serialised_proposal_2:?} {:?}",
-                            sender,
-                            msg_id);
-                    }
-                    (_, Err(error)) | (Err(error), _) => {
-                        error!(
-                            "Failed to add proposal from {}, {:?}: {:?}",
-                            sender, msg_id, error
-                        );
-                    }
-                    (Ok(Some(_)), Ok(None)) | (Ok(None), Ok(Some(_))) => {
-                        warn!(
-                            "Unexpected aggregation result from {} {:?}: one sig is aggregated while the other is not. This should not happen.",
-                            sender,
-                            msg_id);
-                    }
+                    (Ok(None), Ok(None)) => trace!(
+                            "Proposals from {sender} inserted in aggregator, not enough sig shares yet: {serialised_proposal_1:?} and {serialised_proposal_2:?} {msg_id:?}"),
+                    (_, Err(error)) | (Err(error), _) => error!("Failed to add proposal from {sender}, {msg_id:?}: {error:?}"),
+                    (Ok(Some(_)), Ok(None)) | (Ok(None), Ok(Some(_))) => warn!("Unexpected aggregation result from {sender} {msg_id:?}: one sig is aggregated while the other is not. This should not happen."),
                 }
             }
         }
