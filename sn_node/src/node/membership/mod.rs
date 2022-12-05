@@ -162,6 +162,10 @@ impl Membership {
         }
     }
 
+    pub(crate) fn section_key_set(&self) -> PublicKeySet {
+        self.consensus.elders.clone()
+    }
+
     pub(crate) fn last_received_vote_time(&self) -> Option<Instant> {
         self.last_received_vote_time
     }

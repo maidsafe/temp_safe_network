@@ -427,10 +427,14 @@ mod core {
             }
         }
 
-        fn initialize_membership(&mut self, sap: SectionAuthorityProvider) -> Result<()> {
-            let key = self
-                .section_keys_provider
-                .key_share(&self.network_knowledge.section_key())?;
+        fn initialize_membership(&mut self, key: SectionKeyShare) -> bool {
+            let sap = self.network_knowledge.signed_sap().value;
+
+            if let Some(m) = self.membership.as_ref() {
+                if m.section_key_set().public_key() == sap.section_key() {
+                    return false;
+                }
+            }
 
             self.membership = Some(Membership::from(
                 (key.index as u8, key.secret_key_share),
@@ -439,29 +443,33 @@ mod core {
                 BTreeSet::from_iter(sap.members().cloned()),
             ));
 
-            Ok(())
+            true
         }
 
-        fn initialize_handover(&mut self) -> Result<()> {
-            let key = self
-                .section_keys_provider
-                .key_share(&self.network_knowledge.section_key())?;
-            let n_elders = self.network_knowledge.section_auth().elder_count();
+        fn initialize_handover(&mut self, key: SectionKeyShare) -> bool {
+            let sap = self.network_knowledge.signed_sap().value;
+
+            if let Some(h) = self.handover_voting.as_ref() {
+                if h.section_key_set().public_key() == sap.section_key() {
+                    return false;
+                }
+            }
 
             self.handover_voting = Some(Handover::from(
                 (key.index as u8, key.secret_key_share),
                 key.public_key_set,
-                n_elders,
+                sap.elders().count(),
             ));
 
-            Ok(())
+            true
         }
 
-        fn initialize_elder_state(&mut self) -> Result<()> {
-            let sap = self.network_knowledge.signed_sap().value;
-            self.initialize_membership(sap)?;
-            self.initialize_handover()?;
-            Ok(())
+        /// Initializes elder state given the elders key share.
+        /// Returns true if something was initialized, false otherwise.
+        fn initialize_elder_state(&mut self, key: SectionKeyShare) -> bool {
+            let mut updated = self.initialize_membership(key.clone());
+            updated |= self.initialize_handover(key);
+            updated
         }
 
         /// Updates various state if elders changed.
@@ -475,38 +483,36 @@ mod core {
             let old_prefix = old.network_knowledge.prefix();
             let old_section_key = old.network_knowledge.section_key();
 
-            if new_section_key == old_section_key {
-                // there was no change
-                return Ok(vec![]);
-            }
-
             let mut cmds = vec![];
 
-            // clean up DKG sessions 2 generations older than current
-            // `session_id.section_chain_len + 2 < current_chain_len`
+            // clean up DKG sessions 5 generations older than current
+            // `session_id.section_chain_len + 5 < current_chain_len`
             // we voluntarily keep the previous DKG rounds
             // so lagging elder candidates can still get responses to their gossip.
-            // At generation+2, they are not going to be elders anymore so we can safely discard it
+            // At generation+5, they are likely not going to be elders anymore so we can safely discard it
             let current_chain_len = self.network_knowledge.section_chain_len();
-            let mut old_hashes = vec![];
-            for (hash, session_info) in self.dkg_sessions_info.iter() {
-                if session_info.session_id.section_chain_len + 5 < current_chain_len {
-                    old_hashes.push(*hash);
+            let old_hashes = Vec::from_iter(
+                self.dkg_sessions_info
+                    .iter()
+                    .filter(|(_, info)| info.session_id.section_chain_len + 5 < current_chain_len)
+                    .map(|(hash, _)| *hash),
+            );
+            for hash in old_hashes {
+                if let Some(info) = self.dkg_sessions_info.remove(&hash) {
                     debug!(
-                        "Removing old DKG s{} of chain len {} when we are at {}",
-                        session_info.session_id.sh(),
-                        session_info.session_id.section_chain_len,
+                        "Removed old DKG s{} of chain len {} when we are at {}",
+                        info.session_id.sh(),
+                        info.session_id.section_chain_len,
                         current_chain_len
                     );
                 }
-            }
-            for hash in old_hashes {
-                let _ = self.dkg_sessions_info.remove(&hash);
                 self.dkg_voter.remove(&hash);
             }
 
-            // clean up pending split sections
-            self.pending_split_sections = Default::default();
+            if new_section_key != old_section_key {
+                // clean up pending split sections since they no longer apply to the new section
+                self.pending_split_sections = Default::default();
+            }
 
             if new.is_elder {
                 let sap = self.network_knowledge.section_auth();
@@ -523,33 +529,27 @@ mod core {
                 // Eventually our local DKG instance will complete and add our key_share to the
                 // `section_keys_provider` cache. Once that happens, this function will be called
                 // again and we can complete our Elder state transition.
-                let we_have_our_key_share_for_new_section_key = self
-                    .section_keys_provider
-                    .key_share(&new_section_key)
-                    .is_ok();
-
-                if we_have_our_key_share_for_new_section_key {
+                if let Ok(key) = self.section_keys_provider.key_share(&sap.section_key()) {
                     // The section-key has changed, we are now able to function as an elder.
-                    self.initialize_elder_state()?;
+                    if self.initialize_elder_state(key) {
+                        cmds.extend(self.trigger_dkg().await?);
 
-                    cmds.extend(self.trigger_dkg().await?);
-
-                    // Whenever there is an elders change, casting a round of joins_allowed
-                    // proposals to sync this particular state.
-                    cmds.extend(self.propose(Proposal::JoinsAllowed(self.joins_allowed))?);
+                        // Whenever there is an elders change, casting a round of joins_allowed
+                        // proposals to sync this particular state.
+                        cmds.extend(self.propose(Proposal::JoinsAllowed(self.joins_allowed))?);
+                    }
                 }
 
                 self.log_network_stats();
                 self.log_section_stats();
             } else {
-                // if not elder
+                // if not elder, clear elder-only state
                 self.handover_voting = None;
+                self.membership = None;
             }
 
             if new.is_elder || old.is_elder {
-                if let Some(cmd) = self.send_ae_update_to_our_section()? {
-                    cmds.push(cmd);
-                }
+                cmds.extend(self.send_ae_update_to_our_section()?);
             }
 
             let old_elders = old

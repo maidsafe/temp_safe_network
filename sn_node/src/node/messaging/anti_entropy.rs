@@ -263,24 +263,6 @@ impl MyNode {
         SectionTreeUpdate::new(signed_sap, proof_chain)
     }
 
-    /// returns (we_have_a_share_of_this_key, we_should_become_an_elder)
-    fn does_section_tree_update_make_us_an_elder_with_key(
-        context: &NodeContext,
-        section_tree_update: &SectionTreeUpdate,
-    ) -> (bool, bool) {
-        let our_name = context.name;
-        let sap = section_tree_update.signed_sap.clone();
-
-        let we_have_a_share_of_this_key = context
-            .section_keys_provider
-            .key_share(&sap.section_key())
-            .is_ok();
-
-        // check we should be _becoming_ an elder
-        let we_should_become_an_elder = sap.contains_elder(&our_name);
-        (we_have_a_share_of_this_key, we_should_become_an_elder)
-    }
-
     #[instrument(skip_all)]
     /// Test a context to see if we would update Network Knowledge
     /// returns
@@ -293,18 +275,6 @@ impl MyNode {
         members: Option<BTreeSet<SectionSigned<NodeState>>>,
     ) -> Result<bool> {
         let mut mutable_context = context.clone();
-        let (we_have_a_share_of_this_key, we_should_become_an_elder) =
-            MyNode::does_section_tree_update_make_us_an_elder_with_key(
-                context,
-                &section_tree_update,
-            );
-
-        trace!("we_have_a_share_of_this_key: {we_have_a_share_of_this_key}, we_should_become_an_elder: {we_should_become_an_elder}");
-
-        if we_should_become_an_elder && !we_have_a_share_of_this_key {
-            warn!("We should be an elder, but we're missing the keyshare!, ignoring update to wait until we have our keyshare");
-            return Ok(false);
-        };
 
         Ok(mutable_context
             .network_knowledge
@@ -322,22 +292,6 @@ impl MyNode {
         section_tree_update: SectionTreeUpdate,
         members: Option<BTreeSet<SectionSigned<NodeState>>>,
     ) -> Result<bool> {
-        let (we_have_a_share_of_this_key, we_should_become_an_elder) =
-            MyNode::does_section_tree_update_make_us_an_elder_with_key(
-                context,
-                &section_tree_update,
-            );
-
-        trace!("we_have_a_share_of_this_key: {we_have_a_share_of_this_key}, we_should_become_an_elder: {we_should_become_an_elder}");
-
-        // This prevent us from updating our NetworkKnowledge based on an AE message where
-        // we don't have the key share for the new SAP, making this node unable to sign section
-        // messages and possibly being kicked out of the group of Elders.
-        if we_should_become_an_elder && !we_have_a_share_of_this_key {
-            warn!("We should be an elder, but we're missing the keyshare!, ignoring update to wait until we have our keyshare");
-            return Ok(false);
-        };
-
         Ok(self.network_knowledge.update_knowledge_if_valid(
             section_tree_update,
             members,

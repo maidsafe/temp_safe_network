@@ -773,21 +773,14 @@ impl MyNode {
 
         let context = self.context();
 
-        // If we are lagging, we may have been already approved as new Elder, and
-        // an AE update provided us with this same SAP but already signed by previous Elders,
-        // if so we can skip the RequestHandover agreement proposal phase.
-        if self
-            .network_knowledge
-            .try_update_current_sap(key_share_pk, &sap.prefix())
-        {
-            self.update_on_elder_change(&context).await
-        } else {
-            // This proposal is sent to the current set of elders to be aggregated
-            // and section signed.
-            let proposal = Proposal::RequestHandover(sap);
-            let recipients: Vec<_> = self.network_knowledge.section_auth().elders_vec();
-            self.send_proposal_with(recipients, proposal, &key_share)
-        }
+        let mut cmds = self.update_on_elder_change(&context).await?;
+        // This proposal is sent to the current set of elders to be aggregated
+        // and section signed.
+        let proposal = Proposal::RequestHandover(sap);
+        let recipients: Vec<_> = self.network_knowledge.section_auth().elders_vec();
+        cmds.extend(self.send_proposal_with(recipients, proposal, &key_share)?);
+
+        Ok(cmds)
     }
 }
 

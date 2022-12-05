@@ -120,6 +120,10 @@ impl Handover {
         self.gen
     }
 
+    pub(crate) fn section_key_set(&self) -> PublicKeySet {
+        self.consensus.elders.clone()
+    }
+
     fn handle_outdated_signed_vote(
         &mut self,
         signed_vote: SignedVote<SapCandidate>,
