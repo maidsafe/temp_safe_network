@@ -219,8 +219,12 @@ impl MyNode {
         // We need to generate the proof chain to connect our current chain to new SAP.
         match section_chain.insert(&last_key, signed_sap.section_key(), section_sig.signature) {
             Ok(()) => {
-                let section_tree_update = SectionTreeUpdate::new(signed_sap, section_chain);
-                match self.update_network_knowledge(&self.context(), section_tree_update, None) {
+                let update = SectionTreeUpdate::new(signed_sap, section_chain);
+                let name = self.context().name;
+                match self
+                    .network_knowledge
+                    .update_knowledge_if_valid(update, None, &name)
+                {
                     Ok(true) => {
                         info!("Updated our network knowledge for {:?}", prefix);
                         info!("Writing updated knowledge to disk");

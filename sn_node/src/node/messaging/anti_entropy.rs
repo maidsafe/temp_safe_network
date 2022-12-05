@@ -15,10 +15,10 @@ use sn_dysfunction::IssueType;
 use sn_interface::{
     messaging::{
         data::ClientDataResponse,
-        system::{AntiEntropyKind, NodeDataCmd, NodeMsg, SectionSigned},
+        system::{AntiEntropyKind, NodeDataCmd, NodeMsg},
         Dst, MsgId, MsgType, WireMsg,
     },
-    network_knowledge::{NodeState, SectionTreeUpdate},
+    network_knowledge::SectionTreeUpdate,
     types::{log_markers::LogMarker, Peer, PublicKey},
 };
 use std::{collections::BTreeSet, sync::Arc};
@@ -264,42 +264,6 @@ impl MyNode {
     }
 
     #[instrument(skip_all)]
-    /// Test a context to see if we would update Network Knowledge
-    /// returns
-    ///   Ok(true) if the update had new valid information
-    ///   Ok(false) if the update was valid but did not contain new information
-    ///   Err(_) if the update was invalid
-    pub(crate) fn would_we_update_network_knowledge(
-        context: &NodeContext,
-        section_tree_update: SectionTreeUpdate,
-        members: Option<BTreeSet<SectionSigned<NodeState>>>,
-    ) -> Result<bool> {
-        let mut mutable_context = context.clone();
-
-        Ok(mutable_context
-            .network_knowledge
-            .update_knowledge_if_valid(section_tree_update, members, &context.name)?)
-    }
-
-    // Update's Network Knowledge
-    // returns
-    //   Ok(true) if the update had new valid information
-    //   Ok(false) if the update was valid but did not contain new information
-    //   Err(_) if the update was invalid
-    pub(crate) fn update_network_knowledge(
-        &mut self,
-        context: &NodeContext,
-        section_tree_update: SectionTreeUpdate,
-        members: Option<BTreeSet<SectionSigned<NodeState>>>,
-    ) -> Result<bool> {
-        Ok(self.network_knowledge.update_knowledge_if_valid(
-            section_tree_update,
-            members,
-            &context.name,
-        )?)
-    }
-
-    #[instrument(skip_all)]
     pub(crate) async fn handle_anti_entropy_msg(
         node: Arc<RwLock<MyNode>>,
         starting_context: NodeContext,
@@ -320,19 +284,25 @@ impl MyNode {
 
         // block off the write lock
         let updated = {
-            let should_update = MyNode::would_we_update_network_knowledge(
-                &starting_context,
-                section_tree_update.clone(),
-                members.clone(),
-            )?;
+            let should_update = starting_context
+                .clone()
+                .network_knowledge
+                .update_knowledge_if_valid(
+                    section_tree_update.clone(),
+                    members.clone(),
+                    &starting_context.name,
+                )?;
+
             if should_update {
                 let mut write_locked_node = node.write().await;
                 debug!("[NODE WRITE]: handling AE write gottt...");
-                let updated = write_locked_node.update_network_knowledge(
-                    &starting_context,
-                    section_tree_update,
-                    members,
-                )?;
+                let updated = write_locked_node
+                    .network_knowledge
+                    .update_knowledge_if_valid(
+                        section_tree_update,
+                        members,
+                        &starting_context.name,
+                    )?;
                 debug!("net knowledge udpated");
                 // always run this, only changes will trigger events
                 cmds.extend(
@@ -686,7 +656,11 @@ mod tests {
         // now let's insert the other SAP to make it aware of the other prefix
         let section_tree_update =
             SectionTreeUpdate::new(other_sap.clone(), other_section.section_chain());
-        assert!(node.update_network_knowledge(&context, section_tree_update, None,)?);
+        assert!(node.network_knowledge.update_knowledge_if_valid(
+            section_tree_update,
+            None,
+            &context.name,
+        )?);
 
         let new_context = node.context();
         // and it now shall give us an AE redirect msg
