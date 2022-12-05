@@ -647,7 +647,7 @@ mod core {
             let _handle = tokio::spawn(async move {
                 if let Err(error) = dysf_sender.send(DysCmds::TrackIssue(name, issue)).await {
                     // Log the issue, and error. We need to be wary of actually hitting this.
-                    error!("Could not send DysCmds through dysfunctional_cmds_tx: {error}");
+                    warn!("Could not send DysCmds through dysfunctional_cmds_tx: {error}");
                 }
             });
         }
@@ -660,7 +660,7 @@ mod core {
             // TODO: do we need to kill the node if we fail tracking dysf?
             let _handle = tokio::spawn(async move {
                 if let Err(error) = dysf_sender.send(DysCmds::UntrackIssue(name, issue)).await {
-                    error!("Could not send DysCmds through dysfunctional_cmds_tx: {error}");
+                    warn!("Could not send DysCmds through dysfunctional_cmds_tx: {error}");
                 }
             });
         }
