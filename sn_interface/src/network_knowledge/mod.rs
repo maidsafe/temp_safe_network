@@ -61,19 +61,18 @@ pub const DEFAULT_ELDER_COUNT: usize = 7;
 pub fn elder_count() -> usize {
     // if we have an env var for this, lets override
     match std::env::var(SN_ELDER_COUNT) {
-        Ok(count) => match count.parse() {
-            Ok(count) => {
-                warn!(
-                    "ELDER_COUNT count set from env var SN_ELDER_COUNT: {:?}",
-                    SN_ELDER_COUNT
-                );
-                count
+        Ok(count) => {
+            match count.parse() {
+                Ok(count) => {
+                    warn!("ELDER_COUNT count set from env var SN_ELDER_COUNT: {SN_ELDER_COUNT:?}={count}");
+                    count
+                }
+                Err(error) => {
+                    warn!("There was an error parsing {SN_ELDER_COUNT:?} env var. DEFAULT_ELDER_COUNT={DEFAULT_ELDER_COUNT} will be used: {error:?}");
+                    DEFAULT_ELDER_COUNT
+                }
             }
-            Err(error) => {
-                warn!("There was an error parsing {:?} env var. DEFAULT_ELDER_COUNT will be used: {:?}", SN_ELDER_COUNT, error);
-                DEFAULT_ELDER_COUNT
-            }
-        },
+        }
         Err(_) => DEFAULT_ELDER_COUNT,
     }
 }

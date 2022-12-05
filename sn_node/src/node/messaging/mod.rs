@@ -46,6 +46,19 @@ impl Peers {
     }
 }
 
+impl IntoIterator for Peers {
+    type Item = Peer;
+
+    type IntoIter = Box<dyn Iterator<Item = Self::Item>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            Peers::Single(p) => Box::new(std::iter::once(p)),
+            Peers::Multiple(ps) => Box::new(ps.into_iter()),
+        }
+    }
+}
+
 // Message handling
 impl MyNode {
     #[instrument(skip(node))]

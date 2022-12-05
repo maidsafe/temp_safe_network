@@ -771,14 +771,15 @@ impl MyNode {
         // it to sign any msg that needs section agreement.
         self.section_keys_provider.insert(key_share.clone());
 
-        let context = self.context();
+        let mut cmds = self.update_on_elder_change(&self.context()).await?;
 
-        let mut cmds = self.update_on_elder_change(&context).await?;
-        // This proposal is sent to the current set of elders to be aggregated
-        // and section signed.
-        let proposal = Proposal::RequestHandover(sap);
-        let recipients: Vec<_> = self.network_knowledge.section_auth().elders_vec();
-        cmds.extend(self.send_proposal_with(recipients, proposal, &key_share)?);
+        if !self.network_knowledge.has_chain_key(&sap.section_key()) {
+            // This proposal is sent to the current set of elders to be aggregated
+            // and section signed.
+            let proposal = Proposal::RequestHandover(sap);
+            let recipients: Vec<_> = self.network_knowledge.section_auth().elders_vec();
+            cmds.extend(self.send_proposal_with(recipients, proposal, &key_share)?);
+        }
 
         Ok(cmds)
     }
@@ -914,8 +915,7 @@ mod tests {
         let mut new_sk_shares: BTreeMap<XorName, SectionKeyShare> = BTreeMap::new();
         let mut new_sap: BTreeSet<SectionAuthorityProvider> = BTreeSet::new();
         let mut lagging = false;
-        let mut done = false;
-        while !done {
+        while !MyNodeInstance::is_msg_queue_empty(&node_instances).await {
             // For every msg in `msg_queue` for every node instance, 1) handle the msg 2) handle the cmds
             // 3) if the cmds produce more msgs, add them to the `msg_queue` of the respective peer
             let mut msgs_to_other_nodes = Vec::new();
@@ -1050,9 +1050,6 @@ mod tests {
 
             // add the msgs to the msg_queue of each node
             MyNodeInstance::add_msgs_to_queue(&mut node_instances, msgs_to_other_nodes).await;
-
-            // done if the queues are empty
-            done = MyNodeInstance::is_msg_queue_empty(&node_instances).await;
         }
 
         // dkg done, make sure the new key share is valid
@@ -1427,20 +1424,30 @@ mod tests {
             sap: SectionAuthorityProvider,
             key_share: SectionKeyShare,
         ) -> Result<(MockSystemMsg, Vec<Peer>)> {
-            let mut cmds = self.handle_dkg_outcome(sap, key_share).await?;
-            // contains only the SendMsg for RequestHandover proposal
-            assert_eq!(cmds.len(), 1);
-            if let Cmd::SendMsg {
-                msg,
-                msg_id,
-                recipients,
-                ..
-            } = cmds.remove(0)
-            {
-                self.mock_send_msg(msg, msg_id, recipients)
-            } else {
-                Err(eyre!("Should be Cmd::SendMsg"))
+            for cmd in self.handle_dkg_outcome(sap, key_share).await? {
+                let (msg, msg_id, recipients) = match cmd {
+                    Cmd::SendMsg {
+                        msg,
+                        msg_id,
+                        recipients,
+                        ..
+                    } => (msg, msg_id, recipients),
+                    _ => continue,
+                };
+
+                // contains only the SendMsg for RequestHandover proposal
+                if matches!(
+                    msg,
+                    NodeMsg::Propose {
+                        proposal: Proposal::RequestHandover(..),
+                        ..
+                    }
+                ) {
+                    return self.mock_send_msg(msg, msg_id, recipients);
+                }
             }
+
+            Err(eyre!("Did not receive propose msg"))
         }
     }
 }
