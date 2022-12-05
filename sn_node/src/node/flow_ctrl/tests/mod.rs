@@ -1111,13 +1111,15 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
 fn get_single_sig(proposal: &Proposal) -> Result<Vec<u8>> {
     match proposal.as_signable_bytes()? {
         itertools::Either::Left(bytes) => Ok(bytes),
-        itertools::Either::Right(_) => bail!("Invalid expectations! Use another proposal variant."),
+        itertools::Either::Right(_) => {
+            panic!("Invalid expectations! Use another proposal variant.")
+        }
     }
 }
 
 fn get_double_sig(proposal: &Proposal) -> Result<(Vec<u8>, Vec<u8>)> {
     match proposal.as_signable_bytes()? {
-        itertools::Either::Left(_) => bail!("Invalid expectations! Use another proposal variant."),
+        itertools::Either::Left(_) => panic!("Invalid expectations! Use another proposal variant."),
         itertools::Either::Right((bytes1, bytes2)) => Ok((bytes1, bytes2)),
     }
 }
