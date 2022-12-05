@@ -40,8 +40,8 @@ use sn_interface::{
     },
     network_knowledge::{
         recommended_section_size, supermajority, Error as NetworkKnowledgeError, MembershipState,
-        MyNodeInfo, NodeState, RelocateDetails, SectionAuthorityProvider, SectionKeysProvider,
-        SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
+        MyNodeInfo, NodeState, RelocateDetails, SapCandidate, SectionAuthorityProvider,
+        SectionKeysProvider, SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
     },
     test_utils::*,
     types::{keys::ed25519, PublicKey, ReplicatedData},
@@ -296,7 +296,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let node_state = NodeState::left(node_state, None);
 
     let proposal = Proposal::VoteNodeOffline(node_state.clone());
-    let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &proposal.as_signable_bytes()?);
+    let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &get_single_sig(&proposal)?);
 
     let _cmds = run_and_collect_cmds(Cmd::HandleAgreement { proposal, sig }, &dispatcher).await?;
 
@@ -325,7 +325,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
 
     // Handle agreement on the Offline proposal
     let proposal = Proposal::VoteNodeOffline(remove_elder.clone());
-    let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &proposal.as_signable_bytes()?);
+    let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &get_single_sig(&proposal)?);
 
     let _cmds = run_and_collect_cmds(Cmd::HandleAgreement { proposal, sig }, &dispatcher).await?;
 
@@ -676,9 +676,8 @@ async fn handle_elders_update() -> Result<()> {
     // Create `HandleAgreement` cmd for an `NewElders` proposal. This will demote one of the
     // current elders and promote the oldest peer.
     let elders_1: BTreeSet<_> = sap1.elders_set();
-    let proposal = Proposal::NewElders(sap1.clone());
-    let sig =
-        TestKeys::get_section_sig_bytes(&sk_set0.secret_key(), &proposal.as_signable_bytes()?);
+    let proposal = Proposal::HandoverCompleted(SapCandidate::ElderHandover(sap1.clone()));
+    let sig = TestKeys::get_section_sig_bytes(&sk_set0.secret_key(), &get_single_sig(&proposal)?);
 
     let cmds = run_and_collect_cmds(
         Cmd::HandleNewEldersAgreement {
@@ -812,30 +811,30 @@ async fn handle_demote_during_split() -> Result<()> {
 
     let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
 
-    // Create agreement on `OurElder` for both sub-sections
-    let create_our_elders_cmd = |signed_sap: SectionSigned<SectionAuthorityProvider>| -> Result<_> {
-        let proposal = Proposal::NewElders(signed_sap.clone());
-        let sig = TestKeys::get_section_sig_bytes(
-            &sk_set_gen.secret_key(),
-            &proposal.as_signable_bytes()?,
-        );
-        Ok(Cmd::HandleNewEldersAgreement {
-            new_elders: signed_sap,
-            sig,
+    type Sap = SectionSigned<SectionAuthorityProvider>;
+    // Create agreement on `HandoverCompleted` for both sub-sections
+    let create_our_elders_cmd = |sap1: Sap, sap2: Sap| -> Result<_> {
+        let proposal =
+            Proposal::HandoverCompleted(SapCandidate::SectionSplit(sap1.clone(), sap2.clone()));
+        let (bytes1, bytes2) = get_double_sig(&proposal)?;
+        let sig1 = TestKeys::get_section_sig_bytes(&sk_set_gen.secret_key(), &bytes1);
+        let sig2 = TestKeys::get_section_sig_bytes(&sk_set_gen.secret_key(), &bytes2);
+
+        Ok(Cmd::HandleNewSectionsAgreement {
+            sap1,
+            sig1,
+            sap2,
+            sig2,
         })
     };
 
-    // Handle agreement on `NewElders` for prefix-0.
-    let signed_sap = TestKeys::get_section_signed(&sk_set0.secret_key(), sap0);
-    let cmd = create_our_elders_cmd(signed_sap)?;
-    let mut cmds = run_and_collect_cmds(cmd, &dispatcher).await?;
+    // Sign the saps.
+    let signed_sap_0 = TestKeys::get_section_signed(&sk_set0.secret_key(), sap0);
+    let signed_sap_1 = TestKeys::get_section_signed(&sk_set1.secret_key(), sap1);
 
-    // Handle agreement on `NewElders` for prefix-1.
-    let signed_sap = TestKeys::get_section_signed(&sk_set1.secret_key(), sap1);
-    let cmd = create_our_elders_cmd(signed_sap)?;
-    let new_cmds = run_and_collect_cmds(cmd, &dispatcher).await?;
+    let cmd = create_our_elders_cmd(signed_sap_0, signed_sap_1)?;
+    let cmds = run_and_collect_cmds(cmd, &dispatcher).await?;
 
-    cmds.extend(new_cmds);
     let mut update_recipients = BTreeMap::new();
     for cmd in cmds {
         let (msg, recipients) = match cmd {
@@ -1107,4 +1106,20 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
     );
 
     Ok(())
+}
+
+fn get_single_sig(proposal: &Proposal) -> Result<Vec<u8>> {
+    match proposal.as_signable_bytes()? {
+        itertools::Either::Left(bytes) => Ok(bytes),
+        itertools::Either::Right(_) => {
+            panic!("Invalid expectations! Use another proposal variant.")
+        }
+    }
+}
+
+fn get_double_sig(proposal: &Proposal) -> Result<(Vec<u8>, Vec<u8>)> {
+    match proposal.as_signable_bytes()? {
+        itertools::Either::Left(_) => panic!("Invalid expectations! Use another proposal variant."),
+        itertools::Either::Right((bytes1, bytes2)) => Ok((bytes1, bytes2)),
+    }
 }

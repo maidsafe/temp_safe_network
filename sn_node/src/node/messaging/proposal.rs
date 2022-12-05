@@ -7,11 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, Proposal, Result};
-use sn_interface::messaging::system::SectionSigShare;
-
+use itertools::Either;
 use sn_interface::{
-    messaging::{system::NodeMsg, MsgId},
-    network_knowledge::SectionKeyShare,
+    messaging::{
+        system::{NodeMsg, SectionSigShare},
+        MsgId,
+    },
+    network_knowledge::{SapCandidate, SectionKeyShare},
     types::Peer,
 };
 
@@ -50,16 +52,20 @@ impl MyNode {
     ) -> Result<Vec<Cmd>> {
         trace!("Propose {proposal:?}, key_share: {key_share:?}, aggregators: {recipients:?}");
 
-        let sig_share = proposal.sign_with_key_share(
+        let (sig_share, optional_sig_share) = match proposal.sign_with_key_share(
             key_share.public_key_set.clone(),
             key_share.index,
             &key_share.secret_key_share,
-        )?;
+        )? {
+            Either::Left(sig_share) => (sig_share, None),
+            Either::Right((sig_share1, sig_share2)) => (sig_share1, Some(sig_share2)),
+        };
 
         // Broadcast the proposal to the rest of the section elders.
         let msg = NodeMsg::Propose {
             proposal: proposal.clone(),
             sig_share: sig_share.clone(),
+            optional_sig_share: optional_sig_share.clone(),
         };
 
         let msg_id = MsgId::new();
@@ -73,6 +79,7 @@ impl MyNode {
                     msg_id,
                     proposal.clone(),
                     sig_share.clone(),
+                    optional_sig_share.clone(),
                     peer,
                 )?)
             }
@@ -98,6 +105,7 @@ impl MyNode {
         msg_id: MsgId,
         proposal: Proposal,
         sig_share: SectionSigShare,
+        optional_sig_share: Option<SectionSigShare>,
         sender: Peer,
     ) -> Result<Vec<Cmd>> {
         let sig_share_pk = &sig_share.public_key_set.public_key();
@@ -147,13 +155,13 @@ impl MyNode {
                 "Failed to serialise proposal from {}, {:?}: {:?}",
                 sender, msg_id, error
             ),
-            Ok(serialised_proposal) => {
+            Ok(Either::Left(serialised_proposal)) => {
                 match self
                     .proposal_aggregator
                     .try_aggregate(&serialised_proposal, sig_share)
                 {
                     Ok(Some(sig)) => match proposal {
-                        Proposal::NewElders(new_elders) => {
+                        Proposal::HandoverCompleted(SapCandidate::ElderHandover(new_elders)) => {
                             cmds.push(Cmd::HandleNewEldersAgreement { new_elders, sig })
                         }
                         _ => cmds.push(Cmd::HandleAgreement { proposal, sig }),
@@ -171,6 +179,40 @@ impl MyNode {
                             sender, msg_id, error
                         );
                     }
+                }
+            }
+            Ok(Either::Right((serialised_proposal_1, serialised_proposal_2))) => {
+                let sig_share2 = if let Some(sig) = optional_sig_share {
+                    sig
+                } else {
+                    error!("Second sig share is missing! {}, {:?}", sender, msg_id,);
+                    return Ok(cmds); // TODO: return error here
+                };
+
+                let res1 = self
+                    .proposal_aggregator
+                    .try_aggregate(&serialised_proposal_1, sig_share);
+                let res2 = self
+                    .proposal_aggregator
+                    .try_aggregate(&serialised_proposal_2, sig_share2);
+                let res = (res1, res2);
+
+                match res {
+                    (Ok(Some(sig1)), Ok(Some(sig2))) => match proposal {
+                        Proposal::HandoverCompleted(SapCandidate::SectionSplit(sap1, sap2)) => cmds
+                            .push(Cmd::HandleNewSectionsAgreement {
+                                sap1,
+                                sig1,
+                                sap2,
+                                sig2,
+                            }),
+                        _ => error!(
+                            "Inconsistent results when aggregating proposal from {sender}, {msg_id:?}"),
+                    },
+                    (Ok(None), Ok(None)) => trace!(
+                            "Proposals from {sender} inserted in aggregator, not enough sig shares yet: {serialised_proposal_1:?} and {serialised_proposal_2:?} {msg_id:?}"),
+                    (_, Err(error)) | (Err(error), _) => error!("Failed to add proposal from {sender}, {msg_id:?}: {error:?}"),
+                    (Ok(Some(_)), Ok(None)) | (Ok(None), Ok(Some(_))) => warn!("Unexpected aggregation result from {sender} {msg_id:?}: one sig is aggregated while the other is not. This should not happen."),
                 }
             }
         }

@@ -14,6 +14,7 @@ use crate::node::{
     messaging::Peers,
     Error, MyNode, NodeMsg, Peer, Proposal, Result,
 };
+use itertools::Either;
 use sn_consensus::{Generation, SignedVote, VoteResponse};
 use sn_interface::{
     messaging::system::SectionSigned,
@@ -49,7 +50,7 @@ impl MyNode {
                         LogMarker::HandoverConsensusTermination,
                         sap_candidates
                     );
-                    cmds.extend(self.broadcast_handover_decision(sap_candidates));
+                    cmds.extend(self.broadcast_handover_completed(sap_candidates));
                 }
             }
             None => {
@@ -70,39 +71,18 @@ impl MyNode {
         MyNode::send_msg_to_our_elders(context, NodeMsg::HandoverVotes(vec![signed_vote]))
     }
 
-    /// Broadcast the decision of the terminated handover consensus by proposing the NewElders SAP
+    /// Broadcast the decision of the terminated handover consensus by proposing the HandoverCompleted SAP(s)
     /// for signature by the current elders
     #[instrument(skip(self), level = "trace")]
-    pub(crate) fn broadcast_handover_decision(&mut self, candidates_sap: SapCandidate) -> Vec<Cmd> {
-        match candidates_sap {
-            SapCandidate::ElderHandover(sap) => self.propose_new_elders(sap).unwrap_or_else(|e| {
+    pub(crate) fn broadcast_handover_completed(&mut self, candidate: SapCandidate) -> Vec<Cmd> {
+        let proposal_recipients = candidate.elders();
+        let proposal = Proposal::HandoverCompleted(candidate);
+        // sends the `HandoverCompleted` proposal to all of the to-be-Elders so it's aggregated by them.
+        self.send_proposal(proposal_recipients, proposal)
+            .unwrap_or_else(|e| {
                 error!("Failed to propose new elders: {}", e);
                 vec![]
-            }),
-            SapCandidate::SectionSplit(sap1, sap2) => {
-                let mut prop1 = self.propose_new_elders(sap1).unwrap_or_else(|e| {
-                    error!("Failed to propose new elders: {}", e);
-                    vec![]
-                });
-                let mut prop2 = self.propose_new_elders(sap2).unwrap_or_else(|e| {
-                    error!("Failed to propose new elders: {}", e);
-                    vec![]
-                });
-                prop1.append(&mut prop2);
-                prop1
-            }
-        }
-    }
-
-    /// Helper function to propose a `NewElders` list to sign from a SAP
-    /// Send the `NewElders` proposal to all of the to-be-Elders so it's aggregated by them.
-    fn propose_new_elders(
-        &mut self,
-        sap: SectionSigned<SectionAuthorityProvider>,
-    ) -> Result<Vec<Cmd>> {
-        let proposal_recipients = sap.elders_vec();
-        let proposal = Proposal::NewElders(sap);
-        self.send_proposal(proposal_recipients, proposal)
+            })
     }
 
     /// helper to handle a handover vote
@@ -147,9 +127,13 @@ impl MyNode {
     /// Verifies the SAP signature and checks that the signature's public key matches the
     /// signature of the SAP, because SAP candidates are signed by the candidate section key
     fn check_sap_sig(&self, sap: &SectionSigned<SectionAuthorityProvider>) -> Result<()> {
-        let sap_bytes = Proposal::RequestHandover(sap.value.clone()).as_signable_bytes()?;
-        if !sap.sig.verify(&sap_bytes) {
-            return Err(Error::InvalidSignature);
+        match Proposal::RequestHandover(sap.value.clone()).as_signable_bytes()? {
+            Either::Right(_) => return Err(Error::InvalidSignature),
+            Either::Left(sap_bytes) => {
+                if !sap.sig.verify(&sap_bytes) {
+                    return Err(Error::InvalidSignature);
+                }
+            }
         }
         if sap.value.section_key() != sap.sig.public_key {
             return Err(Error::UntrustedSectionAuthProvider(format!(
@@ -322,7 +306,7 @@ impl MyNode {
                             candidates_sap
                         );
 
-                        let bcast_cmds = self.broadcast_handover_decision(candidates_sap);
+                        let bcast_cmds = self.broadcast_handover_completed(candidates_sap);
                         cmds.extend(bcast_cmds);
                     }
                 }
