@@ -149,7 +149,7 @@ jobs:
           short_commit_hash=$(echo "${{ github.event.pull_request.head.sha || github.sha }}" | cut -c 1-7)
           echo "TESTNET_ID=gha-testnet-$short_commit_hash" >> $GITHUB_ENV
       - name: launch testnet
-        uses: maidsafe/sn_testnet_action@main
+        uses: jacderida/sn_testnet_action@fix-workflow-dirs
         with:
           do-token: ${{ secrets.DO_TOKEN }}
           aws-access-key-id: ${{ secrets.S3_DEPLOY_AWS_ACCESS_KEY_ID }}
