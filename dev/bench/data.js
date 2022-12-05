@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1670122584815,
+  "lastUpdate": 1670228285205,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -35470,6 +35470,144 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 389398012,
             "range": "± 13480268",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "d16ebf1efd9fb7199891e46e2114b40fa7cc8687",
+          "message": "Merge #1797\n\n1797: refactor(test): use `TestNetworkBuilder` to build the testing env r=RolandSherwin a=RolandSherwin\n\n- **chore(test): remove `network_utils` module**\r\n\r\n- **refactor(test): simple usage of `TestNetwork`**\r\n  - Modifies the test cases under `flow_ctrl/tests` to make use of `TestNetwork`\r\n  - A network is built with a couple of sections. Then a node is retrieved from one of the sections to be used in the tests.\r\n  - The `peer` from `TestNodeBuilder::build()` refers to `node.info().peer()` where `node` is from the prefix that was passed into `TestNodeBuilder::new()`\r\n\r\n- **refactor(test): handle_agreement_on_online_of_elder_candidate**\r\n  - The test is modified to make use of `TestNetwork` utility.\r\n  - The previous env created a custom `NetworkKnowledge` with varying ages for the elders. A node was then created with this custom `NetworkKnowledge`\r\n  - The `elder_age_pattern` can be directly passed into `TestNetworkBuilder::sap()` to achieve the same result.\r\n\r\n- **refactor(test): use TestNetwork to simulate elder change**\r\n  - Modifies the test cases under `flow_ctrl/tests` to make use of `TestNetwork`\r\n  - The previous envs had a section go through an elder change resulting in two SAPs.\r\n  - An elder node was then created such that it had the `sk_share` for the new SAP, but not the complete SAP; indicating that its handover is still in progress.\r\n  - The same scenario can be simulated by calling `sap_with_members()` which creates a random SAP but with the provided set of members.\r\n\r\n- **refactor(test): spentbook_spend_with_updated_network_knowledge_should_update_the_node**\r\n  - The test is modified to make use of `TestNetwork` utility.\r\n  - Creates a Network with 2 sections.\r\n  - The `dispatcher` is obtained from the genesis prefix\r\n\r\n- **refactor(test): modify anti_entropy test cases**\r\n  - Modifies the test cases under `messaging/ae` to make use of `TestNetwork`\r\n  - Simulate a network with two sections, where \"our section\" has gone through\r\n    3 churn events.\r\n  - The `Env::other_signed_sap` refers to the SAP from prefix1\r\n  - The `Env::proof_chain` refers to the section chain of prefix1.\r\n\r\n- **fix(network_builder): check member type before modifying node**\r\n  - The `SocketAddr` of the node is replaced with a new one. Hence the check for the `TestMemberType` should happen prior to that.\n\nCo-authored-by: RolandSherwin <RolandSherwin@protonmail.com>",
+          "timestamp": "2022-12-05T06:19:45Z",
+          "tree_id": "dd1e03d168c080b0f3434867b40ea45db76cffdb",
+          "url": "https://github.com/maidsafe/safe_network/commit/d16ebf1efd9fb7199891e46e2114b40fa7cc8687"
+        },
+        "date": 1670228282614,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2514000,
+            "range": "± 584452",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 128255511,
+            "range": "± 2822937",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 149376876,
+            "range": "± 6089947",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 587334013,
+            "range": "± 7541743",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 105918863,
+            "range": "± 1580916",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 119951724,
+            "range": "± 2220067",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 485005257,
+            "range": "± 6324208",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 81156158,
+            "range": "± 46296574",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 3030211122,
+            "range": "± 258010761",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 12016975370,
+            "range": "± 628363922",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 384166916,
+            "range": "± 36702545",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 3357461457,
+            "range": "± 88398773",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 10844917774,
+            "range": "± 829968362",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 60928374,
+            "range": "± 3164812",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 598554091,
+            "range": "± 36296785",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 2414363231,
+            "range": "± 74290374",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 14520112,
+            "range": "± 1676820",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 118929779,
+            "range": "± 17385421",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 398365462,
+            "range": "± 22609421",
             "unit": "ns/iter"
           }
         ]
