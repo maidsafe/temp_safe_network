@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1670228285205,
+  "lastUpdate": 1670256554481,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -35608,6 +35608,144 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 398365462,
             "range": "± 22609421",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "d49c241a58bd7062727a50c382408a3ef0a0d209",
+          "message": "Merge #1822\n\n1822: feat(knowledge): update sibling on split r=oetyng a=oetyng\n\nThis PR lets both children get the sibling sap at split.\r\n\r\nWhen sending a msg that was intended for the sibling, and expecting an ae update with the sibling sap, it would instead return the sap of the first section itself (because it didn't know its sibling).\r\n\r\nWith the changes, both children are aware of each other from start, and we now get the sibling sap returned in the ae update.\r\n\n\nCo-authored-by: oetyng <oetyng@gmail.com>",
+          "timestamp": "2022-12-05T14:26:17Z",
+          "tree_id": "b4142bb9707a9b08bf45b3bdba0e5170b2a1549d",
+          "url": "https://github.com/maidsafe/safe_network/commit/d49c241a58bd7062727a50c382408a3ef0a0d209"
+        },
+        "date": 1670256552721,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2619588,
+            "range": "± 661014",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 105726144,
+            "range": "± 3329428",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 125245204,
+            "range": "± 6564981",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 520340243,
+            "range": "± 5793420",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 84605321,
+            "range": "± 1590724",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 95996116,
+            "range": "± 1174676",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 422938798,
+            "range": "± 6540885",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 59805393,
+            "range": "± 25667820",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2523898742,
+            "range": "± 144015550",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 10344723101,
+            "range": "± 506691002",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 250452662,
+            "range": "± 10576186",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 2448008546,
+            "range": "± 116507203",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 9374967427,
+            "range": "± 239873446",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 49607340,
+            "range": "± 4168272",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 484170910,
+            "range": "± 29604695",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1900104170,
+            "range": "± 63814692",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 13157011,
+            "range": "± 837298",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 109899941,
+            "range": "± 4162224",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 392310842,
+            "range": "± 22416142",
             "unit": "ns/iter"
           }
         ]
