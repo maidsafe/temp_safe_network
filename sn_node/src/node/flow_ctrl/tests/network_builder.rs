@@ -248,21 +248,28 @@ impl<R: RngCore> TestNetworkBuilder<R> {
                 .map(|p| p.bit_count())
                 .max()
                 .expect("at-least one sap should be provided");
-            // the permutations of 0,1 with len = max_bit_count gives us the max_prefixes
-            let bits = ["0", "1"];
-            let max_prefixes: Vec<_> = (2..max_bit_count).fold(
-                bits.iter()
-                    .flat_map(|b1| bits.iter().map(|&b2| b2.to_string() + *b1))
-                    .collect(),
-                |acc, _| {
-                    acc.iter()
-                        .flat_map(|b1| bits.iter().map(|&b2| b2.to_string() + b1))
-                        .collect()
-                },
-            );
+
             // max_prefixes are used to construct the `SectionTree`
-            let max_prefixes: BTreeSet<_> =
-                max_prefixes.into_iter().map(|str| prefix(&str)).collect();
+            let bits = ["0", "1"];
+            let max_prefixes = if max_bit_count == 0 {
+                BTreeSet::from([Prefix::default()])
+            } else if max_bit_count == 1 {
+                bits.iter().map(|bit| prefix(bit)).collect()
+            } else {
+                // the permutations of 0,1 with len = max_bit_count gives us the max_prefixes
+                // works only if max_bit_count >= 2
+                let max_prefixes: Vec<_> = (2..max_bit_count).fold(
+                    bits.iter()
+                        .flat_map(|b1| bits.iter().map(|&b2| b2.to_string() + *b1))
+                        .collect(),
+                    |acc, _| {
+                        acc.iter()
+                            .flat_map(|b1| bits.iter().map(|&b2| b2.to_string() + b1))
+                            .collect()
+                    },
+                );
+                max_prefixes.into_iter().map(|str| prefix(&str)).collect()
+            };
 
             // missing_prefixes are used to construct saps
             let mut missing_prefixes: BTreeSet<Prefix> = BTreeSet::new();
