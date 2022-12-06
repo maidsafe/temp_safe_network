@@ -143,7 +143,6 @@ mod core {
         pub(crate) keypair: Arc<Keypair>,
         pub(crate) network_knowledge: NetworkKnowledge,
         pub(crate) section_keys_provider: SectionKeysProvider,
-        pub(crate) full_adults: BTreeSet<XorName>,
         #[debug(skip)]
         pub(crate) comm: Comm,
         pub(crate) joins_allowed: bool,
@@ -171,7 +170,6 @@ mod core {
                 is_elder: self.is_elder(),
                 name: self.name(),
                 info: self.info(),
-                full_adults: self.capacity.full_adults(),
                 keypair: self.keypair.clone(),
                 network_knowledge: self.network_knowledge().clone(),
                 section_keys_provider: self.section_keys_provider.clone(),

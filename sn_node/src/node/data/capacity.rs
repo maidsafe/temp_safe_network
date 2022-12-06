@@ -61,15 +61,6 @@ impl Capacity {
             .collect()
     }
 
-    /// Full chunk storing nodes in the section (considered full when at >= `MIN_LEVEL_WHEN_FULL`).
-    pub(crate) fn full_adults(&self) -> BTreeSet<XorName> {
-        self.adult_levels
-            .iter()
-            .filter(|(_, level)| level.value() >= MIN_LEVEL_WHEN_FULL)
-            .map(|(name, _)| *name)
-            .collect()
-    }
-
     pub(crate) fn set_adult_levels(&mut self, levels: BTreeMap<XorName, StorageLevel>) {
         levels.into_iter().for_each(|(name, level)| {
             let _changed = self.set_adult_level(name, level);
