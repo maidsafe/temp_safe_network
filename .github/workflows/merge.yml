@@ -842,7 +842,7 @@ jobs:
           access_token: ${{ github.token }}
 
   wan-client:
-    name: client tests
+    name: WAN client tests
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -897,7 +897,7 @@ jobs:
         run: cargo run --release --example client_files
 
   wan-api:
-    name: api tests
+    name: WAN api tests
     runs-on: ${{ matrix.os }}
     needs: [wan-client, build-wan-testnet]
     strategy:
@@ -954,7 +954,7 @@ jobs:
           TEST_ENV_GENESIS_DBC_PATH: /tmp/genesis_dbc
 
   wan-cli:
-    name: cli tests
+    name: WAN cli tests
     runs-on: ${{ matrix.os }}
     needs: [wan-api, build-wan-testnet]
     strategy:
