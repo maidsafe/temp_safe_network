@@ -15,7 +15,8 @@ name = "data_storage"
 harness = false
 
 [features]
-default = [ "statemap"]
+default = [ "statemap" ]
+limit-network-size = []
 chaos = []
 unstable-wiremsg-debuginfo = []
 # Needs to be built with RUSTFLAGS="--cfg tokio_unstable"
