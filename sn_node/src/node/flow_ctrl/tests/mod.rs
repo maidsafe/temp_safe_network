@@ -40,8 +40,8 @@ use sn_interface::{
     },
     network_knowledge::{
         recommended_section_size, supermajority, Error as NetworkKnowledgeError, MembershipState,
-        MyNodeInfo, NodeState, RelocateDetails, SectionAuthorityProvider, SectionKeysProvider,
-        SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
+        MyNodeInfo, NodeState, RelocateDetails, SapCandidate, SectionAuthorityProvider,
+        SectionKeysProvider, SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
     },
     test_utils::*,
     types::{keys::ed25519, PublicKey, ReplicatedData},
@@ -296,7 +296,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let node_state = NodeState::left(node_state, None);
 
     let proposal = Proposal::VoteNodeOffline(node_state.clone());
-    let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &proposal.as_signable_bytes()?);
+    let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &get_single_sig(&proposal));
 
     let _cmds = run_and_collect_cmds(Cmd::HandleAgreement { proposal, sig }, &dispatcher).await?;
 
@@ -325,7 +325,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
 
     // Handle agreement on the Offline proposal
     let proposal = Proposal::VoteNodeOffline(remove_elder.clone());
-    let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &proposal.as_signable_bytes()?);
+    let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &get_single_sig(&proposal));
 
     let _cmds = run_and_collect_cmds(Cmd::HandleAgreement { proposal, sig }, &dispatcher).await?;
 
@@ -676,9 +676,8 @@ async fn handle_elders_update() -> Result<()> {
     // Create `HandleAgreement` cmd for an `NewElders` proposal. This will demote one of the
     // current elders and promote the oldest peer.
     let elders_1: BTreeSet<_> = sap1.elders_set();
-    let proposal = Proposal::NewElders(sap1.clone());
-    let sig =
-        TestKeys::get_section_sig_bytes(&sk_set0.secret_key(), &proposal.as_signable_bytes()?);
+    let proposal = Proposal::HandoverCompleted(SapCandidate::ElderHandover(sap1.clone()));
+    let sig = TestKeys::get_section_sig_bytes(&sk_set0.secret_key(), &get_single_sig(&proposal));
 
     let cmds = run_and_collect_cmds(
         Cmd::HandleNewEldersAgreement {
@@ -748,17 +747,16 @@ async fn handle_demote_during_split() -> Result<()> {
     let prefix0 = prefix("0");
     let prefix1 = prefix("1");
 
-    //right now info/node could be in either section...
-    let info = {
-        let (info, comm, _) = TestNetwork::gen_info(MIN_ADULT_AGE, None);
-        (info, comm)
-    };
-    let node_name = info.0.name();
-
     // `peers_a` + `info` are pre-split elders.
     // `peers_a` + `peer_c` are prefix-0 post-split elders.
-    let (peers_a, ..) =
-        TestNetwork::gen_node_infos(&prefix0, elder_count() - 1, 0, Some(&[MIN_ADULT_AGE]));
+    let (mut peers_a, ..) =
+        TestNetwork::gen_node_infos(&prefix0, elder_count(), 0, Some(&[MIN_ADULT_AGE]));
+
+    let info = peers_a
+        .pop()
+        .unwrap_or_else(|| panic!("No nodes generated!"));
+    let node_name = info.0.name();
+
     // `peers_b` are prefix-1 post-split elders.
     let (peers_b, ..) =
         TestNetwork::gen_node_infos(&prefix1, elder_count(), 0, Some(&[MIN_ADULT_AGE]));
@@ -812,30 +810,30 @@ async fn handle_demote_during_split() -> Result<()> {
 
     let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
 
-    // Create agreement on `OurElder` for both sub-sections
-    let create_our_elders_cmd = |signed_sap: SectionSigned<SectionAuthorityProvider>| -> Result<_> {
-        let proposal = Proposal::NewElders(signed_sap.clone());
-        let sig = TestKeys::get_section_sig_bytes(
-            &sk_set_gen.secret_key(),
-            &proposal.as_signable_bytes()?,
-        );
-        Ok(Cmd::HandleNewEldersAgreement {
-            new_elders: signed_sap,
-            sig,
+    type Sap = SectionSigned<SectionAuthorityProvider>;
+    // Create agreement on `HandoverCompleted` for both sub-sections
+    let create_our_elders_cmd = |sap1: Sap, sap2: Sap| -> Result<_> {
+        let proposal =
+            Proposal::HandoverCompleted(SapCandidate::SectionSplit(sap1.clone(), sap2.clone()));
+        let (bytes1, bytes2) = get_double_sig(&proposal);
+        let sig1 = TestKeys::get_section_sig_bytes(&sk_set_gen.secret_key(), &bytes1);
+        let sig2 = TestKeys::get_section_sig_bytes(&sk_set_gen.secret_key(), &bytes2);
+
+        Ok(Cmd::HandleNewSectionsAgreement {
+            sap1,
+            sig1,
+            sap2,
+            sig2,
         })
     };
 
-    // Handle agreement on `NewElders` for prefix-0.
-    let signed_sap = TestKeys::get_section_signed(&sk_set0.secret_key(), sap0);
-    let cmd = create_our_elders_cmd(signed_sap)?;
-    let mut cmds = run_and_collect_cmds(cmd, &dispatcher).await?;
+    // Sign the saps.
+    let signed_sap_0 = TestKeys::get_section_signed(&sk_set0.secret_key(), sap0);
+    let signed_sap_1 = TestKeys::get_section_signed(&sk_set1.secret_key(), sap1);
 
-    // Handle agreement on `NewElders` for prefix-1.
-    let signed_sap = TestKeys::get_section_signed(&sk_set1.secret_key(), sap1);
-    let cmd = create_our_elders_cmd(signed_sap)?;
-    let new_cmds = run_and_collect_cmds(cmd, &dispatcher).await?;
+    let cmd = create_our_elders_cmd(signed_sap_0, signed_sap_1)?;
+    let cmds = run_and_collect_cmds(cmd, &dispatcher).await?;
 
-    cmds.extend(new_cmds);
     let mut update_recipients = BTreeMap::new();
     for cmd in cmds {
         let (msg, recipients) = match cmd {
@@ -1107,4 +1105,18 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
     );
 
     Ok(())
+}
+
+fn get_single_sig(proposal: &Proposal) -> Vec<u8> {
+    match proposal.as_signable_bytes().expect("Failed to serialize") {
+        itertools::Either::Left(bytes) => bytes,
+        _ => panic!("Invalid expectations! Use another proposal variant."),
+    }
+}
+
+fn get_double_sig(proposal: &Proposal) -> (Vec<u8>, Vec<u8>) {
+    match proposal.as_signable_bytes().expect("Failed to serialize") {
+        itertools::Either::Right((bytes1, bytes2)) => (bytes1, bytes2),
+        _ => panic!("Invalid expectations! Use another proposal variant."),
+    }
 }

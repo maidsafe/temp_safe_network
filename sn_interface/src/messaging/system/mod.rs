@@ -124,6 +124,8 @@ pub enum NodeMsg {
         proposal: Proposal,
         /// BLS signature share of an Elder
         sig_share: SectionSigShare,
+        /// BLS signature share of an Elder if Proposal::NewSectionsAgreement
+        optional_sig_share: Option<SectionSigShare>,
     },
     #[cfg(any(feature = "chunks", feature = "registers"))]
     /// Node events are Adult to Elder events about something that happened on an Adult.

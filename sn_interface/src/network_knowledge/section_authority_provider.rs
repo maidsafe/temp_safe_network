@@ -80,6 +80,17 @@ pub enum SapCandidate {
     ),
 }
 
+impl SapCandidate {
+    pub fn elders(&self) -> Vec<Peer> {
+        match self {
+            SapCandidate::ElderHandover(sap) => sap.elders_vec(),
+            SapCandidate::SectionSplit(sap1, sap2) => {
+                [sap1.elders_vec(), sap2.elders_vec()].concat().to_vec()
+            }
+        }
+    }
+}
+
 impl Debug for SectionAuthorityProvider {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         #[derive(Debug)]
