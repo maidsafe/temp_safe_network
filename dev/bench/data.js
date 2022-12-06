@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1670342488328,
+  "lastUpdate": 1670346159684,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -36436,6 +36436,144 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 345163513,
             "range": "± 5224941",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "233fc5f7ed26623c1bec7442503cb1fee81179ef",
+          "message": "Merge #1855\n\n1855: Update sibling on split r=davidrusu a=oetyng\n\nThis PR lets both children get the sibling sap at split.\r\n\r\nWhen sending a msg that was intended for the sibling, and expecting an ae update with the sibling sap, it would instead return the sap of the first section itself (because it didn't know its sibling).\r\n\r\nWith the changes, both children are aware of each other from start, and we now get the sibling sap returned in the ae update.\r\n\r\n***\r\n\r\n(Includes fix to a test-setup, that caused intermittently failing test in #1822)\n\nCo-authored-by: oetyng <oetyng@gmail.com>",
+          "timestamp": "2022-12-06T15:23:12Z",
+          "tree_id": "74ddae4875b199e1eaf23fce99412266c54fe55d",
+          "url": "https://github.com/maidsafe/safe_network/commit/233fc5f7ed26623c1bec7442503cb1fee81179ef"
+        },
+        "date": 1670346158038,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2317292,
+            "range": "± 236980",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 92547474,
+            "range": "± 3017213",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 106737218,
+            "range": "± 3925179",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 430805248,
+            "range": "± 3461174",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 73397459,
+            "range": "± 2118237",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 85082086,
+            "range": "± 1755593",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 352431905,
+            "range": "± 5152828",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 50615217,
+            "range": "± 17789241",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2111700108,
+            "range": "± 183531058",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 8723021548,
+            "range": "± 1167186937",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 321108906,
+            "range": "± 18951261",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 2876229990,
+            "range": "± 208072757",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 9151083020,
+            "range": "± 1662994229",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 47897063,
+            "range": "± 3326000",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 460881512,
+            "range": "± 31054510",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1814464460,
+            "range": "± 60392875",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11978927,
+            "range": "± 1215878",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 99926218,
+            "range": "± 5954141",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 347856497,
+            "range": "± 21479264",
             "unit": "ns/iter"
           }
         ]
