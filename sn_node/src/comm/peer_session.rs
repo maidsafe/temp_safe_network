@@ -14,7 +14,6 @@ use super::Link;
 
 use crate::node::{Error, Result, STANDARD_CHANNEL_SIZE};
 
-use qp2p::RetryConfig;
 use qp2p::SendStream;
 use qp2p::UsrMsgBytes;
 use sn_interface::messaging::MsgId;
@@ -35,7 +34,7 @@ const MAX_SENDJOB_RETRIES: usize = 3;
 #[derive(Debug)]
 enum SessionCmd {
     Send(SendJob),
-    AddConnection(qp2p::Connection),
+    AddConnection(Arc<qp2p::Connection>),
     Terminate,
 }
 
@@ -60,8 +59,8 @@ impl PeerSession {
 
     // this must be restricted somehow, we can't allow an unbounded inflow
     // of connections from a peer...
-    pub(crate) async fn add(&self, conn: qp2p::Connection) {
-        let cmd = SessionCmd::AddConnection(conn.clone());
+    pub(crate) async fn add(&self, conn: Arc<qp2p::Connection>) {
+        let cmd = SessionCmd::AddConnection(conn);
         if let Err(e) = self.channel.send(cmd).await {
             error!("Error while sending AddConnection {e:?}");
         }
@@ -284,14 +283,8 @@ impl PeerSessionWorker {
             let connection_id = conn.id();
             debug!("Connection exists for sendjob: {id:?}, and has conn_id: {connection_id:?}");
 
-            let send_resp = Link::send_with_connection(
-                job.bytes.clone(),
-                0,
-                Some(&RetryConfig::default()),
-                conn,
-                link_connections,
-            )
-            .await;
+            let send_resp =
+                Link::send_with_connection(job.bytes.clone(), 0, conn, link_connections).await;
 
             match send_resp {
                 Ok(_) => {
