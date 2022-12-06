@@ -139,7 +139,4 @@ pub enum LinkError {
     Connection(qp2p::ConnectionError),
     /// Failed to send a msg to a peer
     Send(qp2p::SendError),
-    #[cfg(features = "chaos")]
-    /// ChaosNoConn
-    ChaosNoConnection,
 }
