@@ -187,8 +187,10 @@ mod tests {
             SectionTreeUpdate::new(signed_sap, SectionsDAG::new(genesis_pk))
         };
 
-        let mut network_knowledge =
-            NetworkKnowledge::new(SectionTree::new(genesis_pk), section_tree_update)?;
+        let mut network_knowledge = NetworkKnowledge::new(
+            SectionTree::new(section_tree_update.signed_sap.clone())?,
+            section_tree_update,
+        )?;
 
         for peer in &peers {
             let info = NodeState::joined(*peer, None);

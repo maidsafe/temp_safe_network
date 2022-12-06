@@ -187,7 +187,10 @@ impl NetworkKnowledge {
                 create_first_section_authority_provider(&public_key_set, &secret_key_share, peer)?;
             SectionTreeUpdate::new(section_auth, SectionsDAG::new(genesis_key))
         };
-        let mut network_knowledge = Self::new(SectionTree::new(genesis_key), section_tree_update)?;
+        let mut network_knowledge = Self::new(
+            SectionTree::new(section_tree_update.signed_sap.clone())?,
+            section_tree_update,
+        )?;
 
         for peer in network_knowledge.signed_sap.elders() {
             let node_state = NodeState::joined(*peer, None);
@@ -311,7 +314,9 @@ impl NetworkKnowledge {
 
     // Returns the SAP for the prefix that matches name
     pub fn section_auth_by_name(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
-        self.section_tree.section_by_name(name)
+        self.section_tree
+            .get_signed_by_name(name)
+            .map(|sap| sap.value)
     }
 
     /// Return a copy of current SAP with corresponding section authority
@@ -585,11 +590,15 @@ pub mod test_utils_nw {
                 .sk_set(sk_set)
                 .build();
             let signed_sap = TestKeys::get_section_signed(&sk_set.secret_key(), sap);
-            let section_tree_update =
-                super::SectionTreeUpdate::new(signed_sap, SectionsDAG::new(pk_set.public_key()));
-            let mut network_knowledge =
-                NetworkKnowledge::new(SectionTree::new(pk_set.public_key()), section_tree_update)
-                    .expect("Failed to create NetworkKnowledge");
+            let section_tree_update = super::SectionTreeUpdate::new(
+                signed_sap.clone(),
+                SectionsDAG::new(pk_set.public_key()),
+            );
+            let mut network_knowledge = NetworkKnowledge::new(
+                SectionTree::new(signed_sap).expect("SAP belongs to the prefix section"),
+                section_tree_update,
+            )
+            .expect("Failed to create NetworkKnowledge");
 
             // update the sap members
             for peer in network_knowledge.signed_sap.elders() {

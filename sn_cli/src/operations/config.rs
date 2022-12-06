@@ -663,7 +663,7 @@ pub mod test_utils {
     use assert_fs::{prelude::*, TempDir};
     use color_eyre::{eyre::eyre, Result};
     use httpmock::{Method, MockServer};
-    use sn_api::{SectionTree, DEFAULT_NETWORK_CONTACTS_FILE_NAME};
+    use sn_api::{test_helpers::TestSectionTree, SectionTree, DEFAULT_NETWORK_CONTACTS_FILE_NAME};
     use std::collections::BTreeMap;
     use std::path::{Path, PathBuf};
     use tokio::fs;
@@ -676,8 +676,7 @@ pub mod test_utils {
         let mut dummy_network_contacts: Vec<SectionTree> = Vec::new();
 
         for _ in 0..n_network_contacts {
-            let sk = bls::SecretKey::random();
-            let network_contacts = SectionTree::new(sk.public_key());
+            let (network_contacts, _) = TestSectionTree::random_tree();
             let filename = format!("{:?}", network_contacts.genesis_key());
 
             network_contacts
