@@ -195,9 +195,8 @@ impl MyNode {
                 let res2 = self
                     .proposal_aggregator
                     .try_aggregate(&serialised_proposal_2, sig_share2);
-                let res = (res1, res2);
 
-                match res {
+                match (res1, res2) {
                     (Ok(Some(sig1)), Ok(Some(sig2))) => match proposal {
                         Proposal::HandoverCompleted(SapCandidate::SectionSplit(sap1, sap2)) => cmds
                             .push(Cmd::HandleNewSectionsAgreement {
