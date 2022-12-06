@@ -747,17 +747,16 @@ async fn handle_demote_during_split() -> Result<()> {
     let prefix0 = prefix("0");
     let prefix1 = prefix("1");
 
-    //right now info/node could be in either section...
-    let info = {
-        let (info, comm, _) = TestNetwork::gen_info(MIN_ADULT_AGE, None);
-        (info, comm)
-    };
-    let node_name = info.0.name();
-
     // `peers_a` + `info` are pre-split elders.
     // `peers_a` + `peer_c` are prefix-0 post-split elders.
-    let (peers_a, ..) =
-        TestNetwork::gen_node_infos(&prefix0, elder_count() - 1, 0, Some(&[MIN_ADULT_AGE]));
+    let (mut peers_a, ..) =
+        TestNetwork::gen_node_infos(&prefix0, elder_count(), 0, Some(&[MIN_ADULT_AGE]));
+
+    let info = peers_a
+        .pop()
+        .unwrap_or_else(|| panic!("No nodes generated!"));
+    let node_name = info.0.name();
+
     // `peers_b` are prefix-1 post-split elders.
     let (peers_b, ..) =
         TestNetwork::gen_node_infos(&prefix1, elder_count(), 0, Some(&[MIN_ADULT_AGE]));
