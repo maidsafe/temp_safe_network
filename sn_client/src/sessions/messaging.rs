@@ -112,19 +112,20 @@ impl Session {
         let expected_acks = elders.len();
         let mut received_acks = BTreeSet::default();
         let mut received_errors = BTreeSet::default();
+        let mut failures = BTreeSet::default();
 
         while let Some(msg_resp) = send_cmd_tasks.join_next().await {
             debug!("Handling msg_resp sent to ack wait channel: {msg_resp:?}");
             let (src, result) = match msg_resp {
                 Ok(MsgResponse::CmdResponse(src, response)) => (src, response.result().clone()),
                 Ok(MsgResponse::QueryResponse(src, resp)) => {
-                    debug!("Unexpected query response received from {src:?} when awaiting a CmdAck: {resp:?}");
+                    debug!("Unexpected query response received from {src:?} for {msg_id:?} when awaiting a CmdAck: {resp:?}");
                     let _ = received_errors.insert(src);
                     continue;
                 }
                 Ok(MsgResponse::Failure(src, error)) => {
                     debug!("Failure occurred with msg {msg_id:?} from {src:?}: {error:?}");
-                    let _ = received_errors.insert(src);
+                    let _ = failures.insert(src);
                     continue;
                 }
                 Err(join_err) => {
@@ -148,12 +149,12 @@ impl Session {
                 Err(error) => {
                     let _ = received_errors.insert(src);
                     error!(
-                        "received error {:?} of cmd {:?} from {:?}, so far {} respones and {} of them are errors",
-                        error, msg_id, src, received_acks.len() + received_errors.len(), received_errors.len()
+                        "Received error {error:?} of cmd {msg_id:?} from {src:?}, so far {} respones and {} of them are errors",
+                        received_acks.len() + received_errors.len(), received_errors.len()
                     );
 
                     // exit if too many errors:
-                    if received_errors.len() >= expected_acks {
+                    if failures.len() + received_errors.len() >= expected_acks {
                         error!(
                             "Received majority of error response for cmd {:?}: {:?}",
                             msg_id, error
@@ -167,14 +168,19 @@ impl Session {
             }
         }
 
-        debug!("ACKs received from: {received_acks:?}");
-        debug!("CmdErrors received from: {received_errors:?}");
+        debug!("ACKs for {msg_id:?} received from: {received_acks:?}");
+        debug!("CmdErrors for {msg_id:?} received from: {received_errors:?}");
+        debug!("Failures for {msg_id:?} with: {failures:?}");
 
         let missing_responses: Vec<Peer> = elders
             .iter()
             .cloned()
-            .filter(|p| !received_acks.contains(&p.addr()))
-            .filter(|p| !received_errors.contains(&p.addr()))
+            .filter(|p| {
+                let addr = &p.addr();
+                !received_acks.contains(addr)
+                    && !received_errors.contains(addr)
+                    && !failures.contains(addr)
+            })
             .collect();
 
         debug!(
@@ -270,7 +276,7 @@ impl Session {
             let (peer_address, response) = match msg_resp {
                 Ok(MsgResponse::QueryResponse(src, resp)) => (src, resp),
                 Ok(MsgResponse::CmdResponse(src, resp)) => {
-                    debug!("Unexpected cmd response received from {src:?} when awaiting a QueryResponse: {resp:?}");
+                    debug!("Unexpected cmd response received from {src:?} for {msg_id:?} when awaiting a QueryResponse: {resp:?}");
                     discarded_responses += 1;
                     continue;
                 }
@@ -481,23 +487,18 @@ impl Session {
                                 .recv_stream_listener(msg_id, peer, peer_index, recv_stream)
                                 .await;
                         }
-                        Err(LinkError::Send(error @ SendError::ConnectionLost(_)))
-                            if !connect_now =>
-                        {
-                            warn!("Connection lost to {peer:?}: {error}");
+                        Err(
+                            error @ LinkError::Send(SendError::ConnectionLost(_))
+                            | error @ LinkError::Connection(_),
+                        ) if !connect_now => {
                             // Let's retry (only once) to reconnect to this peer and send the msg.
-                            session.peer_links.remove_link_from_peer_links(&peer).await;
                             error!(
-                                "Failed to send {msg_id:?} bidi to {peer:?}: {error:?}. \
-                                   Creating a new connection to retry once ..."
+                                "Connection lost to {peer:?}. Failed to send {msg_id:?} on a new \
+                                bi-stream: {error:?}. Creating a new connection to retry once ..."
                             );
+                            session.peer_links.remove_link_from_peer_links(&peer).await;
                             connect_now = true;
                             continue;
-                        }
-                        #[cfg(features = "chaos")]
-                        Err(LinkError::ChaosNoConnection) => {
-                            session.peer_links.remove_link_from_peer_links(peer).await;
-                            break MsgResponse::Failure(peer.addr(), Error::ChoasSendFail);
                         }
                         Err(error) => {
                             error!("Error sending {msg_id:?} bidi to {peer:?}: {error:?}");

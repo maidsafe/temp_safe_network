@@ -66,7 +66,9 @@ impl MsgListener {
                     } else {
                         "".to_string()
                     };
-                    debug!("New msg arrived from {remote_address:?}{stream_info}");
+                    debug!(
+                        "New msg arrived over conn_id={conn_id} from {remote_address:?}{stream_info}"
+                    );
 
                     let wire_msg = match WireMsg::from(msg_bytes) {
                         Ok(wire_msg) => wire_msg,
@@ -101,7 +103,7 @@ impl MsgListener {
 
                     let msg_id = wire_msg.msg_id();
                     debug!(
-                        "Msg {msg_id:?} received from: {src_name:?}{stream_info} was: {wire_msg:?}"
+                        "Msg {msg_id:?} received, over conn_id={conn_id}, from: {src_name:?}{stream_info} was: {wire_msg:?}"
                     );
 
                     if let Err(error) = self
@@ -118,7 +120,7 @@ impl MsgListener {
                 }
                 Err(error) => {
                     // TODO: should we propagate this?
-                    warn!("Error on connection with {remote_address}: {error:?}");
+                    warn!("Error on connection {conn_id} with {remote_address}: {error:?}");
                 }
             }
         }
