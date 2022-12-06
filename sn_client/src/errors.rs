@@ -112,6 +112,18 @@ pub enum Error {
         /// Minimum number of bytes for self-encryption
         minimum: usize,
     },
+    #[cfg(feature = "limit-client-upload-size")]
+    /// Not enough bytes for self-encryption.
+    #[error(
+        "Too large file upload attempted ({size} bytes), at most {limit} bytes allowed currently. \
+        Try storing a smaller file."
+    )]
+    UploadSizeLimitExceeded {
+        /// Number of bytes attempted.
+        size: usize,
+        /// Size limit, number of bytes.
+        limit: usize,
+    },
     /// Encryption oversized the SmallFile, so it cannot be stored as a SmallFile and be encrypted
     #[error(
         "You might need to pad the `SmallFile` contents and then store it as a `LargeFile`, \
