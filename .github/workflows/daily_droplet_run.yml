@@ -202,7 +202,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p ~/.safe/network_contacts
-          curl $TESTNET_TOOL_BUCKET_URL/${{ env.TESTNET_ID }}-network-contacts > \
+          curl $TESTNET_TOOL_BUCKET_URL/${{ env.TESTNET_ID }}/network-contacts > \
             ~/.safe/network_contacts/default
 
       - name: Build all client tests before running
@@ -250,7 +250,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p ~/.safe/network_contacts
-          curl $TESTNET_TOOL_BUCKET_URL/${{ env.TESTNET_ID }}-network-contacts > \
+          curl $TESTNET_TOOL_BUCKET_URL/${{ env.TESTNET_ID }}/network-contacts > \
             ~/.safe/network_contacts/default
 
       - uses: Swatinem/rust-cache@v1
@@ -266,7 +266,7 @@ jobs:
       - name: Download genesis DBC
         shell: bash
         run: |
-          curl $TESTNET_TOOL_BUCKET_URL/${{ env.TESTNET_ID }}-genesis-dbc \
+          curl $TESTNET_TOOL_BUCKET_URL/${{ env.TESTNET_ID }}/genesis-dbc > \
             > /tmp/genesis_dbc
 
       - name: Run API tests
@@ -311,12 +311,12 @@ jobs:
         shell: bash
         run: |
           mkdir -p ~/.safe/network_contacts
-          curl $TESTNET_TOOL_BUCKET_URL/${{ env.TESTNET_ID }}-network-contacts > \
+          curl $TESTNET_TOOL_BUCKET_URL/${{ env.TESTNET_ID }}/network-contacts > \
             ~/.safe/network_contacts/default
       - name: Download genesis DBC
         shell: bash
         run: |
-          curl $TESTNET_TOOL_BUCKET_URL/${{ env.TESTNET_ID }}-genesis-dbc \
+          curl $TESTNET_TOOL_BUCKET_URL/${{ env.TESTNET_ID }}/genesis-dbc > \
             > /tmp/genesis_dbc
 
       - name: Build all CLI tests
