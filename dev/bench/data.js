@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1670316972269,
+  "lastUpdate": 1670342488328,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -36298,6 +36298,144 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 411588888,
             "range": "± 16517840",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "9d0f958a0d2bceb9aad7b93b51aa17acf3394b30",
+          "message": "Merge #1845\n\n1845: fix(client): reconnect upon any `LinkError::Connection` error when sending a msg on a bi-stream r=joshuef a=bochaco\n\n- Upgrading qp2p to v0.32.0.\r\n- Also some minor improvements to logging msgs.\r\n- Removing unused error type and cargo feature.\r\n\r\nNew qp2p v0.32 now reports Connection errors due to timeout, and those can occur when trying to open a new bi-stream, therefore we now handle those errors and retry only once by creating a new connection, i.e. the same we started doing with PR #1820 for a `LinkError::Send(qp2p::SendError::ConnectionLost(_))` error, but now for any `LinkError::Connection` error thrown by `Link::send_bi`.\n\nCo-authored-by: bochaco <gabrielviganotti@gmail.com>",
+          "timestamp": "2022-12-06T14:22:30Z",
+          "tree_id": "a09d4512ba165ee7a6fc3c7855ba65dd4c3bf44a",
+          "url": "https://github.com/maidsafe/safe_network/commit/9d0f958a0d2bceb9aad7b93b51aa17acf3394b30"
+        },
+        "date": 1670342486427,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2274148,
+            "range": "± 263493",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 91708179,
+            "range": "± 1315280",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 107008236,
+            "range": "± 4652673",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 434157264,
+            "range": "± 5157078",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 74175422,
+            "range": "± 1533861",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 86305741,
+            "range": "± 1298555",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 354245525,
+            "range": "± 3611334",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 47987523,
+            "range": "± 14052590",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2114594844,
+            "range": "± 198720358",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 8668763684,
+            "range": "± 1299584522",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 233598943,
+            "range": "± 34747584",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 2664705635,
+            "range": "± 194077327",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 10198076470,
+            "range": "± 1148202222",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 48853098,
+            "range": "± 2854999",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 470971309,
+            "range": "± 16860409",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1813129077,
+            "range": "± 46777184",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11902526,
+            "range": "± 366341",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 98265124,
+            "range": "± 3677582",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 345163513,
+            "range": "± 5224941",
             "unit": "ns/iter"
           }
         ]
