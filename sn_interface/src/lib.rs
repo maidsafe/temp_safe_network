@@ -156,8 +156,7 @@ pub fn init_logger() {
 pub mod test_utils {
     pub use crate::{
         network_knowledge::{
-            section_authority_provider::test_utils::*, test_utils::*, test_utils_nw::*,
-            test_utils_st::*,
+            section_authority_provider::test_utils::*, test_utils::*, test_utils_st::*,
         },
         types::keys::test_utils::*,
     };

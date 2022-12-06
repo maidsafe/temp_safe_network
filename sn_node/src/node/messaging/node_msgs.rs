@@ -211,12 +211,11 @@ impl MyNode {
                             );
 
                             let section_tree = node.network_knowledge.section_tree().clone();
-                            let section_tree_update = node
-                                .network_knowledge
-                                .section_tree()
-                                .generate_section_tree_update(&Prefix::default())?; // TODO: remove this dummy update
+                            let prefix = section_tree
+                                .get_signed_by_prefix(&Prefix::default())?
+                                .prefix();
                             let new_network_knowledge =
-                                NetworkKnowledge::new(section_tree, section_tree_update)?;
+                                NetworkKnowledge::new(prefix, section_tree)?;
 
                             // TODO: confirm whether carry out the switch immediately here
                             //       or still using the cmd pattern.

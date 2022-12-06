@@ -176,13 +176,8 @@ impl<'a> Joiner<'a> {
                         target_sap.prefix(),
                     );
 
-                    // TODO: NetworkKnowledge::new(..) should not be taking the section_tree_update
-                    let section_tree_update = self
-                        .section_tree
-                        .generate_section_tree_update(&target_sap.prefix())?;
-
                     let network_knowledge =
-                        NetworkKnowledge::new(self.section_tree, section_tree_update)?;
+                        NetworkKnowledge::new(target_sap.prefix(), self.section_tree)?;
 
                     return Ok((self.node, network_knowledge));
                 }
