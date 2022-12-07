@@ -9,7 +9,35 @@
 
 ## Overview
 
-`sn_client` can interface conditionally against either the sn_routing crate or a mock used for local testing.
+`sn_client` interface against the sn_node crate.
+
+## Features
+
+### "default": This is our standard setup
+(Helps with detecting bugs)
+- Msg _all elders_ for cmds + elders wait on _all acks_ from adults
+- Msg _three elders_ for queries _to one adult_ + wait on _all responses_ from elders
+
+### "check-replicas": this is used for all CI runs right now.
+(Verifies data was stored)
+- Msg _three elders_ for queries _to all adults_ + wait on _all responses_
+
+### "msg-happy-path" [client side]: this is used for sn_client e2e CI runs right now.
+- Msg _one elder_ for cmds/queries
+
+### "msg-happy-path" [node side]: this is to be eventually added to CI runs.
+- Elder waits on _one ack/response_ from adults
+
+----
+
+## Testing
+
+- `"check-replicas"` which is as `default` but makes sure each adult is storing data.
+- `"msg-happy-path"` the least reliable setup, but also least resource demanding.
+- `"msg-happy-path"` churn testing, i.e. are we slowly losing more data (todo).
+
+Eventually (todo), the `"check-replicas"` feat will only run under the `"msg-happy-path"` (makes sense to check replicas after using the happy path, and if check replicas works fine with happy path, shouldn't need testing without it).
+
 
 ## Crate Dependencies
 Crate dependencies graph:
