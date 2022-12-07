@@ -15,12 +15,12 @@ cd sn_cli
 cargo run --release -- keys create --for-cli || ((exit++))
 cargo test --release --test cli_node || ((exit++))
 cargo test --release --test cli_xorurl || ((exit++))
-cargo test --release --test cli_cat -- --test-threads=1 || ((exit++))
-cargo test --release --test cli_dog -- --test-threads=1 || ((exit++))
-cargo test --release --test cli_files -- --test-threads=1 || ((exit++))
-cargo test --release --test cli_files_get -- --test-threads=1 || ((exit++))
+cargo test --release --test cli_cat || ((exit++)) #-- --test-threads=1 || ((exit++))
+cargo test --release --test cli_dog || ((exit++)) #-- --test-threads=1 || ((exit++))
+cargo test --release --test cli_files || ((exit++)) #-- --test-threads=1 || ((exit++))
+cargo test --release --test cli_files_get || ((exit++)) #-- --test-threads=1 || ((exit++))
 cargo test --release --test cli_keys || ((exit++))
-cargo test --release --test cli_nrs -- --test-threads=1 || ((exit++))
-cargo test --release --test cli_wallet -- --test-threads=1 || ((exit++))
+cargo test --release --test cli_nrs || ((exit++)) #-- --test-threads=1 || ((exit++))
+cargo test --release --test cli_wallet || ((exit++)) #-- --test-threads=1 || ((exit++))
 
 exit $exit

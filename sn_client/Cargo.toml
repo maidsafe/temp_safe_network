@@ -33,7 +33,7 @@ name = "query-adult"
 required-features = ["build-bin"]
 
 [features]
-check-replicas = []
+check-replicas = ["msg-happy-path"]
 cmd-happy-path = []
 query-happy-path = []
 msg-happy-path = ["cmd-happy-path", "query-happy-path", "check-replicas"]

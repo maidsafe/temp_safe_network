@@ -149,8 +149,8 @@ jobs:
       - uses: actions/checkout@v2
       - name: build sn_node and testnet
         run: |
-          cargo build --release --bin sn_node
-          cargo build --release --bin testnet
+          cargo build --release --features cmd-happy-path --bin sn_node
+          cargo build --release --features cmd-happy-path --bin testnet
       - name: upload artifacts to s3
         run: |
           mkdir artifacts

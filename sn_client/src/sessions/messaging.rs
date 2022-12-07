@@ -178,7 +178,7 @@ impl Session {
                 .pick_elders(target, all_elders.clone(), skip, take)
                 .await;
 
-            trace!("Sending cmd {msg_id:?}, skipping {skip}, sending to {take} elders..");
+            debug!("Sending cmd {msg_id:?}, skipping {skip}, sending to {take} elders..");
             let send_cmd_tasks = self.send_msg(elders.clone(), wire_msg.clone()).await?;
 
             // We only require one ack, we wait it to get received.
