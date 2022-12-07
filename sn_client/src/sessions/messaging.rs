@@ -8,6 +8,7 @@
 
 use super::{MsgResponse, QueryResult, Session};
 use crate::{Error, Result};
+
 use sn_interface::{
     messaging::{
         data::{DataQuery, DataQueryVariant, QueryResponse},
@@ -70,6 +71,7 @@ impl Session {
         dst_address: XorName,
         auth: ClientAuth,
         payload: Bytes,
+        needs_super_majority: bool,
     ) -> Result<()> {
         let endpoint = self.endpoint.clone();
         // TODO: Consider other approach: Keep a session per section!
@@ -90,13 +92,110 @@ impl Session {
         let kind = MsgKind::Client(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
+        let log_line = |elders_len_s: String| {
+            debug!(
+                "Sending cmd w/id {msg_id:?}, from {}, to {elders_len_s} w/ dst: {dst_address:?}",
+                endpoint.public_addr(),
+            )
+        };
+
+        if needs_super_majority {
+            log_line(format!("{elders_len}"));
+            self.send_to(msg_id, elders.clone(), wire_msg).await
+        } else {
+            #[cfg(feature = "cmd-happy-path")]
+            {
+                log_line(format!("1 Elder (or at most {elders_len})"));
+                self.send_to_one_or_more(dst_address, elders.clone(), wire_msg)
+                    .await
+            }
+            #[cfg(not(feature = "cmd-happy-path"))]
+            {
+                log_line(format!("{elders_len}"));
+                self.send_to(msg_id, elders.clone(), wire_msg).await
+            }
+        }
+    }
+
+    async fn send_to(&self, msg_id: MsgId, elders: Vec<Peer>, wire_msg: WireMsg) -> Result<()> {
         let send_cmd_tasks = self.send_msg(elders.clone(), wire_msg).await?;
         trace!("Cmd msg {msg_id:?} sent");
 
-        // We wait for ALL the Acks get received.
+        // We wait for ALL the expected acks get received.
         // The AE messages are handled by the tasks, hence no extra wait is required.
-        self.we_have_sufficient_acks_for_cmd(msg_id, elders.clone(), send_cmd_tasks)
+        match self
+            .we_have_sufficient_acks_for_cmd(msg_id, elders, send_cmd_tasks)
             .await
+        {
+            Ok(()) => {
+                trace!("Cmd {:?} sent", msg_id);
+                Ok(())
+            }
+            error => error,
+        }
+    }
+
+    /// This fn will try a happy path,
+    /// successively expanding to all the other elders in case of failure.
+    ///
+    /// 1st attempt: Closest Elder (take 1)
+    /// 2nd attempt: Next closest (skip 1, take 1)
+    /// 3rd attempt: Next 2 closest (skip 2, take 2)
+    /// 4th attempt: Next 3 closest (skip 3, take 3)
+    #[cfg(feature = "cmd-happy-path")]
+    async fn send_to_one_or_more(
+        &self,
+        target: XorName,
+        all_elders: Vec<Peer>,
+        wire_msg: WireMsg,
+    ) -> Result<()> {
+        let msg_id = wire_msg.msg_id();
+        // this will do at most 4 attempts, eventually calling all 7 elders
+        for skip in 0..3 {
+            let take = if skip == 0 { 1 } else { skip };
+
+            let elders = self
+                .pick_elders(target, all_elders.clone(), skip, take)
+                .await;
+
+            trace!("Sending cmd {msg_id:?}, skipping {skip}, sending to {take} elders..");
+            let send_cmd_tasks = self.send_msg(elders.clone(), wire_msg.clone()).await?;
+
+            // We wait for ALL the expected acks get received.
+            // The AE messages are handled by the tasks, hence no extra wait is required.
+            if self
+                .we_have_sufficient_acks_for_cmd(msg_id, elders, send_cmd_tasks)
+                .await
+                .is_ok()
+            {
+                trace!("Cmd {:?} sent", msg_id);
+                return Ok(());
+            }
+        }
+
+        // we expected at least one ack, but got 0
+        Err(Error::InsufficientAcksReceived {
+            msg_id,
+            expected: 1,
+            received: 0,
+        })
+    }
+
+    #[cfg(feature = "cmd-happy-path")]
+    async fn pick_elders(
+        &self,
+        target: XorName,
+        elders: Vec<Peer>,
+        skip: usize,
+        take: usize,
+    ) -> Vec<Peer> {
+        use itertools::Itertools;
+        elders
+            .into_iter()
+            .sorted_by(|lhs, rhs| target.cmp_distance(&lhs.name(), &rhs.name()))
+            .skip(skip)
+            .take(take)
+            .collect()
     }
 
     /// Checks for acks for a given msg.

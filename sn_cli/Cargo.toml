@@ -65,6 +65,7 @@ features = [
 [features]
 default = [ "self-update", "limit-client-upload-size" ]
 check-replicas = [ "sn_api/check-replicas" ]
+cmd-happy-path = [ "sn_api/cmd-happy-path" ]
 limit-client-upload-size = ["sn_api/limit-client-upload-size"]
 self-update = []
 
