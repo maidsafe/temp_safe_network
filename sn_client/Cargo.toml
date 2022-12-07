@@ -34,6 +34,7 @@ required-features = ["build-bin"]
 
 [features]
 check-replicas = []
+cmd-happy-path = []
 limit-client-upload-size = []
 test-utils = ["eyre"]
 # Dependencies only when building binary (`query-adult`)
