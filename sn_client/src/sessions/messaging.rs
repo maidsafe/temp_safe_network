@@ -18,7 +18,6 @@ use sn_interface::{
 };
 
 use bytes::Bytes;
-use qp2p::SendError;
 use rand::{rngs::OsRng, seq::SliceRandom};
 use std::collections::BTreeSet;
 use tokio::task::JoinSet;
@@ -487,10 +486,9 @@ impl Session {
                                 .recv_stream_listener(msg_id, peer, peer_index, recv_stream)
                                 .await;
                         }
-                        Err(
-                            error @ LinkError::Send(SendError::ConnectionLost(_))
-                            | error @ LinkError::Connection(_),
-                        ) if !connect_now => {
+                        Err(error @ LinkError::Send(_) | error @ LinkError::Connection(_))
+                            if !connect_now =>
+                        {
                             // Let's retry (only once) to reconnect to this peer and send the msg.
                             error!(
                                 "Connection lost to {peer:?}. Failed to send {msg_id:?} on a new \

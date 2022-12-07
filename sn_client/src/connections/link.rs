@@ -58,10 +58,8 @@ impl Link {
             .map_err(LinkError::Send)?;
         debug!("{msg_id:?} bidi msg sent");
 
-        send_stream.finish().await.or_else(|error| match error {
-            qp2p::SendError::StreamLost(qp2p::StreamError::Stopped(_)) => Ok(()),
-            _ => Err(LinkError::Send(error)),
-        })?;
+        send_stream.finish().await.map_err(LinkError::Send)?;
+
         debug!("{msg_id:?} bidi finished");
         Ok(recv_stream)
     }
