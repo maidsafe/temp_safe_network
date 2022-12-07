@@ -404,7 +404,7 @@ impl MyNode {
             .send(DysCmds::RetainNodes(members))
             .await
         {
-            error!("Could not send RetainNodes through dysfunctional_cmds_tx: {error}");
+            warn!("Could not send RetainNodes through dysfunctional_cmds_tx: {error}");
         };
     }
 
@@ -417,7 +417,7 @@ impl MyNode {
             .send(DysCmds::AddNode(adult))
             .await
         {
-            error!("Could not send AddNode through dysfunctional_cmds_tx: {error}");
+            warn!("Could not send AddNode through dysfunctional_cmds_tx: {error}");
         };
     }
 
