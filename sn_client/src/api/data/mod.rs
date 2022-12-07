@@ -56,6 +56,9 @@ impl SmallFile {
 }
 
 impl LargeFile {
+    #[cfg(feature = "limit-client-upload-size")]
+    const CLIENT_UPLOAD_SIZE_LIMIT: usize = 10 * 1024 * 1024; // 10MiB currently.
+
     /// Enforces size >= [`MIN_ENCRYPTABLE_BYTES`] bytes.
     pub(crate) fn new(bytes: Bytes) -> Result<Self> {
         if MIN_ENCRYPTABLE_BYTES > bytes.len() {
@@ -64,6 +67,15 @@ impl LargeFile {
                 minimum: MIN_ENCRYPTABLE_BYTES,
             })
         } else {
+            #[cfg(feature = "limit-client-upload-size")]
+            {
+                if bytes.len() > Self::CLIENT_UPLOAD_SIZE_LIMIT {
+                    return Err(Error::UploadSizeLimitExceeded {
+                        size: bytes.len(),
+                        limit: Self::CLIENT_UPLOAD_SIZE_LIMIT,
+                    });
+                }
+            }
             Ok(Self { bytes })
         }
     }
