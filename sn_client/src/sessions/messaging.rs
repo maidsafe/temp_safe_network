@@ -26,7 +26,10 @@ use tracing::{debug, error, trace, warn};
 use xor_name::XorName;
 
 // Number of Elders subset to send queries to
+#[cfg(not(feature = "query-happy-path"))]
 pub(crate) const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
+#[cfg(feature = "query-happy-path")]
+pub(crate) const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 1;
 
 impl Session {
     #[instrument(skip(self), level = "debug", name = "session setup conns")]
