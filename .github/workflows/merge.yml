@@ -935,9 +935,7 @@ jobs:
 
       - name: Download genesis DBC
         shell: bash
-        run: |
-          curl $TESTNET_TOOL_BUCKET_URL/${{ env.TESTNET_ID }}/genesis-dbc > \
-            > /tmp/genesis_dbc
+        run: curl $TESTNET_TOOL_BUCKET_URL/${{ env.TESTNET_ID }}/genesis-dbc > /tmp/genesis_dbc
 
       - name: Run API tests
         uses: jacderida/cargo-nextest@main
@@ -985,9 +983,7 @@ jobs:
             ~/.safe/network_contacts/default
       - name: Download genesis DBC
         shell: bash
-        run: |
-          curl $TESTNET_TOOL_BUCKET_URL/${{ env.TESTNET_ID }}/genesis-dbc > \
-            > /tmp/genesis_dbc
+        run: curl $TESTNET_TOOL_BUCKET_URL/${{ env.TESTNET_ID }}/genesis-dbc > /tmp/genesis_dbc
 
       - name: Build all CLI tests
         run: cd sn_cli && cargo test --no-run --release
