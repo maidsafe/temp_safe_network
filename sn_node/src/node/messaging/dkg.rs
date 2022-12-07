@@ -1030,16 +1030,28 @@ mod tests {
                                     });
                                 } else {
                                     // Since the dkg session is for the same prefix, the
-                                    // lagging node just returns a empty cmd list. There are
-                                    // multiple paths here and testing them here is not a wise
-                                    // choice, instead we can test them where the logic is
-                                    // defined.
+                                    // lagging node should just complete the elder handover
+                                    // without requesting handover.
                                     let cmds = node
                                         .write()
                                         .await
                                         .handle_dkg_outcome(section_auth, outcome)
                                         .await?;
-                                    assert_eq!(cmds.len(), 0);
+
+                                    assert_eq!(cmds.len(), 2);
+                                    for cmd in cmds {
+                                        let msg =
+                                            assert_matches!(cmd, Cmd::SendMsg { msg, .. } => msg);
+
+                                        match msg {
+                                            NodeMsg::Propose {
+                                                proposal: Proposal::JoinsAllowed(..),
+                                                ..
+                                            } => (),
+                                            NodeMsg::AntiEntropy { .. } => (),
+                                            msg => panic!("Unexpected msg {msg}"),
+                                        }
+                                    }
                                 }
                             }
                             _ => panic!("got a different cmd {:?}", cmd),
