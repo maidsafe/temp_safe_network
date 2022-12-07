@@ -144,9 +144,9 @@ impl Session {
                         }) => {
                             recv_stream = new_recv_stream;
                             trace!(
-                                "{} of correlation {correlation_id:?} to {}",
+                                "{} of correlation {correlation_id:?} to {} on {stream_id}",
                                 LogMarker::ReceiveCompleted,
-                                addr
+                                addr,
                             );
                             peer = new_peer;
                             attempt += 1;
@@ -158,9 +158,10 @@ impl Session {
         };
 
         trace!(
-            "{} of correlation {correlation_id:?} to {} with {result:?}",
+            "{} of correlation {correlation_id:?} to {}, on {}, with {result:?}",
             LogMarker::ReceiveCompleted,
-            peer.addr()
+            peer.addr(),
+            recv_stream.id()
         );
         result
     }
