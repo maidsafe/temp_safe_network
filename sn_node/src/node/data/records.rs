@@ -26,7 +26,8 @@ use qp2p::{SendStream, UsrMsgBytes};
 use bytes::Bytes;
 use futures::FutureExt;
 use itertools::Itertools;
-use std::{cmp::Ordering, collections::BTreeSet, sync::Arc};
+use lazy_static::lazy_static;
+use std::{cmp::Ordering, collections::BTreeSet, env::var, str::FromStr, sync::Arc};
 use tokio::{
     sync::Mutex,
     time::{timeout, Duration},
@@ -34,9 +35,33 @@ use tokio::{
 use tracing::info;
 use xor_name::XorName;
 
-// Timeout set for data queries forwarded to Adult
-// TODO: how to determine this time? w/ 6s qp2p timeout, we give it just a bit more time
-const ADULT_REPONSE_TIMEOUT: Duration = Duration::from_secs(7);
+/// Environment variable to set timeout value (in seconds) for data queries
+/// forwarded to Adults. Default value (`ADULT_RESPONSE_DEFAULT_TIMEOUT`) is otherwise used.
+const ENV_ADULT_RESPONSE_TIMEOUT: &str = "SN_ADULT_RESPONSE_TIMEOUT";
+
+// Default timeout period set for data queries forwarded to Adult.
+// TODO: how to determine this time properly?
+const ADULT_RESPONSE_DEFAULT_TIMEOUT: Duration = Duration::from_secs(70);
+
+lazy_static! {
+    static ref ADULT_RESPONSE_TIMEOUT: Duration = match var(ENV_ADULT_RESPONSE_TIMEOUT)
+        .map(|v| u64::from_str(&v))
+    {
+        Ok(Ok(secs)) => {
+            let timeout = Duration::from_secs(secs);
+            info!("{ENV_ADULT_RESPONSE_TIMEOUT} env var set, Adult query response timeout set to {timeout:?}");
+            timeout
+        }
+        Ok(Err(err)) => {
+            warn!(
+                "Failed to parse {ENV_ADULT_RESPONSE_TIMEOUT} value, using \
+                default value ({ADULT_RESPONSE_DEFAULT_TIMEOUT:?}): {err:?}"
+            );
+            ADULT_RESPONSE_DEFAULT_TIMEOUT
+        }
+        Err(_) => ADULT_RESPONSE_DEFAULT_TIMEOUT,
+    };
+}
 
 impl MyNode {
     // Locate ideal holders for this data, instruct them to store the data
@@ -260,7 +285,7 @@ impl MyNode {
         )?;
 
         debug!("Sending out {msg_id:?} to Adult {target:?}");
-        let response = match timeout(ADULT_REPONSE_TIMEOUT, async {
+        let response = match timeout(*ADULT_RESPONSE_TIMEOUT, async {
             comm.send_out_bytes_to_peer_and_return_response(target, msg_id, bytes_to_adult)
                 .await
         })
@@ -268,7 +293,11 @@ impl MyNode {
         {
             Ok(resp) => resp,
             Err(_elapsed) => {
-                error!("{msg_id:?}: No response from {target:?} after {ADULT_REPONSE_TIMEOUT:?} timeout. Marking adult as dysfunctional");
+                error!(
+                    "{msg_id:?}: No response from {target:?} after {:?} timeout. \
+                    Marking adult as dysfunctional",
+                    *ADULT_RESPONSE_TIMEOUT
+                );
                 return Ok(vec![Cmd::TrackNodeIssueInDysfunction {
                     name: target.name(),
                     // TODO: no need for op id tracking here, this can be a simple counter
