@@ -57,7 +57,7 @@ impl FlowCtrl {
                             .send(dysfunction.get_dysfunctional_nodes())
                             .await
                         {
-                            error!("Could not send dysfunctional nodes through the mpsc channel: {error:?}");
+                            warn!("Could not send dysfunctional nodes through the mpsc channel: {error:?}");
                         }
                     }
                 }
@@ -85,7 +85,7 @@ impl FlowCtrl {
             {
                 dysfunctional_nodes
             } else {
-                error!("dysfunctional_nodes_rx channel closed?");
+                warn!("dysfunctional_nodes_rx channel closed?");
                 BTreeSet::new()
             }
         }
