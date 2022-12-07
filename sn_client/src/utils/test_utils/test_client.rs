@@ -44,6 +44,7 @@ pub async fn create_test_client_with(
         .dbc_owner(dbc_owner)
         .query_timeout(timeout)
         .cmd_timeout(timeout)
+        .from_env() // any env var set will override the values we've set before
         .build()
         .await?;
 
