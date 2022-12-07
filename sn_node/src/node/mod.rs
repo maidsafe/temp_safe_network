@@ -315,7 +315,7 @@ mod core {
 
         /// Generates section infos for the best elder candidate among the members at the given generation
         /// Returns a set of candidate `DkgSessionId`'s.
-        pub(crate) async fn best_elder_candidates_at_gen(
+        pub(crate) fn best_elder_candidates_at_gen(
             &self,
             membership_gen: u64,
         ) -> Vec<DkgSessionId> {
@@ -417,9 +417,9 @@ mod core {
 
         /// Generates section infos for the current best elder candidate among the current members
         /// Returns a set of candidate `DkgSessionId`'s.
-        pub(crate) async fn best_elder_candidates(&self) -> Vec<DkgSessionId> {
+        pub(crate) fn best_elder_candidates(&self) -> Vec<DkgSessionId> {
             match self.membership.as_ref() {
-                Some(m) => self.best_elder_candidates_at_gen(m.generation()).await,
+                Some(m) => self.best_elder_candidates_at_gen(m.generation()),
                 None => {
                     error!("Attempted to find best elder candidates when we don't have a membership instance");
                     vec![]
@@ -532,7 +532,7 @@ mod core {
                 if let Ok(key) = self.section_keys_provider.key_share(&sap.section_key()) {
                     // The section-key has changed, we are now able to function as an elder.
                     if self.initialize_elder_state(key) {
-                        cmds.extend(self.trigger_dkg().await?);
+                        cmds.extend(self.trigger_dkg()?);
 
                         // Whenever there is an elders change, casting a round of joins_allowed
                         // proposals to sync this particular state.

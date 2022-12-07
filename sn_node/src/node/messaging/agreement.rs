@@ -19,7 +19,7 @@ use std::collections::BTreeSet;
 // Agreement
 impl MyNode {
     #[instrument(skip(self), level = "trace")]
-    pub(crate) async fn handle_general_agreements(
+    pub(crate) fn handle_general_agreements(
         &mut self,
         proposal: Proposal,
         sig: SectionSig,
@@ -31,7 +31,7 @@ impl MyNode {
                 cmds.extend(self.handle_offline_agreement(node_state, sig));
             }
             Proposal::RequestHandover(sap) => {
-                cmds.extend(self.handle_request_handover_agreement(sap, sig).await?);
+                cmds.extend(self.handle_request_handover_agreement(sap, sig)?);
             }
             Proposal::HandoverCompleted(_) => {
                 error!("Handover completed should be handled in a separate blocking fashion");
@@ -53,7 +53,7 @@ impl MyNode {
     }
 
     #[instrument(skip(self), level = "trace")]
-    async fn handle_request_handover_agreement(
+    fn handle_request_handover_agreement(
         &mut self,
         sap: SectionAuthorityProvider,
         sig: SectionSig,
@@ -77,7 +77,7 @@ impl MyNode {
         // check if at the given memberhip gen, the elders candidates are matching
         let membership_gen = sap.membership_gen();
         let signed_sap = SectionSigned::new(sap, sig);
-        let dkg_sessions_info = self.best_elder_candidates_at_gen(membership_gen).await;
+        let dkg_sessions_info = self.best_elder_candidates_at_gen(membership_gen);
 
         let elder_candidates = BTreeSet::from_iter(signed_sap.names());
         if dkg_sessions_info

@@ -862,7 +862,7 @@ mod tests {
                                 ..
                             } => {
                                 let new_msgs =
-                                    node.read().await.mock_send_msg(msg, msg_id, recipients)?;
+                                    node.read().await.mock_send_msg(msg, msg_id, recipients);
                                 msgs_to_other_nodes.push(new_msgs);
                             }
                             Cmd::HandleDkgOutcome {
@@ -876,7 +876,7 @@ mod tests {
                                     .write()
                                     .await
                                     .mock_dkg_outcome_proposal(section_auth, outcome)
-                                    .await?;
+                                    .await;
                                 assert_matches!(msg, NodeMsg::Propose { proposal, .. } => {
                                     assert_matches!(proposal, Proposal::RequestHandover(_))
                                 });
@@ -1009,7 +1009,7 @@ mod tests {
                                 ..
                             } => {
                                 let new_msgs =
-                                    node.read().await.mock_send_msg(msg, msg_id, recipients)?;
+                                    node.read().await.mock_send_msg(msg, msg_id, recipients);
                                 msgs_to_other_nodes.push(new_msgs);
                             }
                             Cmd::HandleDkgOutcome {
@@ -1024,7 +1024,7 @@ mod tests {
                                         .write()
                                         .await
                                         .mock_dkg_outcome_proposal(section_auth, outcome)
-                                        .await?;
+                                        .await;
                                     assert_matches!(msg, NodeMsg::Propose { proposal, .. } => {
                                         assert_matches!(proposal, Proposal::RequestHandover(_))
                                     });
@@ -1114,7 +1114,7 @@ mod tests {
                                 ..
                             } => {
                                 let mut new_msgs =
-                                    node.read().await.mock_send_msg(msg, msg_id, recipients)?;
+                                    node.read().await.mock_send_msg(msg, msg_id, recipients);
                                 // dead_node will not recieve the msg
                                 new_msgs.1.retain(|peer| peer.name() != dead_node);
                                 msgs_to_other_nodes.push(new_msgs);
@@ -1179,7 +1179,7 @@ mod tests {
                                 ..
                             } => {
                                 let mut new_msgs =
-                                    node.read().await.mock_send_msg(msg, msg_id, recipients)?;
+                                    node.read().await.mock_send_msg(msg, msg_id, recipients);
                                 // randomly drop the msg to a peer; chance = 1/node_count
                                 new_msgs.1.retain(|_| rng.gen::<usize>() % node_count != 0);
                                 msgs_to_other_nodes.push(new_msgs);
@@ -1195,7 +1195,7 @@ mod tests {
                                     .write()
                                     .await
                                     .mock_dkg_outcome_proposal(section_auth, outcome)
-                                    .await?;
+                                    .await;
                                 assert_matches!(msg, NodeMsg::Propose { proposal, .. } => {
                                     assert_matches!(proposal, Proposal::RequestHandover(_))
                                 });
@@ -1248,7 +1248,7 @@ mod tests {
                             let new_msgs = random_node
                                 .read()
                                 .await
-                                .mock_send_msg(msg, msg_id, recipients)?;
+                                .mock_send_msg(msg, msg_id, recipients);
                             msgs_to_other_nodes.push(new_msgs);
                         }
                         _ => panic!("should be send msg, got {cmd}"),
@@ -1331,7 +1331,7 @@ mod tests {
                 let mut cmd = node.send_dkg_start(session_id.clone())?;
                 assert_eq!(cmd.len(), 1);
                 let msg = assert_matches!(cmd.remove(0), Cmd::SendMsg { msg, msg_id, recipients, .. } => (msg, msg_id, recipients));
-                let msg = node.mock_send_msg(msg.0, msg.1, msg.2)?;
+                let msg = node.mock_send_msg(msg.0, msg.1, msg.2);
                 msgs_to_other_nodes.push(msg);
             }
             // add the msgs to the msg_queue of each node
@@ -1417,7 +1417,7 @@ mod tests {
             msg: NodeMsg,
             msg_id: MsgId,
             recipients: Peers,
-        ) -> Result<(MockSystemMsg, Vec<Peer>)> {
+        ) -> (MockSystemMsg, Vec<Peer>) {
             info!("msg: {msg:?} msg_id {msg_id:?}, recipients {recipients:?}");
             let current_node = Peer::new(self.name(), self.addr);
 
@@ -1427,7 +1427,7 @@ mod tests {
             };
             let mock_system_msg: MockSystemMsg = (msg_id, msg, current_node);
             info!("SendMsg output {}", mock_system_msg.2);
-            Ok((mock_system_msg, recipients))
+            (mock_system_msg, recipients)
         }
 
         // if RequestHandover proposal is triggered, it will send out msgs to other nodes
@@ -1435,17 +1435,13 @@ mod tests {
             &mut self,
             sap: SectionAuthorityProvider,
             key_share: SectionKeyShare,
-        ) -> Result<(MockSystemMsg, Vec<Peer>)> {
-            for cmd in self.handle_dkg_outcome(sap, key_share).await? {
-                let (msg, msg_id, recipients) = match cmd {
-                    Cmd::SendMsg {
-                        msg,
-                        msg_id,
-                        recipients,
-                        ..
-                    } => (msg, msg_id, recipients),
-                    _ => continue,
-                };
+        ) -> (MockSystemMsg, Vec<Peer>) {
+            for cmd in self
+                .handle_dkg_outcome(sap, key_share)
+                .await
+                .expect("Failed to handle DKG outcome")
+            {
+                let (msg, msg_id, recipients) = assert_matches!(cmd, Cmd::SendMsg { msg, msg_id, recipients, ..} => (msg, msg_id, recipients));
 
                 // contains only the SendMsg for RequestHandover proposal
                 if matches!(
@@ -1459,7 +1455,7 @@ mod tests {
                 }
             }
 
-            Err(eyre!("Did not receive propose msg"))
+            panic!("Expected propose msg");
         }
     }
 }

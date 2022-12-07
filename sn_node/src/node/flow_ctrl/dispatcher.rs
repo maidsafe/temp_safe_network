@@ -161,7 +161,7 @@ impl Dispatcher {
                 let mut node = self.node.write().await;
                 debug!("[NODE WRITE]: general agreements node write got");
 
-                node.handle_general_agreements(proposal, sig).await
+                node.handle_general_agreements(proposal, sig)
             }
             Cmd::HandleMembershipDecision(decision) => {
                 debug!("[NODE WRITE]: membership decision agreements write...");
