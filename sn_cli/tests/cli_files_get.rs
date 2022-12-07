@@ -13,7 +13,7 @@ use sn_api::SafeUrl;
 use sn_cmd_test_utilities::util::{
     can_write_symlinks, create_absolute_symlinks_directory, create_nrs_link, create_symlink,
     digest_file, get_random_string, safe_cmd, safe_cmd_at, safe_cmd_stdout, str_to_sha3_256,
-    sum_tree, test_symlinks_are_valid, upload_path, TEST_FOLDER,
+    sum_tree, test_symlinks_are_valid, upload_path, use_isolated_safe_config_dir, TEST_FOLDER,
 };
 use std::{
     path::{Path, PathBuf},
@@ -47,11 +47,12 @@ use std::{
 #[test]
 fn files_get_src_is_container_and_dst_is_dir() -> Result<()> {
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = false;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
 
     let src = &files_container_xor;
     let dst = assert_fs::TempDir::new()?;
@@ -59,6 +60,7 @@ fn files_get_src_is_container_and_dst_is_dir() -> Result<()> {
 
     // Act
     safe_cmd(
+        &config_dir,
         [
             "files",
             "get",
@@ -111,11 +113,12 @@ fn files_get_src_is_container_and_dst_is_dir() -> Result<()> {
 #[test]
 fn files_get_src_is_container_trailing_and_dst_is_dir() -> Result<()> {
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
 
     let src = &files_container_xor;
     let dst = assert_fs::TempDir::new()?;
@@ -123,6 +126,7 @@ fn files_get_src_is_container_trailing_and_dst_is_dir() -> Result<()> {
 
     // Act
     safe_cmd(
+        &config_dir,
         [
             "files",
             "get",
@@ -166,11 +170,12 @@ fn files_get_src_is_container_trailing_and_dst_is_dir() -> Result<()> {
 #[test]
 fn files_get_src_is_container_and_dst_is_cwd() -> Result<()> {
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
 
     let src = &files_container_xor;
     let dst = assert_fs::TempDir::new()?;
@@ -178,6 +183,7 @@ fn files_get_src_is_container_and_dst_is_cwd() -> Result<()> {
 
     // Act
     safe_cmd_at(
+        &config_dir,
         [
             "files",
             "get",
@@ -222,11 +228,12 @@ fn files_get_src_is_container_and_dst_is_cwd() -> Result<()> {
 #[test]
 fn files_get_src_is_container_and_dst_is_unspecified() -> Result<()> {
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
 
     let src = &files_container_xor;
     let dst = assert_fs::TempDir::new()?;
@@ -234,6 +241,7 @@ fn files_get_src_is_container_and_dst_is_unspecified() -> Result<()> {
 
     // Act
     safe_cmd_at(
+        &config_dir,
         ["files", "get", src, "--exists=overwrite", "--progress=none"],
         &dst,
         Some(0),
@@ -304,11 +312,12 @@ fn files_get_src_is_container_and_dst_is_unspecified() -> Result<()> {
 #[test]
 fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<()> {
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
 
     let subfolder_file = assert_fs::NamedTempFile::new("subfolder")?;
     subfolder_file.write_str("existing text file")?;
@@ -320,6 +329,7 @@ fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<()> {
 
     // Act
     let output = safe_cmd(
+        &config_dir,
         [
             "files",
             "get",
@@ -375,11 +385,12 @@ fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<()> {
 #[test]
 fn files_get_src_is_nrs_and_dst_is_unspecified() -> Result<()> {
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
 
     let mut nrs_name = "NRS_NAME".to_string();
     let now = SystemTime::now()
@@ -389,6 +400,7 @@ fn files_get_src_is_nrs_and_dst_is_unspecified() -> Result<()> {
     nrs_name.push_str(&str_to_sha3_256(&format!("{}", now)));
 
     safe_cmd(
+        &config_dir,
         ["nrs", "register", &nrs_name, "-l", &files_container_xor],
         Some(0),
     )?;
@@ -399,6 +411,7 @@ fn files_get_src_is_nrs_and_dst_is_unspecified() -> Result<()> {
 
     // Act
     safe_cmd_at(
+        &config_dir,
         [
             "files",
             "get",
@@ -446,11 +459,12 @@ fn files_get_src_is_nrs_and_dst_is_unspecified() -> Result<()> {
 #[ignore = "investigate after sn_cli merge into workspace"]
 fn files_get_src_is_nrs_with_path_and_dst_is_unspecified() -> Result<()> {
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_dir = assert_fs::TempDir::new()?;
     tmp_data_dir.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_dir, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_dir, with_trailing_slash)?;
 
     let mut e = SafeUrl::from_url(&files_container_xor)?;
     e.set_path("subfolder");
@@ -464,6 +478,7 @@ fn files_get_src_is_nrs_with_path_and_dst_is_unspecified() -> Result<()> {
     nrs_name.push_str(&str_to_sha3_256(&format!("{}", now)));
 
     safe_cmd(
+        &config_dir,
         ["nrs", "create", &nrs_name, "-l", &xor_url_with_path],
         Some(0),
     )?;
@@ -474,6 +489,7 @@ fn files_get_src_is_nrs_with_path_and_dst_is_unspecified() -> Result<()> {
 
     // Act
     safe_cmd_at(
+        &config_dir,
         [
             "files",
             "get",
@@ -525,11 +541,12 @@ fn files_get_src_is_nrs_with_path_and_dst_is_unspecified() -> Result<()> {
 #[ignore = "investigate after sn_cli merge into workspace"]
 fn files_get_src_is_nrs_recursive_and_dst_not_existing() -> Result<()> {
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = false;
     let tmp_data_dir = assert_fs::TempDir::new()?;
     tmp_data_dir.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_dir, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_dir, with_trailing_slash)?;
 
     let container_folder_name = tmp_data_dir
         .path()
@@ -545,7 +562,7 @@ fn files_get_src_is_nrs_recursive_and_dst_not_existing() -> Result<()> {
     url.set_path(container_folder_name);
 
     let tmp_data_nrs = get_random_string();
-    let tmp_data_nrs_url = create_nrs_link(&tmp_data_nrs, &url.to_string())?;
+    let tmp_data_nrs_url = create_nrs_link(&config_dir, &tmp_data_nrs, &url.to_string())?;
     let version = tmp_data_nrs_url
         .content_version()
         .ok_or_else(|| eyre!("failed to read content version from xorurl"))?;
@@ -556,6 +573,7 @@ fn files_get_src_is_nrs_recursive_and_dst_not_existing() -> Result<()> {
 
     // Act
     safe_cmd(
+        &config_dir,
         [
             "files",
             "get",
@@ -602,12 +620,13 @@ fn files_get_src_is_nrs_recursive_and_dst_not_existing() -> Result<()> {
 #[test]
 fn files_get_src_has_embedded_spaces_and_dst_also() -> Result<()> {
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     let child = tmp_data_path.child("dir with space/file with space");
     child.write_str("some file content")?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
 
     let src = &files_container_xor;
     let dst = assert_fs::TempDir::new()?;
@@ -615,6 +634,7 @@ fn files_get_src_has_embedded_spaces_and_dst_also() -> Result<()> {
 
     // Act
     safe_cmd(
+        &config_dir,
         [
             "files",
             "get",
@@ -663,12 +683,13 @@ fn files_get_src_has_embedded_spaces_and_dst_also() -> Result<()> {
 #[test]
 fn files_get_src_has_encoded_spaces_and_dst_also() -> Result<()> {
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     let child = tmp_data_path.child("dir with space/file with space");
     child.write_str("some file content")?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
 
     let url = SafeUrl::from_url(&files_container_xor)?;
     let src = format!(
@@ -681,6 +702,7 @@ fn files_get_src_has_encoded_spaces_and_dst_also() -> Result<()> {
 
     // Act
     safe_cmd(
+        &config_dir,
         [
             "files",
             "get",
@@ -730,11 +752,12 @@ fn files_get_src_has_encoded_spaces_and_dst_also() -> Result<()> {
 #[test]
 fn files_get_exists_preserve() -> Result<()> {
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
 
     let src = &files_container_xor;
     let test_md_file = assert_fs::NamedTempFile::new("test.md")?;
@@ -745,6 +768,7 @@ fn files_get_exists_preserve() -> Result<()> {
 
     // Act
     safe_cmd(
+        &config_dir,
         [
             "files",
             "get",
@@ -795,11 +819,12 @@ fn files_get_exists_preserve() -> Result<()> {
 #[test]
 fn files_get_exists_overwrite() -> Result<()> {
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
 
     let src = &files_container_xor;
     let test_md_file = assert_fs::NamedTempFile::new("test.md")?;
@@ -810,6 +835,7 @@ fn files_get_exists_overwrite() -> Result<()> {
 
     // Act
     safe_cmd(
+        &config_dir,
         [
             "files",
             "get",
@@ -861,11 +887,12 @@ fn files_get_exists_overwrite() -> Result<()> {
 #[test]
 fn files_get_src_path_is_invalid() -> Result<()> {
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
 
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_content_version(None);
@@ -877,6 +904,7 @@ fn files_get_src_path_is_invalid() -> Result<()> {
 
     // Act
     let output = safe_cmd(
+        &config_dir,
         [
             "files",
             "get",
@@ -922,17 +950,19 @@ fn files_get_src_path_is_invalid() -> Result<()> {
 #[test]
 fn files_get_dst_parent_does_not_exist() -> Result<()> {
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
 
     let src = &&files_container_xor;
     let dst = "/non/existent/path";
 
     // Act
     let output = safe_cmd(
+        &config_dir,
         [
             "files",
             "get",
@@ -1018,11 +1048,13 @@ testdata   | file      | /tmp/newname              | N           | --        | /
 #[test]
 fn files_get_src_is_dir_and_dst_exists_as_dir() -> Result<()> {
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = false;
     let tmp_data_path = assert_fs::TempDir::new()?;
     let child = tmp_data_path.child("testdata");
     child.copy_from("../resources/testdata", &["**"])?;
-    let (files_container_xor, _processed_files, _) = upload_path(&child, with_trailing_slash)?;
+    let (files_container_xor, _processed_files, _) =
+        upload_path(&config_dir, &child, with_trailing_slash)?;
 
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_content_version(None);
@@ -1036,6 +1068,7 @@ fn files_get_src_is_dir_and_dst_exists_as_dir() -> Result<()> {
 
     // Act
     safe_cmd(
+        &config_dir,
         [
             "files",
             "get",
@@ -1080,11 +1113,13 @@ fn files_get_src_is_dir_and_dst_exists_as_dir() -> Result<()> {
 #[test]
 fn files_get_src_is_dir_and_dst_exists_as_file() -> Result<()> {
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = false;
     let tmp_data_path = assert_fs::TempDir::new()?;
     let child = tmp_data_path.child("testdata");
     child.copy_from("../resources/testdata", &["**"])?;
-    let (files_container_xor, _processed_files, _) = upload_path(&child, with_trailing_slash)?;
+    let (files_container_xor, _processed_files, _) =
+        upload_path(&config_dir, &child, with_trailing_slash)?;
 
     let url = SafeUrl::from_url(&files_container_xor)?;
     let src = format!(
@@ -1100,6 +1135,7 @@ fn files_get_src_is_dir_and_dst_exists_as_file() -> Result<()> {
 
     // Act
     let output = safe_cmd(
+        &config_dir,
         [
             "files",
             "get",
@@ -1145,11 +1181,13 @@ fn files_get_src_is_dir_and_dst_exists_as_file() -> Result<()> {
 #[test]
 fn files_get_src_is_dir_and_dst_not_existing() -> Result<()> {
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = false;
     let tmp_data_path = assert_fs::TempDir::new()?;
     let child = tmp_data_path.child("testdata");
     child.copy_from("../resources/testdata", &["**"])?;
-    let (files_container_xor, _processed_files, _) = upload_path(&child, with_trailing_slash)?;
+    let (files_container_xor, _processed_files, _) =
+        upload_path(&config_dir, &child, with_trailing_slash)?;
 
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_content_version(None);
@@ -1161,6 +1199,7 @@ fn files_get_src_is_dir_and_dst_not_existing() -> Result<()> {
 
     // Act
     safe_cmd(
+        &config_dir,
         [
             "files",
             "get",
@@ -1205,11 +1244,13 @@ fn files_get_src_is_dir_and_dst_not_existing() -> Result<()> {
 #[test]
 fn files_get_src_is_dir_and_dst_exists_as_newname_dir() -> Result<()> {
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = false;
     let tmp_data_path = assert_fs::TempDir::new()?;
     let child = tmp_data_path.child("testdata");
     child.copy_from("../resources/testdata", &["**"])?;
-    let (files_container_xor, _processed_files, _) = upload_path(&child, with_trailing_slash)?;
+    let (files_container_xor, _processed_files, _) =
+        upload_path(&config_dir, &child, with_trailing_slash)?;
 
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_content_version(None);
@@ -1223,6 +1264,7 @@ fn files_get_src_is_dir_and_dst_exists_as_newname_dir() -> Result<()> {
 
     // Act
     safe_cmd(
+        &config_dir,
         [
             "files",
             "get",
@@ -1268,11 +1310,13 @@ fn files_get_src_is_dir_and_dst_exists_as_newname_dir() -> Result<()> {
 #[test]
 fn files_get_src_is_dir_and_dst_exists_as_newname_file() -> Result<()> {
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = false;
     let tmp_data_path = assert_fs::TempDir::new()?;
     let child = tmp_data_path.child("testdata");
     child.copy_from("../resources/testdata", &["**"])?;
-    let (files_container_xor, _processed_files, _) = upload_path(&child, with_trailing_slash)?;
+    let (files_container_xor, _processed_files, _) =
+        upload_path(&config_dir, &child, with_trailing_slash)?;
 
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_content_version(None);
@@ -1286,6 +1330,7 @@ fn files_get_src_is_dir_and_dst_exists_as_newname_file() -> Result<()> {
 
     // Act
     let output = safe_cmd(
+        &config_dir,
         [
             "files",
             "get",
@@ -1331,11 +1376,12 @@ fn files_get_src_is_dir_and_dst_exists_as_newname_file() -> Result<()> {
 #[test]
 fn files_get_src_is_file_and_dst_exists_as_dir() -> Result<()> {
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
 
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_content_version(None);
@@ -1349,6 +1395,7 @@ fn files_get_src_is_file_and_dst_exists_as_dir() -> Result<()> {
 
     // Act
     safe_cmd(
+        &config_dir,
         [
             "files",
             "get",
@@ -1399,11 +1446,12 @@ fn files_get_src_is_file_and_dst_exists_as_dir() -> Result<()> {
 #[test]
 fn files_get_src_is_file_and_dst_exists_as_file() -> Result<()> {
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
 
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_content_version(None);
@@ -1417,6 +1465,7 @@ fn files_get_src_is_file_and_dst_exists_as_file() -> Result<()> {
 
     // Act
     safe_cmd(
+        &config_dir,
         [
             "files",
             "get",
@@ -1464,11 +1513,12 @@ fn files_get_src_is_file_and_dst_exists_as_file() -> Result<()> {
 #[test]
 fn files_get_src_is_file_and_dst_not_existing() -> Result<()> {
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
 
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_content_version(None);
@@ -1480,6 +1530,7 @@ fn files_get_src_is_file_and_dst_not_existing() -> Result<()> {
 
     // Act
     safe_cmd(
+        &config_dir,
         [
             "files",
             "get",
@@ -1528,11 +1579,12 @@ fn files_get_src_is_file_and_dst_not_existing() -> Result<()> {
 #[test]
 fn files_get_src_is_file_and_dst_exists_as_newname_dir() -> Result<()> {
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
 
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_content_version(None);
@@ -1546,6 +1598,7 @@ fn files_get_src_is_file_and_dst_exists_as_newname_dir() -> Result<()> {
 
     // Act
     safe_cmd(
+        &config_dir,
         [
             "files",
             "get",
@@ -1594,11 +1647,12 @@ fn files_get_src_is_file_and_dst_exists_as_newname_dir() -> Result<()> {
 #[test]
 fn files_get_src_is_file_and_dst_exists_as_newname_file() -> Result<()> {
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
 
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_content_version(None);
@@ -1612,6 +1666,7 @@ fn files_get_src_is_file_and_dst_exists_as_newname_file() -> Result<()> {
 
     // Act
     safe_cmd(
+        &config_dir,
         [
             "files",
             "get",
@@ -1659,11 +1714,12 @@ fn files_get_src_is_file_and_dst_exists_as_newname_file() -> Result<()> {
 #[test]
 fn files_get_src_is_file_and_dst_newname_not_existing() -> Result<()> {
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
 
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_content_version(None);
@@ -1675,6 +1731,7 @@ fn files_get_src_is_file_and_dst_newname_not_existing() -> Result<()> {
 
     // Act
     safe_cmd(
+        &config_dir,
         [
             "files",
             "get",
@@ -1727,11 +1784,15 @@ fn files_get_symlinks_relative() -> Result<()> {
     }
 
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     // The assert_fs `copy_from` function, that's used in all the other tests, doesn't work
     // correctly with the symlink directory, so we just upload it directly.
     let with_trailing_slash = true;
-    let (files_container_xor, _processed_files, _) =
-        upload_path("../resources/test_symlinks", with_trailing_slash)?;
+    let (files_container_xor, _processed_files, _) = upload_path(
+        &config_dir,
+        "../resources/test_symlinks",
+        with_trailing_slash,
+    )?;
 
     let src = &files_container_xor;
     let dst = assert_fs::TempDir::new()?;
@@ -1739,6 +1800,7 @@ fn files_get_symlinks_relative() -> Result<()> {
 
     // Act
     safe_cmd(
+        &config_dir,
         [
             "files",
             "get",
@@ -1787,11 +1849,12 @@ fn files_get_symlinks_absolute() -> Result<()> {
     }
 
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     create_absolute_symlinks_directory(&tmp_data_path)?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
 
     let src = &files_container_xor;
     let dst = assert_fs::TempDir::new()?;
@@ -1799,6 +1862,7 @@ fn files_get_symlinks_absolute() -> Result<()> {
 
     // Act
     safe_cmd(
+        &config_dir,
         [
             "files",
             "get",
@@ -1856,11 +1920,12 @@ fn files_get_symlinks_after_sync() -> Result<()> {
     }
 
     // Arrange
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     create_absolute_symlinks_directory(&tmp_data_path)?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
 
     let mut safeurl = SafeUrl::from_url(&files_container_xor)?;
     safeurl.set_content_version(None);
@@ -1871,6 +1936,7 @@ fn files_get_symlinks_after_sync() -> Result<()> {
     create_symlink(&new_symlink_target, &new_symlink_path, false).map_err(|e| eyre!("{:?}", e))?;
 
     safe_cmd_stdout(
+        &config_dir,
         [
             "files",
             "sync",
@@ -1886,6 +1952,7 @@ fn files_get_symlinks_after_sync() -> Result<()> {
 
     // Act
     safe_cmd(
+        &config_dir,
         [
             "files",
             "get",

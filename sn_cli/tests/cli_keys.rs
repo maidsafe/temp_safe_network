@@ -7,11 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use color_eyre::{eyre::eyre, Result};
-use sn_cmd_test_utilities::util::{parse_keys_create_output, safe_cmd_stdout};
+use sn_cmd_test_utilities::util::{
+    parse_keys_create_output, safe_cmd_stdout, use_isolated_safe_config_dir,
+};
 
 #[test]
 fn keys_create_should_output_public_and_secret_key() -> Result<()> {
-    let output = safe_cmd_stdout(["keys", "create"], Some(0))?;
+    let config_dir = use_isolated_safe_config_dir()?;
+    let output = safe_cmd_stdout(&config_dir, ["keys", "create"], Some(0))?;
     let lines: Vec<&str> = output.split('\n').collect();
     let (_, pk_hex) = lines[0]
         .split_once(':')
@@ -33,7 +36,8 @@ fn keys_create_should_output_public_and_secret_key() -> Result<()> {
 
 #[test]
 fn keys_create_with_json_output_should_output_keys_and_url() -> Result<()> {
-    let output = safe_cmd_stdout(["keys", "create", "--json"], Some(0))?;
+    let config_dir = use_isolated_safe_config_dir()?;
+    let output = safe_cmd_stdout(&config_dir, ["keys", "create", "--json"], Some(0))?;
     let (pk_hex, sk_hex) = parse_keys_create_output(&output)?;
     let _ = bls::PublicKey::from_hex(&pk_hex)?;
     let sk = bls::SecretKey::from_hex(&sk_hex)?;
@@ -43,7 +47,8 @@ fn keys_create_with_json_output_should_output_keys_and_url() -> Result<()> {
 
 #[test]
 fn keys_show_should_output_public_key() -> Result<()> {
-    let output = safe_cmd_stdout(["keys", "show"], Some(0))?;
+    let config_dir = use_isolated_safe_config_dir()?;
+    let output = safe_cmd_stdout(&config_dir, ["keys", "show"], Some(0))?;
     let lines: Vec<&str> = output.split('\n').collect();
     let (_, pk_hex) = lines[1]
         .split_once(':')
@@ -56,7 +61,8 @@ fn keys_show_should_output_public_key() -> Result<()> {
 
 #[test]
 fn keys_show_with_show_sk_should_output_public_and_secret_key() -> Result<()> {
-    let output = safe_cmd_stdout(["keys", "show", "--show-sk"], Some(0))?;
+    let config_dir = use_isolated_safe_config_dir()?;
+    let output = safe_cmd_stdout(&config_dir, ["keys", "show", "--show-sk"], Some(0))?;
     let lines: Vec<&str> = output.split('\n').collect();
     let (_, pk_hex) = lines[1]
         .split_once(':')
@@ -75,7 +81,8 @@ fn keys_show_with_show_sk_should_output_public_and_secret_key() -> Result<()> {
 
 #[test]
 fn keys_show_with_json_output_should_output_public_and_secret_key() -> Result<()> {
-    let output = safe_cmd_stdout(["keys", "show", "--json"], Some(0))?;
+    let config_dir = use_isolated_safe_config_dir()?;
+    let output = safe_cmd_stdout(&config_dir, ["keys", "show", "--json"], Some(0))?;
     let (pk_hex, sk_hex) = parse_keys_create_output(&output)?;
 
     let _ = bls::PublicKey::from_hex(&pk_hex)?;

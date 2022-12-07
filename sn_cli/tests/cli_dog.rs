@@ -13,24 +13,26 @@ use predicates::prelude::*;
 use sn_api::resolver::{SafeData, SafeUrl};
 use sn_cmd_test_utilities::util::{
     get_random_string, parse_files_put_or_sync_output, parse_wallet_create_output, safe_cmd,
-    safe_cmd_stdout, upload_path,
+    safe_cmd_stdout, upload_path, use_isolated_safe_config_dir,
 };
 use std::path::PathBuf;
 
 const TEST_FILE: &str = "../resources/testdata/test.md";
 
 #[test]
-fn calling_safe_dog_files_container_nrsurl() -> Result<()> {
-    let content = safe_cmd_stdout(["files", "put", TEST_FILE, "--json"], Some(0))?;
+fn dog_should_resolve_files_container_from_nrs_url_without_safe_prefix() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
+    let content = safe_cmd_stdout(&config_dir, ["files", "put", TEST_FILE, "--json"], Some(0))?;
     let (container_xorurl, _) = parse_files_put_or_sync_output(&content)?;
 
     let nrsurl = get_random_string();
     safe_cmd(
+        &config_dir,
         ["nrs", "register", &nrsurl, "-l", &container_xorurl],
         Some(0),
     )?;
 
-    let dog_output = safe_cmd_stdout(["dog", &nrsurl, "--json"], Some(0))?;
+    let dog_output = safe_cmd_stdout(&config_dir, ["dog", &nrsurl, "--json"], Some(0))?;
     let (url, mut content): (String, Vec<SafeData>) =
         serde_json::from_str(&dog_output).expect("Failed to parse output of `safe dog` on file");
     assert_eq!(url, format!("safe://{}", nrsurl));
@@ -44,18 +46,20 @@ fn calling_safe_dog_files_container_nrsurl() -> Result<()> {
 }
 
 #[test]
-fn calling_safe_dog_files_container_nrsurl_with_safe_prefix() -> Result<()> {
-    let content = safe_cmd_stdout(["files", "put", TEST_FILE, "--json"], Some(0))?;
+fn dog_should_resolve_files_container_from_nrs_url_with_safe_prefix() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
+    let content = safe_cmd_stdout(&config_dir, ["files", "put", TEST_FILE, "--json"], Some(0))?;
     let (container_xorurl, _) = parse_files_put_or_sync_output(&content)?;
 
     let site_name = get_random_string();
     let nrsurl = format!("safe://{}", site_name);
     safe_cmd(
+        &config_dir,
         ["nrs", "register", &site_name, "-l", &container_xorurl],
         Some(0),
     )?;
 
-    let dog_output = safe_cmd_stdout(["dog", &nrsurl, "--json"], Some(0))?;
+    let dog_output = safe_cmd_stdout(&config_dir, ["dog", &nrsurl, "--json"], Some(0))?;
     let (url, mut content): (String, Vec<SafeData>) =
         serde_json::from_str(&dog_output).expect("Failed to parse output of `safe dog` on file");
     assert_eq!(url, nrsurl);
@@ -69,17 +73,27 @@ fn calling_safe_dog_files_container_nrsurl_with_safe_prefix() -> Result<()> {
 }
 
 #[test]
-fn calling_safe_dog_files_container_nrsurl_jsoncompact() -> Result<()> {
-    let content = safe_cmd_stdout(["files", "put", TEST_FILE, "--output=jsoncompact"], Some(0))?;
+fn dog_should_resolve_files_container_using_json_compact_output_from_nrs_url() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
+    let content = safe_cmd_stdout(
+        &config_dir,
+        ["files", "put", TEST_FILE, "--output=jsoncompact"],
+        Some(0),
+    )?;
     let (container_xorurl, _) = parse_files_put_or_sync_output(&content)?;
 
     let nrsurl = get_random_string();
     safe_cmd(
+        &config_dir,
         ["nrs", "register", &nrsurl, "-l", &container_xorurl],
         Some(0),
     )?;
 
-    let dog_output = safe_cmd_stdout(["dog", &nrsurl, "--output=jsoncompact"], Some(0))?;
+    let dog_output = safe_cmd_stdout(
+        &config_dir,
+        ["dog", &nrsurl, "--output=jsoncompact"],
+        Some(0),
+    )?;
     let (url, mut content): (String, Vec<SafeData>) =
         serde_json::from_str(&dog_output).expect("Failed to parse output of `safe dog`");
     assert_eq!(url, format!("safe://{}", nrsurl));
@@ -93,16 +107,18 @@ fn calling_safe_dog_files_container_nrsurl_jsoncompact() -> Result<()> {
 }
 
 #[test]
-fn calling_safe_dog_files_container_nrsurl_yaml() -> Result<()> {
-    let content = safe_cmd_stdout(["files", "put", TEST_FILE, "--json"], Some(0))?;
+fn dog_should_resolve_files_container_using_yaml_output_from_nrs_url() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
+    let content = safe_cmd_stdout(&config_dir, ["files", "put", TEST_FILE, "--json"], Some(0))?;
     let (container_xorurl, _) = parse_files_put_or_sync_output(&content)?;
 
     let nrsurl = get_random_string();
     let _ = safe_cmd_stdout(
+        &config_dir,
         ["nrs", "register", &nrsurl, "-l", &container_xorurl],
         Some(0),
     )?;
-    let dog_output = safe_cmd_stdout(["dog", &nrsurl, "--output=yaml"], Some(0))?;
+    let dog_output = safe_cmd_stdout(&config_dir, ["dog", &nrsurl, "--output=yaml"], Some(0))?;
     let (url, mut content): (String, Vec<SafeData>) =
         serde_yaml::from_str(&dog_output).expect("Failed to parse output of `safe dog`");
     assert_eq!(url, format!("safe://{}", nrsurl));
@@ -116,11 +132,12 @@ fn calling_safe_dog_files_container_nrsurl_yaml() -> Result<()> {
 }
 
 #[test]
-fn calling_safe_dog_with_wallet_xorurl() -> Result<()> {
-    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+fn dog_should_resolve_wallet_from_xor_url() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
+    let json_output = safe_cmd_stdout(&config_dir, ["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
 
-    safe_cmd(["dog", &wallet_xorurl], Some(0))?
+    safe_cmd(&config_dir, ["dog", &wallet_xorurl], Some(0))?
         .assert()
         .stdout(predicate::str::contains("= Wallet ="))
         .stdout(predicate::str::contains(format!(
@@ -133,12 +150,13 @@ fn calling_safe_dog_with_wallet_xorurl() -> Result<()> {
 }
 
 #[test]
-fn calling_safe_dog_with_nrs_map_container_link() -> Result<()> {
+fn dog_should_resolve_nrs_container_from_nrs_url() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
 
     let test_file_link = processed_files
         .get(&PathBuf::from(tmp_data_path.path()).join("test.md"))
@@ -154,6 +172,7 @@ fn calling_safe_dog_with_nrs_map_container_link() -> Result<()> {
     let site_name = get_random_string();
     let container_xorurl = SafeUrl::from_url(&format!("safe://{}", site_name))?.to_xorurl_string();
     safe_cmd(
+        &config_dir,
         [
             "nrs",
             "register",
@@ -164,6 +183,7 @@ fn calling_safe_dog_with_nrs_map_container_link() -> Result<()> {
         Some(0),
     )?;
     safe_cmd(
+        &config_dir,
         [
             "nrs",
             "add",
@@ -174,6 +194,7 @@ fn calling_safe_dog_with_nrs_map_container_link() -> Result<()> {
         Some(0),
     )?;
     safe_cmd(
+        &config_dir,
         [
             "nrs",
             "add",
@@ -184,7 +205,7 @@ fn calling_safe_dog_with_nrs_map_container_link() -> Result<()> {
         Some(0),
     )?;
 
-    safe_cmd(["dog", &container_xorurl], Some(0))?
+    safe_cmd(&config_dir, ["dog", &container_xorurl], Some(0))?
         .assert()
         .stdout(predicate::str::contains(format!(
             "{site_name}: {}",
