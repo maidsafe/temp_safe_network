@@ -11,8 +11,6 @@ concurrency:
 
 env:
   CARGO_INCREMENTAL: 0  # bookkeeping for incremental builds has overhead, not useful in CI.
-  SAFE_AUTH_PASSPHRASE: "x"
-  SAFE_AUTH_PASSWORD: "y"
   NODE_COUNT: 15
 
 jobs:
@@ -215,6 +213,7 @@ jobs:
         run: ./target/release/testnet --interval 30000
         id: section-startup
         env:
+          SN_ADULT_RESPONSE_TIMEOUT: 70
           RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
 
       - name: Wait for all nodes to join
@@ -228,6 +227,8 @@ jobs:
 
       - name: Run client tests
         env:
+          SN_CMD_TIMEOUT: 90
+          SN_QUERY_TIMEOUT: 90
           RUST_LOG: "sn_client=trace,qp2p=debug"
         run: cd sn_client && cargo test --release --features check-replicas -- --test-threads=1
         timeout-minutes: 50
