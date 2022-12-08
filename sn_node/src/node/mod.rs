@@ -430,6 +430,9 @@ mod core {
         fn initialize_membership(&mut self, key: SectionKeyShare) -> bool {
             let sap = self.network_knowledge.signed_sap().value;
 
+            // IDEMPOTENCY CHECK: Check if this membership instance has already been
+            // initialized for the current SAP, this allows this function to be
+            // safely called everytime we process an AE update.
             if let Some(m) = self.membership.as_ref() {
                 if m.section_key_set().public_key() == sap.section_key() {
                     return false;
@@ -449,6 +452,9 @@ mod core {
         fn initialize_handover(&mut self, key: SectionKeyShare) -> bool {
             let sap = self.network_knowledge.signed_sap().value;
 
+            // IDEMPOTENCY CHECK: Check if this handover instance has already been
+            // initialized for the current SAP, this allows this function to be
+            // safely called everytime we process an AE update.
             if let Some(h) = self.handover_voting.as_ref() {
                 if h.section_key_set().public_key() == sap.section_key() {
                     return false;
