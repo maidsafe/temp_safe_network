@@ -538,6 +538,8 @@ mod core {
                         // proposals to sync this particular state.
                         cmds.extend(self.propose(Proposal::JoinsAllowed(self.joins_allowed))?);
                     }
+                } else {
+                    warn!("We're an elder but are missing our section key share, delaying elder state initialization until we receive it: sap={sap:?}");
                 }
 
                 self.log_network_stats();
