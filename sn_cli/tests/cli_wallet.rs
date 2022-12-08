@@ -13,12 +13,13 @@ use predicates::prelude::*;
 use sn_api::test_helpers::get_next_bearer_dbc;
 use sn_cmd_test_utilities::util::{
     get_bearer_dbc_on_file, get_owned_dbc_on_file, get_random_string, parse_keys_create_output,
-    parse_wallet_create_output, safe_cmd, safe_cmd_stdout,
+    parse_wallet_create_output, safe_cmd, safe_cmd_stdout, use_isolated_safe_config_dir,
 };
 
 #[test]
 fn wallet_create_should_create_a_wallet() -> Result<()> {
-    safe_cmd(["wallet", "create"], Some(0))?
+    let config_dir = use_isolated_safe_config_dir()?;
+    safe_cmd(&config_dir, ["wallet", "create"], Some(0))?
         .assert()
         .stdout(predicate::str::contains("Wallet created at"))
         .success();
@@ -28,13 +29,15 @@ fn wallet_create_should_create_a_wallet() -> Result<()> {
 
 #[tokio::test]
 async fn wallet_deposit_should_deposit_a_bearer_dbc() -> Result<()> {
-    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let config_dir = use_isolated_safe_config_dir()?;
+    let json_output = safe_cmd_stdout(&config_dir, ["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
 
     let tmp_data_dir = assert_fs::TempDir::new()?;
     let (dbc_file_path, _, balance) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -58,13 +61,15 @@ async fn wallet_deposit_should_deposit_a_bearer_dbc() -> Result<()> {
 
 #[tokio::test]
 async fn wallet_deposit_should_deposit_a_dbc_from_a_file() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
     let (dbc_file_path, _, balance) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
-    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let json_output = safe_cmd_stdout(&config_dir, ["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -89,15 +94,17 @@ async fn wallet_deposit_should_deposit_a_dbc_from_a_file() -> Result<()> {
 #[tokio::test]
 async fn wallet_deposit_should_deposit_a_dbc_from_a_file_with_whitespace_at_the_end() -> Result<()>
 {
+    let config_dir = use_isolated_safe_config_dir()?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
     let dbc_file_path = tmp_data_dir.child(get_random_string());
     let (dbc, balance) = get_next_bearer_dbc().await.map_err(|err| eyre!(err))?;
     dbc_file_path.write_str(&format!("{}  \n", dbc.to_hex()?))?;
 
-    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let json_output = safe_cmd_stdout(&config_dir, ["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -121,14 +128,16 @@ async fn wallet_deposit_should_deposit_a_dbc_from_a_file_with_whitespace_at_the_
 
 #[test]
 fn wallet_deposit_should_fail_with_suggestion_when_file_does_not_contain_dbc_data() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
     let dbc_file_path = tmp_data_dir.child("dbc_with_12_300_000_000");
     dbc_file_path.write_str("this file does not have dbc data")?;
 
-    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let json_output = safe_cmd_stdout(&config_dir, ["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -154,11 +163,13 @@ fn wallet_deposit_should_fail_with_suggestion_when_file_does_not_contain_dbc_dat
 
 #[test]
 fn wallet_deposit_should_fail_with_suggestion_when_path_is_directory() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
-    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let json_output = safe_cmd_stdout(&config_dir, ["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -188,14 +199,17 @@ fn wallet_deposit_should_fail_with_suggestion_when_path_is_directory() -> Result
 /// its own new keypair, but we don't have that infrastructure available at the moment.
 #[tokio::test]
 async fn wallet_deposit_should_deposit_an_owned_dbc_with_configured_secret_key() -> Result<()> {
-    let keys_show_output = safe_cmd_stdout(["keys", "show", "--json"], Some(0))?;
+    let config_dir = use_isolated_safe_config_dir()?;
+    let keys_show_output = safe_cmd_stdout(&config_dir, ["keys", "show", "--json"], Some(0))?;
     let (pk_hex, _) = parse_keys_create_output(&keys_show_output)?;
-    let wallet_create_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let wallet_create_output =
+        safe_cmd_stdout(&config_dir, ["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&wallet_create_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
     let (dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -209,6 +223,7 @@ async fn wallet_deposit_should_deposit_an_owned_dbc_with_configured_secret_key()
     )?;
 
     let reissue_output = safe_cmd_stdout(
+        &config_dir,
         [
             "wallet",
             "reissue",
@@ -223,6 +238,7 @@ async fn wallet_deposit_should_deposit_an_owned_dbc_with_configured_secret_key()
     )?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -245,7 +261,8 @@ async fn wallet_deposit_should_deposit_an_owned_dbc_with_configured_secret_key()
 
 #[tokio::test]
 async fn wallet_deposit_should_deposit_an_owned_dbc_with_secret_key_arg() -> Result<()> {
-    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let config_dir = use_isolated_safe_config_dir()?;
+    let json_output = safe_cmd_stdout(&config_dir, ["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
     let (dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
@@ -254,6 +271,7 @@ async fn wallet_deposit_should_deposit_an_owned_dbc_with_secret_key_arg() -> Res
     let pk = sk.public_key();
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -267,6 +285,7 @@ async fn wallet_deposit_should_deposit_an_owned_dbc_with_secret_key_arg() -> Res
     )?;
 
     let reissue_output = safe_cmd_stdout(
+        &config_dir,
         [
             "wallet",
             "reissue",
@@ -281,6 +300,7 @@ async fn wallet_deposit_should_deposit_an_owned_dbc_with_secret_key_arg() -> Res
     )?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -303,25 +323,19 @@ async fn wallet_deposit_should_deposit_an_owned_dbc_with_secret_key_arg() -> Res
     Ok(())
 }
 
-/// This test is a special case that requires the deletion of the credentials file at
-/// ~/.safe/cli/credentials. The scenario is, we are trying to deposit a DBC, but a secret key
-/// hasn't been supplied and there aren't any credentials are available for the CLI to try.
-///
-/// Some of the remaining tests in the CLI test suite require the existence of the generated
-/// credentials, so at the end of this test, we will generate a new set. The best solution would
-/// probably be for each test case that requires credentials to generate its own keypair, but at
-/// the moment we don't have that infrastructure.
 #[tokio::test]
-#[ignore = "this test is problematic when running in parallel"]
 async fn wallet_deposit_owned_dbc_with_no_secret_key_or_credentials_should_fail_with_suggestion(
 ) -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
     let pk_hex = bls::SecretKey::random().public_key().to_hex();
-    let wallet_create_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let wallet_create_output =
+        safe_cmd_stdout(&config_dir, ["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&wallet_create_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
     let (dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -335,6 +349,7 @@ async fn wallet_deposit_owned_dbc_with_no_secret_key_or_credentials_should_fail_
     )?;
 
     let reissue_output = safe_cmd_stdout(
+        &config_dir,
         [
             "wallet",
             "reissue",
@@ -351,11 +366,11 @@ async fn wallet_deposit_owned_dbc_with_no_secret_key_or_credentials_should_fail_
     // In a real world scenario, there would have been some long period of time between the reissue
     // and depositing the DBC. In that period of time, the credentials file would have been
     // deleted, most likely by accident, but it could have been intentional.
-    let home_path =
-        dirs_next::home_dir().ok_or_else(|| eyre!("Couldn't find user's home directory"))?;
-    std::fs::remove_file(home_path.join(".safe/cli/credentials"))?;
+    let credentials_file = config_dir.child("cli").child("credentials");
+    std::fs::remove_file(credentials_file.path())?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -379,22 +394,24 @@ async fn wallet_deposit_owned_dbc_with_no_secret_key_or_credentials_should_fail_
     ))
     .failure();
 
-    safe_cmd(["keys", "create", "--for-cli"], Some(0))?;
     Ok(())
 }
 
 #[tokio::test]
 async fn wallet_deposit_owned_dbc_with_secret_key_that_does_not_match_should_fail_with_suggestion(
 ) -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
     let sk = bls::SecretKey::random();
     let sk2 = bls::SecretKey::random();
     let pk_hex = sk.public_key().to_hex();
-    let wallet_create_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let wallet_create_output =
+        safe_cmd_stdout(&config_dir, ["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&wallet_create_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
     let (dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -408,6 +425,7 @@ async fn wallet_deposit_owned_dbc_with_secret_key_that_does_not_match_should_fai
     )?;
 
     let reissue_output = safe_cmd_stdout(
+        &config_dir,
         [
             "wallet",
             "reissue",
@@ -422,6 +440,7 @@ async fn wallet_deposit_owned_dbc_with_secret_key_that_does_not_match_should_fai
     )?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -449,12 +468,14 @@ async fn wallet_deposit_owned_dbc_with_secret_key_that_does_not_match_should_fai
 
 #[tokio::test]
 async fn wallet_balance_should_report_the_balance_of_a_wallet() -> Result<()> {
-    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let config_dir = use_isolated_safe_config_dir()?;
+    let json_output = safe_cmd_stdout(&config_dir, ["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
     let (dbc_file_path, _, balance) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -467,7 +488,7 @@ async fn wallet_balance_should_report_the_balance_of_a_wallet() -> Result<()> {
         Some(0),
     )?;
 
-    safe_cmd(["wallet", "balance", &wallet_xorurl], Some(0))?
+    safe_cmd(&config_dir, ["wallet", "balance", &wallet_xorurl], Some(0))?
         .assert()
         .stdout(format!(
             "Wallet at \"{}\" has a total balance of {} safecoins\n",
@@ -480,12 +501,14 @@ async fn wallet_balance_should_report_the_balance_of_a_wallet() -> Result<()> {
 
 #[tokio::test]
 async fn wallet_reissue_should_reissue_a_bearer_dbc_from_a_deposited_dbc() -> Result<()> {
-    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let config_dir = use_isolated_safe_config_dir()?;
+    let json_output = safe_cmd_stdout(&config_dir, ["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
     let (dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -499,6 +522,7 @@ async fn wallet_reissue_should_reissue_a_bearer_dbc_from_a_deposited_dbc() -> Re
     )?;
 
     safe_cmd(
+        &config_dir,
         ["wallet", "reissue", "1.15", "--from", &wallet_xorurl],
         Some(0),
     )?
@@ -516,7 +540,8 @@ async fn wallet_reissue_should_reissue_a_bearer_dbc_from_a_deposited_dbc() -> Re
 
 #[tokio::test]
 async fn wallet_reissue_should_reissue_an_owned_dbc_from_a_deposited_dbc() -> Result<()> {
-    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let config_dir = use_isolated_safe_config_dir()?;
+    let json_output = safe_cmd_stdout(&config_dir, ["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
     let (dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
@@ -524,6 +549,7 @@ async fn wallet_reissue_should_reissue_an_owned_dbc_from_a_deposited_dbc() -> Re
     let pk_hex = bls::SecretKey::random().public_key().to_hex();
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -537,6 +563,7 @@ async fn wallet_reissue_should_reissue_an_owned_dbc_from_a_deposited_dbc() -> Re
     )?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "reissue",
@@ -563,14 +590,17 @@ async fn wallet_reissue_should_reissue_an_owned_dbc_from_a_deposited_dbc() -> Re
 
 #[tokio::test]
 async fn wallet_reissue_with_owned_arg_should_reissue_with_configured_public_key() -> Result<()> {
-    let keys_show_output = safe_cmd_stdout(["keys", "show", "--json"], Some(0))?;
+    let config_dir = use_isolated_safe_config_dir()?;
+    let keys_show_output = safe_cmd_stdout(&config_dir, ["keys", "show", "--json"], Some(0))?;
     let (pk_hex, _) = parse_keys_create_output(&keys_show_output)?;
-    let wallet_create_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let wallet_create_output =
+        safe_cmd_stdout(&config_dir, ["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&wallet_create_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
     let (dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -584,6 +614,7 @@ async fn wallet_reissue_with_owned_arg_should_reissue_with_configured_public_key
     )?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "reissue",
@@ -607,25 +638,18 @@ async fn wallet_reissue_with_owned_arg_should_reissue_with_configured_public_key
     Ok(())
 }
 
-/// This test is a special case that requires the deletion of the credentials file at
-/// ~/.safe/cli/credentials. The scenario is, we are trying to reissue an owned DBC using the
-/// public key with the credentials configured for the CLI, but there are no credentials at the
-/// point of reissue.
-///
-/// Some of the remaining tests in the CLI test suite require the existence of the generated
-/// credentials, so at the end of this test, we will generate a new set. The best solution would
-/// probably be for each test case that requires credentials to generate its own keypair, but at
-/// the moment we don't have that infrastructure.
 #[tokio::test]
-#[ignore = "this test is problematic when running in parallel"]
 async fn wallet_reissue_with_owned_arg_should_fail_if_credentials_are_not_configured() -> Result<()>
 {
-    let wallet_create_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let config_dir = use_isolated_safe_config_dir()?;
+    let wallet_create_output =
+        safe_cmd_stdout(&config_dir, ["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&wallet_create_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
     let (dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -641,11 +665,11 @@ async fn wallet_reissue_with_owned_arg_should_fail_if_credentials_are_not_config
     // In a real world scenario, there would have been some long period of time between the wallet
     // being created and the reissue. In that period of time, the credentials file would have been
     // deleted, most likely by accident, but it could have been intentional.
-    let home_path =
-        dirs_next::home_dir().ok_or_else(|| eyre!("Couldn't find user's home directory"))?;
-    std::fs::remove_file(home_path.join(".safe/cli/credentials"))?;
+    let credentials_file = config_dir.child("cli").child("credentials");
+    std::fs::remove_file(credentials_file.path())?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "reissue",
@@ -665,13 +689,15 @@ async fn wallet_reissue_with_owned_arg_should_fail_if_credentials_are_not_config
     ))
     .failure();
 
-    safe_cmd(["keys", "create", "--for-cli"], Some(0))?;
+    safe_cmd(&config_dir, ["keys", "create", "--for-cli"], Some(0))?;
     Ok(())
 }
 
 #[tokio::test]
 async fn wallet_reissue_with_owned_and_public_key_args_should_fail_with_suggestion() -> Result<()> {
-    let wallet_create_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let config_dir = use_isolated_safe_config_dir()?;
+    let wallet_create_output =
+        safe_cmd_stdout(&config_dir, ["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&wallet_create_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
     let (dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
@@ -679,6 +705,7 @@ async fn wallet_reissue_with_owned_and_public_key_args_should_fail_with_suggesti
     let sk = bls::SecretKey::random();
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -692,6 +719,7 @@ async fn wallet_reissue_with_owned_and_public_key_args_should_fail_with_suggesti
     )?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "reissue",
@@ -718,12 +746,14 @@ async fn wallet_reissue_with_owned_and_public_key_args_should_fail_with_suggesti
 
 #[tokio::test]
 async fn wallet_deposit_should_fail_since_bearer_dbc_is_spent() -> Result<()> {
-    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let config_dir = use_isolated_safe_config_dir()?;
+    let json_output = safe_cmd_stdout(&config_dir, ["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
     let (dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -735,12 +765,14 @@ async fn wallet_deposit_should_fail_since_bearer_dbc_is_spent() -> Result<()> {
     )?;
 
     safe_cmd_stdout(
+        &config_dir,
         ["wallet", "reissue", "0.5", "--from", &wallet_xorurl],
         Some(0),
     )?;
 
     // trying to deposit the already spent DBC shall fail
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -765,13 +797,15 @@ async fn wallet_deposit_should_fail_since_bearer_dbc_is_spent() -> Result<()> {
 
 #[tokio::test]
 async fn wallet_deposit_should_fail_since_owned_dbc_is_spent() -> Result<()> {
-    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let config_dir = use_isolated_safe_config_dir()?;
+    let json_output = safe_cmd_stdout(&config_dir, ["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
     let (dbc_file_path, sk, _) = get_owned_dbc_on_file(&tmp_data_dir).await?;
     let sk_hex = sk.to_hex();
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -785,12 +819,14 @@ async fn wallet_deposit_should_fail_since_owned_dbc_is_spent() -> Result<()> {
     )?;
 
     safe_cmd_stdout(
+        &config_dir,
         ["wallet", "reissue", "0.555", "--from", &wallet_xorurl],
         Some(0),
     )?;
 
     // trying to deposit again the already spent DBC shall fail
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -817,12 +853,14 @@ async fn wallet_deposit_should_fail_since_owned_dbc_is_spent() -> Result<()> {
 
 #[tokio::test]
 async fn wallet_deposit_spent_bearer_dbc_force() -> Result<()> {
-    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let config_dir = use_isolated_safe_config_dir()?;
+    let json_output = safe_cmd_stdout(&config_dir, ["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
     let (dbc_file_path, _, balance) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -834,12 +872,14 @@ async fn wallet_deposit_spent_bearer_dbc_force() -> Result<()> {
     )?;
 
     safe_cmd_stdout(
+        &config_dir,
         ["wallet", "reissue", "0.5", "--from", &wallet_xorurl],
         Some(0),
     )?;
 
     // force to deposit the already spent DBC
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -870,13 +910,15 @@ async fn wallet_deposit_spent_bearer_dbc_force() -> Result<()> {
 
 #[tokio::test]
 async fn wallet_deposit_spent_owned_dbc_force() -> Result<()> {
-    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let config_dir = use_isolated_safe_config_dir()?;
+    let json_output = safe_cmd_stdout(&config_dir, ["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
     let (dbc_file_path, sk, balance) = get_owned_dbc_on_file(&tmp_data_dir).await?;
     let sk_hex = sk.to_hex();
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -890,12 +932,14 @@ async fn wallet_deposit_spent_owned_dbc_force() -> Result<()> {
     )?;
 
     safe_cmd_stdout(
+        &config_dir,
         ["wallet", "reissue", "0.666", "--from", &wallet_xorurl],
         Some(0),
     )?;
 
     // force to deposit the already spent DBC
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -928,12 +972,14 @@ async fn wallet_deposit_spent_owned_dbc_force() -> Result<()> {
 
 #[tokio::test]
 async fn wallet_reissue_to_file_succeeds() -> Result<()> {
-    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let config_dir = use_isolated_safe_config_dir()?;
+    let json_output = safe_cmd_stdout(&config_dir, ["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
     let (from_dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -947,6 +993,7 @@ async fn wallet_reissue_to_file_succeeds() -> Result<()> {
     let to_dbc_file_path = tmp_data_dir.child(get_random_string());
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "reissue",
@@ -974,12 +1021,14 @@ async fn wallet_reissue_to_file_succeeds() -> Result<()> {
 
 #[tokio::test]
 async fn wallet_reissue_to_file_fails() -> Result<()> {
-    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let config_dir = use_isolated_safe_config_dir()?;
+    let json_output = safe_cmd_stdout(&config_dir, ["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
     let (dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -991,6 +1040,7 @@ async fn wallet_reissue_to_file_fails() -> Result<()> {
     )?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "reissue",
@@ -1017,12 +1067,14 @@ async fn wallet_reissue_to_file_fails() -> Result<()> {
 
 #[tokio::test]
 async fn wallet_deposit_dbc_reissued_to_file() -> Result<()> {
-    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let config_dir = use_isolated_safe_config_dir()?;
+    let json_output = safe_cmd_stdout(&config_dir, ["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
     let (from_dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -1036,6 +1088,7 @@ async fn wallet_deposit_dbc_reissued_to_file() -> Result<()> {
     let to_dbc_file_path = tmp_data_dir.child(get_random_string());
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "reissue",
@@ -1049,6 +1102,7 @@ async fn wallet_deposit_dbc_reissued_to_file() -> Result<()> {
     )?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",

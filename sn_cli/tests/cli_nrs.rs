@@ -11,7 +11,9 @@ use assert_fs::prelude::*;
 use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
 use sn_api::SafeUrl;
-use sn_cmd_test_utilities::util::{get_random_string, safe_cmd, upload_path};
+use sn_cmd_test_utilities::util::{
+    get_random_string, safe_cmd, upload_path, use_isolated_safe_config_dir,
+};
 
 ///
 /// `nrs register` subcommand
@@ -24,8 +26,9 @@ use sn_cmd_test_utilities::util::{get_random_string, safe_cmd, upload_path};
 
 #[test]
 fn nrs_register_should_register_a_topname() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
     let topname = get_random_string();
-    safe_cmd(["nrs", "register", &topname], Some(0))?
+    safe_cmd(&config_dir, ["nrs", "register", &topname], Some(0))?
         .assert()
         .stdout(predicate::str::contains(format!(
             "New NRS Map created for \"safe://{}\"",
@@ -36,16 +39,18 @@ fn nrs_register_should_register_a_topname() -> Result<()> {
 
 #[test]
 fn nrs_register_should_register_a_topname_with_a_versioned_content_link() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
     let topname = get_random_string();
     safe_cmd(
+        &config_dir,
         ["nrs", "register", &topname, "--link", &url.to_string()],
         Some(0),
     )?
@@ -63,11 +68,12 @@ fn nrs_register_should_register_a_topname_with_a_versioned_content_link() -> Res
 
 #[test]
 fn nrs_register_should_register_a_topname_with_an_immutable_content_link() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (_files_container_xor, processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
     let test_md_entry = processed_files
         .iter()
         .last()
@@ -82,6 +88,7 @@ fn nrs_register_should_register_a_topname_with_an_immutable_content_link() -> Re
 
     let topname = get_random_string();
     safe_cmd(
+        &config_dir,
         ["nrs", "register", &topname, "--link", &url.to_string()],
         Some(0),
     )?
@@ -99,8 +106,9 @@ fn nrs_register_should_register_a_topname_with_an_immutable_content_link() -> Re
 
 #[test]
 fn nrs_register_should_return_an_error_if_a_subname_is_specified() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
     let name = format!("a.{}", get_random_string());
-    safe_cmd(["nrs", "register", &name], Some(1))?
+    safe_cmd(&config_dir, ["nrs", "register", &name], Some(1))?
         .assert()
         .stderr(predicate::str::contains(
             "The register command can only register a topname, \
@@ -119,17 +127,19 @@ fn nrs_register_should_return_an_error_if_a_subname_is_specified() -> Result<()>
 
 #[test]
 fn nrs_register_should_return_an_error_if_link_to_versioned_content_has_no_version() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
     url.set_content_version(None);
 
     let topname = get_random_string();
     safe_cmd(
+        &config_dir,
         ["nrs", "register", &topname, "--link", &url.to_string()],
         Some(1),
     )?
@@ -148,9 +158,10 @@ fn nrs_register_should_return_an_error_if_link_to_versioned_content_has_no_versi
 
 #[test]
 fn nrs_register_should_return_an_error_if_the_topname_already_exists() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
     let topname = get_random_string();
-    safe_cmd(["nrs", "register", &topname], Some(0))?;
-    safe_cmd(["nrs", "register", &topname], Some(1))?
+    safe_cmd(&config_dir, ["nrs", "register", &topname], Some(0))?;
+    safe_cmd(&config_dir, ["nrs", "register", &topname], Some(1))?
         .assert()
         .stderr(predicate::str::contains(format!(
             "Could not register topname {}. That name is already taken.",
@@ -170,17 +181,19 @@ fn nrs_register_should_return_an_error_if_the_topname_already_exists() -> Result
 
 #[test]
 fn nrs_add_should_add_a_subname_to_versioned_content() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let test_md_file = tmp_data_path.child("test.md");
-    let (files_container_xor, _processed_files, _) = upload_path(test_md_file, false)?;
+    let (files_container_xor, _processed_files, _) = upload_path(&config_dir, test_md_file, false)?;
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
     let test_name = get_random_string();
     let public_name = format!("test.{}", &test_name);
-    safe_cmd(["nrs", "register", &test_name], Some(0))?;
+    safe_cmd(&config_dir, ["nrs", "register", &test_name], Some(0))?;
     safe_cmd(
+        &config_dir,
         ["nrs", "add", &public_name, "--link", &url.to_string()],
         Some(0),
     )?
@@ -195,10 +208,11 @@ fn nrs_add_should_add_a_subname_to_versioned_content() -> Result<()> {
 
 #[test]
 fn nrs_add_should_add_a_subname_to_immutable_content() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let test_md_file = tmp_data_path.child("test.md");
-    let (_, processed_files, _) = upload_path(test_md_file, false)?;
+    let (_, processed_files, _) = upload_path(&config_dir, test_md_file, false)?;
     let test_md_entry = processed_files
         .iter()
         .last()
@@ -212,8 +226,9 @@ fn nrs_add_should_add_a_subname_to_immutable_content() -> Result<()> {
 
     let test_name = get_random_string();
     let public_name = format!("test.{}", &test_name);
-    safe_cmd(["nrs", "register", &test_name], Some(0))?;
+    safe_cmd(&config_dir, ["nrs", "register", &test_name], Some(0))?;
     safe_cmd(
+        &config_dir,
         ["nrs", "add", &public_name, "--link", &url.to_string()],
         Some(0),
     )?
@@ -228,17 +243,19 @@ fn nrs_add_should_add_a_subname_to_immutable_content() -> Result<()> {
 
 #[test]
 fn nrs_add_should_add_a_subname_and_set_it_as_the_default_for_the_topname() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let test_md_file = tmp_data_path.child("test.md");
-    let (files_container_xor, _processed_files, _) = upload_path(test_md_file, false)?;
+    let (files_container_xor, _processed_files, _) = upload_path(&config_dir, test_md_file, false)?;
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
     let topname = get_random_string();
     let public_name = format!("test.{}", &topname);
-    safe_cmd(["nrs", "register", &topname], Some(0))?;
+    safe_cmd(&config_dir, ["nrs", "register", &topname], Some(0))?;
     safe_cmd(
+        &config_dir,
         [
             "nrs",
             "add",
@@ -262,8 +279,8 @@ fn nrs_add_should_add_a_subname_and_set_it_as_the_default_for_the_topname() -> R
     // In this particular test, we will verify the content linked to, because it's the
     // responsibility of the CLI to make sure the correct link is passed to associate the topname
     // with that link.
-    let subname_output = safe_cmd(["cat", &public_name], Some(0))?;
-    let topname_output = safe_cmd(["cat", &topname], Some(0))?;
+    let subname_output = safe_cmd(&config_dir, ["cat", &public_name], Some(0))?;
+    let topname_output = safe_cmd(&config_dir, ["cat", &topname], Some(0))?;
     assert_eq!(subname_output, topname_output);
 
     Ok(())
@@ -271,16 +288,18 @@ fn nrs_add_should_add_a_subname_and_set_it_as_the_default_for_the_topname() -> R
 
 #[test]
 fn nrs_add_should_add_a_subname_and_a_new_topname() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let test_md_file = tmp_data_path.child("test.md");
-    let (files_container_xor, _processed_files, _) = upload_path(test_md_file, false)?;
+    let (files_container_xor, _processed_files, _) = upload_path(&config_dir, test_md_file, false)?;
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
     let test_name = get_random_string();
     let public_name = format!("test.{}", &test_name);
     safe_cmd(
+        &config_dir,
         [
             "nrs",
             "add",
@@ -302,17 +321,19 @@ fn nrs_add_should_add_a_subname_and_a_new_topname() -> Result<()> {
 
 #[test]
 fn nrs_add_should_add_a_subname_and_behave_idempotently_for_existing_topname() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let test_md_file = tmp_data_path.child("test.md");
-    let (files_container_xor, _processed_files, _) = upload_path(test_md_file, false)?;
+    let (files_container_xor, _processed_files, _) = upload_path(&config_dir, test_md_file, false)?;
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
     let test_name = get_random_string();
     let public_name = format!("test.{}", &test_name);
-    safe_cmd(["nrs", "register", &test_name], Some(0))?;
+    safe_cmd(&config_dir, ["nrs", "register", &test_name], Some(0))?;
     safe_cmd(
+        &config_dir,
         [
             "nrs",
             "add",
@@ -334,10 +355,11 @@ fn nrs_add_should_add_a_subname_and_behave_idempotently_for_existing_topname() -
 
 #[test]
 fn nrs_add_should_update_an_existing_subname() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let test_md_file = tmp_data_path.child("test.md");
-    let (files_container_xor, _processed_files, _) = upload_path(test_md_file, false)?;
+    let (files_container_xor, _processed_files, _) = upload_path(&config_dir, test_md_file, false)?;
     let mut test_md_url = SafeUrl::from_url(&files_container_xor)?;
     test_md_url.set_path("test.md");
     let mut another_md_url = SafeUrl::from_url(&files_container_xor)?;
@@ -346,6 +368,7 @@ fn nrs_add_should_update_an_existing_subname() -> Result<()> {
     let test_name = get_random_string();
     let public_name = format!("test.{}", &test_name);
     safe_cmd(
+        &config_dir,
         [
             "nrs",
             "add",
@@ -357,6 +380,7 @@ fn nrs_add_should_update_an_existing_subname() -> Result<()> {
         Some(0),
     )?;
     safe_cmd(
+        &config_dir,
         [
             "nrs",
             "add",
@@ -377,19 +401,21 @@ fn nrs_add_should_update_an_existing_subname() -> Result<()> {
 
 #[test]
 fn nrs_add_should_return_an_error_if_link_to_versioned_content_has_no_version() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
     url.set_content_version(None);
 
     let topname = get_random_string();
     let public_name = format!("test.{}", &topname);
-    safe_cmd(["nrs", "register", &topname], Some(0))?;
+    safe_cmd(&config_dir, ["nrs", "register", &topname], Some(0))?;
     safe_cmd(
+        &config_dir,
         ["nrs", "add", &public_name, "--link", &url.to_string()],
         Some(1),
     )?
@@ -409,19 +435,21 @@ fn nrs_add_should_return_an_error_if_link_to_versioned_content_has_no_version() 
 #[test]
 fn nrs_add_with_register_top_name_should_return_an_error_if_link_to_versioned_content_has_no_version(
 ) -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
     url.set_content_version(None);
 
     let topname = get_random_string();
     let public_name = format!("test.{}", &topname);
-    safe_cmd(["nrs", "register", &topname], Some(0))?;
+    safe_cmd(&config_dir, ["nrs", "register", &topname], Some(0))?;
     safe_cmd(
+        &config_dir,
         [
             "nrs",
             "add",
@@ -448,19 +476,21 @@ fn nrs_add_with_register_top_name_should_return_an_error_if_link_to_versioned_co
 #[test]
 fn nrs_add_with_default_should_return_an_error_if_link_to_versioned_content_has_no_version(
 ) -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
     url.set_content_version(None);
 
     let topname = get_random_string();
     let public_name = format!("test.{}", &topname);
-    safe_cmd(["nrs", "register", &topname], Some(0))?;
+    safe_cmd(&config_dir, ["nrs", "register", &topname], Some(0))?;
     safe_cmd(
+        &config_dir,
         [
             "nrs",
             "add",
@@ -489,16 +519,18 @@ fn nrs_add_with_default_should_return_an_error_if_link_to_versioned_content_has_
 ///
 #[test]
 fn nrs_remove_should_remove_a_subname() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let test_md_file = tmp_data_path.child("test.md");
-    let (files_container_xor, _processed_files, _) = upload_path(test_md_file, false)?;
+    let (files_container_xor, _processed_files, _) = upload_path(&config_dir, test_md_file, false)?;
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
     let test_name = get_random_string();
     let public_name = format!("test.{}", &test_name);
     safe_cmd(
+        &config_dir,
         [
             "nrs",
             "add",
@@ -509,7 +541,7 @@ fn nrs_remove_should_remove_a_subname() -> Result<()> {
         ],
         Some(0),
     )?;
-    safe_cmd(["nrs", "remove", &public_name], Some(0))?
+    safe_cmd(&config_dir, ["nrs", "remove", &public_name], Some(0))?
         .assert()
         .stdout(predicate::str::contains("NRS Map updated"))
         .stdout(predicate::str::contains("-"))
@@ -520,9 +552,10 @@ fn nrs_remove_should_remove_a_subname() -> Result<()> {
 
 #[test]
 fn nrs_remove_should_return_an_error_for_a_non_existent_topname() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
     let topname = get_random_string();
     let public_name = format!("test.{}", &topname);
-    safe_cmd(["nrs", "remove", &public_name], Some(1))?
+    safe_cmd(&config_dir, ["nrs", "remove", &public_name], Some(1))?
         .assert()
         .stderr(predicate::str::contains(format!(
             "Failed to remove {}.",

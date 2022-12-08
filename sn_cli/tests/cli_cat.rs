@@ -10,12 +10,12 @@ use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
 use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
-use sn_api::resolver::{ContentType, DataType, SafeUrl};
+use sn_api::resolver::SafeUrl;
 use sn_cmd_test_utilities::util::{
     get_bearer_dbc_on_file, get_random_string, parse_files_container_output,
     parse_files_put_or_sync_output, parse_nrs_register_output, parse_wallet_create_output,
     safe_cmd, safe_cmd_stderr, safe_cmd_stdout, test_symlinks_are_valid, upload_path,
-    upload_test_symlinks_folder, CLI,
+    upload_test_symlinks_folder, use_isolated_safe_config_dir, CLI,
 };
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -29,42 +29,41 @@ const TEST_FILE_HEXDUMP_CONTENT: &str = "Length: 12 (0xc) bytes\n0000:   68 65 6
 /// A 'spot' file is one that's less than 3072 bytes in size.
 /// These small files are rejected by self encryption and need another way to be stored.
 #[test]
-fn calling_safe_cat_using_spot_file() -> Result<()> {
+fn cat_should_display_file_contents_when_url_points_to_spot_file() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
+
     let content = safe_cmd_stdout(
+        &config_dir,
         ["files", "put", "../resources/testdata/test.md", "--json"],
         Some(0),
     )?;
 
     let (_, processed_files) = parse_files_put_or_sync_output(&content)?;
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
-    cmd.args(&vec![
-        "cat",
-        processed_files[Path::new("../resources/testdata/test.md")]
-            .link()
-            .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?,
-    ])
+    safe_cmd(
+        &config_dir,
+        [
+            "cat",
+            processed_files[Path::new("../resources/testdata/test.md")]
+                .link()
+                .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?,
+        ],
+        Some(0),
+    )?
     .assert()
     .stdout(predicate::str::contains(TEST_FILE_CONTENT))
     .success();
 
-    let safeurl = SafeUrl::from_url(
-        processed_files[Path::new("../resources/testdata/test.md")]
-            .link()
-            .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?,
-    )?;
-    assert_eq!(
-        safeurl.content_type(),
-        ContentType::MediaType("text/markdown".to_string())
-    );
-    assert_eq!(safeurl.data_type(), DataType::File);
     Ok(())
 }
 
 /// A 'large' file is one that's larger than 3072 bytes in size.
 /// These use self encryption and are stored in a different way from 'small' files.
 #[test]
-fn calling_safe_cat_using_large_file() -> Result<()> {
+fn cat_should_display_file_contents_when_url_points_to_large_file() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
+
     let output = safe_cmd_stdout(
+        &config_dir,
         [
             "files",
             "put",
@@ -76,52 +75,51 @@ fn calling_safe_cat_using_large_file() -> Result<()> {
 
     let content = std::fs::read_to_string("../resources/testdata/large_markdown_file.md")?;
     let (_, processed_files) = parse_files_put_or_sync_output(&output)?;
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
-    cmd.args(&vec![
-        "cat",
-        processed_files[Path::new("../resources/testdata/large_markdown_file.md")]
-            .link()
-            .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?,
-    ])
+    safe_cmd(
+        &config_dir,
+        [
+            "cat",
+            processed_files[Path::new("../resources/testdata/large_markdown_file.md")]
+                .link()
+                .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?,
+        ],
+        Some(0),
+    )?
     .assert()
     .stdout(predicate::str::contains(content))
     .success();
 
-    let safeurl = SafeUrl::from_url(
-        processed_files[Path::new("../resources/testdata/large_markdown_file.md")]
-            .link()
-            .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?,
-    )?;
-    assert_eq!(
-        safeurl.content_type(),
-        ContentType::MediaType("text/markdown".to_string())
-    );
-    assert_eq!(safeurl.data_type(), DataType::File);
     Ok(())
 }
 
 #[test]
-fn calling_safe_cat_subfolders() -> Result<()> {
+fn cat_should_display_folder_contents() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
+
     let content = safe_cmd_stdout(
+        &config_dir,
         ["files", "put", TEST_DATA, "--json", "--recursive"],
         Some(0),
     )?;
 
     let (container_xorurl, _) = parse_files_put_or_sync_output(&content)?;
 
-    let content = safe_cmd_stdout(["cat", &container_xorurl, "--json"], Some(0))?;
+    let content = safe_cmd_stdout(&config_dir, ["cat", &container_xorurl, "--json"], Some(0))?;
     let (_xorurl, filesmap) = parse_files_container_output(&content)?;
 
     assert_eq!(filesmap["/emptyfolder"]["type"], "inode/directory");
     assert_eq!(filesmap["/emptyfolder"]["size"], "0");
     assert_eq!(filesmap["/subfolder"]["type"], "inode/directory");
     assert_eq!(filesmap["/subfolder"]["size"], "0");
+
     Ok(())
 }
 
 #[test]
-fn calling_safe_cat_on_relative_file_from_id_fails() -> Result<()> {
-    let content = safe_cmd_stdout(["files", "put", TEST_FILE, "--json"], Some(0))?;
+fn cat_should_fail_when_file_is_not_in_container() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
+
+    let content = safe_cmd_stdout(&config_dir, ["files", "put", TEST_FILE, "--json"], Some(0))?;
 
     let (_, processed_files) = parse_files_put_or_sync_output(&content)?;
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
@@ -136,46 +134,45 @@ fn calling_safe_cat_on_relative_file_from_id_fails() -> Result<()> {
         .assert()
         .stderr(predicate::str::contains(ID_RELATIVE_FILE_ERROR))
         .failure();
+
     Ok(())
 }
 
 #[test]
-fn calling_safe_cat_hexdump() -> Result<()> {
-    let content = safe_cmd_stdout(["files", "put", TEST_FILE, "--json"], Some(0))?;
+fn cat_should_display_file_contents_as_hex_when_hex_arg_is_used() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
+
+    let content = safe_cmd_stdout(&config_dir, ["files", "put", TEST_FILE, "--json"], Some(0))?;
 
     let (_, processed_files) = parse_files_put_or_sync_output(&content)?;
-    let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
-    cmd.args(&vec![
-        "cat",
-        "--hexdump",
-        processed_files[Path::new(TEST_FILE)]
-            .link()
-            .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?,
-    ])
+    safe_cmd(
+        &config_dir,
+        [
+            "cat",
+            "--hexdump",
+            processed_files[Path::new(TEST_FILE)]
+                .link()
+                .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?,
+        ],
+        Some(0),
+    )?
     .assert()
     .stdout(predicate::str::contains(TEST_FILE_HEXDUMP_CONTENT))
     .success();
 
-    let safeurl = SafeUrl::from_url(
-        processed_files[Path::new(TEST_FILE)]
-            .link()
-            .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?,
-    )?;
-    assert_eq!(
-        safeurl.content_type(),
-        ContentType::MediaType("text/markdown".to_string())
-    );
-    assert_eq!(safeurl.data_type(), DataType::File);
     Ok(())
 }
 
 #[test]
-fn calling_safe_cat_xorurl_with_version() -> Result<()> {
+fn cat_should_display_file_contents_when_xor_url_is_used() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
+
     let tmp_dir = assert_fs::TempDir::new()?;
     let md_file = tmp_dir.child("test.md");
     md_file.write_str("hello tests!")?;
 
     let output = safe_cmd_stdout(
+        &config_dir,
         [
             "files",
             "put",
@@ -188,7 +185,7 @@ fn calling_safe_cat_xorurl_with_version() -> Result<()> {
     let mut url = SafeUrl::from_url(&container_xorurl)?;
     url.set_path("test.md");
 
-    safe_cmd(["cat", &url.to_string()], Some(0))?
+    safe_cmd(&config_dir, ["cat", &url.to_string()], Some(0))?
         .assert()
         .stdout(predicate::str::contains("hello tests!"));
 
@@ -196,17 +193,20 @@ fn calling_safe_cat_xorurl_with_version() -> Result<()> {
 }
 
 #[test]
-fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
+fn cat_should_display_file_contents_when_nrs_url_has_version() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
+
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
     let public_name = format!("test.{}", get_random_string());
     let output = safe_cmd_stdout(
+        &config_dir,
         [
             "nrs",
             "add",
@@ -224,7 +224,7 @@ fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
 
     let mut nrs_url = SafeUrl::from_url(&format!("safe://{}", public_name))?;
     nrs_url.set_content_version(version);
-    safe_cmd(["cat", &nrs_url.to_string()], Some(0))?
+    safe_cmd(&config_dir, ["cat", &nrs_url.to_string()], Some(0))?
         .assert()
         .stdout(predicate::str::contains("hello tests!"));
 
@@ -232,17 +232,20 @@ fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
 }
 
 #[test]
-fn calling_safe_cat_nrsurl_without_safe_prefix() -> Result<()> {
+fn cat_should_display_file_contents_when_nrs_url_has_no_safe_prefix() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
+
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
     let public_name = format!("test.{}", get_random_string());
     safe_cmd(
+        &config_dir,
         [
             "nrs",
             "add",
@@ -255,7 +258,7 @@ fn calling_safe_cat_nrsurl_without_safe_prefix() -> Result<()> {
         Some(0),
     )?;
 
-    safe_cmd(["cat", &public_name], Some(0))?
+    safe_cmd(&config_dir, ["cat", &public_name], Some(0))?
         .assert()
         .stdout(predicate::str::contains("hello tests!"));
 
@@ -263,13 +266,15 @@ fn calling_safe_cat_nrsurl_without_safe_prefix() -> Result<()> {
 }
 
 #[test]
-fn calling_safe_cat_nrsurl_with_immutable_content() -> Result<()> {
+fn cat_should_display_file_contents_when_nrs_url_points_to_file() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
+
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let markdown_file = tmp_data_path.child("another.md");
     let (_files_container_xor, processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
 
     let change = processed_files
         .get(&markdown_file.path().to_path_buf())
@@ -281,6 +286,7 @@ fn calling_safe_cat_nrsurl_with_immutable_content() -> Result<()> {
 
     let public_name = format!("test.{}", get_random_string());
     safe_cmd_stdout(
+        &config_dir,
         [
             "nrs",
             "add",
@@ -294,7 +300,7 @@ fn calling_safe_cat_nrsurl_with_immutable_content() -> Result<()> {
     )?;
 
     let nrs_url = SafeUrl::from_url(&format!("safe://{}", public_name))?;
-    safe_cmd(["cat", &nrs_url.to_string()], Some(0))?
+    safe_cmd(&config_dir, ["cat", &nrs_url.to_string()], Some(0))?
         .assert()
         .stdout(predicate::str::contains("exists"));
 
@@ -302,8 +308,10 @@ fn calling_safe_cat_nrsurl_with_immutable_content() -> Result<()> {
 }
 
 #[tokio::test]
-async fn calling_safe_cat_wallet() -> Result<()> {
-    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+async fn cat_should_display_wallet_balances() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
+
+    let json_output = safe_cmd_stdout(&config_dir, ["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
 
     let tmp_data_dir = assert_fs::TempDir::new()?;
@@ -313,6 +321,7 @@ async fn calling_safe_cat_wallet() -> Result<()> {
     dbc_file_path.write_str(&dbc_hex_string)?;
 
     safe_cmd(
+        &config_dir,
         [
             "wallet",
             "deposit",
@@ -333,7 +342,7 @@ async fn calling_safe_cat_wallet() -> Result<()> {
         &dbc_hex_string[dbc_hex_string.len() - 8..]
     );
 
-    safe_cmd(["cat", &wallet_xorurl], Some(0))?
+    safe_cmd(&config_dir, ["cat", &wallet_xorurl], Some(0))?
         .assert()
         .stdout(predicate::str::contains(format!(
             "Spendable balances of wallet at \"{}\":",
@@ -346,115 +355,124 @@ async fn calling_safe_cat_wallet() -> Result<()> {
     Ok(())
 }
 
-// Test:  safe cat <src>/<path>
-//    src is symlinks_test dir, put with trailing slash.
-//    path references both directory and file relative symlinks
-//         including parent dir and sibling dir link targets.
-//         Final destination is the file sibling_dir_file.md
-//         which is itself a symlink to hello.md.
-//
-//         realpath: /sub2/hello.md
-//
-//    expected result: cmd output matches contents of
-//                     ./test_symlinks/sub2/hello.md
+/// Test:  safe cat <src>/<path>
+///    src is symlinks_test dir, put with trailing slash.
+///    path references both directory and file relative symlinks
+///         including parent dir and sibling dir link targets.
+///         Final destination is the file sibling_dir_file.md
+///         which is itself a symlink to hello.md.
+///
+///         realpath: /sub2/hello.md
+///
+///    expected result: cmd output matches contents of
+///                     ./test_symlinks/sub2/hello.md
 #[test]
-fn calling_cat_symlinks_resolve_dir_and_file() -> Result<()> {
+fn cat_should_display_file_contents_when_path_contains_multiple_symlinked_targets() -> Result<()> {
     // Bail if test_symlinks not valid. Typically indicates missing perms on windows.
     if !test_symlinks_are_valid()? {
         return Ok(());
     }
 
-    let (url, ..) = upload_test_symlinks_folder(true)?;
+    let config_dir = use_isolated_safe_config_dir()?;
+
+    let (url, ..) = upload_test_symlinks_folder(&config_dir, true)?;
     let mut safeurl = SafeUrl::from_url(&url)?;
     safeurl.set_path("/dir_link_link/parent_dir/dir_link/sibling_dir_file.md");
 
-    let output = safe_cmd_stdout(["cat", &safeurl.to_string()], Some(0))?;
+    let output = safe_cmd_stdout(&config_dir, ["cat", &safeurl.to_string()], Some(0))?;
     assert_eq!(output, "= Hello =");
+
     Ok(())
 }
 
-// Test:  safe cat <src>/<path>
-//    src is symlinks_test dir, put with trailing slash.
-//    path references a symlink that links to itself.
-//         (infinite loop)
-//
-//    expected result: error, too many links.
+/// Test:  safe cat <src>/<path>
+///    src is symlinks_test dir, put with trailing slash.
+///    path references a symlink that links to itself.
+///         (infinite loop)
+///
+///    expected result: error, too many links.
 #[test]
-fn calling_cat_symlinks_resolve_infinite_loop() -> Result<()> {
+fn cat_should_fail_when_symlink_has_an_infinite_loop() -> Result<()> {
     // Bail if test_symlinks not valid. Typically indicates missing perms on windows.
     if !test_symlinks_are_valid()? {
         return Ok(());
     }
 
-    let (url, ..) = upload_test_symlinks_folder(true)?;
+    let config_dir = use_isolated_safe_config_dir()?;
+
+    let (url, ..) = upload_test_symlinks_folder(&config_dir, true)?;
     let mut safeurl = SafeUrl::from_url(&url)?;
 
     safeurl.set_path("/sub/infinite_loop");
-    let output = safe_cmd_stderr(["cat", &safeurl.to_string()], Some(1))?;
+    let output = safe_cmd_stderr(&config_dir, ["cat", &safeurl.to_string()], Some(1))?;
     assert!(output.contains("ContentNotFound"));
     assert!(output.contains("Too many levels of symbolic links"));
 
     Ok(())
 }
 
-// Test:  safe cat <src>/dir_link_deep/../readme.md
-//    src is symlinks_test dir, put with trailing slash.
-//    path should resolve as follows:
-//         dir_link_deep --> sub/deep
-//         ../           --> sub
-//         readme.md     --> readme.md
-//
-//         realpath: /sub/readme.md
-//
-//    This test verifies that "../" is being resolved
-//    correctly *after* dir_link_deep resolution, not before.
-//
-//    On unix, this behavior can be verified with:
-//       $ cat ./test_symlinks/dir_link_deep/../readme.md
-//       = This is a real markdown file. =
-//
-//    note: This test always failed when SafeUrl
-//          used rust-url for parsing path because it
-//          normalizes away the "../" with no option
-//          to obtain the raw path.
-//          filed issue: https://github.com/servo/rust-url/issues/602
-//
-//    expected result: cmd output matches contents of
-//                     /sub/readme.md
+/// Test:  safe cat <src>/dir_link_deep/../readme.md
+///    src is symlinks_test dir, put with trailing slash.
+///    path should resolve as follows:
+///         dir_link_deep --> sub/deep
+///         ../           --> sub
+///         readme.md     --> readme.md
+///
+///         realpath: /sub/readme.md
+///
+///    This test verifies that "../" is being resolved
+///    correctly *after* dir_link_deep resolution, not before.
+///
+///    On unix, this behavior can be verified with:
+///       $ cat ./test_symlinks/dir_link_deep/../readme.md
+///       = This is a real markdown file. =
+///
+///    note: This test always failed when SafeUrl
+///          used rust-url for parsing path because it
+///          normalizes away the "../" with no option
+///          to obtain the raw path.
+///          filed issue: https://github.com/servo/rust-url/issues/602
+///
+///    expected result: cmd output matches contents of
+///                     /sub/readme.md
 #[test]
-fn calling_cat_symlinks_resolve_parent_dir() -> Result<()> {
+fn cat_should_display_file_contents_when_url_has_relative_path() -> Result<()> {
     // Bail if test_symlinks not valid. Typically indicates missing perms on windows.
     if !test_symlinks_are_valid()? {
         return Ok(());
     }
 
-    let (url, ..) = upload_test_symlinks_folder(true)?;
+    let config_dir = use_isolated_safe_config_dir()?;
+
+    let (url, ..) = upload_test_symlinks_folder(&config_dir, true)?;
     let mut safeurl = SafeUrl::from_url(&url)?;
 
     safeurl.set_path("/dir_link_deep/../readme.md");
-    let output = safe_cmd_stdout(["cat", &safeurl.to_string()], Some(0))?;
+    let output = safe_cmd_stdout(&config_dir, ["cat", &safeurl.to_string()], Some(0))?;
     assert_eq!(output, "= This is a real markdown file. =");
 
     Ok(())
 }
 
-// Test:  safe cat <src>/dir_outside
-//    src is symlinks_test dir, put with trailing slash.
-//    path references a symlink with target outside the FileContainer
-//
-//    expected result: error, too many links.
+/// Test:  safe cat <src>/dir_outside
+///    src is symlinks_test dir, put with trailing slash.
+///    path references a symlink with target outside the FileContainer
+///
+///    expected result: error, too many links.
 #[test]
-fn calling_cat_symlinks_resolve_dir_outside() -> Result<()> {
+fn cat_should_fail_when_symlinked_target_is_outside_the_container() -> Result<()> {
     // Bail if test_symlinks not valid. Typically indicates missing perms on windows.
     if !test_symlinks_are_valid()? {
         return Ok(());
     }
 
-    let (url, ..) = upload_test_symlinks_folder(true)?;
+    let config_dir = use_isolated_safe_config_dir()?;
+
+    let (url, ..) = upload_test_symlinks_folder(&config_dir, true)?;
     let mut safeurl = SafeUrl::from_url(&url)?;
 
     safeurl.set_path("/dir_outside");
-    let output = safe_cmd_stderr(["cat", &safeurl.to_string()], Some(1))?;
+    let output = safe_cmd_stderr(&config_dir, ["cat", &safeurl.to_string()], Some(1))?;
     assert!(output.contains("ContentNotFound"));
     assert!(output.contains("Cannot ascend beyond root directory"));
 
@@ -462,12 +480,14 @@ fn calling_cat_symlinks_resolve_dir_outside() -> Result<()> {
 }
 
 #[test]
-fn calling_safe_cat_nrs_map_container() -> Result<()> {
+fn cat_should_display_nrs_map_container_contents() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
+
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
     tmp_data_path.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, processed_files, _) =
-        upload_path(&tmp_data_path, with_trailing_slash)?;
+        upload_path(&config_dir, &tmp_data_path, with_trailing_slash)?;
 
     let test_file_link = processed_files
         .get(&PathBuf::from(tmp_data_path.path()).join("test.md"))
@@ -483,6 +503,7 @@ fn calling_safe_cat_nrs_map_container() -> Result<()> {
     let site_name = get_random_string();
     let container_xorurl = SafeUrl::from_url(&format!("safe://{}", site_name))?.to_xorurl_string();
     safe_cmd(
+        &config_dir,
         [
             "nrs",
             "register",
@@ -493,6 +514,7 @@ fn calling_safe_cat_nrs_map_container() -> Result<()> {
         Some(0),
     )?;
     safe_cmd(
+        &config_dir,
         [
             "nrs",
             "add",
@@ -503,6 +525,7 @@ fn calling_safe_cat_nrs_map_container() -> Result<()> {
         Some(0),
     )?;
     safe_cmd(
+        &config_dir,
         [
             "nrs",
             "add",
@@ -513,7 +536,7 @@ fn calling_safe_cat_nrs_map_container() -> Result<()> {
         Some(0),
     )?;
 
-    safe_cmd(["cat", &container_xorurl], Some(0))?
+    safe_cmd(&config_dir, ["cat", &container_xorurl], Some(0))?
         .assert()
         .stdout(predicate::str::contains(format!(
             "{site_name}: {}",
@@ -527,5 +550,6 @@ fn calling_safe_cat_nrs_map_container() -> Result<()> {
             "another.{site_name}: {}",
             another_file_link
         )));
+
     Ok(())
 }
