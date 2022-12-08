@@ -154,10 +154,10 @@ impl NetworkKnowledge {
     /// Creates a new `NetworkKnowledge` instance. The prefix is used to choose the
     /// `signed_sap` from the provided SectionTree
     pub fn new(prefix: Prefix, section_tree: SectionTree) -> Result<Self, Error> {
-        let signed_sap = match section_tree.get_signed(&prefix) {
-            Some(signed_sap) => signed_sap.clone(),
-            None => return Err(Error::NoMatchingSection),
-        };
+        let signed_sap = section_tree
+            .get_signed(&prefix)
+            .cloned()
+            .ok_or(Error::NoMatchingSection)?;
         Ok(Self {
             signed_sap,
             section_peers: SectionPeers::default(),

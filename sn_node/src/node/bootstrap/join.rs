@@ -712,8 +712,7 @@ mod tests {
         );
 
         let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone());
-        let mut tree = SectionTree::new(genesis_pk);
-        assert!(tree.insert_without_chain(signed_genesis_sap));
+        let tree = SectionTree::new(signed_genesis_sap).expect("Failed to create SectionTree");
 
         let state = Joiner::new(node.clone(), send_tx, &mut recv_rx, tree.clone());
 
