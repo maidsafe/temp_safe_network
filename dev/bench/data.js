@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1670525508270,
+  "lastUpdate": 1670534952919,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -38230,6 +38230,144 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 368593320,
             "range": "± 18709771",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "56df8392897e5d1641570942a3852644e4cce427",
+          "message": "Merge #1846\n\n1846: Always update sap in network knowledge when we receive an AE update. r=davidrusu a=davidrusu\n\nCurrently we have logic that avoids updating the signed sap in Network-knowledge if we were an elder and we had not received our section key share yet.\r\n\r\nThis PR removes this logic as it was preventing other changes I was trying to make and it doesn't actually seem to be what we want: If a SAP update has occurred, then hanging on to the old SAP until we finish DKG does little to help the network as the other elders will update soon if they hadn't already, any signature shares this elder is creating with the old section key will only have a potential to be aggregated for that short period while we still have a threshold of old elders around still using the old SAP.\r\n\r\nOn a more philosophical point, we probably don't want elders to be signing anything after we've agreed to a handover.\r\n\n\nCo-authored-by: David Rusu <davidrusu.me@gmail.com>",
+          "timestamp": "2022-12-08T19:50:18Z",
+          "tree_id": "ef5c94a41f499473773cd81ca6be37a026ee4d08",
+          "url": "https://github.com/maidsafe/safe_network/commit/56df8392897e5d1641570942a3852644e4cce427"
+        },
+        "date": 1670534951295,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2342128,
+            "range": "± 236621",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 93061079,
+            "range": "± 2136877",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 108185200,
+            "range": "± 4931396",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 435260678,
+            "range": "± 8865059",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 74400600,
+            "range": "± 1211705",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 86397998,
+            "range": "± 3263124",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 352790560,
+            "range": "± 7166756",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 45884490,
+            "range": "± 12115231",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2042538103,
+            "range": "± 240327088",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 8783236938,
+            "range": "± 1139422566",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 297324837,
+            "range": "± 25721551",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 2575678788,
+            "range": "± 180092791",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 8531737986,
+            "range": "± 2121953748",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 50077945,
+            "range": "± 3875411",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 462082351,
+            "range": "± 10018174",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1830405659,
+            "range": "± 41308312",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 12020042,
+            "range": "± 612984",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 100837576,
+            "range": "± 4458587",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 345978566,
+            "range": "± 10590419",
             "unit": "ns/iter"
           }
         ]
