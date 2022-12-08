@@ -107,13 +107,15 @@ impl Client {
 
     /// Tries to chunk the bytes, returning an address and chunks, without storing anything to network.
     #[instrument(skip_all, level = "trace")]
-    pub fn chunk_bytes(&self, bytes: Bytes) -> Result<(XorName, Vec<Chunk>)> {
-        if let Ok(file) = LargeFile::new(bytes.clone()) {
-            Self::encrypt_large(file)
-        } else {
-            let file = SmallFile::new(bytes)?;
-            let chunk = Self::package_small(file)?;
-            Ok((*chunk.name(), vec![chunk]))
+    pub fn chunk_bytes(bytes: Bytes) -> Result<(XorName, Vec<Chunk>)> {
+        match LargeFile::new(bytes.clone()) {
+            Ok(file) => Self::encrypt_large(file),
+            Err(Error::TooSmallForSelfEncryption { .. }) => {
+                let file = SmallFile::new(bytes)?;
+                let chunk = Self::package_small(file)?;
+                Ok((*chunk.name(), vec![chunk]))
+            }
+            Err(error) => Err(error),
         }
     }
 
@@ -154,14 +156,7 @@ impl Client {
     /// without storing them onto the network.
     #[instrument(skip(bytes), level = "debug")]
     pub fn calculate_address(bytes: Bytes) -> Result<XorName> {
-        if let Ok(file) = LargeFile::new(bytes.clone()) {
-            let (head_address, _all_chunks) = Self::encrypt_large(file)?;
-            Ok(head_address)
-        } else {
-            let file = SmallFile::new(bytes)?;
-            let chunk = Self::package_small(file)?;
-            Ok(*chunk.name())
-        }
+        Self::chunk_bytes(bytes).map(|(name, _)| name)
     }
 
     // --------------------------------------------
@@ -170,11 +165,13 @@ impl Client {
 
     #[instrument(skip(self, bytes), level = "trace")]
     async fn upload_bytes(&self, bytes: Bytes, verify: bool) -> Result<XorName> {
-        if let Ok(file) = LargeFile::new(bytes.clone()) {
-            self.upload_large(file, verify).await
-        } else {
-            let file = SmallFile::new(bytes)?;
-            self.upload_small(file, verify).await
+        match LargeFile::new(bytes.clone()) {
+            Ok(file) => self.upload_large(file, verify).await,
+            Err(Error::TooSmallForSelfEncryption { .. }) => {
+                let file = SmallFile::new(bytes)?;
+                self.upload_small(file, verify).await
+            }
+            Err(error) => Err(error),
         }
     }
 
