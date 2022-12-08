@@ -200,10 +200,10 @@ impl NetworkKnowledge {
     }
 
     /// update all section info for our new section
-    pub fn relocated_to(&mut self, new_network_knowledge: Self) -> Result<()> {
-        debug!("Node was relocated to {:?}", new_network_knowledge);
-        self.signed_sap = new_network_knowledge.signed_sap();
-        let _updated = self.merge_members(new_network_knowledge.section_signed_members())?;
+    pub fn relocated_to(&mut self, new_name: XorName) -> Result<()> {
+        let signed_sap = self.section_tree().get_signed_by_name(&new_name)?;
+        debug!("Node was relocated to {:?}", signed_sap.section_key());
+        self.signed_sap = signed_sap;
 
         Ok(())
     }

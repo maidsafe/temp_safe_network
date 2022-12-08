@@ -21,13 +21,12 @@ use sn_interface::{
         system::{JoinResponse, NodeDataCmd, NodeDataQuery, NodeDataResponse, NodeEvent, NodeMsg},
         MsgId,
     },
-    network_knowledge::NetworkKnowledge,
     types::{log_markers::LogMarker, Keypair, Peer, PublicKey, ReplicatedData},
 };
 use std::collections::BTreeSet;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
-use xor_name::{Prefix, XorName};
+use xor_name::XorName;
 
 impl MyNode {
     /// Send a (`NodeMsg`) message to all Elders in our section
@@ -210,18 +209,11 @@ impl MyNode {
                                 previous_name, new_name, new_keypair
                             );
 
-                            let section_tree = node.network_knowledge.section_tree().clone();
-                            let prefix = section_tree
-                                .get_signed_by_prefix(&Prefix::default())?
-                                .prefix();
-                            let new_network_knowledge =
-                                NetworkKnowledge::new(prefix, section_tree)?;
-
                             // TODO: confirm whether carry out the switch immediately here
                             //       or still using the cmd pattern.
                             //       As the sending of the JoinRequest as notification
                             //       may require the `node` to be switched to new already.
-                            node.relocate(new_keypair, new_network_knowledge)?;
+                            node.relocate(new_keypair, new_name)?;
 
                             trace!("{}", LogMarker::RelocateEnd);
                         } else {
