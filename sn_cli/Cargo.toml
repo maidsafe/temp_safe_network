@@ -65,6 +65,7 @@ features = [
 [features]
 default = [ "self-update" ]
 check-replicas = [ "sn_api/check-replicas" ]
+limit-client-upload-size = ["sn_api/limit-client-upload-size"]
 self-update = []
 
 [dev-dependencies]
