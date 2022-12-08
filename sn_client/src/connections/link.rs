@@ -109,7 +109,7 @@ impl Link {
             return Ok(conn);
         }
 
-        debug!("{msg_id:?} creating connnnn to {peer:?}");
+        debug!("{msg_id:?} creating conn to {peer:?}");
         let (conn, _incoming_msgs) = self
             .endpoint
             .connect_to(&peer.addr())

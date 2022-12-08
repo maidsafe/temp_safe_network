@@ -118,13 +118,13 @@ impl RegisterStore {
 
         if !path.exists() {
             trace!(
-                "Register log does not exist, creating a new one {}",
+                "Register log for {addr:?} does not exist yet: {}",
                 path.display()
             );
             return Ok(stored_reg);
         }
 
-        trace!("Register log path exists: {}", path.display());
+        trace!("Register log for {addr:?} path exists: {}", path.display());
         for filepath in list_files_in(&path) {
             match read(&filepath)
                 .await
@@ -146,9 +146,8 @@ impl RegisterStore {
                 }
                 other => {
                     warn!(
-                        "Ignoring corrupted register cmd from storage found at {}: {:?}",
+                        "Ignoring corrupted Register cmd for {addr:?} from storage found at {}: {other:?}",
                         filepath.display(),
-                        other
                     )
                 }
             }
@@ -171,8 +170,9 @@ impl RegisterStore {
         create_dir_all(path).await?;
 
         for cmd in log {
-            // TODO do we want to fail here if one entry fails?
-            self.write_register_cmd(cmd, path).await?;
+            if let Err(err) = self.write_register_cmd(cmd, path).await {
+                error!("Failed to write Register cmd {cmd:?} to disk: {err:?}");
+            }
         }
 
         trace!(

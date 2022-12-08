@@ -219,7 +219,6 @@ jobs:
           release: true
           filters: client
           features: check-replicas
-          test-threads: 2
         timeout-minutes: 25
 
       - name: Run example app for file API
@@ -277,7 +276,6 @@ jobs:
           junit-path: junit.xml
           package: sn_api
           release: true
-          test-threads: 1
           features: check-replicas
         timeout-minutes: 60
         env:

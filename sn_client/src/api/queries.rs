@@ -179,6 +179,24 @@ impl Client {
         let span = info_span!("Attempting a query");
         let _ = span.enter();
 
+        match self.send_query_variant(query.clone()).await {
+            Ok(res) => Ok(res),
+            Err(
+                error @ Error::DataReplicasCheck(DataReplicasCheckError::ReceivedErrors { .. }),
+            ) => {
+                // we'll give it a second chance in this case, let's retry once
+                warn!("First query attempt failed: {error:?}");
+                self.send_query_variant(query).await
+            }
+            Err(other) => Err(other),
+        }
+    }
+
+    #[cfg(feature = "check-replicas")]
+    #[instrument(skip(self), level = "debug")]
+    async fn send_query_variant(&self, query: DataQueryVariant) -> Result<QueryResult, Error> {
+        use crate::errors::DataReplicasCheckError;
+
         let client_pk = self.public_key();
         let dst = query.dst_name();
 
