@@ -19,7 +19,7 @@ use std::collections::BTreeSet;
 // Agreement
 impl MyNode {
     #[instrument(skip(self), level = "trace")]
-    pub(crate) async fn handle_general_agreements(
+    pub(crate) fn handle_general_agreements(
         &mut self,
         proposal: Proposal,
         sig: SectionSig,
@@ -31,7 +31,7 @@ impl MyNode {
                 cmds.extend(self.handle_offline_agreement(node_state, sig));
             }
             Proposal::RequestHandover(sap) => {
-                cmds.extend(self.handle_request_handover_agreement(sap, sig).await?);
+                cmds.extend(self.handle_request_handover_agreement(sap, sig)?);
             }
             Proposal::HandoverCompleted(_) => {
                 error!("Handover completed should be handled in a separate blocking fashion");
@@ -53,7 +53,7 @@ impl MyNode {
     }
 
     #[instrument(skip(self), level = "trace")]
-    async fn handle_request_handover_agreement(
+    fn handle_request_handover_agreement(
         &mut self,
         sap: SectionAuthorityProvider,
         sig: SectionSig,
@@ -77,7 +77,7 @@ impl MyNode {
         // check if at the given memberhip gen, the elders candidates are matching
         let membership_gen = sap.membership_gen();
         let signed_sap = SectionSigned::new(sap, sig);
-        let dkg_sessions_info = self.best_elder_candidates_at_gen(membership_gen).await;
+        let dkg_sessions_info = self.best_elder_candidates_at_gen(membership_gen);
 
         let elder_candidates = BTreeSet::from_iter(signed_sap.names());
         if dkg_sessions_info
@@ -169,31 +169,22 @@ impl MyNode {
 
         // Finally we update our network knowledge with our sibling section SAP.
         // We use the parent proof chain to connect our current chain to sibling SAP.
-        match parent_section_chain.insert(
+        parent_section_chain.insert(
             &parent_key,
             their_sap.section_key(),
             sig_over_them.signature,
-        ) {
-            Ok(()) => {
-                let their_prefix = their_sap.prefix();
-                let section_tree_update = SectionTreeUpdate::new(their_sap, parent_section_chain);
-                match self.network_knowledge.update_knowledge_if_valid(
-                    section_tree_update,
-                    None,
-                    &context.name,
-                ) {
-                    Ok(true) => {
-                        info!("Updated our network knowledge for {:?}", their_prefix);
-                        info!("Writing updated knowledge to disk");
-                        MyNode::write_section_tree(&context);
-                    }
-                    Err(err) => {
-                        error!("Error updating our network knowledge for {their_prefix:?}: {err:?}")
-                    }
-                    _ => {}
-                }
-            }
-            Err(err) => error!("Failed to generate proof chain for a newly received SAP: {err:?}"),
+        )?;
+        let their_prefix = their_sap.prefix();
+        let section_tree_update = SectionTreeUpdate::new(their_sap, parent_section_chain);
+        let updated = self.network_knowledge.update_knowledge_if_valid(
+            section_tree_update,
+            None,
+            &context.name,
+        )?;
+        if updated {
+            info!("Updated our network knowledge for {:?}", their_prefix);
+            info!("Writing updated knowledge to disk");
+            MyNode::write_section_tree(&context);
         }
         Ok(cmds)
     }
@@ -217,30 +208,26 @@ impl MyNode {
         // Let's update our network knowledge, including our
         // section SAP and chain if the new SAP's prefix matches our name
         // We need to generate the proof chain to connect our current chain to new SAP.
-        match section_chain.insert(&last_key, signed_sap.section_key(), section_sig.signature) {
-            Ok(()) => {
-                let section_tree_update = SectionTreeUpdate::new(signed_sap, section_chain);
-                match self.update_network_knowledge(&self.context(), section_tree_update, None) {
-                    Ok(true) => {
-                        info!("Updated our network knowledge for {:?}", prefix);
-                        info!("Writing updated knowledge to disk");
-                        MyNode::write_section_tree(&context);
-                    }
-                    Err(err) => {
-                        error!("Error updating our network knowledge for {prefix:?}: {err:?}")
-                    }
+        section_chain.insert(&last_key, signed_sap.section_key(), section_sig.signature)?;
+        let update = SectionTreeUpdate::new(signed_sap, section_chain);
+        let name = self.context().name;
+        let updated = self
+            .network_knowledge
+            .update_knowledge_if_valid(update, None, &name)?;
 
-                    _ => {}
-                }
-            }
-            Err(err) => error!("Failed to generate proof chain for a newly received SAP: {err:?}"),
+        if updated {
+            info!("Updated our network knowledge for {:?}", prefix);
+            info!("Writing updated knowledge to disk");
+            MyNode::write_section_tree(&context);
+
+            info!(
+                "Prefixes we know about: {:?}",
+                self.network_knowledge.section_tree()
+            );
+
+            self.update_on_elder_change(&context).await
+        } else {
+            Ok(vec![])
         }
-
-        info!(
-            "Prefixes we know about: {:?}",
-            self.network_knowledge.section_tree()
-        );
-
-        self.update_on_elder_change(&context).await
     }
 }

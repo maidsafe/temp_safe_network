@@ -33,15 +33,13 @@ use sn_interface::{
     elder_count, init_logger,
     messaging::{
         data::{ClientMsg, DataCmd, SpentbookCmd},
-        system::{
-            self, AntiEntropyKind, JoinAsRelocatedRequest, NodeDataCmd, NodeMsg, SectionSigned,
-        },
+        system::{self, AntiEntropyKind, JoinAsRelocatedRequest, NodeDataCmd, NodeMsg},
         Dst, MsgType, WireMsg,
     },
     network_knowledge::{
         recommended_section_size, supermajority, Error as NetworkKnowledgeError, MembershipState,
-        MyNodeInfo, NodeState, RelocateDetails, SapCandidate, SectionAuthorityProvider,
-        SectionKeysProvider, SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
+        MyNodeInfo, NodeState, RelocateDetails, SapCandidate, SectionKeysProvider,
+        SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
     },
     test_utils::*,
     types::{keys::ed25519, PublicKey, ReplicatedData},
@@ -51,7 +49,7 @@ use assert_matches::assert_matches;
 use eyre::{bail, eyre, Result};
 use rand::{rngs::StdRng, thread_rng, SeedableRng};
 use std::{
-    collections::{BTreeMap, BTreeSet, HashSet},
+    collections::{BTreeSet, HashSet},
     iter,
     sync::Arc,
 };
@@ -810,51 +808,39 @@ async fn handle_demote_during_split() -> Result<()> {
 
     let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
 
-    type Sap = SectionSigned<SectionAuthorityProvider>;
-    // Create agreement on `HandoverCompleted` for both sub-sections
-    let create_our_elders_cmd = |sap1: Sap, sap2: Sap| -> Result<_> {
+    let cmd = {
+        // Sign the saps.
+        let sap0 = TestKeys::get_section_signed(&sk_set0.secret_key(), sap0);
+        let sap1 = TestKeys::get_section_signed(&sk_set1.secret_key(), sap1);
+
         let proposal =
-            Proposal::HandoverCompleted(SapCandidate::SectionSplit(sap1.clone(), sap2.clone()));
-        let (bytes1, bytes2) = get_double_sig(&proposal);
-        let sig1 = TestKeys::get_section_sig_bytes(&sk_set_gen.secret_key(), &bytes1);
-        let sig2 = TestKeys::get_section_sig_bytes(&sk_set_gen.secret_key(), &bytes2);
+            Proposal::HandoverCompleted(SapCandidate::SectionSplit(sap0.clone(), sap1.clone()));
+        let (bytes0, bytes1) = get_double_sig(&proposal);
 
-        Ok(Cmd::HandleNewSectionsAgreement {
-            sap1,
-            sig1,
-            sap2,
-            sig2,
-        })
+        Cmd::HandleNewSectionsAgreement {
+            sap1: sap0,
+            sig1: TestKeys::get_section_sig_bytes(&sk_set_gen.secret_key(), &bytes0),
+            sap2: sap1,
+            sig2: TestKeys::get_section_sig_bytes(&sk_set_gen.secret_key(), &bytes1),
+        }
     };
-
-    // Sign the saps.
-    let signed_sap_0 = TestKeys::get_section_signed(&sk_set0.secret_key(), sap0);
-    let signed_sap_1 = TestKeys::get_section_signed(&sk_set1.secret_key(), sap1);
-
-    let cmd = create_our_elders_cmd(signed_sap_0, signed_sap_1)?;
     let cmds = run_and_collect_cmds(cmd, &dispatcher).await?;
 
-    let mut update_recipients = BTreeMap::new();
+    let mut update_recipients = BTreeSet::new();
     for cmd in cmds {
         let (msg, recipients) = match cmd {
             Cmd::SendMsg {
-                msg,
-                recipients: Peers::Multiple(recipients),
-                ..
+                msg, recipients, ..
             } => (msg, recipients),
             _ => continue,
         };
 
-        if matches!(
-            msg,
-            NodeMsg::AntiEntropy {
-                kind: AntiEntropyKind::Update { .. },
-                ..
-            }
-        ) {
-            for recipient in recipients {
-                let _old = update_recipients.insert(recipient.name(), recipient.addr());
-            }
+        if let NodeMsg::AntiEntropy {
+            kind: AntiEntropyKind::Update { .. },
+            ..
+        } = msg
+        {
+            update_recipients.extend(recipients.into_iter().map(|r| r.name()))
         }
     }
 

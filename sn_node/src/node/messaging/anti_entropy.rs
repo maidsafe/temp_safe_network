@@ -15,10 +15,10 @@ use sn_dysfunction::IssueType;
 use sn_interface::{
     messaging::{
         data::ClientDataResponse,
-        system::{AntiEntropyKind, NodeDataCmd, NodeMsg, SectionSigned},
+        system::{AntiEntropyKind, NodeDataCmd, NodeMsg},
         Dst, MsgId, MsgType, WireMsg,
     },
-    network_knowledge::{NodeState, SectionTreeUpdate},
+    network_knowledge::SectionTreeUpdate,
     types::{log_markers::LogMarker, Peer, PublicKey},
 };
 use std::{collections::BTreeSet, sync::Arc};
@@ -263,88 +263,6 @@ impl MyNode {
         SectionTreeUpdate::new(signed_sap, proof_chain)
     }
 
-    /// returns (we_have_a_share_of_this_key, we_should_become_an_elder)
-    fn does_section_tree_update_make_us_an_elder_with_key(
-        context: &NodeContext,
-        section_tree_update: &SectionTreeUpdate,
-    ) -> (bool, bool) {
-        let our_name = context.name;
-        let sap = section_tree_update.signed_sap.clone();
-
-        let we_have_a_share_of_this_key = context
-            .section_keys_provider
-            .key_share(&sap.section_key())
-            .is_ok();
-
-        // check we should be _becoming_ an elder
-        let we_should_become_an_elder = sap.contains_elder(&our_name);
-        (we_have_a_share_of_this_key, we_should_become_an_elder)
-    }
-
-    #[instrument(skip_all)]
-    /// Test a context to see if we would update Network Knowledge
-    /// returns
-    ///   Ok(true) if the update had new valid information
-    ///   Ok(false) if the update was valid but did not contain new information
-    ///   Err(_) if the update was invalid
-    pub(crate) fn would_we_update_network_knowledge(
-        context: &NodeContext,
-        section_tree_update: SectionTreeUpdate,
-        members: Option<BTreeSet<SectionSigned<NodeState>>>,
-    ) -> Result<bool> {
-        let mut mutable_context = context.clone();
-        let (we_have_a_share_of_this_key, we_should_become_an_elder) =
-            MyNode::does_section_tree_update_make_us_an_elder_with_key(
-                context,
-                &section_tree_update,
-            );
-
-        trace!("we_have_a_share_of_this_key: {we_have_a_share_of_this_key}, we_should_become_an_elder: {we_should_become_an_elder}");
-
-        if we_should_become_an_elder && !we_have_a_share_of_this_key {
-            warn!("We should be an elder, but we're missing the keyshare!, ignoring update to wait until we have our keyshare");
-            return Ok(false);
-        };
-
-        Ok(mutable_context
-            .network_knowledge
-            .update_knowledge_if_valid(section_tree_update, members, &context.name)?)
-    }
-
-    // Update's Network Knowledge
-    // returns
-    //   Ok(true) if the update had new valid information
-    //   Ok(false) if the update was valid but did not contain new information
-    //   Err(_) if the update was invalid
-    pub(crate) fn update_network_knowledge(
-        &mut self,
-        context: &NodeContext,
-        section_tree_update: SectionTreeUpdate,
-        members: Option<BTreeSet<SectionSigned<NodeState>>>,
-    ) -> Result<bool> {
-        let (we_have_a_share_of_this_key, we_should_become_an_elder) =
-            MyNode::does_section_tree_update_make_us_an_elder_with_key(
-                context,
-                &section_tree_update,
-            );
-
-        trace!("we_have_a_share_of_this_key: {we_have_a_share_of_this_key}, we_should_become_an_elder: {we_should_become_an_elder}");
-
-        // This prevent us from updating our NetworkKnowledge based on an AE message where
-        // we don't have the key share for the new SAP, making this node unable to sign section
-        // messages and possibly being kicked out of the group of Elders.
-        if we_should_become_an_elder && !we_have_a_share_of_this_key {
-            warn!("We should be an elder, but we're missing the keyshare!, ignoring update to wait until we have our keyshare");
-            return Ok(false);
-        };
-
-        Ok(self.network_knowledge.update_knowledge_if_valid(
-            section_tree_update,
-            members,
-            &context.name,
-        )?)
-    }
-
     #[instrument(skip_all)]
     pub(crate) async fn handle_anti_entropy_msg(
         node: Arc<RwLock<MyNode>>,
@@ -366,19 +284,25 @@ impl MyNode {
 
         // block off the write lock
         let updated = {
-            let should_update = MyNode::would_we_update_network_knowledge(
-                &starting_context,
-                section_tree_update.clone(),
-                members.clone(),
-            )?;
+            let should_update = starting_context
+                .clone()
+                .network_knowledge
+                .update_knowledge_if_valid(
+                    section_tree_update.clone(),
+                    members.clone(),
+                    &starting_context.name,
+                )?;
+
             if should_update {
                 let mut write_locked_node = node.write().await;
                 debug!("[NODE WRITE]: handling AE write gottt...");
-                let updated = write_locked_node.update_network_knowledge(
-                    &starting_context,
-                    section_tree_update,
-                    members,
-                )?;
+                let updated = write_locked_node
+                    .network_knowledge
+                    .update_knowledge_if_valid(
+                        section_tree_update,
+                        members,
+                        &starting_context.name,
+                    )?;
                 debug!("net knowledge udpated");
                 // always run this, only changes will trigger events
                 cmds.extend(
@@ -732,7 +656,11 @@ mod tests {
         // now let's insert the other SAP to make it aware of the other prefix
         let section_tree_update =
             SectionTreeUpdate::new(other_sap.clone(), other_section.section_chain());
-        assert!(node.update_network_knowledge(&context, section_tree_update, None,)?);
+        assert!(node.network_knowledge.update_knowledge_if_valid(
+            section_tree_update,
+            None,
+            &context.name,
+        )?);
 
         let new_context = node.context();
         // and it now shall give us an AE redirect msg

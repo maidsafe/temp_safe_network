@@ -61,19 +61,18 @@ pub const DEFAULT_ELDER_COUNT: usize = 7;
 pub fn elder_count() -> usize {
     // if we have an env var for this, lets override
     match std::env::var(SN_ELDER_COUNT) {
-        Ok(count) => match count.parse() {
-            Ok(count) => {
-                warn!(
-                    "ELDER_COUNT count set from env var SN_ELDER_COUNT: {:?}",
-                    SN_ELDER_COUNT
-                );
-                count
+        Ok(count) => {
+            match count.parse() {
+                Ok(count) => {
+                    warn!("ELDER_COUNT count set from env var SN_ELDER_COUNT: {SN_ELDER_COUNT:?}={count}");
+                    count
+                }
+                Err(error) => {
+                    warn!("There was an error parsing {SN_ELDER_COUNT:?} env var. DEFAULT_ELDER_COUNT={DEFAULT_ELDER_COUNT} will be used: {error:?}");
+                    DEFAULT_ELDER_COUNT
+                }
             }
-            Err(error) => {
-                warn!("There was an error parsing {:?} env var. DEFAULT_ELDER_COUNT will be used: {:?}", SN_ELDER_COUNT, error);
-                DEFAULT_ELDER_COUNT
-            }
-        },
+        }
         Err(_) => DEFAULT_ELDER_COUNT,
     }
 }
@@ -215,48 +214,6 @@ impl NetworkKnowledge {
         let _updated = self.merge_members(new_network_knowledge.section_signed_members())?;
 
         Ok(())
-    }
-
-    /// If we already have the signed SAP for the provided key and prefix, we make it the current SAP, and if so, this
-    /// returns 'true'. Note this function assumes we already have the key share for the provided section key.
-    pub fn try_update_current_sap(&mut self, section_key: BlsPublicKey, prefix: &Prefix) -> bool {
-        // Let's try to find the signed SAP corresponding to the provided prefix and section key
-        match self.section_tree.get_signed(prefix) {
-            Some(signed_sap) if signed_sap.value.section_key() == section_key => {
-                let proof_chain = self
-                    .section_tree
-                    .get_sections_dag()
-                    .partial_dag(self.genesis_key(), &section_key);
-                // We have the signed SAP for the provided prefix and section key,
-                // we should be able to update our current SAP and section chain
-                match proof_chain {
-                    Ok(pc) => {
-                        // Remove any peer which doesn't belong to our new section's prefix
-                        self.section_peers.retain(prefix);
-                        // Prune list of archived members
-                        if let Err(e) = self.section_peers.prune_members_archive(&pc, &section_key)
-                        {
-                            error!("Error while pruning member archive with last_key: {section_key:?}, err: {e:?}");
-                        }
-                        // Let's then update our current SAP and section chain
-                        let our_prev_prefix = self.prefix();
-                        self.signed_sap = signed_sap.clone();
-
-                        info!("Switched our section's SAP ({our_prev_prefix:?} to {prefix:?}) with new one: {signed_sap:?}");
-
-                        true
-                    }
-                    Err(err) => {
-                        trace!("We couldn't find section chain for {prefix:?} and section key {section_key:?}: {err:?}");
-                        false
-                    }
-                }
-            }
-            Some(_) | None => {
-                trace!("We yet don't have the signed SAP for {prefix:?} and section key {section_key:?}");
-                false
-            }
-        }
     }
 
     /// Update our network knowledge with the provided `SectionTreeUpdate`
