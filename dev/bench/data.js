@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1670503579494,
+  "lastUpdate": 1670510422230,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -37678,6 +37678,144 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 357588384,
             "range": "± 14770004",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "dd23f7704e689ba2c2fb12be5d03b0ac4ea2c83c",
+          "message": "Merge #1870\n\n1870: fix(chunks): match on specific error r=davidrusu a=oetyng\n\nMatching on any error was wrong, but it was hidden until we actually returned any other error than the expected.\r\nWith `limit-client-upload-size`, we started returning more errors, and we botched the logic with it, causing `TooLargeAsSmallFile` error to be returned.\r\n\r\nThis commit fixes that problem by correctly identifying the error type that signals too small file for self encryption, and erroring out on all other types.\r\nAlso adds a test to verify the limit works as it should.\n\nCo-authored-by: oetyng <oetyng@gmail.com>",
+          "timestamp": "2022-12-08T12:59:53Z",
+          "tree_id": "257854183f9cd00e07aeab336b98a85a6385c88b",
+          "url": "https://github.com/maidsafe/safe_network/commit/dd23f7704e689ba2c2fb12be5d03b0ac4ea2c83c"
+        },
+        "date": 1670510420193,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2213714,
+            "range": "± 133748",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 91009547,
+            "range": "± 2524477",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 108870272,
+            "range": "± 5027421",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 452639358,
+            "range": "± 6893385",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 71113668,
+            "range": "± 4215207",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 83747887,
+            "range": "± 1943071",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 370957422,
+            "range": "± 7106389",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 49879888,
+            "range": "± 25811062",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2430991776,
+            "range": "± 223734840",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 10015590068,
+            "range": "± 1112745769",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 321969804,
+            "range": "± 17740972",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 2138374597,
+            "range": "± 132422238",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 8181945158,
+            "range": "± 604709431",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 43704133,
+            "range": "± 2853686",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 408887105,
+            "range": "± 28703742",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1643643213,
+            "range": "± 56688505",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 13283448,
+            "range": "± 369860",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 105713507,
+            "range": "± 6200622",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 360962729,
+            "range": "± 4360422",
             "unit": "ns/iter"
           }
         ]
