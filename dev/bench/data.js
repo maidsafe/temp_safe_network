@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1670461837136,
+  "lastUpdate": 1670485659004,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -37402,6 +37402,144 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 375338445,
             "range": "± 19377641",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "10ed5f383ed0560931d102c4200bfd828f24c185",
+          "message": "Merge #1866\n\n1866: tests: use isolated config dir for cli tests r=joshuef a=jacderida\n\n- 20996c68e **feat: provide `--config-dir-path` arg for `safe`**\r\n\r\n  Add a global `--config-dir-path` argument that will set the location of the config directory. If\r\n  it's not set, the `SAFE_CONFIG_DIR_PATH` environment variable will be used, and if that's not set,\r\n  we will default to `$HOME/.safe`.\r\n\r\n  The purpose of this customisation is for integration testing so that each test can use an isolated\r\n  configuration directory, but users can apply it too if they wish.\r\n\r\n- fb887ede4 **tests: use isolated config dir for cli tests**\r\n\r\n  A function is added to the test utils library for creating a temporary directory that functions as\r\n  the config directory for the CLI. It uses `assert_fs`, so the directory will be automatically\r\n  deleted when the reference to it is dropped. This enables each test case to use its own config\r\n  directory, which resolves issues we've had with multiple instances of `safe` writing/reading the\r\n  config file in a race situation.\r\n\r\n  The functions for running `safe` commands were changed to require the config directory to be\r\n  passed. This forces each test case to use this mechanism.\r\n\r\n  All the tests were updated to use the same naming convention, with the exception of the `files get`\r\n  tests, which are quite tedious and probably best left with the convention they were using, at least\r\n  for now.\r\n\r\n  Some tests could be un-ignored as part of this change.\n\nCo-authored-by: Chris O'Neil <chriso83@protonmail.com>",
+          "timestamp": "2022-12-08T06:05:04Z",
+          "tree_id": "4d0ec764de7b80f6c7c810e5a3a7545c5ffdcb6c",
+          "url": "https://github.com/maidsafe/safe_network/commit/10ed5f383ed0560931d102c4200bfd828f24c185"
+        },
+        "date": 1670485657332,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2384804,
+            "range": "± 202748",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 88474436,
+            "range": "± 5561002",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 105713875,
+            "range": "± 22714135",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 443009666,
+            "range": "± 31026379",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 71722113,
+            "range": "± 2199377",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 83218522,
+            "range": "± 4299103",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 349960074,
+            "range": "± 20877443",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 51390039,
+            "range": "± 90758519",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 3250753278,
+            "range": "± 384501262",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 11473791175,
+            "range": "± 945824646",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 374193147,
+            "range": "± 36327823",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 3113162940,
+            "range": "± 240748894",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 11291064867,
+            "range": "± 1399750745",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 49162867,
+            "range": "± 4758842",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 472300365,
+            "range": "± 16797136",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1791551049,
+            "range": "± 49933088",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11405934,
+            "range": "± 338239",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 96073366,
+            "range": "± 4860445",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 339483225,
+            "range": "± 28744531",
             "unit": "ns/iter"
           }
         ]
