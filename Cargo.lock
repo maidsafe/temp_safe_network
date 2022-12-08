@@ -3916,6 +3916,7 @@ dependencies = [
 name = "sn_client"
 version = "0.76.0"
 dependencies = [
+ "assert_matches",
  "backoff 0.4.0",
  "base64",
  "bincode",

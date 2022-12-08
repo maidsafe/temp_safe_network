@@ -57,7 +57,7 @@ impl SmallFile {
 
 impl LargeFile {
     #[cfg(feature = "limit-client-upload-size")]
-    const CLIENT_UPLOAD_SIZE_LIMIT: usize = 10 * 1024 * 1024; // 10MiB currently.
+    pub(crate) const CLIENT_UPLOAD_SIZE_LIMIT: usize = 10 * 1024 * 1024; // 10MiB currently.
 
     /// Enforces size >= [`MIN_ENCRYPTABLE_BYTES`] bytes.
     pub(crate) fn new(bytes: Bytes) -> Result<Self> {

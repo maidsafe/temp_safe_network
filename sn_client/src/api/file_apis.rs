@@ -365,6 +365,21 @@ mod tests {
     use xor_name::XorName;
 
     #[test]
+    #[cfg(feature = "limit-client-upload-size")]
+    fn limits_upload_size() -> Result<()> {
+        use super::Error;
+        use assert_matches::assert_matches;
+        let too_large_file = random_bytes(LargeFile::CLIENT_UPLOAD_SIZE_LIMIT + 1);
+        assert_matches!(
+            Client::chunk_bytes(too_large_file),
+            Err(Error::UploadSizeLimitExceeded { .. })
+        );
+        let ok_file_size = random_bytes(LargeFile::CLIENT_UPLOAD_SIZE_LIMIT);
+        assert_matches!(Client::chunk_bytes(ok_file_size), Ok(_));
+        Ok(())
+    }
+
+    #[test]
     fn deterministic_chunking() -> Result<()> {
         init_logger();
         let file = random_bytes(MIN_ENCRYPTABLE_BYTES);
