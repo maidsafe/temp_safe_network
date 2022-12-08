@@ -113,7 +113,7 @@ pub enum Error {
         minimum: usize,
     },
     #[cfg(feature = "limit-client-upload-size")]
-    /// Not enough bytes for self-encryption.
+    /// Upload size exceeded current file size upload limit.
     #[error(
         "Too large file upload attempted ({size} bytes), at most {limit} bytes allowed currently. \
         Try storing a smaller file."

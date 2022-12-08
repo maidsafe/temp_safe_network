@@ -16,7 +16,7 @@ gha-build-x86_64-unknown-linux-musl:
 	sudo apt update -y && sudo apt install -y musl-tools
 	rustup target add x86_64-unknown-linux-musl
 	cargo build --release --target x86_64-unknown-linux-musl --bin sn_node
-	cargo build --release --target x86_64-unknown-linux-musl --bin safe
+	cargo build --release --target x86_64-unknown-linux-musl --features limit-client-upload-size --bin safe
 	find target/x86_64-unknown-linux-musl/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 	rm -f artifacts/.cargo-lock
 
@@ -34,7 +34,7 @@ arm-unknown-linux-musleabi:
 	mkdir artifacts
 	cargo install cross
 	cross build --release --target arm-unknown-linux-musleabi --bin sn_node
-	cross build --release --target arm-unknown-linux-musleabi --bin safe
+	cross build --release --target arm-unknown-linux-musleabi --features limit-client-upload-size --bin safe
 	find target/arm-unknown-linux-musleabi/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
 .ONESHELL:
@@ -47,7 +47,7 @@ armv7-unknown-linux-musleabihf:
 	mkdir artifacts
 	cargo install cross
 	cross build --release --target armv7-unknown-linux-musleabihf --bin sn_node
-	cross build --release --target armv7-unknown-linux-musleabihf --bin safe
+	cross build --release --target armv7-unknown-linux-musleabihf --features limit-client-upload-size --bin safe
 	find target/armv7-unknown-linux-musleabihf/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
 .ONESHELL:
@@ -60,14 +60,14 @@ aarch64-unknown-linux-musl:
 	mkdir artifacts
 	cargo install cross
 	cross build --release --target aarch64-unknown-linux-musl --bin sn_node
-	cross build --release --target aarch64-unknown-linux-musl --bin safe
+	cross build --release --target aarch64-unknown-linux-musl --features limit-client-upload-size --bin safe
 	find target/aarch64-unknown-linux-musl/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
 release-build:
 	rm -rf artifacts
 	mkdir artifacts
 	cargo build --release --bin sn_node
-	cargo build --release --bin safe
+	cargo build --release --features limit-client-upload-size --bin safe
 	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
 .ONESHELL:
@@ -176,6 +176,9 @@ ci-unit-tests:
 	cargo nextest run --profile ci --release --package sn_dysfunction
 	cargo nextest run --profile ci --release --package sn_node dbs node routing
 	cargo nextest run --profile ci --release --package sn_cli --bin safe
+
+ci-client-upload-limit-test:
+	cargo nextest run --profile ci --release --features limit-client-upload-size --package sn_client -- --test-threads=1 limits_upload_size
 
 ci-e2e-tests:
 	cargo nextest run --profile ci --release --package sn_client --test-threads 2
