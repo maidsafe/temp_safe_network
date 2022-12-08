@@ -137,7 +137,6 @@ jobs:
         timeout-minutes: 25
         run: cd sn_cli && cargo test --release --bin safe
 
-
   build:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Build node and testnet binaries (EC2)
@@ -394,7 +393,7 @@ jobs:
       - name: Run API tests
         env:
           RUST_LOG: "sn_client,sn_interface"
-        run: cargo test --release --features check-replicas --package sn_api -- --test-threads=1
+        run: cargo test --release --features check-replicas --package sn_api
         timeout-minutes: 30
 
       - name: Are nodes still running...?
@@ -496,7 +495,7 @@ jobs:
         run: cargo run --release --bin safe keys create --for-cli
 
       - name: Run CLI tests
-        run: cargo test --release --features check-replicas --package sn_cli -- --test-threads=1
+        run: cargo test --release --features check-replicas --package sn_cli
         timeout-minutes: 50
 
       - name: Are nodes still running...?

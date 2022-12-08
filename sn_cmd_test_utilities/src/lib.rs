@@ -49,6 +49,19 @@ pub mod util {
         let _ = color_eyre::install();
     }
 
+    /// Provide an isolated temporary directory for `safe` configuration.
+    ///
+    /// It's preferable for each `safe` integration test to use its own isolated config location,
+    /// because when `safe` manipulates its config files this has been observed to be problematic
+    /// when running test cases in parallel, especially on Windows. Since users will not run
+    /// multiple instances of `safe` in such close time proximity, we shouldn't need to write code
+    /// in the application to accomodate that scenario.
+    pub fn use_isolated_safe_config_dir() -> Result<TempDir> {
+        let temp_dir = assert_fs::TempDir::new()?;
+        safe_cmd(&temp_dir, ["keys", "create", "--for-cli"], Some(0))?;
+        Ok(temp_dir)
+    }
+
     pub async fn get_bearer_dbc_on_file(tmp_data_dir: &TempDir) -> Result<(ChildPath, Dbc, Token)> {
         let dbc_file_path = tmp_data_dir.child(get_random_string());
         let (dbc, balance) = get_next_bearer_dbc().await.map_err(|err| eyre!(err))?;
@@ -143,13 +156,18 @@ pub mod util {
         Ok(target_dir)
     }
 
-    pub fn create_nrs_link(name: &str, link: &str) -> Result<SafeUrl> {
-        let nrs_creation = safe_cmd_stdout(["nrs", "create", name, "-l", link, "--json"], Some(0))?;
+    pub fn create_nrs_link(config_dir: &TempDir, name: &str, link: &str) -> Result<SafeUrl> {
+        let nrs_creation = safe_cmd_stdout(
+            config_dir,
+            ["nrs", "create", name, "-l", link, "--json"],
+            Some(0),
+        )?;
         let (_, nrs_map_xorurl, _change_map) = parse_nrs_register_output(&nrs_creation)?;
         Ok(nrs_map_xorurl)
     }
 
     pub fn upload_path(
+        config_dir: &TempDir,
         path: impl AsRef<Path>,
         add_trailing_slash: bool,
     ) -> Result<(String, ProcessedFiles, String)> {
@@ -160,35 +178,44 @@ pub mod util {
         };
 
         let path = Path::new(&final_path);
-        let files_container = if path.is_dir() {
+        let output = if path.is_dir() {
             safe_cmd_stdout(
+                config_dir,
                 ["files", "put", &final_path, "--recursive", "--json"],
                 Some(0),
             )?
         } else {
-            safe_cmd_stdout(["files", "put", &final_path, "--json"], Some(0))?
+            safe_cmd_stdout(config_dir, ["files", "put", &final_path, "--json"], Some(0))?
         };
-        let (container_xorurl, file_map) = parse_files_put_or_sync_output(&files_container)?;
+        let (container_xorurl, file_map) = parse_files_put_or_sync_output(&output)?;
         Ok((container_xorurl, file_map, final_path))
     }
 
-    pub fn upload_test_folder(trailing_slash: bool) -> Result<(String, ProcessedFiles)> {
-        let d = upload_path(TEST_FOLDER_NO_TRAILING_SLASH, trailing_slash)?;
+    pub fn upload_test_folder(
+        config_dir: &TempDir,
+        trailing_slash: bool,
+    ) -> Result<(String, ProcessedFiles)> {
+        let d = upload_path(config_dir, TEST_FOLDER_NO_TRAILING_SLASH, trailing_slash)?;
         Ok((d.0, d.1))
     }
 
-    pub fn upload_testfolder_trailing_slash() -> Result<(String, ProcessedFiles)> {
-        upload_test_folder(true)
+    pub fn upload_testfolder_trailing_slash(
+        config_dir: &TempDir,
+    ) -> Result<(String, ProcessedFiles)> {
+        upload_test_folder(config_dir, true)
     }
 
-    pub fn upload_testfolder_no_trailing_slash() -> Result<(String, ProcessedFiles)> {
-        upload_test_folder(false)
+    pub fn upload_testfolder_no_trailing_slash(
+        config_dir: &TempDir,
+    ) -> Result<(String, ProcessedFiles)> {
+        upload_test_folder(config_dir, false)
     }
 
     pub fn upload_test_symlinks_folder(
+        config_dir: &TempDir,
         trailing_slash: bool,
     ) -> Result<(String, ProcessedFiles, String)> {
-        upload_path(TEST_SYMLINKS_FOLDER, trailing_slash)
+        upload_path(config_dir, TEST_SYMLINKS_FOLDER, trailing_slash)
     }
 
     /// Creates a temporary directory at the specified path and populates it with absolute
@@ -381,23 +408,36 @@ pub mod util {
 
     /// Runs safe with the arguments specified, with the option to assert on the exit code.
     ///
+    /// Call the `use_isolated_safe_config_dir` in your test to create the `TempDir` to act as the
+    /// temporary config directory.
+    ///
     /// This was changed to use the `assert_cmd` crate because the newer version of this crate
     /// provides *both* the stdout and stderr if the process doesn't exit as expected. This is
     /// extremely useful in this test suite because there are lots of cmds used to setup the
     /// context for the tests, and you need to be able to see why those fail too.
     pub fn safe_cmd<'a>(
+        config_dir: &TempDir,
         args: impl IntoIterator<Item = &'a str>,
         expect_exit_code: Option<i32>,
     ) -> Result<process::Output> {
-        safe_cmd_at(args, env::current_dir()?, expect_exit_code)
+        safe_cmd_at(config_dir, args, env::current_dir()?, expect_exit_code)
     }
 
     pub fn safe_cmd_at<'a>(
+        config_dir: &TempDir,
         args: impl IntoIterator<Item = &'a str>,
         working_directory: impl AsRef<Path>,
         expect_exit_code: Option<i32>,
     ) -> Result<process::Output> {
-        let args: Vec<&str> = args.into_iter().collect();
+        let mut args: Vec<&str> = args.into_iter().collect();
+        args.insert(0, "--config-dir-path");
+        args.insert(
+            1,
+            config_dir
+                .path()
+                .to_str()
+                .ok_or_else(|| eyre!("Could not obtain config directory"))?,
+        );
         println!("Executing: safe {}", args.join(" "));
         let code = expect_exit_code.unwrap_or(0);
         let mut cmd = Command::cargo_bin("safe")?;
@@ -410,33 +450,66 @@ pub mod util {
             .clone())
     }
 
-    // Executes arbitrary `safe` cmds and returns
-    // stdout output
-    //
-    // If expect_exit_code is Some, then an Err is returned
-    // if value does not match process exit code.
+    /// Executes arbitrary `safe` cmds and returns output from stdout.
+    ///
+    /// If expect_exit_code is Some, then an Err is returned if value does not match process exit code.
     pub fn safe_cmd_stdout<'a>(
+        config_dir: &TempDir,
         args: impl IntoIterator<Item = &'a str>,
         expect_exit_code: Option<i32>,
     ) -> Result<String> {
-        let output = safe_cmd(args, expect_exit_code)?;
+        let output = safe_cmd(config_dir, args, expect_exit_code)?;
         let stdout = String::from_utf8(output.stdout)
             .wrap_err("Failed to parse the error output as a UTF-8 string".to_string())?;
         Ok(stdout.trim().to_string())
     }
 
-    // Executes arbitrary `safe` cmds and returns
-    // stderr output
-    //
-    // If expect_exit_code is Some, then an Err is returned
-    // if value does not match process exit code.
+    /// Executes arbitrary `safe` cmds and returns output from stdout.
+    ///
+    /// If expect_exit_code is Some, then an Err is returned if value does not match process exit code.
     pub fn safe_cmd_stderr<'a>(
+        config_dir: &TempDir,
         args: impl IntoIterator<Item = &'a str>,
         expect_exit_code: Option<i32>,
     ) -> Result<String> {
-        let output = safe_cmd(args, expect_exit_code)?;
+        let output = safe_cmd(config_dir, args, expect_exit_code)?;
         String::from_utf8(output.stderr)
             .wrap_err("Failed to parse the error output as a UTF-8 string".to_string())
+    }
+
+    /// Run `safe` commands and output the contents of stderr from the process.
+    ///
+    /// This function can be used in place of `safe_cmd` for debugging. The `safe` integration
+    /// tests parse stdout for the process, so you can't insert `println!` statements without
+    /// causing the tests to fail, which can be problematic for debugging if you're relying on test
+    /// setup to run correctly.
+    ///
+    /// If you need to inspect what's going on in a test, use the `eprintln!` macro in your code,
+    /// then in the test, use this function instead of `safe_cmd`.
+    ///
+    /// It will not assert the exit code of the process because sometimes intermediate steps are
+    /// failing, but you need this setup to proceed.
+    pub fn debug_safe_cmd<'a>(
+        config_dir: &TempDir,
+        args: impl IntoIterator<Item = &'a str>,
+    ) -> Result<()> {
+        let mut args: Vec<&str> = args.into_iter().collect();
+        args.insert(0, "--config-dir-path");
+        args.insert(
+            1,
+            config_dir
+                .path()
+                .to_str()
+                .ok_or_else(|| eyre!("Could not obtain config directory"))?,
+        );
+        println!("Executing: safe {}", args.join(" "));
+        let mut cmd = Command::cargo_bin("safe")?;
+        let output = cmd.args(args).assert().get_output().clone();
+        let stderr = String::from_utf8(output.stderr)
+            .wrap_err("Failed to parse the error output as a UTF-8 string".to_string())?;
+        println!("Output from stderr:");
+        println!("{stderr}");
+        Ok(())
     }
 
     // returns true if the OS permits writing symlinks

@@ -28,7 +28,6 @@ use crate::{
 use clap::{AppSettings::ColoredHelp, Parser};
 use color_eyre::{eyre::eyre, Result};
 use sn_api::{Safe, XorUrlBase};
-use std::env;
 use std::path::PathBuf;
 use tracing::{debug, warn};
 
@@ -36,22 +35,24 @@ use tracing::{debug, warn};
 /// Interact with the Safe Network
 #[clap(global_settings(&[ColoredHelp]), version)]
 pub struct CmdArgs {
-    /// subcommands
+    /// Available sub commands.
     #[clap(subcommand)]
     pub cmd: SubCommands,
+    /// Set the location for the config directory.
+    ///
+    /// Defaults to $HOME/.safe on Linux/macOS or %USERPROFILE%\.safe on Windows
+    #[clap(long = "config-dir-path", env = "SAFE_CONFIG_DIR_PATH", global(true))]
+    config_dir_path: Option<PathBuf>,
+    /// Perform a dry run of the command. No data will be written.
+    #[clap(short = 'n', long = "dry-run", global(true))]
+    dry: bool,
     /// Output data serialisation: [json, jsoncompact, yaml]
     #[clap(short = 'o', long = "output", global(true))]
     output_fmt: Option<OutputFmt>,
-    /// Sets JSON as output serialisation format (alias of '--output json')
+    /// Use JSON as output serialisation format (alias of '--output json')
     #[clap(long = "json", global(true))]
     output_json: bool,
-    // /// Increase output verbosity. (More logs!)
-    // #[clap(short = 'v', long = "verbose", global(true))]
-    // verbose: bool,
-    /// Dry run of command. No data will be written. No coins spent
-    #[clap(short = 'n', long = "dry-run", global(true))]
-    dry: bool,
-    /// Base encoding to be used for XOR-URLs generated. Currently supported: base32z (default), base32 and base64
+    /// Base encoding for XOR-URLs. Currently supported: base32z (default), base32 and base64
     #[clap(long = "xorurl", global(true))]
     xorurl_base: Option<XorUrlBase>,
 }
@@ -65,7 +66,7 @@ pub async fn run() -> Result<()> {
         safe.xorurl_base = base;
     }
 
-    let mut config = get_config().await?;
+    let mut config = get_config(args.config_dir_path.clone()).await?;
 
     let result = process_commands(&mut safe, args, &mut config).await;
 
@@ -133,7 +134,7 @@ async fn process_commands(mut safe: &mut Safe, args: CmdArgs, config: &mut Confi
         SubCommands::Setup(cmd) => setup_commander(cmd, output_fmt),
         SubCommands::Node { cmd } => {
             let mut launcher = Box::new(SnLaunchToolNetworkLauncher::default());
-            node_commander(cmd, &mut get_config().await?, &mut launcher).await
+            node_commander(cmd, config, &mut launcher).await
         }
         SubCommands::Keys(cmd) => key_commander(cmd, output_fmt, config),
         SubCommands::Xorurl {
@@ -180,22 +181,28 @@ async fn process_commands(mut safe: &mut Safe, args: CmdArgs, config: &mut Confi
 
 /// Gets the configuration, which is used by various parts of the application.
 ///
-/// The `SN_CLI_CONFIG_PATH` allows the user to define a custom location as an alternative to
-/// ~/.safe, but this has mainly been added to enable integration tests to use a temporary location
-/// for the config files, and you can then use `assert_fs` to to assert against those temp files.
-/// Using a temporary location also means the test suites don't manipulate the current user's home
-/// directory.
-async fn get_config() -> Result<Config> {
-    let mut default_config_path =
-        dirs_next::home_dir().ok_or_else(|| eyre!("Couldn't find user's home directory"))?;
-    default_config_path.push(".safe");
-    let config_path =
-        env::var("SN_CLI_CONFIG_PATH").map_or(default_config_path.clone(), PathBuf::from);
+/// The location for the configuration directory is either:
+/// * The value of the global `--config-dir` argument
+/// * The value of the `SAFE_CONFIG_DIR_PATH` environment variable
+/// * Defaults to $HOME/.safe on Linux or %USERPROFILE%\.safe on Windows
+///
+/// The reason for customisation of the location is mainly for integration testing, but users could
+/// also apply the customisation if they want to.
+async fn get_config(config_dir_path: Option<PathBuf>) -> Result<Config> {
+    let config_dir_path = if let Some(config_dir_path) = config_dir_path {
+        config_dir_path
+    } else {
+        let mut default_config_path =
+            dirs_next::home_dir().ok_or_else(|| eyre!("Couldn't find user's home directory"))?;
+        default_config_path.push(".safe");
+        default_config_path
+    };
 
-    let mut cli_config_path = config_path.clone();
+    debug!("Using {config_dir_path:?} for configuration");
+    let mut cli_config_path = config_dir_path.clone();
     cli_config_path.push("cli");
     cli_config_path.push("config.json");
-    let mut network_contacts_path = config_path;
+    let mut network_contacts_path = config_dir_path;
     network_contacts_path.push("network_contacts");
     let mut config = Config::new(cli_config_path, network_contacts_path).await?;
     config.sync().await?;
