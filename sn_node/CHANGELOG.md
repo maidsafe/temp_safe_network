@@ -5,7 +5,1130 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.72.0 (2022-12-09)
+
+### Chore
+
+ - <csr-id-cc9b9e0f09ceed4af7ca6d0a0913cfda1e184eef/> expand some message handling log
+ - <csr-id-06041ee529171e51581499a585effac67f037d17/> warn if dysf channels are closed
+ - <csr-id-ede33cc7a590e356232acd5feff6b44ff647517f/> simplify
+ - <csr-id-3dc20bc9424c295bd9038b2847fe01f639b83407/> add feat to limit section size
+   Allows for one less variable during testnets
+ - <csr-id-c0b9b274b60b8c6ecf905c6294e5afb86c69e16f/> increase node to 50gb
+   This should allow for longer data retention tests for now (while avoiding more nodes joining
+ - <csr-id-51bc2ca02dd8fe9634c9a68889c5eedc1e52c31e/> standalone methods to get secret keys
+ - <csr-id-f63d1896e554b72d6a5af463b7b6e7992a1aa8ed/> update comments
+ - <csr-id-8bd83c64ca8cccc78dfe4641e522b4a02f03cbb8/> remove `network_utils` module
+ - <csr-id-b4164cf0782c3083ba2a4e0f9b3f12445747730e/> spawn new thread for dysf channel calls
+   This should avoid any awaiting due to full channel during
+   dkg/churn events
+ - <csr-id-93ef0c1b78d9ec656aa8df85d0a741a26d09f780/> use STANDARD_CHANNEL_SIZE in node. increase to 100_000
+   Channels could be an uniwitting blocker as we await for capacity.
+   
+   If we expect channels to be cleared in a timely fashion,
+   we should aim not to have an artifical bottleneck.
+   
+   100_000 chosen as vast majority of channelsdon't require a lot of data.
+   And anything large waiting, will just be in a channel elsewhere taking up memory,
+   so this way we avoid slowing down node processing
+ - <csr-id-f3fbf83dc15eb791ccc134d780042484a51ab90e/> don't store client peer sessions
+ - <csr-id-64b6c35105168b9fa4b0fb9d626ed9552fd0bed3/> pass in context to NodeMsg handling
+   Thus reducing read lock calls
+ - <csr-id-57662862a8f59b70b9ca41515ff775003ea803fa/> remove more periodic logs
+ - <csr-id-c84f844873208af49e1743199ca75c015d0e14c7/> minor improvements to sn_node bin error messages
+ - <csr-id-e5b0dda1315a5299131cacd135b1d1ab66ed7073/> minor logging improvements to help debug msgs arriving/processing on client and nodes
+ - <csr-id-0ddfb0c2ceffbf69fca172ec555abe1495be1980/> rebase changes
+ - <csr-id-f06b3e75ce97e7c749d2969276ad6533369806bb/> upgrading qp2p to version 0.31.0
+ - <csr-id-986fa81fb00daaa37a17e55b459d66efacfff650/> another log removed
+ - <csr-id-4392fd265faec0b8e6c637342bd71119322d53b4/> less logs
+ - <csr-id-78371980ebf3f1b65ec62c49c35d8a6c015c5537/> rename methods, update comments
+ - <csr-id-7ac1e8abc3d792d5ea69e1e77fc7bdee63268f26/> cleanup some overzealous log msgs
+ - <csr-id-762170be83e21659cb8170987a5c2cdd9f2c14e6/> remove duplicate context in handle_ae_msg
+ - <csr-id-98d0d4cf79919fb56854d6f4492af6740df3587d/> pr suggestions
+ - <csr-id-5e81ac4fb8a2312eb546a4b86e71be05df7c4e26/> remove unusued `Error` module
+ - <csr-id-6cf816f4e3ce1e81af614ba84de83ccf13e8e402/> remove unusued `Result` from methods
+ - <csr-id-c4cf647221cdf0ffaeca4d4a8da82d7dc7b21ca6/> remove Membership from NodeContext.
+   Heaptracking has shown this to be ~80% of mem used, and moost of the time membership in the context is unused. Instead we now manually clone membership as/when we need it.
+ - <csr-id-f33602e0959a0ea86e4802376bd2f073cd8ea57c/> consume context where makes sense
+ - <csr-id-8f072f2bcfd48e5c4047e32332c29e231632efae/> reduce AE node msg handling locking
+ - <csr-id-200cf34c1cfc26b219ee12b9e8b0478fc5415745/> import organisation
+ - <csr-id-c436078af2afca7468bb6d8a579f457dfb662bf3/> Remove locks in data replication flows.
+   Moves the replication flow to be outwith of node, using channels to gather data and send it in another thread entirely. This should remove another cause of serious node.write().lock usage
+ - <csr-id-3c8ac507a85e7c11219fdab8a61eadde89f8582f/> remove is_not_elder from NodeContext
+ - <csr-id-18c0444be06d84c386b18031e59f2162fef81d89/> rename MyNodeSnapshot -> NodeContext
+ - <csr-id-e37180bd65d26c6f4737dabeae8a210674a82bdf/> cleanup unneeded code block
+ - <csr-id-197bb663e088309150a6f85e5c86877e5e0ad2d8/> cleanup commented code
+ - <csr-id-bd2baa03f889fa94fab68ecf9f1acffb71aa993d/> move (and rename) matching_section to MyNodeSnapshot
+ - <csr-id-7bc55f7b1a819c4609a85176d99f287b54a9ad44/> node.get_snapshot -> snapshot
+ - <csr-id-7d79e3e53ce49dc664d4a9215e5cc02839540879/> retry join with new name if we get a completely new SAP
+ - <csr-id-4df40864b5ee030edf16bad0becaa08a07c15fd9/> add in SetStorageLevel cmd to remove mut on DataStorage for normal replication ops
+ - <csr-id-38b8f55121d8b7c461efa6dd0c0407c4fae93418/> Pass around MyNodeState to avoid holding locks
+   For longer running message handling, we now pass around the inital
+   MyNodeState. This avoids a tonnnn of read locks and therefore hopefully
+   prevents holding up write and reads needlessly.
+ - <csr-id-a55b74b4c8f9bede3c91a9426d4687df01138257/> replace `TestSAP` with `TestSapBuilder`
+ - <csr-id-d43bac5ce07b0f08766858eadc4b8f98f9bcfc12/> update self_update to 0.32
+ - <csr-id-667009dc02e6bb17bfaa60e2374d5ab7b75a7be5/> remove duplicate strum/strum_macros/heck deps
+ - <csr-id-af9d3abc665a7490492417aebe974cb5ef839d53/> bump tokio-util 0.6 to 0.7
+ - <csr-id-860f326a9baf7e62d191eec13359fa5313e6956d/> criterion 0.3 -> 0.4, tracing-subscriber 0.2 -> 0.3
+ - <csr-id-ee824e7785b8da770b5aa6bba3415a274a4e0d68/> bump blsttc to 8.0.0
+ - <csr-id-b223bd532bba649c6dd09cf26166758d6ff56893/> remove outgoingmsg::client variant
+ - <csr-id-2e7fde627f41dfff7b5b8cd049f26ee127269bfe/> send client error response if storage fails
+ - <csr-id-c71fcd1fd61a4a2f9075d3d3e5f922b6d06644e6/> Send AE retries to all elders in updated section
+   This should avoid issues where we always send to the same node
+   regardless of initial target elder (as "closest" node in a new prefix
+   will be the same regardless of the initial elder)
+ - <csr-id-2b9268c2aff5aae5eb1584d2698f282c8beae73e/> retry loop for bidi initialisation
+ - <csr-id-62d472354d65f1cd9001f2df00cbf0c82734b969/> elders wait for all storage reqs to be successful
+ - <csr-id-58d656949c09dc3d6445d899725fe2c41d46c216/> remove adult healthcheck for now
+   Refactor for separate 'replicate' and 'replicate and respond to client'
+   flows.
+ - <csr-id-d9bfaef416bc357bdc32632eb0ba263b6995d613/> reset keep_alive flag to be optional
+ - <csr-id-0ef5a2cfd82de58f02a23a96a305b172f27c33c8/> add in error msg in the event of missing stream during adult query
+ - <csr-id-c3aa9414b4232dbaf356cec3fb71460f4d916b4f/> add mising sleep before retrying connection.
+   Dont mark connections as retried unless link has no more candidates
+ - <csr-id-f2dff3636d3bf1446af53790a42a46473079698f/> tweaks to reduce use of async
+ - <csr-id-1bf23ff2d00b66232267403f94d3fa133416fdd3/> set nodes join interval to 30secs for testnet in sn-api tests job
+   - Upgrading qp2p to v0.30.1.
+   - Include bi-stream id in logs both on client and node sides.
+   - Removing unused sn_api and sn_client test helpers.
+   - Adding a 1sec delay in sn-api tests before querying uploaded data.
+ - <csr-id-d19c0b204c368a967a2f6de9d68e1db0caebb71a/> move conn acquisition off thread too.
+   This was currently potentially a blocker if there'd been connection issues.
+   And might prevent other messages being sent
+ - <csr-id-ebb7b793b1e7b4ba439f3f93b5d7ac32e9acc2c2/> Comm is clone. Dont close endpoint on drop.
+   We are currently closing our endpoint when we dropp a comms instance.
+   This could lead to closed connections and other unintended consequences
+   if we drop a clone while another instance persists
+ - <csr-id-0bd38c524b5f6685e3a8ad21b3ae793d097c6b6d/> remove reachability check from inital join
+ - <csr-id-745ae58408997504dd04663a1c8bea8b688ded66/> don't hold read lock over reachability check
+ - <csr-id-36686c794eccb84573e741fdbe6f9af2eb18c8c9/> reducing the amount of threads used in CI for client tests
+   - Run sn_client tests in single-threaded mode.
+   - Nodes to wait 30secs before retrying to joining the network when rejected.
+   - Testnet to launch nodes with an interval of 30secs.
+ - <csr-id-5b0b8589bc9c90fac6285f626a46907b2dd0e819/> cleanup unused deps
+ - <csr-id-3b1548dd8b7f77538f47d6bca6338239899d18a3/> refactor statemap invocation avoid node.read().await
+   Just directly call the funcs, pass in a stable node_identifier so we don't need to lock on each and every cmd process
+ - <csr-id-07e0fc8c7776efdabed61b451258709e4dc8f3d0/> extra log for membership generation during invalid proposal
+ - <csr-id-560d1850783439b7e5affdc5d86a61cbf619fca0/> drop write lock during udpate knowledge handler faster
+ - <csr-id-8b8f9be3e18b1ae2cf94b9e2dbd17f925b7580f6/> log msgid with msg on SendToNodes
+ - <csr-id-a05e6a28d890da5103e12cfae4ee54ffc0870be3/> additional membership logs
+ - <csr-id-bebd96de67906ab0d49a4a42edb9b62a2f1d88f2/> remove ConnectionCleanup.
+   This should all just be hanled by qp2p/quinn and standard connection timeouts
+ - <csr-id-f65d4d457ef8b55fc87f6669f6d8380b371366a1/> reduce logging for periodic loop
+ - <csr-id-27cbeb647b90e7105e5b650b436944d3cdd813c5/> log MsgId in InsufficentAck error
+ - <csr-id-865b459ab0cfcfbee91298787b5c2c4425e5b6a0/> logs around elder periodics
+ - <csr-id-8b50947fe3f2eeb6bfe6350f754303ebba9c09dd/> increase event channel size
+ - <csr-id-68929bda1832d85c1a9f43d904f1c687a3bc9dc4/> refactor client ACK receipt
+   moves to write to a map on ack receipt, regardless of when it come sin.
+   Previously we could miss ACKs if they were in before our DashMap was updated
+ - <csr-id-a05d7ca9b7d2319085a2dea9119735e3e44f50c1/> only enqueue msgs at start, thereafter process all enqueued
+ - <csr-id-98abbbe7af8c870faa22d62819691054e07df718/> remove ExpiringConnection struct
+   dont disconnect link when sutting down channel
+   
+   Allow dropping of link to do all cleanup
+ - <csr-id-6185599884f49a71343c67e625a1a9dd9a75393d/> dont have increase conn retries for existing conn retries
+   Just keep retrying as long as there are more connections to try.
+   
+   (As we dont attempt to connect to a client, we can just use up everythign we have... any retry limit might cause a fail before we hit the live connection)
+ - <csr-id-a9e2c6962b6646cc6b4ac24bf9da50dbf48d3f60/> more logs around conn closing
+ - <csr-id-7ed94ba0599325900246743334b4b821331cba86/> only cleanup on local close if there's no more connections available
+ - <csr-id-999bfaa633e9fcd2a9bc47b90b128f0e3946a951/> wait before reqnqueing job so Link connection can be cleaned up...
+ - <csr-id-f856d853c0166f35bb2b98b24e3f3c8c09783b2d/> allow too many args
+ - <csr-id-a1263ecef879fbdba932588cc37ea63959a0435b/> only perform periodic checks when cmd queue is empty
+ - <csr-id-914b816921fc8f4da99bbf77a9fdd91d896411a4/> increase data query timeout
+ - <csr-id-9a6f4a3cf20852f4b5604bf08a04aba592dca0fa/> dont manually clean up client peers
+   further responses for same opId may come in and succeed. Fastest response would naturally be NotFound... So this would skew results
+ - <csr-id-e57d83235f60a16bd7e1ee801f35a599113dc71a/> write query responses as they come in
+   as opposed to requiring a channel to be in place.
+ - <csr-id-0f11b2ed16c765bee3e25f2f25b374e3f06f8e8f/> cleanup dropped peers
+   and bubble up send channel errors to be handled
+ - <csr-id-5a539a74d0dcca7a8671910d45bbb08ca4382671/> refactor client ACK receipt
+   moves to write to a map on ack receipt, regardless of when it come sin.
+   Previously we could miss ACKs if they were in before our DashMap was updated
+ - <csr-id-411ea371660b5f76a5c3f887f78331e58f8b6961/> dont try and establish connections for ServiceMsgs
+ - <csr-id-177407d1a0e817ea5fff0a98f74cd358f25ac727/> removing done TODOs
+ - <csr-id-014b132923c5affebe2c485aa3e791a22a6b90c5/> further node join write lock reduction
+ - <csr-id-3c05e616e54f423b66d35114668dac35ab5eae14/> reduce locks during join req handling
+ - <csr-id-ec88642644b76c0751db25c9b02b068cd77318d1/> reduce node locking now we can have the lock inside valid msg handling
+ - <csr-id-37785c72943ad126ef8fc94f4a6c2139ae478d69/> explicit errors in join
+ - <csr-id-fc7670e6cc4284d7cf5614185e8e93ffb9f0ba37/> refactor statemap invocation avoid node.read().await
+   Just directly call the funcs, pass in a stable node_identifier so we don't need to lock on each and every cmd process
+ - <csr-id-51425951e8a66a8fd938a8dd2378b583cc80fb94/> use gen_section_tree_update test utility
+ - <csr-id-6276e931291afd518648a47bc10374640b462cad/> adapt DKG docs to sigshare change
+ - <csr-id-8955514b2d08d2f7fbb4ebbf48d9807a9d5127ac/> remove commented out code
+ - <csr-id-e0803687a1b3b374efdf040cac0ecd5c6b4fc60a/> adapt DKG test
+ - <csr-id-1601cde194cb1f3bab2f6b54cc0ca784adb912b8/> increase channel sizes.
+   Packed channels may give us inintentional waits
+ - <csr-id-151a22f63a0aaaf94070f3bd0e1f6bd2f9239856/> rename a helper func
+ - <csr-id-70d848a43b6df02812195845434849b98f409367/> rename SectionAuth to SectionSigned
+ - <csr-id-a7f017cc55da5cba53e8f10063afefc61ea5635a/> remove some code duplication
+ - <csr-id-a0b2df5a0b12c70872dfc854d660afd0cf8b21aa/> improve namings
+ - <csr-id-09c48916a7f2145c1d3cd091d6219fb7150fe1c2/> use latest sdkg
+ - <csr-id-7654f58dbde0c44fd799da16b2a3c4e3a73217df/> update cargo sn_sdkg dep
+ - <csr-id-9a1cdf6f0135ce53f43a48c4346aff9023ccad33/> compile after rebase
+ - <csr-id-cbf5ed4b1065d5d4471bc27291c054f48b64678e/> use sn_sdkg github dependency and clippy
+ - <csr-id-3d72e4b71c079f7ddd8be08642165e53ebf987f6/> github sn_dkg dependency
+ - <csr-id-e1e161ba54ed8e0af298814f0da5b953ff053c93/> clippy
+ - <csr-id-9992d9701ecadff2b7682e47387014b9d11dba63/> compile after rebase
+ - <csr-id-f4c3808f582cf06d58303383296af4ab7a13f0df/> logging improvement
+ - <csr-id-2e937145c39039ee55505f00637cf484943f4471/> add nightly fixes
+ - <csr-id-80446f5d9df88d5915dcf1d3ea2c213c22e40c14/> remove unused rs files
+ - <csr-id-3f52833a8ce977aa79268ecaac61070f01e9c374/> remove unused rs files
+ - <csr-id-77cb17c41bbf258c3f1b16934c4c71b5e5ad2456/> add nightly fixes
+ - <csr-id-100e2ae70d21e141e1ebbc324f8b06e3d3f1a01c/> remove spend retry on client
+   The spend retry depends on providing new network knowledge. We will be using another mechanism to
+   obtain this knowledge, which is not available at the moment. Once it's available, we'll add the
+   retry again.
+   
+   For now we decided it's best to remove it and only merge the node-side changes.
+   
+   This also fixes up various changes after the merge of the new SectionsDAG that replaced the
+   SecuredLinkedList.
+ - <csr-id-e973eee96c9065ce87a1fa65ae45d9be8d6f940c/> remove redundant genesis_key argument in `NetworkKnowledge` constructor
+ - <csr-id-03da7f67fff1fa5bb06d60a66dfdb531506dec4c/> optimizations and code cleanup
+ - <csr-id-859fc30fa70ce41ceb910e0352c71dda5c5501ce/> enable `SectionTree` proptest
+
+### New Features
+
+ - <csr-id-707627f8915a6032390b035786e3e39d1f7bac8d/> allow to change the Elder-to-Adult query responses timeout by env var
+   - feat(node): allow to change the timeout for Elder-to-Adult query responses
+   by setting `SN_ADULT_RESPONSE_TIMEOUT` env var
+   - chore(client): set 90secs for cmds (`SN_CMD_TIMEOUT`) and
+   queries (`SN_QUERY_TIMEOUT`) timeout period in sn-client as default.
+   - chore(node): set 70secs for Elder-to-Adult query responses (`SN_ADULT_RESPONSE_TIMEOUT`)
+   timeout period in sn_node to as default.
+   - chore(ci): setting the same values explicitly for sn_client e2e tests in CI/bors, just
+   to make sure whenever we start adjusting the default vaues we don't change those
+   for CI which have been shown to be adequate in current CI/bors setups so far.
+ - <csr-id-fc9e4feab2a504168221fe2bd893d9327a45ae6f/> update sibling on split
+ - <csr-id-e5ae9d7174ebb7abee2a4643f1c046f13cf15c01/> try to rejoin network if removed
+   Restart the node bootstrap process with a new name if we've been removed
+   from a section. Use `Receiver<RejoinNetwork>` to listen for the command.
+ - <csr-id-2542643330dcc35ff49b54e88fd038a19d0f5d18/> bootstrap the section tree before starting join process
+ - <csr-id-bcdb4fc8035c108f2e24c14983af30ddfb54b8fd/> remove AE hold back
+ - <csr-id-5a39a843c5570993b0e27780a1c2887bbf7a3212/> cmd responses sent from adults over stream
+   Add in the stream initialisation from elders to adults.
+ - <csr-id-87bc680733b8a24fdcb9f6dedb5ef5ef61becfe8/> use bi/di send streams for elder-> adults queries
+ - <csr-id-17167b84b910631e1c847c657b88a2e0b422b1cd/> enable cmd ids and child ids again
+ - <csr-id-815d8034d26fb0a7dec22ceca4ad4e31653041c4/> remove ae_backoff_cache
+ - <csr-id-8368c402bf5b305279b44d8c28cbb497c4bec333/> send client msg back on bidi stream
+ - <csr-id-3fd0a00bad2f9ca266a56de2086b54088459e153/> use bi stream from client; process in Node
+ - <csr-id-95436a1f722bfd02a735dc3cf2f171a8b70de552/> move to event driven msg handling
+   put incoming msgs and cmd handling into their own threads
+ - <csr-id-e945ea97717ff2b63fd553afba82421c128166c4/> move DKG gossip check off thread
+
+ - <csr-id-b27f15cbea63b1994fdf9b576a064273afe8f166/> enable multi-threaded runtime try 2
+ - <csr-id-83922d007af49f2e63cc1c81020db9cde905b66d/> spawn the wait/update for session in comms:is_sent
+ - <csr-id-a641d9f359e0dbc12bc55c62f126a04efa5e78f3/> make sessions return if they're empty, and if so, clean them up then
+ - <csr-id-e9dec49535c22c924af7d2144f4a298cae930eee/> do no requeue existing validate msg cmds
+ - <csr-id-a5bf211daa0272597f1a2d852a17592258a2115a/> force retries to use fresh connection
+ - <csr-id-14ba1a8a034e488728762df09398347f8b909d65/> remove age stepping in genesis sections
+ - <csr-id-8c348b2286925edf319daede9a064399b41f6ec1/> remove NodeMsgAuthority altogether
+ - <csr-id-5019dd3896d278227878ffd91ce14d0cecb2b9dd/> remove node auth
+ - <csr-id-a60eef81e20bee599f9b861822c8e8c3424073af/> get rid of InvalidState Error altogether
+ - <csr-id-50e877d9ac75b62dfa9e851564b6fd6b60167ca3/> section peers uses BTreeMaps instead of DashMap
+ - <csr-id-266f3120b574133fccc39405d3a5a02d05806dfc/> remove section share auth
+ - <csr-id-2bcc1a0735d9cd727f71c93b58de85cd01c8a603/> universal aggregator without timers
+ - <csr-id-59942675bc99d11ae4fcc6a5909aeba4b0f17ec9/> remove unused OutgoingMsg::Elder
+ - <csr-id-8f2c41406165351796ca8df36d2ae3457e000ab9/> adapt to empty vec change in sn_sdkg
+ - <csr-id-b30459ffc565bb38ce7975c443b8df8139b77752/> integrate recursive sn_sdkg changes
+ - <csr-id-b9d39b09e39b7d91fd556abeb385310f50a0eee0/> use separate genesis dbc and section keys
+   For more information, see the doc comments on the diff.
+   
+   The generation of the DBC was also updated to use non-zero values for the `alpha` and `r` fields of
+   `MlsagMaterial`, because zeroes and ones are special values in elliptic curve cryptography.
+   
+   Also fixed a Clippy warning.
+ - <csr-id-a65a5093e55b233dc4fa1293217d6bcd55a9d731/> add technical docs
+ - <csr-id-45072a674021efe9efd1eeaf5f372b8a8bfba4c8/> wait a safe 5 chain len before removing old dkgs
+ - <csr-id-01c8f5d799fce7bf3b8600042587626900940d01/> section info agreement using sap gen to check candidates
+ - <csr-id-f4b5d6b207a0874621d777582ca5906e69196e06/> gossip DKG termination to trigger handover
+ - <csr-id-45d194d4d5927450a91a73c776c68871e857d48c/> outdated gossip AE
+ - <csr-id-3ed0e0167d5bec04d6c57d94ce1a63d1f043a1a0/> dkg start miss handling
+ - <csr-id-40fa4d9c0308c1104aaff60890bd48e08c8508b2/> dkg gossip
+ - <csr-id-69dce88a25254dd84a98ea9571ffccef17208744/> cleanup old DKG sessions when a Handover is complete
+ - <csr-id-ba859ae5f064d6dc15aa563ee956a26e85df1d45/> some necessary cleanup
+ - <csr-id-f5d53c188a03150a06bdee97fb585f7900b7c251/> compiling sdkg integration
+ - <csr-id-5c8b1f50d1bf346d45bd2a9faf92bbf33cb448da/> client retry spend on unknown section key
+   When the client receives an unknown section key error, it will obtain the proof chain and SAP for
+   the unknown section and resubmit the request with this additional information.
+   
+   There is no automated client test for this scenario. We went to great lengths to try, but it proved
+   not worth the effort. It was too difficult to modify the network knowledge with a fake section and
+   still have things function correctly. The scenario is unit tested on the node side, and we done
+   enough testing to know that the retry loop does what's intended.
+   
+   There are a few misc changes along with this commit:
+   
+   * Debugging message to indicate a spend request being processed correctly, which proved useful when
+     trying to get the automated test working.
+   * Remove the current section key from the unknown section key error. It's not necessary to include
+     this.
+   * When running the baby fleming network with the Makefile, include log messages from `sn_interface`.
+   * Fix up git-based references to `sn_dbc` crate.
+ - <csr-id-057ce1ce1e174102e23d96cfcd2ab1d090a6f1dc/> retry dbc spend on unknown section key
+   This is the client side for the scenario where the spent proofs are signed by section keys that the
+   processing section is not aware of.
+   
+   Several retries will be attempted because it's possible for there to be multiple section keys that
+   are not known, but the network will only return back one key at a time.
+   
+   Based on review feedback, this commit also changes the `SpentbookCmd::Spend` variant to use a single
+   field for the updated network knowledge, along with some other more minor changes.
+ - <csr-id-2020ef1a91c8520abc4bb74d3de6385b8cd283b4/> dbc spend can update network knowledge
+   When a DBC is submitted for spending, there are a set of spent proofs sent along with the request,
+   one for each input for the DBC being spent. It's possible that these proofs were signed with a
+   section key that the section processing the request is not aware of. In this case, the request
+   processing section needs to be updated with new network knowledge. Therefore, we add a couple of
+   fields to the spend command to give it the option to send new network knowledge, namely the updated
+   proof chain and the signed section authority provider.
+   
+   If the node detects the spend command has been sent with these, it will create a new type of
+   internal command, `UpdateNetworkAndHandleValidServiceMsg` which will be returned for processing.
+   This command will contain the original spend request, which will be run after the network knowledge
+   is updated. The reason for issuing the new command is because the original `HandleValidServiceMsg`
+   command does not have mutable access to the node.
+ - <csr-id-864c023e26697a609a9ad230c04e7aef7416650c/> custom Serializer, Deserializer for `SectionsDAG`
+ - <csr-id-0cd47ad56e0d93e3e99feb0dfcea8094f871ff6f/> replace `SecuredLinkedList` with `SectionsDAG`
+
+### Bug Fixes
+
+ - <csr-id-7a5a3d31e0668a7beb64742593181c0a30af05f4/> add comments on idempotency checks in elder state init
+ - <csr-id-74eea7619948a11a8ddc87b25a61ef510cd10506/> add a log for when an elder is missing their key share
+ - <csr-id-64ca74861bc7b80e6c6f3dba412940b86f338821/> relax lagging dkg test on which cmds are ok
+ - <csr-id-a5f5deca04a21ddc7ae691cd1da3ca598dae05b0/> adapting tests to work with the signed-sap logic changes
+ - <csr-id-e1953cf95f77053ee243478fb1053e257b197e67/> wait before retrying creation on node instance error
+ - <csr-id-de8ed40b9f1ad353c9a8ded58db5de76acee21e1/> reconnect upon any LinkError::Connection(_) error when sending a msg on a bi-stream
+   - Upgrading qp2p to v0.32.0.
+   - Also some minor improvements to logging msgs.
+   - Removing unused error type and cargo feature.
+ - <csr-id-80edaf1bfbbd247ed92eb91b6de011264224f654/> check member type before modifying node
+   The `SocketAddr` of the node is replaced with a new one. Hence the check for
+   the `TestMemberType` should happen prior to that.
+ - <csr-id-37dc7b76a3f6c7f9d6b8f832562dc79032910412/> report internal error upon failing to send or fnish a response bi-stream
+ - <csr-id-4c0a0c1b1419b44a8ef48a43f7f5bbd666eb1202/> log cleanup
+ - <csr-id-6cafdc75fc808a66b9d88d67b91adc67a7ef5b99/> wait for threshold + 1 section tree update responses
+ - <csr-id-186c606d8eaf4e1b95162ae970369be26a56fb9e/> better log messsages for discarded messages
+ - <csr-id-45c5031a965166dc1e2bf8862a8ace0d25b668e1/> don't check senders of section updates
+ - <csr-id-b55ab9bfc16fd11d755cc88625b73936ce231bfc/> check that section tree update came from elders
+ - <csr-id-51c86dfcd2aa1ed3b5a868077d35f230245b5345/> better log msg when discarding non-bootstrap message
+ - <csr-id-3a13e6773a8faf22dc071e22e5965778ef8e54ad/> adapt tests to work with the new JoinResponses without updates
+ - <csr-id-a935167f2549a87344153d354421ed8b8d408576/> adapt remaining join tests to use the new AE Flow
+ - <csr-id-e71eaa8467b244f875726b40e09ea255b3811c40/> adapt the join disallowed test work with the new flow
+ - <csr-id-1b2d350b358c34b4bd90c6fd3b5def0515e87e1c/> remove unused Result return from join_as_adult test
+ - <csr-id-cd820b2c9ed03be82bba01368a046f8137fdbba5/> get join_as_adult test working with the new join flow
+ - <csr-id-93fdda0505671426119f300a0444f7c6e51756a8/> when failed to store data the Adult was returning a success response to Elder
+ - <csr-id-851f7ad85197e2a474c72d5716c4b7858e840442/> ae_msg_from_the_future_is_handled unit test was failing due to wrong assumption of test utility
+   - The new SAP created by the test was sometimes removing the node used to perform the final test of the AE msg
+   due to assume the list of Elder nodes returned by `TestSapBuilder::build` was sorted in the same order as the
+   `Peer`s obtained from the SAP generated by same utility function.
+ - <csr-id-0021a073e37306cadf0b56a1bdac8cb37734dae6/> only regen join name once per sap
+ - <csr-id-27e97a75f72f8de9801c57ef062ba7f9a9b73432/> only proposal when reached handover consensus first time
+ - <csr-id-9acc41d5884ce4e6f647937fe56df906a7f86452/> small changes
+ - <csr-id-d2d69e10ad6ca5b55945ff15834a8c262b56b3d8/> create new connection to peer if a SendStream cannot be finished when sending a msg
+ - <csr-id-894458c0ba15225754d3c75642926f6ee40db34b/> add missing client ae response w/ stream
+   Sending to elders was not taking place on a stream... so nodes were potentially
+   attempting to connect to clients
+ - <csr-id-aad74a94886df2a95b57859fa53591a8813c7860/> don't report status sent for failed bidi stream send
+ - <csr-id-be99942b65306640f057f11b9b8f7345b9752ac5/> reset ae_backoff_cache
+ - <csr-id-f1e967ad26b06f06f82815c884563df1729219e7/> fix ae response on stream for better prefix
+ - <csr-id-9a014135a5fe9dc031847e91ed0cb0e52815cec1/> request membership AE when we have stalled votes
+   as well as resending out last vote
+ - <csr-id-c98cc98674552794960e5953c5dbf405d961c333/> use repsonse_stream for ae responses to client.
+   Also avoid going into Link at the ndoe layer when we have a send_stream
+   to use
+ - <csr-id-8f887c0f3f128f5d59304a0b47f6105cb52f3155/> spawn a task to read query/cmd responses from bi-stream
+ - <csr-id-96f275d2ff609fc27292ee8f33b188aa0d67ec4a/> rebase issue w/ monitoring
+ - <csr-id-d3923967e5886373bbf77696e4a813e700156f2a/> avoid mem size change across compiler version update
+ - <csr-id-35fcfb6ee2331f2bc34e7680145d0d105e1354ba/> make membership ae >= from gen
+   We were not providing info about the requested generation, just the one afterwards, but obviously this is not enough info for our slow node to proceed
+ - <csr-id-cdb3a474db1a51ac78234e1458e36ed2e70cc5dc/> call to File::sync_data right after writing a Chunk or Register op to disk
+   - Syncing data to disk right after writing reduces the changes of another
+   task/thread reading the file obtains an empty content.
+   - Also this change checks the address of recreated Chunk after read from disk
+   to make sure the content read is complete and matching the expected address.
+ - <csr-id-7f5cbbe83d37fba9255078b893a02ab639eeb739/> request membership AE when we have stalled votes
+   as well as resending out last vote
+ - <csr-id-cb052a3db16366977526d5d2a7f9c75a2990cf34/> Clippy
+ - <csr-id-7b850af7bd4579f1de60629aa88df3c81a35e546/> Rebase clippy fix
+ - <csr-id-9454c727cbfb334ab68800a5022cf2b687d4f97d/> increase restart threshold during join
+ - <csr-id-25448dc71fbe7877560654a4d5b5d69857c10ac9/> fmt
+ - <csr-id-4a6df2948384bbfd3970982fde203778f950bff3/> restart after accumulated retry_response
+ - <csr-id-ffa2cf3c9b49aaa3f5f64b88e0800a4047948378/> join_invalid_retry_prefix test uses empty genesis prefix
+ - <csr-id-ce7d1863e523dbe1761ca60e1cebcf1a802cf83b/> revert 'is_new_sap' check removal from join process
+ - <csr-id-18b393f7c7c5b9d38bf2bc17751b9dbbf08604fa/> remove unneeded err handling; bump join channel size
+ - <csr-id-54222aeea627209c53a1f595578436deb2763ef0/> Fix for rename in benches
+ - <csr-id-1c277731397527b26b8e5edb16d9a5ffda7243d7/> keep old DKG sessions for 2 more section churns
+ - <csr-id-85d3361b3c4b9f66a456a26671406660e641e41f/> split barrier race condition
+ - <csr-id-269245f3289c8d4f482e101aad809a325d67ed7c/> cargo dep rev
+ - <csr-id-5280460bb43a013d8273e5c30742c71596e4799a/> selfish handover issue and limit known msg reprocessing
+ - <csr-id-30fa400d2fa1d5029f5e0190c506cc92b0bcdf09/> invalid signature during plit DKGs
+ - <csr-id-22a0de0e3bd8478a10729112ec1b3bce9ba5cb90/> bls key upgrade issue, more logs
+ - <csr-id-4884c511d302522aa408ebf9350a7ff6cefeecb7/> ignore update if we don't have KeyShare
+
+### Other
+
+ - <csr-id-b550ed00dd3e3af878758aea1a2efb6eba0e8d66/> ignore large clippy variants for now
+ - <csr-id-b2b661d3e891403bf747228985930b301c9ad28f/> fix for recent node comm changes
+ - <csr-id-05846c1741318f51394090c66e7c0ddf911e31ee/> reduce wait for all ndoes to join
+ - <csr-id-30bedf882f1f642592703b92be0966035ef01068/> drop nextest, use cargo test
+   this should hopefully avoid recompilaitons that are happening
+   as well as occasional no-cache hits for nextest itself (which
+   means more compiling
+ - <csr-id-b6474691ea6af5ee441b02f6cb9c3cf2b8f97459/> sn_dkg integration
+ - <csr-id-c7de08209c659ec93557d6ea10e0bcd8c3b74d8b/> minor refactoring and fixing issue reported by new clippy version
+ - <csr-id-230a6ed7f1f4193fa36b2fbb83bea072f4944c1d/> spend with updated network knowledge
+   Previously I had a placeholder in for this case, but now have something working.
+   
+   The test requires having two network sections and one of the input DBCs for a transaction being
+   signed by the other section key.
+   
+   The `TestNodeBuilder` was extended with a function that creates a section without a creating a node,
+   and this included being able to provide a section chain and tree.
+
+### Refactor
+
+ - <csr-id-2b5119423248ce95021a0b1ba826b426d79d7e61/> inline closure that was only used once
+ - <csr-id-e263a66e7db336cf5868b33dde507abbbc25f81c/> remove some verbosity in the dkg test mocks
+ - <csr-id-46068295e8e1c760ebab68f4338b14cf11588605/> inline network knowledge update functions
+ - <csr-id-994b1ef49ffee7c1b02b6361297bacd190e9b5e2/> remove extra logic around SAP update
+ - <csr-id-f0ae5773669937b3c824e98557ecff5994cb1df7/> modify dkg test cases
+ - <csr-id-69d0687c4afc8d8f6e088663dfa4482c4d72ade0/> modify `anti_entropy` test cases
+   - Modifies the test cases under `messaging/ae` to make use of `TestNetwork`
+   - Simulate a network with two sections, where "our section" has gone through
+     3 churn events.
+   - The `Env::other_signed_sap` refers to the SAP from prefix1
+   - The `Env::proof_chain` refers to the section chain of prefix1.
+ - <csr-id-8d79f6fa586758fd75e5e66be95d9d240d9d6551/> spentbook_spend_with_updated_network_knowledge_should_update_the_node
+   - The test is modified to make use of `TestNetwork` utility.
+   - Creates a Network with 2 sections.
+   - The `dispatcher` is obtained from the genesis prefix
+ - <csr-id-4c6ae07d217cbed09d34adda1f3859191eb581c0/> use `TestNetwork` to simulate elder change
+   - Modifies the test cases under `flow_ctrl/tests` to make use of `TestNetwork`
+   - The previous envs had a section go through an elder change resulting
+     in two SAPs.
+   - An elder node was then created such that it had the `sk_share` for
+     the new SAP, but not the complete SAP; indicating that its handover
+     is still in progress.
+   - The same scenario can be simulated by calling `sap_with_members()`
+     which creates a random SAP but with the provided set of members.
+ - <csr-id-636b38889c33b34ffdd391d479605938664bf731/> handle_agreement_on_online_of_elder_candidate
+   - The test is modified to make use of `TestNetwork` utility.
+   - The previous env created a custom `NetworkKnowledge` with varying ages
+     for the elders. A node was then created with this custom `NetworkKnowledge`
+   - The `elder_age_pattern` can be directly passed into
+     `TestNetworkBuilder::sap()` to achieve the same result.
+ - <csr-id-006a4f801f585594142e5ac4a9b19d218676c8b3/> simple usage of `TestNetwork`
+   - Modifies the test cases under `flow_ctrl/tests` to make use of `TestNetwork`
+   - A network is built with a couple of sections. Then a node is retrieved
+     from one of the sections to be used in the tests.
+   - The `peer` from `TestNodeBuilder::build()` refers to
+     `node.info().peer()` where `node` is from the prefix that was passed
+     into `TestNodeBuilder::new()`
+ - <csr-id-2c8f9331ab0f7f63f7d14f7113ecf9ad5e6c4618/> remove `EventSender` and `Event`
+ - <csr-id-aa53ee414631dd4faff600101e909fa98f6885fe/> replace main thread loop with sleep
+ - <csr-id-298b5d86e4ea331f1c4c7213a724f275e01a06d1/> remove events from tests
+ - <csr-id-f66e02ebbcc0298692cfc3d4d4faf69ba2ba1f8f/> convert events to logs
+ - <csr-id-5179cf2dec47295f9673212efa6e23e9531e5ea3/> move to sn_interfaces
+ - <csr-id-6ca7f4377308a0dd47dbd17a3d01b07321d9b8a9/> mark redirect code with TODO to replace w/ retry + AEProbe
+ - <csr-id-e8ab025a3454005890418b10a50560b3c65fd68f/> remove unnecessary Box around JoinResponse
+ - <csr-id-9bee893e381375b6de65d77357e13f1897b9d757/> general cleanup of comments, unused fields etc.
+ - <csr-id-3dc0bb1f0d8d04c8a92a75eab73e10721b105a10/> remove section_tree_updates from within join messages
+ - <csr-id-d22ad7c46753c3e5d3f3c50da4546c80e302dee9/> use recv_node_msg across all join tests
+ - <csr-id-bc2c4ee21335b627e3e998dd56209f72f20aac90/> use send_join_response helper where it makes sense
+ - <csr-id-9414beed24795db97277eb0c15fe24910f4220d7/> working on fixing test failures
+ - <csr-id-4a466e5a14b61f0dcf5467298d11d831a9a8d7e2/> make Proposal saner and add docs
+ - <csr-id-0e73ec1ce28c5e2206eb84a6a24d996a23affd2f/> removing internal unnecessary struct
+ - <csr-id-9f539e9a8dd9c22e7440539114b2fbdaaeb34515/> provide age pattern to generate `NodeInfo`
+ - <csr-id-3353ab617b438ca12cdac68a1f7956e3050eefcf/> organize more network knowledge utils
+ - <csr-id-093ea5bfc200f940662c5c0e458c38c5c77294a9/> organize key related test utilites
+ - <csr-id-4b6569ab2a9face420385d29d7baab31d8ca4d1e/> organize network_knowledge test utilites
+ - <csr-id-9f8ecf90470ac18de31a956c1eee5f9f2d4c77a7/> remove redundant `bls::SecretKeySet` wrapper
+ - <csr-id-30670403d5466f7a052d753136e72e2720d2954d/> remove from sn_node
+ - <csr-id-93c7a054d87df7054224664c4a03c4507bcfbae6/> use one channel per Cmd/Query sent to await for responses
+ - <csr-id-9fad752ce1849763ae16cdb42159b9dccf1a13d0/> remove some ? noise in tests
+ - <csr-id-633dfc836c10eafc54dedefc53b2cbc9526970bb/> AuthKind into MsgKind without node sig
+ - <csr-id-1bfa58e5487b3c8cafdef1593c2037b331c30dd1/> remove msg aggregators
+ - <csr-id-ab22c6989f55994065f0d859b91e141f7489a722/> assert_lists asserts instead of returning Result
+ - <csr-id-32744bcf6c94d9a7cda81813646560b70be53eb2/> remove `SectionAuthorityProvider`, `SectionTreeUpdate` messages
+ - <csr-id-ba78a41f509a3015a5319e09e1e748ac91952b70/> move `MembershipState`, `RelocateDetails` out from messaging
+ - <csr-id-72abbfbc583b5b0dc99a0f7d90cb4d7eb72bd8c4/> remove `NodeState` message
+ - <csr-id-dcb76019971c2765c54ba04e22c1a7d2d1ad2d47/> rename MsgEvent to MsgFromPeer and convert it to struct
+ - <csr-id-8f355749c85e5d117e304bd499da1144b00e6809/> Joiner::send takes NodeMsg instead of JoinRequest
+ - <csr-id-85c30ffa90488f36c32516ca97cea3b246cffbcb/> move timeout out of receive_join_response
+ - <csr-id-80c9f7a74a5c7f80a898f97729a813b6d2445f73/> rename network_contacts to section_tree
+ - <csr-id-3302aee7a41abd58b6deba18cc690c5e74aabff4/> move elders sig trust within DkgStart instead of deep within messaging
+ - <csr-id-702a03fae21fa517b02a1c0271f0617ca5c4f85c/> Remove resource proof
+   We have dysfunction
+ - <csr-id-3215110b021aaa7d3b755b7e80432aeed1e0b436/> fmt
+ - <csr-id-acaa90a13d598915bafc3584c70826f233d89881/> Remove resource proof
+   We have dysfunction
+ - <csr-id-d87bbddfd92ecd802b27531cbcbc13c7271c6a10/> defining a private type to hold periodic checks timestamps within the FlowCtrl instance
+ - <csr-id-07d0991fed28d49c9be85d44a3343b66fac076d9/> adapt confusing auth related code
+ - <csr-id-28c7a9f7b2ce43d698288c12e35eb6a7026a4163/> one more renaming
+ - <csr-id-f289de53f3894a58a6e4db51ce81aaf34f276490/> various more renamings
+ - <csr-id-452ef9c5778ad88270f4e251adc49ccbc9b3cb09/> rename a bunch of auth to sig
+ - <csr-id-85f4d00e81ac5bf67b6be89d7ff51b7bb1060ed6/> simplify section sig
+ - <csr-id-322721635724f9dfa9351dd31e6883a32a330fe4/> pull out bootstrap functions for normal and genesis nodes
+ - <csr-id-dd45c8f42b4f8674eeaea90aa27a465bd3bae0a2/> Looking at change to NodeSig
+ - <csr-id-04605882c324057deef5bec05bdae90e15b5a940/> merge Comm::{first_node, bootstrap} into Comm::new
+ - <csr-id-f88d542b64c3bde832968c99dcfe38e99d85b4f5/> join process no longer takes a bootstrap node arg
+ - <csr-id-de2479e5fe56b3ebf526215b4860ce9f64c7f20c/> move building of join targets into the join method
+ - <csr-id-0a85816f4168024b2892fd77760580b1f8d2d9e9/> rebase
+ - <csr-id-072c5d4c5de7810a0837144853435e2ff2d091d0/> move test_utils module
+   Previously this module was located specifically under the `section_authority_provider` module, but
+   now it moves to its own module and various DBC-related testing utilities are moved from `sn_node`
+   to this location. Again, this test setup is needed by both `sn_node` and `sn_client`.
+ - <csr-id-610880711da814c7717c665e9cb34a729bda5797/> move build_spent_proof_share to sn_interface
+   We move this function from `sn_node` for the same reason we moved `get_public_commitments`.
+   
+   The location for it is not perfect, but it may as well sit alongside the section keys provider, as
+   the function uses that to generate the share.
+ - <csr-id-1152b2764e955edd80fb33921a8d8fe52654a896/> get public commitments from sn_dbc
+   The code for retrieving and validating the public commitments was moved out to the sn_dbc crate.
+   
+   It's needed for both the spend request and test setup code which is going to be referenced in both
+   `sn_node` and `sn_client`.
+   
+   Also fixed a clippy error in `SectionTree::get_signed_by_key`.
+ - <csr-id-60e333d4ced688f3382cde513300d38790613692/> bundle proof chain, SAP into `SectionTreeUpdate`
+   The `SectionTree` always requires a Proof chain and a SAP to update it,
+   hence bundle it together to make it cleaner
+    - A `proof chain` is a chain of keys where each key is signed by the previous one
+    - A `section chain` is a proof chain to our current section key
+ - <csr-id-6343b6fd21fe3bf81412d922da5e14b2c8b6f3c5/> pull out will-be-elder check into node
+ - <csr-id-0176a56a311dd8450f7cd845bc37cc28a7b11c0d/> add node helper for updating net_know
+ - <csr-id-8bf032fff0ba48816311d6ea6967e3c300aedccf/> remove unused genesis parameter
+
+### Style
+
+ - <csr-id-73f5531790ef8817ed3551fd9e4bcbcc7fc6f4f9/> applied clippy nightly
+   Mainly lints `iter_kv_map` (e.g. use `keys()`, instead of `iter()`, which
+   iterates over both keys and values where the value is not used) and `needless_borrow`.
+
+### Test
+
+ - <csr-id-4efda958c765e41b39444f397c500db95716ffa2/> fix ae test by providing updated snapshot
+ - <csr-id-058acaa701792ee58913b2d4524c759367fb65fc/> comment out old OutgoingMsg::Client code in ignored tests
+ - <csr-id-ffbb607835a87683280e4f16b0e2e1b5ca2fd0a1/> tidying for clippy
+ - <csr-id-774c908b6c44b702259782cefdef5d4cdd228385/> fix node config keep alive test time
+ - <csr-id-42c4008aeadac297c212a65cde7109a055f61cec/> ignore client cmd tests that require response stream for now
+ - <csr-id-f53337e6e0c7c4f804489f0d370d4cc97331597f/> ignore spentbook test that tries to handle client w/o a stream etc
+ - <csr-id-edea3fb90697837317f7f050913fefd534938bfd/> remove two spend tests that ar eno longer valid in this flow
+ - <csr-id-5dfeab95bb67454cc257028185dbbf7e1f98d351/> ignore failed send until we have feedback event channel
+ - <csr-id-ac9d1b257db48ab336d2c80e4ff573208cbd4c6c/> fix ae tests for send_stream addition
+
+### Chore (BREAKING)
+
+ - <csr-id-6be0ea16b0ffe2c153c6a13f36916a91fb58cd05/> attempt to reduce allocations
+
+ - <csr-id-fc0c7512144c0c42184b6ae1b5a64e4d894d0eab/> removing unnecessary error types, plus some sn_node log msg improvements
+
+### New Features (BREAKING)
+
+ - <csr-id-f225a2d84ad3422b4f466fa2bf713c3a767588dc/> adding more context info to some node Error types
+   - Initialising logger in sn_client spentbook API tests.
+   - Including stream id in log messages.
+   - Report the error when a stream couldn't be finished when sending a response since that
+   could mean the recipient didn't received it.
+ - <csr-id-7106b7533e119dc94bbf19fa304f3eb1f8dc9425/> making AE msg for clients to be a variant of client response msg type
+
+### Refactor (BREAKING)
+
+ - <csr-id-80917f19125222ce6892e45487f2abe098fefd7a/> breaking up client msg type separating requests from responses
+   - A new messaging type `ClientMsgResponse` is introduced explicitly for client msg responses.
+   - With new msg type, a new msg kind `MsgKind::ClientMsgResponse` is introduced which removes
+   the need of providing a fake client authority in each of the responses sent by nodes to clients.
+ - <csr-id-bdf50e7ad1214ef4bb48c0a12db8a7700193bb2a/> removing unused Error types and adding context info to a couple of them
+ - <csr-id-a973b62a8ef48acc92af8735e7e7bcac94e0092f/> removing op id from query response
+   - Use the query msg id to generate the operation id to track the response from Adults
+   - Remove peers from pending data queries when response was obtained from Adults
+   - Removing correlation id from SystemMsg node query/response
+   - Redefine system::NodeQueryResponse type just as an alias to data::QueryResponse
+ - <csr-id-d550b553acbd70d4adb830a0600f7da7b833ee18/> removing dst_address fn from ClientMsg as it doesn't always contain that info
+
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 391 commits contributed to the release over the course of 79 calendar days.
+ - 80 days passed between releases.
+ - 305 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge #1846 ([`56df839`](https://github.com/maidsafe/safe_network/commit/56df8392897e5d1641570942a3852644e4cce427))
+    - add comments on idempotency checks in elder state init ([`7a5a3d3`](https://github.com/maidsafe/safe_network/commit/7a5a3d31e0668a7beb64742593181c0a30af05f4))
+    - add a log for when an elder is missing their key share ([`74eea76`](https://github.com/maidsafe/safe_network/commit/74eea7619948a11a8ddc87b25a61ef510cd10506))
+    - inline closure that was only used once ([`2b51194`](https://github.com/maidsafe/safe_network/commit/2b5119423248ce95021a0b1ba826b426d79d7e61))
+    - remove some verbosity in the dkg test mocks ([`e263a66`](https://github.com/maidsafe/safe_network/commit/e263a66e7db336cf5868b33dde507abbbc25f81c))
+    - relax lagging dkg test on which cmds are ok ([`64ca748`](https://github.com/maidsafe/safe_network/commit/64ca74861bc7b80e6c6f3dba412940b86f338821))
+    - adapting tests to work with the signed-sap logic changes ([`a5f5dec`](https://github.com/maidsafe/safe_network/commit/a5f5deca04a21ddc7ae691cd1da3ca598dae05b0))
+    - inline network knowledge update functions ([`4606829`](https://github.com/maidsafe/safe_network/commit/46068295e8e1c760ebab68f4338b14cf11588605))
+    - remove extra logic around SAP update ([`994b1ef`](https://github.com/maidsafe/safe_network/commit/994b1ef49ffee7c1b02b6361297bacd190e9b5e2))
+    - Merge #1865 ([`3b3f2f3`](https://github.com/maidsafe/safe_network/commit/3b3f2f32a52caef299a1174a24f76981667a2b2b))
+    - Merge branch 'main' into message_handling ([`80e4030`](https://github.com/maidsafe/safe_network/commit/80e4030820b1380450b86fa6e8c57ee41344a0ed))
+    - Merge #1863 ([`fc3cd7b`](https://github.com/maidsafe/safe_network/commit/fc3cd7b6f7bd8af9b3e1c942819e4537ee5aac1e))
+    - Merge branch 'main' into message_handling ([`6d92148`](https://github.com/maidsafe/safe_network/commit/6d92148dc42bf5f53a21f98131523502133fd169))
+    - Merge branch 'main' into Fix-PreventHardNodeLoopOnError ([`ddcc8b2`](https://github.com/maidsafe/safe_network/commit/ddcc8b2e8cd76b63b8a434b4b8b4178747636dfb))
+    - Merge branch 'main' into Fix-PreventHardNodeLoopOnError ([`1d14544`](https://github.com/maidsafe/safe_network/commit/1d14544e015d02348dac04f4fa20de36316ce616))
+    - Merge #1815 ([`ea487fc`](https://github.com/maidsafe/safe_network/commit/ea487fc3f734830997851326d66121e55a7ee9fb))
+    - allow to change the Elder-to-Adult query responses timeout by env var ([`707627f`](https://github.com/maidsafe/safe_network/commit/707627f8915a6032390b035786e3e39d1f7bac8d))
+    - expand some message handling log ([`cc9b9e0`](https://github.com/maidsafe/safe_network/commit/cc9b9e0f09ceed4af7ca6d0a0913cfda1e184eef))
+    - Merge #1844 ([`308814b`](https://github.com/maidsafe/safe_network/commit/308814b95a023f3f6a4b51140b0a65a3c7e013a8))
+    - wait before retrying creation on node instance error ([`e1953cf`](https://github.com/maidsafe/safe_network/commit/e1953cf95f77053ee243478fb1053e257b197e67))
+    - warn if dysf channels are closed ([`06041ee`](https://github.com/maidsafe/safe_network/commit/06041ee529171e51581499a585effac67f037d17))
+    - Merge #1855 ([`233fc5f`](https://github.com/maidsafe/safe_network/commit/233fc5f7ed26623c1bec7442503cb1fee81179ef))
+    - Merge #1845 ([`9d0f958`](https://github.com/maidsafe/safe_network/commit/9d0f958a0d2bceb9aad7b93b51aa17acf3394b30))
+    - reconnect upon any LinkError::Connection(_) error when sending a msg on a bi-stream ([`de8ed40`](https://github.com/maidsafe/safe_network/commit/de8ed40b9f1ad353c9a8ded58db5de76acee21e1))
+    - simplify ([`ede33cc`](https://github.com/maidsafe/safe_network/commit/ede33cc7a590e356232acd5feff6b44ff647517f))
+    - fix(tests): include promoted node in section - The test was generating the promoted node with random name instead of within the section it was going to. This lead to random test failures, as the node either went into the correct or the wrong section. ([`fab18e0`](https://github.com/maidsafe/safe_network/commit/fab18e0d86946ac4e6a229978d2c93a740a68c3d))
+    - chore(logs): address pr review comments - Fixes log lines. - Tests: Nicer error's with stack traces when with panic instead of bail. ([`f6efbeb`](https://github.com/maidsafe/safe_network/commit/f6efbeb4d36165ebaa7484ccc6e831833264311a))
+    - refactor(proposal): use HandoverCompleted - This replaces both NewElders and NewSections. Also - Adds/updates verify serialize for signing test case. - Updates split tests, giving that HandleNewSectionsAgreement cmd flow is now also tested. ([`d020ce2`](https://github.com/maidsafe/safe_network/commit/d020ce28926011e7135c51e1e9395ef0c4084fc2))
+    - update sibling on split ([`fc9e4fe`](https://github.com/maidsafe/safe_network/commit/fc9e4feab2a504168221fe2bd893d9327a45ae6f))
+    - Merge #1853 ([`0e0a9dc`](https://github.com/maidsafe/safe_network/commit/0e0a9dcd68a46cd35ff2d7002d4c9b12c70874f7))
+    - add feat to limit section size ([`3dc20bc`](https://github.com/maidsafe/safe_network/commit/3dc20bc9424c295bd9038b2847fe01f639b83407))
+    - increase node to 50gb ([`c0b9b27`](https://github.com/maidsafe/safe_network/commit/c0b9b274b60b8c6ecf905c6294e5afb86c69e16f))
+    - Merge #1797 ([`d16ebf1`](https://github.com/maidsafe/safe_network/commit/d16ebf1efd9fb7199891e46e2114b40fa7cc8687))
+    - standalone methods to get secret keys ([`51bc2ca`](https://github.com/maidsafe/safe_network/commit/51bc2ca02dd8fe9634c9a68889c5eedc1e52c31e))
+    - update comments ([`f63d189`](https://github.com/maidsafe/safe_network/commit/f63d1896e554b72d6a5af463b7b6e7992a1aa8ed))
+    - modify dkg test cases ([`f0ae577`](https://github.com/maidsafe/safe_network/commit/f0ae5773669937b3c824e98557ecff5994cb1df7))
+    - check member type before modifying node ([`80edaf1`](https://github.com/maidsafe/safe_network/commit/80edaf1bfbbd247ed92eb91b6de011264224f654))
+    - modify `anti_entropy` test cases ([`69d0687`](https://github.com/maidsafe/safe_network/commit/69d0687c4afc8d8f6e088663dfa4482c4d72ade0))
+    - spentbook_spend_with_updated_network_knowledge_should_update_the_node ([`8d79f6f`](https://github.com/maidsafe/safe_network/commit/8d79f6fa586758fd75e5e66be95d9d240d9d6551))
+    - use `TestNetwork` to simulate elder change ([`4c6ae07`](https://github.com/maidsafe/safe_network/commit/4c6ae07d217cbed09d34adda1f3859191eb581c0))
+    - handle_agreement_on_online_of_elder_candidate ([`636b388`](https://github.com/maidsafe/safe_network/commit/636b38889c33b34ffdd391d479605938664bf731))
+    - simple usage of `TestNetwork` ([`006a4f8`](https://github.com/maidsafe/safe_network/commit/006a4f801f585594142e5ac4a9b19d218676c8b3))
+    - remove `network_utils` module ([`8bd83c6`](https://github.com/maidsafe/safe_network/commit/8bd83c64ca8cccc78dfe4641e522b4a02f03cbb8))
+    - Merge #1836 ([`22bc0ce`](https://github.com/maidsafe/safe_network/commit/22bc0ceef9dae773657aa111e35fd64069658581))
+    - report internal error upon failing to send or fnish a response bi-stream ([`37dc7b7`](https://github.com/maidsafe/safe_network/commit/37dc7b76a3f6c7f9d6b8f832562dc79032910412))
+    - Merge #1825 ([`ffdb4d7`](https://github.com/maidsafe/safe_network/commit/ffdb4d7244839532e754bc509918e46cd8645357))
+    - Merge #1831 ([`5a01ea2`](https://github.com/maidsafe/safe_network/commit/5a01ea24bd220af7b901061af41900b5df3ba79c))
+    - spawn new thread for dysf channel calls ([`b4164cf`](https://github.com/maidsafe/safe_network/commit/b4164cf0782c3083ba2a4e0f9b3f12445747730e))
+    - use STANDARD_CHANNEL_SIZE in node. increase to 100_000 ([`93ef0c1`](https://github.com/maidsafe/safe_network/commit/93ef0c1b78d9ec656aa8df85d0a741a26d09f780))
+    - Merge #1807 ([`1514a15`](https://github.com/maidsafe/safe_network/commit/1514a15b4cf4e82af8038b720d0bdf32cce4e182))
+    - don't store client peer sessions ([`f3fbf83`](https://github.com/maidsafe/safe_network/commit/f3fbf83dc15eb791ccc134d780042484a51ab90e))
+    - Merge #1827 ([`4ec86e9`](https://github.com/maidsafe/safe_network/commit/4ec86e9f398eb905285a5d378278fff2fb122671))
+    - log cleanup ([`4c0a0c1`](https://github.com/maidsafe/safe_network/commit/4c0a0c1b1419b44a8ef48a43f7f5bbd666eb1202))
+    - try to rejoin network if removed ([`e5ae9d7`](https://github.com/maidsafe/safe_network/commit/e5ae9d7174ebb7abee2a4643f1c046f13cf15c01))
+    - remove `EventSender` and `Event` ([`2c8f933`](https://github.com/maidsafe/safe_network/commit/2c8f9331ab0f7f63f7d14f7113ecf9ad5e6c4618))
+    - replace main thread loop with sleep ([`aa53ee4`](https://github.com/maidsafe/safe_network/commit/aa53ee414631dd4faff600101e909fa98f6885fe))
+    - remove events from tests ([`298b5d8`](https://github.com/maidsafe/safe_network/commit/298b5d86e4ea331f1c4c7213a724f275e01a06d1))
+    - convert events to logs ([`f66e02e`](https://github.com/maidsafe/safe_network/commit/f66e02ebbcc0298692cfc3d4d4faf69ba2ba1f8f))
+    - Merge #1824 ([`9494582`](https://github.com/maidsafe/safe_network/commit/949458280b567aa6dce387b276c06c2cb55d7ca4))
+    - applied clippy nightly ([`73f5531`](https://github.com/maidsafe/safe_network/commit/73f5531790ef8817ed3551fd9e4bcbcc7fc6f4f9))
+    - Merge #1818 ([`e95ebba`](https://github.com/maidsafe/safe_network/commit/e95ebba6e50879e9110b21afb5933685a591b85a))
+    - Merge #1817 ([`7fd2bb0`](https://github.com/maidsafe/safe_network/commit/7fd2bb09faf12c65712ee25dab3fd08841cf2d4c))
+    - adding more context info to some node Error types ([`f225a2d`](https://github.com/maidsafe/safe_network/commit/f225a2d84ad3422b4f466fa2bf713c3a767588dc))
+    - pass in context to NodeMsg handling ([`64b6c35`](https://github.com/maidsafe/safe_network/commit/64b6c35105168b9fa4b0fb9d626ed9552fd0bed3))
+    - Merge #1796 ([`e15180b`](https://github.com/maidsafe/safe_network/commit/e15180b53d1daaec76b7eba4637ffc16076c80af))
+    - Merge #1809 ([`9042bd2`](https://github.com/maidsafe/safe_network/commit/9042bd2cba7466b2a21592488d5765e27d05eda5))
+    - test(spentbook): remove old and commented tests - Cleanup of tests that will not be implemented there. ([`ee15a1d`](https://github.com/maidsafe/safe_network/commit/ee15a1de648f1192137c32b00b32d90d7cd84f4a))
+    - move to sn_interfaces ([`5179cf2`](https://github.com/maidsafe/safe_network/commit/5179cf2dec47295f9673212efa6e23e9531e5ea3))
+    - refactor(msgs): remove one layer of indirection - ValidateMsg can be replaced with HandleMsg. ([`fcc72d9`](https://github.com/maidsafe/safe_network/commit/fcc72d9cf97d9a9ed3529ab0193aafef65540c70))
+    - Merge #1793 ([`c5ab10f`](https://github.com/maidsafe/safe_network/commit/c5ab10f2831cc1f6978dfa518293649f08033e03))
+    - attempt to reduce allocations ([`6be0ea1`](https://github.com/maidsafe/safe_network/commit/6be0ea16b0ffe2c153c6a13f36916a91fb58cd05))
+    - remove more periodic logs ([`5766286`](https://github.com/maidsafe/safe_network/commit/57662862a8f59b70b9ca41515ff775003ea803fa))
+    - Merge #1747 ([`24c019c`](https://github.com/maidsafe/safe_network/commit/24c019cf6996bbe05caead1639a3f34083246015))
+    - Merge #1651 ([`aaaa01b`](https://github.com/maidsafe/safe_network/commit/aaaa01b32f40c4a5ca7618cd7f820efb14551440))
+    - Merge #1800 ([`42b6834`](https://github.com/maidsafe/safe_network/commit/42b68341e18e372b01d8b4e92babd35a40c3a133))
+    - wait for threshold + 1 section tree update responses ([`6cafdc7`](https://github.com/maidsafe/safe_network/commit/6cafdc75fc808a66b9d88d67b91adc67a7ef5b99))
+    - minor improvements to sn_node bin error messages ([`c84f844`](https://github.com/maidsafe/safe_network/commit/c84f844873208af49e1743199ca75c015d0e14c7))
+    - Merge #1744 #1792 ([`ea83392`](https://github.com/maidsafe/safe_network/commit/ea83392ccc9cbb79b175c29ba77c4a7e27a5398f))
+    - minor logging improvements to help debug msgs arriving/processing on client and nodes ([`e5b0dda`](https://github.com/maidsafe/safe_network/commit/e5b0dda1315a5299131cacd135b1d1ab66ed7073))
+    - mark redirect code with TODO to replace w/ retry + AEProbe ([`6ca7f43`](https://github.com/maidsafe/safe_network/commit/6ca7f4377308a0dd47dbd17a3d01b07321d9b8a9))
+    - remove unnecessary Box around JoinResponse ([`e8ab025`](https://github.com/maidsafe/safe_network/commit/e8ab025a3454005890418b10a50560b3c65fd68f))
+    - better log messsages for discarded messages ([`186c606`](https://github.com/maidsafe/safe_network/commit/186c606d8eaf4e1b95162ae970369be26a56fb9e))
+    - general cleanup of comments, unused fields etc. ([`9bee893`](https://github.com/maidsafe/safe_network/commit/9bee893e381375b6de65d77357e13f1897b9d757))
+    - chore(clippy) ([`fec604d`](https://github.com/maidsafe/safe_network/commit/fec604d3c534d36fc05b420a23fb5e513611e4a7))
+    - don't check senders of section updates ([`45c5031`](https://github.com/maidsafe/safe_network/commit/45c5031a965166dc1e2bf8862a8ace0d25b668e1))
+    - check that section tree update came from elders ([`b55ab9b`](https://github.com/maidsafe/safe_network/commit/b55ab9bfc16fd11d755cc88625b73936ce231bfc))
+    - better log msg when discarding non-bootstrap message ([`51c86df`](https://github.com/maidsafe/safe_network/commit/51c86dfcd2aa1ed3b5a868077d35f230245b5345))
+    - adapt tests to work with the new JoinResponses without updates ([`3a13e67`](https://github.com/maidsafe/safe_network/commit/3a13e6773a8faf22dc071e22e5965778ef8e54ad))
+    - remove section_tree_updates from within join messages ([`3dc0bb1`](https://github.com/maidsafe/safe_network/commit/3dc0bb1f0d8d04c8a92a75eab73e10721b105a10))
+    - adapt remaining join tests to use the new AE Flow ([`a935167`](https://github.com/maidsafe/safe_network/commit/a935167f2549a87344153d354421ed8b8d408576))
+    - use recv_node_msg across all join tests ([`d22ad7c`](https://github.com/maidsafe/safe_network/commit/d22ad7c46753c3e5d3f3c50da4546c80e302dee9))
+    - adapt the join disallowed test work with the new flow ([`e71eaa8`](https://github.com/maidsafe/safe_network/commit/e71eaa8467b244f875726b40e09ea255b3811c40))
+    - remove unused Result return from join_as_adult test ([`1b2d350`](https://github.com/maidsafe/safe_network/commit/1b2d350b358c34b4bd90c6fd3b5def0515e87e1c))
+    - get join_as_adult test working with the new join flow ([`cd820b2`](https://github.com/maidsafe/safe_network/commit/cd820b2c9ed03be82bba01368a046f8137fdbba5))
+    - use send_join_response helper where it makes sense ([`bc2c4ee`](https://github.com/maidsafe/safe_network/commit/bc2c4ee21335b627e3e998dd56209f72f20aac90))
+    - working on fixing test failures ([`9414bee`](https://github.com/maidsafe/safe_network/commit/9414beed24795db97277eb0c15fe24910f4220d7))
+    - bootstrap the section tree before starting join process ([`2542643`](https://github.com/maidsafe/safe_network/commit/2542643330dcc35ff49b54e88fd038a19d0f5d18))
+    - rebase changes ([`0ddfb0c`](https://github.com/maidsafe/safe_network/commit/0ddfb0c2ceffbf69fca172ec555abe1495be1980))
+    - tests(dkg): use gossip to catchup on DKG votes Simulate nodes dropping some `NodeMsgs` directed at them. This will cause the DKG to stall since they missed some votes. Send DKG gossip from a random node to the participants whenever the DKG is stalled. This should allow the participants to catchup and terminate. ([`b10e194`](https://github.com/maidsafe/safe_network/commit/b10e19437b9b19975c51f5b9296c494fa92c9ccd))
+    - tests(dkg): total participation of nodes is required DKG requires all the votes from the participants to progress ([`63e70e1`](https://github.com/maidsafe/safe_network/commit/63e70e13857180feae4327a3e67aba73cf0ca362))
+    - tests(dkg): lagging node should not propose `SectionInfo` After DKG termination, each node proposes a new `SectionInfo` to denote the change in the `SectionKey`. But if a lagging node (DKG in-progress) has received the `SectionAuthorityProvider` from a terminated node through AE, then the lagging node should not propose `SectionInfo`. ([`9889f7b`](https://github.com/maidsafe/safe_network/commit/9889f7bdb0191a1bc5ff864be5434769c7785c21))
+    - tests(dkg): simulate a `DKG` round Simulate a DKG round from start till termination and verify the newly generated `SecretKeyShare` for each node. The test bypasses the comm module and passes the `NodeMsgs` directly to the corresponding peers. ([`19f6111`](https://github.com/maidsafe/safe_network/commit/19f6111053ba825fe2eddcca66755c60d92d7c0e))
+    - upgrading qp2p to version 0.31.0 ([`f06b3e7`](https://github.com/maidsafe/safe_network/commit/f06b3e75ce97e7c749d2969276ad6533369806bb))
+    - Merge branch 'main' into remove-dataaddress-from-ack ([`ac2548b`](https://github.com/maidsafe/safe_network/commit/ac2548b1890935eb94e8802902d8bb1df0aae8fd))
+    - Merge #1790 ([`aac4f97`](https://github.com/maidsafe/safe_network/commit/aac4f9737483904e6dd10bebf002fc1bf8899b29))
+    - another log removed ([`986fa81`](https://github.com/maidsafe/safe_network/commit/986fa81fb00daaa37a17e55b459d66efacfff650))
+    - Merge #1785 ([`018eaab`](https://github.com/maidsafe/safe_network/commit/018eaab8bef81f4105318c34dc05c4d58412a60d))
+    - less logs ([`4392fd2`](https://github.com/maidsafe/safe_network/commit/4392fd265faec0b8e6c637342bd71119322d53b4))
+    - Merge #1763 ([`fe082f9`](https://github.com/maidsafe/safe_network/commit/fe082f9a19f9838256f3bf6a16e74bb6b2e32a29))
+    - fix(network_builder): construct a complete Network The builder now creates a complete Network (complete tree of prefixes), thus we take the max_prefix that the user has provided and create all the sibling (and its ancestor) prefixes. ([`7ea9048`](https://github.com/maidsafe/safe_network/commit/7ea9048c05a3b82a9fc4169fd694ce2accc18f11))
+    - fix(network_builder): remove `TestNetwork::sk_shares` The sk_shares of a node can be queried, hence we don't have to store it. ([`3e9cdfa`](https://github.com/maidsafe/safe_network/commit/3e9cdfa8bdb1658704b0033d7ab755a686247a27))
+    - rename methods, update comments ([`7837198`](https://github.com/maidsafe/safe_network/commit/78371980ebf3f1b65ec62c49c35d8a6c015c5537))
+    - feat(network_builder): build a working `NetworkKnowledge` The `NetworkKnowledge` can be retrieved from any section and it will contain the information from genesis section till the current one. Also the the `SectionPeers` is updated using the current section members. ([`5d31e27`](https://github.com/maidsafe/safe_network/commit/5d31e2720d8691444c1b8ebbe59bf811fb5cdba8))
+    - feat(network_builder): build a single `MyNode` instance A single node could've been an elder in some older sections. Hence we retrieve all the `SectionKeyShare` from all the old sections. Currently we ignore the sibling `prefixes` for which it could've been an elder. ([`b335502`](https://github.com/maidsafe/safe_network/commit/b3355029b615aa913b464c02eb7dc0dcd1b20cc8))
+    - feat(network_builder): retrieve nodes from a section The `MyNodeInfo` along with the `Comm` structs are needed to construct a single node instance. We also return the `SectionKeyShare` if the node is an Elder. We can also retrieve the `mspc::Receiver` used inside the `Comm` module. ([`b0731e3`](https://github.com/maidsafe/safe_network/commit/b0731e3be909706161091e64534b5ec44924eb20))
+    - feat(network_builder): build a working `SectionTree` The `max_prefixes` can be considered as the leaves of a tree and hence inserting `max_prefix.ancestors()` will effectively insert a single branch from the root till the leaf of the tree. A single prefix can also contain multiple SAPs and these are inserted in the order in which they were provided. ([`d16da92`](https://github.com/maidsafe/safe_network/commit/d16da92d0e866a42cba39c1cd42a055872e47a6b))
+    - feat(network_builder): build `TestNetwork` utility Calling the `build()` method will process the SAPs that the caller has provided and also generate SAPs for the missing prefixes. These are prefixes for which the SAPs are not provided by the caller, but are still required to generate a functional `SectionTree`. ([`03cb393`](https://github.com/maidsafe/safe_network/commit/03cb393f49f3349261db4f608c5ad4bf07dc6349))
+    - feat(network_builder): define `TestNetwork` and `TestNetworkBuilder` The `TestNetwork` utility will facilitate setting up the environment for tests that make use of `MyNode` instances. We can tell the builder to generate a network with a specific SAP in a prefix and it will create a functional network with all the gaps filled in. It also allows us to retrieve a `MyNode` instance from any SAP with valid `Comm`, `NetworkKnowledge`, `SectionKeyProvider` etc. ([`09f1c69`](https://github.com/maidsafe/safe_network/commit/09f1c6943957e9572139a213ef1b1df6f9f4ff7a))
+    - when failed to store data the Adult was returning a success response to Elder ([`93fdda0`](https://github.com/maidsafe/safe_network/commit/93fdda0505671426119f300a0444f7c6e51756a8))
+    - Merge #1780 ([`5a35817`](https://github.com/maidsafe/safe_network/commit/5a35817c9f928fe66a745ac645d9560964e05e8b))
+    - make Proposal saner and add docs ([`4a466e5`](https://github.com/maidsafe/safe_network/commit/4a466e5a14b61f0dcf5467298d11d831a9a8d7e2))
+    - Merge #1776 ([`bb65746`](https://github.com/maidsafe/safe_network/commit/bb657464f8217aa1a41501c4025ceb5dc6d0aca7))
+    - cleanup some overzealous log msgs ([`7ac1e8a`](https://github.com/maidsafe/safe_network/commit/7ac1e8abc3d792d5ea69e1e77fc7bdee63268f26))
+    - remove duplicate context in handle_ae_msg ([`762170b`](https://github.com/maidsafe/safe_network/commit/762170be83e21659cb8170987a5c2cdd9f2c14e6))
+    - Merge #1777 ([`f24e622`](https://github.com/maidsafe/safe_network/commit/f24e622dcb53362623300bdc02d70779590964a5))
+    - refactor(sn_dysfunction): rename `IssueType` variants The `IssueType` is now used to track as well as untrack dysfunctional nodes. Hence modify the names to be more generic. ([`489deb5`](https://github.com/maidsafe/safe_network/commit/489deb59bd53337d889aac2c73b49fa51440f148))
+    - pr suggestions ([`98d0d4c`](https://github.com/maidsafe/safe_network/commit/98d0d4cf79919fb56854d6f4492af6740df3587d))
+    - refactor(dysfunction): move `DysfunctionDetection` to a new task Decouple the Dysfunction module from `MyNode` by moving it to a separate `tokio::task`. Use `mpsc` channels to communicate between the tasks. ([`535d5cf`](https://github.com/maidsafe/safe_network/commit/535d5cfc0c0f0226fbbc051de595564a5628fe1c))
+    - remove unusued `Error` module ([`5e81ac4`](https://github.com/maidsafe/safe_network/commit/5e81ac4fb8a2312eb546a4b86e71be05df7c4e26))
+    - remove unusued `Result` from methods ([`6cf816f`](https://github.com/maidsafe/safe_network/commit/6cf816f4e3ce1e81af614ba84de83ccf13e8e402))
+    - Merge #1779 ([`be3973b`](https://github.com/maidsafe/safe_network/commit/be3973b8496f9920c5059173f48e0237fe3385ba))
+    - remove Membership from NodeContext. ([`c4cf647`](https://github.com/maidsafe/safe_network/commit/c4cf647221cdf0ffaeca4d4a8da82d7dc7b21ca6))
+    - Merge #1765 ([`90a870e`](https://github.com/maidsafe/safe_network/commit/90a870ebe1ce5110b4b264e8e317acc30152ceb1))
+    - making AE msg for clients to be a variant of client response msg type ([`7106b75`](https://github.com/maidsafe/safe_network/commit/7106b7533e119dc94bbf19fa304f3eb1f8dc9425))
+    - consume context where makes sense ([`f33602e`](https://github.com/maidsafe/safe_network/commit/f33602e0959a0ea86e4802376bd2f073cd8ea57c))
+    - reduce AE node msg handling locking ([`8f072f2`](https://github.com/maidsafe/safe_network/commit/8f072f2bcfd48e5c4047e32332c29e231632efae))
+    - Merge #1769 ([`cb8acf7`](https://github.com/maidsafe/safe_network/commit/cb8acf761cd6e39b48d6afab5c9337af3f2fb5aa))
+    - import organisation ([`200cf34`](https://github.com/maidsafe/safe_network/commit/200cf34c1cfc26b219ee12b9e8b0478fc5415745))
+    - Remove locks in data replication flows. ([`c436078`](https://github.com/maidsafe/safe_network/commit/c436078af2afca7468bb6d8a579f457dfb662bf3))
+    - Merge #1766 ([`19ffd04`](https://github.com/maidsafe/safe_network/commit/19ffd04ac02fe98c72c0c4d497c29bdf961e9201))
+    - refactor(responses): return correct cmd response - Returns the ack corresponding to the cmd. - Renames `ClientMsgResponse` to `ClientDataResponse`. - Makes `NodeDataResponse` be handled like `ClientDataResponse`. - Moves data write acks to `NodeDataReponse`. - Makes `NodeEvent` only be Adult to Elder notifications. ([`bd3b46e`](https://github.com/maidsafe/safe_network/commit/bd3b46e686a6f47cc006ce1f5da2f3041a614b2d))
+    - Merge #1768 ([`56e0927`](https://github.com/maidsafe/safe_network/commit/56e0927ef2950771b786d5a3692718c07d3ace32))
+    - ae_msg_from_the_future_is_handled unit test was failing due to wrong assumption of test utility ([`851f7ad`](https://github.com/maidsafe/safe_network/commit/851f7ad85197e2a474c72d5716c4b7858e840442))
+    - Merge #1761 ([`aa6b24a`](https://github.com/maidsafe/safe_network/commit/aa6b24adb1790bc97eca1ffdc4d265247ec4953e))
+    - removing unnecessary error types, plus some sn_node log msg improvements ([`fc0c751`](https://github.com/maidsafe/safe_network/commit/fc0c7512144c0c42184b6ae1b5a64e4d894d0eab))
+    - Merge #1749 ([`ad2574c`](https://github.com/maidsafe/safe_network/commit/ad2574cb7fad692c2f9924fd87130f0b0bb9e2c2))
+    - remove is_not_elder from NodeContext ([`3c8ac50`](https://github.com/maidsafe/safe_network/commit/3c8ac507a85e7c11219fdab8a61eadde89f8582f))
+    - rename MyNodeSnapshot -> NodeContext ([`18c0444`](https://github.com/maidsafe/safe_network/commit/18c0444be06d84c386b18031e59f2162fef81d89))
+    - cleanup unneeded code block ([`e37180b`](https://github.com/maidsafe/safe_network/commit/e37180bd65d26c6f4737dabeae8a210674a82bdf))
+    - cleanup commented code ([`197bb66`](https://github.com/maidsafe/safe_network/commit/197bb663e088309150a6f85e5c86877e5e0ad2d8))
+    - move (and rename) matching_section to MyNodeSnapshot ([`bd2baa0`](https://github.com/maidsafe/safe_network/commit/bd2baa03f889fa94fab68ecf9f1acffb71aa993d))
+    - node.get_snapshot -> snapshot ([`7bc55f7`](https://github.com/maidsafe/safe_network/commit/7bc55f7b1a819c4609a85176d99f287b54a9ad44))
+    - fix ae test by providing updated snapshot ([`4efda95`](https://github.com/maidsafe/safe_network/commit/4efda958c765e41b39444f397c500db95716ffa2))
+    - retry join with new name if we get a completely new SAP ([`7d79e3e`](https://github.com/maidsafe/safe_network/commit/7d79e3e53ce49dc664d4a9215e5cc02839540879))
+    - add in SetStorageLevel cmd to remove mut on DataStorage for normal replication ops ([`4df4086`](https://github.com/maidsafe/safe_network/commit/4df40864b5ee030edf16bad0becaa08a07c15fd9))
+    - only regen join name once per sap ([`0021a07`](https://github.com/maidsafe/safe_network/commit/0021a073e37306cadf0b56a1bdac8cb37734dae6))
+    - Pass around MyNodeState to avoid holding locks ([`38b8f55`](https://github.com/maidsafe/safe_network/commit/38b8f55121d8b7c461efa6dd0c0407c4fae93418))
+    - Merge #1762 ([`ec0f45f`](https://github.com/maidsafe/safe_network/commit/ec0f45fec37a434d5a0ab252b3a8c61e78041c61))
+    - replace `TestSAP` with `TestSapBuilder` ([`a55b74b`](https://github.com/maidsafe/safe_network/commit/a55b74b4c8f9bede3c91a9426d4687df01138257))
+    - only proposal when reached handover consensus first time ([`27e97a7`](https://github.com/maidsafe/safe_network/commit/27e97a75f72f8de9801c57ef062ba7f9a9b73432))
+    - removing internal unnecessary struct ([`0e73ec1`](https://github.com/maidsafe/safe_network/commit/0e73ec1ce28c5e2206eb84a6a24d996a23affd2f))
+    - Merge #1637 ([`45903a9`](https://github.com/maidsafe/safe_network/commit/45903a9988528f543b09afbb56a89d21effbb929))
+    - Merge branch 'main' into refactor-client-msg-response ([`f9c0efc`](https://github.com/maidsafe/safe_network/commit/f9c0efc0db6b07c7bee6073b07aaae3e62ad780d))
+    - refactor(tests): remove `tokio::LocalSet` The `Comm` module does not use `spawn_local` anymore, hence we do not need to use a local task set for the tests ([`15f3218`](https://github.com/maidsafe/safe_network/commit/15f3218140a2475ef545d641c26170a361d0dd57))
+    - breaking up client msg type separating requests from responses ([`80917f1`](https://github.com/maidsafe/safe_network/commit/80917f19125222ce6892e45487f2abe098fefd7a))
+    - remove AE hold back ([`bcdb4fc`](https://github.com/maidsafe/safe_network/commit/bcdb4fc8035c108f2e24c14983af30ddfb54b8fd))
+    - small changes ([`9acc41d`](https://github.com/maidsafe/safe_network/commit/9acc41d5884ce4e6f647937fe56df906a7f86452))
+    - provide age pattern to generate `NodeInfo` ([`9f539e9`](https://github.com/maidsafe/safe_network/commit/9f539e9a8dd9c22e7440539114b2fbdaaeb34515))
+    - organize more network knowledge utils ([`3353ab6`](https://github.com/maidsafe/safe_network/commit/3353ab617b438ca12cdac68a1f7956e3050eefcf))
+    - organize key related test utilites ([`093ea5b`](https://github.com/maidsafe/safe_network/commit/093ea5bfc200f940662c5c0e458c38c5c77294a9))
+    - organize network_knowledge test utilites ([`4b6569a`](https://github.com/maidsafe/safe_network/commit/4b6569ab2a9face420385d29d7baab31d8ca4d1e))
+    - remove redundant `bls::SecretKeySet` wrapper ([`9f8ecf9`](https://github.com/maidsafe/safe_network/commit/9f8ecf90470ac18de31a956c1eee5f9f2d4c77a7))
+    - remove from sn_node ([`3067040`](https://github.com/maidsafe/safe_network/commit/30670403d5466f7a052d753136e72e2720d2954d))
+    - Merge #1724 ([`ef69747`](https://github.com/maidsafe/safe_network/commit/ef697470545ac8b3c359f721bb30b0f8b7854b65))
+    - create new connection to peer if a SendStream cannot be finished when sending a msg ([`d2d69e1`](https://github.com/maidsafe/safe_network/commit/d2d69e10ad6ca5b55945ff15834a8c262b56b3d8))
+    - update self_update to 0.32 ([`d43bac5`](https://github.com/maidsafe/safe_network/commit/d43bac5ce07b0f08766858eadc4b8f98f9bcfc12))
+    - remove duplicate strum/strum_macros/heck deps ([`667009d`](https://github.com/maidsafe/safe_network/commit/667009dc02e6bb17bfaa60e2374d5ab7b75a7be5))
+    - bump tokio-util 0.6 to 0.7 ([`af9d3ab`](https://github.com/maidsafe/safe_network/commit/af9d3abc665a7490492417aebe974cb5ef839d53))
+    - criterion 0.3 -> 0.4, tracing-subscriber 0.2 -> 0.3 ([`860f326`](https://github.com/maidsafe/safe_network/commit/860f326a9baf7e62d191eec13359fa5313e6956d))
+    - bump blsttc to 8.0.0 ([`ee824e7`](https://github.com/maidsafe/safe_network/commit/ee824e7785b8da770b5aa6bba3415a274a4e0d68))
+    - add missing client ae response w/ stream ([`894458c`](https://github.com/maidsafe/safe_network/commit/894458c0ba15225754d3c75642926f6ee40db34b))
+    - comment out old OutgoingMsg::Client code in ignored tests ([`058acaa`](https://github.com/maidsafe/safe_network/commit/058acaa701792ee58913b2d4524c759367fb65fc))
+    - remove outgoingmsg::client variant ([`b223bd5`](https://github.com/maidsafe/safe_network/commit/b223bd532bba649c6dd09cf26166758d6ff56893))
+    - send client error response if storage fails ([`2e7fde6`](https://github.com/maidsafe/safe_network/commit/2e7fde627f41dfff7b5b8cd049f26ee127269bfe))
+    - tidying for clippy ([`ffbb607`](https://github.com/maidsafe/safe_network/commit/ffbb607835a87683280e4f16b0e2e1b5ca2fd0a1))
+    - fix node config keep alive test time ([`774c908`](https://github.com/maidsafe/safe_network/commit/774c908b6c44b702259782cefdef5d4cdd228385))
+    - ignore client cmd tests that require response stream for now ([`42c4008`](https://github.com/maidsafe/safe_network/commit/42c4008aeadac297c212a65cde7109a055f61cec))
+    - ignore large clippy variants for now ([`b550ed0`](https://github.com/maidsafe/safe_network/commit/b550ed00dd3e3af878758aea1a2efb6eba0e8d66))
+    - Send AE retries to all elders in updated section ([`c71fcd1`](https://github.com/maidsafe/safe_network/commit/c71fcd1fd61a4a2f9075d3d3e5f922b6d06644e6))
+    - retry loop for bidi initialisation ([`2b9268c`](https://github.com/maidsafe/safe_network/commit/2b9268c2aff5aae5eb1584d2698f282c8beae73e))
+    - elders wait for all storage reqs to be successful ([`62d4723`](https://github.com/maidsafe/safe_network/commit/62d472354d65f1cd9001f2df00cbf0c82734b969))
+    - remove adult healthcheck for now ([`58d6569`](https://github.com/maidsafe/safe_network/commit/58d656949c09dc3d6445d899725fe2c41d46c216))
+    - chore: split out replication flows depending on iff we need client responses ([`bf826cb`](https://github.com/maidsafe/safe_network/commit/bf826cb9d0f572465a2738b104e161576a077ab7))
+    - reset keep_alive flag to be optional ([`d9bfaef`](https://github.com/maidsafe/safe_network/commit/d9bfaef416bc357bdc32632eb0ba263b6995d613))
+    - don't report status sent for failed bidi stream send ([`aad74a9`](https://github.com/maidsafe/safe_network/commit/aad74a94886df2a95b57859fa53591a8813c7860))
+    - ignore spentbook test that tries to handle client w/o a stream etc ([`f53337e`](https://github.com/maidsafe/safe_network/commit/f53337e6e0c7c4f804489f0d370d4cc97331597f))
+    - add in error msg in the event of missing stream during adult query ([`0ef5a2c`](https://github.com/maidsafe/safe_network/commit/0ef5a2cfd82de58f02a23a96a305b172f27c33c8))
+    - remove two spend tests that ar eno longer valid in this flow ([`edea3fb`](https://github.com/maidsafe/safe_network/commit/edea3fb90697837317f7f050913fefd534938bfd))
+    - cmd responses sent from adults over stream ([`5a39a84`](https://github.com/maidsafe/safe_network/commit/5a39a843c5570993b0e27780a1c2887bbf7a3212))
+    - use bi/di send streams for elder-> adults queries ([`87bc680`](https://github.com/maidsafe/safe_network/commit/87bc680733b8a24fdcb9f6dedb5ef5ef61becfe8))
+    - enable cmd ids and child ids again ([`17167b8`](https://github.com/maidsafe/safe_network/commit/17167b84b910631e1c847c657b88a2e0b422b1cd))
+    - removing unused Error types and adding context info to a couple of them ([`bdf50e7`](https://github.com/maidsafe/safe_network/commit/bdf50e7ad1214ef4bb48c0a12db8a7700193bb2a))
+    - add mising sleep before retrying connection. ([`c3aa941`](https://github.com/maidsafe/safe_network/commit/c3aa9414b4232dbaf356cec3fb71460f4d916b4f))
+    - tweaks to reduce use of async ([`f2dff36`](https://github.com/maidsafe/safe_network/commit/f2dff3636d3bf1446af53790a42a46473079698f))
+    - remove ae_backoff_cache ([`815d803`](https://github.com/maidsafe/safe_network/commit/815d8034d26fb0a7dec22ceca4ad4e31653041c4))
+    - set nodes join interval to 30secs for testnet in sn-api tests job ([`1bf23ff`](https://github.com/maidsafe/safe_network/commit/1bf23ff2d00b66232267403f94d3fa133416fdd3))
+    - move conn acquisition off thread too. ([`d19c0b2`](https://github.com/maidsafe/safe_network/commit/d19c0b204c368a967a2f6de9d68e1db0caebb71a))
+    - Comm is clone. Dont close endpoint on drop. ([`ebb7b79`](https://github.com/maidsafe/safe_network/commit/ebb7b793b1e7b4ba439f3f93b5d7ac32e9acc2c2))
+    - remove reachability check from inital join ([`0bd38c5`](https://github.com/maidsafe/safe_network/commit/0bd38c524b5f6685e3a8ad21b3ae793d097c6b6d))
+    - reset ae_backoff_cache ([`be99942`](https://github.com/maidsafe/safe_network/commit/be99942b65306640f057f11b9b8f7345b9752ac5))
+    - don't hold read lock over reachability check ([`745ae58`](https://github.com/maidsafe/safe_network/commit/745ae58408997504dd04663a1c8bea8b688ded66))
+    - refactor(cmds): replace ack+error with response BREAKING CHANGE: ClientMsg enum variants changed. ([`df19b12`](https://github.com/maidsafe/safe_network/commit/df19b120bd769d0b375a27162f07a4a421f97ec0))
+    - reducing the amount of threads used in CI for client tests ([`36686c7`](https://github.com/maidsafe/safe_network/commit/36686c794eccb84573e741fdbe6f9af2eb18c8c9))
+    - ignore failed send until we have feedback event channel ([`5dfeab9`](https://github.com/maidsafe/safe_network/commit/5dfeab95bb67454cc257028185dbbf7e1f98d351))
+    - cleanup unused deps ([`5b0b858`](https://github.com/maidsafe/safe_network/commit/5b0b8589bc9c90fac6285f626a46907b2dd0e819))
+    - fix for recent node comm changes ([`b2b661d`](https://github.com/maidsafe/safe_network/commit/b2b661d3e891403bf747228985930b301c9ad28f))
+    - fix ae response on stream for better prefix ([`f1e967a`](https://github.com/maidsafe/safe_network/commit/f1e967ad26b06f06f82815c884563df1729219e7))
+    - refactor statemap invocation avoid node.read().await ([`3b1548d`](https://github.com/maidsafe/safe_network/commit/3b1548dd8b7f77538f47d6bca6338239899d18a3))
+    - extra log for membership generation during invalid proposal ([`07e0fc8`](https://github.com/maidsafe/safe_network/commit/07e0fc8c7776efdabed61b451258709e4dc8f3d0))
+    - drop write lock during udpate knowledge handler faster ([`560d185`](https://github.com/maidsafe/safe_network/commit/560d1850783439b7e5affdc5d86a61cbf619fca0))
+    - reduce wait for all ndoes to join ([`05846c1`](https://github.com/maidsafe/safe_network/commit/05846c1741318f51394090c66e7c0ddf911e31ee))
+    - log msgid with msg on SendToNodes ([`8b8f9be`](https://github.com/maidsafe/safe_network/commit/8b8f9be3e18b1ae2cf94b9e2dbd17f925b7580f6))
+    - request membership AE when we have stalled votes ([`9a01413`](https://github.com/maidsafe/safe_network/commit/9a014135a5fe9dc031847e91ed0cb0e52815cec1))
+    - drop nextest, use cargo test ([`30bedf8`](https://github.com/maidsafe/safe_network/commit/30bedf882f1f642592703b92be0966035ef01068))
+    - fix ae tests for send_stream addition ([`ac9d1b2`](https://github.com/maidsafe/safe_network/commit/ac9d1b257db48ab336d2c80e4ff573208cbd4c6c))
+    - additional membership logs ([`a05e6a2`](https://github.com/maidsafe/safe_network/commit/a05e6a28d890da5103e12cfae4ee54ffc0870be3))
+    - remove ConnectionCleanup. ([`bebd96d`](https://github.com/maidsafe/safe_network/commit/bebd96de67906ab0d49a4a42edb9b62a2f1d88f2))
+    - reduce logging for periodic loop ([`f65d4d4`](https://github.com/maidsafe/safe_network/commit/f65d4d457ef8b55fc87f6669f6d8380b371366a1))
+    - use one channel per Cmd/Query sent to await for responses ([`93c7a05`](https://github.com/maidsafe/safe_network/commit/93c7a054d87df7054224664c4a03c4507bcfbae6))
+    - use repsonse_stream for ae responses to client. ([`c98cc98`](https://github.com/maidsafe/safe_network/commit/c98cc98674552794960e5953c5dbf405d961c333))
+    - spawn a task to read query/cmd responses from bi-stream ([`8f887c0`](https://github.com/maidsafe/safe_network/commit/8f887c0f3f128f5d59304a0b47f6105cb52f3155))
+    - send client msg back on bidi stream ([`8368c40`](https://github.com/maidsafe/safe_network/commit/8368c402bf5b305279b44d8c28cbb497c4bec333))
+    - use bi stream from client; process in Node ([`3fd0a00`](https://github.com/maidsafe/safe_network/commit/3fd0a00bad2f9ca266a56de2086b54088459e153))
+    - move to event driven msg handling ([`95436a1`](https://github.com/maidsafe/safe_network/commit/95436a1f722bfd02a735dc3cf2f171a8b70de552))
+    - log MsgId in InsufficentAck error ([`27cbeb6`](https://github.com/maidsafe/safe_network/commit/27cbeb647b90e7105e5b650b436944d3cdd813c5))
+    - move DKG gossip check off thread ([`e945ea9`](https://github.com/maidsafe/safe_network/commit/e945ea97717ff2b63fd553afba82421c128166c4))
+    - logs around elder periodics ([`865b459`](https://github.com/maidsafe/safe_network/commit/865b459ab0cfcfbee91298787b5c2c4425e5b6a0))
+    - increase event channel size ([`8b50947`](https://github.com/maidsafe/safe_network/commit/8b50947fe3f2eeb6bfe6350f754303ebba9c09dd))
+    - rebase issue w/ monitoring ([`96f275d`](https://github.com/maidsafe/safe_network/commit/96f275d2ff609fc27292ee8f33b188aa0d67ec4a))
+    - refactor client ACK receipt ([`68929bd`](https://github.com/maidsafe/safe_network/commit/68929bda1832d85c1a9f43d904f1c687a3bc9dc4))
+    - only enqueue msgs at start, thereafter process all enqueued ([`a05d7ca`](https://github.com/maidsafe/safe_network/commit/a05d7ca9b7d2319085a2dea9119735e3e44f50c1))
+    - remove ExpiringConnection struct ([`98abbbe`](https://github.com/maidsafe/safe_network/commit/98abbbe7af8c870faa22d62819691054e07df718))
+    - dont have increase conn retries for existing conn retries ([`6185599`](https://github.com/maidsafe/safe_network/commit/6185599884f49a71343c67e625a1a9dd9a75393d))
+    - more logs around conn closing ([`a9e2c69`](https://github.com/maidsafe/safe_network/commit/a9e2c6962b6646cc6b4ac24bf9da50dbf48d3f60))
+    - only cleanup on local close if there's no more connections available ([`7ed94ba`](https://github.com/maidsafe/safe_network/commit/7ed94ba0599325900246743334b4b821331cba86))
+    - wait before reqnqueing job so Link connection can be cleaned up... ([`999bfaa`](https://github.com/maidsafe/safe_network/commit/999bfaa633e9fcd2a9bc47b90b128f0e3946a951))
+    - allow too many args ([`f856d85`](https://github.com/maidsafe/safe_network/commit/f856d853c0166f35bb2b98b24e3f3c8c09783b2d))
+    - enable multi-threaded runtime try 2 ([`b27f15c`](https://github.com/maidsafe/safe_network/commit/b27f15cbea63b1994fdf9b576a064273afe8f166))
+    - spawn the wait/update for session in comms:is_sent ([`83922d0`](https://github.com/maidsafe/safe_network/commit/83922d007af49f2e63cc1c81020db9cde905b66d))
+    - removing op id from query response ([`a973b62`](https://github.com/maidsafe/safe_network/commit/a973b62a8ef48acc92af8735e7e7bcac94e0092f))
+    - only perform periodic checks when cmd queue is empty ([`a1263ec`](https://github.com/maidsafe/safe_network/commit/a1263ecef879fbdba932588cc37ea63959a0435b))
+    - increase data query timeout ([`914b816`](https://github.com/maidsafe/safe_network/commit/914b816921fc8f4da99bbf77a9fdd91d896411a4))
+    - make sessions return if they're empty, and if so, clean them up then ([`a641d9f`](https://github.com/maidsafe/safe_network/commit/a641d9f359e0dbc12bc55c62f126a04efa5e78f3))
+    - dont manually clean up client peers ([`9a6f4a3`](https://github.com/maidsafe/safe_network/commit/9a6f4a3cf20852f4b5604bf08a04aba592dca0fa))
+    - do no requeue existing validate msg cmds ([`e9dec49`](https://github.com/maidsafe/safe_network/commit/e9dec49535c22c924af7d2144f4a298cae930eee))
+    - write query responses as they come in ([`e57d832`](https://github.com/maidsafe/safe_network/commit/e57d83235f60a16bd7e1ee801f35a599113dc71a))
+    - cleanup dropped peers ([`0f11b2e`](https://github.com/maidsafe/safe_network/commit/0f11b2ed16c765bee3e25f2f25b374e3f06f8e8f))
+    - refactor client ACK receipt ([`5a539a7`](https://github.com/maidsafe/safe_network/commit/5a539a74d0dcca7a8671910d45bbb08ca4382671))
+    - force retries to use fresh connection ([`a5bf211`](https://github.com/maidsafe/safe_network/commit/a5bf211daa0272597f1a2d852a17592258a2115a))
+    - dont try and establish connections for ServiceMsgs ([`411ea37`](https://github.com/maidsafe/safe_network/commit/411ea371660b5f76a5c3f887f78331e58f8b6961))
+    - avoid mem size change across compiler version update ([`d392396`](https://github.com/maidsafe/safe_network/commit/d3923967e5886373bbf77696e4a813e700156f2a))
+    - remove some ? noise in tests ([`9fad752`](https://github.com/maidsafe/safe_network/commit/9fad752ce1849763ae16cdb42159b9dccf1a13d0))
+    - remove age stepping in genesis sections ([`14ba1a8`](https://github.com/maidsafe/safe_network/commit/14ba1a8a034e488728762df09398347f8b909d65))
+    - Merge #1711 ([`c61d3c9`](https://github.com/maidsafe/safe_network/commit/c61d3c92531c04a188f724869d36c4492fb3d161))
+    - removing done TODOs ([`177407d`](https://github.com/maidsafe/safe_network/commit/177407d1a0e817ea5fff0a98f74cd358f25ac727))
+    - Merge #1703 ([`297004f`](https://github.com/maidsafe/safe_network/commit/297004fe04bba05765eb4d02394210024dfcf559))
+    - AuthKind into MsgKind without node sig ([`633dfc8`](https://github.com/maidsafe/safe_network/commit/633dfc836c10eafc54dedefc53b2cbc9526970bb))
+    - Add port 16685 ([`d673400`](https://github.com/maidsafe/safe_network/commit/d6734004a57557c67d25089957c8471f59644bbe))
+    - Merge #1685 ([`992f917`](https://github.com/maidsafe/safe_network/commit/992f917830c6d7b10fbd4d1f03a81eb5e8a64fdc))
+    - remove NodeMsgAuthority altogether ([`8c348b2`](https://github.com/maidsafe/safe_network/commit/8c348b2286925edf319daede9a064399b41f6ec1))
+    - remove node auth ([`5019dd3`](https://github.com/maidsafe/safe_network/commit/5019dd3896d278227878ffd91ce14d0cecb2b9dd))
+    - further node join write lock reduction ([`014b132`](https://github.com/maidsafe/safe_network/commit/014b132923c5affebe2c485aa3e791a22a6b90c5))
+    - reduce locks during join req handling ([`3c05e61`](https://github.com/maidsafe/safe_network/commit/3c05e616e54f423b66d35114668dac35ab5eae14))
+    - reduce node locking now we can have the lock inside valid msg handling ([`ec88642`](https://github.com/maidsafe/safe_network/commit/ec88642644b76c0751db25c9b02b068cd77318d1))
+    - remove msg aggregators ([`1bfa58e`](https://github.com/maidsafe/safe_network/commit/1bfa58e5487b3c8cafdef1593c2037b331c30dd1))
+    - get rid of InvalidState Error altogether ([`a60eef8`](https://github.com/maidsafe/safe_network/commit/a60eef81e20bee599f9b861822c8e8c3424073af))
+    - explicit errors in join ([`37785c7`](https://github.com/maidsafe/safe_network/commit/37785c72943ad126ef8fc94f4a6c2139ae478d69))
+    - refactor statemap invocation avoid node.read().await ([`fc7670e`](https://github.com/maidsafe/safe_network/commit/fc7670e6cc4284d7cf5614185e8e93ffb9f0ba37))
+    - :chore(node): drop write lock during udpate knowledge handler faster ([`9900341`](https://github.com/maidsafe/safe_network/commit/99003419995f59cf03f840658eb1d780505625ff))
+    - make membership ae >= from gen ([`35fcfb6`](https://github.com/maidsafe/safe_network/commit/35fcfb6ee2331f2bc34e7680145d0d105e1354ba))
+    - section peers uses BTreeMaps instead of DashMap ([`50e877d`](https://github.com/maidsafe/safe_network/commit/50e877d9ac75b62dfa9e851564b6fd6b60167ca3))
+    - assert_lists asserts instead of returning Result ([`ab22c69`](https://github.com/maidsafe/safe_network/commit/ab22c6989f55994065f0d859b91e141f7489a722))
+    - Merge #1667 ([`00a6e1b`](https://github.com/maidsafe/safe_network/commit/00a6e1ba5edbeb647f2614161cb78d3a35420f27))
+    - call to File::sync_data right after writing a Chunk or Register op to disk ([`cdb3a47`](https://github.com/maidsafe/safe_network/commit/cdb3a474db1a51ac78234e1458e36ed2e70cc5dc))
+    - remove `SectionAuthorityProvider`, `SectionTreeUpdate` messages ([`32744bc`](https://github.com/maidsafe/safe_network/commit/32744bcf6c94d9a7cda81813646560b70be53eb2))
+    - move `MembershipState`, `RelocateDetails` out from messaging ([`ba78a41`](https://github.com/maidsafe/safe_network/commit/ba78a41f509a3015a5319e09e1e748ac91952b70))
+    - remove `NodeState` message ([`72abbfb`](https://github.com/maidsafe/safe_network/commit/72abbfbc583b5b0dc99a0f7d90cb4d7eb72bd8c4))
+    - request membership AE when we have stalled votes ([`7f5cbbe`](https://github.com/maidsafe/safe_network/commit/7f5cbbe83d37fba9255078b893a02ab639eeb739))
+    - remove section share auth ([`266f312`](https://github.com/maidsafe/safe_network/commit/266f3120b574133fccc39405d3a5a02d05806dfc))
+    - universal aggregator without timers ([`2bcc1a0`](https://github.com/maidsafe/safe_network/commit/2bcc1a0735d9cd727f71c93b58de85cd01c8a603))
+    - use gen_section_tree_update test utility ([`5142595`](https://github.com/maidsafe/safe_network/commit/51425951e8a66a8fd938a8dd2378b583cc80fb94))
+    - adapt DKG docs to sigshare change ([`6276e93`](https://github.com/maidsafe/safe_network/commit/6276e931291afd518648a47bc10374640b462cad))
+    - remove commented out code ([`8955514`](https://github.com/maidsafe/safe_network/commit/8955514b2d08d2f7fbb4ebbf48d9807a9d5127ac))
+    - rename MsgEvent to MsgFromPeer and convert it to struct ([`dcb7601`](https://github.com/maidsafe/safe_network/commit/dcb76019971c2765c54ba04e22c1a7d2d1ad2d47))
+    - Joiner::send takes NodeMsg instead of JoinRequest ([`8f35574`](https://github.com/maidsafe/safe_network/commit/8f355749c85e5d117e304bd499da1144b00e6809))
+    - move timeout out of receive_join_response ([`85c30ff`](https://github.com/maidsafe/safe_network/commit/85c30ffa90488f36c32516ca97cea3b246cffbcb))
+    - rename network_contacts to section_tree ([`80c9f7a`](https://github.com/maidsafe/safe_network/commit/80c9f7a74a5c7f80a898f97729a813b6d2445f73))
+    - remove unused OutgoingMsg::Elder ([`5994267`](https://github.com/maidsafe/safe_network/commit/59942675bc99d11ae4fcc6a5909aeba4b0f17ec9))
+    - adapt DKG test ([`e080368`](https://github.com/maidsafe/safe_network/commit/e0803687a1b3b374efdf040cac0ecd5c6b4fc60a))
+    - move elders sig trust within DkgStart instead of deep within messaging ([`3302aee`](https://github.com/maidsafe/safe_network/commit/3302aee7a41abd58b6deba18cc690c5e74aabff4))
+    - increase channel sizes. ([`1601cde`](https://github.com/maidsafe/safe_network/commit/1601cde194cb1f3bab2f6b54cc0ca784adb912b8))
+    - Clippy ([`cb052a3`](https://github.com/maidsafe/safe_network/commit/cb052a3db16366977526d5d2a7f9c75a2990cf34))
+    - Rebase clippy fix ([`7b850af`](https://github.com/maidsafe/safe_network/commit/7b850af7bd4579f1de60629aa88df3c81a35e546))
+    - Remove resource proof ([`702a03f`](https://github.com/maidsafe/safe_network/commit/702a03fae21fa517b02a1c0271f0617ca5c4f85c))
+    - fmt ([`3215110`](https://github.com/maidsafe/safe_network/commit/3215110b021aaa7d3b755b7e80432aeed1e0b436))
+    - Remove resource proof ([`acaa90a`](https://github.com/maidsafe/safe_network/commit/acaa90a13d598915bafc3584c70826f233d89881))
+    - defining a private type to hold periodic checks timestamps within the FlowCtrl instance ([`d87bbdd`](https://github.com/maidsafe/safe_network/commit/d87bbddfd92ecd802b27531cbcbc13c7271c6a10))
+    - increase restart threshold during join ([`9454c72`](https://github.com/maidsafe/safe_network/commit/9454c727cbfb334ab68800a5022cf2b687d4f97d))
+    - adapt confusing auth related code ([`07d0991`](https://github.com/maidsafe/safe_network/commit/07d0991fed28d49c9be85d44a3343b66fac076d9))
+    - fmt ([`25448dc`](https://github.com/maidsafe/safe_network/commit/25448dc71fbe7877560654a4d5b5d69857c10ac9))
+    - refactor: Node-> MyNode & MyNodeInfo ([`17baaf4`](https://github.com/maidsafe/safe_network/commit/17baaf4c27442273c238d09ebb240e65be85a582))
+    - removing dst_address fn from ClientMsg as it doesn't always contain that info ([`d550b55`](https://github.com/maidsafe/safe_network/commit/d550b553acbd70d4adb830a0600f7da7b833ee18))
+    - one more renaming ([`28c7a9f`](https://github.com/maidsafe/safe_network/commit/28c7a9f7b2ce43d698288c12e35eb6a7026a4163))
+    - various more renamings ([`f289de5`](https://github.com/maidsafe/safe_network/commit/f289de53f3894a58a6e4db51ce81aaf34f276490))
+    - rename a bunch of auth to sig ([`452ef9c`](https://github.com/maidsafe/safe_network/commit/452ef9c5778ad88270f4e251adc49ccbc9b3cb09))
+    - rename a helper func ([`151a22f`](https://github.com/maidsafe/safe_network/commit/151a22f63a0aaaf94070f3bd0e1f6bd2f9239856))
+    - simplify section sig ([`85f4d00`](https://github.com/maidsafe/safe_network/commit/85f4d00e81ac5bf67b6be89d7ff51b7bb1060ed6))
+    - rename SectionAuth to SectionSigned ([`70d848a`](https://github.com/maidsafe/safe_network/commit/70d848a43b6df02812195845434849b98f409367))
+    - pull out bootstrap functions for normal and genesis nodes ([`3227216`](https://github.com/maidsafe/safe_network/commit/322721635724f9dfa9351dd31e6883a32a330fe4))
+    - Looking at change to NodeSig ([`dd45c8f`](https://github.com/maidsafe/safe_network/commit/dd45c8f42b4f8674eeaea90aa27a465bd3bae0a2))
+    - refactor: NodeAuth -> NodeEvidence ([`cdc126b`](https://github.com/maidsafe/safe_network/commit/cdc126be934229198959eb3da317e5da92b16ac3))
+    - adapt to empty vec change in sn_sdkg ([`8f2c414`](https://github.com/maidsafe/safe_network/commit/8f2c41406165351796ca8df36d2ae3457e000ab9))
+    - integrate recursive sn_sdkg changes ([`b30459f`](https://github.com/maidsafe/safe_network/commit/b30459ffc565bb38ce7975c443b8df8139b77752))
+    - restart after accumulated retry_response ([`4a6df29`](https://github.com/maidsafe/safe_network/commit/4a6df2948384bbfd3970982fde203778f950bff3))
+    - join_invalid_retry_prefix test uses empty genesis prefix ([`ffa2cf3`](https://github.com/maidsafe/safe_network/commit/ffa2cf3c9b49aaa3f5f64b88e0800a4047948378))
+    - revert 'is_new_sap' check removal from join process ([`ce7d186`](https://github.com/maidsafe/safe_network/commit/ce7d1863e523dbe1761ca60e1cebcf1a802cf83b))
+    - merge Comm::{first_node, bootstrap} into Comm::new ([`0460588`](https://github.com/maidsafe/safe_network/commit/04605882c324057deef5bec05bdae90e15b5a940))
+    - join process no longer takes a bootstrap node arg ([`f88d542`](https://github.com/maidsafe/safe_network/commit/f88d542b64c3bde832968c99dcfe38e99d85b4f5))
+    - move building of join targets into the join method ([`de2479e`](https://github.com/maidsafe/safe_network/commit/de2479e5fe56b3ebf526215b4860ce9f64c7f20c))
+    - remove unneeded err handling; bump join channel size ([`18b393f`](https://github.com/maidsafe/safe_network/commit/18b393f7c7c5b9d38bf2bc17751b9dbbf08604fa))
+    - refactor ([`4beec97`](https://github.com/maidsafe/safe_network/commit/4beec978b1f2eae2198bcd85e3e0bf377d97575c))
+    - refactor: ([`444ed16`](https://github.com/maidsafe/safe_network/commit/444ed16e55d8e962404c8c7b643b00f0685eed18))
+    - rebase ([`0a85816`](https://github.com/maidsafe/safe_network/commit/0a85816f4168024b2892fd77760580b1f8d2d9e9))
+    - refactor: rename files system_msgs -> node_msgs service_msgs -> client_msgs ([`10a23cd`](https://github.com/maidsafe/safe_network/commit/10a23cd020b3315172207eb498f7674a588d01eb))
+    - Fix for rename in benches ([`54222ae`](https://github.com/maidsafe/safe_network/commit/54222aeea627209c53a1f595578436deb2763ef0))
+    - refactor: ([`50d48bf`](https://github.com/maidsafe/safe_network/commit/50d48bfc4fcc54266125bc0f1a3369097376497c))
+    - refactor: ServiceAuth -> ClientAuth Service -> Client NodeBlsShare -> SectionPart BlsShareAuth -> SectionAuthPart SystemMsg -> Node2NodeMsg OutgoingMsg::System -> OutgoingMsg::Node2Node + fmt / fix ([`0b9d08b`](https://github.com/maidsafe/safe_network/commit/0b9d08bf88b6892b53dabf82fa988674fdd9992a))
+    - use separate genesis dbc and section keys ([`b9d39b0`](https://github.com/maidsafe/safe_network/commit/b9d39b09e39b7d91fd556abeb385310f50a0eee0))
+    - Merge #1550 ([`c6f2e2f`](https://github.com/maidsafe/safe_network/commit/c6f2e2fb98e29911336f86f54c1d9b9605037b57))
+    - add technical docs ([`a65a509`](https://github.com/maidsafe/safe_network/commit/a65a5093e55b233dc4fa1293217d6bcd55a9d731))
+    - remove some code duplication ([`a7f017c`](https://github.com/maidsafe/safe_network/commit/a7f017cc55da5cba53e8f10063afefc61ea5635a))
+    - improve namings ([`a0b2df5`](https://github.com/maidsafe/safe_network/commit/a0b2df5a0b12c70872dfc854d660afd0cf8b21aa))
+    - use latest sdkg ([`09c4891`](https://github.com/maidsafe/safe_network/commit/09c48916a7f2145c1d3cd091d6219fb7150fe1c2))
+    - update cargo sn_sdkg dep ([`7654f58`](https://github.com/maidsafe/safe_network/commit/7654f58dbde0c44fd799da16b2a3c4e3a73217df))
+    - wait a safe 5 chain len before removing old dkgs ([`45072a6`](https://github.com/maidsafe/safe_network/commit/45072a674021efe9efd1eeaf5f372b8a8bfba4c8))
+    - compile after rebase ([`9a1cdf6`](https://github.com/maidsafe/safe_network/commit/9a1cdf6f0135ce53f43a48c4346aff9023ccad33))
+    - keep old DKG sessions for 2 more section churns ([`1c27773`](https://github.com/maidsafe/safe_network/commit/1c277731397527b26b8e5edb16d9a5ffda7243d7))
+    - split barrier race condition ([`85d3361`](https://github.com/maidsafe/safe_network/commit/85d3361b3c4b9f66a456a26671406660e641e41f))
+    - section info agreement using sap gen to check candidates ([`01c8f5d`](https://github.com/maidsafe/safe_network/commit/01c8f5d799fce7bf3b8600042587626900940d01))
+    - cargo dep rev ([`269245f`](https://github.com/maidsafe/safe_network/commit/269245f3289c8d4f482e101aad809a325d67ed7c))
+    - use sn_sdkg github dependency and clippy ([`cbf5ed4`](https://github.com/maidsafe/safe_network/commit/cbf5ed4b1065d5d4471bc27291c054f48b64678e))
+    - github sn_dkg dependency ([`3d72e4b`](https://github.com/maidsafe/safe_network/commit/3d72e4b71c079f7ddd8be08642165e53ebf987f6))
+    - gossip DKG termination to trigger handover ([`f4b5d6b`](https://github.com/maidsafe/safe_network/commit/f4b5d6b207a0874621d777582ca5906e69196e06))
+    - selfish handover issue and limit known msg reprocessing ([`5280460`](https://github.com/maidsafe/safe_network/commit/5280460bb43a013d8273e5c30742c71596e4799a))
+    - clippy ([`e1e161b`](https://github.com/maidsafe/safe_network/commit/e1e161ba54ed8e0af298814f0da5b953ff053c93))
+    - compile after rebase ([`9992d97`](https://github.com/maidsafe/safe_network/commit/9992d9701ecadff2b7682e47387014b9d11dba63))
+    - outdated gossip AE ([`45d194d`](https://github.com/maidsafe/safe_network/commit/45d194d4d5927450a91a73c776c68871e857d48c))
+    - dkg start miss handling ([`3ed0e01`](https://github.com/maidsafe/safe_network/commit/3ed0e0167d5bec04d6c57d94ce1a63d1f043a1a0))
+    - dkg gossip ([`40fa4d9`](https://github.com/maidsafe/safe_network/commit/40fa4d9c0308c1104aaff60890bd48e08c8508b2))
+    - logging improvement ([`f4c3808`](https://github.com/maidsafe/safe_network/commit/f4c3808f582cf06d58303383296af4ab7a13f0df))
+    - invalid signature during plit DKGs ([`30fa400`](https://github.com/maidsafe/safe_network/commit/30fa400d2fa1d5029f5e0190c506cc92b0bcdf09))
+    - bls key upgrade issue, more logs ([`22a0de0`](https://github.com/maidsafe/safe_network/commit/22a0de0e3bd8478a10729112ec1b3bce9ba5cb90))
+    - cleanup old DKG sessions when a Handover is complete ([`69dce88`](https://github.com/maidsafe/safe_network/commit/69dce88a25254dd84a98ea9571ffccef17208744))
+    - some necessary cleanup ([`ba859ae`](https://github.com/maidsafe/safe_network/commit/ba859ae5f064d6dc15aa563ee956a26e85df1d45))
+    - compiling sdkg integration ([`f5d53c1`](https://github.com/maidsafe/safe_network/commit/f5d53c188a03150a06bdee97fb585f7900b7c251))
+    - sn_dkg integration ([`b647469`](https://github.com/maidsafe/safe_network/commit/b6474691ea6af5ee441b02f6cb9c3cf2b8f97459))
+    - client retry spend on unknown section key ([`5c8b1f5`](https://github.com/maidsafe/safe_network/commit/5c8b1f50d1bf346d45bd2a9faf92bbf33cb448da))
+    - move test_utils module ([`072c5d4`](https://github.com/maidsafe/safe_network/commit/072c5d4c5de7810a0837144853435e2ff2d091d0))
+    - move build_spent_proof_share to sn_interface ([`6108807`](https://github.com/maidsafe/safe_network/commit/610880711da814c7717c665e9cb34a729bda5797))
+    - get public commitments from sn_dbc ([`1152b27`](https://github.com/maidsafe/safe_network/commit/1152b2764e955edd80fb33921a8d8fe52654a896))
+    - add nightly fixes ([`2e93714`](https://github.com/maidsafe/safe_network/commit/2e937145c39039ee55505f00637cf484943f4471))
+    - remove unused rs files ([`80446f5`](https://github.com/maidsafe/safe_network/commit/80446f5d9df88d5915dcf1d3ea2c213c22e40c14))
+    - remove unused rs files ([`3f52833`](https://github.com/maidsafe/safe_network/commit/3f52833a8ce977aa79268ecaac61070f01e9c374))
+    - add nightly fixes ([`77cb17c`](https://github.com/maidsafe/safe_network/commit/77cb17c41bbf258c3f1b16934c4c71b5e5ad2456))
+    - minor refactoring and fixing issue reported by new clippy version ([`c7de082`](https://github.com/maidsafe/safe_network/commit/c7de08209c659ec93557d6ea10e0bcd8c3b74d8b))
+    - Merge #1557 ([`6cac22a`](https://github.com/maidsafe/safe_network/commit/6cac22af4994651719f64bc76391d729a3efb656))
+    - remove spend retry on client ([`100e2ae`](https://github.com/maidsafe/safe_network/commit/100e2ae70d21e141e1ebbc324f8b06e3d3f1a01c))
+    - spend with updated network knowledge ([`230a6ed`](https://github.com/maidsafe/safe_network/commit/230a6ed7f1f4193fa36b2fbb83bea072f4944c1d))
+    - remove redundant genesis_key argument in `NetworkKnowledge` constructor ([`e973eee`](https://github.com/maidsafe/safe_network/commit/e973eee96c9065ce87a1fa65ae45d9be8d6f940c))
+    - bundle proof chain, SAP into `SectionTreeUpdate` ([`60e333d`](https://github.com/maidsafe/safe_network/commit/60e333d4ced688f3382cde513300d38790613692))
+    - retry dbc spend on unknown section key ([`057ce1c`](https://github.com/maidsafe/safe_network/commit/057ce1ce1e174102e23d96cfcd2ab1d090a6f1dc))
+    - dbc spend can update network knowledge ([`2020ef1`](https://github.com/maidsafe/safe_network/commit/2020ef1a91c8520abc4bb74d3de6385b8cd283b4))
+    - pull out will-be-elder check into node ([`6343b6f`](https://github.com/maidsafe/safe_network/commit/6343b6fd21fe3bf81412d922da5e14b2c8b6f3c5))
+    - add node helper for updating net_know ([`0176a56`](https://github.com/maidsafe/safe_network/commit/0176a56a311dd8450f7cd845bc37cc28a7b11c0d))
+    - remove unused genesis parameter ([`8bf032f`](https://github.com/maidsafe/safe_network/commit/8bf032fff0ba48816311d6ea6967e3c300aedccf))
+    - Merge #1527 ([`1f06d6e`](https://github.com/maidsafe/safe_network/commit/1f06d6e90da6f889221f37cc8eac32b6933a94ba))
+    - optimizations and code cleanup ([`03da7f6`](https://github.com/maidsafe/safe_network/commit/03da7f67fff1fa5bb06d60a66dfdb531506dec4c))
+    - ignore update if we don't have KeyShare ([`4884c51`](https://github.com/maidsafe/safe_network/commit/4884c511d302522aa408ebf9350a7ff6cefeecb7))
+    - custom Serializer, Deserializer for `SectionsDAG` ([`864c023`](https://github.com/maidsafe/safe_network/commit/864c023e26697a609a9ad230c04e7aef7416650c))
+    - enable `SectionTree` proptest ([`859fc30`](https://github.com/maidsafe/safe_network/commit/859fc30fa70ce41ceb910e0352c71dda5c5501ce))
+    - replace `SecuredLinkedList` with `SectionsDAG` ([`0cd47ad`](https://github.com/maidsafe/safe_network/commit/0cd47ad56e0d93e3e99feb0dfcea8094f871ff6f))
+</details>
+
+## v0.71.0 (2022-09-19)
+
+### Chore
+
+ - <csr-id-a8a9fb90791b29496e8559090dca4161e04054da/> sn_interface-0.15.0/sn_dysfunction-0.14.0/sn_client-0.76.0/sn_node-0.71.0/sn_api-0.74.0/sn_cli-0.67.0
+ - <csr-id-a0bc2562df4f427752ec0f3ab85d9befe2d20050/> cleanup unused deps
+ - <csr-id-84cedf30fff0cc298f9f658d2c58499990967fe4/> remove unused back-pressure code
+
+### Bug Fixes
+
+ - <csr-id-f1b7d17651fa105d2864059ce52a429f8b329af0/> pass id of parent to cmd
+
+### Refactor (BREAKING)
+
+ - <csr-id-2d1221999b959bf4d0879cf42050d5e1e3119445/> flattening up ServiceMsg::ServiceError and ServiceMsg::CmdError types
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 5 commits contributed to the release over the course of 4 calendar days.
+ - 9 days passed between releases.
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.15.0/sn_dysfunction-0.14.0/sn_client-0.76.0/sn_node-0.71.0/sn_api-0.74.0/sn_cli-0.67.0 ([`a8a9fb9`](https://github.com/maidsafe/safe_network/commit/a8a9fb90791b29496e8559090dca4161e04054da))
+    - flattening up ServiceMsg::ServiceError and ServiceMsg::CmdError types ([`2d12219`](https://github.com/maidsafe/safe_network/commit/2d1221999b959bf4d0879cf42050d5e1e3119445))
+    - cleanup unused deps ([`a0bc256`](https://github.com/maidsafe/safe_network/commit/a0bc2562df4f427752ec0f3ab85d9befe2d20050))
+    - remove unused back-pressure code ([`84cedf3`](https://github.com/maidsafe/safe_network/commit/84cedf30fff0cc298f9f658d2c58499990967fe4))
+    - pass id of parent to cmd ([`f1b7d17`](https://github.com/maidsafe/safe_network/commit/f1b7d17651fa105d2864059ce52a429f8b329af0))
+</details>
+
+## v0.70.0 (2022-09-09)
+
+### Chore
+
+ - <csr-id-448694176dd3b40a12bd8ecc16d9bb66fd171a37/> sn_interface-0.14.0/sn_dysfunction-0.13.0/sn_client-0.75.0/sn_node-0.70.0/sn_api-0.73.0/sn_cli-0.66.0
+
+### New Features
+
+ - <csr-id-7c8b022a53adbfb3abdd31a56f47bedc53031d1d/> set statemap as default in sn_node; docs in README
+ - <csr-id-1601027ae1d88ef282a00cccdf2b01490c3e5224/> remove unnecessary double init for handover
+ - <csr-id-ece2514375980140cf2adc5c263cd3878d6e1dc6/> don't HandlePeerFailedSend for ServiceMsgs
+
+### Bug Fixes
+
+ - <csr-id-829f9fbfefc001e73d1aa6a00c4c6ac5de4c87d3/> add missing back-pressure feature gate to code
+
+### Refactor
+
+ - <csr-id-5e70a7afff0d0969143d75f92ce82a02bc40a7b8/> avoiding unnecessary operation id generation upon query response at elder
+
+### Chore (BREAKING)
+
+ - <csr-id-927931c9eb833df3e589d72affc4839ba57b5cc2/> removing unused SystemMsg::NodeMsgError msg type
+
+### New Features (BREAKING)
+
+ - <csr-id-7bedb7bb7614a8af05f5892a28ff4732e87d4796/> return an error to the client when it cannot accept a query
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 10 commits contributed to the release over the course of 1 calendar day.
+ - 1 day passed between releases.
+ - 8 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.14.0/sn_dysfunction-0.13.0/sn_client-0.75.0/sn_node-0.70.0/sn_api-0.73.0/sn_cli-0.66.0 ([`4486941`](https://github.com/maidsafe/safe_network/commit/448694176dd3b40a12bd8ecc16d9bb66fd171a37))
+    - add missing back-pressure feature gate to code ([`829f9fb`](https://github.com/maidsafe/safe_network/commit/829f9fbfefc001e73d1aa6a00c4c6ac5de4c87d3))
+    - avoiding unnecessary operation id generation upon query response at elder ([`5e70a7a`](https://github.com/maidsafe/safe_network/commit/5e70a7afff0d0969143d75f92ce82a02bc40a7b8))
+    - removing unused SystemMsg::NodeMsgError msg type ([`927931c`](https://github.com/maidsafe/safe_network/commit/927931c9eb833df3e589d72affc4839ba57b5cc2))
+    - return an error to the client when it cannot accept a query ([`7bedb7b`](https://github.com/maidsafe/safe_network/commit/7bedb7bb7614a8af05f5892a28ff4732e87d4796))
+    - set statemap as default in sn_node; docs in README ([`7c8b022`](https://github.com/maidsafe/safe_network/commit/7c8b022a53adbfb3abdd31a56f47bedc53031d1d))
+    - Merge #1559 ([`e762528`](https://github.com/maidsafe/safe_network/commit/e762528eabf076148b5c6767e61b16901681bffe))
+    - remove unnecessary double init for handover ([`1601027`](https://github.com/maidsafe/safe_network/commit/1601027ae1d88ef282a00cccdf2b01490c3e5224))
+    - Merge branch 'main' into Chore-ClientRetriesOnDataNotFound ([`bbca976`](https://github.com/maidsafe/safe_network/commit/bbca97680840e1069c88278fe14ddee153b97dbb))
+    - don't HandlePeerFailedSend for ServiceMsgs ([`ece2514`](https://github.com/maidsafe/safe_network/commit/ece2514375980140cf2adc5c263cd3878d6e1dc6))
+</details>
+
+## v0.69.0 (2022-09-07)
+
+### Chore
+
+ - <csr-id-fe659c5685289fe0071b54298dcac394e83c0dce/> sn_interface-0.13.0/sn_dysfunction-0.12.0/sn_client-0.74.0/sn_node-0.69.0/sn_api-0.72.0/sn_cli-0.65.0
+ - <csr-id-84bfdaaf5b0df86912fef806dcb04f353e828b69/> pass by reference instead of by value
+
+### Bug Fixes
+
+ - <csr-id-4dcbd154698c5f7302502490724150e8eefe32af/> avoid using timeout to handle ContentNotFound
+   Instead of waiting for another adult to respond, return the error.
+   
+   The requeueing is ineffective since the node will not respond again and
+   the operation will linger in the cache until it expires.
+
+### Refactor
+
+ - <csr-id-638bcdfea4cbc713d8a4faecec7ed8538317fa29/> minor refactor to Capacity functions impl, plus removing unused fns
+
+### New Features (BREAKING)
+
+ - <csr-id-d671f4ee4c76b42187d266aee99351114acf6cd7/> report any error occurred when handling a service msg back to the client
+   - Removing several unused sn_node::Error types.
+   - Adapting sn_api wallet and sn_node spentbook unit tests for new error msgs/cmds.
+
+### Refactor (BREAKING)
+
+ - <csr-id-0c49daf5dbfad2593ccf13cb114841045688ffed/> removing unused Error types
+   - Minor refactor to how we convert sn_node modules Error types to sn_interface::Error types.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release.
+ - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.13.0/sn_dysfunction-0.12.0/sn_client-0.74.0/sn_node-0.69.0/sn_api-0.72.0/sn_cli-0.65.0 ([`fe659c5`](https://github.com/maidsafe/safe_network/commit/fe659c5685289fe0071b54298dcac394e83c0dce))
+    - minor refactor to Capacity functions impl, plus removing unused fns ([`638bcdf`](https://github.com/maidsafe/safe_network/commit/638bcdfea4cbc713d8a4faecec7ed8538317fa29))
+    - avoid using timeout to handle ContentNotFound ([`4dcbd15`](https://github.com/maidsafe/safe_network/commit/4dcbd154698c5f7302502490724150e8eefe32af))
+    - pass by reference instead of by value ([`84bfdaa`](https://github.com/maidsafe/safe_network/commit/84bfdaaf5b0df86912fef806dcb04f353e828b69))
+    - removing unused Error types ([`0c49daf`](https://github.com/maidsafe/safe_network/commit/0c49daf5dbfad2593ccf13cb114841045688ffed))
+    - report any error occurred when handling a service msg back to the client ([`d671f4e`](https://github.com/maidsafe/safe_network/commit/d671f4ee4c76b42187d266aee99351114acf6cd7))
+</details>
+
 ## v0.68.0 (2022-09-06)
+
+<csr-id-d28fdf3ddd0a39f7bbc6426e1e71d990319b0ec7/>
+<csr-id-bcbca889993268429636b003c5ae50ed6cbda527/>
+<csr-id-dd89cac97da96ffe26ae78c4b7b62aa952ec53fc/>
+<csr-id-921438659ccaf65b2ea8cc00efb61d8146ef71ef/>
+<csr-id-933f4282fce2e28a1956fd1b50cc8061a68e1515/>
+<csr-id-b040ea14e53247094838de6f1fa9af2830b051fa/>
+<csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/>
+<csr-id-906625895228de811515e7b71d5f55d067964d24/>
+<csr-id-7d8956a8d7ac2bf0961b90b19c48e89dda6cfb21/>
+<csr-id-39dd5a043c75492e416bb9371015a1365b06fa01/>
+<csr-id-183d7f83985a36deeb5933ae9b1880df21da2866/>
+<csr-id-070f7d8902c3bbc2a88b3be1a8f44de3c2726df6/>
+<csr-id-4a9d4c4bdc8f81d11ea78f888368f64d76754d8e/>
+<csr-id-63958a8629c9fbca8e6604edb17d9b61ca92a4ee/>
+<csr-id-9f9a95614991197b240b3c1a363eb4e5946d3fae/>
+<csr-id-62bc8d6d24b7c82bd3a27ceb43cd53d8077ff6b2/>
+<csr-id-277d925aa3ed5ff01eab8c1d2488f653cfe6effc/>
+<csr-id-a6685348578fe546576bd13405e6485d984b3487/>
+<csr-id-ed9f627d0e2c42ab1b7386888cced751ae28f98a/>
+<csr-id-5b73b33b683991be9e9f6440c3d8d568edab3ad6/>
+<csr-id-b7530feb40987f433ff12c5176cfdbc375359dc6/>
 
 ### Chore
 
@@ -28,6 +1151,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    interfaces.
  - <csr-id-3a718d8c0957957a75250b044c9d1ad1b5874ab0/> switch on clippy::unwrap_used as a warning
 
+
+### Chore
+
+ - <csr-id-1b9e0a6564e9564201ef3a3e04adb0bfbef6ac14/> sn_interface-0.12.0/sn_dysfunction-0.11.0/sn_client-0.73.0/sn_node-0.68.0/sn_api-0.71.0/sn_cli-0.64.0
 
 ### New Features
 
@@ -112,10 +1239,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 35 commits contributed to the release over the course of 7 calendar days.
+ - 41 commits contributed to the release over the course of 8 calendar days.
  - 8 days passed between releases.
- - 32 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 33 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -124,8 +1251,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.12.0/sn_dysfunction-0.11.0/sn_client-0.73.0/sn_node-0.68.0/sn_api-0.71.0/sn_cli-0.64.0 ([`1b9e0a6`](https://github.com/maidsafe/safe_network/commit/1b9e0a6564e9564201ef3a3e04adb0bfbef6ac14))
     - update qp2p to use UsrMsgBytes and avoid reserializing bytes ([`f5361d9`](https://github.com/maidsafe/safe_network/commit/f5361d91f8215585651229eb6dc2535f2ecb631c))
     - Merge #1545 ([`b62c056`](https://github.com/maidsafe/safe_network/commit/b62c056b0b28f67a40d9e036b2d64b36fd5380bd))
+    - Merge #1544 ([`e8202a6`](https://github.com/maidsafe/safe_network/commit/e8202a6ea8c07f8ae0a04273b2cda350758352ab))
     - always resend query to adults ([`7c207e4`](https://github.com/maidsafe/safe_network/commit/7c207e407533c09108ae6668d51b398caf896f0f))
     - update qp2p for unique ids ([`6bdc822`](https://github.com/maidsafe/safe_network/commit/6bdc82295dfdcaa617c7c1e36d2b72f085e50042))
     - sn_interface-0.11.0/sn_dysfunction-0.10.0/sn_client-0.72.0/sn_node-0.67.0/sn_api-0.70.0/sn_cli-0.63.0 ([`d28fdf3`](https://github.com/maidsafe/safe_network/commit/d28fdf3ddd0a39f7bbc6426e1e71d990319b0ec7))
@@ -135,11 +1264,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - replace implicit clones with clone ([`dd89cac`](https://github.com/maidsafe/safe_network/commit/dd89cac97da96ffe26ae78c4b7b62aa952ec53fc))
     - unneeded iter methods removal ([`9214386`](https://github.com/maidsafe/safe_network/commit/921438659ccaf65b2ea8cc00efb61d8146ef71ef))
     - small tweaks; clippy::equatable_if_let ([`39dd5a0`](https://github.com/maidsafe/safe_network/commit/39dd5a043c75492e416bb9371015a1365b06fa01))
+    - Merge #1525 ([`6884257`](https://github.com/maidsafe/safe_network/commit/6884257ae51616949b0dfaefaa47fcdd090a7d54))
     - unit tests for register storage key internal helper functions ([`277d925`](https://github.com/maidsafe/safe_network/commit/277d925aa3ed5ff01eab8c1d2488f653cfe6effc))
     - skip spentbook register creation if it already exists ([`183d7f8`](https://github.com/maidsafe/safe_network/commit/183d7f83985a36deeb5933ae9b1880df21da2866))
     - improving internal helpers in register storage mod to reuse some logic/code ([`a668534`](https://github.com/maidsafe/safe_network/commit/a6685348578fe546576bd13405e6485d984b3487))
     - optimise the way we apply and save replicated Register cmds on local storage ([`070f7d8`](https://github.com/maidsafe/safe_network/commit/070f7d8902c3bbc2a88b3be1a8f44de3c2726df6))
+    - Merge #1535 ([`7327112`](https://github.com/maidsafe/safe_network/commit/7327112da76871d52b5039546419ab18e41982f8))
     - fix time alignment; more states; mv to sn_interface ([`08a0a8e`](https://github.com/maidsafe/safe_network/commit/08a0a8eb75a0ca9d51fa321686d17dbcf97fc04e))
+    - Merge #1536 ([`5194123`](https://github.com/maidsafe/safe_network/commit/519412319c9b7504c97cbeae6e398a210226d14e))
     - send adult -> elder ae probes before split ([`d20f4e0`](https://github.com/maidsafe/safe_network/commit/d20f4e0aed02f99d44d5d1407bb7a42b67baf878))
     - remove stopped state from CmdCtrl ([`4a9d4c4`](https://github.com/maidsafe/safe_network/commit/4a9d4c4bdc8f81d11ea78f888368f64d76754d8e))
     - move probe creation to network knowledge ([`63958a8`](https://github.com/maidsafe/safe_network/commit/63958a8629c9fbca8e6604edb17d9b61ca92a4ee))
@@ -152,6 +1284,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - better colors ([`1abeb80`](https://github.com/maidsafe/safe_network/commit/1abeb803bfb7effbbb23d1fad75b341d2f3c9402))
     - some minimal infrastructure for generating statemaps ([`8badef3`](https://github.com/maidsafe/safe_network/commit/8badef313d6f78e0183402983120f2184c130407))
     - sn_interface lints and fixes ([`b040ea1`](https://github.com/maidsafe/safe_network/commit/b040ea14e53247094838de6f1fa9af2830b051fa))
+    - Merge #1521 ([`755c9c1`](https://github.com/maidsafe/safe_network/commit/755c9c1653dd7b700fa1f7d25269cf1352f18f3c))
     - Merge branch 'main' into avoid_testing_data_collision ([`60c368b`](https://github.com/maidsafe/safe_network/commit/60c368b8494eaeb219572c2304bf787a168cfee0))
     - avoid testing data collision during bench test ([`fec85db`](https://github.com/maidsafe/safe_network/commit/fec85dbc3b857458de5c09a02490eab7c1227b40))
     - switch on clippy::unwrap_used as a warning ([`3a718d8`](https://github.com/maidsafe/safe_network/commit/3a718d8c0957957a75250b044c9d1ad1b5874ab0))
@@ -330,10 +1463,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 5 commits contributed to the release over the course of 2 calendar days.
+ - 6 commits contributed to the release over the course of 2 calendar days.
  - 3 days passed between releases.
  - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -344,6 +1477,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  * **Uncategorized**
     - sn_interface-0.10.2/sn_client-0.71.1/sn_node-0.66.2/sn_cli-0.62.1 ([`2b26820`](https://github.com/maidsafe/safe_network/commit/2b268209e6910472558145a5d08b99e968550221))
     - implement `SecuredLinkedList` as a `MerkleRegister` ([`7cc2a00`](https://github.com/maidsafe/safe_network/commit/7cc2a00907381e93db266f31545b12ff76907e5d))
+    - Merge #1512 ([`3ca0038`](https://github.com/maidsafe/safe_network/commit/3ca0038a32539cf20b61292661b755886d02717e))
     - return error to client on unknown section key ([`b87617e`](https://github.com/maidsafe/safe_network/commit/b87617e44e9b20b8a79864e30e29ecee86444352))
     - unit tests for spentbook handler ([`b587893`](https://github.com/maidsafe/safe_network/commit/b587893737bc51aee483f7cd53da782036dd6c5e))
     - removing unnecessary dbs layer from node storage implementation ([`69b4597`](https://github.com/maidsafe/safe_network/commit/69b45973a58f9a866984b660fa13fef50d9f906e))
@@ -398,7 +1532,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - 12 commits contributed to the release.
  - 1 day passed between releases.
  - 12 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -521,8 +1655,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - 31 commits contributed to the release over the course of 8 calendar days.
  - 9 days passed between releases.
- - 29 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 28 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -553,7 +1687,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Update README.md ([`0af715e`](https://github.com/maidsafe/safe_network/commit/0af715e7f647ccae745c8adb41119be66af109a9))
     - increase data query limit ([`9f64d68`](https://github.com/maidsafe/safe_network/commit/9f64d681e285de57a54f571e98ff68f1bf39b6f1))
     - initialise flow control earlier ([`2936bf2`](https://github.com/maidsafe/safe_network/commit/2936bf28e56e0086e687bd99979aa4b1c3bde1e3))
-    - run periodic checks on time ([`93a13d8`](https://github.com/maidsafe/safe_network/commit/93a13d896343f746718be228c46a37b03d6618bb))
+    - chore: run periodic checks on time Instead of running when connection arrives. ([`93a13d8`](https://github.com/maidsafe/safe_network/commit/93a13d896343f746718be228c46a37b03d6618bb))
     - refactor CmdCtrl, naming and remove retries ([`9fa9989`](https://github.com/maidsafe/safe_network/commit/9fa9989657d6a272b5041008d7daf4281db39298))
     - do not merge client requests to different adult indexes ([`b2c1cd4`](https://github.com/maidsafe/safe_network/commit/b2c1cd4f32c54c249aaaf932df014f50268bed0c))
     - clean up unused functionality ([`11b8182`](https://github.com/maidsafe/safe_network/commit/11b8182a3de636a760d899cb15d7184d8153545a))
@@ -946,10 +2080,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 158 commits contributed to the release over the course of 31 calendar days.
+ - 160 commits contributed to the release over the course of 32 calendar days.
  - 32 days passed between releases.
- - 154 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 134 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -988,7 +2122,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - gradually slowdown when send to peer too fast ([`98279c2`](https://github.com/maidsafe/safe_network/commit/98279c2243ec2c5351947e26650d64dc5bf81797))
     - removing Token from sn_interfaces::type as it is now exposed by sn_dbc ([`dd2eb21`](https://github.com/maidsafe/safe_network/commit/dd2eb21352223f6340064e0021f4a7df402cd5c9))
     - make cmd ctrl response quicker ([`0d5ddf0`](https://github.com/maidsafe/safe_network/commit/0d5ddf04001fc65c05865cf2a2ea08cd3cd45615))
-    - organise usings, cleanup ([`8242f2f`](https://github.com/maidsafe/safe_network/commit/8242f2f1035b1c0718e53954951badffa30f3393))
+    - chore(style): organise usings, cleanup - Removes some boilerplate, using fn of `Cmd` to instantiate a send cmd. - Housekeeping, continuing to minimize bloat of usings, by colocating them. - Housekeeping, continuing keeping positions of usings in a file according to a system, from closest (self) on top, down to furthest away (3rd part). ([`8242f2f`](https://github.com/maidsafe/safe_network/commit/8242f2f1035b1c0718e53954951badffa30f3393))
     - use matches! macros, minor refactoring ([`848dba4`](https://github.com/maidsafe/safe_network/commit/848dba48e5959d0b9cfe182fde2f12ede71ba9c2))
     - remove unused async/await ([`35483b3`](https://github.com/maidsafe/safe_network/commit/35483b3f322eeea2c10427e94e4750a8269811c0))
     - remove NetworkPrefxiMap::genesis_key, NetworkKnowledge::genesis_key ([`820fcc9`](https://github.com/maidsafe/safe_network/commit/820fcc9a77f756fca308f247c3ea1b82f65d30b9))
@@ -1002,17 +2136,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - improve Display, Debug impl for Traceroute ([`0a653e4`](https://github.com/maidsafe/safe_network/commit/0a653e4becc4a8e14ffd6d0752cf035430067ce9))
     - improve traceroute readability and other improvements ([`9789797`](https://github.com/maidsafe/safe_network/commit/9789797e3f773285f23bd22957fe45a67aabec24))
     - add traceroute for AE system messages ([`8e626f9`](https://github.com/maidsafe/safe_network/commit/8e626f9fabbb07a126199ea5481e2ac524cbae0d))
-    - make the content explicit ([`366719f`](https://github.com/maidsafe/safe_network/commit/366719f9e158fb35093382739d48cdb8dac65b60))
-    - use correct data address type ([`cebf37e`](https://github.com/maidsafe/safe_network/commit/cebf37ea8ef44c51ce84646a83a5d1e6dcab3e7a))
-    - cleanup unnecessary options and results ([`db22c6c`](https://github.com/maidsafe/safe_network/commit/db22c6c8c1aedb347bea52199a5673695eff86f8))
-    - reduce file db error logs ([`2809ed1`](https://github.com/maidsafe/safe_network/commit/2809ed1177c416f933f3869bd11607c4e5e6a908))
-    - add actual id of parent ([`ec62534`](https://github.com/maidsafe/safe_network/commit/ec625349494b267d24c80fd4c8b176b4524f48cd))
-    - do not require node write lock on query ([`a0c89ff`](https://github.com/maidsafe/safe_network/commit/a0c89ff0e451d2e5dd13fc29635075097f2c7b94))
+    - feat(churnid): make the content explicit We previously allowed any length vec, while we only based it on signatures. Therefore, we could restrict it to the signature contents boundary. ([`366719f`](https://github.com/maidsafe/safe_network/commit/366719f9e158fb35093382739d48cdb8dac65b60))
+    - fix(file_store): use correct data address type The type including `SafeKey` had been incorrectly used (since it is not a network side concept), which caused a lot of `Result` return values bloating the call tree unecessarily. ([`cebf37e`](https://github.com/maidsafe/safe_network/commit/cebf37ea8ef44c51ce84646a83a5d1e6dcab3e7a))
+    - chore: cleanup unnecessary options and results These were remaining in places where there was no path for None or Error. Cleaning these up removes accidental complexity. ([`db22c6c`](https://github.com/maidsafe/safe_network/commit/db22c6c8c1aedb347bea52199a5673695eff86f8))
+    - chore: reduce file db error logs Listing files on a path that doesn't yet exist, resulted in lots of unnecessary error logs. ([`2809ed1`](https://github.com/maidsafe/safe_network/commit/2809ed1177c416f933f3869bd11607c4e5e6a908))
+    - fix(cmd_ctrl): add actual id of parent It tried to add parent id of parent, which would always be None. ([`ec62534`](https://github.com/maidsafe/safe_network/commit/ec625349494b267d24c80fd4c8b176b4524f48cd))
+    - refactor: do not require node write lock on query This creates the `AddToPendingQieries` cmd, which adds asyncly to the list. Also cleans up the `read_data_from_adults` fn a bit. ([`a0c89ff`](https://github.com/maidsafe/safe_network/commit/a0c89ff0e451d2e5dd13fc29635075097f2c7b94))
     - remove optional field ([`0f07efd`](https://github.com/maidsafe/safe_network/commit/0f07efd9ef0b75de79f27772566b013bc886bcc8))
-    - remove more unused code ([`db4f4d0`](https://github.com/maidsafe/safe_network/commit/db4f4d07b155d732ad76d263563d81b5fee535f7))
-    - clarify fn signatures ([`08af2a6`](https://github.com/maidsafe/safe_network/commit/08af2a6ac3485a696d2a1e799af588943f207e6b))
-    - simplify send msg ([`ff1a10b`](https://github.com/maidsafe/safe_network/commit/ff1a10b4aa2b41b7028949101504a29b52927e71))
-    - Merge #1427 ([`949ee11`](https://github.com/maidsafe/safe_network/commit/949ee111717c8f07487f3f4db6fbc0043583916d))
+    - refactor(messaging): remove more unused code More reuse of methods to replace duplication of code. Deprecates delivery group, since it is no longer used. Also, `DstLocation` and `SrcLocation` are removed. BREAKING CHANGE: WireMsg public type is changed. ([`db4f4d0`](https://github.com/maidsafe/safe_network/commit/db4f4d07b155d732ad76d263563d81b5fee535f7))
+    - chore: clarify fn signatures Return single cmd when only one can be returned. Remove some unnecessary Results. Also fixes insufficient adults error being triggered falsely. ([`08af2a6`](https://github.com/maidsafe/safe_network/commit/08af2a6ac3485a696d2a1e799af588943f207e6b))
+    - refactor(send): simplify send msg This places signing and wire msg instantiation in one location, and removes lots of old variables that aren't used in the flow anymore. ([`ff1a10b`](https://github.com/maidsafe/safe_network/commit/ff1a10b4aa2b41b7028949101504a29b52927e71))
     - delete commented out tests ([`080f9ef`](https://github.com/maidsafe/safe_network/commit/080f9ef83005ebda9e1c96b228f3d5096fd79b81))
     - use sn_dbc::SpentProof API for verifying SpentProofShares ([`e0fb940`](https://github.com/maidsafe/safe_network/commit/e0fb940b24e87d86fe920095176362f73503ce79))
     - create query cmd for healthcheck ([`22f4f15`](https://github.com/maidsafe/safe_network/commit/22f4f1512da8f9a2245addf379477823364edd6c))
@@ -1025,7 +2158,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - remove the write lock on node while validating msgs ([`5a5f0f4`](https://github.com/maidsafe/safe_network/commit/5a5f0f4608c27f463178f4a560f1f9b4c020e764))
     - Revert "feat: make traceroute default for now" ([`e9b97c7`](https://github.com/maidsafe/safe_network/commit/e9b97c72b860053285ba866b098937f6b25d99bf))
     - having spent proofs and Txs within SpentbookCmd::Send msg to be a set instead of a vec ([`d3a05a7`](https://github.com/maidsafe/safe_network/commit/d3a05a728be8752ea9ebff4e38e7c4c85e5db09b))
-    - make Sign of NodeMsgs higher prio as this could hold them back before sending ([`83a3a98`](https://github.com/maidsafe/safe_network/commit/83a3a98a6972c9a1824e41cb87325b037b65938c))
+    - make Sign of SystemMsgs higher prio as this could hold them back before sending ([`83a3a98`](https://github.com/maidsafe/safe_network/commit/83a3a98a6972c9a1824e41cb87325b037b65938c))
     - consolidate join / leave into decision handling ([`47179e6`](https://github.com/maidsafe/safe_network/commit/47179e695a7f351d9298c5bdbea006abb26b8e89))
     - make traceroute default for now ([`175d1b9`](https://github.com/maidsafe/safe_network/commit/175d1b909dff8c6729ac7f156ce1d0d22be8cc12))
     - log parent job id during processing ([`9c855c1`](https://github.com/maidsafe/safe_network/commit/9c855c187465a0594cf18fb359a082742593a4d4))
@@ -1034,13 +2167,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - make `&mut self` methods `&self` ([`302fb95`](https://github.com/maidsafe/safe_network/commit/302fb954360521d40efab0e26fd31f8278a74755))
     - removed unused lru_cache module ([`70f3ecc`](https://github.com/maidsafe/safe_network/commit/70f3ecc367ca9450be038f8ff806f40c324d1b00))
     - only do connectivity test for failed sends via dysfunction ([`5a83a4f`](https://github.com/maidsafe/safe_network/commit/5a83a4ff08b7a3c2be0e3532589d209e72367d92))
-    - Cleanup non-joined member sessions, regardless of connected state ([`8efbd96`](https://github.com/maidsafe/safe_network/commit/8efbd96a5fd3907ace5ca6ac282027595fefd8ef))
+    - chore: Cleanup non-joined member sessions, regardless of connected state This reverts commit 7d12399edec6c1191c521528c1d569afc96bca99. ([`8efbd96`](https://github.com/maidsafe/safe_network/commit/8efbd96a5fd3907ace5ca6ac282027595fefd8ef))
     - improve the accuracy of data_storage bench tests ([`f200909`](https://github.com/maidsafe/safe_network/commit/f200909516739769d087b20712a33b5047858ba9))
     - remove one level of indentation ([`81f5e25`](https://github.com/maidsafe/safe_network/commit/81f5e252501174cb6367474a980b8a2a5da58dc2))
-    - reflect the semantics not the type ([`ea490dd`](https://github.com/maidsafe/safe_network/commit/ea490ddf749ac9e0c7962c3c21c053663e6b6ee7))
-    - expose known keys on network knowledge ([`35ebd8e`](https://github.com/maidsafe/safe_network/commit/35ebd8e872f9d9db16c42cbe8d61702f9660aece))
+    - chore(naming): reflect the semantics not the type The type is named Kind but the semantics of it is Auth. Often we mindlessly name things after the type names instead of what they represent in the domain. BREAKING CHANGE: fields of public msg renamed ([`ea490dd`](https://github.com/maidsafe/safe_network/commit/ea490ddf749ac9e0c7962c3c21c053663e6b6ee7))
+    - refactor: expose known keys on network knowledge The method can be called directly instead of passing known keys in the cmds. ([`35ebd8e`](https://github.com/maidsafe/safe_network/commit/35ebd8e872f9d9db16c42cbe8d61702f9660aece))
     - check for dst location to send to clients instead of msg authority type ([`042503a`](https://github.com/maidsafe/safe_network/commit/042503a7d44f94ed3f0ce482984744e175d7752b))
-    - remove unused get mut access ([`6ca512e`](https://github.com/maidsafe/safe_network/commit/6ca512e7adc6681bc85122847fa8ac08550cfb09))
+    - fix(datastorage): remove unused get mut access Gets/Reads should not mutate, and nothing here did require mut access, so it could be removed. ([`6ca512e`](https://github.com/maidsafe/safe_network/commit/6ca512e7adc6681bc85122847fa8ac08550cfb09))
     - whitespace + typo fix ([`bf2902c`](https://github.com/maidsafe/safe_network/commit/bf2902c18b900b8b4a8abae5f966d1e08d547910))
     - disable rejoins ([`a5028c5`](https://github.com/maidsafe/safe_network/commit/a5028c551d1b3db2c4c912c2897490e9a4b34a0d))
     - reduce re-join tests to one case ([`b492cc2`](https://github.com/maidsafe/safe_network/commit/b492cc25cfadf7dd3aaf3584cd5dbbd0dc8532ce))
@@ -1062,6 +2195,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - impl traceroute feature to trace a message's flow in the network ([`a6fb1fc`](https://github.com/maidsafe/safe_network/commit/a6fb1fc516a9ef6dae7aa236f3dd440d50697ae2))
     - fix outdated comm tests ([`893b4af`](https://github.com/maidsafe/safe_network/commit/893b4af340b0ced1a2b38dda07bd82cf833be776))
     - add OTLP support to sn_node bin ([`01ea9c0`](https://github.com/maidsafe/safe_network/commit/01ea9c0bdb88da4f181d8f1638f2f2ad692d0ca3))
+    - Merge #1364 ([`39e4341`](https://github.com/maidsafe/safe_network/commit/39e43415bd4da8298919640e4102dc41be3f8bed))
     - allow more log layers in future ([`a727dae`](https://github.com/maidsafe/safe_network/commit/a727daea6e5a01a24c9bcdbeef033d0622f4ba39))
     - remove cfg() directives ([`1db6648`](https://github.com/maidsafe/safe_network/commit/1db6648954987ebce4c91f8e29bbec4e54b75edf))
     - split logging init into functions ([`fa7dfa3`](https://github.com/maidsafe/safe_network/commit/fa7dfa342e90acd0a681110e149df4400a8f392e))
@@ -1071,12 +2205,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - broken links ([`e3c9099`](https://github.com/maidsafe/safe_network/commit/e3c90998e1abd10768e861370a65a934f52e2ec3))
     - increase Send priority, and tweak depending on DstLocation ([`feaca15`](https://github.com/maidsafe/safe_network/commit/feaca15b7c44297c16a4665ceec738226bb860ba))
     - remove one dir layer ([`9895a2b`](https://github.com/maidsafe/safe_network/commit/9895a2b9e82bdbf110a9805972290841860d1a49))
-    - extract test only used fns ([`1c7b47f`](https://github.com/maidsafe/safe_network/commit/1c7b47f48635bb7b0a8a13d01bb41b148e343ce8))
+    - refactor(node_api): extract test only used fns The api was only used in tests and can be moved to a separate struct. ([`1c7b47f`](https://github.com/maidsafe/safe_network/commit/1c7b47f48635bb7b0a8a13d01bb41b148e343ce8))
     - reduce number of Send retries in PeerSession ([`7d060f0`](https://github.com/maidsafe/safe_network/commit/7d060f0e92e3b250e3fe1e0523aa0c30b439e0be))
     - remove SendMsgDeliveryGroup Cmd ([`7a675f4`](https://github.com/maidsafe/safe_network/commit/7a675f4889c4ef01b9040773184ab2e0ed78b208))
     - use SendMsg for send_node_msg_to_nodes ([`c3778cd`](https://github.com/maidsafe/safe_network/commit/c3778cd77e0c9cbc407449afe713ff7cdb4b9909))
     - remove redundant generation field ([`f0d1abf`](https://github.com/maidsafe/safe_network/commit/f0d1abf6dd8731310b7749cd6cc7077886215997))
-    - remove one layer of indirection ([`f06a026`](https://github.com/maidsafe/safe_network/commit/f06a0260b058519ec858abf654cbce102eb00147))
+    - refactor: remove one layer of indirection `HandleNewEldersAgreement` variant of `Cmd` had an unnecessary wrapper of `Proposal` around the actual object being conveyed. ([`f06a026`](https://github.com/maidsafe/safe_network/commit/f06a0260b058519ec858abf654cbce102eb00147))
+    - Merge #1356 ([`d9b4608`](https://github.com/maidsafe/safe_network/commit/d9b46080ac849cac259983dc80b4b879e58c13ba))
     - drop RwLock guards after job is done ([`640b64d`](https://github.com/maidsafe/safe_network/commit/640b64d2b5f19df5f5439a8fce31a848a47526cd))
     - setup step for tests to reissue a set of DBCs from genesis only once ([`5c82df6`](https://github.com/maidsafe/safe_network/commit/5c82df633e7c062fdf761a8e6e0a7ae8d26cc73a))
     - increase CleanUpPeerLinks prio ([`fba2f76`](https://github.com/maidsafe/safe_network/commit/fba2f76ec23a00ca1da857e63af160a11904288c))
@@ -1088,10 +2223,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Merge #1324 #1345 #1346 ([`f664d79`](https://github.com/maidsafe/safe_network/commit/f664d797b56e7cbf03893c98d6c27d9c6d882be4))
     - reduce service msg response SendMsg cmds ([`900fa8c`](https://github.com/maidsafe/safe_network/commit/900fa8c4803e9e45a1471a32fb4fe5b8cdd5112b))
     - tweak some WireMsg.serialize calls to minimize them ([`a95be62`](https://github.com/maidsafe/safe_network/commit/a95be6277a9ee8d66eccd40711392325fac986e2))
-    - update for the split of HandleCmd ([`38d25d6`](https://github.com/maidsafe/safe_network/commit/38d25d6df71e3bb71e8efda50a4bf64345f69f81))
-    - validate w low prio before handling ([`c6999a9`](https://github.com/maidsafe/safe_network/commit/c6999a92d06f275f7506a24492bec50042466459))
-    - update for the split of HandleCmd ([`ae38fdc`](https://github.com/maidsafe/safe_network/commit/ae38fdce6499d8245025d7bd82fa6c583f04060d))
-    - validate w low prio before handling ([`6f781b9`](https://github.com/maidsafe/safe_network/commit/6f781b96da745839206352ae02c18b759b49f1f2))
+    - fix(tests): update for the split of HandleCmd Also removes order requirement of resulting cmds in one test, as the order is not a system requirement. ([`38d25d6`](https://github.com/maidsafe/safe_network/commit/38d25d6df71e3bb71e8efda50a4bf64345f69f81))
+    - feat(msgs): validate w low prio before handling Deserializes and validates at lower prio, to cut off an overload attack angle. After validity of msg has been established, the msg is dealt with according to its type prio. ([`c6999a9`](https://github.com/maidsafe/safe_network/commit/c6999a92d06f275f7506a24492bec50042466459))
+    - fix(tests): update for the split of HandleCmd Also removes order requirement of resulting cmds in one test, as the order is not a system requirement. ([`ae38fdc`](https://github.com/maidsafe/safe_network/commit/ae38fdce6499d8245025d7bd82fa6c583f04060d))
+    - feat(msgs): validate w low prio before handling Deserializes and validates at lower prio, to cut off an overload attack angle. After validity of msg has been established, the msg is dealt with according to its type prio. ([`6f781b9`](https://github.com/maidsafe/safe_network/commit/6f781b96da745839206352ae02c18b759b49f1f2))
     - use timestamp for log files ([`a856d78`](https://github.com/maidsafe/safe_network/commit/a856d788131ef85414ee1f42a868abcbbfc0d2b6))
     - unused async in CLI ([`6d237e5`](https://github.com/maidsafe/safe_network/commit/6d237e5e7d8306cb955f436910aa01ed7221cd84))
     - unused async in node/dkg etc ([`78be9fb`](https://github.com/maidsafe/safe_network/commit/78be9fb24cf66d9f8f06ac31895302eae875661e))
@@ -1116,6 +2251,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - relax when we track DkgIssues ([`f142bbb`](https://github.com/maidsafe/safe_network/commit/f142bbb0030233add4808427a2819ca386fef503))
     - Tweak dysf interval, reducing to report on issues more rapidly ([`e39917d`](https://github.com/maidsafe/safe_network/commit/e39917d0635a071625f7961ce6d40cb44cc65da0))
     - logging sn_consensus in CI, tweak section min and max elder age ([`879678e`](https://github.com/maidsafe/safe_network/commit/879678e986a722d216ee9a4f37e8ae398221a394))
+    - Merge branch 'main' into feat-cat-wallet-improvements ([`9409bf4`](https://github.com/maidsafe/safe_network/commit/9409bf42e99b4eb3da883f76c802e7dc6ea1a4a0))
 </details>
 
 ## v0.64.3 (2022-07-12)
@@ -1144,10 +2280,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
+ - 5 commits contributed to the release.
  - 1 day passed between releases.
  - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1157,6 +2293,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - sn_node-0.64.3 ([`5068b15`](https://github.com/maidsafe/safe_network/commit/5068b155ce42f0902f9f3847e8069dc415910f34))
+    - Merge branch 'main' into feat-cat-wallet-improvements ([`8e6eecf`](https://github.com/maidsafe/safe_network/commit/8e6eecf0da8df5cdac55bbf1f81d00bcb19558b4))
+    - Merge #1269 ([`09c2fb3`](https://github.com/maidsafe/safe_network/commit/09c2fb304c3a66902d81353153d5138f3e5a0a79))
     - unit tests for JoiningAsRelocated ([`0dcd491`](https://github.com/maidsafe/safe_network/commit/0dcd4917c9a7bfbf6706f3b8a18e68d010c9b50d))
     - move core one level up ([`5523e23`](https://github.com/maidsafe/safe_network/commit/5523e237464a76ef682ae2dbc183692502018682))
 </details>
@@ -1204,7 +2342,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - 11 commits contributed to the release over the course of 2 calendar days.
  - 2 days passed between releases.
  - 7 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1217,13 +2355,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - inline generic write_file function ([`f2ab97c`](https://github.com/maidsafe/safe_network/commit/f2ab97c053f173878ae8a355454818b38e7d72a9))
     - move dkg util method definitions onto the DKG structs ([`dce3ba2`](https://github.com/maidsafe/safe_network/commit/dce3ba214354ad007900efce78273670cfb725d5))
     - move more deps to clap-v3; rm some deps on rand ([`49e223e`](https://github.com/maidsafe/safe_network/commit/49e223e2c07695b4c63e253ba19ce43ec24d7112))
+    - Merge #1301 ([`9c6914e`](https://github.com/maidsafe/safe_network/commit/9c6914e2688f70a25ad5dfe74307572cb8e8fcc2))
     - Merge branch 'main' into feat-dbc-spent-proof-validations ([`45418f2`](https://github.com/maidsafe/safe_network/commit/45418f2f9b5cc58f2a153bf40966beb2bf36a62a))
     - ignore store_and_read_40mb as too heavy for CI ([`5cff2c5`](https://github.com/maidsafe/safe_network/commit/5cff2c5325a854f04788f9111439bca75b21c60f))
     - for QueryResponse, set correlation_id to be the origin msg_id ([`64eb333`](https://github.com/maidsafe/safe_network/commit/64eb333d532694f46f1d0b9dd5109961b3551802))
     - passing the churn test ([`3c383cc`](https://github.com/maidsafe/safe_network/commit/3c383ccf9ad0ed77080fb3e3ec459e5b02158505))
-    - Merge branch 'main' into feat-dbc-spent-proof-validations ([`94be181`](https://github.com/maidsafe/safe_network/commit/94be181789b0010f83ed5e89341f3f347575e37f))
-    - Merge branch 'main' into feat-dbc-spent-proof-validations ([`44411d5`](https://github.com/maidsafe/safe_network/commit/44411d511a496b13893670c8bc7d9f43f0ce9073))
     - Merge branch 'main' into feat-dbc-spent-proof-validations ([`45309c4`](https://github.com/maidsafe/safe_network/commit/45309c4c0463dd9198a49537187417bf4bfdb847))
+    - Merge branch 'main' into feat-cli-wallet-show-deposited-amount ([`6268fe7`](https://github.com/maidsafe/safe_network/commit/6268fe76e9dd81d291492b4611094273f8d1e223))
 </details>
 
 ## v0.64.1 (2022-07-07)
@@ -1296,10 +2434,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 32 commits contributed to the release over the course of 1 calendar day.
+ - 39 commits contributed to the release over the course of 1 calendar day.
  - 2 days passed between releases.
- - 24 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 23 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1309,21 +2447,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - sn_interface-0.8.1/sn_dysfunction-0.7.1/sn_client-0.68.1/sn_node-0.64.1/sn_api-0.66.1/sn_cli-0.59.1 ([`2b00cec`](https://github.com/maidsafe/safe_network/commit/2b00cec961561281f6b927e13e501342843f6a0f))
+    - Merge branch 'main' into feat-cli-wallet-show-deposited-amount ([`7e2a25a`](https://github.com/maidsafe/safe_network/commit/7e2a25ae31ead0fae7824ca794b6c407695080cd))
     - Merge #1315 ([`67686f7`](https://github.com/maidsafe/safe_network/commit/67686f73f9e7b18bb6fbf1eadc3fd3a256285396))
+    - Merge branch 'main' into feat-cli-wallet-show-deposited-amount ([`7cf2eb6`](https://github.com/maidsafe/safe_network/commit/7cf2eb64e1176d2b23d63091f6f459d92bdccb57))
     - Merge branch 'main' into feat-dbc-spent-proof-validations ([`f83724c`](https://github.com/maidsafe/safe_network/commit/f83724cff1e63b35f1612fc82dffdefbeaab6cc1))
+    - Merge branch 'main' into feat-cli-wallet-show-deposited-amount ([`cd2f9aa`](https://github.com/maidsafe/safe_network/commit/cd2f9aa2f7001ae779273745f9ac78fc289525e3))
     - Merge #1313 ([`7fe7be3`](https://github.com/maidsafe/safe_network/commit/7fe7be336799dec811c5b17e6d753ebe31e625f1))
+    - Merge #1308 ([`8421959`](https://github.com/maidsafe/safe_network/commit/8421959b6a80e4386c34fcd6f86a1af5044280ec))
+    - Merge branch 'main' into feat-cli-wallet-show-deposited-amount ([`39bd5b4`](https://github.com/maidsafe/safe_network/commit/39bd5b471b6b3acb6ebe90489335c995b0aca82f))
     - Merge branch 'main' into cargo-husky-tweaks ([`6881855`](https://github.com/maidsafe/safe_network/commit/688185573bb71cc44a7103df17f3fbeea6740247))
     - perform signature verifications on input DBC SpentProof before signing new spent proof share ([`8313ed8`](https://github.com/maidsafe/safe_network/commit/8313ed8d5b45b7f4ed3b36ada231e74c49c9f9e6))
     - Merge #1309 ([`f9fa4f7`](https://github.com/maidsafe/safe_network/commit/f9fa4f7857d8161e8c036cca06006bf187a6c6c3))
     - bit more low hanging clippy fruit ([`c79e2aa`](https://github.com/maidsafe/safe_network/commit/c79e2aac378b28b373fd7c18c4b9006348960071))
     - Merge branch 'main' into feat-cmd-parent-id ([`e10aaa2`](https://github.com/maidsafe/safe_network/commit/e10aaa2cf0404bfa10ef55b7c9dc7ae6fc0d28e5))
     - Merge branch 'main' into cargo-husky-tweaks ([`52dd02e`](https://github.com/maidsafe/safe_network/commit/52dd02e45ab4e160b0a26498919a79ce1aefb1bd))
+    - Merge #1312 ([`00dc24c`](https://github.com/maidsafe/safe_network/commit/00dc24c9263a276797b4abdff0963df5e70c4231))
     - Merge branch 'main' into refactor_messaging ([`349d432`](https://github.com/maidsafe/safe_network/commit/349d43295a44b529cbb138cf2fff9483b03fea07))
     - combine handling, sending sub-modules ([`92336b1`](https://github.com/maidsafe/safe_network/commit/92336b180c0b13290a3b83054545332867bc2d3f))
     - replace StructOpt with Clap in sn_node ([`d2c3f6e`](https://github.com/maidsafe/safe_network/commit/d2c3f6e40156ff092e63640bee7c569017d5da95))
-    - add parent id ([`a2fd9b0`](https://github.com/maidsafe/safe_network/commit/a2fd9b01638c2ec385656e01c4dddbc601cd5beb))
+    - feat(cmd): add parent id This facilitates correlation in logging. ([`a2fd9b0`](https://github.com/maidsafe/safe_network/commit/a2fd9b01638c2ec385656e01c4dddbc601cd5beb))
     - `try!` macro is deprecated ([`4626226`](https://github.com/maidsafe/safe_network/commit/46262268fc167c05963e5b7bd6261310496e2379))
     - clippy runs cargo check already ([`8dccb7f`](https://github.com/maidsafe/safe_network/commit/8dccb7f1fc81385f9f5f25e6c354ad1d35759528))
+    - Merge #1304 ([`6af41dc`](https://github.com/maidsafe/safe_network/commit/6af41dcbad76903cb5526b270100e650aa483191))
     - prevent lock in data_replication loop ([`aa5dab0`](https://github.com/maidsafe/safe_network/commit/aa5dab0c10ccf4732e5ac43fa7d893d597c22f25))
     - remove DashMap from pending_data_to_replicate_to_peers ([`262c104`](https://github.com/maidsafe/safe_network/commit/262c10427e80a79edc5d9d5416fa51116ead284e))
     - remove unneeded async over data storage.keys() ([`b979a27`](https://github.com/maidsafe/safe_network/commit/b979a27793c8618610881ce8c8a71635f766556b))
@@ -1437,8 +2582,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - 24 commits contributed to the release over the course of 6 calendar days.
  - 6 days passed between releases.
- - 24 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 23 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1453,7 +2598,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - remove node_connection_info.config from sn_node, sn_interface, sn_client ([`91da4d4`](https://github.com/maidsafe/safe_network/commit/91da4d4ac7aab039853b0651e5aafd9cdd31b9c4))
     - Docs - put symbols in backticks ([`9314a2d`](https://github.com/maidsafe/safe_network/commit/9314a2db5dc1ae91bc4d80a65c1a8825492fc7c7))
     - tweak join_timeout and bootstra_retry_time ([`c09a983`](https://github.com/maidsafe/safe_network/commit/c09a983cf17fb41cd92c9f05b5605888f202af11))
-    - do not leave loop running on timeout ([`cdec069`](https://github.com/maidsafe/safe_network/commit/cdec0693613008320c4dccc0753b2ef3ce82633c))
+    - fix(join): do not leave loop running on timeout Fixes the case when a node start times out and a new node is started while the previous one is still looping in some task. This used to cause address already in use errors. Even though a random address would have solved that, it's better to ensure that the running node actually is dropped, before starting a new one. ([`cdec069`](https://github.com/maidsafe/safe_network/commit/cdec0693613008320c4dccc0753b2ef3ce82633c))
     - re-enable send job retries on transient errors ([`649e58a`](https://github.com/maidsafe/safe_network/commit/649e58a8608fb5a195160b56a29007cd3c578d57))
     - remove let bindings for unit returns ([`ddb7798`](https://github.com/maidsafe/safe_network/commit/ddb7798a7b0c5e60960e123414277d58f3da27eb))
     - have the nodes to attach valid Commitments to signed SpentProofShares ([`5dad80d`](https://github.com/maidsafe/safe_network/commit/5dad80d3f239f5844243fedb89f8d4baaee3b640))
@@ -1518,7 +2663,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - 7 commits contributed to the release.
  - 2 days passed between releases.
  - 7 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1548,10 +2693,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release over the course of 1 calendar day.
+ - 1 commit contributed to the release.
  - 2 days passed between releases.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1561,7 +2706,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - sn_interface-0.7.0/sn_dysfunction-0.6.0/sn_client-0.67.0/sn_node-0.63.0/sn_api-0.65.0/sn_cli-0.58.0 ([`243cfc4`](https://github.com/maidsafe/safe_network/commit/243cfc48a7f4a9b60b5b7f1fdd609c02197aba5e))
-    - Merge #1268 ([`e9adc0d`](https://github.com/maidsafe/safe_network/commit/e9adc0d3ba2f33fe0b4590a5fe11fea56bd4bda9))
 </details>
 
 ## v0.62.8 (2022-06-24)
@@ -1599,10 +2743,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 10 commits contributed to the release over the course of 3 calendar days.
+ - 14 commits contributed to the release over the course of 3 calendar days.
  - 3 days passed between releases.
- - 7 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1612,14 +2756,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - sn_interface-0.6.5/sn_dysfunction-0.5.3/sn_client-0.66.5/sn_node-0.62.8/sn_cli-0.57.6 ([`dc69a62`](https://github.com/maidsafe/safe_network/commit/dc69a62eec590b2d621ab2cbc3009cb052955e66))
-    - misc cleanup and fixes ([`d7a8313`](https://github.com/maidsafe/safe_network/commit/d7a831329ad600ad7b5a1b6b68841f96b8ef8cfa))
-    - organize internal work ([`71eb46e`](https://github.com/maidsafe/safe_network/commit/71eb46e47032074cdca678783e815b8d55ae39a0))
+    - Merge #1266 ([`366be4d`](https://github.com/maidsafe/safe_network/commit/366be4d3ddc39f32beea0e26d0addd161acc90c2))
+    - chore(misc): misc cleanup and fixes - Complete `msg_kind` => `auth_kind` renaming. - Fix broken `routing_stress` startup. - Clarify context of `HandleTimeout` and `ScheduleTimeout` by inserting `Dkg`. - Tweak `network_split` example. - Set various things, such as payload debug, under `test-utils` flag. - Fix comments/logs: the opposite group of `full` adults are `non-full`, not `empty`. ([`d7a8313`](https://github.com/maidsafe/safe_network/commit/d7a831329ad600ad7b5a1b6b68841f96b8ef8cfa))
+    - Merge #1261 ([`2415f16`](https://github.com/maidsafe/safe_network/commit/2415f169917f101459ec6273375dc5e2cbbd06d4))
+    - feat(flow_control): organize internal work - Organizes internal work so that internal cmds (work) are now dealt with according to priority. - Enables adaptive throughput of cmds. - Prepares for logging of cmds separately (future feat). ([`71eb46e`](https://github.com/maidsafe/safe_network/commit/71eb46e47032074cdca678783e815b8d55ae39a0))
+    - Merge #1264 ([`7f4f4cb`](https://github.com/maidsafe/safe_network/commit/7f4f4cb0b1664c2d6f30962de25d5fdcbc5074de))
     - reduce dysfunction interval to 30s ([`402fb2c`](https://github.com/maidsafe/safe_network/commit/402fb2c13860d89f6c7e5aa0858974ccc75dc1ec))
     - Merge #1255 #1258 ([`ed0b5d8`](https://github.com/maidsafe/safe_network/commit/ed0b5d890e8404a59c25f8131eab5d23ce12eb7d))
     - Merge #1257 #1260 ([`19d89df`](https://github.com/maidsafe/safe_network/commit/19d89dfbbf8ac8ab2b08380ce9b4bed58a5dc0d9))
-    - improve efficiency of load monitoring ([`0a46f50`](https://github.com/maidsafe/safe_network/commit/0a46f508d22141eb06717012fc4cc0b37c7f025f))
-    - move it to its own file ([`1fbc762`](https://github.com/maidsafe/safe_network/commit/1fbc762305a581680b52e2cbdaa7aea2feaf05ab))
+    - refactor: improve efficiency of load monitoring Refactors load monitoring so that it is more efficiently used, and for both outgoing msgs and (in coming commit) cmds. ([`0a46f50`](https://github.com/maidsafe/safe_network/commit/0a46f508d22141eb06717012fc4cc0b37c7f025f))
+    - refactor(msg_type):  move it to its own file - Moves priority fns to service- and system msg. - Moves deserialise of payload to wire_msg fn when getting priority. ([`1fbc762`](https://github.com/maidsafe/safe_network/commit/1fbc762305a581680b52e2cbdaa7aea2feaf05ab))
     - remove register data_storage benchmark for now as sled db keeps erroring ([`024ddf0`](https://github.com/maidsafe/safe_network/commit/024ddf06fc517935f1a55af42b2aa1707a05f2e8))
+    - Merge #1256 ([`cff8b33`](https://github.com/maidsafe/safe_network/commit/cff8b337be20f3e1c0cddc5464c2eee0c8cc9e1c))
     - Merge branch 'main' into refactor-event-channel ([`024883e`](https://github.com/maidsafe/safe_network/commit/024883e9a1b853c02c29daa5c447b03570af2473))
 </details>
 
@@ -1660,10 +2808,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 7 commits contributed to the release.
+ - 8 commits contributed to the release.
  - 2 days passed between releases.
- - 7 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1673,12 +2821,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - sn_interface-0.6.4/sn_dysfunction-0.5.2/sn_client-0.66.4/sn_node-0.62.7/sn_api-0.64.4 ([`d526e0a`](https://github.com/maidsafe/safe_network/commit/d526e0a32d3f09a788899d82db4fe6f13258568c))
-    - cleanup and restructure of enum ([`d26d26d`](https://github.com/maidsafe/safe_network/commit/d26d26df6ddd0321555fa3653be966fe91e2dca4))
+    - refactor(events): cleanup and restructure of enum  - Initiates the use of the node event channel for more structured logging. BREAKING CHANGE: events renamed and restructured ([`d26d26d`](https://github.com/maidsafe/safe_network/commit/d26d26df6ddd0321555fa3653be966fe91e2dca4))
+    - Merge #1253 ([`abc95c1`](https://github.com/maidsafe/safe_network/commit/abc95c1093479938a5efbef279190540156ee23a))
     - routing_stress example compiles once more ([`d5c6544`](https://github.com/maidsafe/safe_network/commit/d5c65440b2152cf570a2014eee102b353678af00))
     - add LocalSet to node test runs ([`d8730f1`](https://github.com/maidsafe/safe_network/commit/d8730f1bbd276b0686c68b00714c54ed86b7241a))
     - make NetworkKnowledge single threaded ([`fd7f845`](https://github.com/maidsafe/safe_network/commit/fd7f845f7d1534cf9ff93ee9dc9f3009ab7e5664))
     - change to single threaded runtime by default ([`a68caa7`](https://github.com/maidsafe/safe_network/commit/a68caa7bb6e998b52f052e322f4485c4b836939c))
-    - misc cleanup ([`c038635`](https://github.com/maidsafe/safe_network/commit/c038635cf88d32c52da89d11a8532e6c91c8bf38))
+    - chore: misc cleanup - Organise usings - Add missing license headers - Update license years As it would take too long to go through all files, a partial cleanup of the code base is made here. It is based on where the using of `sn_interface` has been introduced, as it was a low hanging fruit to cover many occurrences of duplication in many files. ([`c038635`](https://github.com/maidsafe/safe_network/commit/c038635cf88d32c52da89d11a8532e6c91c8bf38))
 </details>
 
 ## v0.62.6 (2022-06-18)
@@ -1698,10 +2847,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
+ - 3 commits contributed to the release.
  - 2 days passed between releases.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1711,6 +2860,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - sn_node-0.62.6/sn_cli-0.57.5 ([`eda5d22`](https://github.com/maidsafe/safe_network/commit/eda5d22e57779a7d1ecab1707f01bccd5f94706d))
+    - Merge #1248 ([`1fad3d5`](https://github.com/maidsafe/safe_network/commit/1fad3d530f1e38544197672639e029a13d3e2207))
     - reorder nodeacceptance cmds to inform node first of all ([`e4b43ce`](https://github.com/maidsafe/safe_network/commit/e4b43ce9a8655cc8deea8d459ac0a0755d9153c1))
 </details>
 
@@ -1757,9 +2907,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 10 commits contributed to the release over the course of 1 calendar day.
+ - 12 commits contributed to the release over the course of 1 calendar day.
  - 10 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1770,7 +2920,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  * **Uncategorized**
     - sn_node-0.62.5 ([`9679f0c`](https://github.com/maidsafe/safe_network/commit/9679f0cde6f4e5a2b1fbf2fded954f17b243e518))
     - sn_interface-0.6.3/sn_dysfunction-0.5.1/sn_client-0.66.3/sn_api-0.64.3/sn_cli-0.57.4 ([`f599c59`](https://github.com/maidsafe/safe_network/commit/f599c5973d50324aad1720166156666d5db1ed3d))
+    - Merge #1241 ([`f9c7544`](https://github.com/maidsafe/safe_network/commit/f9c7544f369e15fb3b6f91158ac3277656737fa4))
     - upgrade blsttc to 6.0.0 ([`4eb43fa`](https://github.com/maidsafe/safe_network/commit/4eb43fa884d7b047febb18c067ae905969a113bf))
+    - Merge #1234 ([`05b9b75`](https://github.com/maidsafe/safe_network/commit/05b9b755165304c282cc415419030eee8b6a3636))
     - increase dysfunction check interval ([`83fa804`](https://github.com/maidsafe/safe_network/commit/83fa804ed62f30344dda48cef7ad852a4ac4118b))
     - log dkg dysfunction in node ([`fa709fb`](https://github.com/maidsafe/safe_network/commit/fa709fb9fea7926048525e5a2f21ff0017676f41))
     - add VotedOffline LogMarker ([`e195c25`](https://github.com/maidsafe/safe_network/commit/e195c2504bee67fdc1ebbbbef9b3b4428ee8a32d))
@@ -1825,10 +2977,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 6 commits contributed to the release over the course of 1 calendar day.
+ - 5 commits contributed to the release over the course of 1 calendar day.
  - 4 days passed between releases.
  - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1838,8 +2990,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - sn_interface-0.6.2/sn_client-0.66.2/sn_node-0.62.4/sn_api-0.64.2/sn_cli-0.57.3 ([`46246f1`](https://github.com/maidsafe/safe_network/commit/46246f155ab65f3fcd61381345f1a7f747dfe957))
-    - Merge remote-tracking branch 'origin/main' into drusu/remove-private-data ([`2057273`](https://github.com/maidsafe/safe_network/commit/2057273509c2488cafc7f6db2ae69a99efc3b350))
-    - Merge branch 'main' into drusu/remove-private-data ([`0cd2007`](https://github.com/maidsafe/safe_network/commit/0cd2007e442086d6eb2a39ad1f452e590fad46a9))
+    - Merge #1216 ([`9877101`](https://github.com/maidsafe/safe_network/commit/9877101c74dcf75d78520a804cb6f2b7aaddaffb))
     - BREAKING CHANGE: removed private scope ([`08ea69a`](https://github.com/maidsafe/safe_network/commit/08ea69a0084b0e8d8aea51f06b99af426a7255c9))
     - some changes I missed in the initial private removal ([`60f5a68`](https://github.com/maidsafe/safe_network/commit/60f5a68a1df6114b65d7c57099fea0347ba3d1dd))
     - remove private registers ([`1b1cb77`](https://github.com/maidsafe/safe_network/commit/1b1cb77df6c2805ecfa741bb824b359214558929))
@@ -1877,7 +3028,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - 3 commits contributed to the release over the course of 1 calendar day.
  - 1 day passed between releases.
  - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1908,10 +3059,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
+ - 3 commits contributed to the release.
  - 2 days passed between releases.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1921,6 +3072,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - sn_node-0.62.2 ([`6253530`](https://github.com/maidsafe/safe_network/commit/6253530bf609e214de3a04433dcc260aa71721e0))
+    - Merge #1220 ([`8c7e42e`](https://github.com/maidsafe/safe_network/commit/8c7e42e9a91f803579426c5c5fcef14ace10fea0))
     - cleanup unneeded logs ([`aa05d4e`](https://github.com/maidsafe/safe_network/commit/aa05d4eac37ebf6969275555e787dd81f5f65de7))
 </details>
 
@@ -1949,10 +3101,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 6 commits contributed to the release over the course of 1 calendar day.
+ - 7 commits contributed to the release over the course of 1 calendar day.
  - 2 days passed between releases.
  - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1962,6 +3114,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - sn_interface-0.6.1/sn_client-0.66.1/sn_node-0.62.1/sn_api-0.64.1 ([`489904e`](https://github.com/maidsafe/safe_network/commit/489904e325cfb8efca4289b05125904ad4029f3b))
+    - Merge #1214 ([`992c495`](https://github.com/maidsafe/safe_network/commit/992c4951670afc769feea7e6cd38db021aed88a7))
     - Merge branch 'main' into Gabriel_Spentbook_PR1143 ([`0eda02a`](https://github.com/maidsafe/safe_network/commit/0eda02ac126be4f088af6bf9e7247c8496a389ba))
     - resolve issue after rebase ([`a8aa4e7`](https://github.com/maidsafe/safe_network/commit/a8aa4e749670db3a930f2351ac46b5dd7d72041e))
     - first version of Spentbook messaging, storage, and client API ([`dbda86b`](https://github.com/maidsafe/safe_network/commit/dbda86be03f912079776be514828ff5fd034830c))
@@ -1990,7 +3143,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - 4 commits contributed to the release over the course of 1 calendar day.
  - 3 days passed between releases.
  - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -2020,7 +3173,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - 2 commits contributed to the release.
  - 5 days passed between releases.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -2088,10 +3241,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 19 commits contributed to the release over the course of 2 calendar days.
+ - 20 commits contributed to the release over the course of 2 calendar days.
  - 2 days passed between releases.
  - 14 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -2103,6 +3256,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - sn_interface-0.5.0/sn_dysfunction-0.4.0/sn_client-0.65.0/sn_node-0.61.0/sn_api-0.63.0/sn_cli-0.56.0 ([`e5fcd03`](https://github.com/maidsafe/safe_network/commit/e5fcd032e1dd904e05bc23e119af1d06e3b85a06))
     - shutdown runtime in node loop ([`77d962a`](https://github.com/maidsafe/safe_network/commit/77d962abb97f8b00e9295419079b43224ca67341))
     - Merge branch 'main' into Chore-ImproveDataStorageBench ([`9904a7a`](https://github.com/maidsafe/safe_network/commit/9904a7a3b53a81248379c44bf4e88688d278582f))
+    - Merge #1210 ([`c08fbb9`](https://github.com/maidsafe/safe_network/commit/c08fbb94e9306a00cdd24db9be73f903cb1f3362))
     - explicitly drop Node on join retry ([`05fcc31`](https://github.com/maidsafe/safe_network/commit/05fcc31c13a2a09da83027655bd8feb1e31660d1))
     - improve data storage benches, more runs, more data ([`f82864b`](https://github.com/maidsafe/safe_network/commit/f82864be6f72876dc5ad5d38ca4cc104fbdcdde7))
     - Merge #1202 ([`e42a2e3`](https://github.com/maidsafe/safe_network/commit/e42a2e3c212597e68238451a5bb4a8725c4761be))
@@ -2115,7 +3269,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - add more intesive churn data integrity test ([`14c92fb`](https://github.com/maidsafe/safe_network/commit/14c92fb0f18fc40176963ca5290914442d340256))
     - split out dispatcher periodic code ([`f9700e3`](https://github.com/maidsafe/safe_network/commit/f9700e3b6bb8b2b9949f33d627c99974c355ca2b))
     - remove sus node flows, replicate data per data ([`294549e`](https://github.com/maidsafe/safe_network/commit/294549ebc998d11a2f3621e2a9fd20a0dd9bcce5))
-    - Merge #1198 #1204 ([`5e82ef3`](https://github.com/maidsafe/safe_network/commit/5e82ef3d0e78898f9ffac8bebe4970c4d26e608f))
+    - Merge #1203 ([`cd32ca6`](https://github.com/maidsafe/safe_network/commit/cd32ca6535b17aedacfb4051e97e4b3540bb8a71))
     - Merge branch 'main' into bump-consensus-2.0.0 ([`a1c592a`](https://github.com/maidsafe/safe_network/commit/a1c592a71247660e7372e019e5f9a6ea23299e0f))
     - cleanup commented code ([`7544945`](https://github.com/maidsafe/safe_network/commit/7544945e15e3df18d5bf666ab7c8fbcee0766d06))
     - dont cleanup section elder PeerLinks ([`ea9906f`](https://github.com/maidsafe/safe_network/commit/ea9906fda233cc1299c64d703267fb3b250364c2))
@@ -2138,7 +3292,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - 3 commits contributed to the release.
  - 3 days passed between releases.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -2203,10 +3357,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 19 commits contributed to the release over the course of 4 calendar days.
+ - 21 commits contributed to the release over the course of 4 calendar days.
  - 4 days passed between releases.
  - 16 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -2218,6 +3372,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - sn_dysfunction-0.2.0/sn_client-0.63.0/sn_node-0.59.0/sn_api-0.61.0/sn_cli-0.54.0 ([`cf21d66`](https://github.com/maidsafe/safe_network/commit/cf21d66b9b726123e0a4320cd68481b67f7af03d))
     - de-dupe init_test_logger ([`8e2731d`](https://github.com/maidsafe/safe_network/commit/8e2731d8b7923a9050451b31ef3a92f892d2d6d3))
     - cargo test works without feature flag ([`f2742d9`](https://github.com/maidsafe/safe_network/commit/f2742d92b3c3b56ed80732aa1d6943885fcd4317))
+    - Merge #1178 ([`d9ba264`](https://github.com/maidsafe/safe_network/commit/d9ba264a6b2b657dce60b5ded78f1cecd840dbb1))
     - Merge branch 'main' into move-membership-history-to-network-knowledge ([`57de06b`](https://github.com/maidsafe/safe_network/commit/57de06b828191e093de06750f94fe6f500890112))
     - move NodeState validations to NodeState struct ([`cb733fd`](https://github.com/maidsafe/safe_network/commit/cb733fd4b1ed642da73f1e9db4fc3d8a1ec49a2b))
     - clippy after rebase ([`48ffebf`](https://github.com/maidsafe/safe_network/commit/48ffebf35093b68923d2139f12fc946d94ae4f4a))
@@ -2227,12 +3382,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - node in an Arc Rwlock and factor out join code ([`2c12b49`](https://github.com/maidsafe/safe_network/commit/2c12b4993f06c9c696475404e37f4e080d01a3b0))
     - error triggering on churn join miss ([`941703e`](https://github.com/maidsafe/safe_network/commit/941703e23a53d8d894d5a9a7a253ad1735e900e0))
     - section probing for all nodes every 120s ([`fe073bc`](https://github.com/maidsafe/safe_network/commit/fe073bc0674c2099b7cd3f30ac744ea6172e24c2))
+    - Merge #1193 ([`c5b0f1b`](https://github.com/maidsafe/safe_network/commit/c5b0f1b6d4f288737bc1f4fbda162386149ec402))
     - cleanup unused import ([`cf1c11a`](https://github.com/maidsafe/safe_network/commit/cf1c11ab576810cc6e063331def6f3a9a95fe663))
     - prevent deadlock in lru cache impl. ([`06591a1`](https://github.com/maidsafe/safe_network/commit/06591a11458adb5cfd917cc1239371acf4f8834f))
     - benchmarking data storage ([`0a7adca`](https://github.com/maidsafe/safe_network/commit/0a7adcab104dcda7baed80e2dd96913d6f93e541))
     - sn_interface-0.2.4/sn_client-0.62.3/sn_api-0.60.2/sn_cli-0.53.1 ([`9b06304`](https://github.com/maidsafe/safe_network/commit/9b06304f46e1a1bda90a0fc6ff82edc928c2529d))
+    - Merge #1190 ([`8833cb8`](https://github.com/maidsafe/safe_network/commit/8833cb8a4ae13f04ea86c67e92fce4d82a107f5a))
     - upgrade blsttc to v5.2.0 and rand to v0.8 ([`07504fa`](https://github.com/maidsafe/safe_network/commit/07504faeda6cbfd0b27abea25facde992398ecf9))
-    - Merge #1189 ([`00f41b4`](https://github.com/maidsafe/safe_network/commit/00f41b4a96bcc172d91620aa0da0cb799db5483c))
     - Merge #1150 ([`afda86c`](https://github.com/maidsafe/safe_network/commit/afda86c5bd759f6a19cb921c356fad51f76daecd))
 </details>
 
@@ -2273,10 +3429,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 8 commits contributed to the release over the course of 1 calendar day.
+ - 10 commits contributed to the release over the course of 1 calendar day.
  - 3 days passed between releases.
  - 7 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -2291,7 +3447,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - rename DkgId generation to section chain len ([`e25fb53`](https://github.com/maidsafe/safe_network/commit/e25fb53a299dd5daa755799c36a316e4b011f4d7))
     - reset split barrier when initializing handover ([`7bac8df`](https://github.com/maidsafe/safe_network/commit/7bac8dfa016ac9ab2fc58c2ae6de02261fc9dc1a))
     - add membership generation to DKG and SectionInfo agreement ([`2b18ba8`](https://github.com/maidsafe/safe_network/commit/2b18ba8a1b0e8342af176bb78dba08f3e7b65d26))
+    - Merge #1184 ([`f22b19d`](https://github.com/maidsafe/safe_network/commit/f22b19dc1e391cc5f5409f4cec2d664ad199cbcc))
     - add PeerLink count log ([`78ad1d4`](https://github.com/maidsafe/safe_network/commit/78ad1d4ebddd5a9f9d6acb1b0ed0fd9b63bf0385))
+    - Merge #1182 ([`b5a222c`](https://github.com/maidsafe/safe_network/commit/b5a222c7facb6f1617281ed1133464a435db01f8))
     - dont hold comms session lock over session cleanup ([`fb324b0`](https://github.com/maidsafe/safe_network/commit/fb324b077d601503d012c032cc9889a70d82e75f))
 </details>
 
@@ -2333,9 +3491,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 5 commits contributed to the release over the course of 1 calendar day.
+ - 4 commits contributed to the release over the course of 1 calendar day.
  - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -2345,7 +3503,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - sn_node-0.58.19 ([`aeb2945`](https://github.com/maidsafe/safe_network/commit/aeb2945e164ca9a07390b4b7fc5220daf07f9401))
-    - Merge #1181 ([`2062bce`](https://github.com/maidsafe/safe_network/commit/2062bcee463c46f028991374d1d548b848f9052b))
     - Merge #1180 ([`aed6d50`](https://github.com/maidsafe/safe_network/commit/aed6d5050c0b2cc37cc66d4c7b6ada70ee79808a))
     - simplify cleanupPeerLinks ([`53ee4c5`](https://github.com/maidsafe/safe_network/commit/53ee4c51b82ebd0060c9adba32dac1a102890120))
     - sort relocate candidates by distance to the churn_id ([`e552c17`](https://github.com/maidsafe/safe_network/commit/e552c17d89d8747b1de32598bf6c58ba43a4f285))
@@ -2387,10 +3544,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 4 commits contributed to the release over the course of 1 calendar day.
+ - 5 commits contributed to the release over the course of 1 calendar day.
  - 1 day passed between releases.
  - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -2400,6 +3557,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - sn_interface-0.2.3/sn_node-0.58.18 ([`a49a007`](https://github.com/maidsafe/safe_network/commit/a49a007ef8fde53a346403824f09eb0fd25e1109))
+    - Merge #1127 ([`a03107e`](https://github.com/maidsafe/safe_network/commit/a03107ea7ea8a393c818a193eb2489e92cbbda20))
     - disable backpressure as a deafult feature ([`965310a`](https://github.com/maidsafe/safe_network/commit/965310a12e09f399d125e8c5227c237d307bc20f))
     - reduce handover logging ([`00dc9c0`](https://github.com/maidsafe/safe_network/commit/00dc9c0ba9afb6de038dda9e20a10e6727a0b0e6))
     - reenable backpressure as a default feature ([`fe017fd`](https://github.com/maidsafe/safe_network/commit/fe017fd27a65a3c432209d2351df8d6397572ec3))
@@ -2441,7 +3599,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - 4 commits contributed to the release.
  - 1 day passed between releases.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -2451,7 +3609,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - sn_dysfunction-0.1.3/sn_node-0.58.17 ([`66638f5`](https://github.com/maidsafe/safe_network/commit/66638f508ad4df12b757672df589ba8ad09fbdfc))
-    - Merge #1176 ([`0cd2172`](https://github.com/maidsafe/safe_network/commit/0cd217240a72b462e04314bd67e1bbaf054374c0))
+    - Merge #1168 ([`375424b`](https://github.com/maidsafe/safe_network/commit/375424bab5dca59adddcc6b691ba0deac09a1bcb))
     - return an error when received an invalid SAP ([`db8b584`](https://github.com/maidsafe/safe_network/commit/db8b58477b5b953ff2ce34163ebcc45f47cc0ab8))
     - Merge branch 'main' into sap_sig_checks ([`f8ec2e5`](https://github.com/maidsafe/safe_network/commit/f8ec2e54943eaa18b50bd9d7562d41f57d5d3248))
 </details>
@@ -2505,10 +3663,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 12 commits contributed to the release over the course of 1 calendar day.
+ - 13 commits contributed to the release over the course of 2 calendar days.
  - 3 days passed between releases.
  - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -2518,17 +3676,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - sn_interface-0.2.2/sn_client-0.62.2/sn_node-0.58.16/sn_api-0.60.1 ([`61ba367`](https://github.com/maidsafe/safe_network/commit/61ba367c308a846cb3f1ae065b1fbbdfb85838e4))
+    - Merge #1175 ([`9a8789e`](https://github.com/maidsafe/safe_network/commit/9a8789e307fa09b9624a8602978f720d3dc9fc8b))
     - Merge branch 'main' into nightly-improvements ([`ee3bbe1`](https://github.com/maidsafe/safe_network/commit/ee3bbe188cea756384dc38d490fe58c59c050292))
     - nightly improvements and fix release process issues ([`bd04335`](https://github.com/maidsafe/safe_network/commit/bd04335d3ee074610ffd5fd4daff15a080b6353d))
-    - Merge #1171 ([`06b4433`](https://github.com/maidsafe/safe_network/commit/06b4433f199ba7c622ad57e767d80f58f0b50a69))
+    - Merge #1172 ([`837c44c`](https://github.com/maidsafe/safe_network/commit/837c44cda38c2757f689cc4db4a84fa7c02091c0))
     - check Register permissions on ops locally to prevent failures when broadcasted to the network ([`ae41562`](https://github.com/maidsafe/safe_network/commit/ae4156228a4bb684ff10ac8c98917dd4dae434ea))
     - Merge #1140 ([`459b641`](https://github.com/maidsafe/safe_network/commit/459b641f22b488f33825777b974da80512eabed5))
-    - Merge #1165 ([`e08096d`](https://github.com/maidsafe/safe_network/commit/e08096d37dfab490f22ae9786a006aa3f9f630c1))
     - Merge #1167 ([`5b21c66`](https://github.com/maidsafe/safe_network/commit/5b21c663c7f11124f0ed2f330b2f8687745f7da7))
     - polish remove operation ([`26db0aa`](https://github.com/maidsafe/safe_network/commit/26db0aaf0acba424c6a93b49e066f036baa42e8b))
     - Merge #1169 ([`e5d0c17`](https://github.com/maidsafe/safe_network/commit/e5d0c17c335a3a25ee0bb4c81906fa176abeb7f5))
     - add ProposalAgreed log marker ([`ae9aeeb`](https://github.com/maidsafe/safe_network/commit/ae9aeeb94f55f29849c8c5fe1b05419b96fac6e9))
     - Merge branch 'main' into main ([`d3f07bb`](https://github.com/maidsafe/safe_network/commit/d3f07bbe5192174082e24869ba86125b6a7b1b20))
+    - Merge branch 'main' into retry-count-input ([`925a8a4`](https://github.com/maidsafe/safe_network/commit/925a8a4aaade025433c29028229947de28fcb214))
 </details>
 
 ## v0.58.15 (2022-05-06)
@@ -2635,10 +3794,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 30 commits contributed to the release over the course of 11 calendar days.
+ - 33 commits contributed to the release over the course of 11 calendar days.
  - 11 days passed between releases.
  - 27 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -2649,8 +3808,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  * **Uncategorized**
     - sn_interface-0.2.1/sn_client-0.62.1/sn_node-0.58.15/sn_api-0.60.0/sn_cli-0.53.0 ([`737d906`](https://github.com/maidsafe/safe_network/commit/737d906a61f772593ac7df755d995d66059e8b5e))
     - check against the new section key instead of the current ([`9203456`](https://github.com/maidsafe/safe_network/commit/9203456e5b5f53e628566d8591dca447481ecb57))
+    - Merge branch 'main' into retry-count-input ([`f514f47`](https://github.com/maidsafe/safe_network/commit/f514f471275a54edb26b1b520f76693174796dee))
     - check incoming authed SAP in signed votes ([`9caadf9`](https://github.com/maidsafe/safe_network/commit/9caadf9f3c64b98aa5edbe992dcde98b5fce8bf7))
     - deterministic operations, insert stored data ([`937ea45`](https://github.com/maidsafe/safe_network/commit/937ea457ea5d7e6f7f123eeba6b5da45fef5b404))
+    - Merge #1162 ([`a4c5ccb`](https://github.com/maidsafe/safe_network/commit/a4c5ccb8bb7fbbf8ab4052d3b1051f8cac100d53))
     - log error when dropping vote due to bad signature ([`ffc1a23`](https://github.com/maidsafe/safe_network/commit/ffc1a23b094b6ab99daaa61c91a628e478acb0e1))
     - validate votes are for our section ([`3757300`](https://github.com/maidsafe/safe_network/commit/3757300caaea01c99a1d692ce4f572d790570ac2))
     - dont keep processing a vote batch when errored ([`7491323`](https://github.com/maidsafe/safe_network/commit/7491323ded9a484ce0ed8f0253c76848921c54a9))
@@ -2663,14 +3824,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - add delay during Store Op ([`56dc95e`](https://github.com/maidsafe/safe_network/commit/56dc95e12310abac60531d50e79895113df49853))
     - model-based test using proptest module ([`ca5e922`](https://github.com/maidsafe/safe_network/commit/ca5e9226a41a878ff6ac255d0d7ca26b41e07c7d))
     - create proptest Strategy to generate ops ([`dd8b50c`](https://github.com/maidsafe/safe_network/commit/dd8b50cff2ac35dd4134a3a6179a06b798305e91))
+    - Merge #1160 ([`d46e85b`](https://github.com/maidsafe/safe_network/commit/d46e85bf508be983017b90e6ce18f588039b16ac))
     - client knowledge could not update ([`9f4c3a5`](https://github.com/maidsafe/safe_network/commit/9f4c3a523212c41079afcde8052a0891f3895f3b))
     - fix split/demotion test ([`4de29a0`](https://github.com/maidsafe/safe_network/commit/4de29a018a5305d18589bdd5a3d557f7979eafd7))
     - remove outdated comment ([`c5ba36e`](https://github.com/maidsafe/safe_network/commit/c5ba36e5ab89b2c440db38f1d1f06d4cf6c90b6a))
     - handover integration squashed ([`0d5cdf9`](https://github.com/maidsafe/safe_network/commit/0d5cdf940afc390de22d94e91621e76d45a9eaad))
+    - Merge #1149 ([`7058ecc`](https://github.com/maidsafe/safe_network/commit/7058ecce9a1f9ca90c353a8f0705d81aad8943a2))
     - avoid AE loop by being judicious with AE requests ([`2f69548`](https://github.com/maidsafe/safe_network/commit/2f69548f5250d8c4bbcd03052bb9a49f9a2bc091))
-    - Merge #1142 ([`b4c8086`](https://github.com/maidsafe/safe_network/commit/b4c8086a53d20c588b4c4c941601edd3f360e04b))
     - add missing backpressure feature gate. ([`a4b7597`](https://github.com/maidsafe/safe_network/commit/a4b7597853c9f154e6fd04f1f82133cab0b3c784))
-    - Merge branch 'main' into Feat-InterfaceAuthKind ([`df40fb9`](https://github.com/maidsafe/safe_network/commit/df40fb94f6847b31aec730eb7cbc6c0b97fe9a0e))
+    - Merge #1139 ([`22abbc7`](https://github.com/maidsafe/safe_network/commit/22abbc73f909131a0208ddc6e9471d073061134a))
     - Merge branch 'main' into Feat-InterfaceAuthKind ([`5db6533`](https://github.com/maidsafe/safe_network/commit/5db6533b2151e2377299a0be11e513210adfabd4))
     - rename MsgKind -> AuthKind ([`7766e7d`](https://github.com/maidsafe/safe_network/commit/7766e7d20b392cf5b8563d1dbc9560254b44e756))
     - remove the max-capacity flag from sn_node cli ([`3894e8e`](https://github.com/maidsafe/safe_network/commit/3894e8ed5ab48bc72287c4ae74fa53ef0ba51aaa))
@@ -2798,9 +3960,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 20 commits contributed to the release over the course of 314 calendar days.
+ - 19 commits contributed to the release over the course of 314 calendar days.
  - 18 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -2817,7 +3979,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - tidy references in cargo manifests ([`318ee1d`](https://github.com/maidsafe/safe_network/commit/318ee1d22970b5f06e93a99b6e8fff6da638c589))
     - use supported referencing style ([`ae4ee5c`](https://github.com/maidsafe/safe_network/commit/ae4ee5c1a37dab7b5ca132d96d026bcdbac50be0))
     - test valid nonce signature ([`5580cac`](https://github.com/maidsafe/safe_network/commit/5580cac3d7aeab7e809729697753a9a38e8f2270))
-    - Merge #1122 ([`f359a45`](https://github.com/maidsafe/safe_network/commit/f359a45971a5b42a6f174536475f47b8ab076901))
     - remove op_id arg from track_issue ([`1f3af46`](https://github.com/maidsafe/safe_network/commit/1f3af46aea59ebeb1b6a4b736e80e86ce2f724d8))
     - fix sn/interface dep version ([`826dfa4`](https://github.com/maidsafe/safe_network/commit/826dfa48cc7c73f19adcd67bb06c7464dba4921d))
     - compare against all nodes in section ([`5df610c`](https://github.com/maidsafe/safe_network/commit/5df610c93b76cfc3a6f09734476240313b16bee6))
