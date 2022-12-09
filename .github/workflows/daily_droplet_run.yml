@@ -1,9 +1,9 @@
 name: Nightly Release Run
 
 on:
-  schedule:
-    # * is a special character in YAML so you have to quote this string
-    - cron: "30 4 * * *"
+  #schedule:
+  ## * is a special character in YAML so you have to quote this string
+  #- cron: "30 4 * * *"
   workflow_dispatch:
     inputs:
       node-count:
