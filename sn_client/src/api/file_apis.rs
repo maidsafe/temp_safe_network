@@ -26,6 +26,9 @@ use tokio::{task, time::sleep};
 use tracing::trace;
 use xor_name::XorName;
 
+// Maximum number of concurrent chunks to be uploaded/retrieved for a file
+const CHUNKS_BATCH_MAX_SIZE: usize = 5;
+
 impl Client {
     #[instrument(skip(self), level = "debug")]
     /// Reads [`Bytes`] from the network, whose contents are contained within on or more chunks.
@@ -54,13 +57,7 @@ impl Client {
     where
         Self: Sized,
     {
-        trace!(
-            "Reading {:?} bytes at: {:?}, starting from position: {:?}",
-            &length,
-            &address,
-            &position,
-        );
-
+        trace!("Reading {length} bytes at: {address}, starting from position: {position}");
         let chunk = self.get_chunk(&address).await?;
 
         // First try to deserialize a LargeFile, if it works, we go and seek it.
@@ -89,7 +86,7 @@ impl Client {
             .await
             .find(|c| c.address().name() == name)
         {
-            trace!("Chunk retrieved from local cache: {:?}", name);
+            trace!("Chunk retrieved from local cache: {name:?}");
             return Ok(chunk.clone());
         }
 
@@ -110,13 +107,15 @@ impl Client {
 
     /// Tries to chunk the bytes, returning an address and chunks, without storing anything to network.
     #[instrument(skip_all, level = "trace")]
-    pub fn chunk_bytes(&self, bytes: Bytes) -> Result<(XorName, Vec<Chunk>)> {
-        if let Ok(file) = LargeFile::new(bytes.clone()) {
-            Self::encrypt_large(file)
-        } else {
-            let file = SmallFile::new(bytes)?;
-            let chunk = Self::package_small(file)?;
-            Ok((*chunk.name(), vec![chunk]))
+    pub fn chunk_bytes(bytes: Bytes) -> Result<(XorName, Vec<Chunk>)> {
+        match LargeFile::new(bytes.clone()) {
+            Ok(file) => Self::encrypt_large(file),
+            Err(Error::TooSmallForSelfEncryption { .. }) => {
+                let file = SmallFile::new(bytes)?;
+                let chunk = Self::package_small(file)?;
+                Ok((*chunk.name(), vec![chunk]))
+            }
+            Err(error) => Err(error),
         }
     }
 
@@ -157,14 +156,7 @@ impl Client {
     /// without storing them onto the network.
     #[instrument(skip(bytes), level = "debug")]
     pub fn calculate_address(bytes: Bytes) -> Result<XorName> {
-        if let Ok(file) = LargeFile::new(bytes.clone()) {
-            let (head_address, _all_chunks) = Self::encrypt_large(file)?;
-            Ok(head_address)
-        } else {
-            let file = SmallFile::new(bytes)?;
-            let chunk = Self::package_small(file)?;
-            Ok(*chunk.name())
-        }
+        Self::chunk_bytes(bytes).map(|(name, _)| name)
     }
 
     // --------------------------------------------
@@ -173,11 +165,13 @@ impl Client {
 
     #[instrument(skip(self, bytes), level = "trace")]
     async fn upload_bytes(&self, bytes: Bytes, verify: bool) -> Result<XorName> {
-        if let Ok(file) = LargeFile::new(bytes.clone()) {
-            self.upload_large(file, verify).await
-        } else {
-            let file = SmallFile::new(bytes)?;
-            self.upload_small(file, verify).await
+        match LargeFile::new(bytes.clone()) {
+            Ok(file) => self.upload_large(file, verify).await,
+            Err(Error::TooSmallForSelfEncryption { .. }) => {
+                let file = SmallFile::new(bytes)?;
+                self.upload_small(file, verify).await
+            }
+            Err(error) => Err(error),
         }
     }
 
@@ -186,34 +180,34 @@ impl Client {
     #[instrument(skip_all, level = "trace")]
     async fn upload_large(&self, large: LargeFile, verify: bool) -> Result<XorName> {
         let (head_address, all_chunks) = Self::encrypt_large(large)?;
+        for next_batch in all_chunks.chunks(CHUNKS_BATCH_MAX_SIZE) {
+            // Connect to all relevant elders before we fire off all msgs...
+            self.session
+                .setup_connections_to_relevant_nodes(next_batch.iter().map(|c| *c.name()).collect())
+                .await?;
 
-        self.session
-            .setup_connections_to_relevant_nodes(all_chunks.iter().map(|c| *c.name()).collect())
-            .await?;
+            let tasks = next_batch.iter().cloned().map(|chunk| {
+                let client_clone = self.clone();
+                task::spawn(async move {
+                    let chunk_addr = *chunk.address().name();
+                    client_clone.send_cmd(DataCmd::StoreChunk(chunk)).await?;
+                    if verify {
+                        client_clone.verify_chunk_is_stored(chunk_addr).await?;
+                    }
+                    Ok::<(), Error>(())
+                })
+            });
 
-        let tasks = all_chunks.into_iter().map(|chunk| {
-            // TODO: connect to all relevant elders before we fire off all msgs...
+            let respones = join_all(tasks)
+                .await
+                .into_iter()
+                .flatten() // swallows errors
+                .collect_vec();
 
-            let client_clone = self.clone();
-            task::spawn(async move {
-                let chunk_addr = *chunk.address().name();
-                client_clone.send_cmd(DataCmd::StoreChunk(chunk)).await?;
-                if verify {
-                    client_clone.verify_chunk_is_stored(chunk_addr).await?;
-                }
-                Ok::<(), Error>(())
-            })
-        });
-
-        let respones = join_all(tasks)
-            .await
-            .into_iter()
-            .flatten() // swallows errors
-            .collect_vec();
-
-        for res in respones {
-            // fail with any issue here
-            res?;
+            for res in respones {
+                // fail with any issue here
+                res?;
+            }
         }
 
         Ok(head_address)
@@ -298,42 +292,39 @@ impl Client {
         chunks_info: Vec<ChunkInfo>,
     ) -> Result<Vec<EncryptedChunk>> {
         let expected_count = chunks_info.len();
-        let tasks = chunks_info.into_iter().map(|chunk_info| {
-            let client = client.clone();
-            task::spawn(async move {
-                match client.get_chunk(&chunk_info.dst_hash).await {
-                    Ok(chunk) => Ok(EncryptedChunk {
-                        index: chunk_info.index,
-                        content: chunk.value().clone(),
-                    }),
-                    Err(err) => {
-                        warn!(
-                            "Reading chunk {} from network, resulted in error {:?}.",
-                            chunk_info.dst_hash, err
-                        );
-                        Err(err)
+        let mut retrieved_chunks = vec![];
+        for next_batch in chunks_info.chunks(CHUNKS_BATCH_MAX_SIZE) {
+            let tasks = next_batch.iter().cloned().map(|chunk_info| {
+                let client = client.clone();
+                task::spawn(async move {
+                    match client.get_chunk(&chunk_info.dst_hash).await {
+                        Ok(chunk) => Ok(EncryptedChunk {
+                            index: chunk_info.index,
+                            content: chunk.value().clone(),
+                        }),
+                        Err(err) => {
+                            warn!(
+                                "Reading chunk {} from network, resulted in error {:?}.",
+                                chunk_info.dst_hash, err
+                            );
+                            Err(err)
+                        }
                     }
-                }
-            })
-        });
+                })
+            });
 
-        // This swallowing of errors
-        // is basically a compaction into a single
-        // error saying "didn't get all chunks".
-        let encrypted_chunks = join_all(tasks)
-            .await
-            .into_iter()
-            .flatten()
-            .flatten()
-            .collect_vec();
+            // This swallowing of errors is basically a compaction into a single
+            // error saying "didn't get all chunks".
+            retrieved_chunks.extend(join_all(tasks).await.into_iter().flatten().flatten());
+        }
 
-        if expected_count > encrypted_chunks.len() {
+        if expected_count > retrieved_chunks.len() {
             Err(Error::NotEnoughChunksRetrieved {
                 expected: expected_count,
-                retrieved: encrypted_chunks.len(),
+                retrieved: retrieved_chunks.len(),
             })
         } else {
-            Ok(encrypted_chunks)
+            Ok(retrieved_chunks)
         }
     }
 
@@ -372,6 +363,21 @@ mod tests {
     use tokio::time::Instant;
     use tracing::{instrument::Instrumented, Instrument};
     use xor_name::XorName;
+
+    #[test]
+    #[cfg(feature = "limit-client-upload-size")]
+    fn limits_upload_size() -> Result<()> {
+        use super::Error;
+        use assert_matches::assert_matches;
+        let too_large_file = random_bytes(LargeFile::CLIENT_UPLOAD_SIZE_LIMIT + 1);
+        assert_matches!(
+            Client::chunk_bytes(too_large_file),
+            Err(Error::UploadSizeLimitExceeded { .. })
+        );
+        let ok_file_size = random_bytes(LargeFile::CLIENT_UPLOAD_SIZE_LIMIT);
+        assert_matches!(Client::chunk_bytes(ok_file_size), Ok(_));
+        Ok(())
+    }
 
     #[test]
     fn deterministic_chunking() -> Result<()> {

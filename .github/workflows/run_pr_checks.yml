@@ -137,7 +137,6 @@ jobs:
         timeout-minutes: 25
         run: cd sn_cli && cargo test --release --bin safe
 
-
   build:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Build node and testnet binaries (EC2)
@@ -209,6 +208,12 @@ jobs:
         run: cargo test --no-run --release --features check-replicas --package sn_client
         timeout-minutes: 50
 
+      - name: Run client test of limit-client-upload-size feature
+        env:
+          RUST_LOG: "sn_client,sn_interface"
+        run: cargo test --release --features limit-client-upload-size --package sn_client -- --test-threads=1 limits_upload_size
+        timeout-minutes: 5
+
       - name: Run client tests
         env:
           RUST_LOG: "sn_client,sn_interface"
@@ -271,122 +276,77 @@ jobs:
         if: failure()
         continue-on-error: true
 
-  # unit-tests-and-e2e-split:
-  #   if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-  #   name: Unit tests and E2E tests (EC2)
-  #   runs-on: self-hosted
-  #   needs: build
-  #   env:
-  #     CARGO_HOME: /mnt/data/cargo
-  #     NODE_COUNT: 15
-  #     TMPDIR: /mnt/data/tmp
-  #   steps:
-  #     - uses: actions/checkout@v2
+  e2e-churn:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: E2E Churn test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
 
-  #     - uses: Swatinem/rust-cache@v1
-  #       continue-on-error: true
-  #       with:
-  #         cache-on-failure: true
-  #         sharedKey: ${{github.run_id}}
+      - uses: Swatinem/rust-cache@v1
+        continue-on-error: true
+        with:
+          cache-on-failure: true
+          sharedKey: ${{github.run_id}}
 
-  #     - name: download and unpack artifacts
-  #       run: |
-  #         curl -O $BUILD_ARTIFACTS_URL/artifacts-$GITHUB_RUN_ID.tar.gz
-  #         mkdir -p artifacts ~/.safe/node
-  #         tar -xvf artifacts-$GITHUB_RUN_ID.tar.gz -C artifacts/ .
-  #         chmod +x artifacts/sn_node
-  #         chmod +x artifacts/testnet
-  #         cp artifacts/sn_node ~/.safe/node
+      # This starts a NODE_COUNT node network, and then adds 12 more nodes. We should kill before moving on to split checks
+      - name: Run network churn data integrity test
+        timeout-minutes: 55 # made 55 for now due to slow network startup
+        shell: bash
+        run: cargo run --release --example churn
 
-  #     - name: Start the network
-  #       run: ./artifacts/testnet --interval 30000
-  #       env:
-  #         RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
+      - name: Ensure no nodes have left during test runs
+        timeout-minutes: 1
+        shell: bash
+        # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
+        run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
 
-  #     - name: Wait for all nodes to join
-  #       shell: bash
-  #       run: ./resources/scripts/wait_for_nodes_to_join.sh
-  #       timeout-minutes: 5
+      - name: Are nodes still running...?
+        shell: bash
+        timeout-minutes: 1
+        continue-on-error: true
+        run: |
+          echo "$(pgrep sn_node | wc -l) nodes still running"
+          ls $HOME/.safe/node/local-test-network
 
-  #     - name: Run sn_interface tests
-  #       run: cargo test --release --package sn_interface
-  #     - name: Run sn_dysfunction tests
-  #       run: cargo test --release --package sn_dysfunction
-  #     - name: Run sn_node tests
-  #       run: cargo test --release --package sn_node
-  #     - name: Run sn_cli tests
-  #       run: cargo test --release --bin safe
+      - name: Kill all nodes
+        shell: bash
+        timeout-minutes: 1
+        if: failure()
+        continue-on-error: true
+        run: |
+          pkill sn_node
+          echo "$(pgrep sn_node | wc -l) nodes still running"
 
-  #     # This starts a NODE_COUNT node network, and then adds 12 more nodes. We should kill before moving on to split checks
-  #     - name: Run network churn data integrity test
-  #       timeout-minutes: 35 # made 35 for now due to client slowdown. TODO: fix that!
-  #       shell: bash
-  #       run: cargo run --release --example churn
+      - name: Generate StateMap
+        shell: bash
+        if: failure()
+        continue-on-error: true
+        run: |
+          cargo install --git https://github.com/TritonDataCenter/statemap.git
+          ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
 
-  #     - name: Build all tests before running
-  #       run: cargo test --no-run --release --package sn_client
+      - name: Upload StateMap
+        uses: actions/upload-artifact@main
+        if: failure()
+        with:
+          name: statemap_e2e_split_self_hosted_ubuntu.svg
+          path: safe_statemap.svg
+        continue-on-error: true
 
-  #     - name: Run client tests
-  #       env:
-  #         RUST_LOG: "sn_client=trace,qp2p=debug"
-  #       run: cargo test --release --package sn_client -- --test-threads=1
-  #       timeout-minutes: 25
+      - name: Tar log files
+        shell: bash
+        continue-on-error: true
+        run: find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
+        if: failure()
 
-  #     - name: Run example app for file API against local network
-  #       timeout-minutes: 10
-  #       shell: bash
-  #       run: cargo run --release --example client_files
-
-  #     - name: Ensure no nodes have left during test runs
-  #       timeout-minutes: 1
-  #       shell: bash
-  #       # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
-  #       run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
-
-  #     - name: Are nodes still running...?
-  #       shell: bash
-  #       timeout-minutes: 1
-  #       continue-on-error: true
-  #       run: |
-  #         echo "$(pgrep sn_node | wc -l) nodes still running"
-  #         ls $HOME/.safe/node/local-test-network
-
-  #     - name: Kill all nodes
-  #       shell: bash
-  #       timeout-minutes: 1
-  #       if: failure()
-  #       continue-on-error: true
-  #       run: |
-  #         pkill sn_node
-  #         echo "$(pgrep sn_node | wc -l) nodes still running"
-
-  #     - name: Generate StateMap
-  #       shell: bash
-  #       continue-on-error: true
-  #       run: |
-  #         cargo install --git https://github.com/TritonDataCenter/statemap.git
-  #         ./resources/scripts/statemap-preprocess.sh --run-statemap > safe_statemap.svg
-
-  #     - name: Upload StateMap
-  #       uses: actions/upload-artifact@main
-  #       with:
-  #         name: statemap_e2e_split_self_hosted_ubuntu.svg
-  #         path: safe_statemap.svg
-  #       continue-on-error: true
-
-  #     - name: Tar log files
-  #       shell: bash
-  #       continue-on-error: true
-  #       run: find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
-  #       if: failure()
-
-  #     - name: Upload Node Logs
-  #       uses: actions/upload-artifact@main
-  #       with:
-  #         name: sn_node_logs_e2e_split_self_hosted_ubuntu
-  #         path: log_files.tar.gz
-  #       if: failure()
-  #       continue-on-error: true
+      - name: Upload Node Logs
+        uses: actions/upload-artifact@main
+        with:
+          name: sn_node_logs_e2e_split_self_hosted_ubuntu
+          path: log_files.tar.gz
+        if: failure()
+        continue-on-error: true
 
   api:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -439,7 +399,7 @@ jobs:
       - name: Run API tests
         env:
           RUST_LOG: "sn_client,sn_interface"
-        run: cargo test --release --features check-replicas --package sn_api -- --test-threads=1
+        run: cargo test --release --features check-replicas --package sn_api
         timeout-minutes: 30
 
       - name: Are nodes still running...?
@@ -541,7 +501,7 @@ jobs:
         run: cargo run --release --bin safe keys create --for-cli
 
       - name: Run CLI tests
-        run: cargo test --release --features check-replicas --package sn_cli -- --test-threads=1
+        run: cargo test --release --features check-replicas --package sn_cli
         timeout-minutes: 50
 
       - name: Are nodes still running...?

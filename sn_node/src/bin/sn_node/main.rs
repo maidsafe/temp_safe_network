@@ -56,6 +56,9 @@ async fn main() -> Result<()> {
         info!("Node runtime started");
         create_runtime_and_node(&config).await?;
 
+        // if we've had an issue, lets put the brakes on any crazy looping here
+        sleep(Duration::from_secs(1)).await;
+
         // pull config again in case it has been updated meanwhile
         config = Config::new().await?;
     }

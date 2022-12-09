@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use std::fmt::{self, Formatter};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -82,7 +83,7 @@ impl PeerSession {
             .await;
         while response.is_err() && attempts <= 2 {
             error!(
-                "Error sending to {:?} on bi conn: {response:?}, attempt # {attempts}",
+                "Error sending {msg_id:?} to {:?} on bi conn: {response:?}, attempt # {attempts}",
                 self.link.peer()
             );
             response = self
@@ -94,7 +95,10 @@ impl PeerSession {
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
 
-        response.map_err(|_e| Error::CmdSendError)
+        response.map_err(|e| {
+            error!("Failed sending {msg_id:?} to {:?} {e:?}", self.link.peer());
+            Error::CmdSendError
+        })
     }
 
     #[instrument(skip(self, bytes))]
@@ -127,6 +131,12 @@ impl PeerSession {
         if let Err(e) = self.channel.send(SessionCmd::Terminate).await {
             error!("Error while sending Terminate command: {e:?}");
         }
+    }
+}
+
+impl fmt::Debug for PeerSession {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "PeerSession {:?}", self.link.peer())
     }
 }
 

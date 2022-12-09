@@ -49,7 +49,7 @@ async fn main() -> Result<()> {
 
     // Print out chunk information of file
 
-    let (data_map_xor, chunks) = client.chunk_bytes(bytes.clone())?;
+    let (data_map_xor, chunks) = Client::chunk_bytes(bytes.clone())?;
     println!("DataMap XOR: {}", data_map_xor);
     for chunk in &chunks {
         println!(

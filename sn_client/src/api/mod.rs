@@ -18,7 +18,7 @@ mod spentbook_apis;
 pub use client_builder::ClientBuilder;
 pub use register_apis::RegisterWriteAheadLog;
 
-use crate::{connections::Session, errors::Error};
+use crate::{errors::Error, sessions::Session};
 
 use sn_dbc::Owner;
 use sn_interface::{

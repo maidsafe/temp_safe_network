@@ -8,8 +8,6 @@
 
 //! SAFE network data types.
 
-/// Connection Handling types
-pub mod connections;
 /// public key types (ed25519)
 pub mod keys;
 /// Standardised log markers for various events
@@ -34,7 +32,6 @@ pub use crate::messaging::{
 pub use address::{ChunkAddress, DataAddress, RegisterAddress, SpentbookAddress};
 pub use cache::Cache;
 pub use chunk::{Chunk, MAX_CHUNK_SIZE_IN_BYTES};
-pub use connections::{PeerLinks, SendToOneError};
 pub use errors::{Error, Result};
 pub use keys::{
     keypair::{BlsKeypairShare, Encryption, Keypair, OwnerType, Signing},

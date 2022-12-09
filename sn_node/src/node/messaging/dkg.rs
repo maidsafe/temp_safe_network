@@ -771,36 +771,26 @@ impl MyNode {
         // it to sign any msg that needs section agreement.
         self.section_keys_provider.insert(key_share.clone());
 
-        let context = self.context();
+        let mut cmds = self.update_on_elder_change(&self.context()).await?;
 
-        // If we are lagging, we may have been already approved as new Elder, and
-        // an AE update provided us with this same SAP but already signed by previous Elders,
-        // if so we can skip the RequestHandover agreement proposal phase.
-        if self
-            .network_knowledge
-            .try_update_current_sap(key_share_pk, &sap.prefix())
-        {
-            self.update_on_elder_change(&context).await
-        } else {
+        if !self.network_knowledge.has_chain_key(&sap.section_key()) {
             // This proposal is sent to the current set of elders to be aggregated
             // and section signed.
             let proposal = Proposal::RequestHandover(sap);
             let recipients: Vec<_> = self.network_knowledge.section_auth().elders_vec();
-            self.send_proposal_with(recipients, proposal, &key_share)
+            cmds.extend(self.send_proposal_with(recipients, proposal, &key_share)?);
         }
+
+        Ok(cmds)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::MyNode;
-    use crate::{
-        node::{
-            cfg::create_test_max_capacity_and_root_storage,
-            flow_ctrl::{cmds::Cmd, tests::network_utils::create_comm},
-            messaging::Peers,
-        },
-        UsedSpace,
+    use crate::node::{
+        flow_ctrl::{cmds::Cmd, tests::network_builder::TestNetworkBuilder},
+        messaging::Peers,
     };
     use sn_interface::{
         init_logger,
@@ -810,7 +800,7 @@ mod tests {
             MsgId, SectionSigShare,
         },
         network_knowledge::{supermajority, NodeState, SectionKeyShare, SectionsDAG},
-        test_utils::{TestKeys, TestNetworkKnowledge, TestSectionTree},
+        test_utils::{TestKeys, TestSectionTree},
         types::Peer,
         SectionAuthorityProvider,
     };
@@ -823,7 +813,7 @@ mod tests {
         collections::{BTreeMap, BTreeSet},
         sync::Arc,
     };
-    use tokio::sync::{mpsc, RwLock};
+    use tokio::sync::RwLock;
     use xor_name::{Prefix, XorName};
 
     /// Simulate an entire round of dkg till termination; The dkg round creates a new keyshare set
@@ -872,7 +862,7 @@ mod tests {
                                 ..
                             } => {
                                 let new_msgs =
-                                    node.read().await.mock_send_msg(msg, msg_id, recipients)?;
+                                    node.read().await.mock_send_msg(msg, msg_id, recipients);
                                 msgs_to_other_nodes.push(new_msgs);
                             }
                             Cmd::HandleDkgOutcome {
@@ -886,7 +876,7 @@ mod tests {
                                     .write()
                                     .await
                                     .mock_dkg_outcome_proposal(section_auth, outcome)
-                                    .await?;
+                                    .await;
                                 assert_matches!(msg, NodeMsg::Propose { proposal, .. } => {
                                     assert_matches!(proposal, Proposal::RequestHandover(_))
                                 });
@@ -925,8 +915,7 @@ mod tests {
         let mut new_sk_shares: BTreeMap<XorName, SectionKeyShare> = BTreeMap::new();
         let mut new_sap: BTreeSet<SectionAuthorityProvider> = BTreeSet::new();
         let mut lagging = false;
-        let mut done = false;
-        while !done {
+        while !MyNodeInstance::is_msg_queue_empty(&node_instances).await {
             // For every msg in `msg_queue` for every node instance, 1) handle the msg 2) handle the cmds
             // 3) if the cmds produce more msgs, add them to the `msg_queue` of the respective peer
             let mut msgs_to_other_nodes = Vec::new();
@@ -1020,7 +1009,7 @@ mod tests {
                                 ..
                             } => {
                                 let new_msgs =
-                                    node.read().await.mock_send_msg(msg, msg_id, recipients)?;
+                                    node.read().await.mock_send_msg(msg, msg_id, recipients);
                                 msgs_to_other_nodes.push(new_msgs);
                             }
                             Cmd::HandleDkgOutcome {
@@ -1035,22 +1024,34 @@ mod tests {
                                         .write()
                                         .await
                                         .mock_dkg_outcome_proposal(section_auth, outcome)
-                                        .await?;
+                                        .await;
                                     assert_matches!(msg, NodeMsg::Propose { proposal, .. } => {
                                         assert_matches!(proposal, Proposal::RequestHandover(_))
                                     });
                                 } else {
                                     // Since the dkg session is for the same prefix, the
-                                    // lagging node just returns a empty cmd list. There are
-                                    // multiple paths here and testing them here is not a wise
-                                    // choice, instead we can test them where the logic is
-                                    // defined.
+                                    // lagging node should just complete the elder handover
+                                    // without requesting handover.
                                     let cmds = node
                                         .write()
                                         .await
                                         .handle_dkg_outcome(section_auth, outcome)
                                         .await?;
-                                    assert_eq!(cmds.len(), 0);
+
+                                    assert_eq!(cmds.len(), 2);
+                                    for cmd in cmds {
+                                        let msg =
+                                            assert_matches!(cmd, Cmd::SendMsg { msg, .. } => msg);
+
+                                        match msg {
+                                            NodeMsg::Propose {
+                                                proposal: Proposal::JoinsAllowed(..),
+                                                ..
+                                            } => (),
+                                            NodeMsg::AntiEntropy { .. } => (),
+                                            msg => panic!("Unexpected msg {msg}"),
+                                        }
+                                    }
                                 }
                             }
                             _ => panic!("got a different cmd {:?}", cmd),
@@ -1061,9 +1062,6 @@ mod tests {
 
             // add the msgs to the msg_queue of each node
             MyNodeInstance::add_msgs_to_queue(&mut node_instances, msgs_to_other_nodes).await;
-
-            // done if the queues are empty
-            done = MyNodeInstance::is_msg_queue_empty(&node_instances).await;
         }
 
         // dkg done, make sure the new key share is valid
@@ -1116,7 +1114,7 @@ mod tests {
                                 ..
                             } => {
                                 let mut new_msgs =
-                                    node.read().await.mock_send_msg(msg, msg_id, recipients)?;
+                                    node.read().await.mock_send_msg(msg, msg_id, recipients);
                                 // dead_node will not recieve the msg
                                 new_msgs.1.retain(|peer| peer.name() != dead_node);
                                 msgs_to_other_nodes.push(new_msgs);
@@ -1181,7 +1179,7 @@ mod tests {
                                 ..
                             } => {
                                 let mut new_msgs =
-                                    node.read().await.mock_send_msg(msg, msg_id, recipients)?;
+                                    node.read().await.mock_send_msg(msg, msg_id, recipients);
                                 // randomly drop the msg to a peer; chance = 1/node_count
                                 new_msgs.1.retain(|_| rng.gen::<usize>() % node_count != 0);
                                 msgs_to_other_nodes.push(new_msgs);
@@ -1197,7 +1195,7 @@ mod tests {
                                     .write()
                                     .await
                                     .mock_dkg_outcome_proposal(section_auth, outcome)
-                                    .await?;
+                                    .await;
                                 assert_matches!(msg, NodeMsg::Propose { proposal, .. } => {
                                     assert_matches!(proposal, Proposal::RequestHandover(_))
                                 });
@@ -1250,7 +1248,7 @@ mod tests {
                             let new_msgs = random_node
                                 .read()
                                 .await
-                                .mock_send_msg(msg, msg_id, recipients)?;
+                                .mock_send_msg(msg, msg_id, recipients);
                             msgs_to_other_nodes.push(new_msgs);
                         }
                         _ => panic!("should be send msg, got {cmd}"),
@@ -1272,39 +1270,6 @@ mod tests {
     }
 
     // Test helpers
-
-    /// Generate a set of `MyNode` instances
-    async fn gen_my_nodes<R: RngCore>(elders: usize, rng: &mut R) -> (Vec<MyNode>, SecretKeySet) {
-        let mut nodes = Vec::new();
-        let (max_capacity, root_storage_dir) =
-            create_test_max_capacity_and_root_storage().expect("Failed to create root_storage_dir");
-        // threshold = 4 if elders = 7; ie, we need supermajority(7) = 5 shares to form a valid sig
-        let gen_section_key_set = SecretKeySet::random(supermajority(elders) - 1, rng);
-        let (network_knowledge, node_infos) = TestNetworkKnowledge::random_section_with_key(
-            Prefix::default(),
-            elders,
-            0,
-            &gen_section_key_set,
-        );
-
-        for (idx, info) in node_infos.into_iter().enumerate() {
-            let section_key_share = TestKeys::get_section_key_share(&gen_section_key_set, idx);
-            let node = MyNode::new(
-                create_comm().await.expect("Failed to create Comm"),
-                info.keypair.clone(),
-                network_knowledge.clone(),
-                Some(section_key_share),
-                UsedSpace::new(max_capacity),
-                root_storage_dir.clone(),
-                mpsc::channel(10).0,
-            )
-            .await
-            .expect("Failed to create MyNode");
-            nodes.push(node);
-        }
-        (nodes, gen_section_key_set)
-    }
-
     type MockSystemMsg = (MsgId, NodeMsg, Peer);
 
     struct MyNodeInstance {
@@ -1319,9 +1284,12 @@ mod tests {
             node_count: usize,
             rng: &mut R,
         ) -> (BTreeMap<XorName, MyNodeInstance>, SecretKeySet) {
-            let (nodes, sk_set) = gen_my_nodes(node_count, rng).await;
+            let env = TestNetworkBuilder::new(rng)
+                .sap(Prefix::default(), node_count, 0, None, None)
+                .build();
 
-            let node_instances = nodes
+            let node_instances = env
+                .get_nodes(Prefix::default(), node_count, 0, None)
                 .into_iter()
                 .map(|node| {
                     let name = node.name();
@@ -1332,6 +1300,7 @@ mod tests {
                     (name, mock)
                 })
                 .collect::<BTreeMap<_, _>>();
+            let sk_set = env.get_secret_key_set(Prefix::default(), None);
             (node_instances, sk_set)
         }
 
@@ -1362,7 +1331,7 @@ mod tests {
                 let mut cmd = node.send_dkg_start(session_id.clone())?;
                 assert_eq!(cmd.len(), 1);
                 let msg = assert_matches!(cmd.remove(0), Cmd::SendMsg { msg, msg_id, recipients, .. } => (msg, msg_id, recipients));
-                let msg = node.mock_send_msg(msg.0, msg.1, msg.2)?;
+                let msg = node.mock_send_msg(msg.0, msg.1, msg.2);
                 msgs_to_other_nodes.push(msg);
             }
             // add the msgs to the msg_queue of each node
@@ -1448,7 +1417,7 @@ mod tests {
             msg: NodeMsg,
             msg_id: MsgId,
             recipients: Peers,
-        ) -> Result<(MockSystemMsg, Vec<Peer>)> {
+        ) -> (MockSystemMsg, Vec<Peer>) {
             info!("msg: {msg:?} msg_id {msg_id:?}, recipients {recipients:?}");
             let current_node = Peer::new(self.name(), self.addr);
 
@@ -1458,7 +1427,7 @@ mod tests {
             };
             let mock_system_msg: MockSystemMsg = (msg_id, msg, current_node);
             info!("SendMsg output {}", mock_system_msg.2);
-            Ok((mock_system_msg, recipients))
+            (mock_system_msg, recipients)
         }
 
         // if RequestHandover proposal is triggered, it will send out msgs to other nodes
@@ -1466,21 +1435,27 @@ mod tests {
             &mut self,
             sap: SectionAuthorityProvider,
             key_share: SectionKeyShare,
-        ) -> Result<(MockSystemMsg, Vec<Peer>)> {
-            let mut cmds = self.handle_dkg_outcome(sap, key_share).await?;
-            // contains only the SendMsg for RequestHandover proposal
-            assert_eq!(cmds.len(), 1);
-            if let Cmd::SendMsg {
-                msg,
-                msg_id,
-                recipients,
-                ..
-            } = cmds.remove(0)
+        ) -> (MockSystemMsg, Vec<Peer>) {
+            for cmd in self
+                .handle_dkg_outcome(sap, key_share)
+                .await
+                .expect("Failed to handle DKG outcome")
             {
-                self.mock_send_msg(msg, msg_id, recipients)
-            } else {
-                Err(eyre!("Should be Cmd::SendMsg"))
+                let (msg, msg_id, recipients) = assert_matches!(cmd, Cmd::SendMsg { msg, msg_id, recipients, ..} => (msg, msg_id, recipients));
+
+                // contains only the SendMsg for RequestHandover proposal
+                if matches!(
+                    msg,
+                    NodeMsg::Propose {
+                        proposal: Proposal::RequestHandover(..),
+                        ..
+                    }
+                ) {
+                    return self.mock_send_msg(msg, msg_id, recipients);
+                }
             }
+
+            panic!("Expected propose msg");
         }
     }
 }

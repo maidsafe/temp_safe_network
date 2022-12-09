@@ -3080,9 +3080,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.31.1"
+version = "0.32.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9451fee7e656f8aaed7f78c4e70b3a20cec20ef874a96e6f4e3427d7e64a1a1f"
+checksum = "33f77dae1f50c4f2ed551958d4abc2bcfbd30fdea187ceca4ba293ad22583c9b"
 dependencies = [
  "backoff 0.3.0",
  "bincode",
@@ -3916,6 +3916,7 @@ dependencies = [
 name = "sn_client"
 version = "0.76.0"
 dependencies = [
+ "assert_matches",
  "backoff 0.4.0",
  "base64",
  "bincode",

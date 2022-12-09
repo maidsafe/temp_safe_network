@@ -9,33 +9,37 @@
 #![allow(dead_code)]
 pub(crate) mod cmd_utils;
 pub(crate) mod dbc_utils;
-pub(crate) mod network_utils;
+pub(crate) mod network_builder;
 
 use crate::{
-    comm::{Comm, MsgFromPeer},
+    comm::MsgFromPeer,
     node::{
-        cfg::create_test_max_capacity_and_root_storage, core::MyNode,
-        flow_ctrl::dispatcher::Dispatcher, messages::WireMsgUtils, messaging::Peers, Cmd, Error,
-        Proposal,
+        flow_ctrl::{
+            dispatcher::Dispatcher,
+            tests::network_builder::{TestNetwork, TestNetworkBuilder},
+        },
+        messages::WireMsgUtils,
+        messaging::Peers,
+        relocation_check, ChurnId, Cmd, Error, Proposal,
     },
-    storage::UsedSpace,
 };
 use cmd_utils::{
     handle_online_cmd, run_and_collect_cmds, run_node_handle_client_msg_and_collect_cmds,
 };
+use sn_consensus::Decision;
 use sn_dbc::Hash;
 use sn_interface::{
     dbcs::gen_genesis_dbc,
     elder_count, init_logger,
     messaging::{
         data::{ClientMsg, DataCmd, SpentbookCmd},
-        system::{AntiEntropyKind, JoinAsRelocatedRequest, NodeDataCmd, NodeMsg, SectionSigned},
+        system::{self, AntiEntropyKind, JoinAsRelocatedRequest, NodeDataCmd, NodeMsg},
         Dst, MsgType, WireMsg,
     },
     network_knowledge::{
         recommended_section_size, supermajority, Error as NetworkKnowledgeError, MembershipState,
-        MyNodeInfo, NetworkKnowledge, NodeState, RelocateDetails, SectionAuthorityProvider,
-        SectionKeysProvider, SectionTree, SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
+        MyNodeInfo, NodeState, RelocateDetails, SapCandidate, SectionKeysProvider,
+        SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
     },
     test_utils::*,
     types::{keys::ed25519, PublicKey, ReplicatedData},
@@ -43,14 +47,13 @@ use sn_interface::{
 
 use assert_matches::assert_matches;
 use eyre::{bail, eyre, Result};
-use rand::thread_rng;
+use rand::{rngs::StdRng, thread_rng, SeedableRng};
 use std::{
-    collections::{BTreeMap, BTreeSet, HashSet},
+    collections::{BTreeSet, HashSet},
     iter,
-    net::Ipv4Addr,
     sync::Arc,
 };
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::RwLock;
 use xor_name::{Prefix, XorName};
 
 #[tokio::test]
@@ -58,10 +61,12 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
     init_logger();
     let _span = tracing::info_span!("receive_join_request_from_relocated_node").entered();
 
-    let (dispatcher, _, _, sk_set) =
-        network_utils::TestNodeBuilder::new(Prefix::default(), elder_count())
-            .build()
-            .await?;
+    let prefix = Prefix::default();
+    let env = TestNetworkBuilder::new(thread_rng())
+        .sap(prefix, elder_count(), 0, None, None)
+        .build();
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
+    let sk_set = env.get_secret_key_set(prefix, None);
     let section_key = sk_set.public_keys().public_key();
     let node = dispatcher.node();
     let node_info = node.read().await.info();
@@ -69,7 +74,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
     let relocated_node_old_keypair = node_info.keypair.clone();
 
     let relocated_node = MyNodeInfo::new(
-        ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE + 1),
+        ed25519::gen_keypair(&prefix.range_inclusive(), MIN_ADULT_AGE + 1),
         gen_addr(),
     );
 
@@ -126,12 +131,13 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
 
 #[tokio::test]
 async fn handle_agreement_on_online() -> Result<()> {
-    let (dispatcher, _, _, sk_set) =
-        network_utils::TestNodeBuilder::new(Prefix::default(), elder_count())
-            .build()
-            .await?;
-
-    let new_peer = network_utils::create_peer(MIN_ADULT_AGE);
+    let prefix = Prefix::default();
+    let env = TestNetworkBuilder::new(thread_rng())
+        .sap(prefix, elder_count(), 0, None, None)
+        .build();
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
+    let sk_set = env.get_secret_key_set(prefix, None);
+    let new_peer = gen_peer(MIN_ADULT_AGE);
     let status = handle_online_cmd(&new_peer, &sk_set, &dispatcher).await?;
     assert!(status.node_approval_sent);
 
@@ -148,48 +154,31 @@ async fn handle_agreement_on_online() -> Result<()> {
 #[tokio::test]
 async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     init_logger();
-    let sk_set = bls::SecretKeySet::random(0, &mut thread_rng());
-    let pk = sk_set.secret_key().public_key();
-    let section_chain = SectionsDAG::new(pk);
-
     // Creates nodes where everybody has age 6 except one has 5.
-    let mut nodes: Vec<_> = gen_sorted_nodes(&Prefix::default(), elder_count(), 0, Some(&[5, 6]));
+    let prefix = Prefix::default();
+    let env = TestNetworkBuilder::new(thread_rng())
+        .sap(
+            prefix,
+            elder_count(),
+            0,
+            Some(&[MIN_ADULT_AGE, MIN_ADULT_AGE + 1]),
+            None,
+        )
+        .build();
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
+    let node_name = dispatcher.node().read().await.name();
+    let section = env.get_network_knowledge(prefix, None);
+    let sk_set = env.get_secret_key_set(prefix, None);
 
-    let elders = nodes.iter().map(MyNodeInfo::peer);
-    let members = nodes.iter().map(|n| NodeState::joined(n.peer(), None));
-    let section_auth =
-        SectionAuthorityProvider::new(elders, Prefix::default(), members, sk_set.public_keys(), 0);
-    let section_tree_update = {
-        let signed_sap = TestKeys::get_section_signed(&sk_set.secret_key(), section_auth.clone());
-        SectionTreeUpdate::new(signed_sap, section_chain)
-    };
-
-    let mut section = NetworkKnowledge::new(SectionTree::new(pk), section_tree_update)?;
-    let mut expected_new_elders = BTreeSet::new();
-
-    for peer in section_auth.elders() {
-        let node_state = NodeState::joined(*peer, None);
-        let sig = TestKeys::get_section_sig(&sk_set.secret_key(), &node_state);
-        let _updated = section.update_member(SectionSigned {
-            value: node_state,
-            sig,
-        });
-        if peer.age() == MIN_ADULT_AGE + 1 {
-            let _changed = expected_new_elders.insert(peer);
-        }
-    }
-
-    let node = nodes.remove(0);
-    let node_name = node.name();
-    let (dispatcher, _, _, _) =
-        network_utils::TestNodeBuilder::new(Prefix::default(), elder_count())
-            .section(section.clone(), sk_set.clone(), node.clone())
-            .build()
-            .await?;
+    let mut expected_new_elders = section
+        .elders()
+        .into_iter()
+        .filter(|peer| peer.age() == MIN_ADULT_AGE + 1)
+        .collect::<BTreeSet<_>>();
 
     // Handle agreement on Online of a peer that is older than the youngest
     // current elder - that means this peer is going to be promoted.
-    let new_peer = network_utils::create_peer(MIN_ADULT_AGE + 1);
+    let new_peer = gen_peer(MIN_ADULT_AGE + 1);
     let node_state = NodeState::joined(new_peer, Some(xor_name::rand::random()));
 
     let membership_decision = section_decision(&sk_set, node_state.clone());
@@ -212,7 +201,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
 
     // Verify we sent a `DkgStart` message with the expected participants.
     let mut dkg_start_sent = false;
-    let _changed = expected_new_elders.insert(&new_peer);
+    let _changed = expected_new_elders.insert(new_peer);
 
     for cmd in cmds {
         let (msg, recipients) = match cmd {
@@ -232,8 +221,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         );
 
         let expected_dkg_start_recipients: BTreeSet<_> = expected_new_elders
-            .clone()
-            .into_iter()
+            .iter()
             .filter(|peer| peer.name() != node_name)
             .cloned()
             .collect();
@@ -253,13 +241,13 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
 async fn handle_join_request_of_rejoined_node() -> Result<()> {
     init_logger();
     let prefix = Prefix::default();
-    let (dispatcher, _, _, _) =
-        network_utils::TestNodeBuilder::new(Prefix::default(), elder_count())
-            .build()
-            .await?;
+    let env = TestNetworkBuilder::new(thread_rng())
+        .sap(prefix, elder_count(), 0, None, None)
+        .build();
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
 
     // Make a left peer.
-    let peer = network_utils::create_peer_in_prefix(&prefix, MIN_ADULT_AGE);
+    let peer = gen_peer_in_prefix(MIN_ADULT_AGE, prefix);
     dispatcher
         .node()
         .write()
@@ -294,17 +282,19 @@ async fn handle_join_request_of_rejoined_node() -> Result<()> {
 async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     init_logger();
     let _span = tracing::info_span!("handle_agreement_on_offline_of_non_elder").entered();
-    let existing_peer = network_utils::create_peer(MIN_ADULT_AGE);
+    let prefix = Prefix::default();
+    let env = TestNetworkBuilder::new(thread_rng())
+        .sap(prefix, elder_count(), 1, None, None)
+        .build();
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
+    let sk_set = env.get_secret_key_set(prefix, None);
 
-    let (dispatcher, _, _, sk_set) =
-        network_utils::TestNodeBuilder::new(Prefix::default(), elder_count())
-            .custom_peer(existing_peer)
-            .build()
-            .await?;
+    // get the node state of the non_elder node
+    let node_state = env.get_nodes(prefix, 0, 1, None).remove(0).info().peer();
+    let node_state = NodeState::left(node_state, None);
 
-    let node_state = NodeState::left(existing_peer, None);
     let proposal = Proposal::VoteNodeOffline(node_state.clone());
-    let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &proposal.as_signable_bytes()?);
+    let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &get_single_sig(&proposal));
 
     let _cmds = run_and_collect_cmds(Cmd::HandleAgreement { proposal, sig }, &dispatcher).await?;
 
@@ -320,31 +310,20 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
 
 #[tokio::test]
 async fn handle_agreement_on_offline_of_elder() -> Result<()> {
-    let (sap, sk_set, mut nodes, _) = TestSapBuilder::new(Prefix::default()).build();
-    let (mut section, _) = network_utils::create_section(&sk_set, &sap, None, None)?;
+    let prefix = Prefix::default();
+    let env = TestNetworkBuilder::new(thread_rng())
+        .sap(prefix, elder_count(), 0, None, None)
+        .build();
+    let mut elders = env.get_dispatchers(prefix, 2, 0, None);
+    let dispatcher = elders.remove(0);
+    let sk_set = env.get_secret_key_set(prefix, None);
 
-    let existing_peer = network_utils::create_peer(MIN_ADULT_AGE);
-    let node_state = NodeState::joined(existing_peer, None);
-    let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state);
-    let _updated = section.update_member(node_state);
+    let remove_elder = elders.remove(0).node().read().await.info().peer();
+    let remove_elder = NodeState::left(remove_elder, None);
 
-    // Pick the elder to remove.
-    let remove_peer = sap.elders().last().expect("sap is empty");
-
-    let remove_node_state = section
-        .get_section_member(&remove_peer.name())
-        .expect("member not found")
-        .leave()?;
-
-    let node = nodes.remove(0);
-    let (dispatcher, _, _, _) =
-        network_utils::TestNodeBuilder::new(Prefix::default(), elder_count())
-            .section(section.clone(), sk_set.clone(), node.clone())
-            .build()
-            .await?;
     // Handle agreement on the Offline proposal
-    let proposal = Proposal::VoteNodeOffline(remove_node_state.clone());
-    let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &proposal.as_signable_bytes()?);
+    let proposal = Proposal::VoteNodeOffline(remove_elder.clone());
+    let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &get_single_sig(&proposal));
 
     let _cmds = run_and_collect_cmds(Cmd::HandleAgreement { proposal, sig }, &dispatcher).await?;
 
@@ -362,77 +341,46 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
 
 #[tokio::test]
 async fn ae_msg_from_the_future_is_handled() -> Result<()> {
-    // The setup here is too complex for the TestNodeBuilder.
     init_logger();
     let _span = info_span!("ae_msg_from_the_future_is_handled").entered();
 
-    // Create first `Section` with a chain of length 2
-    let sk0 = bls::SecretKey::random();
-    let pk0 = sk0.public_key();
+    let prefix = Prefix::default();
+    let (elders0, ..) = TestNetwork::gen_node_infos(&prefix, elder_count(), 0, Some(&[6]));
+    let new_elder = TestNetwork::gen_info(MIN_ADULT_AGE, Some(prefix));
+    let elders1 = elders0
+        .clone()
+        .into_iter()
+        .take(elder_count() - 1)
+        .chain(vec![(new_elder.0, new_elder.1)])
+        .collect::<Vec<_>>();
 
-    let (old_sap, sk_set1, mut elder_nodes, _) = TestSapBuilder::new(Prefix::default()).build();
-    let members = BTreeSet::from_iter(
-        elder_nodes
-            .iter()
-            .map(|n| NodeState::joined(n.peer(), None)),
-    );
-    let pk1 = sk_set1.secret_key().public_key();
+    // SAP0 is succeeded by SAP1 with a change in elder list
+    let env = TestNetworkBuilder::new(thread_rng())
+        .sap_with_members(prefix, elders0.clone(), elders0)
+        .sap_with_members(prefix, elders1.clone(), elders1)
+        .build();
+    let sk_set0 = env.get_secret_key_set(prefix, Some(0));
+    let sap1 = env.get_sap(prefix, Some(1));
+    let sk_set1 = env.get_secret_key_set(prefix, Some(1));
+    let pk_0 = sk_set0.public_keys().public_key();
 
+    // Our node does not know about SAP1
+    let mut node = env.get_nodes(prefix, 1, 0, Some(0)).remove(0);
+
+    let new_section_elders: BTreeSet<_> = sap1.elders_set();
     let section_tree_update = TestSectionTree::get_section_tree_update(
-        &TestKeys::get_section_signed(&sk_set1.secret_key(), old_sap.clone()),
-        &SectionsDAG::new(pk0),
-        &sk0,
-    );
-    let network_knowledge = NetworkKnowledge::new(SectionTree::new(pk0), section_tree_update)?;
-
-    // Create our node
-    let section_key_share = TestKeys::get_section_key_share(&sk_set1, 0);
-    let node_info = elder_nodes.remove(0);
-    let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-    let comm = network_utils::create_comm().await?;
-    let mut node = MyNode::new(
-        comm,
-        node_info.keypair.clone(),
-        network_knowledge,
-        Some(section_key_share),
-        UsedSpace::new(max_capacity),
-        root_storage_dir,
-        mpsc::channel(10).0,
-    )
-    .await?;
-
-    // Create new `Section` as a successor to the previous one.
-    let sk_set2 = bls::SecretKeySet::random(0, &mut thread_rng());
-
-    // Create the new `SectionAuthorityProvider` by replacing one of the peers with a new one,
-    // making sure the one we use as our `node` to receive the AE msg for the final test is included.
-    let old_node = elder_nodes.remove(0);
-    let new_peer = network_utils::create_peer(MIN_ADULT_AGE);
-    let new_elders = elder_nodes
-        .iter()
-        .map(|n| n.peer())
-        .chain(vec![node_info.peer(), new_peer]);
-
-    let new_sap = SectionAuthorityProvider::new(
-        new_elders,
-        old_sap.prefix(),
-        members,
-        sk_set2.public_keys(),
-        0,
-    );
-    let new_section_elders: BTreeSet<_> = new_sap.elders_set();
-    let section_tree_update = TestSectionTree::get_section_tree_update(
-        &TestKeys::get_section_signed(&sk_set2.secret_key(), new_sap.clone()),
+        &sap1,
         &node.section_chain(),
-        &sk_set1.secret_key(),
+        &sk_set0.secret_key(),
     );
 
     // Create the `Sync` message containing the new `Section`.
+    let sender = gen_info(MIN_ADULT_AGE, None);
     let wire_msg = WireMsg::single_src(
-        &old_node,
+        &sender,
         Dst {
-            name: XorName::from(PublicKey::Bls(pk1)),
-            section_key: pk1,
+            name: XorName::from(PublicKey::Bls(pk_0)),
+            section_key: pk_0,
         },
         NodeMsg::AntiEntropy {
             section_tree_update,
@@ -445,13 +393,13 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     // Simulate DKG round finished succesfully by adding
     // the new section key share to our cache
     node.section_keys_provider
-        .insert(TestKeys::get_section_key_share(&sk_set2, 0));
+        .insert(TestKeys::get_section_key_share(&sk_set1, 0));
 
     let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
 
     let _cmds = run_and_collect_cmds(
         Cmd::HandleMsg {
-            origin: old_node.peer(),
+            origin: sender.peer(),
             wire_msg,
             send_stream: None,
         },
@@ -474,10 +422,13 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
     init_logger();
     let _span = tracing::info_span!("untrusted_ae_msg_errors").entered();
 
-    let (dispatcher, section, _, sk_set) =
-        network_utils::TestNodeBuilder::new(Prefix::default(), elder_count())
-            .build()
-            .await?;
+    let prefix = Prefix::default();
+    let env = TestNetworkBuilder::new(thread_rng())
+        .sap(prefix, elder_count(), 0, None, None)
+        .build();
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
+    let section = env.get_network_knowledge(prefix, None);
+    let sk_set = env.get_secret_key_set(prefix, None);
     let pk = sk_set.secret_key().public_key();
 
     // a valid AE msg but with a non-verifiable SAP...
@@ -493,7 +444,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
         },
     };
 
-    let sender = network_utils::gen_info(MIN_ADULT_AGE, None);
+    let sender = gen_info(MIN_ADULT_AGE, None);
     let wire_msg = WireMsg::single_src(
         &sender,
         Dst {
@@ -547,6 +498,29 @@ async fn relocation_of_non_elder() -> Result<()> {
     relocation(RelocatedPeerRole::NonElder).await
 }
 
+/// Create a `Proposal::Online` whose agreement handling triggers relocation of a node with the
+/// given age.
+///
+/// NOTE: recommended to call this with low `age` (4 or 5), otherwise it might take very long time
+/// to complete because it needs to generate a signature with the number of trailing zeroes equal
+/// to (or greater that) `age`.
+pub(crate) fn create_relocation_trigger(
+    sk_set: &bls::SecretKeySet,
+    age: u8,
+) -> Decision<NodeState> {
+    loop {
+        let node_state = NodeState::joined(gen_peer(MIN_ADULT_AGE), Some(xor_name::rand::random()));
+        let decision = section_decision(sk_set, node_state.clone());
+
+        let sig: bls::Signature = decision.proposals[&node_state].clone();
+        let churn_id = ChurnId(sig.to_bytes());
+
+        if relocation_check(age, &churn_id) && !relocation_check(age + 1, &churn_id) {
+            return decision;
+        }
+    }
+}
+
 fn threshold() -> usize {
     supermajority(elder_count()) - 1
 }
@@ -562,45 +536,29 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
         RelocatedPeerRole::Elder => elder_count(),
         RelocatedPeerRole::NonElder => recommended_section_size(),
     };
-    let (sap, sk_set, mut nodes, _) = TestSapBuilder::new(prefix).build();
-    let (mut section, section_key_share) =
-        network_utils::create_section(&sk_set, &sap, None, None)?;
-
-    let mut adults = section_size - elder_count();
-    while adults > 0 {
-        adults -= 1;
-        let non_elder_peer = network_utils::create_peer(MIN_ADULT_AGE);
-        let node_state = NodeState::joined(non_elder_peer, None);
-        let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state);
-        assert!(section.update_member(node_state));
-    }
-
-    let non_elder_peer = network_utils::create_peer(MIN_ADULT_AGE - 1);
-    let node_state = NodeState::joined(non_elder_peer, None);
-    let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state);
-    assert!(section.update_member(node_state));
-    let node = nodes.remove(0);
-    let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-    let comm = network_utils::create_comm().await?;
-    let node = MyNode::new(
-        comm,
-        node.keypair.clone(),
-        section,
-        Some(section_key_share),
-        UsedSpace::new(max_capacity),
-        root_storage_dir,
-        mpsc::channel(10).0,
-    )
-    .await?;
-    let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
+    let adults = section_size - elder_count();
+    let env = TestNetworkBuilder::new(thread_rng())
+        .sap(prefix, elder_count(), adults, None, None)
+        .build();
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
+    let mut section = env.get_network_knowledge(prefix, None);
+    let sk_set = env.get_secret_key_set(prefix, None);
 
     let relocated_peer = match relocated_peer_role {
-        RelocatedPeerRole::Elder => *sap.elders().nth(1).expect("too few elders"),
-        RelocatedPeerRole::NonElder => non_elder_peer,
+        // our node is elder idx 0, so remove the second elder
+        RelocatedPeerRole::Elder => env.get_peers(prefix, 2, 0, None).remove(1),
+        RelocatedPeerRole::NonElder => {
+            let non_elder_peer = gen_peer(MIN_ADULT_AGE - 1);
+            let node_state = NodeState::joined(non_elder_peer, None);
+            let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state);
+            assert!(section.update_member(node_state));
+            // update our node with the new network_knowledge
+            dispatcher.node().write().await.network_knowledge = section.clone();
+            non_elder_peer
+        }
     };
 
-    let membership_decision =
-        network_utils::create_relocation_trigger(&sk_set, relocated_peer.age());
+    let membership_decision = create_relocation_trigger(&sk_set, relocated_peer.age());
     let cmds = run_and_collect_cmds(
         Cmd::HandleMembershipDecision(membership_decision),
         &dispatcher,
@@ -616,7 +574,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
         };
 
         if let NodeMsg::Propose {
-            proposal: sn_interface::messaging::system::Proposal::VoteNodeOffline(node_state),
+            proposal: system::Proposal::VoteNodeOffline(node_state),
             ..
         } = msg
         {
@@ -634,21 +592,13 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
 
 #[tokio::test]
 async fn msg_to_self() -> Result<()> {
-    let info = network_utils::gen_info(MIN_ADULT_AGE, None);
-    let (comm_tx, mut comm_rx) = mpsc::channel(network_utils::TEST_EVENT_CHANNEL_SIZE);
-    let comm = Comm::new((Ipv4Addr::LOCALHOST, 0).into(), Default::default(), comm_tx).await?;
-    let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
+    let prefix = Prefix::default();
+    let mut env = TestNetworkBuilder::new(thread_rng())
+        .sap(prefix, 1, 0, None, None)
+        .build();
 
-    let genesis_sk_set = bls::SecretKeySet::random(0, &mut thread_rng());
-    let (node, _) = MyNode::first_node(
-        comm,
-        info.keypair.clone(),
-        UsedSpace::new(max_capacity),
-        root_storage_dir,
-        genesis_sk_set,
-        mpsc::channel(10).0,
-    )
-    .await?;
+    let node = env.get_nodes(prefix, 1, 0, None).remove(0);
+    let mut comm_rx = env.take_comm_rx(node.info().public_key());
     let context = node.context();
     let info = node.info();
     let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
@@ -682,90 +632,54 @@ async fn msg_to_self() -> Result<()> {
 
 #[tokio::test]
 async fn handle_elders_update() -> Result<()> {
-    // The setup here is too complex for the TestNodeBuilder.
     init_logger();
     let _span = tracing::info_span!("handle_elders_update").entered();
+
+    let prefix = Prefix::default();
     // Start with section that has `elder_count()` elders with age 6, 1 non-elder with age 5 and one
-    // to-be-elder with age 7:
-    let info = network_utils::gen_info(MIN_ADULT_AGE + 1, None);
-    let mut other_elder_peers: Vec<_> =
-        iter::repeat_with(|| network_utils::create_peer(MIN_ADULT_AGE + 1))
-            .take(elder_count() - 1)
-            .collect();
-    let adult_peer = network_utils::create_peer(MIN_ADULT_AGE);
-    let promoted_peer = network_utils::create_peer(MIN_ADULT_AGE + 2);
+    // to-be-elder with age 7
+    let (elders0, ..) = TestNetwork::gen_node_infos(&prefix, elder_count(), 1, Some(&[6]));
+    let mut elders1 = elders0.clone();
+    let promoted_peer = {
+        let (promoted_node, promoted_comm, _) = TestNetwork::gen_info(MIN_ADULT_AGE + 2, None);
+        (promoted_node, promoted_comm)
+    };
+    // members list remain the same for the two SAPs
+    let members = elders1
+        .clone()
+        .into_iter()
+        .chain(vec![promoted_peer.clone()]);
 
-    let members = BTreeSet::from_iter(
-        [info.peer(), adult_peer, promoted_peer]
-            .into_iter()
-            .map(|p| NodeState::joined(p, None)),
-    );
+    let demoted_peer = elders1.remove(elders1.len() - 1);
+    elders1.push(promoted_peer.clone());
 
-    let sk_set0 = bls::SecretKeySet::random(0, &mut thread_rng());
+    let env = TestNetworkBuilder::new(StdRng::seed_from_u64(123))
+        .sap_with_members(prefix, elders0, members.clone())
+        .sap_with_members(prefix, elders1, members)
+        .build();
+    let section0 = env.get_network_knowledge(prefix, Some(0));
+    let sk_set0 = env.get_secret_key_set(prefix, Some(0));
+    let sap1 = env.get_sap(prefix, Some(1));
+    let sk_set1 = env.get_secret_key_set(prefix, Some(1));
 
-    let sap0 = SectionAuthorityProvider::new(
-        iter::once(info.peer()).chain(other_elder_peers.clone()),
-        Prefix::default(),
-        members.clone(),
-        sk_set0.public_keys(),
-        0,
-    );
-
-    let (mut section0, section_key_share) =
-        network_utils::create_section_with_elders(&sk_set0, &sap0)?;
-
-    for peer in [&adult_peer, &promoted_peer] {
-        let node_state = NodeState::joined(*peer, None);
-        let node_state = TestKeys::get_section_signed(&sk_set0.secret_key(), node_state);
-        assert!(section0.update_member(node_state));
-    }
-
-    let demoted_peer = other_elder_peers.remove(0);
-
-    let sk_set1 = bls::SecretKeySet::random(0, &mut thread_rng());
-
-    let pk1 = sk_set1.secret_key().public_key();
-    // Create `HandleAgreement` cmd for an `NewElders` proposal. This will demote one of the
-    // current elders and promote the oldest peer.
-    let sap1 = SectionAuthorityProvider::new(
-        iter::once(info.peer())
-            .chain(other_elder_peers.clone())
-            .chain(iter::once(promoted_peer)),
-        Prefix::default(),
-        members,
-        sk_set1.public_keys(),
-        0,
-    );
-    let elders_1: BTreeSet<_> = sap1.elders_set();
-
-    let signed_sap1 = TestKeys::get_section_signed(&sk_set1.secret_key(), sap1);
-    let proposal = Proposal::NewElders(signed_sap1.clone());
-    let sig =
-        TestKeys::get_section_sig_bytes(&sk_set0.secret_key(), &proposal.as_signable_bytes()?);
-
-    let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-    let comm = network_utils::create_comm().await?;
-    let mut node = MyNode::new(
-        comm,
-        info.keypair.clone(),
-        section0.clone(),
-        Some(section_key_share),
-        UsedSpace::new(max_capacity),
-        root_storage_dir,
-        mpsc::channel(10).0,
-    )
-    .await?;
-
+    // node from sap0 will process `HandleNewEldersAgreement` to update its knowledge about sap1
+    let mut node = env.get_nodes(prefix, 1, 0, Some(0)).remove(0);
+    let info = node.info();
     // Simulate DKG round finished successfully by adding
     // the new section key share to our cache
     node.section_keys_provider
         .insert(TestKeys::get_section_key_share(&sk_set1, 0));
-
     let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
+
+    // Create `HandleAgreement` cmd for an `NewElders` proposal. This will demote one of the
+    // current elders and promote the oldest peer.
+    let elders_1: BTreeSet<_> = sap1.elders_set();
+    let proposal = Proposal::HandoverCompleted(SapCandidate::ElderHandover(sap1.clone()));
+    let sig = TestKeys::get_section_sig_bytes(&sk_set0.secret_key(), &get_single_sig(&proposal));
 
     let cmds = run_and_collect_cmds(
         Cmd::HandleNewEldersAgreement {
-            new_elders: signed_sap1,
+            new_elders: sap1,
             sig,
         },
         &dispatcher,
@@ -773,7 +687,6 @@ async fn handle_elders_update() -> Result<()> {
     .await?;
 
     let mut update_actual_recipients = HashSet::new();
-
     for cmd in cmds {
         let (msg, recipients) = match cmd {
             Cmd::SendMsg {
@@ -793,7 +706,10 @@ async fn handle_elders_update() -> Result<()> {
             _ => continue,
         };
 
-        assert_eq!(section_tree_update.proof_chain.last_key()?, pk1);
+        assert_eq!(
+            section_tree_update.proof_chain.last_key()?,
+            sk_set1.public_keys().public_key()
+        );
         // Merging the section contained in the message with the original section succeeds.
         assert!(section0
             .clone()
@@ -803,11 +719,12 @@ async fn handle_elders_update() -> Result<()> {
         update_actual_recipients.extend(recipients);
     }
 
-    let update_expected_recipients: HashSet<_> = other_elder_peers
+    let update_expected_recipients: HashSet<_> = env
+        .get_peers(prefix, elder_count(), 1, Some(0))
         .into_iter()
-        .chain(iter::once(promoted_peer))
-        .chain(iter::once(demoted_peer))
-        .chain(iter::once(adult_peer))
+        .filter(|peer| *peer != info.peer())
+        .chain(iter::once(promoted_peer.0.peer()))
+        .chain(iter::once(demoted_peer.0.peer()))
         .collect();
 
     assert_eq!(update_actual_recipients, update_expected_recipients);
@@ -823,154 +740,107 @@ async fn handle_elders_update() -> Result<()> {
 /// Test that demoted node still sends `Sync` messages on split.
 #[tokio::test]
 async fn handle_demote_during_split() -> Result<()> {
-    // The setup here is too complex for the TestNodeBuilder.
     init_logger();
     let _span = tracing::info_span!("handle_demote_during_split").entered();
+    let prefix0 = prefix("0");
+    let prefix1 = prefix("1");
 
-    let prefix0 = Prefix::default().pushed(false);
-    let prefix1 = Prefix::default().pushed(true);
+    // `peers_a` + `info` are pre-split elders.
+    // `peers_a` + `peer_c` are prefix-0 post-split elders.
+    let (mut peers_a, ..) =
+        TestNetwork::gen_node_infos(&prefix0, elder_count(), 0, Some(&[MIN_ADULT_AGE]));
 
-    //right not info/node could be in either section...
-    let info = network_utils::gen_info(MIN_ADULT_AGE, None);
-    let node_name = info.name();
+    let info = peers_a
+        .pop()
+        .unwrap_or_else(|| panic!("No nodes generated!"));
+    let node_name = info.0.name();
 
-    // These peers together with `node` are pre-split elders.
-    // These peers together with `peer_c` are prefix-0 post-split elders.
-    let peers_a: Vec<_> =
-        iter::repeat_with(|| network_utils::create_peer_in_prefix(&prefix0, MIN_ADULT_AGE))
-            .take(elder_count() - 1)
-            .collect();
-    // These peers are prefix-1 post-split elders.
-    let peers_b: Vec<_> =
-        iter::repeat_with(|| network_utils::create_peer_in_prefix(&prefix1, MIN_ADULT_AGE))
-            .take(elder_count())
-            .collect();
-    // This peer is a prefix-0 post-split elder.
-    let peer_c = network_utils::create_peer_in_prefix(&prefix0, MIN_ADULT_AGE);
-
+    // `peers_b` are prefix-1 post-split elders.
+    let (peers_b, ..) =
+        TestNetwork::gen_node_infos(&prefix1, elder_count(), 0, Some(&[MIN_ADULT_AGE]));
+    // `peer_c` is a prefix-0 post-split elder.
+    let peer_c = {
+        let (peer_c, comm, _) = TestNetwork::gen_info(MIN_ADULT_AGE, Some(prefix0));
+        (peer_c, comm)
+    };
     // all members
-    let members = BTreeSet::from_iter(
-        peers_a
-            .iter()
-            .chain(peers_b.iter())
-            .copied()
-            .chain([info.peer(), peer_c])
-            .map(|peer| NodeState::joined(peer, None)),
-    );
+    let members = peers_a
+        .iter()
+        .chain(peers_b.iter())
+        .cloned()
+        .chain([info.clone(), peer_c.clone()]);
 
-    // Create the pre-split section
-    let sk_set_v0 = bls::SecretKeySet::random(0, &mut thread_rng());
-    let section_auth_v0 = SectionAuthorityProvider::new(
-        iter::once(info.peer()).chain(peers_a.iter().cloned()),
-        Prefix::default(),
-        members.clone(),
-        sk_set_v0.public_keys(),
-        0,
-    );
-    let (mut section, section_key_share) =
-        network_utils::create_section_with_elders(&sk_set_v0, &section_auth_v0)?;
+    let env = TestNetworkBuilder::new(thread_rng())
+        // pre-split section
+        .sap_with_members(
+            Prefix::default(),
+            peers_a.iter().cloned().chain(iter::once(info.clone())),
+            members.clone(),
+        )
+        // post-split prefix-0
+        .sap_with_members(
+            prefix0,
+            peers_a.iter().cloned().chain(iter::once(peer_c.clone())),
+            members.clone(),
+        )
+        // post-split prefix-1
+        .sap_with_members(prefix1, peers_b.clone(), members)
+        .build();
 
-    // all peers b are added
-    for peer in peers_b.iter().chain(iter::once(&peer_c)).cloned() {
-        let node_state = NodeState::joined(peer, None);
-        let node_state = TestKeys::get_section_signed(&sk_set_v0.secret_key(), node_state);
-        assert!(section.update_member(node_state));
-    }
+    let sk_set_gen = env.get_secret_key_set(Prefix::default(), None);
+    let sap0 = env.get_sap(prefix0, None).value;
+    let sk_set0 = env.get_secret_key_set(prefix0, None);
+    let sap1 = env.get_sap(prefix1, None).value;
+    let sk_set1 = env.get_secret_key_set(prefix1, None);
 
-    // we make a new full node from info, to see what it does
-    let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-    let comm = network_utils::create_comm().await?;
-    let mut node = MyNode::new(
-        comm,
-        info.keypair.clone(),
-        section,
-        Some(section_key_share),
-        UsedSpace::new(max_capacity),
-        root_storage_dir,
-        mpsc::channel(10).0,
-    )
-    .await?;
+    // get the `info` node from pre-split section
+    let mut node = env.get_node_by_key(Prefix::default(), info.0.public_key(), None);
 
-    let sk_set_v1_p0 = bls::SecretKeySet::random(0, &mut thread_rng());
-    let sk_set_v1_p1 = bls::SecretKeySet::random(0, &mut thread_rng());
-
-    // Simulate DKG round finished succesfully by adding the new section
+    // Simulate DKG round finished successfully by adding the new section
     // key share to our cache (according to which split section we'll belong to).
     if prefix0.matches(&node_name) {
         node.section_keys_provider
-            .insert(TestKeys::get_section_key_share(&sk_set_v1_p0, 0));
+            .insert(TestKeys::get_section_key_share(&sk_set0, 0));
     } else {
         node.section_keys_provider
-            .insert(TestKeys::get_section_key_share(&sk_set_v1_p1, 0));
+            .insert(TestKeys::get_section_key_share(&sk_set1, 0));
     }
 
     let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
 
-    // Create agreement on `OurElder` for both sub-sections
-    let create_our_elders_cmd = |signed_sap: SectionSigned<SectionAuthorityProvider>| -> Result<_> {
-        let proposal = Proposal::NewElders(signed_sap.clone());
-        let sig = TestKeys::get_section_sig_bytes(
-            &sk_set_v0.secret_key(),
-            &proposal.as_signable_bytes()?,
-        );
+    let cmd = {
+        // Sign the saps.
+        let sap0 = TestKeys::get_section_signed(&sk_set0.secret_key(), sap0);
+        let sap1 = TestKeys::get_section_signed(&sk_set1.secret_key(), sap1);
 
-        Ok(Cmd::HandleNewEldersAgreement {
-            new_elders: signed_sap,
-            sig,
-        })
+        let proposal =
+            Proposal::HandoverCompleted(SapCandidate::SectionSplit(sap0.clone(), sap1.clone()));
+        let (bytes0, bytes1) = get_double_sig(&proposal);
+
+        Cmd::HandleNewSectionsAgreement {
+            sap1: sap0,
+            sig1: TestKeys::get_section_sig_bytes(&sk_set_gen.secret_key(), &bytes0),
+            sap2: sap1,
+            sig2: TestKeys::get_section_sig_bytes(&sk_set_gen.secret_key(), &bytes1),
+        }
     };
+    let cmds = run_and_collect_cmds(cmd, &dispatcher).await?;
 
-    // Handle agreement on `NewElders` for prefix-0.
-    let section_auth = SectionAuthorityProvider::new(
-        peers_a.iter().cloned().chain(iter::once(peer_c)),
-        prefix0,
-        members.clone(),
-        sk_set_v1_p0.public_keys(),
-        0,
-    );
-
-    let signed_sap = TestKeys::get_section_signed(&sk_set_v1_p0.secret_key(), section_auth);
-    let cmd = create_our_elders_cmd(signed_sap)?;
-    let mut cmds = run_and_collect_cmds(cmd, &dispatcher).await?;
-
-    // Handle agreement on `NewElders` for prefix-1.
-    let section_auth = SectionAuthorityProvider::new(
-        peers_b.iter().cloned(),
-        prefix1,
-        members,
-        sk_set_v1_p1.public_keys(),
-        0,
-    );
-
-    let signed_sap = TestKeys::get_section_signed(&sk_set_v1_p1.secret_key(), section_auth);
-    let cmd = create_our_elders_cmd(signed_sap)?;
-
-    let new_cmds = run_and_collect_cmds(cmd, &dispatcher).await?;
-
-    cmds.extend(new_cmds);
-
-    let mut update_recipients = BTreeMap::new();
-
+    let mut update_recipients = BTreeSet::new();
     for cmd in cmds {
         let (msg, recipients) = match cmd {
             Cmd::SendMsg {
-                msg,
-                recipients: Peers::Multiple(recipients),
-                ..
+                msg, recipients, ..
             } => (msg, recipients),
             _ => continue,
         };
 
-        if matches!(
-            msg,
-            NodeMsg::AntiEntropy {
-                kind: AntiEntropyKind::Update { .. },
-                ..
-            }
-        ) {
-            for recipient in recipients {
-                let _old = update_recipients.insert(recipient.name(), recipient.addr());
-            }
+        if let NodeMsg::AntiEntropy {
+            kind: AntiEntropyKind::Update { .. },
+            ..
+        } = msg
+        {
+            update_recipients.extend(recipients.into_iter().map(|r| r.name()))
         }
     }
 
@@ -983,14 +853,16 @@ async fn handle_demote_during_split() -> Result<()> {
 #[ignore = "This needs to be refactored away from Cmd handling, as we need/use a client response stream therein"]
 async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack() -> Result<()> {
     init_logger();
+    let prefix = Prefix::default();
     let replication_count = 5;
-    let (dispatcher, _, peer, sk_set) =
-        network_utils::TestNodeBuilder::new(Prefix::default().pushed(true), elder_count())
-            .adult_count(6)
-            .section_sk_threshold(0)
-            .data_copy_count(replication_count)
-            .build()
-            .await?;
+    std::env::set_var("SN_DATA_COPY_COUNT", replication_count.to_string());
+
+    let env = TestNetworkBuilder::new(thread_rng())
+        .sap(prefix, elder_count(), 6, None, Some(0))
+        .build();
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
+    let peer = dispatcher.node().read().await.info().peer();
+    let sk_set = env.get_secret_key_set(prefix, None);
 
     let (key_image, tx, spent_proofs, spent_transactions) =
         dbc_utils::get_genesis_dbc_spend_info(&sk_set)?;
@@ -1034,14 +906,17 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
 #[ignore = "This needs to be refactored away from Cmd handling, as we need/use a client response stream therein"]
 async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_error() -> Result<()> {
     init_logger();
+    let prefix = prefix("1");
     let replication_count = 5;
-    let (dispatcher, section, peer, sk_set) =
-        network_utils::TestNodeBuilder::new(Prefix::default().pushed(true), elder_count())
-            .adult_count(6)
-            .section_sk_threshold(0)
-            .data_copy_count(replication_count)
-            .build()
-            .await?;
+    std::env::set_var("SN_DATA_COPY_COUNT", replication_count.to_string());
+
+    let env = TestNetworkBuilder::new(thread_rng())
+        .sap(prefix, elder_count(), 6, None, Some(0))
+        .build();
+    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
+    let peer = dispatcher.node().read().await.info().peer();
+    let section = env.get_network_knowledge(prefix, None);
+    let sk_set = env.get_secret_key_set(prefix, None);
 
     // These conditions will produce a failure on `tx.verify` in the message handler.
     let sap = section.section_auth();
@@ -1110,13 +985,19 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
 async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node() -> Result<()> {
     init_logger();
     let replication_count = 5;
-    let (dispatcher, section, peer, genesis_sk_set) =
-        network_utils::TestNodeBuilder::new(Prefix::default().pushed(false), elder_count())
-            .adult_count(6)
-            .section_sk_threshold(0)
-            .data_copy_count(replication_count)
-            .build()
-            .await?;
+    let prefix1 = prefix("1");
+    std::env::set_var("SN_DATA_COPY_COUNT", replication_count.to_string());
+
+    let env = TestNetworkBuilder::new(thread_rng())
+        .sap(prefix("0"), elder_count(), 6, None, Some(0))
+        .sap(prefix1, elder_count(), 6, None, Some(0))
+        .build();
+    let dispatcher = env.get_dispatchers(Prefix::default(), 1, 0, None).remove(0);
+    let info = dispatcher.node().read().await.info();
+    let genesis_sk_set = env.get_secret_key_set(Prefix::default(), None);
+    let other_section_key_share = env.get_section_key_share(prefix1, info.public_key(), None);
+    let other_section = env.get_network_knowledge(prefix1, None);
+    let other_section_key = env.get_secret_key_set(prefix1, None);
 
     // At this point, only the genesis key should be in the proof chain on this node.
     let tree = dispatcher
@@ -1129,20 +1010,8 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
     let proof_chain = tree.get_sections_dag().clone();
     assert_eq!(proof_chain.keys().into_iter().count(), 1);
 
-    // This will create a section with the following proof chain:
-    // genesis_key -> other_section_key
     // The key share also needs to be added to the section keys provider, which is stored
     // on the node.
-    let other_section_key = bls::SecretKey::random();
-    let (other_section, _, other_section_key_share) =
-        network_utils::TestNodeBuilder::new(Prefix::default().pushed(true), elder_count())
-            .genesis_sk_set(genesis_sk_set.clone())
-            .parent_section_tree(section.section_tree().clone())
-            .adult_count(6)
-            .section_sk_threshold(0)
-            .other_section_keys(vec![other_section_key.clone()])
-            .build_section()
-            .await?;
     dispatcher
         .node()
         .write()
@@ -1166,7 +1035,7 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
         .ok_or_else(|| eyre!("This DBC should have been reissued with a spent proof"))?;
     assert_eq!(
         new_dbc2_spent_proof.spentbook_pub_key,
-        other_section_key.public_key()
+        other_section_key.secret_key().public_key()
     );
 
     // Finally, spend new_dbc2 as part of the input for another reissue.
@@ -1184,7 +1053,7 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
             spent_transactions: new_dbc2.spent_transactions,
             network_knowledge: Some((proof_chain, sap)),
         })),
-        peer,
+        info.peer(),
         &dispatcher,
     )
     .await?;
@@ -1215,11 +1084,25 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
             .ok_or_else(|| eyre!("The proof chain should include the genesis key"))?
     );
     assert_eq!(
-        other_section_key.public_key(),
+        other_section_key.secret_key().public_key(),
         proof_chain_iter
             .next()
             .ok_or_else(|| eyre!("The proof chain should include the other section key"))?
     );
 
     Ok(())
+}
+
+fn get_single_sig(proposal: &Proposal) -> Vec<u8> {
+    match proposal.as_signable_bytes().expect("Failed to serialize") {
+        itertools::Either::Left(bytes) => bytes,
+        _ => panic!("Invalid expectations! Use another proposal variant."),
+    }
+}
+
+fn get_double_sig(proposal: &Proposal) -> (Vec<u8>, Vec<u8>) {
+    match proposal.as_signable_bytes().expect("Failed to serialize") {
+        itertools::Either::Right((bytes1, bytes2)) => (bytes1, bytes2),
+        _ => panic!("Invalid expectations! Use another proposal variant."),
+    }
 }

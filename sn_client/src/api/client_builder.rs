@@ -14,7 +14,7 @@
 //! # Ok(())
 //! # }
 //! ```
-use crate::{connections::Session, Client, Error, DEFAULT_NETWORK_CONTACTS_FILE_NAME};
+use crate::{sessions::Session, Client, Error, DEFAULT_NETWORK_CONTACTS_FILE_NAME};
 
 use qp2p::Config as Qp2pConfig;
 use sn_dbc::Owner;
@@ -40,9 +40,15 @@ pub const ENV_AE_WAIT: &str = "SN_AE_WAIT";
 /// Bind by default to all network interfaces on a OS assigned port
 pub const DEFAULT_LOCAL_ADDR: (Ipv4Addr, u16) = (Ipv4Addr::UNSPECIFIED, 0);
 /// Default timeout to use before timing out queries and commands
-pub const DEFAULT_QUERY_CMD_TIMEOUT: Duration = Duration::from_secs(45);
+pub const DEFAULT_QUERY_CMD_TIMEOUT: Duration = Duration::from_secs(90);
 /// Max amount of time for an operation backoff (time between attempts). In Seconds.
 pub const DEFAULT_MAX_QUERY_CMD_BACKOFF_INTERVAL: Duration = Duration::from_secs(3);
+
+// Default interval at which to send (QUIC) keep-alives msgs to maintain otherwise idle connections.
+const DEFAULT_KEEP_ALIVE_INTERVAL: Duration = Duration::from_secs(3);
+// In the absence of any (QUIC) keep-alive messages, connections will be closed
+// if they remain idle for at least this duration.
+const DEFAULT_IDLE_TIMEOUT: Duration = Duration::from_secs(18);
 
 /// Build a [`crate::Client`]
 #[derive(Debug, Default)]
@@ -169,13 +175,12 @@ impl ClientBuilder {
         };
 
         let mut qp2p = self.qp2p.unwrap_or_default();
-        // If `idle_timeout` is not set, set it to 6 seconds (instead of 18s default).
-        // if qp2p.idle_timeout.is_none() {
-        //     qp2p.idle_timeout = Some(Duration::from_secs(6));
-        // }
+        if qp2p.idle_timeout.is_none() {
+            qp2p.idle_timeout = Some(DEFAULT_IDLE_TIMEOUT);
+        }
 
         if qp2p.keep_alive_interval.is_none() {
-            qp2p.keep_alive_interval = Some(Duration::from_secs(3));
+            qp2p.keep_alive_interval = Some(DEFAULT_KEEP_ALIVE_INTERVAL);
             debug!("Session config w/ keep alive: {:?}", qp2p);
         }
 
@@ -208,12 +213,10 @@ impl ClientBuilder {
 
 /// Parse environment variable. Returns `Ok(None)` if environment variable isn't set.
 fn env_parse<F: FromStr>(s: &str) -> Result<Option<F>, F::Err> {
-    let v = match std::env::var(s) {
-        Ok(v) => v,
-        Err(_) => return Ok(None),
-    };
-
-    F::from_str(&v).map(|v| Some(v))
+    match std::env::var(s) {
+        Ok(v) => F::from_str(&v).map(|v| Some(v)),
+        Err(_) => Ok(None),
+    }
 }
 
 fn default_network_contacts_path() -> Result<PathBuf, Error> {

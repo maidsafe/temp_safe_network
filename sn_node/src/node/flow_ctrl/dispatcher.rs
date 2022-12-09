@@ -161,7 +161,7 @@ impl Dispatcher {
                 let mut node = self.node.write().await;
                 debug!("[NODE WRITE]: general agreements node write got");
 
-                node.handle_general_agreements(proposal, sig).await
+                node.handle_general_agreements(proposal, sig)
             }
             Cmd::HandleMembershipDecision(decision) => {
                 debug!("[NODE WRITE]: membership decision agreements write...");
@@ -174,6 +174,18 @@ impl Dispatcher {
                 let mut node = self.node.write().await;
                 debug!("[NODE WRITE]: new elders decision agreements write got...");
                 node.handle_new_elders_agreement(new_elders, sig).await
+            }
+            Cmd::HandleNewSectionsAgreement {
+                sap1,
+                sig1,
+                sap2,
+                sig2,
+            } => {
+                debug!("[NODE WRITE]: new sections decision agreements write...");
+                let mut node = self.node.write().await;
+                debug!("[NODE WRITE]: new sections decision agreements write got...");
+                node.handle_new_sections_agreement(sap1, sig1, sap2, sig2)
+                    .await
             }
             Cmd::HandleFailedSendToNode { peer, msg_id } => {
                 warn!("Message sending failed to {peer}, for {msg_id:?}");
