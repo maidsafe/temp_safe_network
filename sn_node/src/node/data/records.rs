@@ -27,7 +27,7 @@ use bytes::Bytes;
 use futures::FutureExt;
 use itertools::Itertools;
 use lazy_static::lazy_static;
-use std::{cmp::Ordering, collections::BTreeSet, env::var, str::FromStr, sync::Arc};
+use std::{collections::BTreeSet, env::var, str::FromStr, sync::Arc};
 use tokio::{
     sync::Mutex,
     time::{timeout, Duration},
@@ -239,7 +239,7 @@ impl MyNode {
             operation_id
         );
 
-        let targets = MyNode::target_data_holders_including_full(&snapshot, address.name());
+        let targets = MyNode::target_data_holders(&snapshot, *address.name());
 
         // Query only the nth adult
         let target = if let Some(peer) = targets.iter().nth(query.adult_index) {
@@ -425,7 +425,6 @@ impl MyNode {
     /// Registered holders not present in provided list of members
     /// will be removed from `adult_storage_info` and no longer tracked for liveness.
     pub(crate) async fn liveness_retain_only(&mut self, members: BTreeSet<XorName>) {
-        // full adults
         self.capacity.retain_members_only(&members);
         // stop tracking liveness of absent holders
         if let Err(error) = self
@@ -466,67 +465,9 @@ impl MyNode {
         changed
     }
 
-    /// Construct list of adults that hold target data, including full nodes.
-    /// List is sorted by distance from `target`.
-    fn target_data_holders_including_full(
-        snapshot: &NodeContext,
-        target: &XorName,
-    ) -> BTreeSet<Peer> {
-        let full_adults = &snapshot.full_adults;
-        let adults = snapshot.network_knowledge.adults();
-
-        let mut candidates = adults
-            .clone()
-            .into_iter()
-            .sorted_by(|lhs, rhs| target.cmp_distance(&lhs.name(), &rhs.name()))
-            .filter(|peer| !full_adults.contains(&peer.name()))
-            .take(data_copy_count())
-            .collect::<BTreeSet<_>>();
-
-        trace!(
-            "Data holders of {:?} are non-full adults: {:?} and full adults: {:?}",
-            target,
-            candidates,
-            full_adults
-        );
-
-        // Full adults that are close to the chunk, shall still be considered as candidates
-        // to allow chunks stored to non-full adults can be queried when nodes become full.
-        let candidates_clone = candidates.clone();
-        let close_full_adults = if let Some(closest_not_full) = candidates_clone.iter().next() {
-            full_adults
-                .iter()
-                .filter_map(|name| {
-                    if target.cmp_distance(name, &closest_not_full.name()) == Ordering::Less {
-                        // get the actual peer if closer
-                        let mut the_closer_peer = None;
-                        for adult in &adults {
-                            if &adult.name() == name {
-                                the_closer_peer = Some(adult)
-                            }
-                        }
-                        the_closer_peer
-                    } else {
-                        None
-                    }
-                })
-                .collect::<BTreeSet<_>>()
-        } else {
-            // In case there is no empty candidates, query all full_adults
-            adults
-                .iter()
-                .filter(|peer| !full_adults.contains(&peer.name()))
-                .collect::<BTreeSet<_>>()
-        };
-
-        candidates.extend(close_full_adults);
-        candidates
-    }
-
-    /// Used to fetch the list of holders for given name of data. Excludes full nodes
+    /// Used to fetch the list of holders for given name of data.
+    /// Sorts adults by closeness to data address, returns data_copy_count of them
     pub(crate) fn target_data_holders(context: &NodeContext, target: XorName) -> BTreeSet<Peer> {
-        let full_adults = &context.full_adults;
-        trace!("full_adults = {}", full_adults.len());
         // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
         let adults = context.network_knowledge.adults();
 
@@ -535,16 +476,10 @@ impl MyNode {
         let candidates = adults
             .into_iter()
             .sorted_by(|lhs, rhs| target.cmp_distance(&lhs.name(), &rhs.name()))
-            .filter(|peer| !full_adults.contains(&peer.name()))
             .take(data_copy_count())
             .collect::<BTreeSet<_>>();
 
-        trace!(
-            "Target holders of {:?} are non-full adults: {:?} and full adults that were ignored: {:?}",
-            target,
-            candidates,
-            full_adults
-        );
+        trace!("Target holders of {:?} are : {:?}", target, candidates,);
 
         candidates
     }
