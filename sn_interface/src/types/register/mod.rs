@@ -176,7 +176,9 @@ mod tests {
         register::{Entry, EntryHash, Permissions, Register, RegisterOp, User},
         utils, Error, Keypair, Result,
     };
+    use crate::types::register::MAX_REG_NUM_ENTRIES;
     use crate::{types::register::Policy, types::RegisterAddress as Address};
+    use eyre::Context;
     use proptest::prelude::*;
     use rand_07::{rngs::OsRng, seq::SliceRandom, thread_rng, Rng};
     use std::{
@@ -413,6 +415,46 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn exceeding_max_reg_entries_errors() -> eyre::Result<()> {
+        let name = xor_name::rand::random();
+        let tag = 43_666;
+
+        // one replica will allow write ops to anyone
+        let authority_keypair1 = Keypair::new_ed25519();
+        let owner1 = User::Key(authority_keypair1.public_key());
+        let mut perms1 = BTreeMap::default();
+        let _prev = perms1.insert(User::Anyone, Permissions::new(true));
+        let mut replica = create_reg_replica_with(
+            name,
+            tag,
+            Some(authority_keypair1),
+            Some(Policy {
+                owner: owner1,
+                permissions: perms1,
+            }),
+        );
+
+        for _ in 0..MAX_REG_NUM_ENTRIES {
+            let (_hash, _op) = replica
+                .write(random_register_entry(), BTreeSet::new())
+                .context("Failed to write register entry")?;
+        }
+
+        let excess_entry = replica.write(random_register_entry(), BTreeSet::new());
+
+        match excess_entry {
+            Err(Error::TooManyEntries(size)) => {
+                assert_eq!(size, 1024);
+                Ok(())
+            }
+            anything_else => {
+                eyre::bail!(
+                    "Expected Excess entries error was not found. Instead: {anything_else:?}"
+                )
+            }
+        }
+    }
     // Helpers for tests
 
     fn sign_register_op(mut op: RegisterOp<Entry>, keypair: &Keypair) -> Result<RegisterOp<Entry>> {
