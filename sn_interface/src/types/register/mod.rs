@@ -30,7 +30,7 @@ use xor_name::XorName;
 const MAX_REG_ENTRY_SIZE: usize = MIN_ENCRYPTABLE_BYTES / 3; // 1024 bytes
 
 /// Maximum number of entries of a register.
-const MAX_REG_NUM_ENTRIES: u16 = u16::MAX;
+const MAX_REG_NUM_ENTRIES: u16 = 1024;
 
 /// Register mutation operation to apply to Register.
 pub type RegisterOp<T> = CrdtOperation<T>;
