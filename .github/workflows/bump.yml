@@ -1,9 +1,9 @@
 name: Bump Version
 
-on:
-  schedule:
-    # * is a special character in YAML so you have to quote this string
-    - cron: "30 4 * * *"
+# on:
+#   schedule:
+#     # * is a special character in YAML so you have to quote this string
+#     - cron: "30 4 * * *"
 
 jobs:
 
