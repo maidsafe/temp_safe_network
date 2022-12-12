@@ -7,10 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use sn_interface::{
-    messaging::data::{CreateRegister, SignedRegisterCreate},
+    messaging::data::{CreateRegister, EditRegister, SignedRegisterCreate, SignedRegisterEdit},
     test_utils::TestKeys,
     types::{
-        register::{Policy, User},
+        register::{Policy, Register, User},
         Chunk, Keypair, PublicKey, RegisterCmd, ReplicatedData, SectionSig,
     },
 };
@@ -24,7 +24,10 @@ use criterion::{BenchmarkId, Criterion};
 use eyre::{Result, WrapErr};
 use rand::{distributions::Alphanumeric, rngs::OsRng, thread_rng, Rng};
 use rayon::current_num_threads;
-use std::{collections::BTreeMap, path::Path};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+};
 use tempfile::tempdir;
 use tokio::runtime::Runtime;
 
@@ -86,6 +89,7 @@ fn grows_vec_to_bytes(seed: &[u8]) -> Bytes {
 fn main() -> Result<()> {
     let mut criterion = custom_criterion();
 
+    bench_data_storage_register_edits(&mut criterion)?;
     bench_data_storage_writes(&mut criterion)?;
     bench_data_storage_reads(&mut criterion)?;
 
@@ -144,6 +148,71 @@ fn bench_data_storage_writes(c: &mut Criterion) -> Result<()> {
                             .store(&random_data, pk, keypair.clone())
                             .await
                             .expect("failed to write chunk {i}");
+                    }
+                })
+            },
+        );
+    }
+
+    Ok(())
+}
+
+fn bench_data_storage_register_edits(c: &mut Criterion) -> Result<()> {
+    let pk = PublicKey::Bls(bls::SecretKey::random().public_key());
+    let mut group = c.benchmark_group("register-edit-sampling");
+
+    let runtime = Runtime::new().unwrap();
+
+    let size_ranges = [1000];
+
+    for size in &size_ranges {
+        let (keypair, op) = create_random_register_register_op();
+        let address = op.address();
+        // the actual register we'll be editing
+        let mut register = Register::new(
+            op.owner(),
+            *address.name(),
+            address.tag(),
+            op.policy.clone(),
+        );
+
+        let data_set: Vec<_> = (0..*size)
+            .map(|_| create_random_register_replicated_data_edit(&keypair, &mut register))
+            .collect();
+
+        group.bench_with_input(
+            BenchmarkId::new("register_edits", size),
+            &(size, &data_set),
+            |b, (size, data_set)| {
+                let storage = get_new_data_store()
+                    .context("Could not create a temp data store")
+                    .unwrap();
+                let signature =
+                    keypair.sign(&bincode::serialize(&op.clone()).expect("could not serialize op"));
+
+                let reg_cmd = RegisterCmd::Create {
+                    cmd: SignedRegisterCreate {
+                        op: op.clone(),
+                        auth: sn_interface::messaging::ClientAuth {
+                            public_key: keypair.public_key(),
+                            signature,
+                        },
+                    },
+                    section_sig: section_sig(), // obtained after presenting a valid payment to the network
+                };
+
+                let first_write = ReplicatedData::RegisterWrite(reg_cmd);
+                runtime
+                    .block_on(storage.store(&first_write, pk, keypair.clone()))
+                    .expect("Could not store initial register");
+
+                b.to_async(&runtime).iter(|| async {
+                    for i in 0..**size {
+                        storage
+                            .clone()
+                            .store(&data_set[i], pk, keypair.clone())
+                            .await
+                            .expect("failed to write data storage edit");
                     }
                 })
             },
@@ -227,7 +296,7 @@ fn public_policy(owner: User) -> Policy {
     Policy { owner, permissions }
 }
 
-pub fn create_random_register_replicated_data() -> ReplicatedData {
+pub fn create_random_register_register_op() -> (Keypair, CreateRegister) {
     let keypair = Keypair::new_ed25519();
 
     let name = xor_name::rand::random();
@@ -235,7 +304,42 @@ pub fn create_random_register_replicated_data() -> ReplicatedData {
     let owner = User::Key(keypair.public_key());
     let policy = public_policy(owner);
 
-    let op = CreateRegister { name, tag, policy };
+    (keypair, CreateRegister { name, tag, policy })
+}
+
+/// create random edits to an existing register
+pub fn create_random_register_replicated_data_edit(
+    keypair: &Keypair,
+    register: &mut Register,
+) -> ReplicatedData {
+    let random_content = rand::thread_rng().gen::<[u8; 32]>().to_vec();
+
+    let (_hash, edit) = register
+        .write(random_content, BTreeSet::default())
+        .expect("could not write edit to register");
+
+    let edit_register_op = EditRegister {
+        address: *register.address(),
+        edit,
+    };
+    let signature =
+        keypair.sign(&bincode::serialize(&edit_register_op).expect("could not serialize op"));
+
+    let auth = sn_interface::messaging::ClientAuth {
+        public_key: keypair.public_key(),
+        signature,
+    };
+
+    let reg_cmd = RegisterCmd::Edit(SignedRegisterEdit {
+        op: edit_register_op,
+        auth,
+    });
+
+    ReplicatedData::RegisterWrite(reg_cmd)
+}
+
+pub fn create_random_register_replicated_data() -> ReplicatedData {
+    let (keypair, op) = create_random_register_register_op();
     let signature = keypair.sign(&bincode::serialize(&op).expect("could not serialize op"));
     let reg_cmd = RegisterCmd::Create {
         cmd: SignedRegisterCreate {
@@ -260,6 +364,7 @@ fn get_new_data_store() -> Result<DataStorage> {
 
     let root_dir = tempdir().map_err(|e| eyre::eyre!(e.to_string()))?;
     let storage_dir = Path::new(root_dir.path()).join(random_filename);
+
     let config = Config::default();
     let max_capacity = config.max_capacity();
 
