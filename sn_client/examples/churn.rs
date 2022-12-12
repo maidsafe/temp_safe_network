@@ -16,10 +16,7 @@ use sn_launch_tool::Launch;
 use clap::Parser;
 use dirs_next::home_dir;
 use eyre::{eyre, Context, Result};
-use std::{
-    path::PathBuf,
-    process::{Command, Stdio},
-};
+use std::path::PathBuf;
 use tiny_keccak::{Hasher, Sha3};
 use tokio::fs::create_dir_all;
 use tokio::time::{sleep, Duration};
@@ -51,26 +48,7 @@ async fn main() -> Result<()> {
         .try_init()
         .unwrap_or_else(|_| println!("Error initializing logger"));
 
-    // First lets build the network and testnet launcher, to ensure we're on the latest version
-    let args: Vec<&str> = vec!["build", "--release", "--features", "statemap"];
-
-    println!("Building current sn_node");
-    let _child = Command::new("cargo")
-        .args(args.clone())
-        // .env("RUST_LOG", "debug")
-        // .env("RUST_BACKTRACE", "1")
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .output()
-        .map_err(|err| {
-            eyre!(
-                "Failed to run build command with args '{:?}': {}",
-                args,
-                err
-            )
-        })?;
-
-    println!("sn_node bins built successfully");
+    println!("Ensure you have built sn_node and moved the bin to `~/.safe/node/sn_node`");
 
     run_split().await?;
 
@@ -94,8 +72,7 @@ fn get_node_bin_path(node_path: Option<PathBuf>) -> Result<PathBuf> {
 /// Uses SNLT to create a local network of nodes
 pub async fn run_split() -> Result<()> {
     info!("Starting local network");
-    let node_path = Some(PathBuf::from("./target/release"));
-    let node_path = get_node_bin_path(node_path)?;
+    let node_path = get_node_bin_path(None)?;
 
     let arg_node_path = node_path.join(SAFE_NODE_EXECUTABLE).display().to_string();
     debug!("Running node from {}", arg_node_path);
