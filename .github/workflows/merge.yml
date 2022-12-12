@@ -519,7 +519,7 @@ jobs:
         uses: actions/upload-artifact@main
         if: failure()
         with:
-          name: statemap_e2e_split_self_hosted_ubuntu.svg
+          name: statemap_e2e_churn_self_hosted_ubuntu.svg
           path: safe_statemap.svg
         continue-on-error: true
 
@@ -532,7 +532,7 @@ jobs:
       - name: Upload Node Logs
         uses: actions/upload-artifact@main
         with:
-          name: sn_node_logs_e2e_split_self_hosted_ubuntu
+          name: sn_node_logs_e2e_churn_self_hosted_ubuntu
           path: log_files.tar.gz
         if: failure()
         continue-on-error: true
@@ -542,7 +542,7 @@ jobs:
   #   # disabled temporarily since `self-hosted-ubuntu` runner not available for NodeRefactorBranch branch
   #   if: false
   #   name: E2E tests w/ full network
-  #   runs-on: self-hosted-ubuntu
+  #   runs-on: self-hosted
   #   env:
   #     NODE_COUNT: 15
   #   steps:
@@ -574,17 +574,13 @@ jobs:
   #   run: choco install ripgrep
   #   if: matrix.os == 'windows-latest'
 
-  #     - name: Build sn bins
-  #       run: cd sn_node && cargo build --release --bins
-  #       timeout-minutes: 60
+  #     # - name: Build sn bins
+  #     #   run: cd sn_node && cargo build --release --bins
+  #     #   timeout-minutes: 60
 
   #     - name: Build testnet
   #       run: cd testnet && cargo build  --release --bin testnet
   #       timeout-minutes: 60
-
-  #     # - name: Build log_cmds_inspector
-  #     #   run: cargo build  --release --bin log_cmds_inspector
-  #     #   timeout-minutes: 60
 
   #     # This starts a NODE_COUNT node network, and then adds 12 more nodes. We should kill before moving on to split checks
   #     - name: Run network churn data integrity test
@@ -594,9 +590,9 @@ jobs:
   #       env:
   #         RUST_LOG: "sn_node,sn_client,sn_comms,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
 
-  #     # - name: Print Network Stats after churn test
-  #     #   shell: bash
-  #     #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+  #     - name: Print Network Stats after churn test
+  #       shell: bash
+  #       run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
 
   #     # - name: Cleanup churn test
   #     #   run: |
@@ -612,24 +608,24 @@ jobs:
   #     #   env:
   #     #     RUST_LOG: "sn_node,sn_client,sn_comms,sn_consensus,sn_fault_detection=trace"
 
-  #     # - name: Print Network Log Stats at start
-  #     #   shell: bash
-  #     #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+  #     - name: Print Network Log Stats at start
+  #       shell: bash
+  #       run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
 
-  #     # - name: Wait for all nodes to join
-  #     #   shell: bash
-  #     #   # we should not have the full 33 nodes as yet.
-  #     #   run: NODE_COUNT=28 ./resources/scripts/wait_for_nodes_to_join.sh
-  #     #   timeout-minutes: 20
+  #     - name: Wait for all nodes to join
+  #       shell: bash
+  #       # we should not have the full 33 nodes as yet.
+  #       run: NODE_COUNT=28 ./resources/scripts/wait_for_nodes_to_join.sh
+  #       timeout-minutes: 20
 
-  #     # - name: Is the network split and ready?
-  #     #   shell: bash
-  #     #   run: ./resources/scripts/network_is_ready.sh
-  #     #   timeout-minutes: 5
+  #     - name: Is the network split and ready?
+  #       shell: bash
+  #       run: ./resources/scripts/network_is_ready.sh
+  #       timeout-minutes: 5
 
-  #     # - name: Print Network Log Stats after nodes joined
-  #     #   shell: bash
-  #     #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+  #     - name: Print Network Log Stats after nodes joined
+  #       shell: bash
+  #       run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
 
   #     - name: Build all tests before running
   #       run: cd sn_client && cargo test --no-run --release -p sn_client
