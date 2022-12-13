@@ -58,9 +58,6 @@ impl Link {
             .map_err(LinkError::Send)?;
         debug!("{msg_id:?} bidi msg sent");
 
-        send_stream.finish().await.map_err(LinkError::Send)?;
-
-        debug!("{msg_id:?} bidi finished");
         Ok(recv_stream)
     }
 

@@ -180,15 +180,6 @@ impl PeerSessionWorker {
                                 job.reporter.send(SendStatus::TransientError(format!(
                                     "Could not send msg on response {stream_id} to {peer:?} for {:?}", job.msg_id
                                 )));
-                            } else if let Err(error) = send_stream.finish().await {
-                                error!(
-                                    "Could not close response {stream_id} with {peer:?}, for {:?}: {error:?}",
-                                    job.msg_id
-                                );
-                                job.reporter.send(SendStatus::TransientError(format!(
-                                    "Could not close response {stream_id} with {peer:?} for {:?}",
-                                    job.msg_id
-                                )));
                             } else {
                                 job.reporter.send(SendStatus::Sent);
                             }

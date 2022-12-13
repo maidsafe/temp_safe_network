@@ -157,20 +157,6 @@ impl Link {
         }
 
         trace!("{msg_id:?} sent on {stream_id} to: {:?}", self.peer);
-        send_stream.finish().await.or_else(|err| match err {
-            qp2p::SendError::StreamLost(qp2p::StreamError::Stopped(_)) => Ok(()),
-            _ => {
-                error!("{msg_id:?} Error finishing up stream {stream_id}: {err:?}");
-                // remove that broken conn
-                let _conn = self.connections.remove(&conn_id);
-                Err(SendToOneError::Send(err))
-            }
-        })?;
-
-        trace!(
-            "bidi {stream_id} finished for {msg_id:?} to: {:?}",
-            self.peer
-        );
 
         recv_stream
             .next()

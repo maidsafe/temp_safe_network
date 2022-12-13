@@ -106,11 +106,6 @@ async fn handle_request(
         .await
         .map_err(|e| format!("Failed to send response: {}", e))?;
 
-    // Gracefully terminate the stream
-    send.finish()
-        .await
-        .map_err(|e| format!("Failed to shutdown stream: {}", e))?;
-
     info!("Request complete");
     Ok(())
 }
