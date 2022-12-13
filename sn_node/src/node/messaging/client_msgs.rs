@@ -139,6 +139,7 @@ impl MyNode {
             // Attempt to gracefully terminate the stream.
             // If this errors it does _not_ mean our message has not been sent
             let _ = send_stream.finish().await;
+
             trace!("{msg_id:?} Response sent: to {requesting_elder:?}");
         } else {
             error!("Send stream missing from {requesting_elder:?}, data request response was not sent out.")

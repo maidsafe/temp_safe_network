@@ -157,13 +157,15 @@ impl Link {
         }
 
         trace!("{msg_id:?} sent on {stream_id} to: {:?}", self.peer);
-        // Attempt to gracefully terminate the stream.
-        // If this errors it does _not_ mean our message has not been sent
-        let _ = send_stream.finish().await;
-        trace!(
-            "bidi {stream_id} finished for {msg_id:?} to: {:?}",
-            self.peer
-        );
+
+        let the_peer = self.peer;
+        // unblock + move finish off thread as it's not strictly related to the sending of the msg.
+        let _handle = tokio::spawn(async move {
+            // Attempt to gracefully terminate the stream.
+            // If this errors it does _not_ mean our message has not been sent
+            let _ = send_stream.finish().await;
+            trace!("bidi {stream_id} finished for {msg_id:?} to: {the_peer:?}");
+        });
 
         recv_stream
             .next()
