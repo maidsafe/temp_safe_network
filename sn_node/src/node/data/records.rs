@@ -373,14 +373,9 @@ impl MyNode {
         }
 
         trace!("Msg away for {original_msg_id:?} to {target_peer:?}");
-        if let Err(error) = send_stream.finish().await {
-            // Let's report the error since we cannot guarantee the msg was received/acknowledged by recipient
-            error!(
-                "Could not close response {stream_id} for {original_msg_id:?} to \
-                peer {target_peer:?}: {error:?}"
-            );
-            return Err(error.into());
-        }
+        // Attempt to gracefully terminate the stream.
+        // If this errors it does _not_ mean our message has not been sent
+        let _ = send_stream.finish().await;
 
         debug!("Sent the msg {original_msg_id:?} over {stream_id} to {target_peer:?}");
 
