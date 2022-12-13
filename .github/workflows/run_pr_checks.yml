@@ -211,13 +211,13 @@ jobs:
       - name: Run client test of limit-client-upload-size feature
         env:
           RUST_LOG: "sn_client,sn_interface"
-        run: cargo test --release --features limit-client-upload-size --package sn_client -- --test-threads=1 limits_upload_size
+        run: cargo test --release --features limit-client-upload-size --package sn_client -- limits_upload_size
         timeout-minutes: 5
 
       - name: Run client tests
         env:
           RUST_LOG: "sn_client,sn_interface"
-        run: cargo test --release --features check-replicas --package sn_client -- --test-threads=1
+        run: cargo test --release --features check-replicas --package sn_client
         timeout-minutes: 50
 
       - name: Run example app for file API against local network
