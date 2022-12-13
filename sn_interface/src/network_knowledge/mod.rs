@@ -81,7 +81,8 @@ pub fn elder_count() -> usize {
 /// The section will keep adding nodes when requested by the upper layers, until it can split.
 /// A split happens if both post-split sections would have at least this number of nodes.
 pub fn recommended_section_size() -> usize {
-    2 * elder_count()
+    // 2 * elder_count()
+    10000 // TODO: switch this back after Dec 15 2022 testnet
 }
 
 /// `SuperMajority` of a given group (i.e. > 2/3)
