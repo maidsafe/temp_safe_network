@@ -58,7 +58,9 @@ impl Link {
             .map_err(LinkError::Send)?;
         debug!("{msg_id:?} bidi msg sent");
 
-        send_stream.finish().await.map_err(LinkError::Send)?;
+        // Attempt to gracefully terminate the stream.
+        // If this errors it does _not_ mean our message has not been sent
+        let _ = send_stream.finish().await;
 
         debug!("{msg_id:?} bidi finished");
         Ok(recv_stream)
