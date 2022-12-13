@@ -49,6 +49,8 @@ async fn main() -> Result<()> {
     color_eyre::install()?;
 
     let mut config = Config::new().await?;
+    config.network_config.max_concurrent_bidi_streams = Some(500);
+
     let _guard = log::init_node_logging(&config)?;
     trace!("Initial node config: {config:?}");
 

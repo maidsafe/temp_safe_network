@@ -3101,9 +3101,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.33.0"
+version = "0.33.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f23ee3a8b37edd269bc65b6b0138d77e23e4b4a34cd1a8ad8942bdba134230a6"
+checksum = "c6248ced649f4e5e4a1e3797ebbeacca4ed04e29be2b9cdea1c862e17a567055"
 dependencies = [
  "bincode",
  "bytes",
@@ -4208,7 +4208,7 @@ dependencies = [
  "opentelemetry-otlp",
  "opentelemetry-semantic-conventions",
  "proptest",
- "qp2p 0.33.0",
+ "qp2p 0.33.1",
  "rand 0.7.3",
  "rand 0.8.5",
  "rayon",

@@ -47,7 +47,10 @@ impl Link {
         let peer = self.peer;
         debug!("sending bidi msg out... {msg_id:?} to {peer:?}");
         let conn = self.get_or_connect(msg_id).await?;
-        debug!("connection got {msg_id:?} to {peer:?}");
+        debug!(
+            "connection got {msg_id:?} to {peer:?}, conn_id={}",
+            conn.id()
+        );
         let (mut send_stream, recv_stream) = conn.open_bi().await.map_err(LinkError::Connection)?;
 
         debug!("{msg_id:?} bidi opened");
@@ -105,7 +108,10 @@ impl Link {
 
         // let's double check we havent got a connection meanwhile
         if let Some(conn) = conns.iter().next().map(|(_, c)| c.clone()) {
-            debug!("{msg_id:?} Connection already exists in Link, so returning that instead of creating a fresh connection");
+            debug!(
+                "{msg_id:?} Connection already exists in Link to {peer:?}, using that, conn_id={}",
+                conn.id()
+            );
             return Ok(conn);
         }
 
