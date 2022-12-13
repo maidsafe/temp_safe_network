@@ -81,8 +81,7 @@ pub fn elder_count() -> usize {
 /// The section will keep adding nodes when requested by the upper layers, until it can split.
 /// A split happens if both post-split sections would have at least this number of nodes.
 pub fn recommended_section_size() -> usize {
-    // 2 * elder_count()
-    10000 // TODO: switch this back after Dec 15 2022 testnet
+    2 * elder_count()
 }
 
 /// `SuperMajority` of a given group (i.e. > 2/3)
@@ -116,28 +115,31 @@ pub fn partition_by_prefix(
 }
 
 pub fn section_has_room_for_node(
-    joining_node: XorName,
-    prefix: &Prefix,
-    members: impl IntoIterator<Item = XorName>,
+    _joining_node: XorName,
+    _prefix: &Prefix,
+    _members: impl IntoIterator<Item = XorName>,
 ) -> bool {
-    // We multiply by two to allow a buffer for when nodes are joining sequentially.
-    let split_section_size_cap = recommended_section_size() * 2;
+    // TODO: switch this back after Dec 15 2022 testnet
+    true
 
-    match partition_by_prefix(prefix, members) {
-        Some((zeros, ones)) => {
-            let n_zeros = zeros.len();
-            let n_ones = ones.len();
-            info!("Section {prefix:?} would split into {n_zeros} zero and {n_ones} one nodes");
-            match joining_node.bit(prefix.bit_count() as u8) {
-                // joining node would be part of the `ones` child section
-                true => n_ones < split_section_size_cap,
+    // // We multiply by two to allow a buffer for when nodes are joining sequentially.
+    // let split_section_size_cap = recommended_section_size() * 2;
 
-                // joining node would be part of the `zeros` child section
-                false => n_zeros < split_section_size_cap,
-            }
-        }
-        None => false,
-    }
+    // match partition_by_prefix(prefix, members) {
+    //     Some((zeros, ones)) => {
+    //         let n_zeros = zeros.len();
+    //         let n_ones = ones.len();
+    //         info!("Section {prefix:?} would split into {n_zeros} zero and {n_ones} one nodes");
+    //         match joining_node.bit(prefix.bit_count() as u8) {
+    //             // joining node would be part of the `ones` child section
+    //             true => n_ones < split_section_size_cap,
+
+    //             // joining node would be part of the `zeros` child section
+    //             false => n_zeros < split_section_size_cap,
+    //         }
+    //     }
+    //     None => false,
+    // }
 }
 
 /// Container for storing information about the network, including our own section.
