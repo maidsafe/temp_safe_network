@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{MsgResponse, QueryResult, Session};
-use crate::{Error, LinkError, Result};
+use crate::{Error, Result};
 use sn_interface::{
     messaging::{
         data::{DataQuery, DataQueryVariant, QueryResponse},
@@ -486,12 +486,10 @@ impl Session {
                                 .recv_stream_listener(msg_id, peer, peer_index, recv_stream)
                                 .await;
                         }
-                        Err(error @ LinkError::Send(_) | error @ LinkError::Connection(_))
-                            if !connect_now =>
-                        {
+                        Err(error) if !connect_now => {
                             // Let's retry (only once) to reconnect to this peer and send the msg.
                             error!(
-                                "Connection lost to {peer:?}. Failed to send {msg_id:?} on a new \
+                                "Failed to send {msg_id:?} to {peer:?} on a new \
                                 bi-stream: {error:?}. Creating a new connection to retry once ..."
                             );
                             session.peer_links.remove_link_from_peer_links(&peer).await;

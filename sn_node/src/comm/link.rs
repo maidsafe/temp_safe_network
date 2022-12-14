@@ -139,10 +139,7 @@ impl Link {
             };
 
         let stream_id = send_stream.id();
-        trace!(
-            "bidi {stream_id} openeed for {msg_id:?} to: {:?}",
-            self.peer
-        );
+        trace!("bidi {stream_id} opened for {msg_id:?} to: {:?}", self.peer);
         send_stream.set_priority(10);
         match send_stream.send_user_msg(bytes.clone()).await {
             Ok(_) => {}
