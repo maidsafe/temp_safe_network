@@ -50,17 +50,22 @@ impl Link {
         debug!("connection got {msg_id:?} to {peer:?}");
         let (mut send_stream, recv_stream) = conn.open_bi().await.map_err(LinkError::Connection)?;
 
-        debug!("{msg_id:?} bidi opened");
+        debug!("{msg_id:?} to {peer:?} bidi opened");
         send_stream.set_priority(10);
         send_stream
             .send_user_msg(bytes.clone())
             .await
             .map_err(LinkError::Send)?;
-        debug!("{msg_id:?} bidi msg sent");
+        debug!("{msg_id:?} bidi msg sent to {peer:?}");
 
-        send_stream.finish().await.map_err(LinkError::Send)?;
+        // move finish off thread as it's not strictly related to the sending of the msg.
+        let _handle = tokio::spawn(async move {
+            // Attempt to gracefully terminate the stream.
+            // If this errors it does _not_ mean our message has not been sent
+            let _ = send_stream.finish().await;
+            debug!("{msg_id:?} to {peer:?} bidi finished");
+        });
 
-        debug!("{msg_id:?} bidi finished");
         Ok(recv_stream)
     }
 

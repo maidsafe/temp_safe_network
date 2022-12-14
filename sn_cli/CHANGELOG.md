@@ -4,9 +4,174 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## v0.68.0 (2022-12-09)
+
+### Chore
+
+ - <csr-id-88388875e93adfedba62c25059526ae5e20f9d5a/> remove chrono dependency from sn_cli
+ - <csr-id-d43bac5ce07b0f08766858eadc4b8f98f9bcfc12/> update self_update to 0.32
+ - <csr-id-11efb254d9fd2f92ece0f1d8a1066fb84f199610/> remove duplicate dependency on dirs-next (0.1 and 0.2)
+ - <csr-id-7f76b16e299a708c5834be742eb58d778fee97c2/> console 0.14 -> 0.15
+ - <csr-id-860f326a9baf7e62d191eec13359fa5313e6956d/> criterion 0.3 -> 0.4, tracing-subscriber 0.2 -> 0.3
+ - <csr-id-ee824e7785b8da770b5aa6bba3415a274a4e0d68/> bump blsttc to 8.0.0
+ - <csr-id-2e937145c39039ee55505f00637cf484943f4471/> add nightly fixes
+ - <csr-id-80446f5d9df88d5915dcf1d3ea2c213c22e40c14/> remove unused rs files
+ - <csr-id-3f52833a8ce977aa79268ecaac61070f01e9c374/> remove unused rs files
+ - <csr-id-77cb17c41bbf258c3f1b16934c4c71b5e5ad2456/> add nightly fixes
+ - <csr-id-e973eee96c9065ce87a1fa65ae45d9be8d6f940c/> remove redundant genesis_key argument in `NetworkKnowledge` constructor
+
+### New Features
+
+ - <csr-id-464710fe8a964dc274e40327b85c0b17d9b92b0f/> provide `--config-dir-path` arg for `safe`
+   Add a global `--config-dir-path` argument that will set the location of the config directory. If
+   it's not set, the `SAFE_CONFIG_DIR_PATH` environment variable will be used, and if that's not set,
+   we will default to `$HOME/.safe`.
+   
+   The purpose of this customisation is for integration testing so that each test can use an isolated
+   configuration directory, but users can apply it too if they wish.
+ - <csr-id-5c8b1f50d1bf346d45bd2a9faf92bbf33cb448da/> client retry spend on unknown section key
+   When the client receives an unknown section key error, it will obtain the proof chain and SAP for
+   the unknown section and resubmit the request with this additional information.
+   
+   There is no automated client test for this scenario. We went to great lengths to try, but it proved
+   not worth the effort. It was too difficult to modify the network knowledge with a fake section and
+   still have things function correctly. The scenario is unit tested on the node side, and we done
+   enough testing to know that the retry loop does what's intended.
+   
+   There are a few misc changes along with this commit:
+   
+   * Debugging message to indicate a spend request being processed correctly, which proved useful when
+     trying to get the automated test working.
+   * Remove the current section key from the unknown section key error. It's not necessary to include
+     this.
+   * When running the baby fleming network with the Makefile, include log messages from `sn_interface`.
+   * Fix up git-based references to `sn_dbc` crate.
+ - <csr-id-0cd47ad56e0d93e3e99feb0dfcea8094f871ff6f/> replace `SecuredLinkedList` with `SectionsDAG`
+
+### Bug Fixes
+
+ - <csr-id-8855c50b2e47be4298220c9e1f79a57403fd4ac0/> add upload limit to cli cfg
+ - <csr-id-fa82955cd4e8ad82372089fd08e11e19dcaee42b/> add upload limit to cli cfg
+ - <csr-id-526bdca588bd458d8e60d8e4066e98f692bc8e59/> disable node install tests
+
+### Refactor
+
+ - <csr-id-1152b2764e955edd80fb33921a8d8fe52654a896/> get public commitments from sn_dbc
+   The code for retrieving and validating the public commitments was moved out to the sn_dbc crate.
+   
+   It's needed for both the spend request and test setup code which is going to be referenced in both
+   `sn_node` and `sn_client`.
+   
+   Also fixed a clippy error in `SectionTree::get_signed_by_key`.
+
+### Style
+
+ - <csr-id-73f5531790ef8817ed3551fd9e4bcbcc7fc6f4f9/> applied clippy nightly
+   Mainly lints `iter_kv_map` (e.g. use `keys()`, instead of `iter()`, which
+   iterates over both keys and values where the value is not used) and `needless_borrow`.
+
+### Test
+
+ - <csr-id-096b9c67671324109aa2939e3806813501248cc6/> use isolated config dir for cli tests
+   A function is added to the test utils library for creating a temporary directory that functions as
+   the config directory for the CLI. It uses `assert_fs`, so the directory will be automatically
+   deleted when the reference to it is dropped. This enables each test case to use its own config
+   directory, which resolves issues we've had with multiple instances of `safe` writing/reading the
+   config file in a race situation.
+   
+   The functions for running `safe` commands were changed to require the config directory to be
+   passed. This forces each test case to use this mechanism.
+   
+   All the tests were updated to use the same naming convention, with the exception of the `files get`
+   tests, which are quite tedious and probably best left with the convention they were using, at least
+   for now.
+   
+   Some tests could be un-ignored as part of this change.
+   
+   The API and CLI test suites had their single-thread limitation removed.
+ - <csr-id-ff59202d1374c7e5dcc570d50ed8b399fafe488d/> feature-gated send_query API to verify data is stored in all replicas for each query
+   - Introducing a new `check-replicas` feature to sn_client (as well as sn_api and CLI), which switches
+   the `Client::send_query` API behavior to send the query to all Adults replicas and it expects a
+   valid response from all of them instead of from just one.
+   - Running sn_client, sn_api, and CLI tests in CI with new `check-replicas` feature enabled to verify
+   data was stored in all Adults replicas.
+   - With `check-replicas` feature enabled, query responses from all Adults replicas are also compared
+   to verify they are all the same.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 28 commits contributed to the release over the course of 79 calendar days.
+ - 80 days passed between releases.
+ - 21 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - add upload limit to cli cfg ([`8855c50`](https://github.com/maidsafe/safe_network/commit/8855c50b2e47be4298220c9e1f79a57403fd4ac0))
+    - add upload limit to cli cfg ([`fa82955`](https://github.com/maidsafe/safe_network/commit/fa82955cd4e8ad82372089fd08e11e19dcaee42b))
+    - Merge branch 'main' into message_handling ([`80e4030`](https://github.com/maidsafe/safe_network/commit/80e4030820b1380450b86fa6e8c57ee41344a0ed))
+    - Merge #1866 ([`10ed5f3`](https://github.com/maidsafe/safe_network/commit/10ed5f383ed0560931d102c4200bfd828f24c185))
+    - use isolated config dir for cli tests ([`096b9c6`](https://github.com/maidsafe/safe_network/commit/096b9c67671324109aa2939e3806813501248cc6))
+    - provide `--config-dir-path` arg for `safe` ([`464710f`](https://github.com/maidsafe/safe_network/commit/464710fe8a964dc274e40327b85c0b17d9b92b0f))
+    - Merge #1824 ([`9494582`](https://github.com/maidsafe/safe_network/commit/949458280b567aa6dce387b276c06c2cb55d7ca4))
+    - applied clippy nightly ([`73f5531`](https://github.com/maidsafe/safe_network/commit/73f5531790ef8817ed3551fd9e4bcbcc7fc6f4f9))
+    - Merge #1766 ([`19ffd04`](https://github.com/maidsafe/safe_network/commit/19ffd04ac02fe98c72c0c4d497c29bdf961e9201))
+    - refactor(responses): return correct cmd response - Returns the ack corresponding to the cmd. - Renames `ClientMsgResponse` to `ClientDataResponse`. - Makes `NodeDataResponse` be handled like `ClientDataResponse`. - Moves data write acks to `NodeDataReponse`. - Makes `NodeEvent` only be Adult to Elder notifications. ([`bd3b46e`](https://github.com/maidsafe/safe_network/commit/bd3b46e686a6f47cc006ce1f5da2f3041a614b2d))
+    - Merge #1724 ([`ef69747`](https://github.com/maidsafe/safe_network/commit/ef697470545ac8b3c359f721bb30b0f8b7854b65))
+    - feature-gated send_query API to verify data is stored in all replicas for each query ([`ff59202`](https://github.com/maidsafe/safe_network/commit/ff59202d1374c7e5dcc570d50ed8b399fafe488d))
+    - remove chrono dependency from sn_cli ([`8838887`](https://github.com/maidsafe/safe_network/commit/88388875e93adfedba62c25059526ae5e20f9d5a))
+    - update self_update to 0.32 ([`d43bac5`](https://github.com/maidsafe/safe_network/commit/d43bac5ce07b0f08766858eadc4b8f98f9bcfc12))
+    - remove duplicate dependency on dirs-next (0.1 and 0.2) ([`11efb25`](https://github.com/maidsafe/safe_network/commit/11efb254d9fd2f92ece0f1d8a1066fb84f199610))
+    - console 0.14 -> 0.15 ([`7f76b16`](https://github.com/maidsafe/safe_network/commit/7f76b16e299a708c5834be742eb58d778fee97c2))
+    - criterion 0.3 -> 0.4, tracing-subscriber 0.2 -> 0.3 ([`860f326`](https://github.com/maidsafe/safe_network/commit/860f326a9baf7e62d191eec13359fa5313e6956d))
+    - bump blsttc to 8.0.0 ([`ee824e7`](https://github.com/maidsafe/safe_network/commit/ee824e7785b8da770b5aa6bba3415a274a4e0d68))
+    - disable node install tests ([`526bdca`](https://github.com/maidsafe/safe_network/commit/526bdca588bd458d8e60d8e4066e98f692bc8e59))
+    - client retry spend on unknown section key ([`5c8b1f5`](https://github.com/maidsafe/safe_network/commit/5c8b1f50d1bf346d45bd2a9faf92bbf33cb448da))
+    - get public commitments from sn_dbc ([`1152b27`](https://github.com/maidsafe/safe_network/commit/1152b2764e955edd80fb33921a8d8fe52654a896))
+    - add nightly fixes ([`2e93714`](https://github.com/maidsafe/safe_network/commit/2e937145c39039ee55505f00637cf484943f4471))
+    - remove unused rs files ([`80446f5`](https://github.com/maidsafe/safe_network/commit/80446f5d9df88d5915dcf1d3ea2c213c22e40c14))
+    - remove unused rs files ([`3f52833`](https://github.com/maidsafe/safe_network/commit/3f52833a8ce977aa79268ecaac61070f01e9c374))
+    - add nightly fixes ([`77cb17c`](https://github.com/maidsafe/safe_network/commit/77cb17c41bbf258c3f1b16934c4c71b5e5ad2456))
+    - remove redundant genesis_key argument in `NetworkKnowledge` constructor ([`e973eee`](https://github.com/maidsafe/safe_network/commit/e973eee96c9065ce87a1fa65ae45d9be8d6f940c))
+    - Merge #1527 ([`1f06d6e`](https://github.com/maidsafe/safe_network/commit/1f06d6e90da6f889221f37cc8eac32b6933a94ba))
+    - replace `SecuredLinkedList` with `SectionsDAG` ([`0cd47ad`](https://github.com/maidsafe/safe_network/commit/0cd47ad56e0d93e3e99feb0dfcea8094f871ff6f))
+</details>
+
 ## v0.67.0 (2022-09-19)
 
+### Chore
+
+ - <csr-id-a8a9fb90791b29496e8559090dca4161e04054da/> sn_interface-0.15.0/sn_dysfunction-0.14.0/sn_client-0.76.0/sn_node-0.71.0/sn_api-0.74.0/sn_cli-0.67.0
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 9 days passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.15.0/sn_dysfunction-0.14.0/sn_client-0.76.0/sn_node-0.71.0/sn_api-0.74.0/sn_cli-0.67.0 ([`a8a9fb9`](https://github.com/maidsafe/safe_network/commit/a8a9fb90791b29496e8559090dca4161e04054da))
+</details>
+
 ## v0.66.0 (2022-09-09)
+
+<csr-id-448694176dd3b40a12bd8ecc16d9bb66fd171a37/>
 
 ### Chore
 
@@ -16,10 +181,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
+ - 2 commits contributed to the release over the course of 1 calendar day.
  - 1 day passed between releases.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -29,6 +194,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  * **Uncategorized**
     - sn_interface-0.14.0/sn_dysfunction-0.13.0/sn_client-0.75.0/sn_node-0.70.0/sn_api-0.73.0/sn_cli-0.66.0 ([`4486941`](https://github.com/maidsafe/safe_network/commit/448694176dd3b40a12bd8ecc16d9bb66fd171a37))
+    - Merge branch 'main' into Chore-ClientRetriesOnDataNotFound ([`bbca976`](https://github.com/maidsafe/safe_network/commit/bbca97680840e1069c88278fe14ddee153b97dbb))
 </details>
 
 ## v0.65.0 (2022-09-07)
@@ -57,7 +223,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 3 commits contributed to the release.
  - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -102,10 +268,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 7 commits contributed to the release over the course of 8 calendar days.
+ - 8 commits contributed to the release over the course of 8 calendar days.
  - 8 days passed between releases.
  - 7 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -120,6 +286,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     - unneeded iter methods removal ([`9214386`](https://github.com/maidsafe/safe_network/commit/921438659ccaf65b2ea8cc00efb61d8146ef71ef))
     - applied use_self lint ([`f5d436f`](https://github.com/maidsafe/safe_network/commit/f5d436fba99e0e9c258c7ab3c3a256be3be58f84))
     - small tweaks; clippy::equatable_if_let ([`39dd5a0`](https://github.com/maidsafe/safe_network/commit/39dd5a043c75492e416bb9371015a1365b06fa01))
+    - Merge branch 'main' into avoid_testing_data_collision ([`60c368b`](https://github.com/maidsafe/safe_network/commit/60c368b8494eaeb219572c2304bf787a168cfee0))
     - switch on clippy::unwrap_used as a warning ([`3a718d8`](https://github.com/maidsafe/safe_network/commit/3a718d8c0957957a75250b044c9d1ad1b5874ab0))
 </details>
 
@@ -160,10 +327,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release over the course of 2 calendar days.
+ - 3 commits contributed to the release over the course of 2 calendar days.
  - 3 days passed between releases.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -173,6 +340,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  * **Uncategorized**
     - sn_interface-0.10.2/sn_client-0.71.1/sn_node-0.66.2/sn_cli-0.62.1 ([`2b26820`](https://github.com/maidsafe/safe_network/commit/2b268209e6910472558145a5d08b99e968550221))
+    - Merge #1520 ([`a9eccb3`](https://github.com/maidsafe/safe_network/commit/a9eccb3d3f03b9b56b3f53fa2b561f32c03a1364))
     - use `httpmock` to test remote network contacts ([`5776b75`](https://github.com/maidsafe/safe_network/commit/5776b75465d8bb7eb2d2de30e558b9480e9dc8c3))
 </details>
 
@@ -191,7 +359,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - 1 commit contributed to the release.
  - 1 day passed between releases.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -252,7 +420,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - 10 commits contributed to the release over the course of 8 calendar days.
  - 9 days passed between releases.
  - 10 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -376,10 +544,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 35 commits contributed to the release over the course of 33 calendar days.
+ - 32 commits contributed to the release over the course of 33 calendar days.
  - 34 days passed between releases.
  - 31 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -418,10 +586,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     - replace sled with filestore for storing registers ([`24676da`](https://github.com/maidsafe/safe_network/commit/24676dadb771bbd966b6a3e1aa53d1c736c90627))
     - unused async in CLI ([`6d237e5`](https://github.com/maidsafe/safe_network/commit/6d237e5e7d8306cb955f436910aa01ed7221cd84))
     - enable sn_cli bench ([`9eaf971`](https://github.com/maidsafe/safe_network/commit/9eaf971ac4c16bf326f6443636427951f00ae2b6))
-    - Merge branch 'main' into feat-cat-wallet-improvements ([`08a3b85`](https://github.com/maidsafe/safe_network/commit/08a3b85ae73b2360e63f9d4fbdec23e349dc0626))
-    - Merge branch 'main' into feat-cat-wallet-improvements ([`e2e89e6`](https://github.com/maidsafe/safe_network/commit/e2e89e6b061ae0827cdeeb1d8b17e702d2f3607a))
-    - Merge branch 'main' into feat-cat-wallet-improvements ([`9409bf4`](https://github.com/maidsafe/safe_network/commit/9409bf42e99b4eb3da883f76c802e7dc6ea1a4a0))
-    - Merge branch 'main' into feat-cat-wallet-improvements ([`8e6eecf`](https://github.com/maidsafe/safe_network/commit/8e6eecf0da8df5cdac55bbf1f81d00bcb19558b4))
+    - Merge #1320 ([`d679715`](https://github.com/maidsafe/safe_network/commit/d67971528697627245872f167de690029735c7d7))
     - show the DBC owner in the wallet displayed by cat cmd ([`1b3f051`](https://github.com/maidsafe/safe_network/commit/1b3f0516cf899c2fc0d101ce9cf0079c95bbfd7b))
 </details>
 
@@ -450,10 +615,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release over the course of 1 calendar day.
+ - 4 commits contributed to the release over the course of 1 calendar day.
  - 2 days passed between releases.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -463,7 +628,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  * **Uncategorized**
     - sn_interface-0.8.2/sn_client-0.68.2/sn_node-0.64.2/sn_api-0.66.3/sn_cli-0.59.3 ([`34bd9bd`](https://github.com/maidsafe/safe_network/commit/34bd9bd01a3f042c35e0432df2f0cfcebc32a8a8))
+    - Merge branch 'main' into feat-dbc-spent-proof-validations ([`45418f2`](https://github.com/maidsafe/safe_network/commit/45418f2f9b5cc58f2a153bf40966beb2bf36a62a))
     - passing the churn test ([`3c383cc`](https://github.com/maidsafe/safe_network/commit/3c383ccf9ad0ed77080fb3e3ec459e5b02158505))
+    - Merge branch 'main' into feat-dbc-spent-proof-validations ([`94be181`](https://github.com/maidsafe/safe_network/commit/94be181789b0010f83ed5e89341f3f347575e37f))
 </details>
 
 ## v0.59.2 (2022-07-08)
@@ -478,9 +645,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
+ - 5 commits contributed to the release.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -490,6 +657,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  * **Uncategorized**
     - sn_api-0.66.2/sn_cli-0.59.2 ([`b478314`](https://github.com/maidsafe/safe_network/commit/b478314f331382229c9fb235dab0198f5203f509))
+    - Merge branch 'main' into feat-dbc-spent-proof-validations ([`44411d5`](https://github.com/maidsafe/safe_network/commit/44411d511a496b13893670c8bc7d9f43f0ce9073))
+    - Merge #1314 ([`c4d5dbf`](https://github.com/maidsafe/safe_network/commit/c4d5dbf0d00c3c4d5ca4885add24627868bc825c))
+    - Merge branch 'main' into feat-dbc-spent-proof-validations ([`45309c4`](https://github.com/maidsafe/safe_network/commit/45309c4c0463dd9198a49537187417bf4bfdb847))
     - Merge branch 'main' into feat-cli-wallet-show-deposited-amount ([`6268fe7`](https://github.com/maidsafe/safe_network/commit/6268fe76e9dd81d291492b4611094273f8d1e223))
 </details>
 
@@ -528,7 +698,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - 13 commits contributed to the release over the course of 1 calendar day.
  - 2 days passed between releases.
  - 8 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -539,13 +709,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  * **Uncategorized**
     - sn_interface-0.8.1/sn_dysfunction-0.7.1/sn_client-0.68.1/sn_node-0.64.1/sn_api-0.66.1/sn_cli-0.59.1 ([`2b00cec`](https://github.com/maidsafe/safe_network/commit/2b00cec961561281f6b927e13e501342843f6a0f))
     - Merge branch 'main' into feat-cli-wallet-show-deposited-amount ([`7e2a25a`](https://github.com/maidsafe/safe_network/commit/7e2a25ae31ead0fae7824ca794b6c407695080cd))
-    - Merge branch 'main' into feat-cli-wallet-show-deposited-amount ([`7cf2eb6`](https://github.com/maidsafe/safe_network/commit/7cf2eb64e1176d2b23d63091f6f459d92bdccb57))
-    - Merge branch 'main' into feat-cli-wallet-show-deposited-amount ([`cd2f9aa`](https://github.com/maidsafe/safe_network/commit/cd2f9aa2f7001ae779273745f9ac78fc289525e3))
-    - Merge branch 'main' into feat-cli-wallet-show-deposited-amount ([`39bd5b4`](https://github.com/maidsafe/safe_network/commit/39bd5b471b6b3acb6ebe90489335c995b0aca82f))
-    - Merge #1309 ([`f9fa4f7`](https://github.com/maidsafe/safe_network/commit/f9fa4f7857d8161e8c036cca06006bf187a6c6c3))
+    - Merge #1315 ([`67686f7`](https://github.com/maidsafe/safe_network/commit/67686f73f9e7b18bb6fbf1eadc3fd3a256285396))
     - wallet_deposit API to also return the amount desposited ([`79a53b0`](https://github.com/maidsafe/safe_network/commit/79a53b0d1df5a9377cfe7a9d70480ed1fa31bacc))
     - bit more low hanging clippy fruit ([`c79e2aa`](https://github.com/maidsafe/safe_network/commit/c79e2aac378b28b373fd7c18c4b9006348960071))
     - display balance of the DBC that has been successfully deposited into a wallet ([`510bdb4`](https://github.com/maidsafe/safe_network/commit/510bdb4854bf2a04e187b60e2557ae7721aa9804))
+    - Merge branch 'main' into feat-cmd-parent-id ([`e10aaa2`](https://github.com/maidsafe/safe_network/commit/e10aaa2cf0404bfa10ef55b7c9dc7ae6fc0d28e5))
+    - Merge branch 'main' into cargo-husky-tweaks ([`52dd02e`](https://github.com/maidsafe/safe_network/commit/52dd02e45ab4e160b0a26498919a79ce1aefb1bd))
+    - Merge branch 'main' into refactor_messaging ([`349d432`](https://github.com/maidsafe/safe_network/commit/349d43295a44b529cbb138cf2fff9483b03fea07))
     - use latest sn_launch_tool release, sans StructOpt ([`da13669`](https://github.com/maidsafe/safe_network/commit/da13669193d93b3a56fff4a956c9ac9830055a7a))
     - replace StructOpt with Clap in sn_client ([`85ca7ce`](https://github.com/maidsafe/safe_network/commit/85ca7ce23414bf19e72236e32745b0fb6239664d))
     - replace StructOpt with Clap in sn_cli ([`c5218c9`](https://github.com/maidsafe/safe_network/commit/c5218c91f148e28d0e78c226bb2fd01c68f93344))
@@ -612,7 +782,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - 13 commits contributed to the release over the course of 6 calendar days.
  - 8 days passed between releases.
  - 13 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -748,10 +918,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 12 commits contributed to the release over the course of 1 calendar day.
+ - 11 commits contributed to the release over the course of 1 calendar day.
  - 2 days passed between releases.
  - 11 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -771,7 +941,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     - remove use of xorurl with keys command ([`f7940c5`](https://github.com/maidsafe/safe_network/commit/f7940c5cda4ee4ea286c52252b8ab531b9098c31))
     - serialize to bls keys in util functions ([`67006eb`](https://github.com/maidsafe/safe_network/commit/67006eb2e84b750a6b9b03d04aafdcfc85b38955))
     - extend wallet_deposit for owned dbcs ([`23802f8`](https://github.com/maidsafe/safe_network/commit/23802f8e357831b0166307934ca19658d9107039))
-    - Merge #1268 ([`e9adc0d`](https://github.com/maidsafe/safe_network/commit/e9adc0d3ba2f33fe0b4590a5fe11fea56bd4bda9))
 </details>
 
 ## v0.57.6 (2022-06-24)
@@ -794,7 +963,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - 3 commits contributed to the release over the course of 3 calendar days.
  - 5 days passed between releases.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -804,7 +973,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  * **Uncategorized**
     - sn_interface-0.6.5/sn_dysfunction-0.5.3/sn_client-0.66.5/sn_node-0.62.8/sn_cli-0.57.6 ([`dc69a62`](https://github.com/maidsafe/safe_network/commit/dc69a62eec590b2d621ab2cbc3009cb052955e66))
-    - Merge #1255 #1258 ([`ed0b5d8`](https://github.com/maidsafe/safe_network/commit/ed0b5d890e8404a59c25f8131eab5d23ce12eb7d))
+    - Merge #1257 #1260 ([`19d89df`](https://github.com/maidsafe/safe_network/commit/19d89dfbbf8ac8ab2b08380ce9b4bed58a5dc0d9))
     - use atty instead of isatty ([`9bf7a9f`](https://github.com/maidsafe/safe_network/commit/9bf7a9f710632768fff82f5abc2d10127b844160))
 </details>
 
@@ -830,7 +999,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - 3 commits contributed to the release.
  - 2 days passed between releases.
  - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -866,9 +1035,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
+ - 3 commits contributed to the release.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -878,6 +1047,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  * **Uncategorized**
     - sn_interface-0.6.3/sn_dysfunction-0.5.1/sn_client-0.66.3/sn_api-0.64.3/sn_cli-0.57.4 ([`f599c59`](https://github.com/maidsafe/safe_network/commit/f599c5973d50324aad1720166156666d5db1ed3d))
+    - Merge #1241 ([`f9c7544`](https://github.com/maidsafe/safe_network/commit/f9c7544f369e15fb3b6f91158ac3277656737fa4))
     - upgrade blsttc to 6.0.0 ([`4eb43fa`](https://github.com/maidsafe/safe_network/commit/4eb43fa884d7b047febb18c067ae905969a113bf))
 </details>
 
@@ -907,10 +1077,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 8 commits contributed to the release over the course of 2 calendar days.
+ - 11 commits contributed to the release over the course of 2 calendar days.
  - 6 days passed between releases.
  - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -920,10 +1090,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  * **Uncategorized**
     - sn_interface-0.6.2/sn_client-0.66.2/sn_node-0.62.4/sn_api-0.64.2/sn_cli-0.57.3 ([`46246f1`](https://github.com/maidsafe/safe_network/commit/46246f155ab65f3fcd61381345f1a7f747dfe957))
+    - Merge #1216 ([`9877101`](https://github.com/maidsafe/safe_network/commit/9877101c74dcf75d78520a804cb6f2b7aaddaffb))
     - Merge remote-tracking branch 'origin/main' into drusu/remove-private-data ([`2057273`](https://github.com/maidsafe/safe_network/commit/2057273509c2488cafc7f6db2ae69a99efc3b350))
+    - Merge #1236 ([`298662f`](https://github.com/maidsafe/safe_network/commit/298662fa9d43f1f994dbdd22065b4ca67e3b7a03))
     - Merge branch 'main' into simplify_safeurl ([`a0175ab`](https://github.com/maidsafe/safe_network/commit/a0175abfa15e558e54fbb25dc3baf49343f040ac))
     - Merge branch 'main' into drusu/remove-private-data ([`0cd2007`](https://github.com/maidsafe/safe_network/commit/0cd2007e442086d6eb2a39ad1f452e590fad46a9))
     - add from_safekey, from_register, from_bytes ([`0f00c8c`](https://github.com/maidsafe/safe_network/commit/0f00c8cf7caae190716c8fd57addd38b18a3a49b))
+    - Merge #1224 ([`2fe452b`](https://github.com/maidsafe/safe_network/commit/2fe452b07d2db0cc622021b76d05605b5d4841c3))
     - replace Private Register with Register ([`67aa4f8`](https://github.com/maidsafe/safe_network/commit/67aa4f8380b1ed7ac4da79451caca7734dec0e7e))
     - remove private registers ([`1b1cb77`](https://github.com/maidsafe/safe_network/commit/1b1cb77df6c2805ecfa741bb824b359214558929))
     - make dbc reissue working in Windows ([`7778f99`](https://github.com/maidsafe/safe_network/commit/7778f992fb9f450addb50daa6edfbddb0502079e))
@@ -947,10 +1120,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
+ - 3 commits contributed to the release.
  - 1 day passed between releases.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -960,6 +1133,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  * **Uncategorized**
     - sn_cli-0.57.2 ([`d05e7b3`](https://github.com/maidsafe/safe_network/commit/d05e7b3a97db73cdf84f74560056abe1f087820a))
+    - Merge #1225 ([`64260ce`](https://github.com/maidsafe/safe_network/commit/64260ce19d7025bde5ca6bfae85766613e1cb7a6))
     - strip whitespace from dbc data file ([`b552184`](https://github.com/maidsafe/safe_network/commit/b55218435be43d84956d35539f541c21f5fcb988))
 </details>
 
@@ -986,10 +1160,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release over the course of 2 calendar days.
+ - 3 commits contributed to the release.
  - 2 days passed between releases.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -999,8 +1173,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  * **Uncategorized**
     - sn_cli-0.57.1 ([`9aa6667`](https://github.com/maidsafe/safe_network/commit/9aa666763c381ed589343e306c583f558d935251))
+    - Merge #1222 ([`bab9c03`](https://github.com/maidsafe/safe_network/commit/bab9c036d576af5468f12bb7c85e13caaf899ada))
     - dbc arg can refer to file or dbc data ([`80e2734`](https://github.com/maidsafe/safe_network/commit/80e27349fb4ebeb19be3aa3e5ae9f2d8d8095313))
-    - Merge #1217 ([`2f26043`](https://github.com/maidsafe/safe_network/commit/2f2604325d533357bad7d917315cf4cba0b2d3c0))
 </details>
 
 ## v0.57.0 (2022-06-05)
@@ -1066,10 +1240,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 16 commits contributed to the release over the course of 4 calendar days.
+ - 15 commits contributed to the release over the course of 1 calendar day.
  - 8 days passed between releases.
  - 15 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1093,7 +1267,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     - remove use of test-utils from test runs ([`210c54e`](https://github.com/maidsafe/safe_network/commit/210c54e8814877c15d87150248fe3858e83eeee8))
     - use persistent dbc owner in sn_api ([`1048c5e`](https://github.com/maidsafe/safe_network/commit/1048c5e3d2196aed7de89a7938d6fc01c1843502))
     - command to generate secret key for dbc owner ([`58ff197`](https://github.com/maidsafe/safe_network/commit/58ff1978c2772968290eccc73049ce114d02efbb))
-    - Merge #1192 ([`f9fc2a7`](https://github.com/maidsafe/safe_network/commit/f9fc2a76f083ba5161c8c4eef9013c53586b4693))
 </details>
 
 ## v0.56.0 (2022-05-27)
@@ -1108,10 +1281,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
+ - 2 commits contributed to the release over the course of 2 calendar days.
  - 2 days passed between releases.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1121,6 +1294,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  * **Uncategorized**
     - sn_interface-0.5.0/sn_dysfunction-0.4.0/sn_client-0.65.0/sn_node-0.61.0/sn_api-0.63.0/sn_cli-0.56.0 ([`e5fcd03`](https://github.com/maidsafe/safe_network/commit/e5fcd032e1dd904e05bc23e119af1d06e3b85a06))
+    - Merge branch 'main' into bump-consensus-2.0.0 ([`a1c592a`](https://github.com/maidsafe/safe_network/commit/a1c592a71247660e7372e019e5f9a6ea23299e0f))
 </details>
 
 ## v0.55.0 (2022-05-25)
@@ -1135,10 +1309,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
+ - 1 commit contributed to the release.
  - 3 days passed between releases.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1148,7 +1322,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  * **Uncategorized**
     - sn_interface-0.4.0/sn_dysfunction-0.3.0/sn_client-0.64.0/sn_node-0.60.0/sn_api-0.62.0/sn_cli-0.55.0 ([`ef56cf9`](https://github.com/maidsafe/safe_network/commit/ef56cf9cf8de45a9f13c2510c63de245b12aeae8))
-    - Merge #1195 ([`c6e6e32`](https://github.com/maidsafe/safe_network/commit/c6e6e324164028c6c15a78643783a9f86679f39e))
 </details>
 
 ## v0.54.0 (2022-05-21)
@@ -1166,7 +1339,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - 1 commit contributed to the release.
  - 3 days passed between releases.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1195,10 +1368,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 4 commits contributed to the release over the course of 8 calendar days.
+ - 6 commits contributed to the release over the course of 10 calendar days.
  - 11 days passed between releases.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1208,9 +1381,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  * **Uncategorized**
     - sn_interface-0.2.4/sn_client-0.62.3/sn_api-0.60.2/sn_cli-0.53.1 ([`9b06304`](https://github.com/maidsafe/safe_network/commit/9b06304f46e1a1bda90a0fc6ff82edc928c2529d))
+    - Merge #1190 ([`8833cb8`](https://github.com/maidsafe/safe_network/commit/8833cb8a4ae13f04ea86c67e92fce4d82a107f5a))
     - upgrade blsttc to v5.2.0 and rand to v0.8 ([`07504fa`](https://github.com/maidsafe/safe_network/commit/07504faeda6cbfd0b27abea25facde992398ecf9))
-    - Merge #1140 ([`459b641`](https://github.com/maidsafe/safe_network/commit/459b641f22b488f33825777b974da80512eabed5))
-    - Merge #1169 ([`e5d0c17`](https://github.com/maidsafe/safe_network/commit/e5d0c17c335a3a25ee0bb4c81906fa176abeb7f5))
+    - Merge branch 'main' into sap_sig_checks ([`f8ec2e5`](https://github.com/maidsafe/safe_network/commit/f8ec2e54943eaa18b50bd9d7562d41f57d5d3248))
+    - Merge branch 'main' into main ([`d3f07bb`](https://github.com/maidsafe/safe_network/commit/d3f07bbe5192174082e24869ba86125b6a7b1b20))
+    - Merge branch 'main' into retry-count-input ([`925a8a4`](https://github.com/maidsafe/safe_network/commit/925a8a4aaade025433c29028229947de28fcb214))
 </details>
 
 ## v0.53.0 (2022-05-06)
@@ -1243,10 +1418,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 7 commits contributed to the release over the course of 11 calendar days.
+ - 8 commits contributed to the release over the course of 11 calendar days.
  - 13 days passed between releases.
  - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1256,12 +1431,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  * **Uncategorized**
     - sn_interface-0.2.1/sn_client-0.62.1/sn_node-0.58.15/sn_api-0.60.0/sn_cli-0.53.0 ([`737d906`](https://github.com/maidsafe/safe_network/commit/737d906a61f772593ac7df755d995d66059e8b5e))
+    - Merge #1142 ([`b4c8086`](https://github.com/maidsafe/safe_network/commit/b4c8086a53d20c588b4c4c941601edd3f360e04b))
     - return a Token value from wallet balance API instead of a string ([`681457a`](https://github.com/maidsafe/safe_network/commit/681457a75e818beb30401154f336383507acd935))
+    - Merge branch 'main' into Feat-InterfaceAuthKind ([`5db6533`](https://github.com/maidsafe/safe_network/commit/5db6533b2151e2377299a0be11e513210adfabd4))
     - remove the max-capacity flag from sn_node cli ([`3894e8e`](https://github.com/maidsafe/safe_network/commit/3894e8ed5ab48bc72287c4ae74fa53ef0ba51aaa))
     - change default node max cpacity to 10GB ([`1f2d703`](https://github.com/maidsafe/safe_network/commit/1f2d7037d3178e211842f9b554d8fd0d462709e2))
     - remove the max-capacity flag from sn_node cli ([`0a87a96`](https://github.com/maidsafe/safe_network/commit/0a87a96a911b6497d6cd667c18ebbe75e86876dc))
     - change default node max cpacity to 10GB ([`e17baff`](https://github.com/maidsafe/safe_network/commit/e17baffdc356d244075a97e9422d5ffab2ca46c7))
-    - Merge #1128 ([`e49d382`](https://github.com/maidsafe/safe_network/commit/e49d38239b3a8c468616ad3782e1208316e9b5e0))
 </details>
 
 ## v0.52.0 (2022-04-23)
@@ -1327,7 +1503,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - 10 commits contributed to the release over the course of 4 calendar days.
  - 8 days passed between releases.
  - 10 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1377,7 +1553,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - 4 commits contributed to the release.
  - 5 days passed between releases.
  - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1418,7 +1594,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - 3 commits contributed to the release over the course of 2 calendar days.
  - 9 days passed between releases.
  - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1459,7 +1635,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - 3 commits contributed to the release over the course of 1 calendar day.
  - 5 days passed between releases.
  - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1512,7 +1688,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - 4 commits contributed to the release over the course of 1 calendar day.
  - 3 days passed between releases.
  - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1542,10 +1718,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
+ - 3 commits contributed to the release.
  - 18 days passed between releases.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1555,6 +1731,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  * **Uncategorized**
     - safe_network-0.58.7/sn_api-0.57.3/sn_cli-0.50.5 ([`a6e2e0c`](https://github.com/maidsafe/safe_network/commit/a6e2e0c5eec5c2e88842d18167128991b76ecbe8))
+    - Merge #1066 ([`b272593`](https://github.com/maidsafe/safe_network/commit/b27259341a6e7cc5f4e257ef022b03012bf84e49))
     - bump bls_dkg, self_encryption, xor_name ([`d3989bd`](https://github.com/maidsafe/safe_network/commit/d3989bdd95129999996e58736ec2553242697f2c))
 </details>
 
@@ -1584,7 +1761,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - 2 commits contributed to the release.
  - 2 days passed between releases.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1616,7 +1793,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - 2 commits contributed to the release.
  - 2 days passed between releases.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1658,7 +1835,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - 7 commits contributed to the release over the course of 2 calendar days.
  - 3 days passed between releases.
  - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1705,7 +1882,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - 2 commits contributed to the release.
  - 5 days passed between releases.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1759,7 +1936,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - 3 commits contributed to the release.
  - 2 days passed between releases.
  - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1800,7 +1977,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - 2 commits contributed to the release.
  - 2 days passed between releases.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1872,10 +2049,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 7 commits contributed to the release over the course of 3 calendar days.
+ - 5 commits contributed to the release over the course of 2 calendar days.
  - 3 days passed between releases.
  - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1887,10 +2064,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     - safe_network-0.57.0/sn_api-0.56.0/sn_cli-0.49.0 ([`a398c4f`](https://github.com/maidsafe/safe_network/commit/a398c4f8d72828db0fc8c6d5825ead62ba85db64))
     - Merge #1005 ([`bf07fa2`](https://github.com/maidsafe/safe_network/commit/bf07fa22ccc9e397fccac8fb7a589ccd760cff70))
     - fix xorurl cmds tests and enable them to run in CI ([`2fcbfc0`](https://github.com/maidsafe/safe_network/commit/2fcbfc0347769ea41e0b9243bfb32e7104899a11))
-    - Merge branch 'main' into resolve_nrs_map_container_content ([`1631737`](https://github.com/maidsafe/safe_network/commit/1631737769f0d1a3cd2740af6d835479daafe1a7))
     - make nrs url validation private ([`f558b5c`](https://github.com/maidsafe/safe_network/commit/f558b5c60df64dd349158a327bec945321937cf3))
     - resolve nrs map container content ([`0bc50ae`](https://github.com/maidsafe/safe_network/commit/0bc50ae33ccb934016ac425e7bb2eca90a4b06e3))
-    - Merge #995 ([`5176b3a`](https://github.com/maidsafe/safe_network/commit/5176b3a72e2f5f3f1dfc21116a6bf3ffa3893830))
 </details>
 
 ## v0.48.0 (2022-02-08)
@@ -1909,10 +2084,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
+ - 4 commits contributed to the release over the course of 3 calendar days.
  - 4 days passed between releases.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1922,8 +2097,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  * **Uncategorized**
     - safe_network-0.56.0/sn_api-0.55.0/sn_cli-0.48.0 ([`3f75bf8`](https://github.com/maidsafe/safe_network/commit/3f75bf8da770a6167c396080b3ad8b54cfeb27e2))
-    - Merge branch 'main' into fix-cli-shell-api-instances ([`5fe7e54`](https://github.com/maidsafe/safe_network/commit/5fe7e54874e5d665fd10906c4c973f24d613aeba))
+    - Merge #1000 ([`46c0786`](https://github.com/maidsafe/safe_network/commit/46c07862a8b13c897414c1d77a227f63b73579df))
     - CLI shell was creating a new Safe API instance, and connecting to the net, for every command ([`e867b1f`](https://github.com/maidsafe/safe_network/commit/e867b1f5aa290823e77eff95f0846f00d7c0416c))
+    - Merge branch 'main' into Feat-UpdateQp2p ([`dbf89b5`](https://github.com/maidsafe/safe_network/commit/dbf89b5023766ab34193663a2367ff2eccb6b7e0))
 </details>
 
 ## v0.47.1 (2022-02-04)
@@ -1976,7 +2152,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - 6 commits contributed to the release over the course of 2 calendar days.
  - 2 days passed between releases.
  - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -1989,8 +2165,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     - Merge #993 ([`303e856`](https://github.com/maidsafe/safe_network/commit/303e856346dd1d4e5544c9ceae6d571c54cfb84e))
     - remove get_target_url function ([`9af70e7`](https://github.com/maidsafe/safe_network/commit/9af70e7785c9329d8262de99bda68c4ad79d5154))
     - remove url sanitisation from api ([`a58f6c5`](https://github.com/maidsafe/safe_network/commit/a58f6c5019e73ffbfa0f29965aa0fa62b026ece7))
+    - Merge #991 ([`a4f2c8a`](https://github.com/maidsafe/safe_network/commit/a4f2c8ac42d5d91764ca4e00a73a693f6a0221b5))
     - enable cmd retries ([`b2b0520`](https://github.com/maidsafe/safe_network/commit/b2b0520630774d935aca1f2b602a1de9479ba6f9))
-    - Merge #985 ([`ba572d5`](https://github.com/maidsafe/safe_network/commit/ba572d5f909f5c1dc389b9affadffec39a4e0369))
 </details>
 
 ## v0.47.0 (2022-02-01)
@@ -2032,10 +2208,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
+ - 4 commits contributed to the release.
  - 3 days passed between releases.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -2045,7 +2221,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  * **Uncategorized**
     - safe_network-0.55.1/sn_api-0.54.0/sn_cli-0.47.0 ([`2ec86e2`](https://github.com/maidsafe/safe_network/commit/2ec86e28246031084d603768ffa1fddf320a10a2))
+    - Merge #987 ([`cc018be`](https://github.com/maidsafe/safe_network/commit/cc018be351cba26417b00e6ca8311e9004b31b76))
     - dry-runner was making a connection to the network ([`e088598`](https://github.com/maidsafe/safe_network/commit/e0885987742226f72ed761e7b78b86e2fa72e256))
+    - Merge branch 'main' into Chore-ClientImprovement ([`cea6f47`](https://github.com/maidsafe/safe_network/commit/cea6f4718c5aec320279c9abe7f7a54eeecca9ad))
 </details>
 
 ## v0.46.0 (2022-01-28)
@@ -2109,7 +2287,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - 3 commits contributed to the release over the course of 2 calendar days.
  - 6 days passed between releases.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -2119,7 +2297,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  * **Uncategorized**
     - safe_network-0.55.0/sn_api-0.53.0/sn_cli-0.46.0 ([`366eee2`](https://github.com/maidsafe/safe_network/commit/366eee25f4b982d5a20d90168368a1aa14aa3181))
-    - Merge branch 'main' into nrs_resolve_immutable_content ([`099bf22`](https://github.com/maidsafe/safe_network/commit/099bf224714e667bf998de80099eeeabfd869d8b))
+    - Merge #972 ([`c9668f1`](https://github.com/maidsafe/safe_network/commit/c9668f19ea9a2bca5d8ed96b88ba76fa1c65fc96))
     - retrieve immutable content via nrs ([`3d73dd0`](https://github.com/maidsafe/safe_network/commit/3d73dd03a7a6913a248e5cca7d714f8b8e4c0d01))
 </details>
 
@@ -2146,10 +2324,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 5 commits contributed to the release over the course of 1 calendar day.
+ - 5 commits contributed to the release over the course of 2 calendar days.
  - 1 day passed between releases.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -2160,9 +2338,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  * **Uncategorized**
     - safe_network-0.54.0/sn_api-0.52.0/sn_cli-0.45.0 ([`0190f03`](https://github.com/maidsafe/safe_network/commit/0190f0305980bdaee30f9f2ab5eb5510149916db))
     - update remaining places ([`3dc2327`](https://github.com/maidsafe/safe_network/commit/3dc23278c6a4fabc250b27f4312f5c51f0f271a4))
-    - Merge #958 ([`437a113`](https://github.com/maidsafe/safe_network/commit/437a113e6e5736e4eb4287f41228806678a9762e))
+    - Merge #955 ([`b7581b9`](https://github.com/maidsafe/safe_network/commit/b7581b91ed7778b1b962a0fdfc7d33a65cc7098c))
     - Merge branch 'main' into simplify-sn-api ([`33ef052`](https://github.com/maidsafe/safe_network/commit/33ef0524ae238391f25c8fb340627c34ea79fcb2))
-    - Merge #962 ([`29d01da`](https://github.com/maidsafe/safe_network/commit/29d01da5233fd2a10b30699b555a0d85d7a7409a))
+    - Merge branch 'main' into node-logrotate ([`4c86c16`](https://github.com/maidsafe/safe_network/commit/4c86c16fca4a5eb63c37c74344fa726542fa3422))
 </details>
 
 ## v0.44.0 (2022-01-20)
@@ -2239,10 +2417,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 16 commits contributed to the release over the course of 13 calendar days.
+ - 18 commits contributed to the release over the course of 13 calendar days.
  - 13 days passed between releases.
- - 8 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 7 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -2252,21 +2430,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  * **Uncategorized**
     - safe_network-0.53.0/sn_api-0.51.0/sn_cli-0.44.0 ([`923930a`](https://github.com/maidsafe/safe_network/commit/923930acb3769cfa7047954a1fee1853ec9e3062))
-    - remove one layer of indirection ([`3b5ce19`](https://github.com/maidsafe/safe_network/commit/3b5ce194213a7090ee83c02b0043700cda230796))
+    - refactor(sn_api): remove one layer of indirection Also simplifies instantiation and handling of the safe instance. ([`3b5ce19`](https://github.com/maidsafe/safe_network/commit/3b5ce194213a7090ee83c02b0043700cda230796))
+    - Merge #956 ([`7335439`](https://github.com/maidsafe/safe_network/commit/7335439e2eef6767665db296daf14a392a06d894))
     - update from MIT/BSD3 to GPL3 ([`20f416c`](https://github.com/maidsafe/safe_network/commit/20f416cb7d0960a1d8d6f167a1ad1eed33ed6a7b))
     - update year on files modified 2022 ([`7a7752f`](https://github.com/maidsafe/safe_network/commit/7a7752f830785ec39d301e751dc75f228d43d595))
     - nightly release run ([`ad2e30c`](https://github.com/maidsafe/safe_network/commit/ad2e30cf52cd8be01c00353d722ea1107c43a641))
+    - Merge #945 ([`20a59c6`](https://github.com/maidsafe/safe_network/commit/20a59c6fc7c0fbddcea071117cb85a525804e4ee))
     - solving new clippy findings ([`57749b7`](https://github.com/maidsafe/safe_network/commit/57749b7d0671423fe205447bc84d9f8bfc99f54b))
-    - Merge #885 ([`72a3f12`](https://github.com/maidsafe/safe_network/commit/72a3f1269c9c38add9b88455837655f2bc33b551))
-    - Merge branch 'main' into kill-the-blob ([`5a055ba`](https://github.com/maidsafe/safe_network/commit/5a055ba679e6a4f2cd92700af68f8b36ac12a544))
-    - Merge branch 'main' into kill-the-blob ([`411ce5b`](https://github.com/maidsafe/safe_network/commit/411ce5b9d4c396484d2384324ae09d346c79013f))
+    - Merge branch 'main' into verify-blob ([`df7bf60`](https://github.com/maidsafe/safe_network/commit/df7bf601d1f30048aa33602094b7224ac043558e))
+    - Merge #898 ([`99fd463`](https://github.com/maidsafe/safe_network/commit/99fd46375154a7efca6f795795832234f57e9f5c))
+    - Merge branch 'main' into tokio-console ([`e67cf62`](https://github.com/maidsafe/safe_network/commit/e67cf629d7c36389bba3aaa5a921932cb0da4db1))
     - Merge branch 'main' into kill-the-blob ([`9c5cd80`](https://github.com/maidsafe/safe_network/commit/9c5cd80c286308c6d075c5418d8a1650e87fddd5))
-    - Merge #924 ([`7af9b5b`](https://github.com/maidsafe/safe_network/commit/7af9b5b2ee488e2a589d273b3b204a370b7e585f))
+    - Merge #925 ([`49e7690`](https://github.com/maidsafe/safe_network/commit/49e76908170ac9dea887a4fa65cf1bbd20dd6689))
     - reintroduce the `files sync` command ([`0f44890`](https://github.com/maidsafe/safe_network/commit/0f44890b8d5cd7055a790f70cdf6d167532ada05))
+    - Merge branch 'main' into tokio-console ([`1549a2e`](https://github.com/maidsafe/safe_network/commit/1549a2e1407b2ace0c301c7b5fa42803ed2674a8))
     - Merge branch 'main' into kill-the-blob ([`fe814a6`](https://github.com/maidsafe/safe_network/commit/fe814a69e5ef5fbe4c62a056498ef88ce5897fef))
-    - Merge #917 ([`0eb6439`](https://github.com/maidsafe/safe_network/commit/0eb643910098ab6021561e5b997b6289be9e2c57))
-    - Merge #916 #918 #919 ([`5c4d3a9`](https://github.com/maidsafe/safe_network/commit/5c4d3a92ff28126468f07d599c6caf416661aba2))
     - safe_network-0.52.13/sn_api-0.50.6 ([`155ee03`](https://github.com/maidsafe/safe_network/commit/155ee032ee56cbbb34928f2d14529273ccb69559))
+    - Merge branch 'main' into tokio-console ([`5bebdf7`](https://github.com/maidsafe/safe_network/commit/5bebdf792e297d15d2d3acfb68f4654f67985e62))
 </details>
 
 ## v0.43.2 (2022-01-06)
@@ -2317,8 +2497,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 9 commits contributed to the release over the course of 1 calendar day.
  - 1 day passed between releases.
- - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -2328,11 +2508,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  * **Uncategorized**
     - safe_network-0.52.11/sn_api-0.50.5/sn_cli-0.43.2 ([`99d012e`](https://github.com/maidsafe/safe_network/commit/99d012ef529df78ef4c84f5e6ea99d3a77414797))
-    - Merge branch 'main' into kill-the-blob ([`40268a5`](https://github.com/maidsafe/safe_network/commit/40268a598aea8d14c1dbeb1c00712b9f9a664ef8))
     - Merge branch 'main' into kill-the-blob ([`6f89f12`](https://github.com/maidsafe/safe_network/commit/6f89f129ece75dee45f311d30e52ca71b6b7bc98))
     - safe_network-0.52.9/sn_api-0.50.4 ([`a64c7e0`](https://github.com/maidsafe/safe_network/commit/a64c7e0414b77f545cb8cdbf64af0fb7212d1f2e))
-    - rename dest to dst ([`bebdae9`](https://github.com/maidsafe/safe_network/commit/bebdae9d52d03bd13b679ee19446452990d1e2cf))
-    - Merge branch 'main' into kill-the-blob ([`7d38c3d`](https://github.com/maidsafe/safe_network/commit/7d38c3df14d03c042b645ad05be6cd3cc540d631))
+    - chore: rename dest to dst The more commonly used abbreviation for destination, is the three letter acronym `dst`. This also matches the three letter acronym `src` for source. ([`bebdae9`](https://github.com/maidsafe/safe_network/commit/bebdae9d52d03bd13b679ee19446452990d1e2cf))
+    - Merge branch 'main' into tokio-console ([`3626696`](https://github.com/maidsafe/safe_network/commit/3626696d32a4955a2078800feb899d1fb7246891))
+    - Merge branch 'main' into some_detailed_logging ([`eedd75c`](https://github.com/maidsafe/safe_network/commit/eedd75c266d39e4f290b894fa38fb5e237722722))
     - rename blob to file ([`c790077`](https://github.com/maidsafe/safe_network/commit/c790077bebca691f974000278d5525f4b011b8a7))
     - sn_api-0.50.3 ([`5f7000c`](https://github.com/maidsafe/safe_network/commit/5f7000c5ec5895fb3f4c4a17a74ada52bb873fc7))
     - safe_network-0.52.6/sn_api-0.50.2 ([`0a70425`](https://github.com/maidsafe/safe_network/commit/0a70425fb314de4c165da54fdc29a127ae900d81))
@@ -2365,7 +2545,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 2 commits contributed to the release.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -2397,7 +2577,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 2 commits contributed to the release.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -2429,7 +2609,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - 2 commits contributed to the release.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -2494,7 +2674,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - 6 commits contributed to the release over the course of 10 calendar days.
  - 11 days passed between releases.
  - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -2575,7 +2755,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - 8 commits contributed to the release over the course of 6 calendar days.
  - 6 days passed between releases.
  - 8 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -2619,7 +2799,7 @@ This is a manually generated changelog, as `smart-release` seemed to have some i
 
  - 3 commits contributed to the release.
  - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -2779,7 +2959,7 @@ This is a manual changelog entry. Subsequent CLI releases will use the automated
  - 17 commits contributed to the release over the course of 6 calendar days.
  - 7 days passed between releases.
  - 17 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -3860,8 +4040,8 @@ like files with 0 bytes in them any more.
 <csr-read-only-do-not-edit/>
 
  - 153 commits contributed to the release over the course of 452 calendar days.
- - 126 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
+ - 125 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
 
@@ -3896,10 +4076,9 @@ like files with 0 bytes in them any more.
     - add baby fleming to networks list ([`b09e769`](https://github.com/maidsafe/safe_network/commit/b09e769db55aa3f362f49e62d7124d8030ed34bf))
     - unit test node run-baby-fleming command ([`25ad76b`](https://github.com/maidsafe/safe_network/commit/25ad76bc374e461c1df786def45ca79bd1f7484a))
     - remove unused dependencies ([`1fbfc04`](https://github.com/maidsafe/safe_network/commit/1fbfc0444882d2b950be9eca70df2118606db9c3))
+    - Merge pull request #654 from jacderida/merge_sn_cli_into_workspace ([`47b0b03`](https://github.com/maidsafe/safe_network/commit/47b0b035ec0626ba85ec6b11577b697f681d58f7))
     - appease clippy ([`407efd1`](https://github.com/maidsafe/safe_network/commit/407efd15e0b4854864b83ccdb7d2c3adbb0a02e2))
-    - Merge remote-tracking branch 'upstream/main' into merge_sn_cli_into_workspace ([`eea8307`](https://github.com/maidsafe/safe_network/commit/eea83074b9bbd334d80b80f12cfcce724d0e8ca3))
     - update cli to use new nrs api ([`8691034`](https://github.com/maidsafe/safe_network/commit/86910340897256bb4df77b6edaa0f2c9584d6dce))
-    - Merge branch 'main' into merge_sn_cli_into_workspace ([`c337617`](https://github.com/maidsafe/safe_network/commit/c3376177e095802a7da7d49908314213c169e079))
     - move cli code into sn_cli crate directory ([`a3e0b80`](https://github.com/maidsafe/safe_network/commit/a3e0b805af544205e82ac0c6d2a6e2ed1c55011f))
     - Version change: sn_api v0.26.0; sn_cli v0.26.0; sn_authd v0.8.0 ([`3bcf8ef`](https://github.com/maidsafe/safe_network/commit/3bcf8efcee84c5fb45f5e03ec49d5a623147dc4d))
     - Version change: sn_api v0.25.3; sn_cli v0.25.3; sn_authd v0.7.3 ([`ab68342`](https://github.com/maidsafe/safe_network/commit/ab683420665c54df1ae3dae95055000518b543d1))
@@ -4003,6 +4182,7 @@ like files with 0 bytes in them any more.
     - converting to more generic data types for keypair sk pk ([`dfabea0`](https://github.com/maidsafe/safe_network/commit/dfabea0a26f97f420f47ba314cae0882aae47dca))
     - clippy ([`106407e`](https://github.com/maidsafe/safe_network/commit/106407e8125cc003794ba6249158aa1a655d3357))
     - reenable decoding auth reqs and basic app key generation ([`3f23687`](https://github.com/maidsafe/safe_network/commit/3f23687471b846e3ad1e2492c237a21f212b753f))
+    - Merge pull request #631 from joshuef/ExploreUpdatesForApis ([`6ecc58d`](https://github.com/maidsafe/safe_network/commit/6ecc58dfd92f2012f9751907687448f38bbf591a))
     - tidying up ([`4905fae`](https://github.com/maidsafe/safe_network/commit/4905fae6259063411c5e4ef5fd2afb531980630c))
     - fix merge bugs and readd some shell completion logic ([`b99e7de`](https://github.com/maidsafe/safe_network/commit/b99e7dee3e72e703b47888e3ff03d2baa933b408))
     - Merge branch 'master' into ExploreUpdatesForApis ([`34f9bc7`](https://github.com/maidsafe/safe_network/commit/34f9bc704f301ac903f768813fbd4140cd702f21))
@@ -4020,7 +4200,7 @@ like files with 0 bytes in them any more.
     - update to reference renamed sn_app ([`9651140`](https://github.com/maidsafe/safe_network/commit/96511403687f23516658f1a4fab1b6c6ab3fab45))
     - rename artifacts and paths to match new naming convention ([`e389ab2`](https://github.com/maidsafe/safe_network/commit/e389ab24f2186fc515b115e736a06d20756ae031))
     - update s3 bucket name to sn-api ([`67e6ce1`](https://github.com/maidsafe/safe_network/commit/67e6ce1190ec1def43d4d2437456d985b5c07642))
-    - update safe-cmd-test-utilities name to ([`8f309da`](https://github.com/maidsafe/safe_network/commit/8f309dada1517afa10c263a52f5597429f764890))
+    - chore(name): update safe-cmd-test-utilities name to sn_cmd_test_utlities. Also includes some missed updates from safe-authd -> sn_authd. ([`8f309da`](https://github.com/maidsafe/safe_network/commit/8f309dada1517afa10c263a52f5597429f764890))
     - update safe-authd crate name to sn_authd ([`019370c`](https://github.com/maidsafe/safe_network/commit/019370cfd0ace44c656caf45c17248f2a547dbbf))
     - update safe-cli crate name to sn_cli ([`70c67c7`](https://github.com/maidsafe/safe_network/commit/70c67c749c504ddd552aba6663109d2b1839082a))
 </details>

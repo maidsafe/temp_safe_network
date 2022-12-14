@@ -13,7 +13,6 @@ use std::{
     io::{self},
     net::SocketAddr,
     path::PathBuf,
-    time::Duration,
 };
 use tokio::{
     fs::{self, File},
@@ -247,8 +246,6 @@ impl Config {
             self.network_config.external_ip = Some(public_addr.ip());
         }
 
-        self.network_config.forward_port = !config.skip_auto_port_forwarding;
-
         if let Some(max_msg_size) = config.max_msg_size_allowed {
             self.max_msg_size_allowed = Some(max_msg_size);
         }
@@ -258,11 +255,6 @@ impl Config {
         }
         if let Some(keep_alive_interval_msec) = config.keep_alive_interval_msec {
             self.keep_alive_interval_msec = Some(keep_alive_interval_msec);
-        }
-
-        if let Some(upnp_lease_duration) = config.upnp_lease_duration {
-            self.network_config.upnp_lease_duration =
-                Some(Duration::from_millis(upnp_lease_duration as u64));
         }
     }
 
@@ -464,7 +456,7 @@ fn smoke() -> Result<()> {
     // NOTE: IF this value is being changed due to a change in the config,
     // the change in config also be handled in Config::merge()
     // and in examples/config_handling.rs
-    let expected_size = 109;
+    let expected_size = 56;
 
     assert_eq!(bincode::serialize(&Config::default())?.len(), expected_size);
     Ok(())
