@@ -3953,7 +3953,6 @@ dependencies = [
  "tracing-core",
  "tracing-subscriber",
  "uluru",
- "url",
  "walkdir",
  "xor_name",
 ]
@@ -4069,7 +4068,6 @@ dependencies = [
  "tracing-core",
  "tracing-subscriber",
  "uluru",
- "url",
  "xor_name",
 ]
 
