@@ -27,7 +27,7 @@ type ConnId = String;
 pub(crate) struct Link {
     peer: Peer,
     endpoint: Endpoint,
-    connections: Arc<RwLock<BTreeMap<ConnId, Connection>>>,
+    connections: Arc<RwLock<BTreeMap<ConnId, Arc<Connection>>>>,
 }
 
 impl Link {
@@ -70,7 +70,7 @@ impl Link {
     }
 
     // Get a connection or create a fresh one
-    async fn get_or_connect(&self, msg_id: MsgId) -> Result<Connection, LinkError> {
+    async fn get_or_connect(&self, msg_id: MsgId) -> Result<Arc<Connection>, LinkError> {
         debug!("Attempting to get conn read lock... {msg_id:?}");
         let empty_conns = self.connections.read().await.is_empty();
         debug!("lock got {msg_id:?}");
@@ -101,15 +101,15 @@ impl Link {
     pub(crate) async fn create_connection_if_none_exist(
         &self,
         msg_id: Option<MsgId>,
-    ) -> Result<Connection, LinkError> {
+    ) -> Result<Arc<Connection>, LinkError> {
         let peer = self.peer;
         // grab write lock to prevent many many conns being opened at once
         debug!("[CONN WRITE]: {msg_id:?} to {peer:?}");
-        let mut conns = self.connections.write().await;
+        let mut conns_write_lock = self.connections.write().await;
         debug!("[CONN WRITE]: lock obtained {msg_id:?} to {peer:?}");
 
         // let's double check we havent got a connection meanwhile
-        if let Some(conn) = conns.iter().next().map(|(_, c)| c.clone()) {
+        if let Some(conn) = conns_write_lock.iter().next().map(|(_, c)| c.clone()) {
             debug!("{msg_id:?} Connection already exists in Link, so returning that instead of creating a fresh connection");
             return Ok(conn);
         }
@@ -129,9 +129,11 @@ impl Link {
             conn.id()
         );
 
-        let _ = conns.insert(conn.id(), conn.clone());
+        let conn_id = conn.id();
+        let conn_arc = Arc::new(conn);
+        let _ = conns_write_lock.insert(conn_id, conn_arc.clone());
 
-        Ok(conn)
+        Ok(conn_arc)
     }
 }
 
