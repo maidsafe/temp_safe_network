@@ -117,10 +117,7 @@ impl RegisterStore {
         };
 
         if !path.exists() {
-            trace!(
-                "Register log does not exist, creating a new one {}",
-                path.display()
-            );
+            trace!("Register log does not exist yet: {}", path.display());
             return Ok(stored_reg);
         }
 
@@ -146,9 +143,8 @@ impl RegisterStore {
                 }
                 other => {
                     warn!(
-                        "Ignoring corrupted register cmd from storage found at {}: {:?}",
-                        filepath.display(),
-                        other
+                        "Ignoring corrupted register cmd from storage found at {}: {other:?}",
+                        filepath.display()
                     )
                 }
             }
@@ -170,17 +166,24 @@ impl RegisterStore {
 
         create_dir_all(path).await?;
 
+        let mut last_err = None;
         for cmd in log {
-            // TODO do we want to fail here if one entry fails?
-            self.write_register_cmd(cmd, path).await?;
+            if let Err(err) = self.write_register_cmd(cmd, path).await {
+                error!("Failed to write Register cmd {cmd:?} to disk: {err:?}");
+                last_err = Some(err);
+            }
         }
 
-        trace!(
-            "Log of {} cmd/s written successfully at {}",
-            log.len(),
-            path.display()
-        );
-        Ok(())
+        if let Some(err) = last_err {
+            Err(err)
+        } else {
+            trace!(
+                "Log of {} cmd/s written successfully at {}",
+                log.len(),
+                path.display()
+            );
+            Ok(())
+        }
     }
 
     /// Persists a RegisterCmd to disk
