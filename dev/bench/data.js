@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1671036551536,
+  "lastUpdate": 1671041949874,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -39928,6 +39928,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 341261230,
             "range": "± 3455423",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "2b6622144178d6a67db1392dfd4929232cb4ca62",
+          "message": "Merge #1887\n\n1887: fix(storage): write all Register cmds to disk even if one or more fail r=bochaco a=bochaco\n\n- When writting Register cmds log to disk, we log and return the error for any of them failing, but we don't prevent the rest to be written to disk.\r\n- Enable multi-threaded mode for sn_api tests in Bors.\r\n- Some minor improvements to log msgs.\n\nCo-authored-by: bochaco <gabrielviganotti@gmail.com>",
+          "timestamp": "2022-12-14T16:34:37Z",
+          "tree_id": "7dcbeea575fe2a36455a7e769c0b574fa714339c",
+          "url": "https://github.com/maidsafe/safe_network/commit/2b6622144178d6a67db1392dfd4929232cb4ca62"
+        },
+        "date": 1671041947563,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2464471,
+            "range": "± 315485",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 97079325,
+            "range": "± 1348339",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 116696762,
+            "range": "± 5646013",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 442334919,
+            "range": "± 5160038",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 77644411,
+            "range": "± 996554",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 89977127,
+            "range": "± 1290656",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 361756387,
+            "range": "± 4469304",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 25081530572,
+            "range": "± 173991495",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 46530837,
+            "range": "± 9343992",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2050077250,
+            "range": "± 231805659",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 7213214183,
+            "range": "± 533173337",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 186176029,
+            "range": "± 15606267",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1783632574,
+            "range": "± 86072211",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 6625741570,
+            "range": "± 530092792",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 46030060,
+            "range": "± 3077854",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 459710457,
+            "range": "± 27662655",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1864690591,
+            "range": "± 51604883",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 12071723,
+            "range": "± 622394",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 99545697,
+            "range": "± 3211867",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 344069870,
+            "range": "± 7384662",
             "unit": "ns/iter"
           }
         ]
