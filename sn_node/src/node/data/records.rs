@@ -403,9 +403,6 @@ impl MyNode {
 
         let mut wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
-        #[cfg(feature = "test-utils")]
-        let wire_msg = wire_msg.set_payload_debug(msg);
-
         wire_msg
             .serialize_and_cache_bytes()
             .map_err(|_| Error::InvalidMessage)
