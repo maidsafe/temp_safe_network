@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1670998177291,
+  "lastUpdate": 1671002021554,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -39640,6 +39640,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 435525842,
             "range": "± 28523097",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "3f3175ed7e006d68176670b31ddded2cef024b15",
+          "message": "Merge #1884\n\n1884: feat(testnet): prevent splits for next testnet r=joshuef a=davidrusu\n\nThis PR is in preparations for the next testnet. We'll try for a single very large section with joins enabled.\r\n\r\n~This is implemented by increasing the recommended section size to a very large constant (10000).~ increasing the recommended section size led to some very long running tests and a few failures as well.\r\n\r\nInstead of bumping the recommended section size, I've:\r\n1. modified the `try_split()` logic to always return None and add\r\n2. modified the check for room in the section to always return true.\r\n\r\nWith these two changes I was able to get a 50 node network running without splitting and all tests are passing without further changes.\n\nCo-authored-by: David Rusu <davidrusu.me@gmail.com>",
+          "timestamp": "2022-12-14T05:23:31Z",
+          "tree_id": "047da833784c7570b1f9f4e1457c91a2d080ebbe",
+          "url": "https://github.com/maidsafe/safe_network/commit/3f3175ed7e006d68176670b31ddded2cef024b15"
+        },
+        "date": 1671002019064,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2681217,
+            "range": "± 703714",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 130772471,
+            "range": "± 3748276",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 156956234,
+            "range": "± 4044252",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 593240611,
+            "range": "± 7818959",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 106724956,
+            "range": "± 1203688",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 122903121,
+            "range": "± 2701386",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 489024304,
+            "range": "± 8842882",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 31008782662,
+            "range": "± 293099938",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 72067495,
+            "range": "± 30551125",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2766217906,
+            "range": "± 132016940",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 10886908173,
+            "range": "± 666103112",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 272029187,
+            "range": "± 8178090",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 2602737984,
+            "range": "± 110332407",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 9750678939,
+            "range": "± 291091213",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 64842105,
+            "range": "± 2894053",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 623960255,
+            "range": "± 38382743",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 2373192390,
+            "range": "± 53218484",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 14692395,
+            "range": "± 1645162",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 119618413,
+            "range": "± 12478817",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 420652825,
+            "range": "± 16759318",
             "unit": "ns/iter"
           }
         ]
