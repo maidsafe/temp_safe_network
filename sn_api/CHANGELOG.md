@@ -5,7 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.75.0 (2022-12-09)
+## v0.75.1 (2022-12-15)
+
+### Chore
+
+ - <csr-id-89e1e40ed9100b28a1ad5ed196620a6d6415706e/> ignore qp2p::SendStream::finish errors
+   They dont mean a msg was not sent.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - ignore qp2p::SendStream::finish errors ([`89e1e40`](https://github.com/maidsafe/safe_network/commit/89e1e40ed9100b28a1ad5ed196620a6d6415706e))
+</details>
+
+## v0.75.0 (2022-12-13)
+
+<csr-id-ee824e7785b8da770b5aa6bba3415a274a4e0d68/>
+<csr-id-1bf23ff2d00b66232267403f94d3fa133416fdd3/>
+<csr-id-bef40c17867f33e4775af8ee5e9b617d52ee2667/>
+<csr-id-c2d0a0c98569b7fbeacad6796d7b245d2c3e6828/>
+<csr-id-033d17f355bea910939e094770af73be89e642ad/>
+<csr-id-8a569827c64c89c9b7268e7c6b103a42a4e45dae/>
+<csr-id-68c54c90eb622a33bed1981ef765adb9bded2d96/>
+<csr-id-e57d83235f60a16bd7e1ee801f35a599113dc71a/>
+<csr-id-2e937145c39039ee55505f00637cf484943f4471/>
+<csr-id-77cb17c41bbf258c3f1b16934c4c71b5e5ad2456/>
+<csr-id-e58d19d10d8cf4817f066942e1dbbeffbca740ce/>
+<csr-id-6bc0892e50dddbda393eb37abac44e2bf7e626eb/>
+<csr-id-10c2420505b85914eb7518c48a3951a5402331cf/>
+<csr-id-1152b2764e955edd80fb33921a8d8fe52654a896/>
+<csr-id-ff59202d1374c7e5dcc570d50ed8b399fafe488d/>
+<csr-id-905b8d8ed5652c50aac8c381b3c000efcad5de74/>
+<csr-id-bdf50e7ad1214ef4bb48c0a12db8a7700193bb2a/>
+<csr-id-a973b62a8ef48acc92af8735e7e7bcac94e0092f/>
 
 ### Chore
 
@@ -29,6 +73,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-2e937145c39039ee55505f00637cf484943f4471/> add nightly fixes
  - <csr-id-77cb17c41bbf258c3f1b16934c4c71b5e5ad2456/> add nightly fixes
 
+### Chore
+
+ - <csr-id-ea1d0490f0b67a9f39bd98b2bd5830a0f63fbf6e/> upgrade sn_dbc and blsttc
+   Upgrade both of these crates to resolve a publishing issue regarding a crate that had been yanked
+   being pulled in to the dependency graph.
+ - <csr-id-e3bb817e20843f68ee21e9a5dd7e52c8a6e92b88/> sn_interface-0.16.0/sn_dysfunction-0.15.0/sn_client-0.77.0/sn_node-0.72.0/sn_api-0.75.0/sn_cli-0.68.0
+
 ### New Features
 
  - <csr-id-5c8b1f50d1bf346d45bd2a9faf92bbf33cb448da/> client retry spend on unknown section key
@@ -43,11 +94,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    There are a few misc changes along with this commit:
    
    * Debugging message to indicate a spend request being processed correctly, which proved useful when
-     trying to get the automated test working.
-   * Remove the current section key from the unknown section key error. It's not necessary to include
+   trying to get the automated test working.
+* Remove the current section key from the unknown section key error. It's not necessary to include
      this.
-   * When running the baby fleming network with the Makefile, include log messages from `sn_interface`.
-   * Fix up git-based references to `sn_dbc` crate.
+* When running the baby fleming network with the Makefile, include log messages from `sn_interface`.
+* Fix up git-based references to `sn_dbc` crate.
 
 ### Bug Fixes
 
@@ -104,9 +155,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 27 commits contributed to the release over the course of 72 calendar days.
- - 80 days passed between releases.
- - 23 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 30 commits contributed to the release over the course of 77 calendar days.
+ - 85 days passed between releases.
+ - 25 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -116,6 +167,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1882 ([`16e82d1`](https://github.com/maidsafe/safe_network/commit/16e82d13cfeee993c85c04f1c6f90e4305c90487))
+    - upgrade sn_dbc and blsttc ([`ea1d049`](https://github.com/maidsafe/safe_network/commit/ea1d0490f0b67a9f39bd98b2bd5830a0f63fbf6e))
+    - sn_interface-0.16.0/sn_dysfunction-0.15.0/sn_client-0.77.0/sn_node-0.72.0/sn_api-0.75.0/sn_cli-0.68.0 ([`e3bb817`](https://github.com/maidsafe/safe_network/commit/e3bb817e20843f68ee21e9a5dd7e52c8a6e92b88))
     - add upload limit to cli cfg ([`8855c50`](https://github.com/maidsafe/safe_network/commit/8855c50b2e47be4298220c9e1f79a57403fd4ac0))
     - add upload limit to cli cfg ([`fa82955`](https://github.com/maidsafe/safe_network/commit/fa82955cd4e8ad82372089fd08e11e19dcaee42b))
     - Merge #1744 #1792 ([`ea83392`](https://github.com/maidsafe/safe_network/commit/ea83392ccc9cbb79b175c29ba77c4a7e27a5398f))
@@ -146,6 +200,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.74.0 (2022-09-19)
+
+<csr-id-a8a9fb90791b29496e8559090dca4161e04054da/>
 
 ### Chore
 
@@ -229,9 +285,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - sn_interface-0.13.0/sn_dysfunction-0.12.0/sn_client-0.74.0/sn_node-0.69.0/sn_api-0.72.0/sn_cli-0.65.0 ([`fe659c5`](https://github.com/maidsafe/safe_network/commit/fe659c5685289fe0071b54298dcac394e83c0dce))
     - report any error occurred when handling a service msg back to the client ([`d671f4e`](https://github.com/maidsafe/safe_network/commit/d671f4ee4c76b42187d266aee99351114acf6cd7))
 </details>
-
-<csr-unknown>
-Adapting sn_api wallet and sn_node spentbook unit tests for new error msgs/cmds.<csr-unknown/>
 
 ## v0.71.0 (2022-09-06)
 
