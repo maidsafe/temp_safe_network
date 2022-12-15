@@ -1,13 +1,13 @@
-name: Nightly Release Run
+name: Version Bump
 
 on:
-  schedule:
-    # * is a special character in YAML so you have to quote this string
-    - cron: "30 4 * * *"
+  push:
+    branches:
+      - main
 
 jobs:
   bump_version:
-    if: github.repository_owner == 'maidsafe' && github.ref_name == 'main'
+    if: github.repository_owner == 'maidsafe'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
