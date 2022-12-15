@@ -5,13 +5,81 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.72.3 (2022-12-15)
+
+### Chore
+
+ - <csr-id-f1b929344db992ace9e05aeffc96cd81e72b1ae0/> change wording of lib.rs docs
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - change wording of lib.rs docs ([`f1b9293`](https://github.com/maidsafe/safe_network/commit/f1b929344db992ace9e05aeffc96cd81e72b1ae0))
+</details>
+
+## v0.72.2 (2022-12-15)
+
+### Chore
+
+ - <csr-id-c42f6361cd6366c91d2e0c232abf0c070ab27ab7/> sn_interface-0.16.2/sn_node-0.72.2
+
+### Bug Fixes
+
+ - <csr-id-fc90ff09ae51eda433e28536289176104cb62872/> send all data batches, not just the first
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.2/sn_node-0.72.2 ([`c42f636`](https://github.com/maidsafe/safe_network/commit/c42f6361cd6366c91d2e0c232abf0c070ab27ab7))
+    - Merge #1889 ([`d0ab3b0`](https://github.com/maidsafe/safe_network/commit/d0ab3b05a0200d266b55cdb9477cef35b071f186))
+    - send all data batches, not just the first ([`fc90ff0`](https://github.com/maidsafe/safe_network/commit/fc90ff09ae51eda433e28536289176104cb62872))
+    - Merge #1888 ([`fc0be25`](https://github.com/maidsafe/safe_network/commit/fc0be25da404d64a33b1addb6499033883f5035a))
+</details>
+
 ## v0.72.1 (2022-12-15)
+
+<csr-id-841a004786767c53ab9d60d4a310299d535b86bc/>
+<csr-id-89e1e40ed9100b28a1ad5ed196620a6d6415706e/>
+<csr-id-52be4b12a07f3851474b713f66c821defd7a29f5/>
 
 ### Chore
 
  - <csr-id-841a004786767c53ab9d60d4a310299d535b86bc/> make stream.finish non blocking where we can
  - <csr-id-89e1e40ed9100b28a1ad5ed196620a6d6415706e/> ignore qp2p::SendStream::finish errors
    They dont mean a msg was not sent.
+
+### Refactor
+
+ - <csr-id-6e4fce574b8f1e916ea3bd941ed7ecaec3a62931/> minor refactor within comm mod
+
+### Chore
+
+ - <csr-id-82c0cf683f8052374eafbb859176c69d52956c72/> sn_interface-0.16.1/sn_client-0.77.1/sn_node-0.72.1/sn_api-0.75.1
+ - <csr-id-6e84b0aa25bfd6ecff45812cc32e189245b8ec3a/> removing unused payload_debug field from msgs
 
 ### New Features
 
@@ -22,8 +90,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-b67adb74f03e4e8784ec4d391032d9a1eacb847d/> write all Register cmds to disk even if one or more failed
    - When writting Register cmds log to disk, we log and return the error for
    any of them failing, but we don't prevent the rest to be written to disk.
-   - Enable multi-threaded mode for sn_api tests in Bors.
-   - Some minor improvements to log msgs.
+- Enable multi-threaded mode for sn_api tests in Bors.
+- Some minor improvements to log msgs.
 
 ### Other
 
@@ -33,8 +101,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 7 commits contributed to the release over the course of 1 calendar day.
- - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 10 commits contributed to the release over the course of 1 calendar day.
+ - 1 day passed between releases.
+ - 8 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -44,6 +113,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.16.1/sn_client-0.77.1/sn_node-0.72.1/sn_api-0.75.1 ([`82c0cf6`](https://github.com/maidsafe/safe_network/commit/82c0cf683f8052374eafbb859176c69d52956c72))
+    - minor refactor within comm mod ([`6e4fce5`](https://github.com/maidsafe/safe_network/commit/6e4fce574b8f1e916ea3bd941ed7ecaec3a62931))
+    - removing unused payload_debug field from msgs ([`6e84b0a`](https://github.com/maidsafe/safe_network/commit/6e84b0aa25bfd6ecff45812cc32e189245b8ec3a))
     - Merge #1887 ([`2b66221`](https://github.com/maidsafe/safe_network/commit/2b6622144178d6a67db1392dfd4929232cb4ca62))
     - write all Register cmds to disk even if one or more failed ([`b67adb7`](https://github.com/maidsafe/safe_network/commit/b67adb74f03e4e8784ec4d391032d9a1eacb847d))
     - Merge #1884 ([`3f3175e`](https://github.com/maidsafe/safe_network/commit/3f3175ed7e006d68176670b31ddded2cef024b15))
@@ -261,6 +333,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-bdf50e7ad1214ef4bb48c0a12db8a7700193bb2a/>
 <csr-id-a973b62a8ef48acc92af8735e7e7bcac94e0092f/>
 <csr-id-d550b553acbd70d4adb830a0600f7da7b833ee18/>
+<csr-id-66a15497201ef63c52721a6ba8ce4840393f03bc/>
+<csr-id-dcf40cba6ae0f73476d3095a01aca5c3cade031c/>
+<csr-id-ea1d0490f0b67a9f39bd98b2bd5830a0f63fbf6e/>
+<csr-id-e3bb817e20843f68ee21e9a5dd7e52c8a6e92b88/>
 
 ### Chore
 
@@ -508,13 +584,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-707627f8915a6032390b035786e3e39d1f7bac8d/> allow to change the Elder-to-Adult query responses timeout by env var
    - feat(node): allow to change the timeout for Elder-to-Adult query responses
    by setting `SN_ADULT_RESPONSE_TIMEOUT` env var
-- chore(client): set 90secs for cmds (`SN_CMD_TIMEOUT`) and
-   queries (`SN_QUERY_TIMEOUT`) timeout period in sn-client as default.
-- chore(node): set 70secs for Elder-to-Adult query responses (`SN_ADULT_RESPONSE_TIMEOUT`)
-   timeout period in sn_node to as default.
-- chore(ci): setting the same values explicitly for sn_client e2e tests in CI/bors, just
-   to make sure whenever we start adjusting the default vaues we don't change those
-   for CI which have been shown to be adequate in current CI/bors setups so far.
 * Debugging message to indicate a spend request being processed correctly, which proved useful when
      trying to get the automated test working.
 * Remove the current section key from the unknown section key error. It's not necessary to include
@@ -571,6 +640,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-30fa400d2fa1d5029f5e0190c506cc92b0bcdf09/>
 <csr-id-22a0de0e3bd8478a10729112ec1b3bce9ba5cb90/>
 <csr-id-4884c511d302522aa408ebf9350a7ff6cefeecb7/>
+<csr-id-1f08fe59ceeccbf724d28f3bebc855e2999492d7/>
+<csr-id-26b9f5b5ef39bab12466a7820de713c60b593faf/>
 
  - <csr-id-7a5a3d31e0668a7beb64742593181c0a30af05f4/> add comments on idempotency checks in elder state init
  - <csr-id-74eea7619948a11a8ddc87b25a61ef510cd10506/> add a log for when an elder is missing their key share
@@ -579,18 +650,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-e1953cf95f77053ee243478fb1053e257b197e67/> wait before retrying creation on node instance error
  - <csr-id-de8ed40b9f1ad353c9a8ded58db5de76acee21e1/> reconnect upon any LinkError::Connection(_) error when sending a msg on a bi-stream
    - Upgrading qp2p to v0.32.0.
-- Also some minor improvements to logging msgs.
-- Removing unused error type and cargo feature.
-- The new SAP created by the test was sometimes removing the node used to perform the final test of the AE msg
-   due to assume the list of Elder nodes returned by `TestSapBuilder::build` was sorted in the same order as the
-   `Peer`s obtained from the SAP generated by same utility function.
-- Syncing data to disk right after writing reduces the changes of another
-   task/thread reading the file obtains an empty content.
-- Also this change checks the address of recreated Chunk after read from disk
-   to make sure the content read is complete and matching the expected address.
- - <csr-id-1f08fe59ceeccbf724d28f3bebc855e2999492d7/> change of config size test
- - <csr-id-26b9f5b5ef39bab12466a7820de713c60b593faf/> remove full adults from data storage algos
-
 
 ### Other
 
@@ -756,9 +815,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-f225a2d84ad3422b4f466fa2bf713c3a767588dc/> adding more context info to some node Error types
    - Initialising logger in sn_client spentbook API tests.
-- Including stream id in log messages.
-- Report the error when a stream couldn't be finished when sending a response since that
-   could mean the recipient didn't received it.
 
 ### Refactor (BREAKING)
 
@@ -1195,7 +1251,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 <csr-unknown>
- update sibling on split try to rejoin network if removedRestart the node bootstrap process with a new name if we’ve been removedfrom a section. Use Receiver<RejoinNetwork> to listen for the command. bootstrap the section tree before starting join process remove AE hold back cmd responses sent from adults over streamAdd in the stream initialisation from elders to adults. use bi/di send streams for elder-> adults queries enable cmd ids and child ids again remove ae_backoff_cache send client msg back on bidi stream use bi stream from client; process in Node move to event driven msg handlingput incoming msgs and cmd handling into their own threads move DKG gossip check off thread enable multi-threaded runtime try 2 spawn the wait/update for session in comms:is_sent make sessions return if they’re empty, and if so, clean them up then do no requeue existing validate msg cmds force retries to use fresh connection remove age stepping in genesis sections remove NodeMsgAuthority altogether remove node auth get rid of InvalidState Error altogether section peers uses BTreeMaps instead of DashMap remove section share auth universal aggregator without timers remove unused OutgoingMsg::Elder adapt to empty vec change in sn_sdkg integrate recursive sn_sdkg changes use separate genesis dbc and section keysFor more information, see the doc comments on the diff.The generation of the DBC was also updated to use non-zero values for the alpha and r fields ofMlsagMaterial, because zeroes and ones are special values in elliptic curve cryptography.Also fixed a Clippy warning. add technical docs wait a safe 5 chain len before removing old dkgs section info agreement using sap gen to check candidates gossip DKG termination to trigger handover outdated gossip AE dkg start miss handling dkg gossip cleanup old DKG sessions when a Handover is complete some necessary cleanup compiling sdkg integration client retry spend on unknown section keyWhen the client receives an unknown section key error, it will obtain the proof chain and SAP forthe unknown section and resubmit the request with this additional information.There is no automated client test for this scenario. We went to great lengths to try, but it provednot worth the effort. It was too difficult to modify the network knowledge with a fake section andstill have things function correctly. The scenario is unit tested on the node side, and we doneenough testing to know that the retry loop does what’s intended.There are a few misc changes along with this commit: retry dbc spend on unknown section keyThis is the client side for the scenario where the spent proofs are signed by section keys that theprocessing section is not aware of.Several retries will be attempted because it’s possible for there to be multiple section keys thatare not known, but the network will only return back one key at a time.Based on review feedback, this commit also changes the SpentbookCmd::Spend variant to use a singlefield for the updated network knowledge, along with some other more minor changes. dbc spend can update network knowledgeWhen a DBC is submitted for spending, there are a set of spent proofs sent along with the request,one for each input for the DBC being spent. It’s possible that these proofs were signed with asection key that the section processing the request is not aware of. In this case, the requestprocessing section needs to be updated with new network knowledge. Therefore, we add a couple offields to the spend command to give it the option to send new network knowledge, namely the updatedproof chain and the signed section authority provider.If the node detects the spend command has been sent with these, it will create a new type ofinternal command, UpdateNetworkAndHandleValidServiceMsg which will be returned for processing.This command will contain the original spend request, which will be run after the network knowledgeis updated. The reason for issuing the new command is because the original HandleValidServiceMsgcommand does not have mutable access to the node. custom Serializer, Deserializer for SectionsDAG replace SecuredLinkedList with SectionsDAG check member type before modifying nodeThe SocketAddr of the node is replaced with a new one. Hence the check forthe TestMemberType should happen prior to that. report internal error upon failing to send or fnish a response bi-stream log cleanup wait for threshold + 1 section tree update responses better log messsages for discarded messages don’t check senders of section updates check that section tree update came from elders better log msg when discarding non-bootstrap message adapt tests to work with the new JoinResponses without updates adapt remaining join tests to use the new AE Flow adapt the join disallowed test work with the new flow remove unused Result return from join_as_adult test get join_as_adult test working with the new join flow when failed to store data the Adult was returning a success response to Elder ae_msg_from_the_future_is_handled unit test was failing due to wrong assumption of test utility only regen join name once per sap only proposal when reached handover consensus first time small changes create new connection to peer if a SendStream cannot be finished when sending a msg add missing client ae response w/ streamSending to elders was not taking place on a stream… so nodes were potentiallyattempting to connect to clients don’t report status sent for failed bidi stream send reset ae_backoff_cache fix ae response on stream for better prefix request membership AE when we have stalled votesas well as resending out last vote use repsonse_stream for ae responses to client.Also avoid going into Link at the ndoe layer when we have a send_streamto use spawn a task to read query/cmd responses from bi-stream rebase issue w/ monitoring avoid mem size change across compiler version update make membership ae >= from genWe were not providing info about the requested generation, just the one afterwards, but obviously this is not enough info for our slow node to proceed call to File::sync_data right after writing a Chunk or Register op to disk request membership AE when we have stalled votesas well as resending out last vote Clippy Rebase clippy fix increase restart threshold during join fmt restart after accumulated retry_response join_invalid_retry_prefix test uses empty genesis prefix revert ‘is_new_sap’ check removal from join process remove unneeded err handling; bump join channel size Fix for rename in benches keep old DKG sessions for 2 more section churns split barrier race condition cargo dep rev selfish handover issue and limit known msg reprocessing invalid signature during plit DKGs bls key upgrade issue, more logs ignore update if we don’t have KeyShare making AE msg for clients to be a variant of client response msg type<csr-unknown/>
+chore(client): set 90secs for cmds (SN_CMD_TIMEOUT) andqueries (SN_QUERY_TIMEOUT) timeout period in sn-client as default.chore(node): set 70secs for Elder-to-Adult query responses (SN_ADULT_RESPONSE_TIMEOUT)timeout period in sn_node to as default.chore(ci): setting the same values explicitly for sn_client e2e tests in CI/bors, justto make sure whenever we start adjusting the default vaues we don’t change thosefor CI which have been shown to be adequate in current CI/bors setups so far.Also some minor improvements to logging msgs.Removing unused error type and cargo feature.The new SAP created by the test was sometimes removing the node used to perform the final test of the AE msgdue to assume the list of Elder nodes returned by TestSapBuilder::build was sorted in the same order as thePeers obtained from the SAP generated by same utility function.Syncing data to disk right after writing reduces the changes of anothertask/thread reading the file obtains an empty content.Also this change checks the address of recreated Chunk after read from diskto make sure the content read is complete and matching the expected address. change of config size test remove full adults from data storage algosIncluding stream id in log messages.Report the error when a stream couldn’t be finished when sending a response since thatcould mean the recipient didn’t received it.<csr-unknown/>
 
 ## v0.71.0 (2022-09-19)
 
@@ -1329,7 +1385,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-d671f4ee4c76b42187d266aee99351114acf6cd7/> report any error occurred when handling a service msg back to the client
    - Removing several unused sn_node::Error types.
-- Adapting sn_api wallet and sn_node spentbook unit tests for new error msgs/cmds.
 
 ### Refactor (BREAKING)
 
@@ -1358,6 +1413,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - removing unused Error types ([`0c49daf`](https://github.com/maidsafe/safe_network/commit/0c49daf5dbfad2593ccf13cb114841045688ffed))
     - report any error occurred when handling a service msg back to the client ([`d671f4e`](https://github.com/maidsafe/safe_network/commit/d671f4ee4c76b42187d266aee99351114acf6cd7))
 </details>
+
+<csr-unknown>
+Adapting sn_api wallet and sn_node spentbook unit tests for new error msgs/cmds.<csr-unknown/>
 
 ## v0.68.0 (2022-09-06)
 
