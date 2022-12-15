@@ -27,9 +27,6 @@ impl WireMsgUtils for WireMsg {
 
         let wire_msg = WireMsg::new_msg(MsgId::new(), msg_payload, MsgKind::Node(node.name()), dst);
 
-        #[cfg(feature = "test-utils")]
-        let wire_msg = wire_msg.set_payload_debug(msg);
-
         Ok(wire_msg)
     }
 }

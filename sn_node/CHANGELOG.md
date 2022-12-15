@@ -5,7 +5,262 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.0 (2022-12-09)
+## v0.72.1 (2022-12-15)
+
+### Chore
+
+ - <csr-id-841a004786767c53ab9d60d4a310299d535b86bc/> make stream.finish non blocking where we can
+ - <csr-id-89e1e40ed9100b28a1ad5ed196620a6d6415706e/> ignore qp2p::SendStream::finish errors
+   They dont mean a msg was not sent.
+
+### New Features
+
+ - <csr-id-38ebca089ed7134a63d9fefbf69f4f791b5858fb/> change split detection instead of size
+
+### Bug Fixes
+
+ - <csr-id-b67adb74f03e4e8784ec4d391032d9a1eacb847d/> write all Register cmds to disk even if one or more failed
+   - When writting Register cmds log to disk, we log and return the error for
+   any of them failing, but we don't prevent the rest to be written to disk.
+   - Enable multi-threaded mode for sn_api tests in Bors.
+   - Some minor improvements to log msgs.
+
+### Other
+
+ - <csr-id-52be4b12a07f3851474b713f66c821defd7a29f5/> allow client tests to be multithreaded
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 7 commits contributed to the release over the course of 1 calendar day.
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge #1887 ([`2b66221`](https://github.com/maidsafe/safe_network/commit/2b6622144178d6a67db1392dfd4929232cb4ca62))
+    - write all Register cmds to disk even if one or more failed ([`b67adb7`](https://github.com/maidsafe/safe_network/commit/b67adb74f03e4e8784ec4d391032d9a1eacb847d))
+    - Merge #1884 ([`3f3175e`](https://github.com/maidsafe/safe_network/commit/3f3175ed7e006d68176670b31ddded2cef024b15))
+    - make stream.finish non blocking where we can ([`841a004`](https://github.com/maidsafe/safe_network/commit/841a004786767c53ab9d60d4a310299d535b86bc))
+    - allow client tests to be multithreaded ([`52be4b1`](https://github.com/maidsafe/safe_network/commit/52be4b12a07f3851474b713f66c821defd7a29f5))
+    - ignore qp2p::SendStream::finish errors ([`89e1e40`](https://github.com/maidsafe/safe_network/commit/89e1e40ed9100b28a1ad5ed196620a6d6415706e))
+    - change split detection instead of size ([`38ebca0`](https://github.com/maidsafe/safe_network/commit/38ebca089ed7134a63d9fefbf69f4f791b5858fb))
+</details>
+
+## v0.72.0 (2022-12-13)
+
+<csr-id-cc9b9e0f09ceed4af7ca6d0a0913cfda1e184eef/>
+<csr-id-06041ee529171e51581499a585effac67f037d17/>
+<csr-id-ede33cc7a590e356232acd5feff6b44ff647517f/>
+<csr-id-3dc20bc9424c295bd9038b2847fe01f639b83407/>
+<csr-id-c0b9b274b60b8c6ecf905c6294e5afb86c69e16f/>
+<csr-id-51bc2ca02dd8fe9634c9a68889c5eedc1e52c31e/>
+<csr-id-f63d1896e554b72d6a5af463b7b6e7992a1aa8ed/>
+<csr-id-8bd83c64ca8cccc78dfe4641e522b4a02f03cbb8/>
+<csr-id-b4164cf0782c3083ba2a4e0f9b3f12445747730e/>
+<csr-id-93ef0c1b78d9ec656aa8df85d0a741a26d09f780/>
+<csr-id-f3fbf83dc15eb791ccc134d780042484a51ab90e/>
+<csr-id-64b6c35105168b9fa4b0fb9d626ed9552fd0bed3/>
+<csr-id-57662862a8f59b70b9ca41515ff775003ea803fa/>
+<csr-id-c84f844873208af49e1743199ca75c015d0e14c7/>
+<csr-id-e5b0dda1315a5299131cacd135b1d1ab66ed7073/>
+<csr-id-0ddfb0c2ceffbf69fca172ec555abe1495be1980/>
+<csr-id-f06b3e75ce97e7c749d2969276ad6533369806bb/>
+<csr-id-986fa81fb00daaa37a17e55b459d66efacfff650/>
+<csr-id-4392fd265faec0b8e6c637342bd71119322d53b4/>
+<csr-id-78371980ebf3f1b65ec62c49c35d8a6c015c5537/>
+<csr-id-7ac1e8abc3d792d5ea69e1e77fc7bdee63268f26/>
+<csr-id-762170be83e21659cb8170987a5c2cdd9f2c14e6/>
+<csr-id-98d0d4cf79919fb56854d6f4492af6740df3587d/>
+<csr-id-5e81ac4fb8a2312eb546a4b86e71be05df7c4e26/>
+<csr-id-6cf816f4e3ce1e81af614ba84de83ccf13e8e402/>
+<csr-id-c4cf647221cdf0ffaeca4d4a8da82d7dc7b21ca6/>
+<csr-id-f33602e0959a0ea86e4802376bd2f073cd8ea57c/>
+<csr-id-8f072f2bcfd48e5c4047e32332c29e231632efae/>
+<csr-id-200cf34c1cfc26b219ee12b9e8b0478fc5415745/>
+<csr-id-c436078af2afca7468bb6d8a579f457dfb662bf3/>
+<csr-id-3c8ac507a85e7c11219fdab8a61eadde89f8582f/>
+<csr-id-18c0444be06d84c386b18031e59f2162fef81d89/>
+<csr-id-e37180bd65d26c6f4737dabeae8a210674a82bdf/>
+<csr-id-197bb663e088309150a6f85e5c86877e5e0ad2d8/>
+<csr-id-bd2baa03f889fa94fab68ecf9f1acffb71aa993d/>
+<csr-id-7bc55f7b1a819c4609a85176d99f287b54a9ad44/>
+<csr-id-7d79e3e53ce49dc664d4a9215e5cc02839540879/>
+<csr-id-4df40864b5ee030edf16bad0becaa08a07c15fd9/>
+<csr-id-38b8f55121d8b7c461efa6dd0c0407c4fae93418/>
+<csr-id-a55b74b4c8f9bede3c91a9426d4687df01138257/>
+<csr-id-d43bac5ce07b0f08766858eadc4b8f98f9bcfc12/>
+<csr-id-667009dc02e6bb17bfaa60e2374d5ab7b75a7be5/>
+<csr-id-af9d3abc665a7490492417aebe974cb5ef839d53/>
+<csr-id-860f326a9baf7e62d191eec13359fa5313e6956d/>
+<csr-id-ee824e7785b8da770b5aa6bba3415a274a4e0d68/>
+<csr-id-b223bd532bba649c6dd09cf26166758d6ff56893/>
+<csr-id-2e7fde627f41dfff7b5b8cd049f26ee127269bfe/>
+<csr-id-c71fcd1fd61a4a2f9075d3d3e5f922b6d06644e6/>
+<csr-id-2b9268c2aff5aae5eb1584d2698f282c8beae73e/>
+<csr-id-62d472354d65f1cd9001f2df00cbf0c82734b969/>
+<csr-id-58d656949c09dc3d6445d899725fe2c41d46c216/>
+<csr-id-d9bfaef416bc357bdc32632eb0ba263b6995d613/>
+<csr-id-0ef5a2cfd82de58f02a23a96a305b172f27c33c8/>
+<csr-id-c3aa9414b4232dbaf356cec3fb71460f4d916b4f/>
+<csr-id-f2dff3636d3bf1446af53790a42a46473079698f/>
+<csr-id-1bf23ff2d00b66232267403f94d3fa133416fdd3/>
+<csr-id-d19c0b204c368a967a2f6de9d68e1db0caebb71a/>
+<csr-id-ebb7b793b1e7b4ba439f3f93b5d7ac32e9acc2c2/>
+<csr-id-0bd38c524b5f6685e3a8ad21b3ae793d097c6b6d/>
+<csr-id-745ae58408997504dd04663a1c8bea8b688ded66/>
+<csr-id-36686c794eccb84573e741fdbe6f9af2eb18c8c9/>
+<csr-id-5b0b8589bc9c90fac6285f626a46907b2dd0e819/>
+<csr-id-3b1548dd8b7f77538f47d6bca6338239899d18a3/>
+<csr-id-07e0fc8c7776efdabed61b451258709e4dc8f3d0/>
+<csr-id-560d1850783439b7e5affdc5d86a61cbf619fca0/>
+<csr-id-8b8f9be3e18b1ae2cf94b9e2dbd17f925b7580f6/>
+<csr-id-a05e6a28d890da5103e12cfae4ee54ffc0870be3/>
+<csr-id-bebd96de67906ab0d49a4a42edb9b62a2f1d88f2/>
+<csr-id-f65d4d457ef8b55fc87f6669f6d8380b371366a1/>
+<csr-id-27cbeb647b90e7105e5b650b436944d3cdd813c5/>
+<csr-id-865b459ab0cfcfbee91298787b5c2c4425e5b6a0/>
+<csr-id-8b50947fe3f2eeb6bfe6350f754303ebba9c09dd/>
+<csr-id-68929bda1832d85c1a9f43d904f1c687a3bc9dc4/>
+<csr-id-a05d7ca9b7d2319085a2dea9119735e3e44f50c1/>
+<csr-id-98abbbe7af8c870faa22d62819691054e07df718/>
+<csr-id-6185599884f49a71343c67e625a1a9dd9a75393d/>
+<csr-id-a9e2c6962b6646cc6b4ac24bf9da50dbf48d3f60/>
+<csr-id-7ed94ba0599325900246743334b4b821331cba86/>
+<csr-id-999bfaa633e9fcd2a9bc47b90b128f0e3946a951/>
+<csr-id-f856d853c0166f35bb2b98b24e3f3c8c09783b2d/>
+<csr-id-a1263ecef879fbdba932588cc37ea63959a0435b/>
+<csr-id-914b816921fc8f4da99bbf77a9fdd91d896411a4/>
+<csr-id-9a6f4a3cf20852f4b5604bf08a04aba592dca0fa/>
+<csr-id-e57d83235f60a16bd7e1ee801f35a599113dc71a/>
+<csr-id-0f11b2ed16c765bee3e25f2f25b374e3f06f8e8f/>
+<csr-id-5a539a74d0dcca7a8671910d45bbb08ca4382671/>
+<csr-id-411ea371660b5f76a5c3f887f78331e58f8b6961/>
+<csr-id-177407d1a0e817ea5fff0a98f74cd358f25ac727/>
+<csr-id-014b132923c5affebe2c485aa3e791a22a6b90c5/>
+<csr-id-3c05e616e54f423b66d35114668dac35ab5eae14/>
+<csr-id-ec88642644b76c0751db25c9b02b068cd77318d1/>
+<csr-id-37785c72943ad126ef8fc94f4a6c2139ae478d69/>
+<csr-id-fc7670e6cc4284d7cf5614185e8e93ffb9f0ba37/>
+<csr-id-51425951e8a66a8fd938a8dd2378b583cc80fb94/>
+<csr-id-6276e931291afd518648a47bc10374640b462cad/>
+<csr-id-8955514b2d08d2f7fbb4ebbf48d9807a9d5127ac/>
+<csr-id-e0803687a1b3b374efdf040cac0ecd5c6b4fc60a/>
+<csr-id-1601cde194cb1f3bab2f6b54cc0ca784adb912b8/>
+<csr-id-151a22f63a0aaaf94070f3bd0e1f6bd2f9239856/>
+<csr-id-70d848a43b6df02812195845434849b98f409367/>
+<csr-id-a7f017cc55da5cba53e8f10063afefc61ea5635a/>
+<csr-id-a0b2df5a0b12c70872dfc854d660afd0cf8b21aa/>
+<csr-id-09c48916a7f2145c1d3cd091d6219fb7150fe1c2/>
+<csr-id-7654f58dbde0c44fd799da16b2a3c4e3a73217df/>
+<csr-id-9a1cdf6f0135ce53f43a48c4346aff9023ccad33/>
+<csr-id-cbf5ed4b1065d5d4471bc27291c054f48b64678e/>
+<csr-id-3d72e4b71c079f7ddd8be08642165e53ebf987f6/>
+<csr-id-e1e161ba54ed8e0af298814f0da5b953ff053c93/>
+<csr-id-9992d9701ecadff2b7682e47387014b9d11dba63/>
+<csr-id-f4c3808f582cf06d58303383296af4ab7a13f0df/>
+<csr-id-2e937145c39039ee55505f00637cf484943f4471/>
+<csr-id-80446f5d9df88d5915dcf1d3ea2c213c22e40c14/>
+<csr-id-3f52833a8ce977aa79268ecaac61070f01e9c374/>
+<csr-id-77cb17c41bbf258c3f1b16934c4c71b5e5ad2456/>
+<csr-id-100e2ae70d21e141e1ebbc324f8b06e3d3f1a01c/>
+<csr-id-e973eee96c9065ce87a1fa65ae45d9be8d6f940c/>
+<csr-id-03da7f67fff1fa5bb06d60a66dfdb531506dec4c/>
+<csr-id-859fc30fa70ce41ceb910e0352c71dda5c5501ce/>
+<csr-id-b550ed00dd3e3af878758aea1a2efb6eba0e8d66/>
+<csr-id-b2b661d3e891403bf747228985930b301c9ad28f/>
+<csr-id-05846c1741318f51394090c66e7c0ddf911e31ee/>
+<csr-id-30bedf882f1f642592703b92be0966035ef01068/>
+<csr-id-b6474691ea6af5ee441b02f6cb9c3cf2b8f97459/>
+<csr-id-c7de08209c659ec93557d6ea10e0bcd8c3b74d8b/>
+<csr-id-230a6ed7f1f4193fa36b2fbb83bea072f4944c1d/>
+<csr-id-2b5119423248ce95021a0b1ba826b426d79d7e61/>
+<csr-id-e263a66e7db336cf5868b33dde507abbbc25f81c/>
+<csr-id-46068295e8e1c760ebab68f4338b14cf11588605/>
+<csr-id-994b1ef49ffee7c1b02b6361297bacd190e9b5e2/>
+<csr-id-f0ae5773669937b3c824e98557ecff5994cb1df7/>
+<csr-id-69d0687c4afc8d8f6e088663dfa4482c4d72ade0/>
+<csr-id-8d79f6fa586758fd75e5e66be95d9d240d9d6551/>
+<csr-id-4c6ae07d217cbed09d34adda1f3859191eb581c0/>
+<csr-id-636b38889c33b34ffdd391d479605938664bf731/>
+<csr-id-006a4f801f585594142e5ac4a9b19d218676c8b3/>
+<csr-id-2c8f9331ab0f7f63f7d14f7113ecf9ad5e6c4618/>
+<csr-id-aa53ee414631dd4faff600101e909fa98f6885fe/>
+<csr-id-298b5d86e4ea331f1c4c7213a724f275e01a06d1/>
+<csr-id-f66e02ebbcc0298692cfc3d4d4faf69ba2ba1f8f/>
+<csr-id-5179cf2dec47295f9673212efa6e23e9531e5ea3/>
+<csr-id-6ca7f4377308a0dd47dbd17a3d01b07321d9b8a9/>
+<csr-id-e8ab025a3454005890418b10a50560b3c65fd68f/>
+<csr-id-9bee893e381375b6de65d77357e13f1897b9d757/>
+<csr-id-3dc0bb1f0d8d04c8a92a75eab73e10721b105a10/>
+<csr-id-d22ad7c46753c3e5d3f3c50da4546c80e302dee9/>
+<csr-id-bc2c4ee21335b627e3e998dd56209f72f20aac90/>
+<csr-id-9414beed24795db97277eb0c15fe24910f4220d7/>
+<csr-id-4a466e5a14b61f0dcf5467298d11d831a9a8d7e2/>
+<csr-id-0e73ec1ce28c5e2206eb84a6a24d996a23affd2f/>
+<csr-id-9f539e9a8dd9c22e7440539114b2fbdaaeb34515/>
+<csr-id-3353ab617b438ca12cdac68a1f7956e3050eefcf/>
+<csr-id-093ea5bfc200f940662c5c0e458c38c5c77294a9/>
+<csr-id-4b6569ab2a9face420385d29d7baab31d8ca4d1e/>
+<csr-id-9f8ecf90470ac18de31a956c1eee5f9f2d4c77a7/>
+<csr-id-30670403d5466f7a052d753136e72e2720d2954d/>
+<csr-id-93c7a054d87df7054224664c4a03c4507bcfbae6/>
+<csr-id-9fad752ce1849763ae16cdb42159b9dccf1a13d0/>
+<csr-id-633dfc836c10eafc54dedefc53b2cbc9526970bb/>
+<csr-id-1bfa58e5487b3c8cafdef1593c2037b331c30dd1/>
+<csr-id-ab22c6989f55994065f0d859b91e141f7489a722/>
+<csr-id-32744bcf6c94d9a7cda81813646560b70be53eb2/>
+<csr-id-ba78a41f509a3015a5319e09e1e748ac91952b70/>
+<csr-id-72abbfbc583b5b0dc99a0f7d90cb4d7eb72bd8c4/>
+<csr-id-dcb76019971c2765c54ba04e22c1a7d2d1ad2d47/>
+<csr-id-8f355749c85e5d117e304bd499da1144b00e6809/>
+<csr-id-85c30ffa90488f36c32516ca97cea3b246cffbcb/>
+<csr-id-80c9f7a74a5c7f80a898f97729a813b6d2445f73/>
+<csr-id-3302aee7a41abd58b6deba18cc690c5e74aabff4/>
+<csr-id-702a03fae21fa517b02a1c0271f0617ca5c4f85c/>
+<csr-id-3215110b021aaa7d3b755b7e80432aeed1e0b436/>
+<csr-id-acaa90a13d598915bafc3584c70826f233d89881/>
+<csr-id-d87bbddfd92ecd802b27531cbcbc13c7271c6a10/>
+<csr-id-07d0991fed28d49c9be85d44a3343b66fac076d9/>
+<csr-id-28c7a9f7b2ce43d698288c12e35eb6a7026a4163/>
+<csr-id-f289de53f3894a58a6e4db51ce81aaf34f276490/>
+<csr-id-452ef9c5778ad88270f4e251adc49ccbc9b3cb09/>
+<csr-id-85f4d00e81ac5bf67b6be89d7ff51b7bb1060ed6/>
+<csr-id-322721635724f9dfa9351dd31e6883a32a330fe4/>
+<csr-id-dd45c8f42b4f8674eeaea90aa27a465bd3bae0a2/>
+<csr-id-04605882c324057deef5bec05bdae90e15b5a940/>
+<csr-id-f88d542b64c3bde832968c99dcfe38e99d85b4f5/>
+<csr-id-de2479e5fe56b3ebf526215b4860ce9f64c7f20c/>
+<csr-id-0a85816f4168024b2892fd77760580b1f8d2d9e9/>
+<csr-id-072c5d4c5de7810a0837144853435e2ff2d091d0/>
+<csr-id-610880711da814c7717c665e9cb34a729bda5797/>
+<csr-id-1152b2764e955edd80fb33921a8d8fe52654a896/>
+<csr-id-60e333d4ced688f3382cde513300d38790613692/>
+<csr-id-6343b6fd21fe3bf81412d922da5e14b2c8b6f3c5/>
+<csr-id-0176a56a311dd8450f7cd845bc37cc28a7b11c0d/>
+<csr-id-8bf032fff0ba48816311d6ea6967e3c300aedccf/>
+<csr-id-73f5531790ef8817ed3551fd9e4bcbcc7fc6f4f9/>
+<csr-id-4efda958c765e41b39444f397c500db95716ffa2/>
+<csr-id-058acaa701792ee58913b2d4524c759367fb65fc/>
+<csr-id-ffbb607835a87683280e4f16b0e2e1b5ca2fd0a1/>
+<csr-id-774c908b6c44b702259782cefdef5d4cdd228385/>
+<csr-id-42c4008aeadac297c212a65cde7109a055f61cec/>
+<csr-id-f53337e6e0c7c4f804489f0d370d4cc97331597f/>
+<csr-id-edea3fb90697837317f7f050913fefd534938bfd/>
+<csr-id-5dfeab95bb67454cc257028185dbbf7e1f98d351/>
+<csr-id-ac9d1b257db48ab336d2c80e4ff573208cbd4c6c/>
+<csr-id-6be0ea16b0ffe2c153c6a13f36916a91fb58cd05/>
+<csr-id-fc0c7512144c0c42184b6ae1b5a64e4d894d0eab/>
+<csr-id-80917f19125222ce6892e45487f2abe098fefd7a/>
+<csr-id-bdf50e7ad1214ef4bb48c0a12db8a7700193bb2a/>
+<csr-id-a973b62a8ef48acc92af8735e7e7bcac94e0092f/>
+<csr-id-d550b553acbd70d4adb830a0600f7da7b833ee18/>
 
 ### Chore
 
@@ -189,110 +444,133 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-03da7f67fff1fa5bb06d60a66dfdb531506dec4c/> optimizations and code cleanup
  - <csr-id-859fc30fa70ce41ceb910e0352c71dda5c5501ce/> enable `SectionTree` proptest
 
+### Test
+
+ - <csr-id-66a15497201ef63c52721a6ba8ce4840393f03bc/> add reg edit bench
+
+### Refactor
+
+ - <csr-id-dcf40cba6ae0f73476d3095a01aca5c3cade031c/> update qp2p (quinn)
+
+### Chore
+
+ - <csr-id-ea1d0490f0b67a9f39bd98b2bd5830a0f63fbf6e/> upgrade sn_dbc and blsttc
+   Upgrade both of these crates to resolve a publishing issue regarding a crate that had been yanked
+   being pulled in to the dependency graph.
+ - <csr-id-e3bb817e20843f68ee21e9a5dd7e52c8a6e92b88/> sn_interface-0.16.0/sn_dysfunction-0.15.0/sn_client-0.77.0/sn_node-0.72.0/sn_api-0.75.0/sn_cli-0.68.0
+
 ### New Features
+
+<csr-id-fc9e4feab2a504168221fe2bd893d9327a45ae6f/>
+<csr-id-e5ae9d7174ebb7abee2a4643f1c046f13cf15c01/>
+<csr-id-2542643330dcc35ff49b54e88fd038a19d0f5d18/>
+<csr-id-bcdb4fc8035c108f2e24c14983af30ddfb54b8fd/>
+<csr-id-5a39a843c5570993b0e27780a1c2887bbf7a3212/>
+<csr-id-87bc680733b8a24fdcb9f6dedb5ef5ef61becfe8/>
+<csr-id-17167b84b910631e1c847c657b88a2e0b422b1cd/>
+<csr-id-815d8034d26fb0a7dec22ceca4ad4e31653041c4/>
+<csr-id-8368c402bf5b305279b44d8c28cbb497c4bec333/>
+<csr-id-3fd0a00bad2f9ca266a56de2086b54088459e153/>
+<csr-id-95436a1f722bfd02a735dc3cf2f171a8b70de552/>
+<csr-id-e945ea97717ff2b63fd553afba82421c128166c4/>
+<csr-id-b27f15cbea63b1994fdf9b576a064273afe8f166/>
+<csr-id-83922d007af49f2e63cc1c81020db9cde905b66d/>
+<csr-id-a641d9f359e0dbc12bc55c62f126a04efa5e78f3/>
+<csr-id-e9dec49535c22c924af7d2144f4a298cae930eee/>
+<csr-id-a5bf211daa0272597f1a2d852a17592258a2115a/>
+<csr-id-14ba1a8a034e488728762df09398347f8b909d65/>
+<csr-id-8c348b2286925edf319daede9a064399b41f6ec1/>
+<csr-id-5019dd3896d278227878ffd91ce14d0cecb2b9dd/>
+<csr-id-a60eef81e20bee599f9b861822c8e8c3424073af/>
+<csr-id-50e877d9ac75b62dfa9e851564b6fd6b60167ca3/>
+<csr-id-266f3120b574133fccc39405d3a5a02d05806dfc/>
+<csr-id-2bcc1a0735d9cd727f71c93b58de85cd01c8a603/>
+<csr-id-59942675bc99d11ae4fcc6a5909aeba4b0f17ec9/>
+<csr-id-8f2c41406165351796ca8df36d2ae3457e000ab9/>
+<csr-id-b30459ffc565bb38ce7975c443b8df8139b77752/>
+<csr-id-b9d39b09e39b7d91fd556abeb385310f50a0eee0/>
+<csr-id-a65a5093e55b233dc4fa1293217d6bcd55a9d731/>
+<csr-id-45072a674021efe9efd1eeaf5f372b8a8bfba4c8/>
+<csr-id-01c8f5d799fce7bf3b8600042587626900940d01/>
+<csr-id-f4b5d6b207a0874621d777582ca5906e69196e06/>
+<csr-id-45d194d4d5927450a91a73c776c68871e857d48c/>
+<csr-id-3ed0e0167d5bec04d6c57d94ce1a63d1f043a1a0/>
+<csr-id-40fa4d9c0308c1104aaff60890bd48e08c8508b2/>
+<csr-id-69dce88a25254dd84a98ea9571ffccef17208744/>
+<csr-id-ba859ae5f064d6dc15aa563ee956a26e85df1d45/>
+<csr-id-f5d53c188a03150a06bdee97fb585f7900b7c251/>
+<csr-id-5c8b1f50d1bf346d45bd2a9faf92bbf33cb448da/>
+<csr-id-057ce1ce1e174102e23d96cfcd2ab1d090a6f1dc/>
+<csr-id-2020ef1a91c8520abc4bb74d3de6385b8cd283b4/>
+<csr-id-864c023e26697a609a9ad230c04e7aef7416650c/>
+<csr-id-0cd47ad56e0d93e3e99feb0dfcea8094f871ff6f/>
 
  - <csr-id-707627f8915a6032390b035786e3e39d1f7bac8d/> allow to change the Elder-to-Adult query responses timeout by env var
    - feat(node): allow to change the timeout for Elder-to-Adult query responses
    by setting `SN_ADULT_RESPONSE_TIMEOUT` env var
-   - chore(client): set 90secs for cmds (`SN_CMD_TIMEOUT`) and
+- chore(client): set 90secs for cmds (`SN_CMD_TIMEOUT`) and
    queries (`SN_QUERY_TIMEOUT`) timeout period in sn-client as default.
-   - chore(node): set 70secs for Elder-to-Adult query responses (`SN_ADULT_RESPONSE_TIMEOUT`)
+- chore(node): set 70secs for Elder-to-Adult query responses (`SN_ADULT_RESPONSE_TIMEOUT`)
    timeout period in sn_node to as default.
-   - chore(ci): setting the same values explicitly for sn_client e2e tests in CI/bors, just
+- chore(ci): setting the same values explicitly for sn_client e2e tests in CI/bors, just
    to make sure whenever we start adjusting the default vaues we don't change those
    for CI which have been shown to be adequate in current CI/bors setups so far.
- - <csr-id-fc9e4feab2a504168221fe2bd893d9327a45ae6f/> update sibling on split
- - <csr-id-e5ae9d7174ebb7abee2a4643f1c046f13cf15c01/> try to rejoin network if removed
-   Restart the node bootstrap process with a new name if we've been removed
-   from a section. Use `Receiver<RejoinNetwork>` to listen for the command.
- - <csr-id-2542643330dcc35ff49b54e88fd038a19d0f5d18/> bootstrap the section tree before starting join process
- - <csr-id-bcdb4fc8035c108f2e24c14983af30ddfb54b8fd/> remove AE hold back
- - <csr-id-5a39a843c5570993b0e27780a1c2887bbf7a3212/> cmd responses sent from adults over stream
-   Add in the stream initialisation from elders to adults.
- - <csr-id-87bc680733b8a24fdcb9f6dedb5ef5ef61becfe8/> use bi/di send streams for elder-> adults queries
- - <csr-id-17167b84b910631e1c847c657b88a2e0b422b1cd/> enable cmd ids and child ids again
- - <csr-id-815d8034d26fb0a7dec22ceca4ad4e31653041c4/> remove ae_backoff_cache
- - <csr-id-8368c402bf5b305279b44d8c28cbb497c4bec333/> send client msg back on bidi stream
- - <csr-id-3fd0a00bad2f9ca266a56de2086b54088459e153/> use bi stream from client; process in Node
- - <csr-id-95436a1f722bfd02a735dc3cf2f171a8b70de552/> move to event driven msg handling
-   put incoming msgs and cmd handling into their own threads
- - <csr-id-e945ea97717ff2b63fd553afba82421c128166c4/> move DKG gossip check off thread
-
- - <csr-id-b27f15cbea63b1994fdf9b576a064273afe8f166/> enable multi-threaded runtime try 2
- - <csr-id-83922d007af49f2e63cc1c81020db9cde905b66d/> spawn the wait/update for session in comms:is_sent
- - <csr-id-a641d9f359e0dbc12bc55c62f126a04efa5e78f3/> make sessions return if they're empty, and if so, clean them up then
- - <csr-id-e9dec49535c22c924af7d2144f4a298cae930eee/> do no requeue existing validate msg cmds
- - <csr-id-a5bf211daa0272597f1a2d852a17592258a2115a/> force retries to use fresh connection
- - <csr-id-14ba1a8a034e488728762df09398347f8b909d65/> remove age stepping in genesis sections
- - <csr-id-8c348b2286925edf319daede9a064399b41f6ec1/> remove NodeMsgAuthority altogether
- - <csr-id-5019dd3896d278227878ffd91ce14d0cecb2b9dd/> remove node auth
- - <csr-id-a60eef81e20bee599f9b861822c8e8c3424073af/> get rid of InvalidState Error altogether
- - <csr-id-50e877d9ac75b62dfa9e851564b6fd6b60167ca3/> section peers uses BTreeMaps instead of DashMap
- - <csr-id-266f3120b574133fccc39405d3a5a02d05806dfc/> remove section share auth
- - <csr-id-2bcc1a0735d9cd727f71c93b58de85cd01c8a603/> universal aggregator without timers
- - <csr-id-59942675bc99d11ae4fcc6a5909aeba4b0f17ec9/> remove unused OutgoingMsg::Elder
- - <csr-id-8f2c41406165351796ca8df36d2ae3457e000ab9/> adapt to empty vec change in sn_sdkg
- - <csr-id-b30459ffc565bb38ce7975c443b8df8139b77752/> integrate recursive sn_sdkg changes
- - <csr-id-b9d39b09e39b7d91fd556abeb385310f50a0eee0/> use separate genesis dbc and section keys
-   For more information, see the doc comments on the diff.
-   
-   The generation of the DBC was also updated to use non-zero values for the `alpha` and `r` fields of
-   `MlsagMaterial`, because zeroes and ones are special values in elliptic curve cryptography.
-   
-   Also fixed a Clippy warning.
- - <csr-id-a65a5093e55b233dc4fa1293217d6bcd55a9d731/> add technical docs
- - <csr-id-45072a674021efe9efd1eeaf5f372b8a8bfba4c8/> wait a safe 5 chain len before removing old dkgs
- - <csr-id-01c8f5d799fce7bf3b8600042587626900940d01/> section info agreement using sap gen to check candidates
- - <csr-id-f4b5d6b207a0874621d777582ca5906e69196e06/> gossip DKG termination to trigger handover
- - <csr-id-45d194d4d5927450a91a73c776c68871e857d48c/> outdated gossip AE
- - <csr-id-3ed0e0167d5bec04d6c57d94ce1a63d1f043a1a0/> dkg start miss handling
- - <csr-id-40fa4d9c0308c1104aaff60890bd48e08c8508b2/> dkg gossip
- - <csr-id-69dce88a25254dd84a98ea9571ffccef17208744/> cleanup old DKG sessions when a Handover is complete
- - <csr-id-ba859ae5f064d6dc15aa563ee956a26e85df1d45/> some necessary cleanup
- - <csr-id-f5d53c188a03150a06bdee97fb585f7900b7c251/> compiling sdkg integration
- - <csr-id-5c8b1f50d1bf346d45bd2a9faf92bbf33cb448da/> client retry spend on unknown section key
-   When the client receives an unknown section key error, it will obtain the proof chain and SAP for
-   the unknown section and resubmit the request with this additional information.
-   
-   There is no automated client test for this scenario. We went to great lengths to try, but it proved
-   not worth the effort. It was too difficult to modify the network knowledge with a fake section and
-   still have things function correctly. The scenario is unit tested on the node side, and we done
-   enough testing to know that the retry loop does what's intended.
-   
-   There are a few misc changes along with this commit:
-   
-   * Debugging message to indicate a spend request being processed correctly, which proved useful when
+* Debugging message to indicate a spend request being processed correctly, which proved useful when
      trying to get the automated test working.
-   * Remove the current section key from the unknown section key error. It's not necessary to include
+* Remove the current section key from the unknown section key error. It's not necessary to include
      this.
-   * When running the baby fleming network with the Makefile, include log messages from `sn_interface`.
-   * Fix up git-based references to `sn_dbc` crate.
- - <csr-id-057ce1ce1e174102e23d96cfcd2ab1d090a6f1dc/> retry dbc spend on unknown section key
-   This is the client side for the scenario where the spent proofs are signed by section keys that the
-   processing section is not aware of.
-   
-   Several retries will be attempted because it's possible for there to be multiple section keys that
-   are not known, but the network will only return back one key at a time.
-   
-   Based on review feedback, this commit also changes the `SpentbookCmd::Spend` variant to use a single
-   field for the updated network knowledge, along with some other more minor changes.
- - <csr-id-2020ef1a91c8520abc4bb74d3de6385b8cd283b4/> dbc spend can update network knowledge
-   When a DBC is submitted for spending, there are a set of spent proofs sent along with the request,
-   one for each input for the DBC being spent. It's possible that these proofs were signed with a
-   section key that the section processing the request is not aware of. In this case, the request
-   processing section needs to be updated with new network knowledge. Therefore, we add a couple of
-   fields to the spend command to give it the option to send new network knowledge, namely the updated
-   proof chain and the signed section authority provider.
-   
-   If the node detects the spend command has been sent with these, it will create a new type of
-   internal command, `UpdateNetworkAndHandleValidServiceMsg` which will be returned for processing.
-   This command will contain the original spend request, which will be run after the network knowledge
-   is updated. The reason for issuing the new command is because the original `HandleValidServiceMsg`
-   command does not have mutable access to the node.
- - <csr-id-864c023e26697a609a9ad230c04e7aef7416650c/> custom Serializer, Deserializer for `SectionsDAG`
- - <csr-id-0cd47ad56e0d93e3e99feb0dfcea8094f871ff6f/> replace `SecuredLinkedList` with `SectionsDAG`
+* When running the baby fleming network with the Makefile, include log messages from `sn_interface`.
+* Fix up git-based references to `sn_dbc` crate.
 
 ### Bug Fixes
+
+<csr-id-80edaf1bfbbd247ed92eb91b6de011264224f654/>
+<csr-id-37dc7b76a3f6c7f9d6b8f832562dc79032910412/>
+<csr-id-4c0a0c1b1419b44a8ef48a43f7f5bbd666eb1202/>
+<csr-id-6cafdc75fc808a66b9d88d67b91adc67a7ef5b99/>
+<csr-id-186c606d8eaf4e1b95162ae970369be26a56fb9e/>
+<csr-id-45c5031a965166dc1e2bf8862a8ace0d25b668e1/>
+<csr-id-b55ab9bfc16fd11d755cc88625b73936ce231bfc/>
+<csr-id-51c86dfcd2aa1ed3b5a868077d35f230245b5345/>
+<csr-id-3a13e6773a8faf22dc071e22e5965778ef8e54ad/>
+<csr-id-a935167f2549a87344153d354421ed8b8d408576/>
+<csr-id-e71eaa8467b244f875726b40e09ea255b3811c40/>
+<csr-id-1b2d350b358c34b4bd90c6fd3b5def0515e87e1c/>
+<csr-id-cd820b2c9ed03be82bba01368a046f8137fdbba5/>
+<csr-id-93fdda0505671426119f300a0444f7c6e51756a8/>
+<csr-id-851f7ad85197e2a474c72d5716c4b7858e840442/>
+<csr-id-0021a073e37306cadf0b56a1bdac8cb37734dae6/>
+<csr-id-27e97a75f72f8de9801c57ef062ba7f9a9b73432/>
+<csr-id-9acc41d5884ce4e6f647937fe56df906a7f86452/>
+<csr-id-d2d69e10ad6ca5b55945ff15834a8c262b56b3d8/>
+<csr-id-894458c0ba15225754d3c75642926f6ee40db34b/>
+<csr-id-aad74a94886df2a95b57859fa53591a8813c7860/>
+<csr-id-be99942b65306640f057f11b9b8f7345b9752ac5/>
+<csr-id-f1e967ad26b06f06f82815c884563df1729219e7/>
+<csr-id-9a014135a5fe9dc031847e91ed0cb0e52815cec1/>
+<csr-id-c98cc98674552794960e5953c5dbf405d961c333/>
+<csr-id-8f887c0f3f128f5d59304a0b47f6105cb52f3155/>
+<csr-id-96f275d2ff609fc27292ee8f33b188aa0d67ec4a/>
+<csr-id-d3923967e5886373bbf77696e4a813e700156f2a/>
+<csr-id-35fcfb6ee2331f2bc34e7680145d0d105e1354ba/>
+<csr-id-cdb3a474db1a51ac78234e1458e36ed2e70cc5dc/>
+<csr-id-7f5cbbe83d37fba9255078b893a02ab639eeb739/>
+<csr-id-cb052a3db16366977526d5d2a7f9c75a2990cf34/>
+<csr-id-7b850af7bd4579f1de60629aa88df3c81a35e546/>
+<csr-id-9454c727cbfb334ab68800a5022cf2b687d4f97d/>
+<csr-id-25448dc71fbe7877560654a4d5b5d69857c10ac9/>
+<csr-id-4a6df2948384bbfd3970982fde203778f950bff3/>
+<csr-id-ffa2cf3c9b49aaa3f5f64b88e0800a4047948378/>
+<csr-id-ce7d1863e523dbe1761ca60e1cebcf1a802cf83b/>
+<csr-id-18b393f7c7c5b9d38bf2bc17751b9dbbf08604fa/>
+<csr-id-54222aeea627209c53a1f595578436deb2763ef0/>
+<csr-id-1c277731397527b26b8e5edb16d9a5ffda7243d7/>
+<csr-id-85d3361b3c4b9f66a456a26671406660e641e41f/>
+<csr-id-269245f3289c8d4f482e101aad809a325d67ed7c/>
+<csr-id-5280460bb43a013d8273e5c30742c71596e4799a/>
+<csr-id-30fa400d2fa1d5029f5e0190c506cc92b0bcdf09/>
+<csr-id-22a0de0e3bd8478a10729112ec1b3bce9ba5cb90/>
+<csr-id-4884c511d302522aa408ebf9350a7ff6cefeecb7/>
 
  - <csr-id-7a5a3d31e0668a7beb64742593181c0a30af05f4/> add comments on idempotency checks in elder state init
  - <csr-id-74eea7619948a11a8ddc87b25a61ef510cd10506/> add a log for when an elder is missing their key share
@@ -301,71 +579,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-e1953cf95f77053ee243478fb1053e257b197e67/> wait before retrying creation on node instance error
  - <csr-id-de8ed40b9f1ad353c9a8ded58db5de76acee21e1/> reconnect upon any LinkError::Connection(_) error when sending a msg on a bi-stream
    - Upgrading qp2p to v0.32.0.
-   - Also some minor improvements to logging msgs.
-   - Removing unused error type and cargo feature.
- - <csr-id-80edaf1bfbbd247ed92eb91b6de011264224f654/> check member type before modifying node
-   The `SocketAddr` of the node is replaced with a new one. Hence the check for
-   the `TestMemberType` should happen prior to that.
- - <csr-id-37dc7b76a3f6c7f9d6b8f832562dc79032910412/> report internal error upon failing to send or fnish a response bi-stream
- - <csr-id-4c0a0c1b1419b44a8ef48a43f7f5bbd666eb1202/> log cleanup
- - <csr-id-6cafdc75fc808a66b9d88d67b91adc67a7ef5b99/> wait for threshold + 1 section tree update responses
- - <csr-id-186c606d8eaf4e1b95162ae970369be26a56fb9e/> better log messsages for discarded messages
- - <csr-id-45c5031a965166dc1e2bf8862a8ace0d25b668e1/> don't check senders of section updates
- - <csr-id-b55ab9bfc16fd11d755cc88625b73936ce231bfc/> check that section tree update came from elders
- - <csr-id-51c86dfcd2aa1ed3b5a868077d35f230245b5345/> better log msg when discarding non-bootstrap message
- - <csr-id-3a13e6773a8faf22dc071e22e5965778ef8e54ad/> adapt tests to work with the new JoinResponses without updates
- - <csr-id-a935167f2549a87344153d354421ed8b8d408576/> adapt remaining join tests to use the new AE Flow
- - <csr-id-e71eaa8467b244f875726b40e09ea255b3811c40/> adapt the join disallowed test work with the new flow
- - <csr-id-1b2d350b358c34b4bd90c6fd3b5def0515e87e1c/> remove unused Result return from join_as_adult test
- - <csr-id-cd820b2c9ed03be82bba01368a046f8137fdbba5/> get join_as_adult test working with the new join flow
- - <csr-id-93fdda0505671426119f300a0444f7c6e51756a8/> when failed to store data the Adult was returning a success response to Elder
- - <csr-id-851f7ad85197e2a474c72d5716c4b7858e840442/> ae_msg_from_the_future_is_handled unit test was failing due to wrong assumption of test utility
-   - The new SAP created by the test was sometimes removing the node used to perform the final test of the AE msg
+- Also some minor improvements to logging msgs.
+- Removing unused error type and cargo feature.
+- The new SAP created by the test was sometimes removing the node used to perform the final test of the AE msg
    due to assume the list of Elder nodes returned by `TestSapBuilder::build` was sorted in the same order as the
    `Peer`s obtained from the SAP generated by same utility function.
- - <csr-id-0021a073e37306cadf0b56a1bdac8cb37734dae6/> only regen join name once per sap
- - <csr-id-27e97a75f72f8de9801c57ef062ba7f9a9b73432/> only proposal when reached handover consensus first time
- - <csr-id-9acc41d5884ce4e6f647937fe56df906a7f86452/> small changes
- - <csr-id-d2d69e10ad6ca5b55945ff15834a8c262b56b3d8/> create new connection to peer if a SendStream cannot be finished when sending a msg
- - <csr-id-894458c0ba15225754d3c75642926f6ee40db34b/> add missing client ae response w/ stream
-   Sending to elders was not taking place on a stream... so nodes were potentially
-   attempting to connect to clients
- - <csr-id-aad74a94886df2a95b57859fa53591a8813c7860/> don't report status sent for failed bidi stream send
- - <csr-id-be99942b65306640f057f11b9b8f7345b9752ac5/> reset ae_backoff_cache
- - <csr-id-f1e967ad26b06f06f82815c884563df1729219e7/> fix ae response on stream for better prefix
- - <csr-id-9a014135a5fe9dc031847e91ed0cb0e52815cec1/> request membership AE when we have stalled votes
-   as well as resending out last vote
- - <csr-id-c98cc98674552794960e5953c5dbf405d961c333/> use repsonse_stream for ae responses to client.
-   Also avoid going into Link at the ndoe layer when we have a send_stream
-   to use
- - <csr-id-8f887c0f3f128f5d59304a0b47f6105cb52f3155/> spawn a task to read query/cmd responses from bi-stream
- - <csr-id-96f275d2ff609fc27292ee8f33b188aa0d67ec4a/> rebase issue w/ monitoring
- - <csr-id-d3923967e5886373bbf77696e4a813e700156f2a/> avoid mem size change across compiler version update
- - <csr-id-35fcfb6ee2331f2bc34e7680145d0d105e1354ba/> make membership ae >= from gen
-   We were not providing info about the requested generation, just the one afterwards, but obviously this is not enough info for our slow node to proceed
- - <csr-id-cdb3a474db1a51ac78234e1458e36ed2e70cc5dc/> call to File::sync_data right after writing a Chunk or Register op to disk
-   - Syncing data to disk right after writing reduces the changes of another
+- Syncing data to disk right after writing reduces the changes of another
    task/thread reading the file obtains an empty content.
-   - Also this change checks the address of recreated Chunk after read from disk
+- Also this change checks the address of recreated Chunk after read from disk
    to make sure the content read is complete and matching the expected address.
- - <csr-id-7f5cbbe83d37fba9255078b893a02ab639eeb739/> request membership AE when we have stalled votes
-   as well as resending out last vote
- - <csr-id-cb052a3db16366977526d5d2a7f9c75a2990cf34/> Clippy
- - <csr-id-7b850af7bd4579f1de60629aa88df3c81a35e546/> Rebase clippy fix
- - <csr-id-9454c727cbfb334ab68800a5022cf2b687d4f97d/> increase restart threshold during join
- - <csr-id-25448dc71fbe7877560654a4d5b5d69857c10ac9/> fmt
- - <csr-id-4a6df2948384bbfd3970982fde203778f950bff3/> restart after accumulated retry_response
- - <csr-id-ffa2cf3c9b49aaa3f5f64b88e0800a4047948378/> join_invalid_retry_prefix test uses empty genesis prefix
- - <csr-id-ce7d1863e523dbe1761ca60e1cebcf1a802cf83b/> revert 'is_new_sap' check removal from join process
- - <csr-id-18b393f7c7c5b9d38bf2bc17751b9dbbf08604fa/> remove unneeded err handling; bump join channel size
- - <csr-id-54222aeea627209c53a1f595578436deb2763ef0/> Fix for rename in benches
- - <csr-id-1c277731397527b26b8e5edb16d9a5ffda7243d7/> keep old DKG sessions for 2 more section churns
- - <csr-id-85d3361b3c4b9f66a456a26671406660e641e41f/> split barrier race condition
- - <csr-id-269245f3289c8d4f482e101aad809a325d67ed7c/> cargo dep rev
- - <csr-id-5280460bb43a013d8273e5c30742c71596e4799a/> selfish handover issue and limit known msg reprocessing
- - <csr-id-30fa400d2fa1d5029f5e0190c506cc92b0bcdf09/> invalid signature during plit DKGs
- - <csr-id-22a0de0e3bd8478a10729112ec1b3bce9ba5cb90/> bls key upgrade issue, more logs
- - <csr-id-4884c511d302522aa408ebf9350a7ff6cefeecb7/> ignore update if we don't have KeyShare
+ - <csr-id-1f08fe59ceeccbf724d28f3bebc855e2999492d7/> change of config size test
+ - <csr-id-26b9f5b5ef39bab12466a7820de713c60b593faf/> remove full adults from data storage algos
+
 
 ### Other
 
@@ -527,12 +752,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### New Features (BREAKING)
 
+<csr-id-7106b7533e119dc94bbf19fa304f3eb1f8dc9425/>
+
  - <csr-id-f225a2d84ad3422b4f466fa2bf713c3a767588dc/> adding more context info to some node Error types
    - Initialising logger in sn_client spentbook API tests.
-   - Including stream id in log messages.
-   - Report the error when a stream couldn't be finished when sending a response since that
+- Including stream id in log messages.
+- Report the error when a stream couldn't be finished when sending a response since that
    could mean the recipient didn't received it.
- - <csr-id-7106b7533e119dc94bbf19fa304f3eb1f8dc9425/> making AE msg for clients to be a variant of client response msg type
 
 ### Refactor (BREAKING)
 
@@ -553,9 +779,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 391 commits contributed to the release over the course of 79 calendar days.
- - 80 days passed between releases.
- - 305 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 401 commits contributed to the release over the course of 84 calendar days.
+ - 85 days passed between releases.
+ - 311 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -565,6 +791,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1882 ([`16e82d1`](https://github.com/maidsafe/safe_network/commit/16e82d13cfeee993c85c04f1c6f90e4305c90487))
+    - upgrade sn_dbc and blsttc ([`ea1d049`](https://github.com/maidsafe/safe_network/commit/ea1d0490f0b67a9f39bd98b2bd5830a0f63fbf6e))
+    - Merge #1858 ([`0911a17`](https://github.com/maidsafe/safe_network/commit/0911a17edd50763fb1deb85f25c51a1263f13a7f))
+    - change of config size test ([`1f08fe5`](https://github.com/maidsafe/safe_network/commit/1f08fe59ceeccbf724d28f3bebc855e2999492d7))
+    - Merge #1875 ([`381dff4`](https://github.com/maidsafe/safe_network/commit/381dff4d6e3ed97d210ecf3e7b662ae17cd3d1a9))
+    - update qp2p (quinn) ([`dcf40cb`](https://github.com/maidsafe/safe_network/commit/dcf40cba6ae0f73476d3095a01aca5c3cade031c))
+    - add reg edit bench ([`66a1549`](https://github.com/maidsafe/safe_network/commit/66a15497201ef63c52721a6ba8ce4840393f03bc))
+    - Merge #1851 ([`b90d652`](https://github.com/maidsafe/safe_network/commit/b90d6524cfeafeba7de7b2b65255fadc98e33eea))
+    - sn_interface-0.16.0/sn_dysfunction-0.15.0/sn_client-0.77.0/sn_node-0.72.0/sn_api-0.75.0/sn_cli-0.68.0 ([`e3bb817`](https://github.com/maidsafe/safe_network/commit/e3bb817e20843f68ee21e9a5dd7e52c8a6e92b88))
+    - remove full adults from data storage algos ([`26b9f5b`](https://github.com/maidsafe/safe_network/commit/26b9f5b5ef39bab12466a7820de713c60b593faf))
     - Merge #1846 ([`56df839`](https://github.com/maidsafe/safe_network/commit/56df8392897e5d1641570942a3852644e4cce427))
     - add comments on idempotency checks in elder state init ([`7a5a3d3`](https://github.com/maidsafe/safe_network/commit/7a5a3d31e0668a7beb64742593181c0a30af05f4))
     - add a log for when an elder is missing their key share ([`74eea76`](https://github.com/maidsafe/safe_network/commit/74eea7619948a11a8ddc87b25a61ef510cd10506))
@@ -958,7 +1194,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - replace `SecuredLinkedList` with `SectionsDAG` ([`0cd47ad`](https://github.com/maidsafe/safe_network/commit/0cd47ad56e0d93e3e99feb0dfcea8094f871ff6f))
 </details>
 
+<csr-unknown>
+ update sibling on split try to rejoin network if removedRestart the node bootstrap process with a new name if we’ve been removedfrom a section. Use Receiver<RejoinNetwork> to listen for the command. bootstrap the section tree before starting join process remove AE hold back cmd responses sent from adults over streamAdd in the stream initialisation from elders to adults. use bi/di send streams for elder-> adults queries enable cmd ids and child ids again remove ae_backoff_cache send client msg back on bidi stream use bi stream from client; process in Node move to event driven msg handlingput incoming msgs and cmd handling into their own threads move DKG gossip check off thread enable multi-threaded runtime try 2 spawn the wait/update for session in comms:is_sent make sessions return if they’re empty, and if so, clean them up then do no requeue existing validate msg cmds force retries to use fresh connection remove age stepping in genesis sections remove NodeMsgAuthority altogether remove node auth get rid of InvalidState Error altogether section peers uses BTreeMaps instead of DashMap remove section share auth universal aggregator without timers remove unused OutgoingMsg::Elder adapt to empty vec change in sn_sdkg integrate recursive sn_sdkg changes use separate genesis dbc and section keysFor more information, see the doc comments on the diff.The generation of the DBC was also updated to use non-zero values for the alpha and r fields ofMlsagMaterial, because zeroes and ones are special values in elliptic curve cryptography.Also fixed a Clippy warning. add technical docs wait a safe 5 chain len before removing old dkgs section info agreement using sap gen to check candidates gossip DKG termination to trigger handover outdated gossip AE dkg start miss handling dkg gossip cleanup old DKG sessions when a Handover is complete some necessary cleanup compiling sdkg integration client retry spend on unknown section keyWhen the client receives an unknown section key error, it will obtain the proof chain and SAP forthe unknown section and resubmit the request with this additional information.There is no automated client test for this scenario. We went to great lengths to try, but it provednot worth the effort. It was too difficult to modify the network knowledge with a fake section andstill have things function correctly. The scenario is unit tested on the node side, and we doneenough testing to know that the retry loop does what’s intended.There are a few misc changes along with this commit: retry dbc spend on unknown section keyThis is the client side for the scenario where the spent proofs are signed by section keys that theprocessing section is not aware of.Several retries will be attempted because it’s possible for there to be multiple section keys thatare not known, but the network will only return back one key at a time.Based on review feedback, this commit also changes the SpentbookCmd::Spend variant to use a singlefield for the updated network knowledge, along with some other more minor changes. dbc spend can update network knowledgeWhen a DBC is submitted for spending, there are a set of spent proofs sent along with the request,one for each input for the DBC being spent. It’s possible that these proofs were signed with asection key that the section processing the request is not aware of. In this case, the requestprocessing section needs to be updated with new network knowledge. Therefore, we add a couple offields to the spend command to give it the option to send new network knowledge, namely the updatedproof chain and the signed section authority provider.If the node detects the spend command has been sent with these, it will create a new type ofinternal command, UpdateNetworkAndHandleValidServiceMsg which will be returned for processing.This command will contain the original spend request, which will be run after the network knowledgeis updated. The reason for issuing the new command is because the original HandleValidServiceMsgcommand does not have mutable access to the node. custom Serializer, Deserializer for SectionsDAG replace SecuredLinkedList with SectionsDAG check member type before modifying nodeThe SocketAddr of the node is replaced with a new one. Hence the check forthe TestMemberType should happen prior to that. report internal error upon failing to send or fnish a response bi-stream log cleanup wait for threshold + 1 section tree update responses better log messsages for discarded messages don’t check senders of section updates check that section tree update came from elders better log msg when discarding non-bootstrap message adapt tests to work with the new JoinResponses without updates adapt remaining join tests to use the new AE Flow adapt the join disallowed test work with the new flow remove unused Result return from join_as_adult test get join_as_adult test working with the new join flow when failed to store data the Adult was returning a success response to Elder ae_msg_from_the_future_is_handled unit test was failing due to wrong assumption of test utility only regen join name once per sap only proposal when reached handover consensus first time small changes create new connection to peer if a SendStream cannot be finished when sending a msg add missing client ae response w/ streamSending to elders was not taking place on a stream… so nodes were potentiallyattempting to connect to clients don’t report status sent for failed bidi stream send reset ae_backoff_cache fix ae response on stream for better prefix request membership AE when we have stalled votesas well as resending out last vote use repsonse_stream for ae responses to client.Also avoid going into Link at the ndoe layer when we have a send_streamto use spawn a task to read query/cmd responses from bi-stream rebase issue w/ monitoring avoid mem size change across compiler version update make membership ae >= from genWe were not providing info about the requested generation, just the one afterwards, but obviously this is not enough info for our slow node to proceed call to File::sync_data right after writing a Chunk or Register op to disk request membership AE when we have stalled votesas well as resending out last vote Clippy Rebase clippy fix increase restart threshold during join fmt restart after accumulated retry_response join_invalid_retry_prefix test uses empty genesis prefix revert ‘is_new_sap’ check removal from join process remove unneeded err handling; bump join channel size Fix for rename in benches keep old DKG sessions for 2 more section churns split barrier race condition cargo dep rev selfish handover issue and limit known msg reprocessing invalid signature during plit DKGs bls key upgrade issue, more logs ignore update if we don’t have KeyShare making AE msg for clients to be a variant of client response msg type<csr-unknown/>
+
 ## v0.71.0 (2022-09-19)
+
+<csr-id-a8a9fb90791b29496e8559090dca4161e04054da/>
+<csr-id-a0bc2562df4f427752ec0f3ab85d9befe2d20050/>
+<csr-id-84cedf30fff0cc298f9f658d2c58499990967fe4/>
+<csr-id-2d1221999b959bf4d0879cf42050d5e1e3119445/>
 
 ### Chore
 
@@ -998,6 +1242,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.70.0 (2022-09-09)
+
+<csr-id-448694176dd3b40a12bd8ecc16d9bb66fd171a37/>
+<csr-id-5e70a7afff0d0969143d75f92ce82a02bc40a7b8/>
+<csr-id-927931c9eb833df3e589d72affc4839ba57b5cc2/>
 
 ### Chore
 
@@ -1055,6 +1303,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.69.0 (2022-09-07)
 
+<csr-id-fe659c5685289fe0071b54298dcac394e83c0dce/>
+<csr-id-84bfdaaf5b0df86912fef806dcb04f353e828b69/>
+<csr-id-638bcdfea4cbc713d8a4faecec7ed8538317fa29/>
+<csr-id-0c49daf5dbfad2593ccf13cb114841045688ffed/>
+
 ### Chore
 
  - <csr-id-fe659c5685289fe0071b54298dcac394e83c0dce/> sn_interface-0.13.0/sn_dysfunction-0.12.0/sn_client-0.74.0/sn_node-0.69.0/sn_api-0.72.0/sn_cli-0.65.0
@@ -1076,7 +1329,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-d671f4ee4c76b42187d266aee99351114acf6cd7/> report any error occurred when handling a service msg back to the client
    - Removing several unused sn_node::Error types.
-   - Adapting sn_api wallet and sn_node spentbook unit tests for new error msgs/cmds.
+- Adapting sn_api wallet and sn_node spentbook unit tests for new error msgs/cmds.
 
 ### Refactor (BREAKING)
 
@@ -1129,6 +1382,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-ed9f627d0e2c42ab1b7386888cced751ae28f98a/>
 <csr-id-5b73b33b683991be9e9f6440c3d8d568edab3ad6/>
 <csr-id-b7530feb40987f433ff12c5176cfdbc375359dc6/>
+<csr-id-1b9e0a6564e9564201ef3a3e04adb0bfbef6ac14/>
 
 ### Chore
 

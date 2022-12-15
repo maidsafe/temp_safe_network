@@ -14,7 +14,6 @@ use super::Link;
 
 use crate::node::{Error, Result, STANDARD_CHANNEL_SIZE};
 
-use qp2p::RetryConfig;
 use qp2p::SendStream;
 use qp2p::UsrMsgBytes;
 use sn_interface::messaging::MsgId;
@@ -35,7 +34,7 @@ const MAX_SENDJOB_RETRIES: usize = 3;
 #[derive(Debug)]
 enum SessionCmd {
     Send(SendJob),
-    AddConnection(qp2p::Connection),
+    AddConnection(Arc<qp2p::Connection>),
     Terminate,
 }
 
@@ -60,8 +59,8 @@ impl PeerSession {
 
     // this must be restricted somehow, we can't allow an unbounded inflow
     // of connections from a peer...
-    pub(crate) async fn add(&self, conn: qp2p::Connection) {
-        let cmd = SessionCmd::AddConnection(conn.clone());
+    pub(crate) async fn add(&self, conn: Arc<qp2p::Connection>) {
+        let cmd = SessionCmd::AddConnection(conn);
         if let Err(e) = self.channel.send(cmd).await {
             error!("Error while sending AddConnection {e:?}");
         }
@@ -163,52 +162,43 @@ impl PeerSessionWorker {
             trace!("Processing session {peer:?} cmd: {session_cmd:?}");
 
             let status = match session_cmd {
-                SessionCmd::Send(job) => {
-                    if let Some(send_stream) = job.send_stream {
-                        // send response on the stream
-                        debug!("Sending on stream via PeerSessionWorker");
-                        let _handle = tokio::spawn(async move {
-                            let stream_prio = 10;
-                            let mut send_stream = send_stream.lock().await;
-                            send_stream.set_priority(stream_prio);
-                            let stream_id = send_stream.id();
-                            if let Err(error) = send_stream.send_user_msg(job.bytes).await {
-                                error!(
-                                    "Could not send msg {:?} over response {stream_id} to {peer:?}: {error:?}",
-                                    job.msg_id
-                                );
+                SessionCmd::Send(SendJob {
+                    msg_id,
+                    bytes,
+                    reporter,
+                    send_stream: Some(send_stream),
+                    ..
+                }) => {
+                    // send response on the stream
+                    let _handle = tokio::spawn(async move {
+                        let stream_prio = 10;
+                        let mut send_stream = send_stream.lock().await;
+                        debug!("Sending on {} via PeerSessionWorker", send_stream.id());
+                        send_stream.set_priority(stream_prio);
+                        let stream_id = send_stream.id();
+                        if let Err(error) = send_stream.send_user_msg(bytes).await {
+                            error!("Could not send msg {msg_id:?} over response {stream_id} to {peer:?}: {error:?}");
+                            reporter.send(SendStatus::TransientError(format!("Could not send msg on response {stream_id} to {peer:?} for {msg_id:?}")));
+                        } else {
+                            // Attempt to gracefully terminate the stream.
+                            // If this errors it does _not_ mean our message has not been sent
+                            let _ = send_stream.finish().await;
 
-                                job.reporter.send(SendStatus::TransientError(format!(
-                                    "Could not send msg on response {stream_id} to {peer:?} for {:?}", job.msg_id
-                                )));
-                            } else if let Err(error) = send_stream.finish().await {
-                                error!(
-                                    "Could not close response {stream_id} with {peer:?}, for {:?}: {error:?}",
-                                    job.msg_id
-                                );
-                                job.reporter.send(SendStatus::TransientError(format!(
-                                    "Could not close response {stream_id} with {peer:?} for {:?}",
-                                    job.msg_id
-                                )));
-                            } else {
-                                job.reporter.send(SendStatus::Sent);
-                            }
-                        });
-
-                        SessionStatus::Ok
-                    } else {
-                        //another
-                        match self.send_over_peer_connection(job).await {
-                            Ok(s) => s,
-                            Err(error) => {
-                                error!("session error {error:?}");
-                                // don't breakout here?
-                                // TODO: is this correct?
-                                continue;
-                            }
+                            reporter.send(SendStatus::Sent);
                         }
-                    }
+                    });
+
+                    SessionStatus::Ok
                 }
+                SessionCmd::Send(job) => match self.send_over_peer_connection(job).await {
+                    Ok(status) => status,
+                    Err(error) => {
+                        error!("session error {error:?}");
+                        // don't breakout here?
+                        // TODO: is this correct?
+                        continue;
+                    }
+                },
                 SessionCmd::AddConnection(conn) => {
                     self.link.add(conn);
                     SessionStatus::Ok
@@ -284,14 +274,8 @@ impl PeerSessionWorker {
             let connection_id = conn.id();
             debug!("Connection exists for sendjob: {id:?}, and has conn_id: {connection_id:?}");
 
-            let send_resp = Link::send_with_connection(
-                job.bytes.clone(),
-                0,
-                Some(&RetryConfig::default()),
-                conn,
-                link_connections,
-            )
-            .await;
+            let send_resp =
+                Link::send_with_connection(job.bytes.clone(), 0, conn, link_connections).await;
 
             match send_resp {
                 Ok(_) => {

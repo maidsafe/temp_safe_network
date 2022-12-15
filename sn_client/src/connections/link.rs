@@ -27,7 +27,7 @@ type ConnId = String;
 pub(crate) struct Link {
     peer: Peer,
     endpoint: Endpoint,
-    connections: Arc<RwLock<BTreeMap<ConnId, Connection>>>,
+    connections: Arc<RwLock<BTreeMap<ConnId, Arc<Connection>>>>,
 }
 
 impl Link {
@@ -47,25 +47,33 @@ impl Link {
         let peer = self.peer;
         debug!("sending bidi msg out... {msg_id:?} to {peer:?}");
         let conn = self.get_or_connect(msg_id).await?;
-        debug!("connection got {msg_id:?} to {peer:?}");
+        debug!(
+            "connection got {msg_id:?} to {peer:?}, conn_id={}",
+            conn.id()
+        );
         let (mut send_stream, recv_stream) = conn.open_bi().await.map_err(LinkError::Connection)?;
 
-        debug!("{msg_id:?} bidi opened");
+        debug!("{msg_id:?} to {peer:?} bidi opened");
         send_stream.set_priority(10);
         send_stream
             .send_user_msg(bytes.clone())
             .await
             .map_err(LinkError::Send)?;
-        debug!("{msg_id:?} bidi msg sent");
+        debug!("{msg_id:?} bidi msg sent to {peer:?}");
 
-        send_stream.finish().await.map_err(LinkError::Send)?;
+        // move finish off thread as it's not strictly related to the sending of the msg.
+        let _handle = tokio::spawn(async move {
+            // Attempt to gracefully terminate the stream.
+            // If this errors it does _not_ mean our message has not been sent
+            let _ = send_stream.finish().await;
+            debug!("{msg_id:?} to {peer:?} bidi finished");
+        });
 
-        debug!("{msg_id:?} bidi finished");
         Ok(recv_stream)
     }
 
     // Get a connection or create a fresh one
-    async fn get_or_connect(&self, msg_id: MsgId) -> Result<Connection, LinkError> {
+    async fn get_or_connect(&self, msg_id: MsgId) -> Result<Arc<Connection>, LinkError> {
         debug!("Attempting to get conn read lock... {msg_id:?}");
         let empty_conns = self.connections.read().await.is_empty();
         debug!("lock got {msg_id:?}");
@@ -96,20 +104,23 @@ impl Link {
     pub(crate) async fn create_connection_if_none_exist(
         &self,
         msg_id: Option<MsgId>,
-    ) -> Result<Connection, LinkError> {
+    ) -> Result<Arc<Connection>, LinkError> {
         let peer = self.peer;
         // grab write lock to prevent many many conns being opened at once
         debug!("[CONN WRITE]: {msg_id:?} to {peer:?}");
-        let mut conns = self.connections.write().await;
+        let mut conns_write_lock = self.connections.write().await;
         debug!("[CONN WRITE]: lock obtained {msg_id:?} to {peer:?}");
 
         // let's double check we havent got a connection meanwhile
-        if let Some(conn) = conns.iter().next().map(|(_, c)| c.clone()) {
-            debug!("{msg_id:?} Connection already exists in Link, so returning that instead of creating a fresh connection");
+        if let Some(conn) = conns_write_lock.iter().next().map(|(_, c)| c.clone()) {
+            debug!(
+                "{msg_id:?} Connection already exists in Link to {peer:?}, using that, conn_id={}",
+                conn.id()
+            );
             return Ok(conn);
         }
 
-        debug!("{msg_id:?} creating connnnn to {peer:?}");
+        debug!("{msg_id:?} creating conn to {peer:?}");
         let (conn, _incoming_msgs) = self
             .endpoint
             .connect_to(&peer.addr())
@@ -124,9 +135,11 @@ impl Link {
             conn.id()
         );
 
-        let _ = conns.insert(conn.id(), conn.clone());
+        let conn_id = conn.id();
+        let conn_arc = Arc::new(conn);
+        let _ = conns_write_lock.insert(conn_id, conn_arc.clone());
 
-        Ok(conn)
+        Ok(conn_arc)
     }
 }
 

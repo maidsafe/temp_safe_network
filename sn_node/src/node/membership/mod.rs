@@ -90,7 +90,9 @@ pub(crate) fn try_split_dkg(
         membership_gen,
     };
 
-    Some((zero_id, one_id))
+    // Some((zero_id, one_id))
+    info!("We should have split in a real network: {zero_id:?}, {one_id:?}");
+    None // TODO: switch this back after Dec 15 2022 testnet
 }
 
 /// Returns the nodes that should be candidates to become the next elders, sorted by names.

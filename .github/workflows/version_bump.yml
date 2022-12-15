@@ -1,0 +1,41 @@
+name: Version Bump
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  bump_version:
+    if: github.repository_owner == 'maidsafe'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: "0"
+          token: ${{ secrets.VERSION_BUMP_COMMIT_PAT }}
+      - uses: actions-rs/toolchain@v1
+        id: toolchain
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - shell: bash
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+      - shell: bash
+        run: cargo install cargo-smart-release
+      - shell: bash
+        run: ./resources/scripts/bump_version.sh
+      - name: push version bump commit and tags
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.VERSION_BUMP_COMMIT_PAT }}
+          branch: main
+          tags: true
+      - name: Upload event file
+        uses: actions/upload-artifact@main
+        with:
+          name: event-file
+          path: ${{ github.event_path }}

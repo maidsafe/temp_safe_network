@@ -1113,7 +1113,145 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
-## v0.77.0 (2022-12-09)
+## v0.77.1 (2022-12-15)
+
+### Chore
+
+ - <csr-id-7620ede57d6f01a63380ac144684b5d504ae4fb4/> removing unused 'url' dependency
+ - <csr-id-80201067111349306a651a3f42a8ca740f48abaa/> use latest 0.33 qp2p
+ - <csr-id-841a004786767c53ab9d60d4a310299d535b86bc/> make stream.finish non blocking where we can
+ - <csr-id-89e1e40ed9100b28a1ad5ed196620a6d6415706e/> ignore qp2p::SendStream::finish errors
+   They dont mean a msg was not sent.
+
+### Bug Fixes
+
+ - <csr-id-b67adb74f03e4e8784ec4d391032d9a1eacb847d/> write all Register cmds to disk even if one or more failed
+   - When writting Register cmds log to disk, we log and return the error for
+   any of them failing, but we don't prevent the rest to be written to disk.
+   - Enable multi-threaded mode for sn_api tests in Bors.
+   - Some minor improvements to log msgs.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 7 commits contributed to the release.
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge #1887 ([`2b66221`](https://github.com/maidsafe/safe_network/commit/2b6622144178d6a67db1392dfd4929232cb4ca62))
+    - write all Register cmds to disk even if one or more failed ([`b67adb7`](https://github.com/maidsafe/safe_network/commit/b67adb74f03e4e8784ec4d391032d9a1eacb847d))
+    - Merge #1885 ([`79439fb`](https://github.com/maidsafe/safe_network/commit/79439fb7c2d3ec01115960a893fcd8ce03da1790))
+    - removing unused 'url' dependency ([`7620ede`](https://github.com/maidsafe/safe_network/commit/7620ede57d6f01a63380ac144684b5d504ae4fb4))
+    - use latest 0.33 qp2p ([`8020106`](https://github.com/maidsafe/safe_network/commit/80201067111349306a651a3f42a8ca740f48abaa))
+    - make stream.finish non blocking where we can ([`841a004`](https://github.com/maidsafe/safe_network/commit/841a004786767c53ab9d60d4a310299d535b86bc))
+    - ignore qp2p::SendStream::finish errors ([`89e1e40`](https://github.com/maidsafe/safe_network/commit/89e1e40ed9100b28a1ad5ed196620a6d6415706e))
+</details>
+
+## v0.77.0 (2022-12-13)
+
+<csr-id-812640dd910e8accbb73e831d1f819c8e1c7f6db/>
+<csr-id-64b6c35105168b9fa4b0fb9d626ed9552fd0bed3/>
+<csr-id-e5b0dda1315a5299131cacd135b1d1ab66ed7073/>
+<csr-id-f06b3e75ce97e7c749d2969276ad6533369806bb/>
+<csr-id-e344c3149cf39b6b22a91b755d7e8b0a8ca87dec/>
+<csr-id-7ac8d43bb3f559d01d9eac829a19e171a401e1a8/>
+<csr-id-2691c53daa36b82185a664482a55d9c893dc8439/>
+<csr-id-7f288b389175f3165fdca383dfe5f51097cc591f/>
+<csr-id-38b8f55121d8b7c461efa6dd0c0407c4fae93418/>
+<csr-id-a55b74b4c8f9bede3c91a9426d4687df01138257/>
+<csr-id-233bf64f33a632bef2fdaed409888efaa6f10b63/>
+<csr-id-667009dc02e6bb17bfaa60e2374d5ab7b75a7be5/>
+<csr-id-860f326a9baf7e62d191eec13359fa5313e6956d/>
+<csr-id-ee824e7785b8da770b5aa6bba3415a274a4e0d68/>
+<csr-id-7405a23895d4d412db3c5f25b1ca85b534e469eb/>
+<csr-id-4431c843d5c7f326848826e68c88cc36d8b300b2/>
+<csr-id-f2174d4150580c770ed2e7e6a4a457d35dca1383/>
+<csr-id-317fdb18ce227bc383f5637e6dd300ec94af20ff/>
+<csr-id-c71fcd1fd61a4a2f9075d3d3e5f922b6d06644e6/>
+<csr-id-2b9268c2aff5aae5eb1584d2698f282c8beae73e/>
+<csr-id-0ef5a2cfd82de58f02a23a96a305b172f27c33c8/>
+<csr-id-f15cee66c4bbc0aa8cd8cd81652745726915e595/>
+<csr-id-f2dff3636d3bf1446af53790a42a46473079698f/>
+<csr-id-1bf23ff2d00b66232267403f94d3fa133416fdd3/>
+<csr-id-5b0b8589bc9c90fac6285f626a46907b2dd0e819/>
+<csr-id-20003daa9ff41de61fc2a9509364c0483c92d136/>
+<csr-id-27cbeb647b90e7105e5b650b436944d3cdd813c5/>
+<csr-id-a05d7ca9b7d2319085a2dea9119735e3e44f50c1/>
+<csr-id-98abbbe7af8c870faa22d62819691054e07df718/>
+<csr-id-f459a85663d93a8a516dab85cf91f378a3982020/>
+<csr-id-9aeac110cad307f0013d67589c48c39a184468e4/>
+<csr-id-f856d853c0166f35bb2b98b24e3f3c8c09783b2d/>
+<csr-id-a736dc6bd6a107d85981c3687cb5bcb39c62653c/>
+<csr-id-40ce02d611027f748d7934fa21adb4142422f7fc/>
+<csr-id-428d2e9528c567e5ac46256100ecadcf496dd8e1/>
+<csr-id-bef40c17867f33e4775af8ee5e9b617d52ee2667/>
+<csr-id-c2d0a0c98569b7fbeacad6796d7b245d2c3e6828/>
+<csr-id-033d17f355bea910939e094770af73be89e642ad/>
+<csr-id-b74d424f41990c5cf048a9472031983e22099947/>
+<csr-id-8a569827c64c89c9b7268e7c6b103a42a4e45dae/>
+<csr-id-68c54c90eb622a33bed1981ef765adb9bded2d96/>
+<csr-id-9a6f4a3cf20852f4b5604bf08a04aba592dca0fa/>
+<csr-id-e57d83235f60a16bd7e1ee801f35a599113dc71a/>
+<csr-id-0f11b2ed16c765bee3e25f2f25b374e3f06f8e8f/>
+<csr-id-5a539a74d0dcca7a8671910d45bbb08ca4382671/>
+<csr-id-a6d225ba65c4817ada16b82626910bed3071d2bf/>
+<csr-id-411ea371660b5f76a5c3f887f78331e58f8b6961/>
+<csr-id-151a22f63a0aaaf94070f3bd0e1f6bd2f9239856/>
+<csr-id-100e2ae70d21e141e1ebbc324f8b06e3d3f1a01c/>
+<csr-id-03da7f67fff1fa5bb06d60a66dfdb531506dec4c/>
+<csr-id-e867df4d5d5be662cf29b6d7dd8efc1333328141/>
+<csr-id-b550ed00dd3e3af878758aea1a2efb6eba0e8d66/>
+<csr-id-3a860ace8096e84ab5421e409e2d58bcf491ec55/>
+<csr-id-16fafb026bb9286b1724dd152587dfd9b23f7b0c/>
+<csr-id-213d7c89adf4706ebd928f56ec0954fcc97a810b/>
+<csr-id-daaf79dbd780e03a99baf0e19a738a08bf2f954e/>
+<csr-id-c7de08209c659ec93557d6ea10e0bcd8c3b74d8b/>
+<csr-id-230a6ed7f1f4193fa36b2fbb83bea072f4944c1d/>
+<csr-id-b8d7cfad51e1051391288094bf3c4e4263b6eb94/>
+<csr-id-6bc0892e50dddbda393eb37abac44e2bf7e626eb/>
+<csr-id-a612553e6dd4c21bc1fec34425fcb6fe2875b044/>
+<csr-id-d41de505ef9fc0ce7ebb84c1271e1da77ca29f85/>
+<csr-id-9f539e9a8dd9c22e7440539114b2fbdaaeb34515/>
+<csr-id-093ea5bfc200f940662c5c0e458c38c5c77294a9/>
+<csr-id-4b6569ab2a9face420385d29d7baab31d8ca4d1e/>
+<csr-id-c3bce22d6f780441207f23ad0355c9081e60f323/>
+<csr-id-c3934b9b9bb6122294e40e0810c5f7f8ad59746a/>
+<csr-id-10c2420505b85914eb7518c48a3951a5402331cf/>
+<csr-id-93c7a054d87df7054224664c4a03c4507bcfbae6/>
+<csr-id-9fad752ce1849763ae16cdb42159b9dccf1a13d0/>
+<csr-id-633dfc836c10eafc54dedefc53b2cbc9526970bb/>
+<csr-id-ab22c6989f55994065f0d859b91e141f7489a722/>
+<csr-id-32744bcf6c94d9a7cda81813646560b70be53eb2/>
+<csr-id-07d0991fed28d49c9be85d44a3343b66fac076d9/>
+<csr-id-452ef9c5778ad88270f4e251adc49ccbc9b3cb09/>
+<csr-id-85f4d00e81ac5bf67b6be89d7ff51b7bb1060ed6/>
+<csr-id-1152b2764e955edd80fb33921a8d8fe52654a896/>
+<csr-id-60e333d4ced688f3382cde513300d38790613692/>
+<csr-id-73f5531790ef8817ed3551fd9e4bcbcc7fc6f4f9/>
+<csr-id-4affb147382403fa4d60809558c671810307df05/>
+<csr-id-6dde9550c7be949fd40b60757f682d082836138b/>
+<csr-id-04d0774bbd65967944932456aeb75152ae015ef6/>
+<csr-id-02322c68c449863ea475531cd953a05fbb2ee71b/>
+<csr-id-38fc82067065e9e67422388c07456d3ea896614b/>
+<csr-id-961b6ba0f60c3fa5cd337d8954b4be8cc196274b/>
+<csr-id-ff59202d1374c7e5dcc570d50ed8b399fafe488d/>
+<csr-id-110d45ea649783e74d1eb3f449fa55aa0baa8e8a/>
+<csr-id-f53337e6e0c7c4f804489f0d370d4cc97331597f/>
+<csr-id-18bea3c1e56268b28826643e1ff8936dfa6d4896/>
+<csr-id-6be0ea16b0ffe2c153c6a13f36916a91fb58cd05/>
+<csr-id-b98d8f6b11a19a72187535b188faef0caf8ba578/>
+<csr-id-80917f19125222ce6892e45487f2abe098fefd7a/>
+<csr-id-bdf50e7ad1214ef4bb48c0a12db8a7700193bb2a/>
+<csr-id-004263308ee31a9568c77aa9655dc186fde75e75/>
+<csr-id-a973b62a8ef48acc92af8735e7e7bcac94e0092f/>
 
 ### Chore
 
@@ -1204,74 +1342,61 @@ needed, as they keypair itself contains the Arcs we need.
    SecuredLinkedList.
  - <csr-id-03da7f67fff1fa5bb06d60a66dfdb531506dec4c/> optimizations and code cleanup
 
+### Chore
+
+ - <csr-id-ea1d0490f0b67a9f39bd98b2bd5830a0f63fbf6e/> upgrade sn_dbc and blsttc
+   Upgrade both of these crates to resolve a publishing issue regarding a crate that had been yanked
+   being pulled in to the dependency graph.
+ - <csr-id-e3bb817e20843f68ee21e9a5dd7e52c8a6e92b88/> sn_interface-0.16.0/sn_dysfunction-0.15.0/sn_client-0.77.0/sn_node-0.72.0/sn_api-0.75.0/sn_cli-0.68.0
+
 ### New Features
+
+<csr-id-9b8b20b1a191f7283624cf3f9953f020d21ed6d8/>
+<csr-id-5a39a843c5570993b0e27780a1c2887bbf7a3212/>
+<csr-id-3089b2c8d3f3ee099ff9e0880a96720b319e52a4/>
+<csr-id-3fd0a00bad2f9ca266a56de2086b54088459e153/>
+<csr-id-95436a1f722bfd02a735dc3cf2f171a8b70de552/>
+<csr-id-a5bf211daa0272597f1a2d852a17592258a2115a/>
+<csr-id-5019dd3896d278227878ffd91ce14d0cecb2b9dd/>
+<csr-id-f5d53c188a03150a06bdee97fb585f7900b7c251/>
+<csr-id-5c8b1f50d1bf346d45bd2a9faf92bbf33cb448da/>
+<csr-id-057ce1ce1e174102e23d96cfcd2ab1d090a6f1dc/>
+<csr-id-0cd47ad56e0d93e3e99feb0dfcea8094f871ff6f/>
 
  - <csr-id-707627f8915a6032390b035786e3e39d1f7bac8d/> allow to change the Elder-to-Adult query responses timeout by env var
    - feat(node): allow to change the timeout for Elder-to-Adult query responses
    by setting `SN_ADULT_RESPONSE_TIMEOUT` env var
-   - chore(client): set 90secs for cmds (`SN_CMD_TIMEOUT`) and
+- chore(client): set 90secs for cmds (`SN_CMD_TIMEOUT`) and
    queries (`SN_QUERY_TIMEOUT`) timeout period in sn-client as default.
-   - chore(node): set 70secs for Elder-to-Adult query responses (`SN_ADULT_RESPONSE_TIMEOUT`)
+- chore(node): set 70secs for Elder-to-Adult query responses (`SN_ADULT_RESPONSE_TIMEOUT`)
    timeout period in sn_node to as default.
-   - chore(ci): setting the same values explicitly for sn_client e2e tests in CI/bors, just
+- chore(ci): setting the same values explicitly for sn_client e2e tests in CI/bors, just
    to make sure whenever we start adjusting the default vaues we don't change those
    for CI which have been shown to be adequate in current CI/bors setups so far.
- - <csr-id-9b8b20b1a191f7283624cf3f9953f020d21ed6d8/> cap the number of concurrent chunks to be uploaded/retrieved for a file
-   - Limiting the maximum number of chunks per file concurrently uploaded/retrieved to 5.
- - <csr-id-5a39a843c5570993b0e27780a1c2887bbf7a3212/> cmd responses sent from adults over stream
-   Add in the stream initialisation from elders to adults.
- - <csr-id-3089b2c8d3f3ee099ff9e0880a96720b319e52a4/> try to reconnect once when the client lost a connection to a peer
- - <csr-id-3fd0a00bad2f9ca266a56de2086b54088459e153/> use bi stream from client; process in Node
- - <csr-id-95436a1f722bfd02a735dc3cf2f171a8b70de552/> move to event driven msg handling
-   put incoming msgs and cmd handling into their own threads
- - <csr-id-a5bf211daa0272597f1a2d852a17592258a2115a/> force retries to use fresh connection
- - <csr-id-5019dd3896d278227878ffd91ce14d0cecb2b9dd/> remove node auth
- - <csr-id-f5d53c188a03150a06bdee97fb585f7900b7c251/> compiling sdkg integration
- - <csr-id-5c8b1f50d1bf346d45bd2a9faf92bbf33cb448da/> client retry spend on unknown section key
-   When the client receives an unknown section key error, it will obtain the proof chain and SAP for
-   the unknown section and resubmit the request with this additional information.
-   
-   There is no automated client test for this scenario. We went to great lengths to try, but it proved
-   not worth the effort. It was too difficult to modify the network knowledge with a fake section and
-   still have things function correctly. The scenario is unit tested on the node side, and we done
-   enough testing to know that the retry loop does what's intended.
-   
-   There are a few misc changes along with this commit:
-   
-   * Debugging message to indicate a spend request being processed correctly, which proved useful when
+- Limiting the maximum number of chunks per file concurrently uploaded/retrieved to 5.
+* Debugging message to indicate a spend request being processed correctly, which proved useful when
      trying to get the automated test working.
-   * Remove the current section key from the unknown section key error. It's not necessary to include
+* Remove the current section key from the unknown section key error. It's not necessary to include
      this.
-   * When running the baby fleming network with the Makefile, include log messages from `sn_interface`.
-   * Fix up git-based references to `sn_dbc` crate.
- - <csr-id-057ce1ce1e174102e23d96cfcd2ab1d090a6f1dc/> retry dbc spend on unknown section key
-   This is the client side for the scenario where the spent proofs are signed by section keys that the
-   processing section is not aware of.
-   
-   Several retries will be attempted because it's possible for there to be multiple section keys that
-   are not known, but the network will only return back one key at a time.
-   
-   Based on review feedback, this commit also changes the `SpentbookCmd::Spend` variant to use a single
-   field for the updated network knowledge, along with some other more minor changes.
- - <csr-id-0cd47ad56e0d93e3e99feb0dfcea8094f871ff6f/> replace `SecuredLinkedList` with `SectionsDAG`
+* When running the baby fleming network with the Makefile, include log messages from `sn_interface`.
+* Fix up git-based references to `sn_dbc` crate.
 
 ### Bug Fixes
 
+<csr-id-4c039335707851c8f7ec71703acfb646184fa30a/>
+<csr-id-eccb7090e024e38bf561efa3b7ff2abfe491ba72/>
+<csr-id-7f448bcb3106b429c711d6ff81ded5c33138bca7/>
+<csr-id-c73b83b0a4ac0e3072b41e1af5b42b90c8a54177/>
+<csr-id-bfaf6eac15cfa6e7f829cdc9a79181836a27f473/>
+<csr-id-c98cc98674552794960e5953c5dbf405d961c333/>
+<csr-id-8f887c0f3f128f5d59304a0b47f6105cb52f3155/>
+<csr-id-e4721ab8c3bfcb3379fe09bbd069c1eab0048753/>
+<csr-id-54222aeea627209c53a1f595578436deb2763ef0/>
+
  - <csr-id-de8ed40b9f1ad353c9a8ded58db5de76acee21e1/> reconnect upon any LinkError::Connection(_) error when sending a msg on a bi-stream
    - Upgrading qp2p to v0.32.0.
-   - Also some minor improvements to logging msgs.
-   - Removing unused error type and cargo feature.
- - <csr-id-4c039335707851c8f7ec71703acfb646184fa30a/> make client receive stream log clearer
- - <csr-id-eccb7090e024e38bf561efa3b7ff2abfe491ba72/> use latest client knowledge to get new target elders
- - <csr-id-7f448bcb3106b429c711d6ff81ded5c33138bca7/> query adult update for query send changes
- - <csr-id-c73b83b0a4ac0e3072b41e1af5b42b90c8a54177/> do not consider as a data-not-found case when not enough spent-proof-shares were retrieved from SpentBook
- - <csr-id-bfaf6eac15cfa6e7f829cdc9a79181836a27f473/> missing MsgKind import after rebase
- - <csr-id-c98cc98674552794960e5953c5dbf405d961c333/> use repsonse_stream for ae responses to client.
-   Also avoid going into Link at the ndoe layer when we have a send_stream
-   to use
- - <csr-id-8f887c0f3f128f5d59304a0b47f6105cb52f3155/> spawn a task to read query/cmd responses from bi-stream
- - <csr-id-e4721ab8c3bfcb3379fe09bbd069c1eab0048753/> retry cmd if any sends failed
- - <csr-id-54222aeea627209c53a1f595578436deb2763ef0/> Fix for rename in benches
+- Also some minor improvements to logging msgs.
+- Removing unused error type and cargo feature.
 
 ### Other
 
@@ -1368,15 +1493,15 @@ needed, as they keypair itself contains the Arcs we need.
 
 ### New Features (BREAKING)
 
- - <csr-id-7afd7a95d39098fb5166785c215881233bab528a/> retry once if connection was lost when trying to send on a bi-stream
+<csr-id-7106b7533e119dc94bbf19fa304f3eb1f8dc9425/>
+<csr-id-718248bfdabfff68de6dd775a9e6292e1c5733b4/>
 
+ - <csr-id-7afd7a95d39098fb5166785c215881233bab528a/> retry once if connection was lost when trying to send on a bi-stream
  - <csr-id-f225a2d84ad3422b4f466fa2bf713c3a767588dc/> adding more context info to some node Error types
    - Initialising logger in sn_client spentbook API tests.
-   - Including stream id in log messages.
-   - Report the error when a stream couldn't be finished when sending a response since that
+- Including stream id in log messages.
+- Report the error when a stream couldn't be finished when sending a response since that
    could mean the recipient didn't received it.
- - <csr-id-7106b7533e119dc94bbf19fa304f3eb1f8dc9425/> making AE msg for clients to be a variant of client response msg type
- - <csr-id-718248bfdabfff68de6dd775a9e6292e1c5733b4/> additional contextual information for a few sn_client::Error types
 
 ### Refactor (BREAKING)
 
@@ -1401,9 +1526,9 @@ needed, as they keypair itself contains the Arcs we need.
 
 <csr-read-only-do-not-edit/>
 
- - 175 commits contributed to the release over the course of 80 calendar days.
- - 80 days passed between releases.
- - 121 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 178 commits contributed to the release over the course of 85 calendar days.
+ - 85 days passed between releases.
+ - 123 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -1413,6 +1538,9 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1882 ([`16e82d1`](https://github.com/maidsafe/safe_network/commit/16e82d13cfeee993c85c04f1c6f90e4305c90487))
+    - upgrade sn_dbc and blsttc ([`ea1d049`](https://github.com/maidsafe/safe_network/commit/ea1d0490f0b67a9f39bd98b2bd5830a0f63fbf6e))
+    - sn_interface-0.16.0/sn_dysfunction-0.15.0/sn_client-0.77.0/sn_node-0.72.0/sn_api-0.75.0/sn_cli-0.68.0 ([`e3bb817`](https://github.com/maidsafe/safe_network/commit/e3bb817e20843f68ee21e9a5dd7e52c8a6e92b88))
     - Merge #1870 ([`dd23f77`](https://github.com/maidsafe/safe_network/commit/dd23f7704e689ba2c2fb12be5d03b0ac4ea2c83c))
     - add test for size upload limit ([`4affb14`](https://github.com/maidsafe/safe_network/commit/4affb147382403fa4d60809558c671810307df05))
     - fix(chunks): match on specific error - Matching on any error was wrong, but it was hidden until we actually returned any other error than the expected. With `limit-client-upload-size`, we started returning more errors. ([`2699f03`](https://github.com/maidsafe/safe_network/commit/2699f036e0ba5cab539e93b30b0e418569e9bc00))
@@ -1590,7 +1718,14 @@ needed, as they keypair itself contains the Arcs we need.
     - verify client generate entry_hash ([`18bea3c`](https://github.com/maidsafe/safe_network/commit/18bea3c1e56268b28826643e1ff8936dfa6d4896))
 </details>
 
+<csr-unknown>
+ cap the number of concurrent chunks to be uploaded/retrieved for a file cmd responses sent from adults over streamAdd in the stream initialisation from elders to adults. try to reconnect once when the client lost a connection to a peer use bi stream from client; process in Node move to event driven msg handlingput incoming msgs and cmd handling into their own threads force retries to use fresh connection remove node auth compiling sdkg integration client retry spend on unknown section keyWhen the client receives an unknown section key error, it will obtain the proof chain and SAP forthe unknown section and resubmit the request with this additional information.There is no automated client test for this scenario. We went to great lengths to try, but it provednot worth the effort. It was too difficult to modify the network knowledge with a fake section andstill have things function correctly. The scenario is unit tested on the node side, and we doneenough testing to know that the retry loop does what’s intended.There are a few misc changes along with this commit: retry dbc spend on unknown section keyThis is the client side for the scenario where the spent proofs are signed by section keys that theprocessing section is not aware of.Several retries will be attempted because it’s possible for there to be multiple section keys thatare not known, but the network will only return back one key at a time.Based on review feedback, this commit also changes the SpentbookCmd::Spend variant to use a singlefield for the updated network knowledge, along with some other more minor changes. replace SecuredLinkedList with SectionsDAG make client receive stream log clearer use latest client knowledge to get new target elders query adult update for query send changes do not consider as a data-not-found case when not enough spent-proof-shares were retrieved from SpentBook missing MsgKind import after rebase use repsonse_stream for ae responses to client.Also avoid going into Link at the ndoe layer when we have a send_streamto use spawn a task to read query/cmd responses from bi-stream retry cmd if any sends failed Fix for rename in benches making AE msg for clients to be a variant of client response msg type additional contextual information for a few sn_client::Error types<csr-unknown/>
+
 ## v0.76.0 (2022-09-19)
+
+<csr-id-a8a9fb90791b29496e8559090dca4161e04054da/>
+<csr-id-a0bc2562df4f427752ec0f3ab85d9befe2d20050/>
+<csr-id-2d1221999b959bf4d0879cf42050d5e1e3119445/>
 
 ### Chore
 
@@ -1623,6 +1758,10 @@ needed, as they keypair itself contains the Arcs we need.
 </details>
 
 ## v0.75.0 (2022-09-09)
+
+<csr-id-448694176dd3b40a12bd8ecc16d9bb66fd171a37/>
+<csr-id-7d4a15a7855429d604c0216f67e46620fea80e6f/>
+<csr-id-278f29ea80352211c7c0606945f7dfc4908ea9ca/>
 
 ### Chore
 
@@ -1660,6 +1799,9 @@ needed, as they keypair itself contains the Arcs we need.
 </details>
 
 ## v0.74.0 (2022-09-07)
+
+<csr-id-fe659c5685289fe0071b54298dcac394e83c0dce/>
+<csr-id-b1329158b3c2427a7c1939060ba1fe3ef9e72bf9/>
 
 ### Chore
 

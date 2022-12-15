@@ -198,18 +198,8 @@ impl fmt::Display for Cmd {
             Cmd::SetStorageLevel(level) => {
                 write!(f, "SetStorageLevel {:?}", level)
             }
-            #[cfg(not(feature = "test-utils"))]
             Cmd::HandleMsg { wire_msg, .. } => {
                 write!(f, "HandleMsg {:?}", wire_msg.msg_id())
-            }
-            #[cfg(feature = "test-utils")]
-            Cmd::HandleMsg { wire_msg, .. } => {
-                write!(
-                    f,
-                    "HandleMsg {:?} {:?}",
-                    wire_msg.msg_id(),
-                    wire_msg.payload_debug
-                )
             }
             Cmd::UpdateNetworkAndHandleValidClientMsg { msg_id, msg, .. } => {
                 write!(f, "UpdateAndHandleValidClientMsg {:?}: {:?}", msg_id, msg)

@@ -142,20 +142,18 @@ impl FlowCtrl {
                     // enumerate is 0 indexed, let's correct for that for counting
                     // and then comparing to data_addresses
                     let iteration = i + 1;
-                    let next_data_to_send = match node_data_storage
-                        .get_from_local_store(address)
-                        .await
-                    {
-                        Ok(data) => data,
+                    match node_data_storage.get_from_local_store(address).await {
+                        Ok(data) => {
+                            data_batch.push(data);
+                        }
                         Err(error) => {
                             error!("Error getting {address:?} from local storage during data replication flow: {error:?}");
-                            continue;
                         }
                     };
-                    data_batch.push(next_data_to_send);
 
-                    // if we hit the batch limit or we're at the last data to send...
-                    if iteration == data_batch_size || iteration == data_addresses.len() {
+                    // if we hit a multiple of the batch limit or we're at the last data to send...
+                    if data_batch.len() == data_batch_size || iteration == data_addresses.len() {
+                        trace!("Sending out data batch on i:{iteration:?} to {peer:?}");
                         let msg = NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateData(data_batch));
                         let cmd = Cmd::send_msg(msg, Peers::Single(peer), node_context.clone());
                         if let Err(error) =
@@ -217,13 +215,6 @@ impl FlowCtrl {
             "{:?} from {sender:?} length {original_bytes_len}",
             LogMarker::DispatchHandleMsgCmd,
         );
-
-        #[cfg(feature = "test-utils")]
-        let wire_msg = if let Ok(msg) = wire_msg.into_msg() {
-            wire_msg.set_payload_debug(msg)
-        } else {
-            wire_msg
-        };
 
         Ok(Cmd::HandleMsg {
             origin: sender,

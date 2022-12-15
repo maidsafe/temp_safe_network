@@ -37,11 +37,6 @@ pub struct WireMsg {
     #[debug(skip)]
     /// Serialized Message dst
     pub serialized_dst: Option<Bytes>,
-    /// Extra debug info if the relevant feature is enabled.
-    // This is behind a feature because it's potentially expensive to carry around the message as
-    // well as its serialization.
-    #[cfg(feature = "test-utils")]
-    pub payload_debug: Option<std::sync::Arc<dyn std::fmt::Debug + Send + Sync>>,
 }
 
 impl PartialEq for WireMsg {
@@ -92,8 +87,6 @@ impl WireMsg {
             payload,
             serialized_dst: None,
             serialized_header: None,
-            #[cfg(feature = "test-utils")]
-            payload_debug: None,
         }
     }
 
@@ -117,8 +110,6 @@ impl WireMsg {
             payload,
             serialized_dst: Some(dst_bytes),
             serialized_header: Some(header_bytes),
-            #[cfg(feature = "test-utils")]
-            payload_debug: None,
         })
     }
 
@@ -266,16 +257,6 @@ impl WireMsg {
     /// Convenience function which validates the signature on a `ClientMsg`.
     pub fn verify_sig(auth: ClientAuth, msg: ClientMsg) -> Result<AuthorityProof<ClientAuth>> {
         Self::serialize_msg_payload(&msg).and_then(|payload| AuthorityProof::verify(auth, &payload))
-    }
-
-    #[cfg(feature = "test-utils")]
-    pub fn set_payload_debug(
-        // take ownership for ergonomics in `cfg(...)` blocks
-        mut self,
-        payload_debug: impl std::fmt::Debug + Send + Sync + 'static,
-    ) -> Self {
-        self.payload_debug = Some(std::sync::Arc::new(payload_debug));
-        self
     }
 }
 

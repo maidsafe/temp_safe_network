@@ -358,7 +358,7 @@ impl MyNode {
         )?;
         trace!("Sending {original_msg_id:?} to recipient over stream");
         let stream_prio = 10;
-        let mut send_stream = send_stream.lock().await;
+        let mut send_stream = send_stream.lock_owned().await;
         let stream_id = send_stream.id();
 
         trace!("Stream {stream_id} locked for {original_msg_id:?} to {target_peer:?}");
@@ -373,14 +373,14 @@ impl MyNode {
         }
 
         trace!("Msg away for {original_msg_id:?} to {target_peer:?}");
-        if let Err(error) = send_stream.finish().await {
-            // Let's report the error since we cannot guarantee the msg was received/acknowledged by recipient
-            error!(
-                "Could not close response {stream_id} for {original_msg_id:?} to \
-                peer {target_peer:?}: {error:?}"
-            );
-            return Err(error.into());
-        }
+
+        // unblock + move finish off thread as it's not strictly related to the sending of the msg.
+        let _handle = tokio::spawn(async move {
+            // Attempt to gracefully terminate the stream.
+            // If this errors it does _not_ mean our message has not been sent
+            let _ = send_stream.finish().await;
+            trace!("bidi stream finished for {original_msg_id:?} to: {target_peer:?}");
+        });
 
         debug!("Sent the msg {original_msg_id:?} over {stream_id} to {target_peer:?}");
 
@@ -402,9 +402,6 @@ impl MyNode {
         };
 
         let mut wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
-
-        #[cfg(feature = "test-utils")]
-        let wire_msg = wire_msg.set_payload_debug(msg);
 
         wire_msg
             .serialize_and_cache_bytes()
