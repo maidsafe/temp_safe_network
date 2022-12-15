@@ -75,7 +75,7 @@ See the [LICENSE](LICENSE) file for more details.
 
 ## Contributing
 
-Want to contribute? Great :tada:
+Want to contribute? Great! :tada:
 
 There are many ways to give back to the project, whether it be writing new code, fixing bugs, or just reporting errors. All forms of contributions are encouraged!
 
