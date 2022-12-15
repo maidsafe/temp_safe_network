@@ -4024,7 +4024,7 @@ dependencies = [
 
 [[package]]
 name = "sn_interface"
-version = "0.16.1"
+version = "0.16.2"
 dependencies = [
  "base64",
  "bincode",
@@ -4087,7 +4087,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.72.1"
+version = "0.72.2"
 dependencies = [
  "assert_matches",
  "backoff",

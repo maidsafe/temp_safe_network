@@ -6,12 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## v0.16.2 (2022-12-15)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge #1888 ([`fc0be25`](https://github.com/maidsafe/safe_network/commit/fc0be25da404d64a33b1addb6499033883f5035a))
+</details>
+
 ## v0.16.1 (2022-12-15)
+
+<csr-id-7620ede57d6f01a63380ac144684b5d504ae4fb4/>
+<csr-id-80201067111349306a651a3f42a8ca740f48abaa/>
 
 ### Chore
 
  - <csr-id-7620ede57d6f01a63380ac144684b5d504ae4fb4/> removing unused 'url' dependency
  - <csr-id-80201067111349306a651a3f42a8ca740f48abaa/> use latest 0.33 qp2p
+
+### Chore
+
+ - <csr-id-82c0cf683f8052374eafbb859176c69d52956c72/> sn_interface-0.16.1/sn_client-0.77.1/sn_node-0.72.1/sn_api-0.75.1
+ - <csr-id-6e84b0aa25bfd6ecff45812cc32e189245b8ec3a/> removing unused payload_debug field from msgs
 
 ### New Features
 
@@ -22,8 +50,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 6 commits contributed to the release over the course of 1 calendar day.
- - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 8 commits contributed to the release over the course of 1 calendar day.
+ - 1 day passed between releases.
+ - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -33,6 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.16.1/sn_client-0.77.1/sn_node-0.72.1/sn_api-0.75.1 ([`82c0cf6`](https://github.com/maidsafe/safe_network/commit/82c0cf683f8052374eafbb859176c69d52956c72))
+    - removing unused payload_debug field from msgs ([`6e84b0a`](https://github.com/maidsafe/safe_network/commit/6e84b0aa25bfd6ecff45812cc32e189245b8ec3a))
     - Merge #1885 ([`79439fb`](https://github.com/maidsafe/safe_network/commit/79439fb7c2d3ec01115960a893fcd8ce03da1790))
     - removing unused 'url' dependency ([`7620ede`](https://github.com/maidsafe/safe_network/commit/7620ede57d6f01a63380ac144684b5d504ae4fb4))
     - use latest 0.33 qp2p ([`8020106`](https://github.com/maidsafe/safe_network/commit/80201067111349306a651a3f42a8ca740f48abaa))
@@ -124,6 +155,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-bdf50e7ad1214ef4bb48c0a12db8a7700193bb2a/>
 <csr-id-a973b62a8ef48acc92af8735e7e7bcac94e0092f/>
 <csr-id-d550b553acbd70d4adb830a0600f7da7b833ee18/>
+<csr-id-d67e502aab180f79869ffc240d94df4812f95a5e/>
+<csr-id-ea1d0490f0b67a9f39bd98b2bd5830a0f63fbf6e/>
+<csr-id-e3bb817e20843f68ee21e9a5dd7e52c8a6e92b88/>
 
 ### Chore
 
@@ -271,8 +305,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-a5f5deca04a21ddc7ae691cd1da3ca598dae05b0/> adapting tests to work with the signed-sap logic changes
  - <csr-id-de8ed40b9f1ad353c9a8ded58db5de76acee21e1/> reconnect upon any LinkError::Connection(_) error when sending a msg on a bi-stream
    - Upgrading qp2p to v0.32.0.
-- Also some minor improvements to logging msgs.
-- Removing unused error type and cargo feature.
 
 ### Other
 
@@ -583,7 +615,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 <csr-unknown>
- retry dbc spend on unknown section keyThis is the client side for the scenario where the spent proofs are signed by section keys that theprocessing section is not aware of.Several retries will be attempted because it’s possible for there to be multiple section keys thatare not known, but the network will only return back one key at a time.Based on review feedback, this commit also changes the SpentbookCmd::Spend variant to use a singlefield for the updated network knowledge, along with some other more minor changes. dbc spend can update network knowledgeWhen a DBC is submitted for spending, there are a set of spent proofs sent along with the request,one for each input for the DBC being spent. It’s possible that these proofs were signed with asection key that the section processing the request is not aware of. In this case, the requestprocessing section needs to be updated with new network knowledge. Therefore, we add a couple offields to the spend command to give it the option to send new network knowledge, namely the updatedproof chain and the signed section authority provider.If the node detects the spend command has been sent with these, it will create a new type ofinternal command, UpdateNetworkAndHandleValidServiceMsg which will be returned for processing.This command will contain the original spend request, which will be run after the network knowledgeis updated. The reason for issuing the new command is because the original HandleValidServiceMsgcommand does not have mutable access to the node. custom Serializer, Deserializer for SectionsDAG replace SecuredLinkedList with SectionsDAG log cleanup make client receive stream log clearer add test for new err case for SectionsDag::partial_dag remove genesis special case from SectionTree::partial_dag adapt the join disallowed test work with the new flow when failed to store data the Adult was returning a success response to Elder small changes do not consider as a data-not-found case when not enough spent-proof-shares were retrieved from SpentBook use existing conns when availablebidi streams were always creating new conns. Now they will reuse existing doctest fix apply clippy suggestion for iterator join_invalid_retry_prefix test uses empty genesis prefix Clippy doc error make session id sum u16 to reduce collision chance in logs bls key upgrade issue, more logs return err from NetworkKnowledge constructor ignore update if we don’t have KeyShare<csr-unknown/>
+Also some minor improvements to logging msgs.Removing unused error type and cargo feature.<csr-unknown/>
 
 ## v0.15.0 (2022-09-19)
 
@@ -605,7 +637,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-32577f2e5c158db2420bbf173e84aef7f4175fd7/> add API to retrieve a single-branch partial DAG containing a given key.
    - Adding `single_branch_dag_for_key` API to get a partial `SectionsDAG` with a single branch
    which contains the given `key`, from the genesis to the last key of any of its children branches.
-- The new API also returns the last key of the (single) branch the returned DAG contains.
 
 ### Test
 
@@ -640,6 +671,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - operation id to be generated merely by bincode serialisation without any encoding ([`d5cc996`](https://github.com/maidsafe/safe_network/commit/d5cc996e5ca0a34bfad3ed16760a44a93d3264a2))
     - add API to retrieve a single-branch partial DAG containing a given key. ([`32577f2`](https://github.com/maidsafe/safe_network/commit/32577f2e5c158db2420bbf173e84aef7f4175fd7))
 </details>
+
+<csr-unknown>
+The new API also returns the last key of the (single) branch the returned DAG contains.<csr-unknown/>
 
 ## v0.14.0 (2022-09-09)
 
@@ -708,7 +742,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-d671f4ee4c76b42187d266aee99351114acf6cd7/> report any error occurred when handling a service msg back to the client
    - Removing several unused sn_node::Error types.
-- Adapting sn_api wallet and sn_node spentbook unit tests for new error msgs/cmds.
 
 ### Refactor (BREAKING)
 
@@ -737,6 +770,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - removing unused Error types ([`0c49daf`](https://github.com/maidsafe/safe_network/commit/0c49daf5dbfad2593ccf13cb114841045688ffed))
     - report any error occurred when handling a service msg back to the client ([`d671f4e`](https://github.com/maidsafe/safe_network/commit/d671f4ee4c76b42187d266aee99351114acf6cd7))
 </details>
+
+<csr-unknown>
+Adapting sn_api wallet and sn_node spentbook unit tests for new error msgs/cmds.<csr-unknown/>
 
 ## v0.12.0 (2022-09-06)
 
