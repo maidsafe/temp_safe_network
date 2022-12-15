@@ -218,13 +218,6 @@ impl FlowCtrl {
             LogMarker::DispatchHandleMsgCmd,
         );
 
-        #[cfg(feature = "test-utils")]
-        let wire_msg = if let Ok(msg) = wire_msg.into_msg() {
-            wire_msg.set_payload_debug(msg)
-        } else {
-            wire_msg
-        };
-
         Ok(Cmd::HandleMsg {
             origin: sender,
             wire_msg,

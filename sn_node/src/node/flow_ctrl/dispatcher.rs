@@ -9,14 +9,13 @@
 use crate::node::{messaging::Peers, Cmd, Error, MyNode, Result, STANDARD_CHANNEL_SIZE};
 
 use sn_interface::{
-    messaging::{system::NodeMsg, Dst, MsgId, MsgKind, WireMsg},
+    messaging::{system::NodeMsg, Dst, MsgId, WireMsg},
     network_knowledge::{NetworkKnowledge, SectionTreeUpdate},
     types::{DataAddress, Peer},
 };
 
 use qp2p::UsrMsgBytes;
 
-use bytes::Bytes;
 use std::sync::Arc;
 use tokio::sync::{
     mpsc::{channel, Receiver, Sender},
@@ -254,7 +253,7 @@ fn into_msg_bytes(
         section_key: bls::SecretKey::random().public_key(),
     };
 
-    let mut initial_wire_msg = wire_msg(msg_id, payload, kind, dst);
+    let mut initial_wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
     let _bytes = initial_wire_msg.serialize_and_cache_bytes()?;
 
@@ -273,13 +272,4 @@ fn into_msg_bytes(
     }
 
     Ok(msgs)
-}
-
-fn wire_msg(msg_id: MsgId, payload: Bytes, auth: MsgKind, dst: Dst) -> WireMsg {
-    #[allow(unused_mut)]
-    let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
-
-    #[cfg(feature = "test-utils")]
-    let wire_msg = wire_msg.set_payload_debug(msg);
-    wire_msg
 }
