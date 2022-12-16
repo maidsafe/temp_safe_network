@@ -6,14 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.16.2 (2022-12-15)
+## v0.16.3 (2022-12-16)
+
+### Chore
+
+ - <csr-id-540cd9fe6a95ab32894d3035e04a812de33de326/> fix rustdoc warnings
+ - <csr-id-01dc60676d5740dc7dd6250edb130b46a33cc168/> fix new clippy warnings
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -23,6 +28,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - fix rustdoc warnings ([`540cd9f`](https://github.com/maidsafe/safe_network/commit/540cd9fe6a95ab32894d3035e04a812de33de326))
+    - fix new clippy warnings ([`01dc606`](https://github.com/maidsafe/safe_network/commit/01dc60676d5740dc7dd6250edb130b46a33cc168))
+</details>
+
+## v0.16.2 (2022-12-15)
+
+### Chore
+
+ - <csr-id-c42f6361cd6366c91d2e0c232abf0c070ab27ab7/> sn_interface-0.16.2/sn_node-0.72.2
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.2/sn_node-0.72.2 ([`c42f636`](https://github.com/maidsafe/safe_network/commit/c42f6361cd6366c91d2e0c232abf0c070ab27ab7))
     - Merge #1888 ([`fc0be25`](https://github.com/maidsafe/safe_network/commit/fc0be25da404d64a33b1addb6499033883f5035a))
 </details>
 
@@ -30,6 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-id-7620ede57d6f01a63380ac144684b5d504ae4fb4/>
 <csr-id-80201067111349306a651a3f42a8ca740f48abaa/>
+<csr-id-82c0cf683f8052374eafbb859176c69d52956c72/>
+<csr-id-6e84b0aa25bfd6ecff45812cc32e189245b8ec3a/>
 
 ### Chore
 
@@ -614,9 +647,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - verify entry_hash generation ([`301aeeb`](https://github.com/maidsafe/safe_network/commit/301aeeb687561106f8e2fd6bab1133159d22a6f1))
 </details>
 
-<csr-unknown>
-Also some minor improvements to logging msgs.Removing unused error type and cargo feature.<csr-unknown/>
-
 ## v0.15.0 (2022-09-19)
 
 <csr-id-a8a9fb90791b29496e8559090dca4161e04054da/>
@@ -671,9 +701,6 @@ Also some minor improvements to logging msgs.Removing unused error type and carg
     - operation id to be generated merely by bincode serialisation without any encoding ([`d5cc996`](https://github.com/maidsafe/safe_network/commit/d5cc996e5ca0a34bfad3ed16760a44a93d3264a2))
     - add API to retrieve a single-branch partial DAG containing a given key. ([`32577f2`](https://github.com/maidsafe/safe_network/commit/32577f2e5c158db2420bbf173e84aef7f4175fd7))
 </details>
-
-<csr-unknown>
-The new API also returns the last key of the (single) branch the returned DAG contains.<csr-unknown/>
 
 ## v0.14.0 (2022-09-09)
 
@@ -770,9 +797,6 @@ The new API also returns the last key of the (single) branch the returned DAG co
     - removing unused Error types ([`0c49daf`](https://github.com/maidsafe/safe_network/commit/0c49daf5dbfad2593ccf13cb114841045688ffed))
     - report any error occurred when handling a service msg back to the client ([`d671f4e`](https://github.com/maidsafe/safe_network/commit/d671f4ee4c76b42187d266aee99351114acf6cd7))
 </details>
-
-<csr-unknown>
-Adapting sn_api wallet and sn_node spentbook unit tests for new error msgs/cmds.<csr-unknown/>
 
 ## v0.12.0 (2022-09-06)
 
