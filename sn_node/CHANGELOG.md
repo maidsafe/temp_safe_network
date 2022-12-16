@@ -5,19 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.4 (2022-12-16)
-
-### Chore
-
- - <csr-id-e0f052e46dcfb2beda4edc414fa7f560726fcd73/> revert change split detection instead of size
-   This reverts commit 38ebca089ed7134a63d9fefbf69f4f791b5858fb.
+## v0.72.5 (2022-12-16)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -27,6 +22,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1892 ([`5ebdfb8`](https://github.com/maidsafe/safe_network/commit/5ebdfb8fd659f2589d4b5de704c61b4a6975efe9))
+</details>
+
+## v0.72.4 (2022-12-16)
+
+<csr-id-e0f052e46dcfb2beda4edc414fa7f560726fcd73/>
+
+### Chore
+
+ - <csr-id-e0f052e46dcfb2beda4edc414fa7f560726fcd73/> revert change split detection instead of size
+   This reverts commit 38ebca089ed7134a63d9fefbf69f4f791b5858fb.
+
+### Chore
+
+ - <csr-id-837c70af642b904f42121aa0a08f697eba551826/> sn_interface-0.16.4/sn_node-0.72.4
+ - <csr-id-e764fd015664dc565bc5ea2168a0879f718e3e08/> dont block replication channel
+   Move the actual data replication off thread to unblock the channel
+ - <csr-id-37651b8659a641c18775f151e77e5d5ee4903f51/> increase data replication batch size
+ - <csr-id-56d905fb67135d891e1ce44955ef4744212645b7/> sort data for replication before we start batching
+   This means we should send closest data first
+ - <csr-id-e9c58e34deaad1e7448399e5ae0de81926f4445e/> refactor flow_ctrl / replication sender
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 7 commits contributed to the release.
+ - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.4/sn_node-0.72.4 ([`837c70a`](https://github.com/maidsafe/safe_network/commit/837c70af642b904f42121aa0a08f697eba551826))
+    - dont block replication channel ([`e764fd0`](https://github.com/maidsafe/safe_network/commit/e764fd015664dc565bc5ea2168a0879f718e3e08))
+    - increase data replication batch size ([`37651b8`](https://github.com/maidsafe/safe_network/commit/37651b8659a641c18775f151e77e5d5ee4903f51))
+    - sort data for replication before we start batching ([`56d905f`](https://github.com/maidsafe/safe_network/commit/56d905fb67135d891e1ce44955ef4744212645b7))
+    - refactor flow_ctrl / replication sender ([`e9c58e3`](https://github.com/maidsafe/safe_network/commit/e9c58e34deaad1e7448399e5ae0de81926f4445e))
     - Merge #1895 ([`266a11a`](https://github.com/maidsafe/safe_network/commit/266a11aba08c7a7a0673499cf94144273dd48111))
     - revert change split detection instead of size ([`e0f052e`](https://github.com/maidsafe/safe_network/commit/e0f052e46dcfb2beda4edc414fa7f560726fcd73))
 </details>
@@ -34,6 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.72.3 (2022-12-15)
 
 <csr-id-f1b929344db992ace9e05aeffc96cd81e72b1ae0/>
+<csr-id-3c46851572dfdd0125a48d4e04774eb3bf2e9969/>
 
 ### Chore
 
@@ -160,9 +198,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - ignore qp2p::SendStream::finish errors ([`89e1e40`](https://github.com/maidsafe/safe_network/commit/89e1e40ed9100b28a1ad5ed196620a6d6415706e))
     - change split detection instead of size ([`38ebca0`](https://github.com/maidsafe/safe_network/commit/38ebca089ed7134a63d9fefbf69f4f791b5858fb))
 </details>
-
-<csr-unknown>
-Enable multi-threaded mode for sn_api tests in Bors.Some minor improvements to log msgs.<csr-unknown/>
 
 ## v0.72.0 (2022-12-13)
 
