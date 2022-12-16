@@ -27,21 +27,25 @@ pub(crate) enum ListenerEvent {
         peer: Peer,
         connection: Arc<qp2p::Connection>,
     },
+    ConnectionClosed {
+        peer: Peer,
+        connection: Arc<qp2p::Connection>,
+    },
 }
 
 #[derive(Clone)]
 pub(crate) struct MsgListener {
-    add_connection: mpsc::Sender<ListenerEvent>,
+    connection_events: mpsc::Sender<ListenerEvent>,
     receive_msg: mpsc::Sender<MsgFromPeer>,
 }
 
 impl MsgListener {
     pub(crate) fn new(
-        add_connection: mpsc::Sender<ListenerEvent>,
+        connection_events: mpsc::Sender<ListenerEvent>,
         receive_msg: mpsc::Sender<MsgFromPeer>,
     ) -> Self {
         Self {
-            add_connection,
+            connection_events,
             receive_msg,
         }
     }
@@ -60,7 +64,7 @@ impl MsgListener {
     ) {
         let conn_id = conn.id();
         let remote_address = conn.remote_address();
-        let mut first = true;
+        let mut node_conn_cached = None;
 
         while let Some(result) = incoming_msgs.next_with_stream().await.transpose() {
             match result {
@@ -93,13 +97,15 @@ impl MsgListener {
                         | MsgKind::NodeDataResponse(name) => *name,
                     };
 
+                    let peer = Peer::new(src_name, remote_address);
+
                     // we don't want to store PeerSessions from clients
-                    if first && !is_from_client {
-                        first = false;
+                    if node_conn_cached.is_none() && !is_from_client {
+                        node_conn_cached = Some(peer);
                         let _ = self
-                            .add_connection
+                            .connection_events
                             .send(ListenerEvent::Connected {
-                                peer: Peer::new(src_name, remote_address),
+                                peer,
                                 connection: conn.clone(),
                             })
                             .await;
@@ -107,13 +113,13 @@ impl MsgListener {
 
                     let msg_id = wire_msg.msg_id();
                     debug!(
-                        "Msg {msg_id:?} received, over conn_id={conn_id}, from: {src_name:?}{stream_info} was: {wire_msg:?}"
+                        "Msg {msg_id:?} received, over conn_id={conn_id}, from: {peer:?}{stream_info} was: {wire_msg:?}"
                     );
 
                     if let Err(error) = self
                         .receive_msg
                         .send(MsgFromPeer {
-                            sender: Peer::new(src_name, remote_address),
+                            sender: peer,
                             wire_msg,
                             send_stream: send_stream.map(|s| Arc::new(Mutex::new(s))),
                         })
@@ -123,12 +129,23 @@ impl MsgListener {
                     }
                 }
                 Err(error) => {
-                    // TODO: should we propagate this?
                     warn!("Error on connection {conn_id} with {remote_address}: {error:?}");
                 }
             }
         }
 
         trace!(%conn_id, %remote_address, "{}", LogMarker::ConnectionClosed);
+
+        // if the connection was from a (non client) peer was cached, we shall remove it
+        if let Some(peer) = node_conn_cached {
+            trace!("Removing connection {conn_id} with node {peer} from cache");
+            let _ = self
+                .connection_events
+                .send(ListenerEvent::ConnectionClosed {
+                    peer,
+                    connection: conn,
+                })
+                .await;
+        }
     }
 }

@@ -64,6 +64,14 @@ impl Link {
         self.insert(conn);
     }
 
+    pub(crate) fn remove(&mut self, conn: Arc<Connection>) {
+        let conn_id = conn.id();
+        debug!("Removing connection from link store: {conn_id}");
+
+        let _ = self.connections.remove(&conn_id);
+        debug!("Connection REMOVED from link store: {conn_id}");
+    }
+
     /// Send a message to the peer using the given configuration.
     ///
     /// See [`send`](Self::send) if you want to send with the default configuration.
