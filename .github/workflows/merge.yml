@@ -584,16 +584,10 @@ jobs:
     runs-on: self-hosted
     env:
       NODE_COUNT: 15
+      CARGO_HOME: /mnt/data/cargo
+      TMPDIR: /mnt/data/tmp
     steps:
       - uses: actions/checkout@v3
-
-      - name: Install Rust
-        id: toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
 
       - uses: Swatinem/rust-cache@v1
         continue-on-error: true
