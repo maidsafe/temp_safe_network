@@ -263,7 +263,7 @@ mod tests {
         for key in keys {
             assert_eq!(
                 key,
-                PublicKey::decode_from_zbase32(&key.encode_to_zbase32()?)?
+                PublicKey::decode_from_zbase32(key.encode_to_zbase32()?)?
             );
         }
 
