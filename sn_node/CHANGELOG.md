@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.5 (2022-12-16)
+## v0.72.6 (2022-12-16)
 
 ### Commit Statistics
 
@@ -22,12 +22,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1896 #1897 ([`b4f5700`](https://github.com/maidsafe/safe_network/commit/b4f57007619856a368f635aac5a0e865d3f35bc5))
+</details>
+
+## v0.72.5 (2022-12-16)
+
+### Chore
+
+ - <csr-id-244349ee077775910cf386a82ca7ff22dbf7ee2f/> sn_node-0.72.5
+ - <csr-id-aedc93e5a809c110bb40740df5ca5d688b26e8d4/> remove the looping system load log
+ - <csr-id-7950fc96036e925820910bbd7438968db9f14862/> change limit-section to still allow joins when needed
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 5 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_node-0.72.5 ([`244349e`](https://github.com/maidsafe/safe_network/commit/244349ee077775910cf386a82ca7ff22dbf7ee2f))
+    - remove the looping system load log ([`aedc93e`](https://github.com/maidsafe/safe_network/commit/aedc93e5a809c110bb40740df5ca5d688b26e8d4))
+    - Merge branch 'main' into AlternateNetworkLimitation ([`5354f5e`](https://github.com/maidsafe/safe_network/commit/5354f5e9a0c0ac2145c5c5063b28d48f7bc3a30d))
     - Merge #1892 ([`5ebdfb8`](https://github.com/maidsafe/safe_network/commit/5ebdfb8fd659f2589d4b5de704c61b4a6975efe9))
+    - change limit-section to still allow joins when needed ([`7950fc9`](https://github.com/maidsafe/safe_network/commit/7950fc96036e925820910bbd7438968db9f14862))
 </details>
 
 ## v0.72.4 (2022-12-16)
 
 <csr-id-e0f052e46dcfb2beda4edc414fa7f560726fcd73/>
+<csr-id-837c70af642b904f42121aa0a08f697eba551826/>
+<csr-id-e764fd015664dc565bc5ea2168a0879f718e3e08/>
+<csr-id-37651b8659a641c18775f151e77e5d5ee4903f51/>
+<csr-id-56d905fb67135d891e1ce44955ef4744212645b7/>
+<csr-id-e9c58e34deaad1e7448399e5ae0de81926f4445e/>
 
 ### Chore
 
