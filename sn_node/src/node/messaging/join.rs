@@ -48,6 +48,24 @@ impl MyNode {
             return Ok(None);
         }
 
+        // Reject nodes behind NAT.
+        if peer.addr() != join_request.addr {
+            warn!(
+                "Detected join request from node behind NAT, rejecting since {} != {}",
+                peer.addr(),
+                join_request.addr
+            );
+
+            let msg = NodeMsg::JoinResponse(JoinResponse::Rejected(
+                JoinRejectionReason::NodeNotReachable(peer.addr()),
+            ));
+            return Ok(Some(MyNode::send_system_msg(
+                msg,
+                Peers::Single(peer),
+                context.clone(),
+            )));
+        }
+
         let our_prefix = context.network_knowledge.prefix();
         if !our_prefix.matches(&peer.name()) {
             // TODO: Replace Redirect with a Retry + AEProbe.

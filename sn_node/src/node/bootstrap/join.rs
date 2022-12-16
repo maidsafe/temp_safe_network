@@ -135,7 +135,8 @@ impl<'a> Joiner<'a> {
 
         let mut target_sap = self.join_target_sap()?;
         let section_key = target_sap.section_key();
-        let msg = NodeMsg::JoinRequest(JoinRequest { section_key });
+        let addr = self.node.addr;
+        let msg = NodeMsg::JoinRequest(JoinRequest { section_key, addr });
         self.send(msg, &target_sap.elders_vec(), section_key, false)
             .await?;
 
@@ -207,7 +208,8 @@ impl<'a> Joiner<'a> {
                         info!("Retrying with new name: {}", self.node.name());
 
                         let section_key = target_sap.section_key();
-                        let msg = NodeMsg::JoinRequest(JoinRequest { section_key });
+                        let addr = self.node.addr;
+                        let msg = NodeMsg::JoinRequest(JoinRequest { section_key, addr });
                         self.send(msg, &target_sap.elders_vec(), section_key, true)
                             .await?;
                     }
@@ -245,8 +247,9 @@ impl<'a> Joiner<'a> {
 
                     let target_sap = self.join_target_sap()?;
                     let section_key = target_sap.section_key();
+                    let addr = self.node.addr;
 
-                    let msg = NodeMsg::JoinRequest(JoinRequest { section_key });
+                    let msg = NodeMsg::JoinRequest(JoinRequest { section_key, addr });
                     self.send(msg, &target_sap.elders_vec(), section_key, true)
                         .await?;
                 }
