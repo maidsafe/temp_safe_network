@@ -482,7 +482,7 @@ impl Safe {
         let proof_key_verifier = SpentProofKeyVerifier { client };
 
         // Let's build the output DBCs
-        let mut dbc_builder = tx_builder.build(&mut rng::thread_rng())?;
+        let mut dbc_builder = tx_builder.build(rng::thread_rng())?;
 
         // Spend all the input DBCs, collecting the spent proof shares for each of them
         for (key_image, tx) in dbc_builder.inputs() {

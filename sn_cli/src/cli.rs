@@ -133,7 +133,7 @@ async fn process_commands(mut safe: &mut Safe, args: CmdArgs, config: &mut Confi
         }
         SubCommands::Setup(cmd) => setup_commander(cmd, output_fmt),
         SubCommands::Node { cmd } => {
-            let mut launcher = Box::new(SnLaunchToolNetworkLauncher::default());
+            let mut launcher = Box::<SnLaunchToolNetworkLauncher>::default();
             node_commander(cmd, config, &mut launcher).await
         }
         SubCommands::Keys(cmd) => key_commander(cmd, output_fmt, config),
