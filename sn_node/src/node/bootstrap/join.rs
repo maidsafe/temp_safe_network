@@ -538,7 +538,7 @@ mod tests {
 
             itertools::assert_equal(recipients, next_sap.elders());
             assert_eq!(dst.section_key, next_section_key);
-            assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest{ section_key }) => {
+            assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest{ section_key, .. }) => {
                 assert_eq!(section_key, next_section_key);
             });
 
@@ -666,7 +666,7 @@ mod tests {
             itertools::assert_equal(recipients, new_sap.elders());
 
             assert_eq!(dst.section_key, new_sap.section_key());
-            assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest{ section_key }) => {
+            assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest{ section_key, .. }) => {
                 assert_eq!(section_key, new_sap.section_key());
             });
 
