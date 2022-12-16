@@ -115,31 +115,28 @@ pub fn partition_by_prefix(
 }
 
 pub fn section_has_room_for_node(
-    _joining_node: XorName,
-    _prefix: &Prefix,
-    _members: impl IntoIterator<Item = XorName>,
+    joining_node: XorName,
+    prefix: &Prefix,
+    members: impl IntoIterator<Item = XorName>,
 ) -> bool {
-    // TODO: switch this back after Dec 15 2022 testnet
-    true
+    // We multiply by two to allow a buffer for when nodes are joining sequentially.
+    let split_section_size_cap = recommended_section_size() * 2;
 
-    // // We multiply by two to allow a buffer for when nodes are joining sequentially.
-    // let split_section_size_cap = recommended_section_size() * 2;
+    match partition_by_prefix(prefix, members) {
+        Some((zeros, ones)) => {
+            let n_zeros = zeros.len();
+            let n_ones = ones.len();
+            info!("Section {prefix:?} would split into {n_zeros} zero and {n_ones} one nodes");
+            match joining_node.bit(prefix.bit_count() as u8) {
+                // joining node would be part of the `ones` child section
+                true => n_ones < split_section_size_cap,
 
-    // match partition_by_prefix(prefix, members) {
-    //     Some((zeros, ones)) => {
-    //         let n_zeros = zeros.len();
-    //         let n_ones = ones.len();
-    //         info!("Section {prefix:?} would split into {n_zeros} zero and {n_ones} one nodes");
-    //         match joining_node.bit(prefix.bit_count() as u8) {
-    //             // joining node would be part of the `ones` child section
-    //             true => n_ones < split_section_size_cap,
-
-    //             // joining node would be part of the `zeros` child section
-    //             false => n_zeros < split_section_size_cap,
-    //         }
-    //     }
-    //     None => false,
-    // }
+                // joining node would be part of the `zeros` child section
+                false => n_zeros < split_section_size_cap,
+            }
+        }
+        None => false,
+    }
 }
 
 /// Container for storing information about the network, including our own section.
