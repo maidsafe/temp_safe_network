@@ -692,7 +692,7 @@ impl SafeUrl {
     ///
     /// # Arguments
     ///
-    /// * `version` - u64 representing value of ?v=<val>
+    /// * `version` - u64 representing value of `?v=<val>`
     pub fn set_content_version(&mut self, version: Option<VersionHash>) {
         // Convert Option<u64> to Option<&str>
         let version_string: String;
@@ -768,7 +768,7 @@ impl SafeUrl {
 
     /// sets query string.
     ///
-    /// If the query string contains ?v=<version> then it
+    /// If the query string contains `?v=<version>` then it
     /// will take effect as if `set_content_version`() had been
     /// called.
     ///
