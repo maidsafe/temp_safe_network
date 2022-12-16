@@ -6,19 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.16.3 (2022-12-16)
+## v0.16.4 (2022-12-16)
 
 ### Chore
 
- - <csr-id-540cd9fe6a95ab32894d3035e04a812de33de326/> fix rustdoc warnings
- - <csr-id-01dc60676d5740dc7dd6250edb130b46a33cc168/> fix new clippy warnings
+ - <csr-id-e0f052e46dcfb2beda4edc414fa7f560726fcd73/> revert change split detection instead of size
+   This reverts commit 38ebca089ed7134a63d9fefbf69f4f791b5858fb.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -28,11 +28,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1895 ([`266a11a`](https://github.com/maidsafe/safe_network/commit/266a11aba08c7a7a0673499cf94144273dd48111))
+    - revert change split detection instead of size ([`e0f052e`](https://github.com/maidsafe/safe_network/commit/e0f052e46dcfb2beda4edc414fa7f560726fcd73))
+</details>
+
+## v0.16.3 (2022-12-16)
+
+<csr-id-540cd9fe6a95ab32894d3035e04a812de33de326/>
+<csr-id-01dc60676d5740dc7dd6250edb130b46a33cc168/>
+
+### Chore
+
+ - <csr-id-540cd9fe6a95ab32894d3035e04a812de33de326/> fix rustdoc warnings
+ - <csr-id-01dc60676d5740dc7dd6250edb130b46a33cc168/> fix new clippy warnings
+
+### Chore
+
+ - <csr-id-119ae2d7661d162371749b8466cfd2e9b85d910f/> sn_interface-0.16.3/sn_client-0.77.2/sn_api-0.75.2/sn_cli-0.68.1
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.3/sn_client-0.77.2/sn_api-0.75.2/sn_cli-0.68.1 ([`119ae2d`](https://github.com/maidsafe/safe_network/commit/119ae2d7661d162371749b8466cfd2e9b85d910f))
     - fix rustdoc warnings ([`540cd9f`](https://github.com/maidsafe/safe_network/commit/540cd9fe6a95ab32894d3035e04a812de33de326))
     - fix new clippy warnings ([`01dc606`](https://github.com/maidsafe/safe_network/commit/01dc60676d5740dc7dd6250edb130b46a33cc168))
 </details>
 
 ## v0.16.2 (2022-12-15)
+
+<csr-id-c42f6361cd6366c91d2e0c232abf0c070ab27ab7/>
 
 ### Chore
 
