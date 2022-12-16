@@ -13,7 +13,7 @@ use crate::node::{
         cmds::Cmd, dispatcher::Dispatcher, dysfunction::DysCmds, CmdCtrl, FlowCtrl, RejoinNetwork,
     },
     join_network,
-    logging::{log_ctx::LogCtx, run_system_logger},
+    logging::{log_ctx::LogCtx, log_system_details},
     Config, Error, MyNode, Result, STANDARD_CHANNEL_SIZE,
 };
 use crate::UsedSpace;
@@ -123,7 +123,7 @@ async fn new_node(
         );
     }
 
-    run_system_logger(LogCtx::new(node.clone()), config.resource_logs).await;
+    log_system_details(LogCtx::new(node.clone())).await;
 
     Ok((node, cmd_channel, rejoin_network_rx))
 }
