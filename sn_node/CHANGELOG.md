@@ -5,14 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.6 (2022-12-16)
+## v0.72.7 (2022-12-17)
+
+### New Features
+
+ - <csr-id-8aa694171b1dd5c2505259e67d6e3434ee94d213/> prevent joins from nodes behind NAT
+
+### Bug Fixes
+
+ - <csr-id-3683215412906f58736e5a5e77c140b7b82d35a9/> relax pattern matching on JoinRequest
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -22,10 +30,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1900 ([`9650289`](https://github.com/maidsafe/safe_network/commit/96502896245fc41a3ef619d3959f4938413e938c))
+    - relax pattern matching on JoinRequest ([`3683215`](https://github.com/maidsafe/safe_network/commit/3683215412906f58736e5a5e77c140b7b82d35a9))
+    - prevent joins from nodes behind NAT ([`8aa6941`](https://github.com/maidsafe/safe_network/commit/8aa694171b1dd5c2505259e67d6e3434ee94d213))
+</details>
+
+## v0.72.6 (2022-12-16)
+
+### Chore
+
+ - <csr-id-4ce57cc7c349c209d2fa60d876706ad15dd07a04/> sn_node-0.72.6/sn_cli-0.68.2
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_node-0.72.6/sn_cli-0.68.2 ([`4ce57cc`](https://github.com/maidsafe/safe_network/commit/4ce57cc7c349c209d2fa60d876706ad15dd07a04))
     - Merge #1896 #1897 ([`b4f5700`](https://github.com/maidsafe/safe_network/commit/b4f57007619856a368f635aac5a0e865d3f35bc5))
 </details>
 
 ## v0.72.5 (2022-12-16)
+
+<csr-id-244349ee077775910cf386a82ca7ff22dbf7ee2f/>
+<csr-id-aedc93e5a809c110bb40740df5ca5d688b26e8d4/>
+<csr-id-7950fc96036e925820910bbd7438968db9f14862/>
 
 ### Chore
 

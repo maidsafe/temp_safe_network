@@ -6,18 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.16.4 (2022-12-16)
+## v0.16.5 (2022-12-17)
 
-### Chore
+### New Features
 
- - <csr-id-e0f052e46dcfb2beda4edc414fa7f560726fcd73/> revert change split detection instead of size
-   This reverts commit 38ebca089ed7134a63d9fefbf69f4f791b5858fb.
+ - <csr-id-8aa694171b1dd5c2505259e67d6e3434ee94d213/> prevent joins from nodes behind NAT
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
+ - 3 commits contributed to the release.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -28,6 +27,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1900 ([`9650289`](https://github.com/maidsafe/safe_network/commit/96502896245fc41a3ef619d3959f4938413e938c))
+    - prevent joins from nodes behind NAT ([`8aa6941`](https://github.com/maidsafe/safe_network/commit/8aa694171b1dd5c2505259e67d6e3434ee94d213))
+    - Merge branch 'main' into AlternateNetworkLimitation ([`5354f5e`](https://github.com/maidsafe/safe_network/commit/5354f5e9a0c0ac2145c5c5063b28d48f7bc3a30d))
+</details>
+
+## v0.16.4 (2022-12-16)
+
+<csr-id-e0f052e46dcfb2beda4edc414fa7f560726fcd73/>
+
+### Chore
+
+ - <csr-id-e0f052e46dcfb2beda4edc414fa7f560726fcd73/> revert change split detection instead of size
+   This reverts commit 38ebca089ed7134a63d9fefbf69f4f791b5858fb.
+
+### Chore
+
+ - <csr-id-837c70af642b904f42121aa0a08f697eba551826/> sn_interface-0.16.4/sn_node-0.72.4
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.4/sn_node-0.72.4 ([`837c70a`](https://github.com/maidsafe/safe_network/commit/837c70af642b904f42121aa0a08f697eba551826))
     - Merge #1895 ([`266a11a`](https://github.com/maidsafe/safe_network/commit/266a11aba08c7a7a0673499cf94144273dd48111))
     - revert change split detection instead of size ([`e0f052e`](https://github.com/maidsafe/safe_network/commit/e0f052e46dcfb2beda4edc414fa7f560726fcd73))
 </details>
@@ -36,6 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-id-540cd9fe6a95ab32894d3035e04a812de33de326/>
 <csr-id-01dc60676d5740dc7dd6250edb130b46a33cc168/>
+<csr-id-119ae2d7661d162371749b8466cfd2e9b85d910f/>
 
 ### Chore
 
