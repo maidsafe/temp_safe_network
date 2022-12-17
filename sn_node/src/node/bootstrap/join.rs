@@ -135,7 +135,8 @@ impl<'a> Joiner<'a> {
 
         let mut target_sap = self.join_target_sap()?;
         let section_key = target_sap.section_key();
-        let msg = NodeMsg::JoinRequest(JoinRequest { section_key });
+        let addr = self.node.addr;
+        let msg = NodeMsg::JoinRequest(JoinRequest { section_key, addr });
         self.send(msg, &target_sap.elders_vec(), section_key, false)
             .await?;
 
@@ -207,7 +208,8 @@ impl<'a> Joiner<'a> {
                         info!("Retrying with new name: {}", self.node.name());
 
                         let section_key = target_sap.section_key();
-                        let msg = NodeMsg::JoinRequest(JoinRequest { section_key });
+                        let addr = self.node.addr;
+                        let msg = NodeMsg::JoinRequest(JoinRequest { section_key, addr });
                         self.send(msg, &target_sap.elders_vec(), section_key, true)
                             .await?;
                     }
@@ -245,8 +247,9 @@ impl<'a> Joiner<'a> {
 
                     let target_sap = self.join_target_sap()?;
                     let section_key = target_sap.section_key();
+                    let addr = self.node.addr;
 
-                    let msg = NodeMsg::JoinRequest(JoinRequest { section_key });
+                    let msg = NodeMsg::JoinRequest(JoinRequest { section_key, addr });
                     self.send(msg, &target_sap.elders_vec(), section_key, true)
                         .await?;
                 }
@@ -535,7 +538,7 @@ mod tests {
 
             itertools::assert_equal(recipients, next_sap.elders());
             assert_eq!(dst.section_key, next_section_key);
-            assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest{ section_key }) => {
+            assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest{ section_key, .. }) => {
                 assert_eq!(section_key, next_section_key);
             });
 
@@ -663,7 +666,7 @@ mod tests {
             itertools::assert_equal(recipients, new_sap.elders());
 
             assert_eq!(dst.section_key, new_sap.section_key());
-            assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest{ section_key }) => {
+            assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest{ section_key, .. }) => {
                 assert_eq!(section_key, new_sap.section_key());
             });
 
