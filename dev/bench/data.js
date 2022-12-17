@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1671208726249,
+  "lastUpdate": 1671250191624,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -42232,6 +42232,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 338435018,
             "range": "± 8161711",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "96502896245fc41a3ef619d3959f4938413e938c",
+          "message": "Merge #1900\n\n1900: feat(join): prevent joins from nodes behind NAT r=dirvine a=davidrusu\n\nThis PR adds the joining nodes address to the join request.\r\n\r\nIf the address is different from the connection address, then this node is behind NAT 🙅 \n\nCo-authored-by: David Rusu <davidrusu.me@gmail.com>",
+          "timestamp": "2022-12-17T02:22:00Z",
+          "tree_id": "27e254c35d8d09300e36d37bab33562b71eef40a",
+          "url": "https://github.com/maidsafe/safe_network/commit/96502896245fc41a3ef619d3959f4938413e938c"
+        },
+        "date": 1671250188945,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2301761,
+            "range": "± 101995",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 116662962,
+            "range": "± 2697124",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 137847688,
+            "range": "± 6782777",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 541333687,
+            "range": "± 5228006",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 95416996,
+            "range": "± 1451400",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 108646077,
+            "range": "± 2254278",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 441714391,
+            "range": "± 10642254",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 26692006753,
+            "range": "± 292782330",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 68395180,
+            "range": "± 34130822",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2646295375,
+            "range": "± 168919883",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 10676459159,
+            "range": "± 605734207",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 277323200,
+            "range": "± 27181737",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 2487268554,
+            "range": "± 100212191",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 9739728724,
+            "range": "± 136255365",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 57122473,
+            "range": "± 4679500",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 577001412,
+            "range": "± 32434698",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 2185709615,
+            "range": "± 67690580",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11720295,
+            "range": "± 864514",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 111714699,
+            "range": "± 11914596",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 374878815,
+            "range": "± 30809900",
             "unit": "ns/iter"
           }
         ]
