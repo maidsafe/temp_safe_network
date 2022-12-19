@@ -49,6 +49,8 @@ use xor_name::XorName;
 // still not implemented, it uses a Public Register for now.
 pub const SPENTBOOK_TYPE_TAG: u64 = 0;
 
+const REGISTER_CMD_SIZE: usize = 300;
+
 /// Register data exchange.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReplicatedRegisterLog {
@@ -97,6 +99,17 @@ impl ReplicatedData {
                 DataAddress::Spentbook(SpentbookAddress::new(*cmd.dst_address().name()))
             }
         }
+    }
+
+    pub fn size(&self) -> u64 {
+        let length = match self {
+            Self::Chunk(chunk) => chunk.payload_size(),
+            Self::RegisterWrite(_) | Self::SpentbookWrite(_) => REGISTER_CMD_SIZE,
+            Self::RegisterLog(log) | Self::SpentbookLog(log) => {
+                REGISTER_CMD_SIZE * log.op_log.len()
+            }
+        };
+        length as u64
     }
 
     pub fn error_response(&self, error: DataError) -> Result<CmdResponse> {

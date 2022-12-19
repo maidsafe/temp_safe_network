@@ -29,7 +29,7 @@ use periodic_checks::PeriodicChecksTimestamps;
 use sn_dysfunction::DysfunctionDetection;
 use sn_interface::{
     messaging::system::{NodeDataCmd, NodeMsg},
-    types::{log_markers::LogMarker, DataAddress, Peer},
+    types::{log_markers::LogMarker, DataAddress, Peer, ReplicatedData},
 };
 
 use super::DataStorage;
@@ -170,10 +170,11 @@ impl FlowCtrl {
                     data_addresses
                         .sort_by(|lhs, rhs| peer.name().cmp_distance(lhs.name(), rhs.name()));
 
-                    // TODO: To what extent might we want to bundle these messages?
-                    let data_batch_size = 50; // at most bundle 50 pieces of data together into one message
+                    // The messages shall be bundled by size AND numbers.
+                    // That is: a bundle get sent out whichever the total size and total numbers
+                    //          reached the upper limit first.
+                    let mut data_bundle = DataBundle::default();
 
-                    let mut data_batch = vec![];
                     debug!(
                         "{:?} Data {:?} to: {:?}",
                         LogMarker::SendingMissingReplicatedData,
@@ -187,7 +188,7 @@ impl FlowCtrl {
                         let iteration = i + 1;
                         match data_storage.get_from_local_store(address).await {
                             Ok(data) => {
-                                data_batch.push(data);
+                                data_bundle.push(data);
                             }
                             Err(error) => {
                                 error!("Error getting {address:?} from local storage during data replication flow: {error:?}");
@@ -195,10 +196,11 @@ impl FlowCtrl {
                         };
 
                         // if we hit a multiple of the batch limit or we're at the last data to send...
-                        if data_batch.len() == data_batch_size || iteration == data_addresses.len()
-                        {
+                        if data_bundle.shall_flush() || iteration == data_addresses.len() {
                             trace!("Sending out data batch on i:{iteration:?} to {peer:?}");
-                            let msg = NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateData(data_batch));
+                            let msg = NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateData(
+                                data_bundle.take(),
+                            ));
 
                             let node_context = the_node.read().await.context();
 
@@ -206,7 +208,6 @@ impl FlowCtrl {
                             if let Err(error) = send_cmd_channel.send((cmd, vec![])).await {
                                 error!("Failed to enqueue send msg command for replication of data batch to {peer:?}: {error:?}");
                             }
-                            data_batch = vec![];
                         }
                     }
                 });
@@ -248,5 +249,33 @@ impl FlowCtrl {
             wire_msg,
             send_stream,
         })
+    }
+}
+
+static DATA_BUNDLE_SIZE_LIMIT: u64 = 10_000_000;
+static DATA_BUNDLE_ENTRY_LIMIT: usize = 250;
+
+#[derive(Default)]
+struct DataBundle {
+    data_batch: Vec<ReplicatedData>,
+    total_size: u64,
+}
+
+impl DataBundle {
+    fn push(&mut self, data: ReplicatedData) {
+        self.total_size += data.size();
+        self.data_batch.push(data);
+    }
+
+    fn take(&mut self) -> Vec<ReplicatedData> {
+        let data_batch = self.data_batch.clone();
+        self.data_batch = vec![];
+        self.total_size = 0;
+        data_batch
+    }
+
+    fn shall_flush(&self) -> bool {
+        self.total_size >= DATA_BUNDLE_SIZE_LIMIT
+            || self.data_batch.len() >= DATA_BUNDLE_ENTRY_LIMIT
     }
 }
