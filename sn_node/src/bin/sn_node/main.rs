@@ -37,7 +37,7 @@ use eyre::{eyre, ErrReport, Result};
 use self_update::{cargo_crate_version, Status};
 use std::{io::Write, process::exit};
 use tokio::runtime::Runtime;
-use tokio::time::{sleep, Duration};
+use tokio::time::Duration;
 use tracing::{self, error, info, trace, warn};
 
 const JOIN_TIMEOUT_SEC: u64 = 100;
@@ -65,31 +65,10 @@ fn main() -> Result<()> {
     }
 }
 
-/// Create a tokio runtime per `run_node` instance.
+/// Create a tokio runtime per `start_node` attempt.
 /// This ensures any spawned tasks are closed before this would
-/// be run again
+/// be run again.
 fn create_runtime_and_node(config: &Config) -> Result<()> {
-    // Create the runtime
-    let rt = Runtime::new()?;
-
-    rt.block_on(async {
-        match run_node(config).await {
-            Ok(_) => {
-                info!("Node has finished running, no runtime errors were reported");
-            }
-            Err(error) => {
-                warn!("Node instance finished with an error: {error:?}");
-            }
-        };
-    });
-
-    // actively shut down the runtime
-    rt.shutdown_timeout(Duration::from_secs(2));
-
-    Ok(())
-}
-
-async fn run_node(config: &Config) -> Result<()> {
     if let Some(c) = &config.completions() {
         let shell = c.parse().map_err(|err: String| eyre!(err))?;
         let buf = gen_completions_for_shell(shell, Config::command()).map_err(|err| eyre!(err))?;
@@ -130,9 +109,42 @@ async fn run_node(config: &Config) -> Result<()> {
         "unknown".to_string()
     };
 
-    let (_node, mut rejoin_network_rx) = loop {
-        match start_node(config, join_timeout).await {
-            Ok(result) => break result,
+    loop {
+        // make a fresh runtime
+        let rt = Runtime::new()?;
+
+        let outcome = rt.block_on(async { start_node(config, join_timeout).await });
+
+        match outcome {
+            Ok((_node, mut rejoin_network_rx)) => {
+                rt.block_on(async {
+                    // Simulate failed node starts, and ensure that
+                   #[cfg(feature = "chaos")]
+                   {
+                       use rand::Rng;
+                       let mut rng = rand::thread_rng();
+                       let x: f64 = rng.gen_range(0.0..1.0);
+
+                       if !config.is_first() && x > 0.6 {
+                           println!(
+                               "\n =========== [Chaos] (PID: {our_pid}): Startup chaos crash w/ x of: {}. ============== \n",
+                               x
+                           );
+
+                           // tiny sleep so testnet doesn't detect a fauly node and exit
+                           tokio::time::sleep(Duration::from_secs(1)).await;
+                           warn!("[Chaos] (PID: {our_pid}): ChaoticStartupCrash");
+                           return Err(NodeError::ChaoticStartupCrash).map_err(ErrReport::msg);
+                       }
+                   }
+
+                   // this keeps node running
+                   if rejoin_network_rx.recv().await.is_some() {
+                       return Err(NodeError::RemovedFromSection).map_err(ErrReport::msg);
+                   }
+                   Ok(())
+                })?;
+            }
             Err(NodeError::TryJoinLater) => {
                 let message = format!(
                     "The network is not accepting nodes right now. \
@@ -169,36 +181,13 @@ async fn run_node(config: &Config) -> Result<()> {
                 return err;
             }
         }
+
+        // actively shut down the runtime
+        rt.shutdown_timeout(Duration::from_secs(2));
         // The sleep shall only need to be carried out when being asked to join later?
         // For the case of a timed_out, a retry can be carried out immediately?
-        sleep(bootstrap_retry_duration).await;
-    };
-
-    // Simulate failed node starts, and ensure that
-    #[cfg(feature = "chaos")]
-    {
-        use rand::Rng;
-        let mut rng = rand::thread_rng();
-        let x: f64 = rng.gen_range(0.0..1.0);
-
-        if !config.is_first() && x > 0.6 {
-            println!(
-                "\n =========== [Chaos] (PID: {our_pid}): Startup chaos crash w/ x of: {}. ============== \n",
-                x
-            );
-
-            // tiny sleep so testnet doesn't detect a fauly node and exit
-            sleep(Duration::from_secs(1)).await;
-            warn!("[Chaos] (PID: {our_pid}): ChaoticStartupCrash");
-            return Err(NodeError::ChaoticStartupCrash).map_err(ErrReport::msg);
-        }
+        std::thread::sleep(bootstrap_retry_duration);
     }
-
-    // this keeps node running
-    if rejoin_network_rx.recv().await.is_some() {
-        return Err(NodeError::RemovedFromSection).map_err(ErrReport::msg);
-    }
-    Ok(())
 }
 
 fn update() -> Result<Status, Box<dyn (::std::error::Error)>> {
