@@ -5,14 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.8 (2022-12-19)
+## v0.72.9 (2022-12-19)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
- - 2 days passed between releases.
  - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -23,10 +22,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1880 #1898 ([`aea33e3`](https://github.com/maidsafe/safe_network/commit/aea33e3292f815d9b60ed02c14dfa907dc7e6984))
+</details>
+
+## v0.72.8 (2022-12-19)
+
+### Chore
+
+ - <csr-id-b0199a21705a622dbfdc5bc3f6326fd5979ac345/> sn_node-0.72.8
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 days passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_node-0.72.8 ([`b0199a2`](https://github.com/maidsafe/safe_network/commit/b0199a21705a622dbfdc5bc3f6326fd5979ac345))
     - Merge #1901 ([`7d88182`](https://github.com/maidsafe/safe_network/commit/7d881828c14db3aed471c2591919144c01c64301))
 </details>
 
 ## v0.72.7 (2022-12-17)
+
+<csr-id-a8d7efe0b55280756811c571525b2947ca268bfc/>
 
 ### Chore
 
@@ -215,13 +242,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Bug Fixes
 
  - <csr-id-fc90ff09ae51eda433e28536289176104cb62872/> send all data batches, not just the first
+ - <csr-id-093b97cf39e9b251055426c0c6bc050ba6135885/> update network knowledge AFTER sent join request
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 4 commits contributed to the release.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 5 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -232,6 +260,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - sn_interface-0.16.2/sn_node-0.72.2 ([`c42f636`](https://github.com/maidsafe/safe_network/commit/c42f6361cd6366c91d2e0c232abf0c070ab27ab7))
+    - update network knowledge AFTER sent join request ([`093b97c`](https://github.com/maidsafe/safe_network/commit/093b97cf39e9b251055426c0c6bc050ba6135885))
     - Merge #1889 ([`d0ab3b0`](https://github.com/maidsafe/safe_network/commit/d0ab3b05a0200d266b55cdb9477cef35b071f186))
     - send all data batches, not just the first ([`fc90ff0`](https://github.com/maidsafe/safe_network/commit/fc90ff09ae51eda433e28536289176104cb62872))
     - Merge #1888 ([`fc0be25`](https://github.com/maidsafe/safe_network/commit/fc0be25da404d64a33b1addb6499033883f5035a))
