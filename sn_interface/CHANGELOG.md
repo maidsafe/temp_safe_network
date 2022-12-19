@@ -6,17 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.16.5 (2022-12-17)
+## v0.16.6 (2022-12-19)
 
 ### New Features
 
- - <csr-id-8aa694171b1dd5c2505259e67d6e3434ee94d213/> prevent joins from nodes behind NAT
+ - <csr-id-6fa35bc5b094583b728d8d068d9ae21df12d40b9/> bundle messages according to size and number
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
+ - 2 commits contributed to the release.
+ - 2 days passed between releases.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -27,6 +28,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1907 ([`8ebd0a6`](https://github.com/maidsafe/safe_network/commit/8ebd0a67d548169fc4cbf716f0c940425096264f))
+    - bundle messages according to size and number ([`6fa35bc`](https://github.com/maidsafe/safe_network/commit/6fa35bc5b094583b728d8d068d9ae21df12d40b9))
+</details>
+
+## v0.16.5 (2022-12-17)
+
+### Chore
+
+ - <csr-id-a8d7efe0b55280756811c571525b2947ca268bfc/> sn_interface-0.16.5/sn_node-0.72.7
+
+### New Features
+
+ - <csr-id-8aa694171b1dd5c2505259e67d6e3434ee94d213/> prevent joins from nodes behind NAT
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.5/sn_node-0.72.7 ([`a8d7efe`](https://github.com/maidsafe/safe_network/commit/a8d7efe0b55280756811c571525b2947ca268bfc))
     - Merge #1900 ([`9650289`](https://github.com/maidsafe/safe_network/commit/96502896245fc41a3ef619d3959f4938413e938c))
     - prevent joins from nodes behind NAT ([`8aa6941`](https://github.com/maidsafe/safe_network/commit/8aa694171b1dd5c2505259e67d6e3434ee94d213))
     - Merge branch 'main' into AlternateNetworkLimitation ([`5354f5e`](https://github.com/maidsafe/safe_network/commit/5354f5e9a0c0ac2145c5c5063b28d48f7bc3a30d))
@@ -35,6 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.16.4 (2022-12-16)
 
 <csr-id-e0f052e46dcfb2beda4edc414fa7f560726fcd73/>
+<csr-id-837c70af642b904f42121aa0a08f697eba551826/>
 
 ### Chore
 
