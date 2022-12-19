@@ -36,6 +36,7 @@ use color_eyre::{Section, SectionExt};
 use eyre::{eyre, ErrReport, Result};
 use self_update::{cargo_crate_version, Status};
 use std::{io::Write, process::exit};
+use tokio::runtime::Runtime;
 use tokio::time::{sleep, Duration};
 use tracing::{self, error, info, trace, warn};
 
@@ -44,36 +45,46 @@ const BOOTSTRAP_RETRY_TIME_SEC: u64 = 30;
 
 mod log;
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     color_eyre::install()?;
 
-    let mut config = Config::new().await?;
+    let mut config = futures::executor::block_on(Config::new())?;
+
     let _guard = log::init_node_logging(&config)?;
     trace!("Initial node config: {config:?}");
 
     loop {
         info!("Node runtime started");
-        create_runtime_and_node(&config).await?;
+        create_runtime_and_node(&config)?;
 
         // if we've had an issue, lets put the brakes on any crazy looping here
-        sleep(Duration::from_secs(1)).await;
+        std::thread::sleep(Duration::from_secs(1));
 
         // pull config again in case it has been updated meanwhile
-        config = Config::new().await?;
+        config = futures::executor::block_on(Config::new())?;
     }
 }
 
 /// Create a tokio runtime per `run_node` instance.
-async fn create_runtime_and_node(config: &Config) -> Result<()> {
-    match run_node(config).await {
-        Ok(_) => {
-            info!("Node has finished running, no runtime errors were reported");
-        }
-        Err(error) => {
-            warn!("Node instance finished with an error: {error:?}");
-        }
-    };
+/// This ensures any spawned tasks are closed before this would
+/// be run again
+fn create_runtime_and_node(config: &Config) -> Result<()> {
+    // Create the runtime
+    let rt = Runtime::new()?;
+
+    rt.block_on(async {
+        match run_node(config).await {
+            Ok(_) => {
+                info!("Node has finished running, no runtime errors were reported");
+            }
+            Err(error) => {
+                warn!("Node instance finished with an error: {error:?}");
+            }
+        };
+    });
+
+    // actively shut down the runtime
+    rt.shutdown_timeout(Duration::from_secs(2));
 
     Ok(())
 }
