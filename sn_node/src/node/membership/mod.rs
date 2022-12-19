@@ -41,6 +41,16 @@ fn get_split_info(
     members: &BTreeMap<XorName, NodeState>,
 ) -> Option<(BTreeSet<NodeState>, BTreeSet<NodeState>)> {
     let (zero, one) = partition_by_prefix(&prefix, members.keys().copied())?;
+    trace!(
+        "{} candidates for prefix zero sub-section {:?}",
+        zero.len(),
+        zero
+    );
+    trace!(
+        "{} candidates for prefix one sub-section {:?}",
+        one.len(),
+        one
+    );
 
     // make sure the sections contain enough entries
     let split_threshold = recommended_section_size();
