@@ -35,6 +35,7 @@ const MAX_SENDJOB_RETRIES: usize = 3;
 enum SessionCmd {
     Send(SendJob),
     AddConnection(Arc<qp2p::Connection>),
+    RemoveConnection(Arc<qp2p::Connection>),
     Terminate,
 }
 
@@ -63,6 +64,14 @@ impl PeerSession {
         let cmd = SessionCmd::AddConnection(conn);
         if let Err(e) = self.channel.send(cmd).await {
             error!("Error while sending AddConnection {e:?}");
+        }
+    }
+
+    // Remove a connection from a peer
+    pub(crate) async fn remove(&self, conn: Arc<qp2p::Connection>) {
+        let cmd = SessionCmd::RemoveConnection(conn);
+        if let Err(e) = self.channel.send(cmd).await {
+            error!("Error while sending RemoveConnection {e:?}");
         }
     }
 
@@ -201,6 +210,10 @@ impl PeerSessionWorker {
                 },
                 SessionCmd::AddConnection(conn) => {
                     self.link.add(conn);
+                    SessionStatus::Ok
+                }
+                SessionCmd::RemoveConnection(conn) => {
+                    self.link.remove(conn);
                     SessionStatus::Ok
                 }
                 SessionCmd::Terminate => SessionStatus::Terminating,

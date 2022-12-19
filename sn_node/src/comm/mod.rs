@@ -285,6 +285,18 @@ impl Comm {
         }
     }
 
+    /// Remove a qp2p:Connection from a peer's session.
+    async fn remove_conn(&self, peer: &Peer, conn: Arc<Connection>) {
+        debug!(
+            "Removing incoming conn to {peer:?} w/ conn_id : {:?}",
+            conn.id()
+        );
+        if let Some(entry) = self.sessions.get(peer) {
+            let peer_session = entry.value();
+            peer_session.remove(conn).await;
+        }
+    }
+
     // Helper to send a message to a single recipient.
     #[instrument(skip(self, bytes))]
     async fn send_to_one(
@@ -323,7 +335,6 @@ impl Comm {
 fn setup_comms(
     our_endpoint: Endpoint,
     incoming_connections: IncomingConnections,
-    // monitoring: RateLimits,
     incoming_msg_pipe: Sender<MsgFromPeer>,
 ) -> (Comm, MsgListener) {
     let (comm, msg_listener) = setup(our_endpoint, incoming_msg_pipe);
@@ -335,7 +346,7 @@ fn setup_comms(
 
 #[tracing::instrument(skip_all)]
 fn setup(our_endpoint: Endpoint, receive_msg: Sender<MsgFromPeer>) -> (Comm, MsgListener) {
-    let (add_connection, conn_receiver) = mpsc::channel(STANDARD_CHANNEL_SIZE);
+    let (add_connection, conn_events_recv) = mpsc::channel(STANDARD_CHANNEL_SIZE);
 
     let msg_listener = MsgListener::new(add_connection, receive_msg);
 
@@ -345,15 +356,22 @@ fn setup(our_endpoint: Endpoint, receive_msg: Sender<MsgFromPeer>) -> (Comm, Msg
         sessions: Arc::new(DashMap::new()),
     };
 
-    let _ = task::spawn(receive_conns(comm.clone(), conn_receiver));
+    let _ = task::spawn(receive_conns(comm.clone(), conn_events_recv));
 
     (comm, msg_listener)
 }
 
 #[tracing::instrument(skip_all)]
-async fn receive_conns(comm: Comm, mut conn_receiver: Receiver<ListenerEvent>) {
-    while let Some(ListenerEvent::Connected { peer, connection }) = conn_receiver.recv().await {
-        comm.add_incoming(&peer, connection).await;
+async fn receive_conns(comm: Comm, mut conn_events_recv: Receiver<ListenerEvent>) {
+    while let Some(event) = conn_events_recv.recv().await {
+        match event {
+            ListenerEvent::Connected { peer, connection } => {
+                comm.add_incoming(&peer, connection).await
+            }
+            ListenerEvent::ConnectionClosed { peer, connection } => {
+                comm.remove_conn(&peer, connection).await
+            }
+        }
     }
 }
 
