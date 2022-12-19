@@ -6,7 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::operations::config::{Config, NetworkInfo};
+use crate::{
+    operations::config::{Config, NetworkInfo},
+    subcommands::OutputFmt,
+};
 use clap::Subcommand;
 use color_eyre::Result;
 use comfy_table::{Cell, CellAlignment, Table};
@@ -49,6 +52,7 @@ pub enum NetworksSubCommands {
 
 pub async fn networks_commander(
     cmd: Option<NetworksSubCommands>,
+    output_fmt: OutputFmt,
     config: &mut Config,
 ) -> Result<()> {
     match cmd {
@@ -161,7 +165,9 @@ pub async fn networks_commander(
                 println!();
             }
         }
-        None => config.print_networks().await,
+        None => {
+            config.print_network(output_fmt).await?;
+        }
     }
 
     Ok(())
