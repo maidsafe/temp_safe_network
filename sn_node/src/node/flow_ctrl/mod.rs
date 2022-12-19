@@ -35,6 +35,7 @@ use sn_interface::{
 use super::DataStorage;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
+use tokio::time::{sleep, Duration};
 use xor_name::XorName;
 
 /// Sent via the rejoin_network_tx to start the bootstrap process again
@@ -171,13 +172,13 @@ impl FlowCtrl {
                         .sort_by(|lhs, rhs| peer.name().cmp_distance(lhs.name(), rhs.name()));
 
                     // TODO: To what extent might we want to bundle these messages?
-                    let data_batch_size = 50; // at most bundle 50 pieces of data together into one message
+                    let data_batch_size = 25; // bundle X pieces of data together into one message
 
                     let mut data_batch = vec![];
-                    debug!(
-                        "{:?} Data {:?} to: {:?}",
+                    trace!(
+                        "{:?} Data of len: {:?} to: {:?}",
                         LogMarker::SendingMissingReplicatedData,
-                        data_addresses,
+                        data_addresses.len(),
                         peer,
                     );
 
@@ -207,6 +208,10 @@ impl FlowCtrl {
                                 error!("Failed to enqueue send msg command for replication of data batch to {peer:?}: {error:?}");
                             }
                             data_batch = vec![];
+
+                            // w/ batch size of data_batch_size (mb) at most, this would limit us to:
+                            // 25mb * 2 / s
+                            sleep(Duration::from_millis(500)).await;
                         }
                     }
                 });
@@ -220,7 +225,7 @@ impl FlowCtrl {
         // the internal process loop
         loop {
             self.perform_periodic_checks().await;
-            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            sleep(Duration::from_millis(100)).await;
         }
     }
 
