@@ -127,20 +127,19 @@ impl MyNode {
 
         if let Some(send_stream) = send_stream {
             // send response on the stream
-            trace!("{msg_id:?} Sending response to {requesting_elder:?}");
             let stream_prio = 10;
             let mut send_stream = send_stream.lock().await;
             send_stream.set_priority(stream_prio);
             let stream_id = send_stream.id();
+            trace!("{msg_id:?} Sending response to {requesting_elder:?} over {stream_id}");
             if let Err(error) = send_stream.send_user_msg(bytes).await {
                 error!("Could not send msg {msg_id:?} over response {stream_id} to {requesting_elder:?}: {error:?}");
                 return Err(error.into());
             }
             // Attempt to gracefully terminate the stream.
             // If this errors it does _not_ mean our message has not been sent
-            let _ = send_stream.finish().await;
-
-            trace!("{msg_id:?} Response sent: to {requesting_elder:?}");
+            let result = send_stream.finish().await;
+            trace!("{msg_id:?} Response sent to {requesting_elder:?} over {stream_id}. Stream finished with result: {result:?}");
         } else {
             error!("Send stream missing from {requesting_elder:?}, data request response was not sent out.")
         }

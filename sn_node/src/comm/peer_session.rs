@@ -8,7 +8,6 @@
 
 use std::fmt::{self, Formatter};
 use std::sync::Arc;
-use std::time::Duration;
 
 use super::Link;
 
@@ -83,30 +82,16 @@ impl PeerSession {
         bytes: UsrMsgBytes,
         msg_id: MsgId,
     ) -> Result<UsrMsgBytes> {
-        // TODO: make a real error here
-        let mut attempts = 0;
-        let mut response = self
-            .link
-            .send_on_new_bi_di_stream(bytes.clone(), msg_id)
-            .await;
-        while response.is_err() && attempts <= 2 {
-            error!(
-                "Error sending {msg_id:?} to {:?} on bi conn: {response:?}, attempt # {attempts}",
-                self.link.peer()
-            );
-            response = self
-                .link
-                .send_on_new_bi_di_stream(bytes.clone(), msg_id)
-                .await;
-            attempts += 1;
-            // wee sleep
-            tokio::time::sleep(Duration::from_millis(100)).await;
-        }
-
-        response.map_err(|e| {
-            error!("Failed sending {msg_id:?} to {:?} {e:?}", self.link.peer());
-            Error::CmdSendError
-        })
+        self.link
+            .send_on_new_bi_di_stream(bytes, msg_id)
+            .await
+            .map_err(|err| {
+                error!(
+                    "Failed sending {msg_id:?} to {:?} {err:?}",
+                    self.link.peer()
+                );
+                Error::CmdSendError
+            })
     }
 
     #[instrument(skip(self, bytes))]
@@ -182,16 +167,19 @@ impl PeerSessionWorker {
                     let _handle = tokio::spawn(async move {
                         let stream_prio = 10;
                         let mut send_stream = send_stream.lock().await;
-                        debug!("Sending on {} via PeerSessionWorker", send_stream.id());
                         send_stream.set_priority(stream_prio);
                         let stream_id = send_stream.id();
+                        debug!("Sending on {stream_id} via PeerSessionWorker");
                         if let Err(error) = send_stream.send_user_msg(bytes).await {
                             error!("Could not send msg {msg_id:?} over response {stream_id} to {peer:?}: {error:?}");
                             reporter.send(SendStatus::TransientError(format!("Could not send msg on response {stream_id} to {peer:?} for {msg_id:?}")));
                         } else {
                             // Attempt to gracefully terminate the stream.
                             // If this errors it does _not_ mean our message has not been sent
-                            let _ = send_stream.finish().await;
+                            let result = send_stream.finish().await;
+                            trace!(
+                                "bidi {stream_id} finished for {msg_id:?} to {peer:?}: {result:?}"
+                            );
 
                             reporter.send(SendStatus::Sent);
                         }
@@ -296,9 +284,7 @@ impl PeerSessionWorker {
                 Link::send_with_connection(job.bytes.clone(), 0, conn, link_connections).await;
 
             match send_resp {
-                Ok(_) => {
-                    job.reporter.send(SendStatus::Sent);
-                }
+                Ok(()) => job.reporter.send(SendStatus::Sent),
                 Err(err) => {
                     if err.is_local_close() {
                         debug!("Peer linked dropped when trying to send {:?}. But link has {:?} connections", id, conns_count );
@@ -326,8 +312,6 @@ impl PeerSessionWorker {
                     if let Err(e) = queue.send(SessionCmd::Send(job)).await {
                         warn!("Failed to re-enqueue job {id:?} after transient error {e:?}");
                     }
-
-                    // Ok(())
                 }
             }
         });
