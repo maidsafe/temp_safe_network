@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1671478128010,
+  "lastUpdate": 1671522279089,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -43384,6 +43384,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 338528987,
             "range": "± 8716126",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "ddaf8571749c142e9960407cfd9cfa94231a36ad",
+          "message": "Merge #1848\n\n1848: fix: remove dummy SectionTree update r=RolandSherwin a=RolandSherwin\n\nFixes https://github.com/maidsafe/safe_network/issues/1810 \r\nFixes https://github.com/maidsafe/safe_network/issues/1798\r\n\r\n- fix(section_tree): genesis_sap is required to create the `SectionTree`\r\n  - The fields of the tree are assumed to be in sync. But it is not the case for a newly created tree.\r\n  - This can be fixed by accepting the genesis sap while creating the tree.\r\n- refactor(network_knowledge): rework constructor\r\n  - Allows us to create a minimal `NetworkKnowledge` by just providing the genesis SAP. This will be set as our current `signed_sap`. A new `SectionTree` is also created with the provided SAP.\r\n  - Optionally, we can provide a `SectionTree` which will replace our current tree. In this case, the provided SAP is considered to be part of the tree and is set as our current `signed_sap`\r\n\r\n\n\nCo-authored-by: RolandSherwin <RolandSherwin@protonmail.com>",
+          "timestamp": "2022-12-20T06:00:57Z",
+          "tree_id": "c8774d7f7858782e1b346f0d7bfd3d8ce3594853",
+          "url": "https://github.com/maidsafe/safe_network/commit/ddaf8571749c142e9960407cfd9cfa94231a36ad"
+        },
+        "date": 1671522277261,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2387370,
+            "range": "± 153220",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 89655489,
+            "range": "± 1728085",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 109538180,
+            "range": "± 3709607",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 426190274,
+            "range": "± 4907808",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 72351236,
+            "range": "± 975116",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 85852268,
+            "range": "± 1008907",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 347910204,
+            "range": "± 3208908",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 24913423531,
+            "range": "± 552752936",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 47337537,
+            "range": "± 19623269",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2059071823,
+            "range": "± 179082723",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 8591536705,
+            "range": "± 856395456",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 198401323,
+            "range": "± 8728012",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 2161507843,
+            "range": "± 197516449",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 7626378755,
+            "range": "± 591968688",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 46669397,
+            "range": "± 2280355",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 457824524,
+            "range": "± 14567119",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1792770724,
+            "range": "± 43034376",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11722732,
+            "range": "± 1468892",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 102364212,
+            "range": "± 6979924",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 334009008,
+            "range": "± 10859540",
             "unit": "ns/iter"
           }
         ]
