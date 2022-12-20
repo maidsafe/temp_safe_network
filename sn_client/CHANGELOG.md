@@ -1113,18 +1113,21 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
-## v0.77.2 (2022-12-16)
+## v0.77.3 (2022-12-20)
 
-### Chore
+### Bug Fixes
 
- - <csr-id-01dc60676d5740dc7dd6250edb130b46a33cc168/> fix new clippy warnings
+ - <csr-id-22402ca6acb0215ecfe9b1fdbf306c0f9cb87d95/> genesis_sap is required to create the `SectionTree`
+   - The fields of the tree are assumed to be in sync. But it is not the
+     case for a newly created tree.
+   - This can be fixed by accepting the genesis sap while creating the tree.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 1 day passed between releases.
+ - 2 commits contributed to the release.
+ - 3 days passed between releases.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -1135,6 +1138,39 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1848 ([`ddaf857`](https://github.com/maidsafe/safe_network/commit/ddaf8571749c142e9960407cfd9cfa94231a36ad))
+    - genesis_sap is required to create the `SectionTree` ([`22402ca`](https://github.com/maidsafe/safe_network/commit/22402ca6acb0215ecfe9b1fdbf306c0f9cb87d95))
+</details>
+
+## v0.77.2 (2022-12-16)
+
+<csr-id-01dc60676d5740dc7dd6250edb130b46a33cc168/>
+
+### Chore
+
+ - <csr-id-01dc60676d5740dc7dd6250edb130b46a33cc168/> fix new clippy warnings
+
+### Chore
+
+ - <csr-id-119ae2d7661d162371749b8466cfd2e9b85d910f/> sn_interface-0.16.3/sn_client-0.77.2/sn_api-0.75.2/sn_cli-0.68.1
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 1 day passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.3/sn_client-0.77.2/sn_api-0.75.2/sn_cli-0.68.1 ([`119ae2d`](https://github.com/maidsafe/safe_network/commit/119ae2d7661d162371749b8466cfd2e9b85d910f))
     - fix new clippy warnings ([`01dc606`](https://github.com/maidsafe/safe_network/commit/01dc60676d5740dc7dd6250edb130b46a33cc168))
 </details>
 
@@ -1144,6 +1180,7 @@ needed, as they keypair itself contains the Arcs we need.
 <csr-id-80201067111349306a651a3f42a8ca740f48abaa/>
 <csr-id-841a004786767c53ab9d60d4a310299d535b86bc/>
 <csr-id-89e1e40ed9100b28a1ad5ed196620a6d6415706e/>
+<csr-id-82c0cf683f8052374eafbb859176c69d52956c72/>
 
 ### Chore
 
@@ -1162,8 +1199,6 @@ needed, as they keypair itself contains the Arcs we need.
  - <csr-id-b67adb74f03e4e8784ec4d391032d9a1eacb847d/> write all Register cmds to disk even if one or more failed
    - When writting Register cmds log to disk, we log and return the error for
    any of them failing, but we don't prevent the rest to be written to disk.
-- Enable multi-threaded mode for sn_api tests in Bors.
-- Some minor improvements to log msgs.
 
 ### Commit Statistics
 
@@ -1190,6 +1225,9 @@ needed, as they keypair itself contains the Arcs we need.
     - make stream.finish non blocking where we can ([`841a004`](https://github.com/maidsafe/safe_network/commit/841a004786767c53ab9d60d4a310299d535b86bc))
     - ignore qp2p::SendStream::finish errors ([`89e1e40`](https://github.com/maidsafe/safe_network/commit/89e1e40ed9100b28a1ad5ed196620a6d6415706e))
 </details>
+
+<csr-unknown>
+Enable multi-threaded mode for sn_api tests in Bors.Some minor improvements to log msgs.<csr-unknown/>
 
 ## v0.77.0 (2022-12-13)
 
@@ -1742,9 +1780,6 @@ needed, as they keypair itself contains the Arcs we need.
     - replace `SecuredLinkedList` with `SectionsDAG` ([`0cd47ad`](https://github.com/maidsafe/safe_network/commit/0cd47ad56e0d93e3e99feb0dfcea8094f871ff6f))
     - verify client generate entry_hash ([`18bea3c`](https://github.com/maidsafe/safe_network/commit/18bea3c1e56268b28826643e1ff8936dfa6d4896))
 </details>
-
-<csr-unknown>
-chore(client): set 90secs for cmds (SN_CMD_TIMEOUT) andqueries (SN_QUERY_TIMEOUT) timeout period in sn-client as default.chore(node): set 70secs for Elder-to-Adult query responses (SN_ADULT_RESPONSE_TIMEOUT)timeout period in sn_node to as default.chore(ci): setting the same values explicitly for sn_client e2e tests in CI/bors, justto make sure whenever we start adjusting the default vaues we don’t change thosefor CI which have been shown to be adequate in current CI/bors setups so far.Limiting the maximum number of chunks per file concurrently uploaded/retrieved to 5.Also some minor improvements to logging msgs.Removing unused error type and cargo feature.Including stream id in log messages.Report the error when a stream couldn’t be finished when sending a response since thatcould mean the recipient didn’t received it.<csr-unknown/>
 
 ## v0.76.0 (2022-09-19)
 

@@ -5,18 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.10 (2022-12-19)
+## v0.72.11 (2022-12-20)
 
-### New Features
+### Chore
 
- - <csr-id-6fa35bc5b094583b728d8d068d9ae21df12d40b9/> bundle messages according to size and number
+ - <csr-id-43a3680784029da46fd549f7d06e2aff786a98d0/> pr suggestions
+
+### Bug Fixes
+
+ - <csr-id-22402ca6acb0215ecfe9b1fdbf306c0f9cb87d95/> genesis_sap is required to create the `SectionTree`
+   - The fields of the tree are assumed to be in sync. But it is not the
+     case for a newly created tree.
+   - This can be fixed by accepting the genesis sap while creating the tree.
+
+### Refactor
+
+ - <csr-id-4d16bbedc35e470200126bb8a2554d8d96b8faa5/> relocate based on our new name
+   - Pass in our current name to get relocated to the correct section
+   - Avoids creating a new `NetworkKnowledge` instance
+ - <csr-id-5dfa24c9982c13fb321006f13b5ff417153191f3/> rework constructor
+   - Create the `NetworkKnowledge` struct by passing in a `SectionTree`
+     and a `Prefix`. The current signed SAP is retrieved from the tree
+     using the provided prefix.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 5 commits contributed to the release.
+ - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -26,11 +43,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1848 ([`ddaf857`](https://github.com/maidsafe/safe_network/commit/ddaf8571749c142e9960407cfd9cfa94231a36ad))
+    - pr suggestions ([`43a3680`](https://github.com/maidsafe/safe_network/commit/43a3680784029da46fd549f7d06e2aff786a98d0))
+    - relocate based on our new name ([`4d16bbe`](https://github.com/maidsafe/safe_network/commit/4d16bbedc35e470200126bb8a2554d8d96b8faa5))
+    - rework constructor ([`5dfa24c`](https://github.com/maidsafe/safe_network/commit/5dfa24c9982c13fb321006f13b5ff417153191f3))
+    - genesis_sap is required to create the `SectionTree` ([`22402ca`](https://github.com/maidsafe/safe_network/commit/22402ca6acb0215ecfe9b1fdbf306c0f9cb87d95))
+</details>
+
+## v0.72.10 (2022-12-19)
+
+### Chore
+
+ - <csr-id-8fcbf73821b9cbde8ed2d87910842134e179fdbf/> sn_interface-0.16.6/sn_node-0.72.10
+
+### New Features
+
+ - <csr-id-6fa35bc5b094583b728d8d068d9ae21df12d40b9/> bundle messages according to size and number
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.6/sn_node-0.72.10 ([`8fcbf73`](https://github.com/maidsafe/safe_network/commit/8fcbf73821b9cbde8ed2d87910842134e179fdbf))
     - Merge #1907 ([`8ebd0a6`](https://github.com/maidsafe/safe_network/commit/8ebd0a67d548169fc4cbf716f0c940425096264f))
     - bundle messages according to size and number ([`6fa35bc`](https://github.com/maidsafe/safe_network/commit/6fa35bc5b094583b728d8d068d9ae21df12d40b9))
 </details>
 
 ## v0.72.9 (2022-12-19)
+
+<csr-id-27d14ffb98d5ce86c61c3c43b2bf33055f21c32d/>
 
 ### Chore
 

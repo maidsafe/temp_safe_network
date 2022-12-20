@@ -4,18 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.68.1 (2022-12-16)
+## v0.68.3 (2022-12-20)
 
-### Chore
+### Bug Fixes
 
- - <csr-id-01dc60676d5740dc7dd6250edb130b46a33cc168/> fix new clippy warnings
+ - <csr-id-22402ca6acb0215ecfe9b1fdbf306c0f9cb87d95/> genesis_sap is required to create the `SectionTree`
+   - The fields of the tree are assumed to be in sync. But it is not the
+     case for a newly created tree.
+   - This can be fixed by accepting the genesis sap while creating the tree.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 2 days passed between releases.
+ - 2 commits contributed to the release.
+ - 3 days passed between releases.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -26,6 +29,66 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1848 ([`ddaf857`](https://github.com/maidsafe/safe_network/commit/ddaf8571749c142e9960407cfd9cfa94231a36ad))
+    - genesis_sap is required to create the `SectionTree` ([`22402ca`](https://github.com/maidsafe/safe_network/commit/22402ca6acb0215ecfe9b1fdbf306c0f9cb87d95))
+</details>
+
+## v0.68.2 (2022-12-16)
+
+### Chore
+
+ - <csr-id-4ce57cc7c349c209d2fa60d876706ad15dd07a04/> sn_node-0.72.6/sn_cli-0.68.2
+ - <csr-id-029b4edf99515569dbc6b4d694e514478ae82db8/> limit client upload size by default
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_node-0.72.6/sn_cli-0.68.2 ([`4ce57cc`](https://github.com/maidsafe/safe_network/commit/4ce57cc7c349c209d2fa60d876706ad15dd07a04))
+    - Merge #1896 #1897 ([`b4f5700`](https://github.com/maidsafe/safe_network/commit/b4f57007619856a368f635aac5a0e865d3f35bc5))
+    - limit client upload size by default ([`029b4ed`](https://github.com/maidsafe/safe_network/commit/029b4edf99515569dbc6b4d694e514478ae82db8))
+</details>
+
+## v0.68.1 (2022-12-16)
+
+<csr-id-01dc60676d5740dc7dd6250edb130b46a33cc168/>
+
+### Chore
+
+ - <csr-id-01dc60676d5740dc7dd6250edb130b46a33cc168/> fix new clippy warnings
+
+### Chore
+
+ - <csr-id-119ae2d7661d162371749b8466cfd2e9b85d910f/> sn_interface-0.16.3/sn_client-0.77.2/sn_api-0.75.2/sn_cli-0.68.1
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 days passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.3/sn_client-0.77.2/sn_api-0.75.2/sn_cli-0.68.1 ([`119ae2d`](https://github.com/maidsafe/safe_network/commit/119ae2d7661d162371749b8466cfd2e9b85d910f))
     - fix new clippy warnings ([`01dc606`](https://github.com/maidsafe/safe_network/commit/01dc60676d5740dc7dd6250edb130b46a33cc168))
 </details>
 
@@ -46,6 +109,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <csr-id-73f5531790ef8817ed3551fd9e4bcbcc7fc6f4f9/>
 <csr-id-096b9c67671324109aa2939e3806813501248cc6/>
 <csr-id-ff59202d1374c7e5dcc570d50ed8b399fafe488d/>
+<csr-id-ea1d0490f0b67a9f39bd98b2bd5830a0f63fbf6e/>
+<csr-id-e3bb817e20843f68ee21e9a5dd7e52c8a6e92b88/>
 
 ### Chore
 
@@ -195,9 +260,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     - Merge #1527 ([`1f06d6e`](https://github.com/maidsafe/safe_network/commit/1f06d6e90da6f889221f37cc8eac32b6933a94ba))
     - replace `SecuredLinkedList` with `SectionsDAG` ([`0cd47ad`](https://github.com/maidsafe/safe_network/commit/0cd47ad56e0d93e3e99feb0dfcea8094f871ff6f))
 </details>
-
-<csr-unknown>
- replace SecuredLinkedList with SectionsDAG<csr-unknown/>
 
 ## v0.67.0 (2022-09-19)
 
