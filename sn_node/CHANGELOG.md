@@ -5,13 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.12 (2022-12-20)
+## v0.72.13 (2022-12-20)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
+ - 1 commit contributed to the release.
  - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -22,6 +22,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1905 ([`9c1565f`](https://github.com/maidsafe/safe_network/commit/9c1565f188b31110151cd2d4ac0c3fa58aa83edd))
+</details>
+
+## v0.72.12 (2022-12-20)
+
+### Bug Fixes
+
+ - <csr-id-3f3d6400d58f8ec9f68dbbaf7814c962559404fe/> init logging in loop
+   Ensures logging functions correctly
+
+### Chore
+
+ - <csr-id-bb11b8369c36d20eb926d11fd7fbaa41ff37f011/> sn_interface-0.16.8/sn_node-0.72.12
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.8/sn_node-0.72.12 ([`bb11b83`](https://github.com/maidsafe/safe_network/commit/bb11b8369c36d20eb926d11fd7fbaa41ff37f011))
+    - init logging in loop ([`3f3d640`](https://github.com/maidsafe/safe_network/commit/3f3d6400d58f8ec9f68dbbaf7814c962559404fe))
     - Merge #1910 ([`f9cd9d6`](https://github.com/maidsafe/safe_network/commit/f9cd9d61a7b9229c14ea284c8aa9bf10a9f78bbd))
     - Revert "feat(join): prevent joins from nodes behind NAT" ([`c46bb99`](https://github.com/maidsafe/safe_network/commit/c46bb9934d7c12881dcac887ae55fe796027525d))
 </details>
@@ -31,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-43a3680784029da46fd549f7d06e2aff786a98d0/>
 <csr-id-4d16bbedc35e470200126bb8a2554d8d96b8faa5/>
 <csr-id-5dfa24c9982c13fb321006f13b5ff417153191f3/>
+<csr-id-a6addd1dde96833d6629e75b418ac2a244ab31f3/>
 
 ### Chore
 
@@ -45,7 +77,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-22402ca6acb0215ecfe9b1fdbf306c0f9cb87d95/> genesis_sap is required to create the `SectionTree`
    - The fields of the tree are assumed to be in sync. But it is not the
    case for a newly created tree.
-- This can be fixed by accepting the genesis sap while creating the tree.
 
 ### Refactor
 
@@ -80,6 +111,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - genesis_sap is required to create the `SectionTree` ([`22402ca`](https://github.com/maidsafe/safe_network/commit/22402ca6acb0215ecfe9b1fdbf306c0f9cb87d95))
 </details>
 
+<csr-unknown>
+This can be fixed by accepting the genesis sap while creating the tree.<csr-unknown/>
+
 ## v0.72.10 (2022-12-19)
 
 <csr-id-8fcbf73821b9cbde8ed2d87910842134e179fdbf/>
@@ -87,6 +121,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Chore
 
  - <csr-id-8fcbf73821b9cbde8ed2d87910842134e179fdbf/> sn_interface-0.16.6/sn_node-0.72.10
+
+### Bug Fixes
+
+ - <csr-id-4c79cbc641b2395afd7b600a1511a64709cc5309/> ensure we use a fresh runtime each startup
+   Previously the runtime was only refreshed if we
+   errored out, now we refresh if were attempting to rejoin too
+ - <csr-id-a893f6a3ac27fde2294904299fd08e29f93db0b3/> ues a fresh runtime every node_run call
+   This should close all existing endpoints and other spawned tasks
+   and get us a proper fresh ndoe instance
 
 ### New Features
 
@@ -96,8 +139,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 5 commits contributed to the release.
+ - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -110,6 +153,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - sn_interface-0.16.6/sn_node-0.72.10 ([`8fcbf73`](https://github.com/maidsafe/safe_network/commit/8fcbf73821b9cbde8ed2d87910842134e179fdbf))
     - Merge #1907 ([`8ebd0a6`](https://github.com/maidsafe/safe_network/commit/8ebd0a67d548169fc4cbf716f0c940425096264f))
     - bundle messages according to size and number ([`6fa35bc`](https://github.com/maidsafe/safe_network/commit/6fa35bc5b094583b728d8d068d9ae21df12d40b9))
+    - ensure we use a fresh runtime each startup ([`4c79cbc`](https://github.com/maidsafe/safe_network/commit/4c79cbc641b2395afd7b600a1511a64709cc5309))
+    - ues a fresh runtime every node_run call ([`a893f6a`](https://github.com/maidsafe/safe_network/commit/a893f6a3ac27fde2294904299fd08e29f93db0b3))
 </details>
 
 ## v0.72.9 (2022-12-19)
