@@ -1,9 +1,8 @@
 mod appender;
 
 use sn_interface::LogFormatter;
-use sn_node::node::Config;
+use sn_node::node::{Config, Result};
 
-use eyre::Result;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::filter::{EnvFilter, Targets};
 use tracing_subscriber::fmt::Layer;

@@ -218,6 +218,9 @@ pub enum Error {
     CannotHandleQuery(DataQuery),
     #[error("BLS error: {0}")]
     BlsError(#[from] bls::Error),
+    #[cfg(feature = "otlp")]
+    #[error("OpenTelemetry Tracing error: {0}")]
+    OpenTelemetryTracing(#[from] opentelemetry::trace::TraceError),
 }
 
 impl From<qp2p::ClientEndpointError> for Error {

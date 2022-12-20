@@ -50,11 +50,8 @@ fn main() -> Result<()> {
 
     let mut config = futures::executor::block_on(Config::new())?;
 
-    let _guard = log::init_node_logging(&config)?;
-    trace!("Initial node config: {config:?}");
-
     loop {
-        info!("Node runtime started");
+        println!("Node started");
         create_runtime_and_node(&config)?;
 
         // if we've had an issue, lets put the brakes on any crazy looping here
@@ -85,20 +82,13 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
                     exit(0);
                 }
             }
-            Err(e) => error!("Updating node failed: {:?}", e),
+            Err(e) => println!("Updating node failed: {:?}", e),
         }
 
         if config.update_only() {
             exit(0);
         }
     }
-
-    let message = format!(
-        "Running {} v{}",
-        Config::clap().get_name(),
-        env!("CARGO_PKG_VERSION")
-    );
-    info!("\n{}\n{}", message, "=".repeat(message.len()));
 
     let our_pid = std::process::id();
     let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
@@ -113,7 +103,20 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
         // make a fresh runtime
         let rt = Runtime::new()?;
 
-        let outcome = rt.block_on(async { start_node(config, join_timeout).await });
+        let message = format!(
+            "Running {} v{}",
+            Config::clap().get_name(),
+            env!("CARGO_PKG_VERSION")
+        );
+
+        info!("\n{}\n{}", message, "=".repeat(message.len()));
+
+        let outcome = rt.block_on(async {
+            let _guard = log::init_node_logging(config)?;
+            trace!("Initial node config: {config:?}");
+
+            start_node(config, join_timeout).await
+        });
 
         match outcome {
             Ok((_node, mut rejoin_network_rx)) => {
