@@ -446,6 +446,11 @@ impl MyNode {
                 let section_pk = PublicKey::Bls(context.network_knowledge.section_key());
                 let node_keypair = Keypair::Ed25519(context.keypair.clone());
 
+                // To avoid duplication, only record storage level once.
+                let mut record_storage_level = None;
+                let mut is_full = false;
+                let has_replicated_data_in = !data_collection.is_empty();
+
                 for data in data_collection {
                     // grab the write lock each time in the loop to not hold it over large data sets
                     let store_result = context
@@ -459,11 +464,7 @@ impl MyNode {
                     match store_result {
                         Ok(level_report) => {
                             info!("Storage level report: {:?}", level_report);
-                            cmds.extend(MyNode::record_storage_level_if_any(
-                                &context,
-                                level_report,
-                            )?);
-
+                            record_storage_level = Some(level_report);
                             info!("End of message flow.");
                         }
                         Err(StorageError::NotEnoughSpace) => {
@@ -476,6 +477,7 @@ impl MyNode {
                                 data,
                                 full: true,
                             });
+                            is_full = true;
 
                             cmds.push(MyNode::send_msg_to_our_elders(&context, msg))
                         }
@@ -484,6 +486,19 @@ impl MyNode {
                             error!("Problem storing data, but it was ignored: {error}");
                         }
                     }
+                }
+
+                if let Some(level_report) = record_storage_level {
+                    cmds.extend(MyNode::record_storage_level_if_any(&context, level_report)?);
+                }
+
+                // Whenever there is a replicated data in, we send back a query again
+                if !is_full && has_replicated_data_in {
+                    let data_i_have = context.data_storage.data_addrs().await;
+                    let msg =
+                        NodeMsg::NodeDataCmd(NodeDataCmd::SendAnyMissingRelevantData(data_i_have));
+                    let cmd = MyNode::send_system_msg(msg, Peers::Single(sender), context.clone());
+                    cmds.push(cmd);
                 }
 
                 Ok(cmds)

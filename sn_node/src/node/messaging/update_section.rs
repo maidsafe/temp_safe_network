@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Peers, MyNode};
-
+use rand::{rngs::OsRng, seq::SliceRandom};
 use sn_interface::{
     data_copy_count,
     messaging::system::{NodeDataCmd, NodeMsg},
@@ -16,6 +16,8 @@ use sn_interface::{
 
 use itertools::Itertools;
 use std::collections::BTreeSet;
+
+static MAX_MISSED_DATA_TO_REPLICATE: usize = 100;
 
 impl MyNode {
     /// Given what data the peer has, we shall calculate what data the peer is missing that
@@ -30,13 +32,16 @@ impl MyNode {
         // Collection of data addresses that we do not have
 
         // TODO: can cache this data stored per churn event?
-        let data_i_have = context.data_storage.data_addrs().await;
+        let mut data_i_have = context.data_storage.data_addrs().await;
         trace!("Our data got");
 
         if data_i_have.is_empty() {
             trace!("We have no data");
             return None;
         }
+        // To make each data storage node reply with different copies, so that the
+        // overall queries can be reduceds, the data names are scrambled.
+        data_i_have.shuffle(&mut OsRng);
 
         let adults = context.network_knowledge.adults();
         let adults_names = adults.iter().map(|p2p_node| p2p_node.name());
@@ -61,6 +66,11 @@ impl MyNode {
                     sender
                 );
                 data_for_sender.push(data);
+                // To avoid bundle too many data into one response,
+                // Only reply with MAX_MISSED_DATA_TO_REPLICATE data for each query round,
+                if data_for_sender.len() == MAX_MISSED_DATA_TO_REPLICATE {
+                    break;
+                }
             }
         }
 
