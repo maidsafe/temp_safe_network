@@ -82,155 +82,146 @@ impl Link {
         conn: Arc<Connection>,
         connections: LinkConnections,
     ) -> Result<(), SendToOneError> {
+        let conn_id = conn.id();
         trace!(
-            "We have {} open connections to node {:?}.",
-            connections.len(),
-            conn.id()
+            "We have {} open connections to node {conn_id}.",
+            connections.len()
         );
 
-        match conn.send_with(bytes, priority).await {
-            Ok(()) => Ok(()),
-            Err(error) => {
-                error!(
-                    "Error sending out from link... We have {} open connections to node {:?}.",
-                    connections.len(),
-                    conn.id()
-                );
-                // clean up failing connections at once, no nead to leak it outside of here
-                // next send (e.g. when retrying) will use/create a new connection
-                let id = &conn.id();
-                // We could write just `self.connections.remove(id)`, but the library warns for `unused_results`.
-                {
-                    // Timeouts etc should register instantly so we should clean those up fair fast
-                    let _ = connections.remove(id);
-                }
+        conn.send_with(bytes, priority).await.map_err(|error| {
+            error!(
+                "Error sending out from link... We have {} open connections to node {conn_id}.",
+                connections.len()
+            );
+            // clean up failing connections at once, no nead to leak it outside of here
+            // next send (e.g. when retrying) will use/create a new connection
+            // Timeouts etc should register instantly so we should clean those up fair fast
+            let _ = connections.remove(&conn_id);
 
-                debug!("Connection remove from link: {id:?}");
-                // dont close just let the conn timeout incase msgs are coming in...
-                // it's removed from out Peer tracking, so wont be used again for sending.
-                Err(SendToOneError::Send(error))
-            }
-        }
+            debug!("Connection removed from link: {conn_id}");
+            // dont close just let the conn timeout incase msgs are coming in...
+            // it's removed from out Peer tracking, so won't be used again for sending.
+            SendToOneError::Send(error)
+        })
     }
 
     /// Send a message using a bi-di stream and await response
+    /// When sending a msg to a peer, if it fails with an existing
+    /// cached connection, it will keep retrying till it either:
+    /// a. finds another cached connection which it succeeded with,
+    /// b. or it cleaned them all up from the cache creating a new connection
+    ///    to the peer as last attempt.
     pub(crate) async fn send_on_new_bi_di_stream(
         &mut self,
         bytes: UsrMsgBytes,
         msg_id: MsgId,
     ) -> Result<UsrMsgBytes, SendToOneError> {
-        trace!("Sending {msg_id:?} via a bi stream");
+        let peer = self.peer;
+        trace!(
+            "Sending {msg_id:?} via a bi-stream to {peer:?}, we have {} cached connections.",
+            self.connections.len()
+        );
+        let mut attempt = 0;
+        loop {
+            let conn = self
+                .connections
+                .iter()
+                .next()
+                .map(|entry| entry.value().clone());
 
-        let conn = match self.get_or_connect(msg_id).await {
-            Ok(conn) => conn,
-            Err(err) => {
-                error!(
-                    "{msg_id:?} Err getting connection during bi stream initialisation to: {:?}.",
-                    self.peer()
+            let (conn, is_last_attempt) = if let Some(conn) = conn {
+                trace!(
+                    "Sending {msg_id:?} via bi-stream over existing connection {}, attempt #{attempt}.",
+                    conn.id()
                 );
-                return Err(err);
-            }
-        };
+                (conn, false)
+            } else {
+                trace!("Sending {msg_id:?} via bi-stream over new connection to {peer:?}, attempt #{attempt}.");
+                let conn = self.create_connection(msg_id).await?;
+                (conn, true)
+            };
 
-        let conn_id = conn.id();
-        trace!("connection got to: {:?} {msg_id:?}", self.peer);
-        let (mut send_stream, mut recv_stream) =
-            match conn.open_bi().await.map_err(SendToOneError::Connection) {
-                Ok(streams) => streams,
-                Err(stream_opening_err) => {
-                    error!("{msg_id:?} Error opening streams {stream_opening_err:?}");
+            attempt += 1;
+
+            let conn_id = conn.id();
+            trace!("Connection {conn_id} got to {peer:?} for {msg_id:?}");
+            let (mut send_stream, mut recv_stream) = match conn.open_bi().await {
+                Ok(bi_stream) => bi_stream,
+                Err(err) => {
+                    error!("{msg_id:?} Error opening bi-stream over {conn_id}: {err:?}");
                     // remove that broken conn
                     let _conn = self.connections.remove(&conn_id);
-
-                    return Err(stream_opening_err);
+                    match is_last_attempt {
+                        true => break Err(SendToOneError::Connection(err)),
+                        false => continue,
+                    }
                 }
             };
 
-        let stream_id = send_stream.id();
-        trace!("bidi {stream_id} opened for {msg_id:?} to: {:?}", self.peer);
-        send_stream.set_priority(10);
-        match send_stream.send_user_msg(bytes.clone()).await {
-            Ok(_) => {}
-            Err(err) => {
-                error!(
-                    "Error sending bytes {msg_id:?} over stream {stream_id}: {:?}",
-                    err
-                );
+            let stream_id = send_stream.id();
+            trace!("bidi {stream_id} opened for {msg_id:?} to {peer:?}");
+            send_stream.set_priority(10);
+            if let Err(err) = send_stream.send_user_msg(bytes.clone()).await {
+                error!("Error sending bytes for {msg_id:?} over {stream_id}: {err:?}");
                 // remove that broken conn
                 let _conn = self.connections.remove(&conn_id);
+                match is_last_attempt {
+                    true => break Err(SendToOneError::Send(err)),
+                    false => continue,
+                }
+            }
+
+            trace!("{msg_id:?} sent on {stream_id} to {peer:?}");
+
+            // unblock + move finish off thread as it's not strictly related to the sending of the msg.
+            let stream_id_clone = stream_id.clone();
+            let _handle = tokio::spawn(async move {
+                // Attempt to gracefully terminate the stream.
+                // If this errors it does _not_ mean our message has not been sent
+                let result = send_stream.finish().await;
+                trace!("{msg_id:?} finished {stream_id_clone} to {peer:?}: {result:?}");
+            });
+
+            match recv_stream.next().await {
+                Ok(Some(response)) => break Ok(response),
+                Ok(None) => {
+                    error!(
+                        "Stream closed by peer when awaiting response to {msg_id:?} from {peer:?} over {stream_id}."
+                    );
+                    let _conn = self.connections.remove(&conn_id);
+                    if is_last_attempt {
+                        break Err(SendToOneError::RecvClosed(peer));
+                    }
+                }
+                Err(err) => {
+                    error!("Error receiving response to {msg_id:?} from {peer:?} over {stream_id}: {err:?}");
+                    let _conn = self.connections.remove(&conn_id);
+                    if is_last_attempt {
+                        break Err(SendToOneError::Recv(err));
+                    }
+                }
             }
         }
-
-        trace!("{msg_id:?} sent on {stream_id} to: {:?}", self.peer);
-
-        let the_peer = self.peer;
-        // unblock + move finish off thread as it's not strictly related to the sending of the msg.
-        let _handle = tokio::spawn(async move {
-            // Attempt to gracefully terminate the stream.
-            // If this errors it does _not_ mean our message has not been sent
-            let _ = send_stream.finish().await;
-            trace!("bidi {stream_id} finished for {msg_id:?} to: {the_peer:?}");
-        });
-
-        recv_stream
-            .next()
-            .await
-            .map_err(SendToOneError::Recv)?
-            .ok_or(SendToOneError::RecvClosed(self.peer))
     }
 
     // Gets an existing connection or creates a new one to the Link's Peer
-    // Should only return still valid connections
-    pub(crate) async fn get_or_connect(
+    pub(super) async fn get_or_connect(
         &mut self,
         msg_id: MsgId,
     ) -> Result<Arc<Connection>, SendToOneError> {
-        if self.connections.is_empty() {
-            debug!(
-                "{msg_id:?} attempting to create a connection to {:?}",
-                self.peer
-            );
-            return self.create_connection(msg_id).await;
-        }
+        let peer = self.peer;
+        trace!("{msg_id:?} Grabbing a connection from link store to {peer:?}");
 
-        trace!(
-            "{msg_id:?} Grabbing a connection from link.. {:?}",
-            self.peer()
-        );
-        // TODO: add in simple connection check when available.
-        // we can then remove dead conns easily and return only valid conns
-        let connections = &self.connections;
-        let mut dead_conns = vec![];
-        let mut live_conn = None;
-
-        for entry in connections.iter() {
-            let conn = entry.value().clone();
-            let conn_id = conn.id();
-
-            let is_valid = conn.open_bi().await.is_ok();
-
-            if !is_valid {
-                dead_conns.push(conn_id);
-                continue;
-            }
-            //we have a conn
-            live_conn = Some(conn);
-            break;
-        }
-
-        // cleanup dead conns
-        for dead_conn in dead_conns {
-            let _gone = self.connections.remove(&dead_conn);
-        }
-
-        if let Some(conn) = live_conn {
-            trace!("{msg_id:?} live connection found to {:?}", self.peer());
+        let conn = self
+            .connections
+            .iter()
+            .next()
+            .map(|entry| entry.value().clone());
+        if let Some(conn) = conn {
+            trace!("{msg_id:?} Connection found to {peer:?}");
             Ok(conn)
         } else {
-            trace!(
-                "{msg_id:?} No live connection found to {:?}, creating a new one.",
-                self.peer()
-            );
+            trace!("{msg_id:?} No connection found to {peer:?}, creating a new one.");
             self.create_connection(msg_id).await
         }
     }
@@ -263,11 +254,11 @@ impl Link {
     }
 
     fn insert(&mut self, conn: Arc<Connection>) {
-        let id = conn.id();
-        debug!("Inserting connection into link store: {id:?}");
+        let conn_id = conn.id();
+        debug!("Inserting connection into link store: {conn_id}");
 
-        let _ = self.connections.insert(id.clone(), conn);
-        debug!("Connection INSERTED into link store: {id:?}");
+        let _ = self.connections.insert(conn_id.clone(), conn);
+        debug!("Connection INSERTED into link store: {conn_id}");
     }
 }
 

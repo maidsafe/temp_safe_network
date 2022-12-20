@@ -356,14 +356,14 @@ impl MyNode {
             target_peer,
             original_msg_id,
         )?;
-        trace!("Sending {original_msg_id:?} to recipient over stream");
         let stream_prio = 10;
         let mut send_stream = send_stream.lock_owned().await;
         let stream_id = send_stream.id();
+        trace!("Sending {original_msg_id:?} to recipient over {stream_id}");
 
         trace!("Stream {stream_id} locked for {original_msg_id:?} to {target_peer:?}");
         send_stream.set_priority(stream_prio);
-        trace!("Prio set for {original_msg_id:?} to {target_peer:?}");
+        trace!("Prio set for {original_msg_id:?} to {target_peer:?}, over {stream_id}");
         if let Err(error) = send_stream.send_user_msg(bytes).await {
             error!(
                 "Could not send query response {original_msg_id:?} to \
@@ -372,14 +372,15 @@ impl MyNode {
             return Err(error.into());
         }
 
-        trace!("Msg away for {original_msg_id:?} to {target_peer:?}");
+        trace!("Msg away for {original_msg_id:?} to {target_peer:?}, over {stream_id}");
 
         // unblock + move finish off thread as it's not strictly related to the sending of the msg.
+        let stream_id_clone = stream_id.clone();
         let _handle = tokio::spawn(async move {
             // Attempt to gracefully terminate the stream.
             // If this errors it does _not_ mean our message has not been sent
-            let _ = send_stream.finish().await;
-            trace!("bidi stream finished for {original_msg_id:?} to: {target_peer:?}");
+            let result = send_stream.finish().await;
+            trace!("bidi {stream_id_clone} finished for {original_msg_id:?} to {target_peer:?}: {result:?}");
         });
 
         debug!("Sent the msg {original_msg_id:?} over {stream_id} to {target_peer:?}");
