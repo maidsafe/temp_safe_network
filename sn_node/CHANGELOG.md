@@ -5,24 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.15 (2022-12-20)
-
-### New Features
-
- - <csr-id-96e8c7c5315090462e1269c48027cdba1bfea23a/> retry sending msg to peer cleaning up all cached bad connections
-   - When sending a msg to a peer, if it fails with an existing cached connection,
-   it will keep retrying till it either finds another cached connection which it
-   succeeds with, or it cleans them all up from the cache creating a new connection
-   to the peer as last attempt.
-   - Also this includes some minor improvements to Comm log msgs.
-   - Upgrading qp2p to v0.34.0.
+## v0.72.16 (2022-12-20)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -32,11 +22,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1862 ([`aed6549`](https://github.com/maidsafe/safe_network/commit/aed65493fb5dd3cb6c39f32559e0bb20bff157c9))
+</details>
+
+## v0.72.15 (2022-12-20)
+
+### Chore
+
+ - <csr-id-aed73cfa0eb0dc3271defa7de2a90a96c790bc8d/> sn_interface-0.16.9/sn_client-0.77.4/sn_node-0.72.15
+
+### New Features
+
+ - <csr-id-96e8c7c5315090462e1269c48027cdba1bfea23a/> retry sending msg to peer cleaning up all cached bad connections
+   - When sending a msg to a peer, if it fails with an existing cached connection,
+   it will keep retrying till it either finds another cached connection which it
+   succeeds with, or it cleans them all up from the cache creating a new connection
+   to the peer as last attempt.
+- Also this includes some minor improvements to Comm log msgs.
+- Upgrading qp2p to v0.34.0.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.9/sn_client-0.77.4/sn_node-0.72.15 ([`aed73cf`](https://github.com/maidsafe/safe_network/commit/aed73cfa0eb0dc3271defa7de2a90a96c790bc8d))
     - Merge #1899 ([`d88b5dd`](https://github.com/maidsafe/safe_network/commit/d88b5dd5c8c5799c6896b19a9c4de094943b377f))
     - retry sending msg to peer cleaning up all cached bad connections ([`96e8c7c`](https://github.com/maidsafe/safe_network/commit/96e8c7c5315090462e1269c48027cdba1bfea23a))
 </details>
 
 ## v0.72.14 (2022-12-20)
+
+<csr-id-fbf081a85626d8e65598e786f60cbcfe477419f8/>
 
 ### Chore
 
@@ -257,13 +284,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-b0199a21705a622dbfdc5bc3f6326fd5979ac345/> sn_node-0.72.8
 
+### Refactor
+
+ - <csr-id-781459fe3e92c91f503953fc5aa6a2241f1c587f/> pass `NodeMsgs` via the `Comm` module
+   - The dkg tests bypassed the Comm module and used a queue to pass
+     along the `NodeMsgs` for testing. This was due to the fact that the
+     msgs were sent asynchronously, preventing any control of the flow.
+   - Hence using the test-only synchronous msg sender allows us to do the
+     above without using any extra queues.
+
+### Bug Fixes
+
+ - <csr-id-b1cc6f56f16b715cec2013ec07ef83dcc0df03d0/> fix edge case while calculating max_prefixes
+
+### New Features
+
+ - <csr-id-a371c6a593451c4190818b5140576a25755871d4/> synchronously send `NodeMsg` to other nodes
+   - This allows us to control the flow of msgs in certain tests
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
+ - 5 commits contributed to the release.
  - 2 days passed between releases.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -274,6 +319,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - sn_node-0.72.8 ([`b0199a2`](https://github.com/maidsafe/safe_network/commit/b0199a21705a622dbfdc5bc3f6326fd5979ac345))
+    - pass `NodeMsgs` via the `Comm` module ([`781459f`](https://github.com/maidsafe/safe_network/commit/781459fe3e92c91f503953fc5aa6a2241f1c587f))
+    - synchronously send `NodeMsg` to other nodes ([`a371c6a`](https://github.com/maidsafe/safe_network/commit/a371c6a593451c4190818b5140576a25755871d4))
+    - fix edge case while calculating max_prefixes ([`b1cc6f5`](https://github.com/maidsafe/safe_network/commit/b1cc6f56f16b715cec2013ec07ef83dcc0df03d0))
     - Merge #1901 ([`7d88182`](https://github.com/maidsafe/safe_network/commit/7d881828c14db3aed471c2591919144c01c64301))
 </details>
 
