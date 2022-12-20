@@ -5,14 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.14 (2022-12-20)
+## v0.72.15 (2022-12-20)
+
+### New Features
+
+ - <csr-id-96e8c7c5315090462e1269c48027cdba1bfea23a/> retry sending msg to peer cleaning up all cached bad connections
+   - When sending a msg to a peer, if it fails with an existing cached connection,
+   it will keep retrying till it either finds another cached connection which it
+   succeeds with, or it cleans them all up from the cache creating a new connection
+   to the peer as last attempt.
+   - Also this includes some minor improvements to Comm log msgs.
+   - Upgrading qp2p to v0.34.0.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -22,10 +32,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1899 ([`d88b5dd`](https://github.com/maidsafe/safe_network/commit/d88b5dd5c8c5799c6896b19a9c4de094943b377f))
+    - retry sending msg to peer cleaning up all cached bad connections ([`96e8c7c`](https://github.com/maidsafe/safe_network/commit/96e8c7c5315090462e1269c48027cdba1bfea23a))
+</details>
+
+## v0.72.14 (2022-12-20)
+
+### Chore
+
+ - <csr-id-fbf081a85626d8e65598e786f60cbcfe477419f8/> sn_node-0.72.14
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_node-0.72.14 ([`fbf081a`](https://github.com/maidsafe/safe_network/commit/fbf081a85626d8e65598e786f60cbcfe477419f8))
     - Merge #1903 ([`aefe4b2`](https://github.com/maidsafe/safe_network/commit/aefe4b2d132f9330d274beff766d0015c71e22a6))
 </details>
 
 ## v0.72.13 (2022-12-20)
+
+<csr-id-98b25549f85b5d885ae6ee5825e7262c7d29e38b/>
 
 ### Chore
 
