@@ -35,6 +35,7 @@ target*/
 # Misc
 *.back.aip
 *.bootstrap.cache
+*.mp3
 *.orig
 *.rsproj
 .DS_Store
