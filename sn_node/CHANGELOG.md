@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.13 (2022-12-20)
+## v0.72.14 (2022-12-20)
 
 ### Commit Statistics
 
@@ -22,10 +22,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1903 ([`aefe4b2`](https://github.com/maidsafe/safe_network/commit/aefe4b2d132f9330d274beff766d0015c71e22a6))
+</details>
+
+## v0.72.13 (2022-12-20)
+
+### Chore
+
+ - <csr-id-98b25549f85b5d885ae6ee5825e7262c7d29e38b/> sn_node-0.72.13
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_node-0.72.13 ([`98b2554`](https://github.com/maidsafe/safe_network/commit/98b25549f85b5d885ae6ee5825e7262c7d29e38b))
     - Merge #1905 ([`9c1565f`](https://github.com/maidsafe/safe_network/commit/9c1565f188b31110151cd2d4ac0c3fa58aa83edd))
 </details>
 
 ## v0.72.12 (2022-12-20)
+
+<csr-id-bb11b8369c36d20eb926d11fd7fbaa41ff37f011/>
 
 ### Bug Fixes
 
@@ -111,9 +138,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - genesis_sap is required to create the `SectionTree` ([`22402ca`](https://github.com/maidsafe/safe_network/commit/22402ca6acb0215ecfe9b1fdbf306c0f9cb87d95))
 </details>
 
-<csr-unknown>
-This can be fixed by accepting the genesis sap while creating the tree.<csr-unknown/>
-
 ## v0.72.10 (2022-12-19)
 
 <csr-id-8fcbf73821b9cbde8ed2d87910842134e179fdbf/>
@@ -130,6 +154,8 @@ This can be fixed by accepting the genesis sap while creating the tree.<csr-unkn
  - <csr-id-a893f6a3ac27fde2294904299fd08e29f93db0b3/> ues a fresh runtime every node_run call
    This should close all existing endpoints and other spawned tasks
    and get us a proper fresh ndoe instance
+ - <csr-id-936454fd9d087c29a54a84e3b4672d0d60f81dbd/> make initial get/connect blocking
+   This avoids many many connection attempts to the same node if one is in progress already.
 
 ### New Features
 
@@ -139,8 +165,8 @@ This can be fixed by accepting the genesis sap while creating the tree.<csr-unkn
 
 <csr-read-only-do-not-edit/>
 
- - 5 commits contributed to the release.
- - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 6 commits contributed to the release.
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -155,6 +181,7 @@ This can be fixed by accepting the genesis sap while creating the tree.<csr-unkn
     - bundle messages according to size and number ([`6fa35bc`](https://github.com/maidsafe/safe_network/commit/6fa35bc5b094583b728d8d068d9ae21df12d40b9))
     - ensure we use a fresh runtime each startup ([`4c79cbc`](https://github.com/maidsafe/safe_network/commit/4c79cbc641b2395afd7b600a1511a64709cc5309))
     - ues a fresh runtime every node_run call ([`a893f6a`](https://github.com/maidsafe/safe_network/commit/a893f6a3ac27fde2294904299fd08e29f93db0b3))
+    - make initial get/connect blocking ([`936454f`](https://github.com/maidsafe/safe_network/commit/936454fd9d087c29a54a84e3b4672d0d60f81dbd))
 </details>
 
 ## v0.72.9 (2022-12-19)
