@@ -62,7 +62,7 @@ authd_client = [ ]
 app = [ ]
 check-replicas = [ "sn_client/check-replicas" ]
 limit-client-upload-size = ["sn_client/limit-client-upload-size"]
-test-utils = [ "sn_client/test-utils", "anyhow", "async_once", "tracing-subscriber" ]
+test-utils = [ "sn_interface/test-utils", "sn_client/test-utils", "anyhow", "async_once", "tracing-subscriber" ]
 default = [ "authenticator", "authd_client", "app" ]
 
 [dev-dependencies]
@@ -74,5 +74,6 @@ hex = "~0.4"
 predicates = "2.0"
 proptest = "1.0.0"
 sn_client = { path = "../sn_client", version = "^0.77.2", features = ["test-utils"] }
+sn_interface = { path = "../sn_interface", version = "^0.16.3", features = ["test-utils"] }
 tokio = { version = "1.6.0", features = ["macros"] }
 tracing-subscriber = "~0.3.1"

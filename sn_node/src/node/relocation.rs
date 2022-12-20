@@ -123,9 +123,7 @@ mod tests {
 
     use sn_interface::{
         elder_count,
-        network_knowledge::{
-            SectionAuthorityProvider, SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
-        },
+        network_knowledge::{SectionAuthorityProvider, SectionTree, MIN_ADULT_AGE},
         test_utils::TestKeys,
         types::Peer,
     };
@@ -134,7 +132,6 @@ mod tests {
     use itertools::Itertools;
     use proptest::{collection::SizeRange, prelude::*};
     use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
-    use sn_interface::network_knowledge::SectionTree;
     use std::net::SocketAddr;
     use xor_name::{Prefix, XOR_NAME_LEN};
 
@@ -166,11 +163,10 @@ mod tests {
     fn proptest_actions_impl(peers: Vec<Peer>, signature_trailing_zeros: u8) -> Result<()> {
         let sk_set = bls::SecretKeySet::random(0, &mut thread_rng());
         let sk = sk_set.secret_key();
-        let genesis_pk = sk.public_key();
 
         // Create `Section` with `peers` as its members and set the `elder_count()` oldest peers as
         // the elders.
-        let section_auth = SectionAuthorityProvider::new(
+        let sap = SectionAuthorityProvider::new(
             peers
                 .iter()
                 .sorted_by_key(|peer| peer.age())
@@ -182,13 +178,9 @@ mod tests {
             sk_set.public_keys(),
             0,
         );
-        let section_tree_update = {
-            let signed_sap = TestKeys::get_section_signed(&sk, section_auth);
-            SectionTreeUpdate::new(signed_sap, SectionsDAG::new(genesis_pk))
-        };
-
-        let mut network_knowledge =
-            NetworkKnowledge::new(SectionTree::new(genesis_pk), section_tree_update)?;
+        let sap = TestKeys::get_section_signed(&sk, sap);
+        let tree = SectionTree::new(sap)?;
+        let mut network_knowledge = NetworkKnowledge::new(Prefix::default(), tree)?;
 
         for peer in &peers {
             let info = NodeState::joined(*peer, None);

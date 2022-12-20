@@ -27,6 +27,7 @@ use ed25519_dalek::Keypair;
 use sn_dbc::Dbc;
 use std::{path::PathBuf, sync::Arc};
 use tokio::sync::mpsc;
+use xor_name::XorName;
 
 impl MyNode {
     pub(crate) async fn first_node(
@@ -63,13 +64,9 @@ impl MyNode {
         Ok((node, genesis_dbc))
     }
 
-    pub(crate) fn relocate(
-        &mut self,
-        new_keypair: Arc<Keypair>,
-        new_section: NetworkKnowledge,
-    ) -> Result<()> {
-        // we first try to relocate section info.
-        self.network_knowledge.relocated_to(new_section)?;
+    pub(crate) fn relocate(&mut self, new_keypair: Arc<Keypair>, new_name: XorName) -> Result<()> {
+        // try to relocate to the section that matches our current name
+        self.network_knowledge.relocated_to(new_name)?;
 
         self.keypair = new_keypair;
 

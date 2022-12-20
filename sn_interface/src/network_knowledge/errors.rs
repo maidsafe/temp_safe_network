@@ -27,6 +27,8 @@ pub enum Error {
     /// Failed to deserialise a section tree.
     #[error("Failed to deserialise section tree: {0}")]
     Deserialisation(String),
+    #[error("The provided SAP must belong to the genesis prefix")]
+    NonGenesisSap,
     #[error("The provided signature cannot be verified while inserting into the SectionsDAG")]
     InvalidSignature,
     #[error("Key not found in the SectionsDAG: {0:?}")]

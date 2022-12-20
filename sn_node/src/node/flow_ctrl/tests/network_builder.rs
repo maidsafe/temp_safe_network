@@ -345,9 +345,10 @@ impl<R: RngCore> TestNetworkBuilder<R> {
         let gen_prefix = &sections
             .get(&Prefix::default())
             .expect("Genesis section is absent. Provide at-least a single SAP");
-        let gen_sk = gen_prefix[0].1.secret_key();
+        let gen_sap = gen_prefix[0].0.clone();
 
-        let mut section_tree = SectionTree::new(gen_sk.public_key());
+        let mut section_tree =
+            SectionTree::new(gen_sap).expect("gen_sap belongs to the genesis prefix");
         let mut completed = BTreeSet::new();
         // need to insert the default prefix first
         let prefix_iter = if max_prefixes.contains(&Prefix::default()) {
@@ -874,20 +875,25 @@ impl TestNetwork {
         sap: &SectionSigned<SectionAuthorityProvider>,
         sk_set: &SecretKeySet,
     ) -> NetworkKnowledge {
-        let gen = self.section_tree.genesis_key();
-        let section_key = sap.section_key();
-        let proof_chain = if *gen == section_key {
-            SectionsDAG::new(*gen)
-        } else {
-            self.section_tree
-                .get_sections_dag()
-                .partial_dag(gen, &sap.section_key())
-                .expect("failed to create proof chain")
-        };
-        let update = SectionTreeUpdate::new(sap.clone(), proof_chain);
+        let gen_sap = self
+            .get_sap_single_churn(Prefix::default(), Some(0))
+            .0
+            .clone();
+        let gen_section_key = gen_sap.section_key();
+        assert_eq!(&gen_section_key, self.section_tree.genesis_key());
 
-        let mut nw = NetworkKnowledge::new(SectionTree::new(*gen), update)
-            .expect("Failed to create NetworkKnowledge");
+        let mut tree = SectionTree::new(gen_sap).expect("gen_sap belongs to the default prefix");
+        if gen_section_key != sap.section_key() {
+            let proof_chain = self
+                .section_tree
+                .get_sections_dag()
+                .partial_dag(&gen_section_key, &sap.section_key())
+                .expect("failed to create proof chain");
+            let update = SectionTreeUpdate::new(sap.clone(), proof_chain);
+            let _ = tree.update(update).expect("Error updating the SectionTree");
+        };
+        let mut nw =
+            NetworkKnowledge::new(sap.prefix(), tree).expect("Failed to create NetworkKnowledge");
 
         for node_state in sap.members().cloned() {
             let sig = TestKeys::get_section_sig(&sk_set.secret_key(), &node_state);

@@ -151,20 +151,13 @@ pub struct NetworkKnowledge {
 }
 
 impl NetworkKnowledge {
-    /// Creates a minimal `NetworkKnowledge` with the provided SectionTree and SAP
-    pub fn new(
-        section_tree: SectionTree,
-        section_tree_update: SectionTreeUpdate,
-    ) -> Result<Self, Error> {
-        let mut section_tree = section_tree;
-        let signed_sap = section_tree_update.signed_sap.clone();
-
-        // Update fails if the proof chain's genesis key is not part of the SectionTree's dag.
-        if let Err(err) = section_tree.update(section_tree_update.clone()) {
-            debug!("Failed to update SectionTree with {section_tree_update:?} upon creating new NetworkKnowledge instance: {err:?}");
-            return Err(err);
-        }
-
+    /// Creates a new `NetworkKnowledge` instance. The prefix is used to choose the
+    /// `signed_sap` from the provided SectionTree
+    pub fn new(prefix: Prefix, section_tree: SectionTree) -> Result<Self, Error> {
+        let signed_sap = section_tree
+            .get_signed(&prefix)
+            .cloned()
+            .ok_or(Error::NoMatchingSection)?;
         Ok(Self {
             signed_sap,
             section_peers: SectionPeers::default(),
@@ -180,14 +173,13 @@ impl NetworkKnowledge {
         let public_key_set = genesis_sk_set.public_keys();
         let secret_key_index = 0u8;
         let secret_key_share = genesis_sk_set.secret_key_share(secret_key_index as u64);
-        let genesis_key = public_key_set.public_key();
 
-        let section_tree_update = {
-            let section_auth =
+        let section_tree = {
+            let genesis_signed_sap =
                 create_first_section_authority_provider(&public_key_set, &secret_key_share, peer)?;
-            SectionTreeUpdate::new(section_auth, SectionsDAG::new(genesis_key))
+            SectionTree::new(genesis_signed_sap)?
         };
-        let mut network_knowledge = Self::new(SectionTree::new(genesis_key), section_tree_update)?;
+        let mut network_knowledge = Self::new(Prefix::default(), section_tree)?;
 
         for peer in network_knowledge.signed_sap.elders() {
             let node_state = NodeState::joined(*peer, None);
@@ -208,10 +200,10 @@ impl NetworkKnowledge {
     }
 
     /// update all section info for our new section
-    pub fn relocated_to(&mut self, new_network_knowledge: Self) -> Result<()> {
-        debug!("Node was relocated to {:?}", new_network_knowledge);
-        self.signed_sap = new_network_knowledge.signed_sap();
-        let _updated = self.merge_members(new_network_knowledge.section_signed_members())?;
+    pub fn relocated_to(&mut self, new_name: XorName) -> Result<()> {
+        let signed_sap = self.section_tree().get_signed_by_name(&new_name)?;
+        debug!("Node was relocated to {:?}", signed_sap.section_key());
+        self.signed_sap = signed_sap;
 
         Ok(())
     }
@@ -311,7 +303,9 @@ impl NetworkKnowledge {
 
     // Returns the SAP for the prefix that matches name
     pub fn section_auth_by_name(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
-        self.section_tree.section_by_name(name)
+        self.section_tree
+            .get_signed_by_name(name)
+            .map(|sap| sap.value)
     }
 
     /// Return a copy of current SAP with corresponding section authority
@@ -561,48 +555,6 @@ fn create_first_sig<T: Serialize>(
     })
 }
 
-#[cfg(any(test, feature = "test-utils"))]
-pub mod test_utils_nw {
-    use super::{MyNodeInfo, NetworkKnowledge, NodeState, SectionTree, SectionsDAG};
-    use crate::{test_utils::TestSapBuilder, types::keys::test_utils::TestKeys};
-    use xor_name::Prefix;
-
-    /// `NetworkKnowledge` related utils for testing
-    pub struct TestNetworkKnowledge {}
-
-    impl TestNetworkKnowledge {
-        /// Generate a random `NetworkKnowledge` (section) for testing.
-        pub fn random_section_with_key(
-            prefix: Prefix,
-            elder_count: usize,
-            adult_count: usize,
-            sk_set: &bls::SecretKeySet,
-        ) -> (NetworkKnowledge, Vec<MyNodeInfo>) {
-            let pk_set = sk_set.public_keys();
-            let (sap, _, mut elders, adults) = TestSapBuilder::new(prefix)
-                .elder_count(elder_count)
-                .adult_count(adult_count)
-                .sk_set(sk_set)
-                .build();
-            let signed_sap = TestKeys::get_section_signed(&sk_set.secret_key(), sap);
-            let section_tree_update =
-                super::SectionTreeUpdate::new(signed_sap, SectionsDAG::new(pk_set.public_key()));
-            let mut network_knowledge =
-                NetworkKnowledge::new(SectionTree::new(pk_set.public_key()), section_tree_update)
-                    .expect("Failed to create NetworkKnowledge");
-
-            // update the sap members
-            for peer in network_knowledge.signed_sap.elders() {
-                let node_state = NodeState::joined(*peer, None);
-                let signed_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state);
-                let _changed = network_knowledge.section_peers.update(signed_state);
-            }
-            elders.extend(adults.into_iter());
-            (network_knowledge, elders)
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::{supermajority, NetworkKnowledge};
@@ -610,6 +562,7 @@ mod tests {
         test_utils::{gen_addr, prefix, TestKeys, TestSapBuilder, TestSectionTree},
         types::Peer,
     };
+
     use bls::SecretKeySet;
     use eyre::Result;
     use proptest::prelude::*;

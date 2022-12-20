@@ -524,14 +524,17 @@ mod tests {
     use eyre::Result;
     use qp2p::Config;
     use std::net::{Ipv4Addr, SocketAddr};
+    use xor_name::Prefix;
 
     fn new_network_network_contacts() -> (SectionTree, bls::SecretKey, bls::PublicKey) {
-        let genesis_sk = bls::SecretKey::random();
+        let (genesis_sap, genesis_sk_set, ..) = TestSapBuilder::new(Prefix::default()).build();
+
+        let genesis_sk = genesis_sk_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
+        let genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap);
+        let tree = SectionTree::new(genesis_sap).expect("SAP belongs to the genesis prefix");
 
-        let map = SectionTree::new(genesis_pk);
-
-        (map, genesis_sk, genesis_pk)
+        (tree, genesis_sk, genesis_pk)
     }
 
     #[tokio::test(flavor = "multi_thread")]

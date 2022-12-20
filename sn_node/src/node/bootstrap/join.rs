@@ -12,7 +12,7 @@ use crate::node::{messages::WireMsgUtils, Error, Result, STANDARD_CHANNEL_SIZE};
 
 use sn_interface::{
     messaging::{
-        system::{JoinRejectionReason, JoinRequest, JoinResponse, NodeMsg},
+        system::{JoinRejectionReason, JoinRequest, JoinResponse, NodeMsg, SectionSigned},
         Dst, MsgType, WireMsg,
     },
     network_knowledge::{
@@ -122,15 +122,15 @@ impl<'a> Joiner<'a> {
             })?
     }
 
-    fn join_target_sap(&self) -> Result<SectionAuthorityProvider> {
+    fn join_target_sap(&self) -> Result<SectionSigned<SectionAuthorityProvider>> {
         let our_name = self.node.name();
-        let sap = self.section_tree.section_by_name(&our_name)?;
+        let sap = self.section_tree.get_signed_by_name(&our_name)?;
         Ok(sap)
     }
 
     #[tracing::instrument(skip(self))]
     async fn join(mut self, response_timeout: Duration) -> Result<(MyNodeInfo, NetworkKnowledge)> {
-        self.bootstrap_section_tree(self.join_target_sap()?, response_timeout)
+        self.bootstrap_section_tree(self.join_target_sap()?.value, response_timeout)
             .await?;
 
         let target_sap = self.join_target_sap()?;
@@ -176,13 +176,8 @@ impl<'a> Joiner<'a> {
                         target_sap.prefix(),
                     );
 
-                    // TODO: NetworkKnowledge::new(..) should not be taking the section_tree_update
-                    let section_tree_update = self
-                        .section_tree
-                        .generate_section_tree_update(&target_sap.prefix())?;
-
                     let network_knowledge =
-                        NetworkKnowledge::new(self.section_tree, section_tree_update)?;
+                        NetworkKnowledge::new(target_sap.prefix(), self.section_tree)?;
 
                     return Ok((self.node, network_knowledge));
                 }
@@ -198,7 +193,7 @@ impl<'a> Joiner<'a> {
                         self.retry_responses_cache = Default::default();
 
                         trace!("Bootstrapping section tree for retry");
-                        self.bootstrap_section_tree(target_sap, response_timeout)
+                        self.bootstrap_section_tree(target_sap.value, response_timeout)
                             .await?;
                         let target_sap = self.join_target_sap()?;
 
@@ -304,7 +299,7 @@ impl<'a> Joiner<'a> {
 
             if any_new_information {
                 // Update the target sap since we've received new information and try again.
-                target_sap = self.join_target_sap()?;
+                target_sap = self.join_target_sap()?.value;
                 info!("Received new information in last AEProbe, updating target sap to {target_sap:?}");
             } else {
                 // We are up to date with these nodes so we can end the bootstrap
@@ -483,7 +478,7 @@ mod tests {
     const JOIN_TIMEOUT_SEC: u64 = 15;
 
     #[tokio::test]
-    async fn join_as_adult() {
+    async fn join_as_adult() -> Result<()> {
         init_logger();
 
         let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
@@ -501,8 +496,7 @@ mod tests {
         );
 
         let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone());
-        let mut tree = SectionTree::new(genesis_pk);
-        assert!(tree.insert_without_chain(signed_genesis_sap));
+        let tree = SectionTree::new(signed_genesis_sap)?;
 
         let state = Joiner::new(node.clone(), send_tx, &mut recv_rx, tree);
 
@@ -576,6 +570,8 @@ mod tests {
         assert_eq!(section.section_auth(), next_sap);
         assert_eq!(section.section_key(), next_section_key);
         assert_eq!(node.age(), MIN_ADULT_AGE);
+
+        Ok(())
     }
 
     #[tokio::test]
@@ -597,8 +593,7 @@ mod tests {
         );
 
         let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone());
-        let mut tree = SectionTree::new(genesis_pk);
-        assert!(tree.insert_without_chain(signed_genesis_sap));
+        let tree = SectionTree::new(signed_genesis_sap)?;
 
         let state = Joiner::new(node, send_tx, &mut recv_rx, tree.clone());
 
@@ -717,8 +712,7 @@ mod tests {
         );
 
         let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone());
-        let mut tree = SectionTree::new(genesis_pk);
-        assert!(tree.insert_without_chain(signed_genesis_sap));
+        let tree = SectionTree::new(signed_genesis_sap).expect("Failed to create SectionTree");
 
         let state = Joiner::new(node.clone(), send_tx, &mut recv_rx, tree.clone());
 
@@ -820,7 +814,6 @@ mod tests {
         let (genesis_sap, genesis_sk_set, genesis_nodes, _) =
             TestSapBuilder::new(Prefix::default()).build();
         let genesis_sk = genesis_sk_set.secret_key();
-        let genesis_pk = genesis_sk.public_key();
 
         let node = MyNodeInfo::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
@@ -828,8 +821,7 @@ mod tests {
         );
 
         let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone());
-        let mut tree = SectionTree::new(genesis_pk);
-        assert!(tree.insert_without_chain(signed_genesis_sap));
+        let tree = SectionTree::new(signed_genesis_sap)?;
 
         let state = Joiner::new(node, send_tx, &mut recv_rx, tree.clone());
 
@@ -913,7 +905,6 @@ mod tests {
         let (genesis_sap, genesis_sk_set, genesis_nodes, _) =
             TestSapBuilder::new(Prefix::default()).build();
         let genesis_sk = genesis_sk_set.secret_key();
-        let genesis_pk = genesis_sk.public_key();
 
         let node = MyNodeInfo::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
@@ -921,8 +912,7 @@ mod tests {
         );
 
         let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone());
-        let mut tree = SectionTree::new(genesis_pk);
-        assert!(tree.insert_without_chain(signed_genesis_sap));
+        let tree = SectionTree::new(signed_genesis_sap)?;
 
         let state = Joiner::new(node, send_tx, &mut recv_rx, tree.clone());
 
