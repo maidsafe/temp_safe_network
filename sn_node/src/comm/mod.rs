@@ -167,6 +167,40 @@ impl Comm {
         Ok(())
     }
 
+    // Test helper to send out Msgs in a blocking fashion
+    #[cfg(test)]
+    pub(crate) async fn send_out_bytes_sync(&self, peer: Peer, msg_id: MsgId, bytes: UsrMsgBytes) {
+        let watcher = self.send_to_one(peer, msg_id, bytes, None).await;
+        match watcher {
+            Ok(Some(watcher)) => {
+                let (send_was_successful, should_remove) = Self::is_sent(watcher, msg_id, peer)
+                    .await
+                    .expect("Error in is_sent");
+
+                if send_was_successful {
+                    trace!("Msg {msg_id:?} sent to {peer:?}");
+                } else if should_remove {
+                    // do cleanup of that peer
+                    let perhaps_session = self.sessions.remove(&peer);
+                    if let Some((_peer, session)) = perhaps_session {
+                        session.disconnect().await;
+                    }
+                }
+            }
+            Ok(None) => {}
+            Err(error) => {
+                error!(
+                "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed as we have disconnected from the peer. (Error is: {})",
+                msg_id,
+                peer.addr(),
+                peer.name(),
+                error,
+            );
+                let _peer = self.sessions.remove(&peer);
+            }
+        }
+    }
+
     // TODO: tweak messaging to just allow passthrough
     #[tracing::instrument(skip(self, bytes))]
     pub(crate) async fn send_out_bytes_to_peer_and_return_response(

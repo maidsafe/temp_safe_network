@@ -234,7 +234,7 @@ impl Dispatcher {
 // Serializes and signs the msg if it's a Client message,
 // and produces one [`WireMsg`] instance per recipient -
 // the last step before passing it over to comms module.
-fn into_msg_bytes(
+pub(crate) fn into_msg_bytes(
     network_knowledge: &NetworkKnowledge,
     our_node_name: XorName,
     msg: NodeMsg,
