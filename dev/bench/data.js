@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1671556747595,
+  "lastUpdate": 1671562733724,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -44824,6 +44824,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 421446147,
             "range": "± 20504797",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "aed65493fb5dd3cb6c39f32559e0bb20bff157c9",
+          "message": "Merge #1862\n\n1862: tests: replace msg_queue with `Comm` r=joshuef a=RolandSherwin\n\n- **fix(network_builder): fix edge case while calculating max_prefixes**\r\n  - When `max_bit_count == 0 (or) 1`, the logic for calculating the permutations failed, this fixes it.\r\n- **feat(test): synchronously send `NodeMsg` to other nodes**\r\n  - This allows us to control the flow of msgs in certain tests allowing us to avoid using custom msg queues.\r\n- **refactor(test): pass `NodeMsgs` via the `Comm` module**\r\n  - The dkg tests bypassed the `Comm` module and used a queue to pass along the `NodeMsgs` for testing. This was due to the fact that the msgs were sent asynchronously, preventing any control of the flow.\r\n  - Hence using the test-only synchronous msg sender allows us to do the above without using any extra queues.\r\n\n\nCo-authored-by: RolandSherwin <RolandSherwin@protonmail.com>",
+          "timestamp": "2022-12-20T17:15:40Z",
+          "tree_id": "31402ea96cc272d5706e056d6114ca1264371de9",
+          "url": "https://github.com/maidsafe/safe_network/commit/aed65493fb5dd3cb6c39f32559e0bb20bff157c9"
+        },
+        "date": 1671562731641,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2287729,
+            "range": "± 248438",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 66242160,
+            "range": "± 1603172",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 89942862,
+            "range": "± 3067461",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 372252317,
+            "range": "± 3259336",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 53062627,
+            "range": "± 478105",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 71391392,
+            "range": "± 535390",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 295636669,
+            "range": "± 2407879",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 24353066400,
+            "range": "± 156702399",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 54850906,
+            "range": "± 20738951",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 1920192538,
+            "range": "± 296678099",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 9267287668,
+            "range": "± 1668476005",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 307374925,
+            "range": "± 54954668",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 3000667448,
+            "range": "± 229272123",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 9181615302,
+            "range": "± 2116629278",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 47557741,
+            "range": "± 1147214",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 469782104,
+            "range": "± 16931215",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1793750895,
+            "range": "± 33140911",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11811802,
+            "range": "± 1440186",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 100901154,
+            "range": "± 9754887",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 348782362,
+            "range": "± 8625304",
             "unit": "ns/iter"
           }
         ]
