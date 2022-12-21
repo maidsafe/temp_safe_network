@@ -22,7 +22,7 @@ use tracing::{debug, error, warn, Level};
 
 const CONFIG_FILE: &str = "node.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
-const DEFAULT_MAX_CAPACITY: usize = 512 * 1024 * 1024; // 500mb
+const DEFAULT_MAX_CAPACITY: usize = 1024 * 1024 * 1024; // 1gb
 
 /// Node configuration
 #[derive(Default, Clone, Debug, Serialize, Deserialize, clap::StructOpt)]
