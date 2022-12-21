@@ -17,7 +17,9 @@ use sn_interface::{
 use itertools::Itertools;
 use std::collections::BTreeSet;
 
-static MAX_MISSED_DATA_TO_REPLICATE: usize = 100;
+// This data will all be replicated into one message, as such we want to keep size
+// low to ensure that serialisation sin't too heavy
+static MAX_MISSED_DATA_TO_REPLICATE: usize = 25;
 
 impl MyNode {
     /// Given what data the peer has, we shall calculate what data the peer is missing that
