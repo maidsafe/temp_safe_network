@@ -1113,17 +1113,15 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
-## v0.77.4 (2022-12-20)
+## v0.77.5 (2022-12-21)
 
 ### New Features
 
- - <csr-id-96e8c7c5315090462e1269c48027cdba1bfea23a/> retry sending msg to peer cleaning up all cached bad connections
-   - When sending a msg to a peer, if it fails with an existing cached connection,
-   it will keep retrying till it either finds another cached connection which it
-   succeeds with, or it cleans them all up from the cache creating a new connection
-   to the peer as last attempt.
-   - Also this includes some minor improvements to Comm log msgs.
-   - Upgrading qp2p to v0.34.0.
+ - <csr-id-79421d660dfcfebc8d8bf3955ee2534cc3d98e2d/> verify members in network knowledge are the expected
+   - Additional checks added to all_nodes_joined.sh script to be able
+   to detect nodes in the network knowledge which are not those that
+   effectively joined the network.
+   - Also some minor improvements to sn_client log msgs.
 
 ### Commit Statistics
 
@@ -1140,11 +1138,49 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1908 ([`8875a59`](https://github.com/maidsafe/safe_network/commit/8875a59d21db86edf0ca8f4affcc80ad7618231f))
+    - verify members in network knowledge are the expected ([`79421d6`](https://github.com/maidsafe/safe_network/commit/79421d660dfcfebc8d8bf3955ee2534cc3d98e2d))
+</details>
+
+## v0.77.4 (2022-12-20)
+
+### Chore
+
+ - <csr-id-aed73cfa0eb0dc3271defa7de2a90a96c790bc8d/> sn_interface-0.16.9/sn_client-0.77.4/sn_node-0.72.15
+
+### New Features
+
+ - <csr-id-96e8c7c5315090462e1269c48027cdba1bfea23a/> retry sending msg to peer cleaning up all cached bad connections
+   - When sending a msg to a peer, if it fails with an existing cached connection,
+   it will keep retrying till it either finds another cached connection which it
+   succeeds with, or it cleans them all up from the cache creating a new connection
+   to the peer as last attempt.
+- Also this includes some minor improvements to Comm log msgs.
+- Upgrading qp2p to v0.34.0.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.9/sn_client-0.77.4/sn_node-0.72.15 ([`aed73cf`](https://github.com/maidsafe/safe_network/commit/aed73cfa0eb0dc3271defa7de2a90a96c790bc8d))
     - Merge #1899 ([`d88b5dd`](https://github.com/maidsafe/safe_network/commit/d88b5dd5c8c5799c6896b19a9c4de094943b377f))
     - retry sending msg to peer cleaning up all cached bad connections ([`96e8c7c`](https://github.com/maidsafe/safe_network/commit/96e8c7c5315090462e1269c48027cdba1bfea23a))
 </details>
 
 ## v0.77.3 (2022-12-20)
+
+<csr-id-a6addd1dde96833d6629e75b418ac2a244ab31f3/>
 
 ### Chore
 
@@ -1155,7 +1191,6 @@ needed, as they keypair itself contains the Arcs we need.
  - <csr-id-22402ca6acb0215ecfe9b1fdbf306c0f9cb87d95/> genesis_sap is required to create the `SectionTree`
    - The fields of the tree are assumed to be in sync. But it is not the
    case for a newly created tree.
-- This can be fixed by accepting the genesis sap while creating the tree.
 
 ### Commit Statistics
 
@@ -1177,6 +1212,9 @@ needed, as they keypair itself contains the Arcs we need.
     - Merge #1848 ([`ddaf857`](https://github.com/maidsafe/safe_network/commit/ddaf8571749c142e9960407cfd9cfa94231a36ad))
     - genesis_sap is required to create the `SectionTree` ([`22402ca`](https://github.com/maidsafe/safe_network/commit/22402ca6acb0215ecfe9b1fdbf306c0f9cb87d95))
 </details>
+
+<csr-unknown>
+This can be fixed by accepting the genesis sap while creating the tree.<csr-unknown/>
 
 ## v0.77.2 (2022-12-16)
 

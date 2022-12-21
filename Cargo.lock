@@ -3900,7 +3900,7 @@ dependencies = [
 
 [[package]]
 name = "sn_client"
-version = "0.77.4"
+version = "0.77.5"
 dependencies = [
  "assert_matches",
  "backoff",
