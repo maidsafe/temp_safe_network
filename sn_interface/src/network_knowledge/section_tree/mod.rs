@@ -198,7 +198,10 @@ impl SectionTree {
     }
     /// Update our `SectionTree` if the provided update can be verified
     /// Returns true if an update was made
-    pub fn update(&mut self, section_tree_update: SectionTreeUpdate) -> Result<bool> {
+    pub fn update_the_section_tree(
+        &mut self,
+        section_tree_update: SectionTreeUpdate,
+    ) -> Result<bool> {
         let signed_sap = section_tree_update.signed_sap;
         let proof_chain = section_tree_update.proof_chain;
 
@@ -276,8 +279,8 @@ impl SectionTree {
                     // As an outdated node will got updated via AE triggered by other messages,
                     // there is no need to bounce back here (assuming the sender is outdated) to
                     // avoid potential looping.
-                    return Err(Error::UntrustedProofChain(format!(
-                        "Provided proof_chain doesn't cover the SAP's key we currently know: {proof_chain:?}, {:?}",
+                    return Err(Error::ProofChainNotCovered(format!(
+                        "{proof_chain:?}, {:?}",
                         sap.value
                     )));
                 }
@@ -768,12 +771,12 @@ mod tests {
         let (sap01, _) = random_signed_sap(p01);
         let section_tree_update =
             TestSectionTree::get_section_tree_update(&sap01, &dag, &genesis_sk);
-        assert!(tree.update(section_tree_update)?);
+        assert!(tree.update_the_section_tree(section_tree_update)?);
 
         let (sap10, _) = random_signed_sap(p10);
         let section_tree_update =
             TestSectionTree::get_section_tree_update(&sap10, &dag, &genesis_sk);
-        assert!(tree.update(section_tree_update)?);
+        assert!(tree.update_the_section_tree(section_tree_update)?);
 
         let n01 = p01.substituted_in(xor_name::rand::random());
         let n10 = p10.substituted_in(xor_name::rand::random());
@@ -793,7 +796,7 @@ mod tests {
         let (sap0, _) = random_signed_sap(prefix("0"));
         let tree_update =
             TestSectionTree::get_section_tree_update(&sap0, tree.get_sections_dag(), &genesis_sk);
-        assert!(tree.update(tree_update)?);
+        assert!(tree.update_the_section_tree(tree_update)?);
 
         let (sap1, _) = random_signed_sap(prefix("1"));
         // instead of constructing a proof_chain from gen -> 1; we also include the branch '0'
@@ -801,7 +804,7 @@ mod tests {
         let tree_update =
             TestSectionTree::get_section_tree_update(&sap1, tree.get_sections_dag(), &genesis_sk);
         assert!(matches!(
-            tree.update(tree_update),
+            tree.update_the_section_tree(tree_update),
             Err(Error::MultipleBranchError)
         ));
 
@@ -817,10 +820,10 @@ mod tests {
         let tree_update =
             TestSectionTree::get_section_tree_update(&sap0, tree.get_sections_dag(), &genesis_sk);
         let tree_update_same = tree_update.clone();
-        assert!(tree.update(tree_update)?);
+        assert!(tree.update_the_section_tree(tree_update)?);
 
         // node tries to call update with the same information
-        assert!(!tree.update(tree_update_same)?);
+        assert!(!tree.update_the_section_tree(tree_update_same)?);
 
         Ok(())
     }
@@ -834,15 +837,15 @@ mod tests {
         let proof_chain = tree.get_sections_dag().clone();
         let tree_update =
             TestSectionTree::get_section_tree_update(&sap0, &proof_chain, &genesis_sk);
-        assert!(tree.update(tree_update)?);
+        assert!(tree.update_the_section_tree(tree_update)?);
 
         // node tries to update with sap signed by same parent for the same prefix
         let (sap0_same, _) = random_signed_sap(prefix("0"));
         let tree_update =
             TestSectionTree::get_section_tree_update(&sap0_same, &proof_chain, &genesis_sk);
         assert!(matches!(
-            tree.update(tree_update),
-            Err(Error::UntrustedProofChain(_))
+            tree.update_the_section_tree(tree_update),
+            Err(Error::ProofChainNotCovered(_))
         ));
 
         Ok(())
@@ -857,18 +860,18 @@ mod tests {
         let tree_update =
             TestSectionTree::get_section_tree_update(&sap0, tree.get_sections_dag(), &genesis_sk);
         let tree_update_outdated = tree_update.clone();
-        assert!(tree.update(tree_update)?);
+        assert!(tree.update_the_section_tree(tree_update)?);
 
         // node updated with sap1 with same prefix
         let (sap1, _) = random_signed_sap(prefix("0"));
         let tree_update =
             TestSectionTree::get_section_tree_update(&sap1, tree.get_sections_dag(), &sk0);
-        assert!(tree.update(tree_update)?);
+        assert!(tree.update_the_section_tree(tree_update)?);
 
         // node receives an outdated AE update for sap0
         assert!(matches!(
-            tree.update(tree_update_outdated),
-            Err(Error::UntrustedProofChain(_))
+            tree.update_the_section_tree(tree_update_outdated),
+            Err(Error::ProofChainNotCovered(_))
         ));
 
         Ok(())
@@ -888,7 +891,7 @@ mod tests {
             let mut section_tree = SectionTree::new(genesis_sap).expect("SAP belongs to the genesis prefix");
             for (proof_chain, sap) in &list_of_proof_chains {
                 let tree_update = SectionTreeUpdate::new(sap.clone(), proof_chain.clone());
-                assert!(section_tree.update(tree_update)?);
+                assert!(section_tree.update_the_section_tree(tree_update)?);
                 // The `sections` are supposed to hold the SAP of the `sections_dag`'s leaves. Verify it
                 assert_lists(
                     section_tree.sections.values().map(|sap| sap.section_key()),

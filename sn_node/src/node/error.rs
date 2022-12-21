@@ -162,7 +162,7 @@ pub enum Error {
     #[error("Error Sending Cmd to adult {0:?} for processing.")]
     AdultCmdSendError(Peer),
     /// Network Knowledge error.
-    #[error("Network data error:: {0}")]
+    #[error("Network knowledge error:: {0}")]
     NetworkKnowledge(#[from] sn_interface::network_knowledge::Error),
     /// Signature verification failed
     #[error("Invalid signature")]
