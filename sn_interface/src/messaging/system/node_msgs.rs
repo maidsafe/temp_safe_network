@@ -47,7 +47,6 @@ pub enum NodeDataCmd {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeEvent {
-    #[cfg(any(feature = "chunks", feature = "registers"))]
     /// Sent by a full Adult, and tells the Elders to store a chunk at some other Adult in the section
     CouldNotStoreData {
         /// Node Id
