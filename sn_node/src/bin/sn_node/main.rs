@@ -111,12 +111,12 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
 
         info!("\n{}\n{}", message, "=".repeat(message.len()));
 
-        let outcome = rt.block_on(async {
-            let _guard = log::init_node_logging(config)?;
+        let (outcome, _log_guard) = rt.block_on(async {
+            let log_guard = log::init_node_logging(config)?;
             trace!("Initial node config: {config:?}");
 
-            start_node(config, join_timeout).await
-        });
+            Ok::<_, ErrReport>((start_node(config, join_timeout).await, log_guard))
+        })?;
 
         match outcome {
             Ok((_node, mut rejoin_network_rx)) => {
