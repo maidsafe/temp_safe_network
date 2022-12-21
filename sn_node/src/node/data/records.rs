@@ -7,18 +7,20 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    core::NodeContext, flow_ctrl::dysfunction::DysCmds, Cmd, Error, MyNode, Prefix, Result,
+    core::NodeContext, flow_ctrl::dysfunction::DysCmds, messaging::Peers, Cmd, Error, MyNode,
+    Prefix, Result,
 };
+use crate::storage::Error as StorageError;
 
 use sn_dysfunction::IssueType;
 use sn_interface::{
     data_copy_count,
     messaging::{
         data::{ClientDataResponse, DataCmd, DataQuery, MetadataExchange, StorageLevel},
-        system::{NodeDataCmd, NodeDataQuery, NodeDataResponse, NodeMsg, OperationId},
+        system::{NodeDataCmd, NodeDataQuery, NodeDataResponse, NodeEvent, NodeMsg, OperationId},
         AuthorityProof, ClientAuth, Dst, MsgId, MsgKind, MsgType, WireMsg,
     },
-    types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData},
+    types::{log_markers::LogMarker, Keypair, Peer, PublicKey, ReplicatedData},
 };
 
 use qp2p::{SendStream, UsrMsgBytes};
@@ -472,5 +474,80 @@ impl MyNode {
         trace!("Target holders of {:?} are : {:?}", target, candidates,);
 
         candidates
+    }
+
+    /// Replicate data in the batch locally and then trigger further update reqeusts
+    /// Requests for more data will go to sending node if there is more to come, or to the next
+    /// furthest nodes if there was no data sent.
+    pub(crate) async fn replicate_data_batch(
+        context: &NodeContext,
+        sender: Peer,
+        data_collection: Vec<ReplicatedData>,
+    ) -> Result<Vec<Cmd>> {
+        if context.is_elder {
+            error!("Received unexpected message while Elder");
+            return Ok(vec![]);
+        }
+
+        let mut cmds = vec![];
+
+        let section_pk = PublicKey::Bls(context.network_knowledge.section_key());
+        let node_keypair = Keypair::Ed25519(context.keypair.clone());
+
+        // To avoid duplication, only record storage level once.
+        let mut record_storage_level = None;
+        let mut is_full = false;
+        let has_replicated_data_in = !data_collection.is_empty();
+
+        for data in data_collection {
+            // grab the write lock each time in the loop to not hold it over large data sets
+            let store_result = context
+                .data_storage
+                .store(&data, section_pk, node_keypair.clone())
+                .await;
+
+            // We are an adult here, so just store away!
+            // This may return a DatabaseFull error... but we should have reported storage increase
+            // well before this
+            match store_result {
+                Ok(level_report) => {
+                    info!("Storage level report: {:?}", level_report);
+                    record_storage_level = Some(level_report);
+                    info!("End of message flow.");
+                }
+                Err(StorageError::NotEnoughSpace) => {
+                    // storage full
+                    error!("Not enough space to store more data");
+
+                    let node_id = PublicKey::from(context.keypair.public);
+                    let msg = NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
+                        node_id,
+                        data,
+                        full: true,
+                    });
+                    is_full = true;
+
+                    cmds.push(MyNode::send_msg_to_our_elders(context, msg))
+                }
+                Err(error) => {
+                    // the rest seem to be non-problematic errors.. (?)
+                    error!("Problem storing data, but it was ignored: {error}");
+                }
+            }
+        }
+
+        if let Some(level_report) = record_storage_level {
+            cmds.extend(MyNode::record_storage_level_if_any(context, level_report)?);
+        }
+
+        // Whenever there is a replicated data in, we send back a query again
+        if !is_full && has_replicated_data_in {
+            let data_i_have = context.data_storage.data_addrs().await;
+            let msg = NodeMsg::NodeDataCmd(NodeDataCmd::SendAnyMissingRelevantData(data_i_have));
+            let cmd = MyNode::send_system_msg(msg, Peers::Single(sender), context.clone());
+            cmds.push(cmd);
+        }
+
+        Ok(cmds)
     }
 }
