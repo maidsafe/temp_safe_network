@@ -389,7 +389,7 @@ impl NetworkKnowledge {
                 continue;
             }
             trace!(
-                "Updating section members. Name: {:?}, new state: {:?}",
+                "Attempting to update section members. Name: {:?}, new state: {:?}",
                 node_state.name(),
                 node_state.state()
             );
