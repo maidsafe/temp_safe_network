@@ -173,8 +173,9 @@ impl FlowCtrl {
                         peer,
                     );
 
+                    let mut data_bundle = vec![];
+
                     for address in data_addresses.iter() {
-                        let mut data_bundle = vec![];
                         match data_storage.get_from_local_store(address).await {
                             Ok(data) => {
                                 data_bundle.push(data);
@@ -183,17 +184,15 @@ impl FlowCtrl {
                                 error!("Error getting {address:?} from local storage during data replication flow: {error:?}");
                             }
                         };
+                    }
+                    trace!("Sending out data batch to {peer:?}");
+                    let msg = NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateDataBatch(data_bundle));
 
-                        trace!("Sending out data batch to {peer:?}");
-                        let msg =
-                            NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateDataBatch(data_bundle));
+                    let node_context = the_node.read().await.context();
 
-                        let node_context = the_node.read().await.context();
-
-                        let cmd = Cmd::send_msg(msg, Peers::Single(peer), node_context.clone());
-                        if let Err(error) = send_cmd_channel.send((cmd, vec![])).await {
-                            error!("Failed to enqueue send msg command for replication of data batch to {peer:?}: {error:?}");
-                        }
+                    let cmd = Cmd::send_msg(msg, Peers::Single(peer), node_context.clone());
+                    if let Err(error) = send_cmd_channel.send((cmd, vec![])).await {
+                        error!("Failed to enqueue send msg command for replication of data batch to {peer:?}: {error:?}");
                     }
                 });
             }
