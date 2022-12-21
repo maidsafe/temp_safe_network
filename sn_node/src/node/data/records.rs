@@ -144,6 +144,9 @@ impl MyNode {
                 }
                 Err(error) => {
                     error!("{msg_id:?} Error when replicating to adult {peer:?}: {error:?}");
+                    if let Error::AdultCmdSendError(peer) = error {
+                        context.log_node_issue(peer.name(), IssueType::Communication);
+                    }
                     last_error = Some(error);
                 }
             }

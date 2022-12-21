@@ -146,6 +146,8 @@ mod core {
         #[debug(skip)]
         pub(crate) comm: Comm,
         pub(crate) joins_allowed: bool,
+        #[debug(skip)]
+        pub(crate) dysfunction_cmds_sender: mpsc::Sender<DysCmds>,
     }
 
     impl NodeContext {
@@ -157,6 +159,21 @@ mod core {
             self.network_knowledge
                 .section_auth_by_name(name)
                 .map_err(Error::from)
+        }
+
+        /// Log an issue in dysfunction
+        /// Spawns a process to send this incase the channel may be full, we don't hold up
+        /// processing around this (as this can be called during dkg eg)
+        pub(crate) fn log_node_issue(&self, name: XorName, issue: IssueType) {
+            trace!("Logging issue {issue:?} in dysfunction for {name}");
+            let dysf_sender = self.dysfunction_cmds_sender.clone();
+            // TODO: do we need to kill the node if we fail tracking dysf?
+            let _handle = tokio::spawn(async move {
+                if let Err(error) = dysf_sender.send(DysCmds::TrackIssue(name, issue)).await {
+                    // Log the issue, and error. We need to be wary of actually hitting this.
+                    warn!("Could not send DysCmds through dysfunctional_cmds_tx: {error}");
+                }
+            });
         }
     }
 
@@ -176,6 +193,7 @@ mod core {
                 comm: self.comm.clone(),
                 joins_allowed: self.joins_allowed,
                 data_storage: self.data_storage.clone(),
+                dysfunction_cmds_sender: self.dysfunction_cmds_sender.clone(),
             }
         }
 
