@@ -433,7 +433,7 @@ impl MyNode {
                 MyNode::store_data_as_adult_and_respond(&context, data, send_stream, sender, msg_id)
                     .await
             }
-            NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateData(data_collection)) => {
+            NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateDataBatch(data_collection)) => {
                 info!("ReplicateData collection MsgId: {:?}", msg_id);
 
                 if context.is_elder {

@@ -32,7 +32,7 @@ pub enum NodeDataCmd {
     /// Tells an Adult to store a data
     ReplicateOneData(ReplicatedData),
     /// Tells an Adult to store a replica of some data set
-    ReplicateData(Vec<ReplicatedData>),
+    ReplicateDataBatch(Vec<ReplicatedData>),
     /// Tells an Adult to fetch and replicate data from the sender
     SendAnyMissingRelevantData(Vec<DataAddress>),
     /// Sent to all promoted nodes (also sibling if any) after

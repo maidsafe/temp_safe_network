@@ -185,7 +185,8 @@ impl FlowCtrl {
                         };
 
                         trace!("Sending out data batch to {peer:?}");
-                        let msg = NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateData(data_bundle));
+                        let msg =
+                            NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateDataBatch(data_bundle));
 
                         let node_context = the_node.read().await.context();
 
