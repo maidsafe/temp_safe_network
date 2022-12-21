@@ -398,7 +398,7 @@ impl MyNode {
                     return Ok(vec![]);
                 }
 
-                if full {
+                if full && !context.joins_allowed {
                     let mut write_locked_node = node.write().await;
                     debug!("[NODE WRITE]: CouldNotStore write gottt...");
                     let changed = write_locked_node
