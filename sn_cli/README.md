@@ -323,14 +323,14 @@ At this point, you can now start using this network. Try uploading some files an
 
 With the remote networks added, we have the opportunity to launch our own node and participate in either of those networks. This will provide more storage space to the network. Let's join the 'alpha' network. We can do so using the `node join` command.
 
-Successfully joining a remote network depends on your networking and routing configuration. The node implements automated port forwarding according to the [IGD Protocol](https://en.wikipedia.org/wiki/Internet_Gateway_Device_Protocol). If your router is IGD compatible, you should be able to join the network with no further configuration.
+Successfully joining a remote network depends on your networking and routing configuration. Make sure the node is externally reachable by forwarding the neccessary ports on your router.
 
 Try the `safe node join` command and see what happens. If this command runs without error and the node starts, you've sent a join request. If there's an error, it's likely to be related to UPnP port forwarding. If so, run `safe node join --skip-auto-port-forwarding`. Again, this may successfully start the node and send a join request, but the request could be rejected.
 
 We need to inspect the node log to see the status of the join request. The CLI will tell you the location of the log, but it's usually under the `~/.safe/node/local-node` directory. If the join request is rejected, you would see something similar to the following:
 ```
 ➤ Node cannot join the network since it is not externally reachable: X.X.X.X:38854
-Unfortunately we are unable to establish a connection to your machine (X.X.X.X:38854) either through a public IP address, or via IGD on your router. Please ensure that IGD is enabled on your router - if it is and you are still unable to add your node to the testnet, then skip adding a node for this testnet iteration. You can still use the testnet as a client, uploading and downloading content, etc. https://safenetforum.org/
+Unfortunately we are unable to establish a connection to your machine through its public IP address. This might involve forwarding ports on your router.
 ```
 
 The Xs will be your internet public IP address. If this is the case, you most likely need to configure port forwarding on your router. Obviously, this is something that varies depending on the router, so a step-by-step guide is beyond the scope of this document. However, we can say broadly, you need to access the admin console for your router and find a section on access control and port forwarding. What you want to do is add a UDP rule to forward any external requests on a port of your choosing, to an internal network address and port. The internal address will be the address of the machine where the node is running, and most likely in the form 192.168.X.X. The node uses port 12000 by default, so that's a good one to go with. The rule would look something like this:

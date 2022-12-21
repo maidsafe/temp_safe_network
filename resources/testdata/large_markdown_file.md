@@ -284,8 +284,6 @@ Node logs are being stored at: ~/.safe/node/local-node/sn_node.log
 
 Your node will now launch and attempt to connect to the shared network. You can keep an eye on its progress via its logs, which can be found at `~/.safe/node/local-node/sn_node.log`.
 
-Note that at the time of writing nodes from home is being restricted to those with home routers which correctly implement [IGD](https://en.wikipedia.org/wiki/Internet_Gateway_Device_Protocol). This will be expanded imminently to include those with routers which don't support IGD, with instructions added here for manual port forwarding at that point. If your log file states `Automatic Port forwarding Failed` then be on stand by for the next iteration.
-
 #### Switch networks
 
 MaidSafe currently hosts a test network for those who don't want to run a local network but still have a go at using the CLI and client applications. It's very common for users testing and experimenting with CLI and Safe applications to have a local network running, but switching to use the MaidSafe hosted network, back and forth, is also quite common.

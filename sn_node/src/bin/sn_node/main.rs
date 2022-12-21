@@ -158,12 +158,9 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
             }
             Err(error @ NodeError::NodeNotReachable(_)) => {
                 let err = Err(error).suggestion(
-                    "Unfortunately we are unable to establish a connection to your machine either through a \
-                    public IP address, or via IGD on your router. Please ensure that IGD is enabled on your router - \
-                    if it is and you are still unable to add your node to the testnet, then skip adding a node for this \
-                    testnet iteration. You can still use the testnet as a client, uploading and downloading content, etc. \
-                    https://safenetforum.org/"
-                        .header("Please ensure that IGD is enabled on your router")
+                    "Unfortunately we are unable to establish a connection to your machine through its \
+                    public IP address. This might involve forwarding ports on your router."
+                        .header("Please ensure your node is externally reachable")
                 );
 
                 println!("{err:?}");
