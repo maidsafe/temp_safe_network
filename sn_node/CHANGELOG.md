@@ -5,12 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.17 (2022-12-21)
+## v0.72.18 (2022-12-21)
 
-### Bug Fixes
+### Refactor
 
- - <csr-id-21705c1458e6c57f3db428758a6a7767e0cfb251/> persist log guard
-   So we keep logging after init
+ - <csr-id-bf159dc0477417bfd35b0f778822dbdeb3dd0023/> serialise the msg header only once when replicating data to holders
+   - Also removing some minor but unnecessary WireMsg caching, and some objs cloning.
 
 ### Commit Statistics
 
@@ -27,11 +27,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1921 ([`c3b09c5`](https://github.com/maidsafe/safe_network/commit/c3b09c5a851ce23ae4628455c7c7f3f17b58ed8c))
+    - serialise the msg header only once when replicating data to holders ([`bf159dc`](https://github.com/maidsafe/safe_network/commit/bf159dc0477417bfd35b0f778822dbdeb3dd0023))
+</details>
+
+## v0.72.17 (2022-12-21)
+
+### Chore
+
+ - <csr-id-a1f1ac9401edfb18cb9d209ba866b89a622aeaf2/> sn_node-0.72.17
+
+### Bug Fixes
+
+ - <csr-id-21705c1458e6c57f3db428758a6a7767e0cfb251/> persist log guard
+   So we keep logging after init
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_node-0.72.17 ([`a1f1ac9`](https://github.com/maidsafe/safe_network/commit/a1f1ac9401edfb18cb9d209ba866b89a622aeaf2))
     - Merge #1914 ([`a5da8fc`](https://github.com/maidsafe/safe_network/commit/a5da8fcb3687fe34acbafed369a3fa0f2f20a4cf))
     - persist log guard ([`21705c1`](https://github.com/maidsafe/safe_network/commit/21705c1458e6c57f3db428758a6a7767e0cfb251))
 </details>
 
 ## v0.72.16 (2022-12-20)
+
+<csr-id-c75b41ab4b2dead66ce37487255939205f771aa6/>
 
 ### Chore
 
@@ -91,9 +124,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Merge #1899 ([`d88b5dd`](https://github.com/maidsafe/safe_network/commit/d88b5dd5c8c5799c6896b19a9c4de094943b377f))
     - retry sending msg to peer cleaning up all cached bad connections ([`96e8c7c`](https://github.com/maidsafe/safe_network/commit/96e8c7c5315090462e1269c48027cdba1bfea23a))
 </details>
-
-<csr-unknown>
-Also this includes some minor improvements to Comm log msgs.Upgrading qp2p to v0.34.0.<csr-unknown/>
 
 ## v0.72.14 (2022-12-20)
 

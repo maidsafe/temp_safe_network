@@ -6,23 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.16.9 (2022-12-20)
+## v0.16.10 (2022-12-21)
 
-### New Features
+### Refactor
 
- - <csr-id-96e8c7c5315090462e1269c48027cdba1bfea23a/> retry sending msg to peer cleaning up all cached bad connections
-   - When sending a msg to a peer, if it fails with an existing cached connection,
-   it will keep retrying till it either finds another cached connection which it
-   succeeds with, or it cleans them all up from the cache creating a new connection
-   to the peer as last attempt.
-   - Also this includes some minor improvements to Comm log msgs.
-   - Upgrading qp2p to v0.34.0.
+ - <csr-id-bf159dc0477417bfd35b0f778822dbdeb3dd0023/> serialise the msg header only once when replicating data to holders
+   - Also removing some minor but unnecessary WireMsg caching, and some objs cloning.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
+ - 1 day passed between releases.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -33,11 +29,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1921 ([`c3b09c5`](https://github.com/maidsafe/safe_network/commit/c3b09c5a851ce23ae4628455c7c7f3f17b58ed8c))
+    - serialise the msg header only once when replicating data to holders ([`bf159dc`](https://github.com/maidsafe/safe_network/commit/bf159dc0477417bfd35b0f778822dbdeb3dd0023))
+</details>
+
+## v0.16.9 (2022-12-20)
+
+### Chore
+
+ - <csr-id-aed73cfa0eb0dc3271defa7de2a90a96c790bc8d/> sn_interface-0.16.9/sn_client-0.77.4/sn_node-0.72.15
+
+### New Features
+
+ - <csr-id-96e8c7c5315090462e1269c48027cdba1bfea23a/> retry sending msg to peer cleaning up all cached bad connections
+   - When sending a msg to a peer, if it fails with an existing cached connection,
+   it will keep retrying till it either finds another cached connection which it
+   succeeds with, or it cleans them all up from the cache creating a new connection
+   to the peer as last attempt.
+- Also this includes some minor improvements to Comm log msgs.
+- Upgrading qp2p to v0.34.0.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.9/sn_client-0.77.4/sn_node-0.72.15 ([`aed73cf`](https://github.com/maidsafe/safe_network/commit/aed73cfa0eb0dc3271defa7de2a90a96c790bc8d))
     - Merge #1899 ([`d88b5dd`](https://github.com/maidsafe/safe_network/commit/d88b5dd5c8c5799c6896b19a9c4de094943b377f))
     - retry sending msg to peer cleaning up all cached bad connections ([`96e8c7c`](https://github.com/maidsafe/safe_network/commit/96e8c7c5315090462e1269c48027cdba1bfea23a))
 </details>
 
 ## v0.16.8 (2022-12-20)
+
+<csr-id-bb11b8369c36d20eb926d11fd7fbaa41ff37f011/>
 
 ### Chore
 
@@ -116,9 +150,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - rework constructor ([`5dfa24c`](https://github.com/maidsafe/safe_network/commit/5dfa24c9982c13fb321006f13b5ff417153191f3))
     - genesis_sap is required to create the `SectionTree` ([`22402ca`](https://github.com/maidsafe/safe_network/commit/22402ca6acb0215ecfe9b1fdbf306c0f9cb87d95))
 </details>
-
-<csr-unknown>
-This can be fixed by accepting the genesis sap while creating the tree.<csr-unknown/>
 
 ## v0.16.6 (2022-12-19)
 
