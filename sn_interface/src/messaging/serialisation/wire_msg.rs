@@ -138,21 +138,21 @@ impl WireMsg {
     /// Caching the bytes to the WireMsg itself
     pub fn serialize_and_cache_bytes(&mut self) -> Result<UsrMsgBytes> {
         // if we've already serialized, grab those header bytes
-        let header = if let Some(bytes) = &self.serialized_header {
-            bytes.clone()
+        let header = if let Some(hdr_bytes) = &self.serialized_header {
+            hdr_bytes.clone()
         } else {
-            self.header.serialize()?
+            let hdr_bytes = self.header.serialize()?;
+            self.serialized_header = Some(hdr_bytes.clone());
+            hdr_bytes
         };
 
-        self.serialized_header = Some(header.clone());
-
-        let dst = if let Some(bytes) = &self.serialized_dst {
-            bytes.clone()
+        let dst = if let Some(dst_bytes) = &self.serialized_dst {
+            dst_bytes.clone()
         } else {
-            self.serialize_msg_dst()?
+            let dst_bytes = self.serialize_msg_dst()?;
+            self.serialized_dst = Some(dst_bytes.clone());
+            dst_bytes
         };
-
-        self.serialized_dst = Some(dst.clone());
 
         Ok((header, dst, self.payload.clone()))
     }

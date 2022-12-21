@@ -66,15 +66,14 @@ lazy_static! {
 impl MyNode {
     // Locate ideal holders for this data, instruct them to store the data
     pub(crate) async fn replicate_data_to_adults(
-        snapshot: &NodeContext,
+        context: &NodeContext,
         data: ReplicatedData,
         msg_id: MsgId,
         targets: BTreeSet<Peer>,
     ) -> Result<Vec<(Peer, Result<WireMsg>)>> {
         info!(
-            "Replicating data from {msg_id:?} {:?} to holders {:?}",
-            data.name(),
-            &targets,
+            "Replicating data from {msg_id:?} {:?} to holders: {targets:?}",
+            data.name()
         );
 
         // TODO: general ReplicateData flow could go bidi?
@@ -83,23 +82,22 @@ impl MyNode {
         let msg = NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateOneData(data));
         let mut send_tasks = vec![];
 
-        let (kind, payload) = MyNode::serialize_node_msg(snapshot.name, msg)?;
-        let section_key = snapshot.network_knowledge.section_key();
+        let (kind, payload) = MyNode::serialize_node_msg(context.name, msg)?;
+        let section_key = context.network_knowledge.section_key();
 
-        debug!("replication read locks got");
-        // drop the read lock before we do anything async
+        // We create a Dst with random dst name, but we'll update it for each target
+        let mut dst = Dst {
+            name: xor_name::rand::random(),
+            section_key,
+        };
+        let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
         for target in targets {
-            let bytes_to_adult = MyNode::form_usr_msg_bytes_to_node(
-                section_key,
-                payload.clone(),
-                kind.clone(),
-                Some(target),
-                msg_id,
-            )?;
+            dst.name = target.name();
+            let bytes_to_adult = wire_msg.serialize_with_new_dst(&dst)?;
 
-            let comm = snapshot.comm.clone();
-            info!("About to send {msg_id:?} to holder: {:?}", &target);
+            let comm = context.comm.clone();
+            info!("About to send {msg_id:?} to holder: {target:?}");
 
             send_tasks.push(
                 async move {
@@ -122,7 +120,7 @@ impl MyNode {
 
     // Locate ideal holders for this data, instruct them to store the data
     pub(crate) async fn replicate_data_to_adults_and_ack_to_client(
-        snapshot: &NodeContext,
+        context: &NodeContext,
         cmd: DataCmd,
         data: ReplicatedData,
         msg_id: MsgId,
@@ -131,7 +129,7 @@ impl MyNode {
     ) -> Result<()> {
         let targets_len = targets.len();
 
-        let responses = MyNode::replicate_data_to_adults(snapshot, data, msg_id, targets).await?;
+        let responses = MyNode::replicate_data_to_adults(context, data, msg_id, targets).await?;
         let mut success_count = 0;
         let mut ack_response = None;
         let mut last_error = None;
@@ -153,7 +151,7 @@ impl MyNode {
         if success_count == targets_len {
             if let Some(response) = ack_response {
                 MyNode::respond_to_client_on_stream(
-                    snapshot,
+                    context,
                     response,
                     client_response_stream.clone(),
                 )
@@ -167,7 +165,7 @@ impl MyNode {
 
             if let Some(error) = last_error {
                 MyNode::send_cmd_error_response_over_stream(
-                    snapshot,
+                    context,
                     cmd,
                     error,
                     msg_id,
@@ -182,7 +180,7 @@ impl MyNode {
 
     /// Parses WireMsg and if DataStored Ack, we send a response to the client
     async fn respond_to_client_on_stream(
-        snapshot: &NodeContext,
+        context: &NodeContext,
         response: WireMsg,
         send_stream: Arc<Mutex<SendStream>>,
     ) -> Result<()> {
@@ -200,11 +198,11 @@ impl MyNode {
                 correlation_id,
             };
 
-            let (kind, payload) = MyNode::serialize_client_msg_response(snapshot.name, client_msg)?;
+            let (kind, payload) = MyNode::serialize_client_msg_response(context.name, client_msg)?;
 
             debug!("{correlation_id:?} sending cmd response ack back to client");
             MyNode::send_msg_on_stream(
-                snapshot.network_knowledge.section_key(),
+                context.network_knowledge.section_key(),
                 payload,
                 kind,
                 send_stream,
@@ -221,7 +219,7 @@ impl MyNode {
 
     /// Find target adult, sends a bidi msg, awaiting response, and then sends this on to the client
     pub(crate) async fn read_data_from_adult_and_respond_to_client(
-        snapshot: NodeContext,
+        context: NodeContext,
         query: DataQuery,
         msg_id: MsgId,
         auth: AuthorityProof<ClientAuth>,
@@ -239,7 +237,7 @@ impl MyNode {
             operation_id
         );
 
-        let targets = MyNode::target_data_holders(&snapshot, *address.name());
+        let targets = MyNode::target_data_holders(&context, *address.name());
 
         // Query only the nth adult
         let target = if let Some(peer) = targets.iter().nth(query.adult_index) {
@@ -247,13 +245,13 @@ impl MyNode {
         } else {
             debug!("No targets found for {msg_id:?}");
             let error = Error::InsufficientAdults {
-                prefix: snapshot.network_knowledge.prefix(),
+                prefix: context.network_knowledge.prefix(),
                 expected: query.adult_index as u8 + 1,
                 found: targets.len() as u8,
             };
 
             MyNode::send_query_error_response_on_stream(
-                snapshot,
+                context,
                 error,
                 &query.variant,
                 source_client,
@@ -272,12 +270,12 @@ impl MyNode {
             operation_id,
         });
 
-        let (kind, payload) = MyNode::serialize_node_msg(snapshot.name, msg)?;
+        let (kind, payload) = MyNode::serialize_node_msg(context.name, msg)?;
 
-        let comm = snapshot.comm.clone();
+        let comm = context.comm.clone();
 
         let bytes_to_adult = MyNode::form_usr_msg_bytes_to_node(
-            snapshot.network_knowledge.section_key(),
+            context.network_knowledge.section_key(),
             payload,
             kind,
             Some(target),
@@ -318,10 +316,10 @@ impl MyNode {
                 correlation_id: msg_id,
             };
 
-            let (kind, payload) = MyNode::serialize_client_msg_response(snapshot.name, client_msg)?;
+            let (kind, payload) = MyNode::serialize_client_msg_response(context.name, client_msg)?;
 
             MyNode::send_msg_on_stream(
-                snapshot.network_knowledge.section_key(),
+                context.network_knowledge.section_key(),
                 payload,
                 kind,
                 client_response_stream,
@@ -395,18 +393,12 @@ impl MyNode {
         target: Option<Peer>,
         msg_id: MsgId,
     ) -> Result<UsrMsgBytes> {
-        let dst_name = target.map_or(XorName::default(), |peer| peer.name());
-        // we first generate the XorName
         let dst = Dst {
-            name: dst_name,
+            name: target.map_or(XorName::default(), |peer| peer.name()),
             section_key,
         };
-
-        let mut wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
-
-        wire_msg
-            .serialize_and_cache_bytes()
-            .map_err(|_| Error::InvalidMessage)
+        let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
+        wire_msg.serialize().map_err(|_| Error::InvalidMessage)
     }
 
     pub(crate) fn get_metadata_of(&self, prefix: &Prefix) -> MetadataExchange {
