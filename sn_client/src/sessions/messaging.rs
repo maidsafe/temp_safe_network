@@ -91,7 +91,7 @@ impl Session {
         let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
         let send_cmd_tasks = self.send_msg(elders.clone(), wire_msg).await?;
-        trace!("Cmd msg {:?} sent", msg_id);
+        trace!("Cmd msg {msg_id:?} sent");
 
         // We wait for ALL the Acks get received.
         // The AE messages are handled by the tasks, hence no extra wait is required.
@@ -107,7 +107,7 @@ impl Session {
         elders: Vec<Peer>,
         mut send_cmd_tasks: JoinSet<MsgResponse>,
     ) -> Result<()> {
-        debug!("----> init of check for acks for {:?}", msg_id);
+        debug!("----> Init of check for acks for {msg_id:?}");
         let expected_acks = elders.len();
         let mut received_acks = BTreeSet::default();
         let mut received_errors = BTreeSet::default();
@@ -154,10 +154,7 @@ impl Session {
 
                     // exit if too many errors:
                     if failures.len() + received_errors.len() >= expected_acks {
-                        error!(
-                            "Received majority of error response for cmd {:?}: {:?}",
-                            msg_id, error
-                        );
+                        error!("Received majority of error response for cmd {msg_id:?}: {error:?}");
                         return Err(Error::CmdError {
                             source: error,
                             msg_id,
@@ -228,12 +225,9 @@ impl Session {
         let msg_id = MsgId::new();
 
         debug!(
-            "Sending query message {:?}, from {}, {:?} to the {} Elders closest to data name: {:?}",
-            msg_id,
+            "Sending query message {msg_id:?}, from {}, {query:?} to \
+            the {elders_len} Elders closest to data name: {elders:?}",
             endpoint.public_addr(),
-            query,
-            elders_len,
-            elders
         );
 
         let dst = Dst {
@@ -291,23 +285,23 @@ impl Session {
             };
 
             // let's see if we have a positive response...
-            debug!("Response to {msg_id:?}: {:?}", response);
+            debug!("Response to {msg_id:?}: {response:?}");
 
             match *response {
                 QueryResponse::GetChunk(Ok(chunk)) => {
                     if let Some(chunk_addr) = chunk_addr {
                         // We are dealing with Chunk query responses, thus we validate its hash
                         // matches its xorname, if so, we don't need to await for more responses
-                        debug!("Chunk QueryResponse received is: {:#?}", chunk);
+                        debug!("Chunk QueryResponse received is: {chunk:#?}");
 
                         if chunk_addr.name() == chunk.name() {
-                            trace!("Valid Chunk received for {:?}", msg_id);
+                            trace!("Valid Chunk received for {msg_id:?}");
                             valid_response = Some(QueryResponse::GetChunk(Ok(chunk)));
                             break;
                         } else {
                             // the Chunk content doesn't match its XorName,
                             // this is suspicious and it could be a byzantine node
-                            warn!("We received an invalid Chunk response from one of the nodes");
+                            warn!("We received an invalid Chunk response from one of the nodes for {msg_id:?}");
                             discarded_responses += 1;
                         }
                     }
@@ -371,7 +365,7 @@ impl Session {
         // we've looped over all responses...
         // if any are valid, lets return it
         if let Some(response) = valid_response {
-            debug!("valid response innnn!!! : {:?}", response);
+            debug!("Valid response in!!!: {response:?}");
             return Ok(QueryResult { response });
             // otherwise, if we've got an error in
             // we can return that too
@@ -431,14 +425,18 @@ impl Session {
         if let Some(sap) = a_close_sap {
             let sap_elders = sap.elders_vec();
             let section_pk = sap.section_key();
-            trace!("SAP elders found {:?}", sap_elders);
+            trace!("SAP elders found {sap_elders:?}");
 
             // Supermajority of elders is expected.
             let targets_count = supermajority(sap_elders.len());
 
             // any SAP that does not hold elders_count() is indicative of a broken network (after genesis)
             if sap_elders.len() < targets_count {
-                error!("Insufficient knowledge to send to address {:?}, elders for this section: {sap_elders:?} ({targets_count} needed), section PK is: {section_pk:?}", dst_address);
+                error!(
+                    "Insufficient knowledge to send to address {dst_address:?}, \
+                    elders for this section: {sap_elders:?} ({targets_count} needed), \
+                    section PK is: {section_pk:?}"
+                );
                 return Err(Error::InsufficientElderKnowledge {
                     connections: sap_elders.len(),
                     required: targets_count,
@@ -459,7 +457,7 @@ impl Session {
         wire_msg: WireMsg,
     ) -> Result<JoinSet<MsgResponse>> {
         let msg_id = wire_msg.msg_id();
-        debug!("---> send msg {msg_id:?} going out.");
+        debug!("---> Send msg {msg_id:?} going out.");
         let bytes = wire_msg.serialize()?;
 
         let mut tasks = JoinSet::new();
