@@ -5,7 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.72.20 (2022-12-22)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge #1922 ([`cc39e3f`](https://github.com/maidsafe/safe_network/commit/cc39e3fb7a95e2d14cd2550932c7d263df74a9ed))
+</details>
+
 ## v0.72.19 (2022-12-22)
+
+<csr-id-54180f6c075d7f15f18aecf6068748e18f29a1b5/>
+<csr-id-ea500663afffca0a083a75f3e9b5972ebd89a5bd/>
+<csr-id-1f69f70b3784e3b8ab7ca56c2b60815e989b03ba/>
+<csr-id-c9c30abbb232ae7ee173fcecf36b608e15cb92fd/>
+<csr-id-3456e8c5bbe06b6ebfb92df5b05a94a3c0d1336d/>
+<csr-id-3f094260e46e52e7293315cd772000617233d53e/>
+<csr-id-0436915e88c1422d487d370ad718fda4c6c578a2/>
+<csr-id-c70703f6a23ab7ab28a5f838366aa7b303e06e98/>
+<csr-id-00cf71aad448cee3216b0d3e3cc1b3bc6159d14a/>
 
 ### Chore
 
@@ -21,6 +51,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-c70703f6a23ab7ab28a5f838366aa7b303e06e98/> dont limit network size by default
  - <csr-id-00cf71aad448cee3216b0d3e3cc1b3bc6159d14a/> make default node size 10gb
 
+### Chore
+
+ - <csr-id-6bef36cadd09bba0bff9171a352813e3e860ee2c/> sn_interface-0.16.11/sn_client-0.77.6/sn_node-0.72.19
+
 ### New Features
 
  - <csr-id-de6770aae3aeeccc4689047c0a07667e4b392be3/> separate data replication into rounds
@@ -34,13 +68,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    :facepalm:
  - <csr-id-386bf375395ace0acf140ae6a8ea42df2457daa4/> remove async call and LogCtx
    The readlock in here could have been causing a deadlock
+ - <csr-id-952cc5999c68ae6b97aaaa9744ba3c635490cbe7/> initialize logging just once
+   - opentelemetry tracing requires a tokio runtime to be present, hence
+     leave a separate rt running if `otlp` feature is enabled
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 14 commits contributed to the release.
- - 13 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 16 commits contributed to the release.
+ - 15 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -50,6 +87,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.16.11/sn_client-0.77.6/sn_node-0.72.19 ([`6bef36c`](https://github.com/maidsafe/safe_network/commit/6bef36cadd09bba0bff9171a352813e3e860ee2c))
+    - initialize logging just once ([`952cc59`](https://github.com/maidsafe/safe_network/commit/952cc5999c68ae6b97aaaa9744ba3c635490cbe7))
     - Merge #1917 ([`94fecdf`](https://github.com/maidsafe/safe_network/commit/94fecdff1270a7f215095f7419cfa1bb649213ce))
     - dont bail on join if sap update errors ([`c4b47f1`](https://github.com/maidsafe/safe_network/commit/c4b47f1fa7b3d814a0de236f8a50b2c9f89750f2))
     - improve error on failed send + track dysf ([`54180f6`](https://github.com/maidsafe/safe_network/commit/54180f6c075d7f15f18aecf6068748e18f29a1b5))
@@ -69,6 +108,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.72.18 (2022-12-21)
 
 <csr-id-bf159dc0477417bfd35b0f778822dbdeb3dd0023/>
+<csr-id-5ca4e906c3ff3a55cdedcff1203df57f9f5d4767/>
 
 ### Refactor
 
