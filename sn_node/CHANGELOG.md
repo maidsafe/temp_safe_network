@@ -5,14 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.20 (2022-12-22)
+## v0.72.21 (2022-12-22)
+
+### Chore
+
+ - <csr-id-ff4a6aea4edc722f0aef23cea8100d7c09d3100a/> remove unused event formatting option
+   - the `.event_format()` overrides the `.with_thread_names()` option,
+     hence remove it
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -22,6 +28,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1916 ([`24e9b56`](https://github.com/maidsafe/safe_network/commit/24e9b561f2396b944d7b02d2da453c7d9998d55d))
+    - remove unused event formatting option ([`ff4a6ae`](https://github.com/maidsafe/safe_network/commit/ff4a6aea4edc722f0aef23cea8100d7c09d3100a))
+</details>
+
+## v0.72.20 (2022-12-22)
+
+### Bug Fixes
+
+ - <csr-id-c1b517f99b4688ccd65eb91615b8fb531f95e853/> prevent panic when we have multiple tracing subscribers
+   - When we have the `otlp` feature enabled, we effectively have
+     multiple subscribers consuming the logs.
+   - Under rare circumstances, we get a panic with the following msg,
+     `Format: was already formatted once`
+   - Turns out it's because the `itertools::format()` is being called
+     multiple times
+   - Was not able to reproduce the issue with a minimal setup, but this
+     gets rid of the panic.
+ - <csr-id-2dce913547af13c31ee1785160a7e86be82c8ac9/> use vector of `Layers` to build the `Subscriber`
+   - Replaces the macros with a vector containing boxed Layers
+
+### Chore
+
+ - <csr-id-c6ac3e58159a30d4efa1ee1f35c787532d685ca5/> sn_node-0.72.20
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_node-0.72.20 ([`c6ac3e5`](https://github.com/maidsafe/safe_network/commit/c6ac3e58159a30d4efa1ee1f35c787532d685ca5))
+    - prevent panic when we have multiple tracing subscribers ([`c1b517f`](https://github.com/maidsafe/safe_network/commit/c1b517f99b4688ccd65eb91615b8fb531f95e853))
+    - use vector of `Layers` to build the `Subscriber` ([`2dce913`](https://github.com/maidsafe/safe_network/commit/2dce913547af13c31ee1785160a7e86be82c8ac9))
     - Merge #1922 ([`cc39e3f`](https://github.com/maidsafe/safe_network/commit/cc39e3fb7a95e2d14cd2550932c7d263df74a9ed))
 </details>
 
@@ -36,6 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-0436915e88c1422d487d370ad718fda4c6c578a2/>
 <csr-id-c70703f6a23ab7ab28a5f838366aa7b303e06e98/>
 <csr-id-00cf71aad448cee3216b0d3e3cc1b3bc6159d14a/>
+<csr-id-6bef36cadd09bba0bff9171a352813e3e860ee2c/>
 
 ### Chore
 
@@ -70,7 +119,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    The readlock in here could have been causing a deadlock
  - <csr-id-952cc5999c68ae6b97aaaa9744ba3c635490cbe7/> initialize logging just once
    - opentelemetry tracing requires a tokio runtime to be present, hence
-     leave a separate rt running if `otlp` feature is enabled
+   leave a separate rt running if `otlp` feature is enabled
 
 ### Commit Statistics
 
