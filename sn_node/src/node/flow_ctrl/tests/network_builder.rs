@@ -428,7 +428,7 @@ impl<R: RngCore> TestNetworkBuilder<R> {
                     let update =
                         TestSectionTree::get_section_tree_update(sap, &proof_chain, &parent);
                     let _ = section_tree
-                        .update(update)
+                        .update_the_section_tree(update)
                         .expect("Failed to update section_tree");
                     parent = sk;
                     let _ = completed.insert(anc);
@@ -897,7 +897,9 @@ impl TestNetwork {
                 .partial_dag(&gen_section_key, &sap.section_key())
                 .expect("failed to create proof chain");
             let update = SectionTreeUpdate::new(sap.clone(), proof_chain);
-            let _ = tree.update(update).expect("Error updating the SectionTree");
+            let _ = tree
+                .update_the_section_tree(update)
+                .expect("Error updating the SectionTree");
         };
         let mut nw =
             NetworkKnowledge::new(sap.prefix(), tree).expect("Failed to create NetworkKnowledge");

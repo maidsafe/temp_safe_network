@@ -603,7 +603,7 @@ async fn msg_to_self() -> Result<()> {
     let info = node.info();
     let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
 
-    let node_msg = NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateData(vec![]));
+    let node_msg = NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateDataBatch(vec![]));
 
     // don't use the cmd collection fn, as it skips Cmd::SendMsg
     let cmds = dispatcher

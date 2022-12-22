@@ -241,7 +241,7 @@ impl Session {
         let mut network = self.network.write().await;
         debug!("Attempting to update our network knowledge... WRITE LOCK GOT");
         // Update our network SectionTree based upon passed in knowledge
-        match network.update(section_tree_update) {
+        match network.update_the_section_tree(section_tree_update) {
             Ok(true) => {
                 debug!("Anti-Entropy: updated remote section SAP for {prefix:?} to {sap:?}");
             }

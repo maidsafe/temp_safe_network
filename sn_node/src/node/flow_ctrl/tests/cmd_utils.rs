@@ -184,7 +184,7 @@ impl Cmd {
         match self {
             Cmd::SendMsg { msg, .. } => match msg {
                 NodeMsg::NodeDataCmd(node_cmd) => match node_cmd {
-                    NodeDataCmd::ReplicateData(data) => {
+                    NodeDataCmd::ReplicateDataBatch(data) => {
                         if data.len() != 1 {
                             return Err(eyre!("Only 1 replicated data instance is expected"));
                         }

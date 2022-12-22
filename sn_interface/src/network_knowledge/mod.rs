@@ -223,7 +223,10 @@ impl NetworkKnowledge {
         // If the update is for a different prefix, we just update the section_tree; else we should
         // update the section_tree and signed_sap together. Or else they might go out of sync and
         // querying section_tree using signed_sap will result in undesirable effect
-        match self.section_tree.update(section_tree_update) {
+        match self
+            .section_tree
+            .update_the_section_tree(section_tree_update)
+        {
             Ok(true) => {
                 there_was_an_update = true;
                 info!("Updated network section tree with SAP for {:?}", sap_prefix);
@@ -389,7 +392,7 @@ impl NetworkKnowledge {
                 continue;
             }
             trace!(
-                "Updating section members. Name: {:?}, new state: {:?}",
+                "Attempting to update section members. Name: {:?}, new state: {:?}",
                 node_state.name(),
                 node_state.state()
             );

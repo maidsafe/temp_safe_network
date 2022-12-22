@@ -39,6 +39,8 @@ pub enum Error {
     MultipleBranchError,
     #[error("Proof chain cannot be trusted: {0}")]
     UntrustedProofChain(String),
+    #[error("Provided proof_chain doesn't cover the SAP's key we currently know: {0}")]
+    ProofChainNotCovered(String),
     #[error("Section authority provider cannot be trusted: {0}")]
     UntrustedSectionAuthProvider(String),
     #[error("The genesis key of the provided SectionTree is invalid: {0:?}")]

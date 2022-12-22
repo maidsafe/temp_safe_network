@@ -287,7 +287,15 @@ impl<'a> Joiner<'a> {
 
                 info!("Received section tree update: {update:?}");
 
-                any_new_information = self.section_tree.update(update)?;
+                any_new_information = match self.section_tree.update_the_section_tree(update) {
+                    Ok(bool) => bool,
+                    Err(error) => {
+                        error!("Error updating section tree during join: {error:?}");
+                        // this error should not kill us though, so we otherwise ignore it and note there's
+                        // no new info
+                        false
+                    }
+                };
 
                 if any_new_information {
                     break;
@@ -376,7 +384,21 @@ impl<'a> Joiner<'a> {
                 } => {
                     info!("After sent join request, received section tree update: {section_tree_update:?}");
                     let old_target = self.join_target_sap()?;
-                    if self.section_tree.update(section_tree_update)? {
+
+                    let any_new_information = match self
+                        .section_tree
+                        .update_the_section_tree(section_tree_update)
+                    {
+                        Ok(bool) => bool,
+                        Err(error) => {
+                            error!("Error updating section tree during join: {error:?}");
+                            // this error should not kill us though, so we otherwise ignore it and note there's
+                            // no new info
+                            false
+                        }
+                    };
+
+                    if any_new_information {
                         let current_sap = self.join_target_sap()?;
                         info!("After sent join request, network sap changed from {old_target:?} to {current_sap:?}");
                     }

@@ -6,19 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub(super) mod log_ctx;
-
-use self::log_ctx::LogCtx;
 use sysinfo::{System, SystemExt};
 use tracing::trace;
+use xor_name::Prefix;
 
-pub(super) async fn log_system_details(ctx: LogCtx) {
+pub(super) fn log_system_details(prefix: Prefix) {
     let mut system = System::new_all();
-    initial_log(&mut system, &ctx).await;
+    initial_log(&mut system, prefix);
 }
 
-async fn initial_log(system: &mut System, ctx: &LogCtx) {
-    let prefix: &str = &format!("{}", ctx.prefix().await.name());
+fn initial_log(system: &mut System, prefix: Prefix) {
+    let prefix: &str = &format!("{}", prefix.name());
     let os_name: &str = &fmt(system.name());
     let kernel_version: &str = &fmt(system.kernel_version());
     let os_version: &str = &fmt(system.os_version());
