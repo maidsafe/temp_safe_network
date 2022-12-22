@@ -50,6 +50,16 @@ fn main() -> Result<()> {
 
     let mut config = futures::executor::block_on(Config::new())?;
 
+    #[cfg(not(feature = "otlp"))]
+    let _log_guard = log::init_node_logging(&config)?;
+    #[cfg(feature = "otlp")]
+    let (_rt, _guard) = {
+        // init logging in a separate runtime if we are sending traces to an opentelemetry server
+        let rt = Runtime::new()?;
+        let guard = rt.block_on(async { log::init_node_logging(&config) })?;
+        (rt, guard)
+    };
+
     loop {
         println!("Node started");
         create_runtime_and_node(&config)?;
@@ -111,11 +121,9 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
 
         info!("\n{}\n{}", message, "=".repeat(message.len()));
 
-        let (outcome, _log_guard) = rt.block_on(async {
-            let log_guard = log::init_node_logging(config)?;
+        let outcome = rt.block_on(async {
             trace!("Initial node config: {config:?}");
-
-            Ok::<_, ErrReport>((start_node(config, join_timeout).await, log_guard))
+            Ok::<_, ErrReport>(start_node(config, join_timeout).await)
         })?;
 
         match outcome {
