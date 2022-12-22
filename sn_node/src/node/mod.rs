@@ -54,8 +54,8 @@ pub use qp2p::{Config as NetworkConfig, SendStream};
 pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API update
 
 mod core {
-    use crate::comm::Comm;
     use crate::{
+        comm::Comm,
         node::{
             bootstrap::JoiningAsRelocated,
             data::Capacity,
@@ -68,9 +68,8 @@ mod core {
         },
         UsedSpace,
     };
-
+    use sn_consensus::Generation;
     use sn_dysfunction::IssueType;
-
     use sn_interface::{
         messaging::{
             signature_aggregator::SignatureAggregator,
@@ -85,9 +84,6 @@ mod core {
     };
 
     use ed25519_dalek::Keypair;
-    use itertools::Itertools;
-
-    use sn_consensus::Generation;
     use std::{
         collections::{BTreeMap, BTreeSet, HashMap},
         net::SocketAddr,
@@ -539,10 +535,10 @@ mod core {
             if new.is_elder {
                 let sap = self.network_knowledge.section_auth();
                 info!(
-                    "Section updated: prefix: ({:b}), key: {:?}, elders: {}",
+                    "Section updated: prefix: ({:b}), key: {:?}, elders: {:?}",
                     new_prefix,
                     new_section_key,
-                    sap.elders().format(", ")
+                    sap.elders_vec(),
                 );
 
                 // It can happen that we recieve the SAP demonstrating that we've become elders

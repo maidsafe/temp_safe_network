@@ -142,7 +142,6 @@ pub fn init_logger() {
         tracing_subscriber::fmt::fmt()
             // NOTE: uncomment this line for pretty printed log output.
             //.pretty()
-            .with_thread_names(true)
             .with_ansi(false)
             .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
             .with_target(false)
