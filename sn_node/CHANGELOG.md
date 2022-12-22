@@ -5,19 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.18 (2022-12-21)
+## v0.72.19 (2022-12-22)
 
-### Refactor
+### Chore
 
- - <csr-id-bf159dc0477417bfd35b0f778822dbdeb3dd0023/> serialise the msg header only once when replicating data to holders
-   - Also removing some minor but unnecessary WireMsg caching, and some objs cloning.
+ - <csr-id-54180f6c075d7f15f18aecf6068748e18f29a1b5/> improve error on failed send + track dysf
+ - <csr-id-ea500663afffca0a083a75f3e9b5972ebd89a5bd/> only track full nodes as/when joins are not already allowed
+ - <csr-id-1f69f70b3784e3b8ab7ca56c2b60815e989b03ba/> use 1gb, and increase threshold for warning
+ - <csr-id-c9c30abbb232ae7ee173fcecf36b608e15cb92fd/> refactor out replicate_data_batch code
+ - <csr-id-3456e8c5bbe06b6ebfb92df5b05a94a3c0d1336d/> reduce MAX_MISSED_DATA_TO_REPLICATE to 25
+ - <csr-id-3f094260e46e52e7293315cd772000617233d53e/> rename to ReplicateDataBatch
+   to be more clearly distinct from the single replication flow
+ - <csr-id-0436915e88c1422d487d370ad718fda4c6c578a2/> remove replication data bundling
+   Now that we have a limit per msg and batches determined by sender
+ - <csr-id-c70703f6a23ab7ab28a5f838366aa7b303e06e98/> dont limit network size by default
+ - <csr-id-00cf71aad448cee3216b0d3e3cc1b3bc6159d14a/> make default node size 10gb
+
+### New Features
+
+ - <csr-id-de6770aae3aeeccc4689047c0a07667e4b392be3/> separate data replication into rounds
+
+### Bug Fixes
+
+ - <csr-id-c4b47f1fa7b3d814a0de236f8a50b2c9f89750f2/> dont bail on join if sap update errors
+ - <csr-id-2128c1bb2d364aa4d303831f146807d1bc7addea/> move data batch send out of loop
+   We were duplicate sending data as we pushed each datum to the batch.
+   
+   :facepalm:
+ - <csr-id-386bf375395ace0acf140ae6a8ea42df2457daa4/> remove async call and LogCtx
+   The readlock in here could have been causing a deadlock
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 14 commits contributed to the release.
+ - 13 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -27,11 +50,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1917 ([`94fecdf`](https://github.com/maidsafe/safe_network/commit/94fecdff1270a7f215095f7419cfa1bb649213ce))
+    - dont bail on join if sap update errors ([`c4b47f1`](https://github.com/maidsafe/safe_network/commit/c4b47f1fa7b3d814a0de236f8a50b2c9f89750f2))
+    - improve error on failed send + track dysf ([`54180f6`](https://github.com/maidsafe/safe_network/commit/54180f6c075d7f15f18aecf6068748e18f29a1b5))
+    - only track full nodes as/when joins are not already allowed ([`ea50066`](https://github.com/maidsafe/safe_network/commit/ea500663afffca0a083a75f3e9b5972ebd89a5bd))
+    - use 1gb, and increase threshold for warning ([`1f69f70`](https://github.com/maidsafe/safe_network/commit/1f69f70b3784e3b8ab7ca56c2b60815e989b03ba))
+    - move data batch send out of loop ([`2128c1b`](https://github.com/maidsafe/safe_network/commit/2128c1bb2d364aa4d303831f146807d1bc7addea))
+    - remove async call and LogCtx ([`386bf37`](https://github.com/maidsafe/safe_network/commit/386bf375395ace0acf140ae6a8ea42df2457daa4))
+    - refactor out replicate_data_batch code ([`c9c30ab`](https://github.com/maidsafe/safe_network/commit/c9c30abbb232ae7ee173fcecf36b608e15cb92fd))
+    - reduce MAX_MISSED_DATA_TO_REPLICATE to 25 ([`3456e8c`](https://github.com/maidsafe/safe_network/commit/3456e8c5bbe06b6ebfb92df5b05a94a3c0d1336d))
+    - rename to ReplicateDataBatch ([`3f09426`](https://github.com/maidsafe/safe_network/commit/3f094260e46e52e7293315cd772000617233d53e))
+    - remove replication data bundling ([`0436915`](https://github.com/maidsafe/safe_network/commit/0436915e88c1422d487d370ad718fda4c6c578a2))
+    - dont limit network size by default ([`c70703f`](https://github.com/maidsafe/safe_network/commit/c70703f6a23ab7ab28a5f838366aa7b303e06e98))
+    - make default node size 10gb ([`00cf71a`](https://github.com/maidsafe/safe_network/commit/00cf71aad448cee3216b0d3e3cc1b3bc6159d14a))
+    - separate data replication into rounds ([`de6770a`](https://github.com/maidsafe/safe_network/commit/de6770aae3aeeccc4689047c0a07667e4b392be3))
+</details>
+
+## v0.72.18 (2022-12-21)
+
+<csr-id-bf159dc0477417bfd35b0f778822dbdeb3dd0023/>
+
+### Refactor
+
+ - <csr-id-bf159dc0477417bfd35b0f778822dbdeb3dd0023/> serialise the msg header only once when replicating data to holders
+   - Also removing some minor but unnecessary WireMsg caching, and some objs cloning.
+
+### Chore
+
+ - <csr-id-5ca4e906c3ff3a55cdedcff1203df57f9f5d4767/> sn_interface-0.16.10/sn_node-0.72.18
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.10/sn_node-0.72.18 ([`5ca4e90`](https://github.com/maidsafe/safe_network/commit/5ca4e906c3ff3a55cdedcff1203df57f9f5d4767))
     - Merge #1921 ([`c3b09c5`](https://github.com/maidsafe/safe_network/commit/c3b09c5a851ce23ae4628455c7c7f3f17b58ed8c))
     - serialise the msg header only once when replicating data to holders ([`bf159dc`](https://github.com/maidsafe/safe_network/commit/bf159dc0477417bfd35b0f778822dbdeb3dd0023))
 </details>
 
 ## v0.72.17 (2022-12-21)
+
+<csr-id-a1f1ac9401edfb18cb9d209ba866b89a622aeaf2/>
 
 ### Chore
 

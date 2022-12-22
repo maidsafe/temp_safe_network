@@ -6,20 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.16.10 (2022-12-21)
+## v0.16.11 (2022-12-22)
 
-### Refactor
+### Chore
 
- - <csr-id-bf159dc0477417bfd35b0f778822dbdeb3dd0023/> serialise the msg header only once when replicating data to holders
-   - Also removing some minor but unnecessary WireMsg caching, and some objs cloning.
+ - <csr-id-3f094260e46e52e7293315cd772000617233d53e/> rename to ReplicateDataBatch
+   to be more clearly distinct from the single replication flow
+
+### Bug Fixes
+
+ - <csr-id-c4b47f1fa7b3d814a0de236f8a50b2c9f89750f2/> dont bail on join if sap update errors
+ - <csr-id-386bf375395ace0acf140ae6a8ea42df2457daa4/> remove async call and LogCtx
+   The readlock in here could have been causing a deadlock
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 1 day passed between releases.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -29,11 +34,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1917 ([`94fecdf`](https://github.com/maidsafe/safe_network/commit/94fecdff1270a7f215095f7419cfa1bb649213ce))
+    - dont bail on join if sap update errors ([`c4b47f1`](https://github.com/maidsafe/safe_network/commit/c4b47f1fa7b3d814a0de236f8a50b2c9f89750f2))
+    - remove async call and LogCtx ([`386bf37`](https://github.com/maidsafe/safe_network/commit/386bf375395ace0acf140ae6a8ea42df2457daa4))
+    - rename to ReplicateDataBatch ([`3f09426`](https://github.com/maidsafe/safe_network/commit/3f094260e46e52e7293315cd772000617233d53e))
+</details>
+
+## v0.16.10 (2022-12-21)
+
+<csr-id-bf159dc0477417bfd35b0f778822dbdeb3dd0023/>
+
+### Refactor
+
+ - <csr-id-bf159dc0477417bfd35b0f778822dbdeb3dd0023/> serialise the msg header only once when replicating data to holders
+   - Also removing some minor but unnecessary WireMsg caching, and some objs cloning.
+
+### Chore
+
+ - <csr-id-5ca4e906c3ff3a55cdedcff1203df57f9f5d4767/> sn_interface-0.16.10/sn_node-0.72.18
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 1 day passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.10/sn_node-0.72.18 ([`5ca4e90`](https://github.com/maidsafe/safe_network/commit/5ca4e906c3ff3a55cdedcff1203df57f9f5d4767))
     - Merge #1921 ([`c3b09c5`](https://github.com/maidsafe/safe_network/commit/c3b09c5a851ce23ae4628455c7c7f3f17b58ed8c))
     - serialise the msg header only once when replicating data to holders ([`bf159dc`](https://github.com/maidsafe/safe_network/commit/bf159dc0477417bfd35b0f778822dbdeb3dd0023))
 </details>
 
 ## v0.16.9 (2022-12-20)
+
+<csr-id-aed73cfa0eb0dc3271defa7de2a90a96c790bc8d/>
 
 ### Chore
 
@@ -46,8 +89,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    it will keep retrying till it either finds another cached connection which it
    succeeds with, or it cleans them all up from the cache creating a new connection
    to the peer as last attempt.
-- Also this includes some minor improvements to Comm log msgs.
-- Upgrading qp2p to v0.34.0.
 
 ### Commit Statistics
 
@@ -68,6 +109,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Merge #1899 ([`d88b5dd`](https://github.com/maidsafe/safe_network/commit/d88b5dd5c8c5799c6896b19a9c4de094943b377f))
     - retry sending msg to peer cleaning up all cached bad connections ([`96e8c7c`](https://github.com/maidsafe/safe_network/commit/96e8c7c5315090462e1269c48027cdba1bfea23a))
 </details>
+
+<csr-unknown>
+Also this includes some minor improvements to Comm log msgs.Upgrading qp2p to v0.34.0.<csr-unknown/>
 
 ## v0.16.8 (2022-12-20)
 
