@@ -5,20 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.21 (2022-12-22)
-
-### Chore
-
- - <csr-id-ff4a6aea4edc722f0aef23cea8100d7c09d3100a/> remove unused event formatting option
-   - the `.event_format()` overrides the `.with_thread_names()` option,
-     hence remove it
+## v0.72.22 (2022-12-22)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -28,25 +22,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1915 ([`a41a2bc`](https://github.com/maidsafe/safe_network/commit/a41a2bcd7d0be64d20efc913d643091718ce743e))
+</details>
+
+## v0.72.21 (2022-12-22)
+
+<csr-id-ff4a6aea4edc722f0aef23cea8100d7c09d3100a/>
+
+### Chore
+
+ - <csr-id-ff4a6aea4edc722f0aef23cea8100d7c09d3100a/> remove unused event formatting option
+   - the `.event_format()` overrides the `.with_thread_names()` option,
+     hence remove it
+
+### Chore
+
+ - <csr-id-c6ff5c120048c526788fd415c2db075f4be94090/> sn_interface-0.16.12/sn_node-0.72.21
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.12/sn_node-0.72.21 ([`c6ff5c1`](https://github.com/maidsafe/safe_network/commit/c6ff5c120048c526788fd415c2db075f4be94090))
     - Merge #1916 ([`24e9b56`](https://github.com/maidsafe/safe_network/commit/24e9b561f2396b944d7b02d2da453c7d9998d55d))
     - remove unused event formatting option ([`ff4a6ae`](https://github.com/maidsafe/safe_network/commit/ff4a6aea4edc722f0aef23cea8100d7c09d3100a))
 </details>
 
 ## v0.72.20 (2022-12-22)
 
+<csr-id-c6ac3e58159a30d4efa1ee1f35c787532d685ca5/>
+
 ### Bug Fixes
+
+<csr-id-2dce913547af13c31ee1785160a7e86be82c8ac9/>
 
  - <csr-id-c1b517f99b4688ccd65eb91615b8fb531f95e853/> prevent panic when we have multiple tracing subscribers
    - When we have the `otlp` feature enabled, we effectively have
-     multiple subscribers consuming the logs.
-   - Under rare circumstances, we get a panic with the following msg,
+   multiple subscribers consuming the logs.
+- Under rare circumstances, we get a panic with the following msg,
      `Format: was already formatted once`
-   - Turns out it's because the `itertools::format()` is being called
+- Turns out it's because the `itertools::format()` is being called
      multiple times
-   - Was not able to reproduce the issue with a minimal setup, but this
+- Was not able to reproduce the issue with a minimal setup, but this
      gets rid of the panic.
- - <csr-id-2dce913547af13c31ee1785160a7e86be82c8ac9/> use vector of `Layers` to build the `Subscriber`
-   - Replaces the macros with a vector containing boxed Layers
+- Replaces the macros with a vector containing boxed Layers
 
 ### Chore
 
@@ -72,6 +102,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - use vector of `Layers` to build the `Subscriber` ([`2dce913`](https://github.com/maidsafe/safe_network/commit/2dce913547af13c31ee1785160a7e86be82c8ac9))
     - Merge #1922 ([`cc39e3f`](https://github.com/maidsafe/safe_network/commit/cc39e3fb7a95e2d14cd2550932c7d263df74a9ed))
 </details>
+
+<csr-unknown>
+ use vector of Layers to build the Subscriber<csr-unknown/>
 
 ## v0.72.19 (2022-12-22)
 
@@ -196,6 +229,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-a1f1ac9401edfb18cb9d209ba866b89a622aeaf2/> sn_node-0.72.17
 
+### Chore
+
+ - <csr-id-046224649bbbbd2f160cc69b8320a1b127284600/> remove references to IGD
+
 ### Bug Fixes
 
  - <csr-id-21705c1458e6c57f3db428758a6a7767e0cfb251/> persist log guard
@@ -205,8 +242,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -218,6 +255,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  * **Uncategorized**
     - sn_node-0.72.17 ([`a1f1ac9`](https://github.com/maidsafe/safe_network/commit/a1f1ac9401edfb18cb9d209ba866b89a622aeaf2))
     - Merge #1914 ([`a5da8fc`](https://github.com/maidsafe/safe_network/commit/a5da8fcb3687fe34acbafed369a3fa0f2f20a4cf))
+    - remove references to IGD ([`0462246`](https://github.com/maidsafe/safe_network/commit/046224649bbbbd2f160cc69b8320a1b127284600))
     - persist log guard ([`21705c1`](https://github.com/maidsafe/safe_network/commit/21705c1458e6c57f3db428758a6a7767e0cfb251))
 </details>
 
