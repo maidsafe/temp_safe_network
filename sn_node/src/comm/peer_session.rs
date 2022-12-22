@@ -166,7 +166,9 @@ impl PeerSessionWorker {
                     // send response on the stream
                     let _handle = tokio::spawn(async move {
                         let stream_prio = 10;
+                        error!(">>>>> GET LOCK FOR send msg {msg_id:?} over response stream to {peer:?}");
                         let mut send_stream = send_stream.lock().await;
+                        error!(">>>>> GOT LOCK!!!!!! FOR send msg {msg_id:?} over response stream to {peer:?}");
                         send_stream.set_priority(stream_prio);
                         let stream_id = send_stream.id();
                         debug!("Sending on {stream_id} via PeerSessionWorker");

@@ -122,7 +122,29 @@ impl RegisterStore {
         }
 
         trace!("Register log path exists: {}", path.display());
-        for filepath in list_files_in(&path) {
+        let files_to_read = list_files_in(&path);
+        let failed_to_read = self.read_register_cmd(files_to_read, &mut stored_reg).await;
+        // Let's retry once with the files that previosuly failed
+        let failures = self
+            .read_register_cmd(failed_to_read, &mut stored_reg)
+            .await;
+        if !failures.is_empty() {
+            error!(
+                "Failed to read some Register cmds from disk: {:?}",
+                failures.iter().map(|p| p.display().to_string())
+            );
+        }
+
+        Ok(stored_reg)
+    }
+
+    async fn read_register_cmd(
+        &self,
+        files_to_read: Vec<PathBuf>,
+        stored_reg: &mut StoredRegister,
+    ) -> Vec<PathBuf> {
+        let mut failures = vec![];
+        for filepath in files_to_read {
             match read(&filepath)
                 .await
                 .map(|serialized_data| deserialise::<RegisterCmd>(&serialized_data))
@@ -145,12 +167,13 @@ impl RegisterStore {
                     warn!(
                         "Ignoring corrupted register cmd from storage found at {}: {other:?}",
                         filepath.display()
-                    )
+                    );
+                    failures.push(filepath);
                 }
             }
         }
 
-        Ok(stored_reg)
+        failures
     }
 
     /// Persists a RegisterLog to disk

@@ -74,6 +74,7 @@ impl Comm {
     #[cfg(not(test))]
     pub(crate) async fn is_reachable(&self, peer: &SocketAddr) -> Result<(), Error> {
         let qp2p_config = qp2p::Config {
+            max_concurrent_bidi_streams: Some(500),
             ..Default::default()
         };
 

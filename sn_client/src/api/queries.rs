@@ -176,6 +176,25 @@ impl Client {
     #[instrument(skip(self), level = "debug")]
     pub async fn send_query(&self, query: DataQueryVariant) -> Result<QueryResult, Error> {
         use crate::errors::DataReplicasCheckError;
+
+        match self.send_query_variant(query.clone()).await {
+            Ok(r) => Ok(r),
+            Err(Error::DataReplicasCheck(
+                error @ DataReplicasCheckError::DifferentResponses { .. },
+            )) => {
+                error!(">>>>> FAILED FIRST ATTEMPT WITH DIFF RESPONSES: {error:?}");
+                let res2 = self.send_query_variant(query).await;
+                error!(">>>>> SECOND ATTEMPT WITH DIFF RESPONSES: {res2:?}");
+                res2
+            }
+            Err(other) => Err(other),
+        }
+    }
+
+    #[cfg(feature = "check-replicas")]
+    #[instrument(skip(self), level = "debug")]
+    async fn send_query_variant(&self, query: DataQueryVariant) -> Result<QueryResult, Error> {
+        use crate::errors::DataReplicasCheckError;
         let span = info_span!("Attempting a query");
         let _ = span.enter();
 

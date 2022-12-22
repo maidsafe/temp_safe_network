@@ -24,10 +24,10 @@ jobs:
       - cargo-udeps
       # - cargo-deny
       - e2e
-      - api
-      - cli
+      #- api
+      #- cli
       # - e2e-split
-      - unit
+      #- unit
       - checks
       - lint
       - e2e-churn
@@ -110,7 +110,7 @@ jobs:
         run: RUSTDOCFLAGS="--deny=warnings" cargo doc --no-deps
 
   unit:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    if: false #"!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Unit Tests
     runs-on: ${{ matrix.os }}
     strategy:
@@ -215,7 +215,7 @@ jobs:
         id: section-startup
         env:
           SN_ADULT_RESPONSE_TIMEOUT: 70
-          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
+          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace,qp2p=trace"
 
       - name: Wait for all nodes to join
         shell: bash
@@ -230,8 +230,8 @@ jobs:
         env:
           SN_CMD_TIMEOUT: 90
           SN_QUERY_TIMEOUT: 90
-          RUST_LOG: "sn_client=trace,qp2p=debug"
-        run: cd sn_client && cargo test --release --features check-replicas -- --test-threads=1
+          RUST_LOG: "sn_client=trace,qp2p=trace"
+        run: cd sn_client && cargo test --release --features check-replicas
         timeout-minutes: 50
 
       - name: Run example app for file API against local network
@@ -293,7 +293,7 @@ jobs:
         continue-on-error: true
 
   e2e-churn:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    if: false #"!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: E2E Churn test
     runs-on: ubuntu-latest
     steps:
@@ -543,7 +543,7 @@ jobs:
   #         rm -rf ~/.safe
 
   api:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    if: false #"!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Run API tests
     runs-on: ${{ matrix.os }}
     strategy:
@@ -661,7 +661,7 @@ jobs:
         continue-on-error: true
 
   cli:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    if: false #"!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Run CLI tests
     runs-on: ${{ matrix.os }}
     strategy:

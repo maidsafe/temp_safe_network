@@ -49,6 +49,7 @@ fn main() -> Result<()> {
     color_eyre::install()?;
 
     let mut config = futures::executor::block_on(Config::new())?;
+    config.network_config.max_concurrent_bidi_streams = Some(500);
 
     #[cfg(not(feature = "otlp"))]
     let _log_guard = log::init_node_logging(&config)?;

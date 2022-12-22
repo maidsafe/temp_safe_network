@@ -128,9 +128,11 @@ impl MyNode {
         if let Some(send_stream) = send_stream {
             // send response on the stream
             let stream_prio = 10;
+            error!(">>>>> GET LOCK FOR send msg {msg_id:?} over response stream to {requesting_elder:?}");
             let mut send_stream = send_stream.lock().await;
             send_stream.set_priority(stream_prio);
             let stream_id = send_stream.id();
+            error!(">>>>> GOT!!! LOCK FOR send msg {msg_id:?} over response {stream_id} to {requesting_elder:?}");
             trace!("{msg_id:?} Sending response to {requesting_elder:?} over {stream_id}");
             if let Err(error) = send_stream.send_user_msg(bytes).await {
                 error!("Could not send msg {msg_id:?} over response {stream_id} to {requesting_elder:?}: {error:?}");

@@ -59,10 +59,11 @@ impl Session {
     /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
     #[instrument(level = "debug")]
     pub(crate) fn new(
-        qp2p_config: QuicP2pConfig,
+        mut qp2p_config: QuicP2pConfig,
         local_addr: SocketAddr,
         network_contacts: SectionTree,
     ) -> Result<Self> {
+        qp2p_config.max_concurrent_bidi_streams = Some(500);
         let endpoint = Endpoint::new_client(local_addr, qp2p_config)?;
         let peer_links = PeerLinks::new(endpoint.clone());
 
