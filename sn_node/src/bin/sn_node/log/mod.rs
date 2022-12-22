@@ -27,9 +27,7 @@ impl TracingLayers {
             } else {
                 Box::new(Targets::new().with_target(current_crate_str(), config.verbose()))
             };
-        let fmt_layer = tracing_fmt::layer()
-            .with_thread_names(true)
-            .with_ansi(false);
+        let fmt_layer = tracing_fmt::layer().with_ansi(false);
 
         if let Some(log_dir) = config.log_dir() {
             println!("Starting logging to directory: {:?}", log_dir);
