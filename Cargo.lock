@@ -3033,9 +3033,8 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.34.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "565b5f8a239def75dad631fe787a591929a18bd848d05bbf5f3be03973701c1e"
+version = "0.34.0"
+source = "git+https://github.com/b-zee/qp2p?branch=refactor-single-wiremsg-per-stream#0b0a0ade6125ce68bca5ebbc74a47312c9b3c791"
 dependencies = [
  "bincode",
  "bytes",

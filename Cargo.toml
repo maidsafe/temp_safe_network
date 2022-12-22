@@ -10,3 +10,6 @@ members = [
     "sn_interface",
     "testnet"
 ]
+
+[patch.crates-io]
+qp2p = { git = "https://github.com/b-zee/qp2p", branch = "refactor-single-wiremsg-per-stream" }

@@ -197,19 +197,19 @@ impl Link {
             });
 
             match recv_stream.next().await {
-                Ok(Some(response)) => break Ok(response),
-                Ok(None) => {
-                    error!(
-                        "Stream closed by peer when awaiting response to {msg_id:?} from {peer:?} over {stream_id}."
-                    );
-                    let _conn = self.connections.remove(&conn_id);
+                Ok(response) => break Ok(response),
+                // Ok(None) => {
+                //     error!(
+                //         "Stream closed by peer when awaiting response to {msg_id:?} from {peer:?} over {stream_id}."
+                //     );
+                //     let _conn = self.connections.remove(&conn_id);
 
-                    if is_last_attempt {
-                        break Err(SendToOneError::RecvClosed(peer));
-                    }
-                    // tiny wait for comms/dashmap to cope with removal
-                    sleep(CONN_RETRY_WAIT).await;
-                }
+                //     if is_last_attempt {
+                //         break Err(SendToOneError::RecvClosed(peer));
+                //     }
+                //     // tiny wait for comms/dashmap to cope with removal
+                //     sleep(CONN_RETRY_WAIT).await;
+                // }
                 Err(err) => {
                     error!("Error receiving response to {msg_id:?} from {peer:?} over {stream_id}: {err:?}");
                     let _conn = self.connections.remove(&conn_id);
@@ -291,8 +291,6 @@ pub(crate) enum SendToOneError {
     Send(qp2p::SendError),
     ///
     Recv(qp2p::RecvError),
-    /// Remote peer closed the bi-stream we expected a msg on
-    RecvClosed(Peer),
 }
 
 impl SendToOneError {

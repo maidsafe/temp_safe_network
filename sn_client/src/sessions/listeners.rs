@@ -39,27 +39,21 @@ impl Session {
         peer: Peer,
         correlation_id: MsgId,
     ) -> Result<(MsgId, ClientDataResponse), Error> {
-        if let Some(bytes) = recv_stream.next().await? {
-            match WireMsg::deserialize(bytes)? {
-                MsgType::ClientDataResponse { msg_id, msg } => Ok((msg_id, msg)),
-                msg => {
-                    warn!(
-                        "Unexpected msg type received on {} from {peer:?} in response \
+        let bytes = recv_stream.next().await?;
+        match WireMsg::deserialize(bytes)? {
+            MsgType::ClientDataResponse { msg_id, msg } => Ok((msg_id, msg)),
+            msg => {
+                warn!(
+                    "Unexpected msg type received on {} from {peer:?} in response \
                     to {correlation_id:?}: {msg:?}",
-                        recv_stream.id()
-                    );
-                    Err(Error::UnexpectedMsgType {
-                        correlation_id,
-                        peer,
-                        msg,
-                    })
-                }
+                    recv_stream.id()
+                );
+                Err(Error::UnexpectedMsgType {
+                    correlation_id,
+                    peer,
+                    msg,
+                })
             }
-        } else {
-            Err(Error::ResponseStreamClosed {
-                msg_id: correlation_id,
-                peer,
-            })
         }
     }
 
