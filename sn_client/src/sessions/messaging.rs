@@ -77,9 +77,9 @@ impl Session {
 
         let elders_len = elders.len();
         let msg_id = MsgId::new();
-
         debug!(
-            "Sending cmd w/id {msg_id:?}, from {}, to {elders_len} Elders w/ dst: {dst_address:?}",
+            "Sending cmd with {msg_id:?}, dst: {dst_address:?}, from {}, \
+            to {elders_len} Elders: {elders:?}",
             endpoint.public_addr(),
         );
 
@@ -136,9 +136,9 @@ impl Session {
             match result {
                 Ok(()) => {
                     let preexisting = !received_acks.insert(src) || received_errors.contains(&src);
-                    debug!(
-                        "ACK from {src:?} read from set for {msg_id:?} - preexisting??: {preexisting:?}",
-                    );
+                    if preexisting {
+                        warn!("ACK from {src:?} for {msg_id:?} was received more than once");
+                    }
 
                     if received_acks.len() >= expected_acks {
                         trace!("{msg_id:?} Good! We're at or above {expected_acks} expected_acks");

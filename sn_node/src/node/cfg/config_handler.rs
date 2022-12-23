@@ -251,6 +251,7 @@ impl Config {
         if let Some(idle_timeout) = config.idle_timeout_msec {
             self.idle_timeout_msec = Some(idle_timeout);
         }
+
         if let Some(keep_alive_interval_msec) = config.keep_alive_interval_msec {
             self.keep_alive_interval_msec = Some(keep_alive_interval_msec);
         }
