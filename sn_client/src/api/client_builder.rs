@@ -45,10 +45,10 @@ pub const DEFAULT_MAX_QUERY_CMD_BACKOFF_INTERVAL: Duration = Duration::from_secs
 // Divisor of `idle_timeout` to calculate the default interval at which to send (QUIC)
 // keep-alive msgs to maintain otherwise idle connections. E.g. if the `idle_timeout`
 // value is set to 18secs, a ratio of 0.5 would set keep-alive interval to 9secs.
-const DEFAULT_KEEP_ALIVE_INTERVAL_DIVISOR: u32 = 2;
+const DEFAULT_KEEP_ALIVE_INTERVAL_DIVISOR: u32 = 5;
 // In the absence of any (QUIC) keep-alive messages, connections will be closed
 // if they remain idle for at least this duration.
-const DEFAULT_IDLE_TIMEOUT: Duration = Duration::from_secs(18);
+const DEFAULT_IDLE_TIMEOUT: Duration = Duration::from_secs(45);
 
 /// Build a [`crate::Client`]
 #[derive(Debug, Default)]
