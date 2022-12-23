@@ -17,6 +17,7 @@ use std::{
 use tokio::{
     fs::{self, File},
     io::AsyncWriteExt,
+    time::Duration,
 };
 use tracing::{debug, error, warn, Level};
 
@@ -253,8 +254,15 @@ impl Config {
         }
 
         match config.idle_timeout_msec {
-            Some(t) => self.idle_timeout_msec = Some(t),
-            None => self.idle_timeout_msec = Some(DEFAULT_IDLE_TIMEOUT),
+            Some(t) => {
+                self.idle_timeout_msec = Some(t);
+                self.network_config.idle_timeout = Some(Duration::from_millis(t));
+            }
+            None => {
+                self.idle_timeout_msec = Some(DEFAULT_IDLE_TIMEOUT);
+                self.network_config.idle_timeout =
+                    Some(Duration::from_millis(DEFAULT_IDLE_TIMEOUT));
+            }
         }
 
         if let Some(keep_alive_interval_msec) = config.keep_alive_interval_msec {
