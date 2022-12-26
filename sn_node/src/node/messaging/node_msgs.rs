@@ -366,11 +366,11 @@ impl MyNode {
             NodeMsg::NodeEvent(NodeEvent::StorageThresholdReached { node_id, level, .. }) => {
                 let mut node = node.write().await;
                 debug!("[NODE WRITE]: StorageThresholdReached write gottt...");
-                let changed = node.set_adult_full(&node_id, level);
+                let changed = node.set_node_full(&node_id, level);
                 if changed {
                     // ..then we accept a new node in place of the full node
                     node.joins_allowed = true;
-                    if node.are_majority_of_adults_full() {
+                    if node.are_majority_of_nodes_full() {
                         // ..then we accept new nodes until we split
                         node.joins_allowed_until_split = true;
                     }
@@ -392,11 +392,11 @@ impl MyNode {
                 if full && !context.joins_allowed {
                     let mut node = node.write().await;
                     debug!("[NODE WRITE]: CouldNotStore write gottt...");
-                    let changed = node.set_adult_full(&node_id, StorageThreshold::new());
+                    let changed = node.set_node_full(&node_id, StorageThreshold::new());
                     if changed {
                         // ..then we accept a new node in place of the full node
                         node.joins_allowed = true;
-                        if node.are_majority_of_adults_full() {
+                        if node.are_majority_of_nodes_full() {
                             // ..then we accept new nodes until we split
                             node.joins_allowed_until_split = true;
                         }
