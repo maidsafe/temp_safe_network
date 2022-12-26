@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1671710137869,
+  "lastUpdate": 1672078692778,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -47272,6 +47272,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 476628486,
             "range": "± 23977810",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "ec4dde8a583b5c6d4c7451e76977a80a840f9764",
+          "message": "Merge #1925\n\n1925: refactor(node): simplify logic retrieve qp2p config from sn_node::Config r=bochaco a=bochaco\n\n- We used to keep an instance of qp2p::Config within sn_node::Config which required to keep in sync when modifying/reading network related config, we now simply build a qp2p::Config just when is queried from sn_node::Config.\n\nCo-authored-by: bochaco <gabrielviganotti@gmail.com>",
+          "timestamp": "2022-12-26T16:29:23Z",
+          "tree_id": "d1a156659e1a0c2e09ffcf359ffa61697ce06fd7",
+          "url": "https://github.com/maidsafe/safe_network/commit/ec4dde8a583b5c6d4c7451e76977a80a840f9764"
+        },
+        "date": 1672078691368,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2367154,
+            "range": "± 558004",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 88299683,
+            "range": "± 1987969",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 105787581,
+            "range": "± 4158290",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 422131315,
+            "range": "± 6693134",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 73544730,
+            "range": "± 1291074",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 85990002,
+            "range": "± 1334709",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 349121525,
+            "range": "± 7789402",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 23905038977,
+            "range": "± 173026458",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 46570959,
+            "range": "± 13797300",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2100341616,
+            "range": "± 251917989",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 9084838657,
+            "range": "± 1100755161",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 204151746,
+            "range": "± 23439903",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1803620898,
+            "range": "± 90555715",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 6563817304,
+            "range": "± 305427244",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 47589753,
+            "range": "± 5644422",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 453541091,
+            "range": "± 19509224",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1810316391,
+            "range": "± 42251663",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11759393,
+            "range": "± 401148",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 97750704,
+            "range": "± 6739173",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 339595611,
+            "range": "± 10818536",
             "unit": "ns/iter"
           }
         ]
