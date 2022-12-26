@@ -55,7 +55,7 @@ impl Client {
     ) -> Result<QueryResult, Error> {
         let client_pk = self.public_key();
         let mut query = DataQuery {
-            adult_index: 0,
+            holder_index: 0,
             variant: query,
         };
 
@@ -84,7 +84,10 @@ impl Client {
             let msg = ClientMsg::Query(query.clone());
             let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
             let signature = self.keypair.sign(&serialised_query);
-            debug!("Attempting {query:?} (adult_index #{})", query.adult_index);
+            debug!(
+                "Attempting {query:?} (holder_index #{})",
+                query.holder_index
+            );
 
             // grab up to date destination section from our local network knowledge
             let (section_pk, elders) = self.session.get_query_elders(dst).await?;
@@ -99,10 +102,10 @@ impl Client {
                 )
                 .await;
 
-            // There should not be more than a certain amount of adults holding
-            // copies of the data. Retry the closest adult again.
-            if !retry || query.adult_index >= data_copy_count() - 1 {
-                // we don't want to retry beyond data_copy_count Adults
+            // There should not be more than a certain amount of data holders holding
+            // copies of the data. Retry the closest data holders again.
+            if !retry || query.holder_index >= data_copy_count() - 1 {
+                // we don't want to retry beyond data_copy_count data holders
                 return res;
             }
 
@@ -120,8 +123,8 @@ impl Client {
                     }
                 }
 
-                // In the next attempt, try the next adult, further away.
-                query.adult_index += 1;
+                // In the next attempt, try the next data holder, further away.
+                query.holder_index += 1;
                 debug!("Sleeping before trying query again: {delay:?} sleep for {query:?}");
                 sleep(delay).await;
             } else {
@@ -170,8 +173,8 @@ impl Client {
 
     /// Send a Query to the network and await a response.
     /// Queries are sent once per each replica, i.e. it sends the query targetting
-    /// all Adults replicas (using `query_index`) to make sure the piece of content
-    /// is stored in each and all of the expected data replicas at section Adults.
+    /// all data holders replicas (using `query_index`) to make sure the piece of content
+    /// is stored in each and all of the expected data replicas at section data holders.
     #[cfg(feature = "check-replicas")]
     #[instrument(skip(self), level = "debug")]
     pub async fn send_query(&self, query: DataQueryVariant) -> Result<QueryResult, Error> {
@@ -188,9 +191,9 @@ impl Client {
         // Send queries to all replicas concurrently
         let num_of_replicas = data_copy_count();
         let mut tasks = vec![];
-        for adult_index in 0..num_of_replicas {
+        for holder_index in 0..num_of_replicas {
             let data_query = DataQuery {
-                adult_index,
+                holder_index,
                 variant: query.clone(),
             };
             let msg = ClientMsg::Query(data_query.clone());
@@ -211,7 +214,7 @@ impl Client {
                     )
                     .await;
 
-                (result, adult_index)
+                (result, holder_index)
             });
         }
 
@@ -221,8 +224,8 @@ impl Client {
         let mut errors = vec![];
         let mut responses = vec![];
         results.into_iter().for_each(|result| match result {
-            (Err(error), adult_index) => errors.push((error, adult_index)),
-            (Ok(resp), adult_index) => responses.push((resp, adult_index)),
+            (Err(error), holder_index) => errors.push((error, holder_index)),
+            (Ok(resp), holder_index) => responses.push((resp, holder_index)),
         });
 
         if !errors.is_empty() {
@@ -244,13 +247,13 @@ impl Client {
             .into());
         }
 
-        if let Some((resp, adult_index)) = responses.pop() {
+        if let Some((resp, holder_index)) = responses.pop() {
             if responses.iter().all(|(r, _)| r.response == resp.response) {
                 return Ok(resp);
             }
 
             // put the last response back in the list so it's included in the report
-            responses.push((resp, adult_index));
+            responses.push((resp, holder_index));
             let error_msg = responses.iter().fold(
                 format!(
                     "Not all responses received are the same when sending query to all \

@@ -163,7 +163,7 @@ impl MyNode {
         let cmd = match msg {
             ClientMsg::Cmd(cmd) => cmd,
             ClientMsg::Query(query) => {
-                return MyNode::read_data_from_adult_and_respond_to_client(
+                return MyNode::read_data_from_holder_and_respond_to_client(
                     context,
                     query,
                     msg_id,
@@ -241,8 +241,8 @@ impl MyNode {
 
         // make sure the expected replication factor is achieved
         if data_copy_count() > targets.len() {
-            error!("InsufficientAdults for storing data reliably");
-            let error = Error::InsufficientAdults {
+            error!("InsufficientHolders for storing data reliably");
+            let error = Error::InsufficientHolders {
                 prefix: context.network_knowledge.prefix(),
                 expected: data_copy_count() as u8,
                 found: targets.len() as u8,
@@ -256,10 +256,10 @@ impl MyNode {
             return Ok(vec![]);
         }
 
-        // the replication msg sent to adults
+        // the replication msg sent to data holders
         // cmds here may be dysfunction tracking.
         // CmdAcks are sent over the send stream herein
-        MyNode::replicate_data_to_adults_and_ack_to_client(
+        MyNode::replicate_data_to_holders_and_ack_to_client(
             &context,
             cmd,
             data,

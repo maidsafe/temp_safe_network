@@ -181,7 +181,7 @@ impl FlowCtrl {
 
     //     let msg = ClientMsg::Query(DataQuery {
     //         variant: DataQueryVariant::GetChunk(ChunkAddress(chunk_addr)),
-    //         adult_index: 0,
+    //         holder_index: 0,
     //     });
 
     //     let msg_id = MsgId::new();

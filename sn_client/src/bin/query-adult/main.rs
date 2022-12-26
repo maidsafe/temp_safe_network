@@ -109,10 +109,10 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn query_chunk(client: &Client, adult_index: usize, address: XorName) -> Result<Chunk> {
+async fn query_chunk(client: &Client, holder_index: usize, address: XorName) -> Result<Chunk> {
     let variant = DataQueryVariant::GetChunk(ChunkAddress(address));
     let query = DataQuery {
-        adult_index,
+        holder_index,
         variant: variant.clone(),
     };
     let query_response = send_query(client, query).await?;

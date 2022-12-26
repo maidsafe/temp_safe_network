@@ -31,14 +31,14 @@ pub enum Error {
     /// Failed to write file, likely due to a system Io error
     #[error("Failed to write file")]
     FailedToWriteFile,
-    /// Insufficient Adults found to store data
+    /// Insufficient data holders found to store data
     #[error("Failed to store data. Insufficient replication count at section {prefix:?}. Expected {expected}, found {found}.")]
-    InsufficientAdults {
+    InsufficientHolders {
         /// The prefix of the section.
         prefix: Prefix,
-        /// Expected number of Adults for minimum replication.
+        /// Expected number of data holders for minimum replication.
         expected: u8,
-        /// Actual number of Adults found to hold the data.
+        /// Actual number of data holders found to hold the data.
         found: u8,
     },
     /// Provided data already exists on the network

@@ -67,7 +67,7 @@ lazy_static! {
 
 impl MyNode {
     // Locate ideal holders for this data, instruct them to store the data
-    pub(crate) async fn replicate_data_to_adults(
+    pub(crate) async fn replicate_data_to_holders(
         context: &NodeContext,
         data: ReplicatedData,
         msg_id: MsgId,
@@ -121,7 +121,7 @@ impl MyNode {
     }
 
     // Locate ideal holders for this data, instruct them to store the data
-    pub(crate) async fn replicate_data_to_adults_and_ack_to_client(
+    pub(crate) async fn replicate_data_to_holders_and_ack_to_client(
         context: &NodeContext,
         cmd: DataCmd,
         data: ReplicatedData,
@@ -131,7 +131,7 @@ impl MyNode {
     ) -> Result<()> {
         let targets_len = targets.len();
 
-        let responses = MyNode::replicate_data_to_adults(context, data, msg_id, targets).await?;
+        let responses = MyNode::replicate_data_to_holders(context, data, msg_id, targets).await?;
         let mut success_count = 0;
         let mut ack_response = None;
         let mut last_error = None;
@@ -143,7 +143,7 @@ impl MyNode {
                     ack_response = Some(response);
                 }
                 Err(error) => {
-                    error!("{msg_id:?} Error when replicating to adult {peer:?}: {error:?}");
+                    error!("{msg_id:?} Error when replicating to data holder {peer:?}: {error:?}");
                     if let Error::AdultCmdSendError(peer) = error {
                         context.log_node_issue(peer.name(), IssueType::Communication);
                     }
@@ -222,8 +222,8 @@ impl MyNode {
         }
     }
 
-    /// Find target adult, sends a bidi msg, awaiting response, and then sends this on to the client
-    pub(crate) async fn read_data_from_adult_and_respond_to_client(
+    /// Find target data holder, sends a bidi msg, awaiting response, and then sends this on to the client
+    pub(crate) async fn read_data_from_holder_and_respond_to_client(
         context: NodeContext,
         query: DataQuery,
         msg_id: MsgId,
@@ -231,12 +231,12 @@ impl MyNode {
         source_client: Peer,
         client_response_stream: Arc<Mutex<SendStream>>,
     ) -> Result<Vec<Cmd>> {
-        // We generate the operation id to track the response from the Adult
+        // We generate the operation id to track the response from the data holder
         // by using the query msg id, which shall be unique per query.
         let operation_id = OperationId::from(&Bytes::copy_from_slice(msg_id.as_ref()));
         let address = query.variant.address();
         trace!(
-            "{:?} preparing to query adults for data at {:?} with op_id: {:?}",
+            "{:?} preparing to query data holders for data at {:?} with op_id: {:?}",
             LogMarker::DataQueryReceviedAtElder,
             address,
             operation_id
@@ -244,14 +244,14 @@ impl MyNode {
 
         let targets = MyNode::target_data_holders(&context, *address.name());
 
-        // Query only the nth adult
-        let target = if let Some(peer) = targets.iter().nth(query.adult_index) {
+        // Query only the nth data holder
+        let target = if let Some(peer) = targets.iter().nth(query.holder_index) {
             *peer
         } else {
             debug!("No targets found for {msg_id:?}");
-            let error = Error::InsufficientAdults {
+            let error = Error::InsufficientHolders {
                 prefix: context.network_knowledge.prefix(),
-                expected: query.adult_index as u8 + 1,
+                expected: query.holder_index as u8 + 1,
                 found: targets.len() as u8,
             };
 
@@ -279,7 +279,7 @@ impl MyNode {
 
         let comm = context.comm.clone();
 
-        let bytes_to_adult = MyNode::form_usr_msg_bytes_to_node(
+        let bytes_to_holder = MyNode::form_usr_msg_bytes_to_node(
             context.network_knowledge.section_key(),
             payload,
             kind,
@@ -287,9 +287,9 @@ impl MyNode {
             msg_id,
         )?;
 
-        debug!("Sending out {msg_id:?} to Adult {target:?}");
+        debug!("Sending out {msg_id:?} to data holder {target:?}");
         let response = match timeout(*ADULT_RESPONSE_TIMEOUT, async {
-            comm.send_out_bytes_to_peer_and_return_response(target, msg_id, bytes_to_adult)
+            comm.send_out_bytes_to_peer_and_return_response(target, msg_id, bytes_to_holder)
                 .await
         })
         .await
@@ -298,7 +298,7 @@ impl MyNode {
             Err(_elapsed) => {
                 error!(
                     "{msg_id:?}: No response from {target:?} after {:?} timeout. \
-                    Marking adult as dysfunctional",
+                    Marking node as dysfunctional",
                     *ADULT_RESPONSE_TIMEOUT
                 );
                 return Ok(vec![Cmd::TrackNodeIssueInDysfunction {
@@ -461,14 +461,13 @@ impl MyNode {
     }
 
     /// Used to fetch the list of holders for given name of data.
-    /// Sorts adults by closeness to data address, returns data_copy_count of them
+    /// Sorts members by closeness to data address, returns data_copy_count of them
     pub(crate) fn target_data_holders(context: &NodeContext, target: XorName) -> BTreeSet<Peer> {
-        // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
-        let adults = context.network_knowledge.adults();
+        let members = context.network_knowledge.members();
 
-        trace!("Total adults known about: {:?}", adults.len());
+        trace!("Total members known about: {:?}", members.len());
 
-        let candidates = adults
+        let candidates = members
             .into_iter()
             .sorted_by(|lhs, rhs| target.cmp_distance(&lhs.name(), &rhs.name()))
             .take(data_copy_count())

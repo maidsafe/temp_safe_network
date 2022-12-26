@@ -98,16 +98,16 @@ pub enum Error {
     /// Database error.
     #[error("Database error:: {0}")]
     Database(#[from] crate::storage::Error),
-    /// Insufficient number of Adults found to perform data operation
+    /// Insufficient number of data holders found to perform data operation
     #[error(
-        "Not enough Adults available at section {prefix:?}. Expected {expected}, found {found}."
+        "Not enough data holders available at section {prefix:?}. Expected {expected}, found {found}."
     )]
-    InsufficientAdults {
+    InsufficientHolders {
         /// The prefix of the section.
         prefix: Prefix,
-        /// Expected number of Adults for minimum replication.
+        /// Expected number of data holders for minimum replication.
         expected: u8,
-        /// Actual number of Adults found to hold the data.
+        /// Actual number of data holders found to hold the data.
         found: u8,
     },
     /// Received a dkg message from an invalid Xorname
@@ -248,11 +248,11 @@ impl From<qp2p::SendError> for Error {
 impl From<Error> for ErrorMsg {
     fn from(error: Error) -> ErrorMsg {
         match error {
-            Error::InsufficientAdults {
+            Error::InsufficientHolders {
                 prefix,
                 expected,
                 found,
-            } => ErrorMsg::InsufficientAdults {
+            } => ErrorMsg::InsufficientHolders {
                 prefix,
                 expected,
                 found,

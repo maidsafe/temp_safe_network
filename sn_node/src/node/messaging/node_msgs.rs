@@ -413,7 +413,7 @@ impl MyNode {
 
                 // TODO: handle responses where replication failed...
                 let _results =
-                    MyNode::replicate_data_to_adults(&context, data, msg_id, targets).await?;
+                    MyNode::replicate_data_to_holders(&context, data, msg_id, targets).await?;
 
                 Ok(vec![])
             }
