@@ -145,7 +145,7 @@ async fn bootstrap_node(
 
     let comm = Comm::new(
         config.local_addr(),
-        config.network_config().clone(),
+        config.network_config(),
         incoming_msg_pipe,
     )
     .await?;
