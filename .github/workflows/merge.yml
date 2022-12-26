@@ -215,7 +215,7 @@ jobs:
         id: section-startup
         env:
           SN_ADULT_RESPONSE_TIMEOUT: 70
-          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
+          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction,sn_interface=trace"
 
       - name: Wait for all nodes to join
         shell: bash
@@ -232,10 +232,10 @@ jobs:
           SN_QUERY_TIMEOUT: 90
           RUST_LOG: "sn_client=trace,qp2p=debug"
         run: cd sn_client && cargo test --release --features check-replicas -- --test-threads=1
-        timeout-minutes: 50
+        timeout-minutes: 7
 
       - name: Run example app for file API against local network
-        timeout-minutes: 10
+        timeout-minutes: 2
         shell: bash
         run: cd sn_client && cargo run --release --example client_files
 
@@ -606,7 +606,7 @@ jobs:
         env:
           RUST_LOG: "sn_client=trace"
         run: cd sn_api && cargo test --release --features check-replicas
-        timeout-minutes: 30
+        timeout-minutes: 7
 
       - name: Are nodes still running...?
         shell: bash
@@ -725,7 +725,7 @@ jobs:
 
       - name: Run CLI tests
         run: cd sn_cli && cargo test --release --features check-replicas -- --test-threads=1
-        timeout-minutes: 50
+        timeout-minutes: 7
 
       - name: Are nodes still running...?
         shell: bash

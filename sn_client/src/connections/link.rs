@@ -65,8 +65,8 @@ impl Link {
         let _handle = tokio::spawn(async move {
             // Attempt to gracefully terminate the stream.
             // If this errors it does _not_ mean our message has not been sent
-            let _ = send_stream.finish().await;
-            debug!("{msg_id:?} to {peer:?} bidi finished");
+            let result = send_stream.finish().await;
+            debug!("{msg_id:?} to {peer:?} bidi finished: {result:?}");
         });
 
         Ok(recv_stream)
