@@ -5,14 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.22 (2022-12-22)
+## v0.72.23 (2022-12-26)
+
+### Refactor
+
+ - <csr-id-6230dd6d001cea9c80cd0eaed5dece1d696335b6/> simplify logic retrieve qp2p config from sn_node::Config
+   - We used to keep an instance of qp2p::Config within sn_node::Config which
+   required to keep in sync when modifying/reading network related config, we
+   now simply build a qp2p::Config just when is queried from sn_node::Config.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 4 days passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -22,12 +30,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1925 ([`ec4dde8`](https://github.com/maidsafe/safe_network/commit/ec4dde8a583b5c6d4c7451e76977a80a840f9764))
+    - simplify logic retrieve qp2p config from sn_node::Config ([`6230dd6`](https://github.com/maidsafe/safe_network/commit/6230dd6d001cea9c80cd0eaed5dece1d696335b6))
+</details>
+
+## v0.72.22 (2022-12-22)
+
+### Chore
+
+ - <csr-id-4ddc75277726d5d752ff5340c5d885622d76b990/> sn_node-0.72.22/sn_cli-0.68.4
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_node-0.72.22/sn_cli-0.68.4 ([`4ddc752`](https://github.com/maidsafe/safe_network/commit/4ddc75277726d5d752ff5340c5d885622d76b990))
     - Merge #1915 ([`a41a2bc`](https://github.com/maidsafe/safe_network/commit/a41a2bcd7d0be64d20efc913d643091718ce743e))
 </details>
 
 ## v0.72.21 (2022-12-22)
 
 <csr-id-ff4a6aea4edc722f0aef23cea8100d7c09d3100a/>
+<csr-id-c6ff5c120048c526788fd415c2db075f4be94090/>
 
 ### Chore
 
@@ -70,13 +105,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-c1b517f99b4688ccd65eb91615b8fb531f95e853/> prevent panic when we have multiple tracing subscribers
    - When we have the `otlp` feature enabled, we effectively have
    multiple subscribers consuming the logs.
-- Under rare circumstances, we get a panic with the following msg,
-     `Format: was already formatted once`
-- Turns out it's because the `itertools::format()` is being called
-     multiple times
-- Was not able to reproduce the issue with a minimal setup, but this
-     gets rid of the panic.
-- Replaces the macros with a vector containing boxed Layers
 
 ### Chore
 
@@ -104,7 +132,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 <csr-unknown>
- use vector of Layers to build the Subscriber<csr-unknown/>
+Under rare circumstances, we get a panic with the following msg,Format: was already formatted onceTurns out it’s because the itertools::format() is being calledmultiple timesWas not able to reproduce the issue with a minimal setup, but thisgets rid of the panic.Replaces the macros with a vector containing boxed Layers<csr-unknown/>
 
 ## v0.72.19 (2022-12-22)
 
@@ -224,6 +252,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.72.17 (2022-12-21)
 
 <csr-id-a1f1ac9401edfb18cb9d209ba866b89a622aeaf2/>
+<csr-id-046224649bbbbd2f160cc69b8320a1b127284600/>
 
 ### Chore
 
