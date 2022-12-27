@@ -260,7 +260,7 @@ impl MyNode {
         // cmds here may be fault tracking.
         // CmdAcks are sent over the send stream herein
         MyNode::replicate_data_to_adults_and_ack_to_client(
-            &context,
+            context,
             cmd,
             data,
             msg_id,

@@ -29,7 +29,7 @@ use bytes::Bytes;
 use futures::FutureExt;
 use itertools::Itertools;
 use lazy_static::lazy_static;
-use std::{collections::BTreeSet, env::var, str::FromStr, sync::Arc};
+use std::{collections::BTreeSet, env::var, pin::Pin, str::FromStr, sync::Arc};
 use tokio::{
     sync::Mutex,
     time::{timeout, Duration},
@@ -37,7 +37,9 @@ use tokio::{
 use tracing::info;
 use xor_name::XorName;
 
-/// Environment variable to set timeout value (in seconds) for data queries
+type SendTasks = Vec<Pin<Box<dyn futures::Future<Output = (Peer, Result<WireMsg, Error>)> + Send>>>;
+
+// Environment variable to set timeout value (in seconds) for data queries
 /// forwarded to Adults. Default value (`ADULT_RESPONSE_DEFAULT_TIMEOUT`) is otherwise used.
 const ENV_ADULT_RESPONSE_TIMEOUT: &str = "SN_ADULT_RESPONSE_TIMEOUT";
 
@@ -67,12 +69,24 @@ lazy_static! {
 
 impl MyNode {
     // Locate ideal holders for this data, instruct them to store the data
+    #[cfg(not(feature = "cmd-happy-path"))]
     pub(crate) async fn replicate_data_to_adults(
         context: &NodeContext,
         data: ReplicatedData,
         msg_id: MsgId,
         targets: BTreeSet<Peer>,
     ) -> Result<Vec<(Peer, Result<WireMsg>)>> {
+        let send_tasks = Self::build_replication_tasks(context, data, msg_id, targets).await?;
+
+        Ok(futures::future::join_all(send_tasks).await)
+    }
+
+    async fn build_replication_tasks(
+        context: &NodeContext,
+        data: ReplicatedData,
+        msg_id: MsgId,
+        targets: BTreeSet<Peer>,
+    ) -> Result<SendTasks> {
         info!(
             "Replicating data from {msg_id:?} {:?} to holders: {targets:?}",
             data.name()
@@ -117,11 +131,97 @@ impl MyNode {
             );
         }
 
-        Ok(futures::future::join_all(send_tasks).await)
+        Ok(send_tasks)
     }
 
     // Locate ideal holders for this data, instruct them to store the data
     pub(crate) async fn replicate_data_to_adults_and_ack_to_client(
+        context: NodeContext,
+        cmd: DataCmd,
+        data: ReplicatedData,
+        msg_id: MsgId,
+        targets: BTreeSet<Peer>,
+        client_response_stream: Arc<Mutex<SendStream>>,
+    ) -> Result<()> {
+        #[cfg(feature = "cmd-happy-path")]
+        {
+            let send_tasks = Self::build_replication_tasks(&context, data, msg_id, targets).await?;
+
+            let _ = tokio::task::spawn(async move {
+                // relay first response back to client
+                Self::relay_first_response(msg_id, cmd, context, client_response_stream, send_tasks)
+                    .await
+            });
+            Ok(())
+        }
+        #[cfg(not(feature = "cmd-happy-path"))]
+        {
+            Self::replicate_data_to_adults_and_ack_to_client_internal(
+                &context,
+                cmd,
+                data,
+                msg_id,
+                targets,
+                client_response_stream,
+            )
+            .await
+        }
+    }
+
+    // relays the first response back to client, will send one ack and one error if both occur.
+    #[cfg(feature = "cmd-happy-path")]
+    async fn relay_first_response(
+        msg_id: MsgId,
+        cmd: DataCmd,
+        context: NodeContext,
+        client_response_stream: Arc<Mutex<SendStream>>,
+        send_tasks: SendTasks,
+    ) -> Result<()> {
+        let mut ack_sent = false;
+        let mut error_sent = false;
+        let mut tasks = send_tasks;
+        while !tasks.is_empty() {
+            let ((peer, result), _, remaining_tasks) = futures::future::select_all(tasks).await;
+            tasks = remaining_tasks;
+            match result {
+                Ok(response) => {
+                    debug!("Response in from {peer:?} for {msg_id:?} {response:?}");
+                    if !ack_sent {
+                        MyNode::respond_to_client_on_stream(
+                            &context,
+                            response,
+                            client_response_stream.clone(),
+                        )
+                        .await?;
+                        ack_sent = true;
+                    }
+                }
+                Err(error) => {
+                    error!("{msg_id:?} Error when replicating to adult {peer:?}: {error:?}");
+                    if let Error::AdultCmdSendError(peer) = error {
+                        context.log_node_issue(peer.name(), IssueType::Communication);
+                    }
+                    error!("Storage was not completely successful for {msg_id:?}");
+                    if !error_sent {
+                        MyNode::send_cmd_error_response_over_stream(
+                            &context,
+                            cmd.clone(),
+                            error,
+                            msg_id,
+                            client_response_stream.clone(),
+                        )
+                        .await?;
+                    }
+                    error_sent = true;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    // Locate ideal holders for this data, instruct them to store the data
+    #[cfg(not(feature = "cmd-happy-path"))]
+    async fn replicate_data_to_adults_and_ack_to_client_internal(
         context: &NodeContext,
         cmd: DataCmd,
         data: ReplicatedData,

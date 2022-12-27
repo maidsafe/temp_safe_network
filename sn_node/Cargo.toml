@@ -17,6 +17,7 @@ harness = false
 [features]
 default = [ "statemap"]
 limit-network-size = []
+cmd-happy-path = []
 chaos = []
 unstable-wiremsg-debuginfo = []
 # Needs to be built with RUSTFLAGS="--cfg tokio_unstable"
