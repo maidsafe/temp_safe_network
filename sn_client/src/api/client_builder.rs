@@ -42,14 +42,6 @@ pub const DEFAULT_QUERY_CMD_TIMEOUT: Duration = Duration::from_secs(90);
 /// Max amount of time for an operation backoff (time between attempts). In Seconds.
 pub const DEFAULT_MAX_QUERY_CMD_BACKOFF_INTERVAL: Duration = Duration::from_secs(3);
 
-// Divisor of `idle_timeout` to calculate the default interval at which to send (QUIC)
-// keep-alive msgs to maintain otherwise idle connections. E.g. if the `idle_timeout`
-// value is set to 18secs, a ratio of 0.5 would set keep-alive interval to 9secs.
-const DEFAULT_KEEP_ALIVE_INTERVAL_DIVISOR: u32 = 2;
-// In the absence of any (QUIC) keep-alive messages, connections will be closed
-// if they remain idle for at least this duration.
-const DEFAULT_IDLE_TIMEOUT: Duration = Duration::from_secs(18);
-
 /// Build a [`crate::Client`]
 #[derive(Debug, Default)]
 pub struct ClientBuilder {
@@ -164,17 +156,13 @@ impl ClientBuilder {
         };
 
         let mut qp2p = self.qp2p.unwrap_or_default();
-        let idle_timeout = match qp2p.idle_timeout {
-            Some(t) => t,
-            None => {
-                qp2p.idle_timeout = Some(DEFAULT_IDLE_TIMEOUT);
-                DEFAULT_IDLE_TIMEOUT
-            }
-        };
-
-        if qp2p.keep_alive_interval.is_none() {
-            qp2p.keep_alive_interval =
-                idle_timeout.checked_div(DEFAULT_KEEP_ALIVE_INTERVAL_DIVISOR);
+        if qp2p.idle_timeout.is_none() {
+            let idle_timeout = if query_timeout > cmd_timeout {
+                query_timeout
+            } else {
+                cmd_timeout
+            };
+            qp2p.idle_timeout = Some(idle_timeout);
         }
 
         debug!("Session config: {:?}", qp2p);
