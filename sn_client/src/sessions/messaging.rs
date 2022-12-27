@@ -104,7 +104,8 @@ impl Session {
 
         if needs_super_majority {
             log_line(format!("{elders_len}"));
-            self.send_to(msg_id, elders.clone(), wire_msg).await
+            self.send_msg_and_check_acks(msg_id, elders.clone(), wire_msg)
+                .await
         } else {
             #[cfg(feature = "cmd-happy-path")]
             {
@@ -115,12 +116,18 @@ impl Session {
             #[cfg(not(feature = "cmd-happy-path"))]
             {
                 log_line(format!("{elders_len}"));
-                self.send_to(msg_id, elders.clone(), wire_msg).await
+                self.send_msg_and_check_acks(msg_id, elders.clone(), wire_msg)
+                    .await
             }
         }
     }
 
-    async fn send_to(&self, msg_id: MsgId, elders: Vec<Peer>, wire_msg: WireMsg) -> Result<()> {
+    async fn send_msg_and_check_acks(
+        &self,
+        msg_id: MsgId,
+        elders: Vec<Peer>,
+        wire_msg: WireMsg,
+    ) -> Result<()> {
         let send_cmd_tasks = self.send_msg(elders.clone(), wire_msg).await?;
         trace!("Cmd msg {msg_id:?} sent");
 
