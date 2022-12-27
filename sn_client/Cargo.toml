@@ -36,7 +36,7 @@ required-features = ["build-bin"]
 check-replicas = []
 cmd-happy-path = []
 query-happy-path = []
-msg-happy-path = ["cmd-happy-path", "query-happy-path"]
+msg-happy-path = ["cmd-happy-path", "query-happy-path", "check-replicas"]
 limit-client-upload-size = []
 test-utils = ["eyre"]
 # Dependencies only when building binary (`query-adult`)
