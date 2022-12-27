@@ -503,7 +503,6 @@ impl MyNode {
         let has_replicated_data_in = !data_collection.is_empty();
 
         for data in data_collection {
-            // grab the write lock each time in the loop to not hold it over large data sets
             let store_result = context
                 .data_storage
                 .store(&data, section_pk, node_keypair.clone())
