@@ -25,6 +25,10 @@ const CONFIG_FILE: &str = "node.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 const DEFAULT_MAX_CAPACITY: usize = 1024 * 1024 * 1024; // 1gb
 
+// In the absence of any (QUIC) keep-alive messages, connections will be closed
+// if they remain idle for at least this duration.
+const DEFAULT_IDLE_TIMEOUT_MSEC: u64 = 70_000;
+
 /// Node configuration
 #[derive(Default, Clone, Debug, Serialize, Deserialize, clap::StructOpt)]
 #[clap(rename_all = "kebab-case", bin_name = "sn_node", version)]
@@ -244,8 +248,9 @@ impl Config {
             self.max_msg_size_allowed = config.max_msg_size_allowed;
         }
 
-        if config.idle_timeout_msec.is_some() {
-            self.idle_timeout_msec = config.idle_timeout_msec;
+        match config.idle_timeout_msec {
+            Some(t) => self.idle_timeout_msec = Some(t),
+            None => self.idle_timeout_msec = Some(DEFAULT_IDLE_TIMEOUT_MSEC),
         }
 
         if config.keep_alive_interval_msec.is_some() {
