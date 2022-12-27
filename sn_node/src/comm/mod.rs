@@ -21,7 +21,7 @@ use qp2p::{Connection, SendStream, UsrMsgBytes};
 
 use sn_interface::{
     messaging::{MsgId, WireMsg},
-    types::Peer,
+    types::{log_markers::LogMarker, Peer},
 };
 
 use dashmap::DashMap;
@@ -417,7 +417,8 @@ fn listen_for_incoming_msgs(
     let _ = task::spawn(async move {
         while let Some((connection, incoming_msgs)) = incoming_connections.next().await {
             trace!(
-                "incoming_connection from {:?} with connection_id {:?}",
+                "{}: from {:?} with connection_id {}",
+                LogMarker::IncomingConnection,
                 connection.remote_address(),
                 connection.id()
             );
