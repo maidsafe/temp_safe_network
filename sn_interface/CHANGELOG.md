@@ -6,19 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.16.12 (2022-12-22)
+## v0.16.13 (2022-12-27)
 
-### Chore
+### Bug Fixes
 
- - <csr-id-ff4a6aea4edc722f0aef23cea8100d7c09d3100a/> remove unused event formatting option
-   - the `.event_format()` overrides the `.with_thread_names()` option,
-     hence remove it
+ - <csr-id-220fd52ab3e1bac776ba74793d5042de220bb315/> set default keep-alive interval to be 1/2 of idle_timeout value set
+   - By default the sn_client keep_alive msgs interval will now be set to 1/2 the
+   value set for the idle_timeout value.
+   - Removing unused ClientBuilder::cmd_ack_wait config value.
+   - Decreasing the CI timeout for sn_client, sn_api, and CLI tests, to 7mins.
+   - New LogMarker::IncomingConnection logged by sn_node.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
+ - 4 days passed between releases.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -29,6 +33,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1924 ([`be2cded`](https://github.com/maidsafe/safe_network/commit/be2cdedb19154adf324782d7178f0e25018cd16c))
+    - set default keep-alive interval to be 1/2 of idle_timeout value set ([`220fd52`](https://github.com/maidsafe/safe_network/commit/220fd52ab3e1bac776ba74793d5042de220bb315))
+</details>
+
+## v0.16.12 (2022-12-22)
+
+<csr-id-ff4a6aea4edc722f0aef23cea8100d7c09d3100a/>
+
+### Chore
+
+ - <csr-id-ff4a6aea4edc722f0aef23cea8100d7c09d3100a/> remove unused event formatting option
+   - the `.event_format()` overrides the `.with_thread_names()` option,
+     hence remove it
+
+### Chore
+
+ - <csr-id-c6ff5c120048c526788fd415c2db075f4be94090/> sn_interface-0.16.12/sn_node-0.72.21
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.12/sn_node-0.72.21 ([`c6ff5c1`](https://github.com/maidsafe/safe_network/commit/c6ff5c120048c526788fd415c2db075f4be94090))
     - Merge #1916 ([`24e9b56`](https://github.com/maidsafe/safe_network/commit/24e9b561f2396b944d7b02d2da453c7d9998d55d))
     - remove unused event formatting option ([`ff4a6ae`](https://github.com/maidsafe/safe_network/commit/ff4a6aea4edc722f0aef23cea8100d7c09d3100a))
 </details>
@@ -36,6 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.16.11 (2022-12-22)
 
 <csr-id-3f094260e46e52e7293315cd772000617233d53e/>
+<csr-id-6bef36cadd09bba0bff9171a352813e3e860ee2c/>
 
 ### Chore
 

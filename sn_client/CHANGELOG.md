@@ -1113,17 +1113,23 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
-## v0.77.6 (2022-12-22)
+## v0.77.7 (2022-12-27)
 
 ### Bug Fixes
 
- - <csr-id-c4b47f1fa7b3d814a0de236f8a50b2c9f89750f2/> dont bail on join if sap update errors
+ - <csr-id-220fd52ab3e1bac776ba74793d5042de220bb315/> set default keep-alive interval to be 1/2 of idle_timeout value set
+   - By default the sn_client keep_alive msgs interval will now be set to 1/2 the
+   value set for the idle_timeout value.
+   - Removing unused ClientBuilder::cmd_ack_wait config value.
+   - Decreasing the CI timeout for sn_client, sn_api, and CLI tests, to 7mins.
+   - New LogMarker::IncomingConnection logged by sn_node.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
+ - 5 days passed between releases.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -1134,11 +1140,43 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1924 ([`be2cded`](https://github.com/maidsafe/safe_network/commit/be2cdedb19154adf324782d7178f0e25018cd16c))
+    - set default keep-alive interval to be 1/2 of idle_timeout value set ([`220fd52`](https://github.com/maidsafe/safe_network/commit/220fd52ab3e1bac776ba74793d5042de220bb315))
+</details>
+
+## v0.77.6 (2022-12-22)
+
+### Chore
+
+ - <csr-id-6bef36cadd09bba0bff9171a352813e3e860ee2c/> sn_interface-0.16.11/sn_client-0.77.6/sn_node-0.72.19
+
+### Bug Fixes
+
+ - <csr-id-c4b47f1fa7b3d814a0de236f8a50b2c9f89750f2/> dont bail on join if sap update errors
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.11/sn_client-0.77.6/sn_node-0.72.19 ([`6bef36c`](https://github.com/maidsafe/safe_network/commit/6bef36cadd09bba0bff9171a352813e3e860ee2c))
     - Merge #1917 ([`94fecdf`](https://github.com/maidsafe/safe_network/commit/94fecdff1270a7f215095f7419cfa1bb649213ce))
     - dont bail on join if sap update errors ([`c4b47f1`](https://github.com/maidsafe/safe_network/commit/c4b47f1fa7b3d814a0de236f8a50b2c9f89750f2))
 </details>
 
 ## v0.77.5 (2022-12-21)
+
+<csr-id-2af98acaa6b078570fa24b7538705c61d6654f9e/>
 
 ### Chore
 
@@ -1150,7 +1188,6 @@ needed, as they keypair itself contains the Arcs we need.
    - Additional checks added to all_nodes_joined.sh script to be able
    to detect nodes in the network knowledge which are not those that
    effectively joined the network.
-- Also some minor improvements to sn_client log msgs.
 
 ### Commit Statistics
 
@@ -1171,6 +1208,9 @@ needed, as they keypair itself contains the Arcs we need.
     - Merge #1908 ([`8875a59`](https://github.com/maidsafe/safe_network/commit/8875a59d21db86edf0ca8f4affcc80ad7618231f))
     - verify members in network knowledge are the expected ([`79421d6`](https://github.com/maidsafe/safe_network/commit/79421d660dfcfebc8d8bf3955ee2534cc3d98e2d))
 </details>
+
+<csr-unknown>
+Also some minor improvements to sn_client log msgs.<csr-unknown/>
 
 ## v0.77.4 (2022-12-20)
 
@@ -1207,9 +1247,6 @@ needed, as they keypair itself contains the Arcs we need.
     - Merge #1899 ([`d88b5dd`](https://github.com/maidsafe/safe_network/commit/d88b5dd5c8c5799c6896b19a9c4de094943b377f))
     - retry sending msg to peer cleaning up all cached bad connections ([`96e8c7c`](https://github.com/maidsafe/safe_network/commit/96e8c7c5315090462e1269c48027cdba1bfea23a))
 </details>
-
-<csr-unknown>
-Also this includes some minor improvements to Comm log msgs.Upgrading qp2p to v0.34.0.<csr-unknown/>
 
 ## v0.77.3 (2022-12-20)
 

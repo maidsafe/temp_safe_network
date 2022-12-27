@@ -5,21 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.23 (2022-12-26)
+## v0.72.24 (2022-12-27)
 
-### Refactor
+### Bug Fixes
 
- - <csr-id-6230dd6d001cea9c80cd0eaed5dece1d696335b6/> simplify logic retrieve qp2p config from sn_node::Config
-   - We used to keep an instance of qp2p::Config within sn_node::Config which
-   required to keep in sync when modifying/reading network related config, we
-   now simply build a qp2p::Config just when is queried from sn_node::Config.
+ - <csr-id-220fd52ab3e1bac776ba74793d5042de220bb315/> set default keep-alive interval to be 1/2 of idle_timeout value set
+   - By default the sn_client keep_alive msgs interval will now be set to 1/2 the
+   value set for the idle_timeout value.
+   - Removing unused ClientBuilder::cmd_ack_wait config value.
+   - Decreasing the CI timeout for sn_client, sn_api, and CLI tests, to 7mins.
+   - New LogMarker::IncomingConnection logged by sn_node.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
- - 4 days passed between releases.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -30,11 +31,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1924 ([`be2cded`](https://github.com/maidsafe/safe_network/commit/be2cdedb19154adf324782d7178f0e25018cd16c))
+    - set default keep-alive interval to be 1/2 of idle_timeout value set ([`220fd52`](https://github.com/maidsafe/safe_network/commit/220fd52ab3e1bac776ba74793d5042de220bb315))
+</details>
+
+## v0.72.23 (2022-12-26)
+
+<csr-id-6230dd6d001cea9c80cd0eaed5dece1d696335b6/>
+
+### Refactor
+
+ - <csr-id-6230dd6d001cea9c80cd0eaed5dece1d696335b6/> simplify logic retrieve qp2p config from sn_node::Config
+   - We used to keep an instance of qp2p::Config within sn_node::Config which
+   required to keep in sync when modifying/reading network related config, we
+   now simply build a qp2p::Config just when is queried from sn_node::Config.
+
+### Chore
+
+ - <csr-id-dfff22988ebb99da5bd84c927be283d8d92b8fce/> sn_node-0.72.23
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 4 days passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_node-0.72.23 ([`dfff229`](https://github.com/maidsafe/safe_network/commit/dfff22988ebb99da5bd84c927be283d8d92b8fce))
     - Merge #1925 ([`ec4dde8`](https://github.com/maidsafe/safe_network/commit/ec4dde8a583b5c6d4c7451e76977a80a840f9764))
     - simplify logic retrieve qp2p config from sn_node::Config ([`6230dd6`](https://github.com/maidsafe/safe_network/commit/6230dd6d001cea9c80cd0eaed5dece1d696335b6))
 </details>
 
 ## v0.72.22 (2022-12-22)
+
+<csr-id-4ddc75277726d5d752ff5340c5d885622d76b990/>
 
 ### Chore
 
@@ -130,9 +169,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - use vector of `Layers` to build the `Subscriber` ([`2dce913`](https://github.com/maidsafe/safe_network/commit/2dce913547af13c31ee1785160a7e86be82c8ac9))
     - Merge #1922 ([`cc39e3f`](https://github.com/maidsafe/safe_network/commit/cc39e3fb7a95e2d14cd2550932c7d263df74a9ed))
 </details>
-
-<csr-unknown>
-Under rare circumstances, we get a panic with the following msg,Format: was already formatted onceTurns out it’s because the itertools::format() is being calledmultiple timesWas not able to reproduce the issue with a minimal setup, but thisgets rid of the panic.Replaces the macros with a vector containing boxed Layers<csr-unknown/>
 
 ## v0.72.19 (2022-12-22)
 
