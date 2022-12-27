@@ -51,8 +51,8 @@ pub enum NodeEvent {
     CouldNotStoreData {
         /// Node Id
         node_id: PublicKey,
-        /// The data that the Adult couldn't store
-        data: ReplicatedData,
+        /// The data that the Node couldn't store
+        data_address: DataAddress,
         /// Whether store failed due to full
         full: bool,
     },
