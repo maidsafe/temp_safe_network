@@ -66,7 +66,7 @@ impl MyNode {
 
     pub(crate) fn relocate(&mut self, new_keypair: Arc<Keypair>, new_name: XorName) -> Result<()> {
         // try to relocate to the section that matches our current name
-        self.network_knowledge.relocated_to(new_name)?;
+        self.network_knowledge.relocate_to(new_name)?;
 
         self.keypair = new_keypair;
 
