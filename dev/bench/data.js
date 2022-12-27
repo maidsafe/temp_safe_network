@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1672154133629,
+  "lastUpdate": 1672160949792,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -48136,6 +48136,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 419520906,
             "range": "± 22055949",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "964a1bfde64969a2335b1f6f4558d0ea917474b2",
+          "message": "Merge #1931\n\n1931: Minor fixes on post merge reviews r=joshuef a=oetyng\n\n- [chore(errors): fix naming](https://github.com/maidsafe/safe_network/commit/224a669222396827336248f80eed9e2ffeda3079) \r\n-> There was an aiming error in the sentence structure. It's not the\r\nproof chain that is not covered, it's the key that is not covered.\r\n\r\n- [chore(unused): remove unused argument](https://github.com/maidsafe/safe_network/commit/f001f1d1bb26e15b8a8b4ccc03a23fa9a86ef161)\r\n\r\n- [fix(name): rename from interrogative to imperative](https://github.com/maidsafe/safe_network/commit/98e051ec3f89b58d0304170f2e6433dfc835efb6) \r\n-> The naming was confusing as to what the method actually did.\r\n\r\n- [chore(comments): remove outdated comment](https://github.com/maidsafe/safe_network/commit/70442ff64963ba46c4ec62e2fac5850ece26c2ee)\r\n\n\nCo-authored-by: oetyng <oetyng@gmail.com>",
+          "timestamp": "2022-12-27T15:34:53Z",
+          "tree_id": "a7db6f078b38af7cc11aa3a15ffcfb05d643277b",
+          "url": "https://github.com/maidsafe/safe_network/commit/964a1bfde64969a2335b1f6f4558d0ea917474b2"
+        },
+        "date": 1672160946539,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2654803,
+            "range": "± 573170",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 104092264,
+            "range": "± 5454029",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 125143303,
+            "range": "± 5441930",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 520980803,
+            "range": "± 6501150",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 85188506,
+            "range": "± 1170772",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 99262396,
+            "range": "± 1991088",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 420113850,
+            "range": "± 4395889",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 27132203526,
+            "range": "± 222133062",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 53921459,
+            "range": "± 24387131",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2101425271,
+            "range": "± 166284433",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 8931972339,
+            "range": "± 1051421480",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 310187130,
+            "range": "± 39510220",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 3050507531,
+            "range": "± 340480231",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 10069887602,
+            "range": "± 1313864612",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 54805192,
+            "range": "± 7479883",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 490997664,
+            "range": "± 29177887",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1896745279,
+            "range": "± 80958314",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 12910994,
+            "range": "± 2861640",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 113910422,
+            "range": "± 4555269",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 388121138,
+            "range": "± 15551355",
             "unit": "ns/iter"
           }
         ]
