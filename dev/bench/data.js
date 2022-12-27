@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1672079112085,
+  "lastUpdate": 1672135391121,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -47560,6 +47560,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 334649627,
             "range": "± 5519496",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "be2cdedb19154adf324782d7178f0e25018cd16c",
+          "message": "Merge #1924\n\n1924: fix(client): set default keep-alive interval to be 1/2 of idle_timeout value set r=joshuef a=bochaco\n\n- By default the sn_client keep_alive msgs interval will now be set to 1/2 the value set for the\r\nidle_timeout value.\r\n- Removing unused ClientBuilder::cmd_ack_wait config value.\r\n- Decreasing the CI timeout for sn_client, sn_api, and CLI tests, to 7mins.\r\n- New LogMarker::IncomingConnection logged by sn_node.\r\n- Minor improvements to some log msgs.\r\n\r\nWith PR #1927 we may be able to actually remove keep-alive msgs from client (if testing is successful), but this PR already introduces an improvement by reducing the amount of QUIC msgs sent to the network.\n\nCo-authored-by: bochaco <gabrielviganotti@gmail.com>",
+          "timestamp": "2022-12-27T08:31:25Z",
+          "tree_id": "5622de48c8f13c52040062210989ae192ea415e3",
+          "url": "https://github.com/maidsafe/safe_network/commit/be2cdedb19154adf324782d7178f0e25018cd16c"
+        },
+        "date": 1672135388202,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2386852,
+            "range": "± 174333",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 94412010,
+            "range": "± 3660322",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 111185213,
+            "range": "± 8151580",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 436244392,
+            "range": "± 12575385",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 74661408,
+            "range": "± 3225641",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 89264611,
+            "range": "± 3071166",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 364617237,
+            "range": "± 9054275",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 24339410798,
+            "range": "± 397513130",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 59080119,
+            "range": "± 26186227",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2020031423,
+            "range": "± 253354327",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 8122600125,
+            "range": "± 679728435",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 168183868,
+            "range": "± 23746727",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1970276712,
+            "range": "± 179319773",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 7193418864,
+            "range": "± 485783200",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 46734248,
+            "range": "± 3637439",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 457493362,
+            "range": "± 19535789",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1789536379,
+            "range": "± 48030281",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11586556,
+            "range": "± 407462",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 101368343,
+            "range": "± 4701699",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 347187580,
+            "range": "± 10227217",
             "unit": "ns/iter"
           }
         ]
