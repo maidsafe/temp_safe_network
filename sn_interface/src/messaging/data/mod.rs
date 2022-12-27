@@ -72,7 +72,6 @@ pub enum ClientMsg {
 }
 
 impl ClientMsg {
-    #[cfg(any(feature = "chunks", feature = "registers"))]
     /// The priority of the message, when handled by lower level comms.
     pub fn priority(&self) -> i32 {
         match self {
@@ -128,7 +127,6 @@ pub enum ClientDataResponse {
 }
 
 impl ClientDataResponse {
-    #[cfg(any(feature = "chunks", feature = "registers"))]
     /// The priority of the message, when handled by lower level comms.
     pub fn priority(&self) -> i32 {
         CLIENT_QUERY_PRIORITY

@@ -29,7 +29,6 @@ pub struct DataQuery {
 #[allow(clippy::large_enum_variant)]
 #[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
 pub enum DataQueryVariant {
-    #[cfg(feature = "chunks")]
     /// Retrieve a [`Chunk`] at the given address.
     ///
     /// This should eventually lead to a [`GetChunk`] response.
@@ -37,12 +36,10 @@ pub enum DataQueryVariant {
     /// [`Chunk`]:  crate::types::Chunk
     /// [`GetChunk`]: QueryResponse::GetChunk
     GetChunk(ChunkAddress),
-    #[cfg(feature = "registers")]
     /// [`Register`] read operation.
     ///
     /// [`Register`]: crate::types::register::Register
     Register(RegisterQuery),
-    #[cfg(feature = "spentbook")]
     /// Spentbook read operation.
     Spentbook(SpentbookQuery),
 }
@@ -53,11 +50,8 @@ impl DataQueryVariant {
     pub fn to_error_response(&self, error: Error) -> QueryResponse {
         use DataQueryVariant::*;
         match self {
-            #[cfg(feature = "chunks")]
             GetChunk(_) => QueryResponse::GetChunk(Err(error)),
-            #[cfg(feature = "registers")]
             Register(q) => q.to_error_response(error),
-            #[cfg(feature = "spentbook")]
             Spentbook(q) => q.to_error_response(error),
         }
     }
@@ -66,11 +60,8 @@ impl DataQueryVariant {
     pub fn dst_name(&self) -> XorName {
         use DataQueryVariant::*;
         match self {
-            #[cfg(feature = "chunks")]
             GetChunk(address) => *address.name(),
-            #[cfg(feature = "registers")]
             Register(q) => q.dst_name(),
-            #[cfg(feature = "spentbook")]
             Spentbook(q) => q.dst_name(),
         }
     }
@@ -78,11 +69,8 @@ impl DataQueryVariant {
     /// Returns the address of the data
     pub fn address(&self) -> DataAddress {
         match self {
-            #[cfg(feature = "chunks")]
             Self::GetChunk(address) => DataAddress::Bytes(*address),
-            #[cfg(feature = "registers")]
             Self::Register(read) => DataAddress::Register(read.dst_address()),
-            #[cfg(feature = "spentbook")]
             Self::Spentbook(read) => {
                 DataAddress::Spentbook(SpentbookAddress::new(*read.dst_address().name()))
             }

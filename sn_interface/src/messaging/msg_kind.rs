@@ -17,7 +17,6 @@ use xor_name::XorName;
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum MsgKind {
-    #[cfg(any(feature = "chunks", feature = "registers"))]
     /// A data message, with the requesting peer's authority.
     /// Authority is needed to access private data, such as reading or writing a private file.
     Client(ClientAuth),
