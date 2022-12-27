@@ -215,7 +215,7 @@ jobs:
         id: section-startup
         env:
           SN_NODE_RESPONSE_TIMEOUT: 70
-          RUST_LOG: "sn_node,sn_consensus,sn_fault_detection,sn_interface=trace"
+          RUST_LOG: "sn_node,sn_consensus,sn_fault_detection,sn_interface,qp2p=trace"
 
       - name: Wait for all nodes to join
         shell: bash
@@ -226,12 +226,20 @@ jobs:
         run: cd sn_client && cargo test --no-run --release --features check-replicas
         timeout-minutes: 50
 
-      - name: Run client tests
+      - name: Run client tests (excluding Spentbook tests)
+        env:
+          SN_CMD_TIMEOUT: 90
+          SN_QUERY_TIMEOUT: 90
+          RUST_LOG: "sn_client=trace,qp2p=trace"
+        run: cd sn_client && cargo test --release --features check-replicas -- --skip spentbook
+        timeout-minutes: 7
+
+      - name: Run client Spentbook tests
         env:
           SN_CMD_TIMEOUT: 90
           SN_QUERY_TIMEOUT: 90
           RUST_LOG: "sn_client=trace,qp2p=debug"
-        run: cd sn_client && cargo test --release --features check-replicas -- --test-threads=1
+        run: cd sn_client && cargo test --release --features check-replicas spentbook -- --test-threads=1
         timeout-minutes: 7
 
       - name: Run example app for file API against local network
