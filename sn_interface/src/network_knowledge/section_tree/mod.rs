@@ -279,7 +279,7 @@ impl SectionTree {
                     // As an outdated node will got updated via AE triggered by other messages,
                     // there is no need to bounce back here (assuming the sender is outdated) to
                     // avoid potential looping.
-                    return Err(Error::ProofChainNotCovered(format!(
+                    return Err(Error::SAPKeyNotCoveredByProofChain(format!(
                         "{proof_chain:?}, {:?}",
                         sap.value
                     )));
@@ -845,7 +845,7 @@ mod tests {
             TestSectionTree::get_section_tree_update(&sap0_same, &proof_chain, &genesis_sk);
         assert!(matches!(
             tree.update_the_section_tree(tree_update),
-            Err(Error::ProofChainNotCovered(_))
+            Err(Error::SAPKeyNotCoveredByProofChain(_))
         ));
 
         Ok(())
@@ -871,7 +871,7 @@ mod tests {
         // node receives an outdated AE update for sap0
         assert!(matches!(
             tree.update_the_section_tree(tree_update_outdated),
-            Err(Error::ProofChainNotCovered(_))
+            Err(Error::SAPKeyNotCoveredByProofChain(_))
         ));
 
         Ok(())

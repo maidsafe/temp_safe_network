@@ -324,7 +324,7 @@ impl MyNode {
         if updated && !latest_context.is_elder {
             // only done if adult, since as an elder we dont want to get any more
             // data for our name (elders will eventually be caching data in general)
-            cmds.push(MyNode::ask_for_any_new_data(&latest_context, None).await);
+            cmds.push(MyNode::ask_for_any_new_data(&latest_context).await);
         }
 
         if updated {
