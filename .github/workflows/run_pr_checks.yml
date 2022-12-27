@@ -232,13 +232,14 @@ jobs:
         # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
         run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
 
+      # asserts if we don't have NODE_COUNT nodes running (ie, some died)
       - name: Are nodes still running...?
         shell: bash
         timeout-minutes: 1
-        continue-on-error: true
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
+          (($(pgrep sn_node | wc -l) == $NODE_COUNT))
 
       - name: Kill all nodes
         shell: bash
@@ -513,13 +514,14 @@ jobs:
         run: cargo test --release --features check-replicas --package sn_api
         timeout-minutes: 30
 
+        # asserts if we don't have NODE_COUNT nodes running (ie, some died)
       - name: Are nodes still running...?
         shell: bash
         timeout-minutes: 1
-        if: failure() && matrix.os
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
+          (($(pgrep sn_node | wc -l) == $NODE_COUNT))
 
       - name: Kill all nodes
         shell: bash
@@ -615,13 +617,14 @@ jobs:
         run: cargo test --release --features check-replicas --package sn_cli
         timeout-minutes: 50
 
+      # asserts if we don't have NODE_COUNT nodes running (ie, some died)
       - name: Are nodes still running...?
         shell: bash
         timeout-minutes: 1
-        if: failure() && matrix.os
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
+          (($(pgrep sn_node | wc -l) == $NODE_COUNT))
 
       - name: Kill all nodes
         shell: bash

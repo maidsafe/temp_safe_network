@@ -249,10 +249,10 @@ jobs:
         shell: bash
         timeout-minutes: 1
         if: failure() && matrix.os != 'windows-latest'
-        continue-on-error: true
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
+          (($(pgrep sn_node | wc -l) == $NODE_COUNT))
 
       - name: Kill all nodes
         shell: bash
@@ -446,10 +446,11 @@ jobs:
       - name: Are nodes still running...?
         shell: bash
         timeout-minutes: 1
-        continue-on-error: true
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
+          (($(pgrep sn_node | wc -l) == $NODE_COUNT))
+
 
       - name: Kill all nodes
         shell: bash
@@ -617,7 +618,6 @@ jobs:
   #       run: |
   #         echo "$(pgrep sn_node | wc -l) nodes still running"
   #         ls $HOME/.safe/node/local-test-network
-
   #      - name: Kill all nodes
   #        shell: bash
   #        timeout-minutes: 1
@@ -737,10 +737,10 @@ jobs:
       - name: Are nodes still running...?
         shell: bash
         timeout-minutes: 1
-        if: failure() && matrix.os
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
+          (($(pgrep sn_node | wc -l) == $NODE_COUNT))
 
       - name: Kill all nodes
         shell: bash
@@ -856,10 +856,10 @@ jobs:
       - name: Are nodes still running...?
         shell: bash
         timeout-minutes: 1
-        if: failure() && matrix.os
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
+          (($(pgrep sn_node | wc -l) == $NODE_COUNT))
 
       - name: Kill all nodes
         shell: bash
