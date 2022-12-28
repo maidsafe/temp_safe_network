@@ -638,9 +638,10 @@ mod core {
                 );
             }
 
-            // when we split, the range of data on nodes are responsible for is halved, i.e. their threshold is no longer reached..
+            // When we split, we have brought in new nodes since the flag was set
+            // in order to bring down used space. It is therefore not needed anymore.
+            // (the default mechanism of adding nodes is used again)
             if section_split && old.is_elder {
-                // .. so, we do not need to allow new nodes in to bring down used space.
                 self.joins_allowed_until_split = false;
             }
 
