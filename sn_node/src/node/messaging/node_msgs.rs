@@ -63,8 +63,10 @@ impl MyNode {
         {
             Ok(()) => {
                 trace!("Data has been stored: {data_addr:?}");
-                if context.data_storage.has_reached_limit() && !context.joins_allowed_until_split {
-                    // we accept new nodes until split, since we have reached the max capacity (i.e. storage limit)
+                if context.data_storage.has_reached_min_capacity()
+                    && !context.joins_allowed_until_split
+                {
+                    // we accept new nodes until split, since we have reached the min capacity (i.e. storage limit)
                     cmds.push(Cmd::SetJoinsAllowedUntilSplit(true));
                 }
                 CmdResponse::ok(data)?

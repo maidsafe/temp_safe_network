@@ -93,7 +93,7 @@ async fn new_node(
         }
     };
 
-    let used_space = UsedSpace::new(config.max_capacity());
+    let used_space = UsedSpace::new(config.min_capacity(), config.max_capacity());
 
     let (node, cmd_channel, rejoin_network_rx) =
         bootstrap_node(config, used_space, root_dir, join_timeout).await?;

@@ -15,15 +15,24 @@ use tracing::info;
 #[derive(Clone, Debug)]
 /// Tracking used space
 pub struct UsedSpace {
-    /// the maximum (inclusive) allocated space for storage
+    /// The minimum space that the network requires of the node, to allocate for storage.
+    ///
+    /// If this value is lower than what is currently used by the elders, the node will sooner or later risk getting kicked out
+    /// (as it will fill up or fail to serve requested data).
+    min_capacity: usize,
+    /// The maximum (inclusive) allocated space for storage
+    ///
+    /// This is used by a node operator to prevent the node to fill up
+    /// actual disk space beyond what the operator deems convenient.
     max_capacity: usize,
     used_space: Arc<AtomicUsize>,
 }
 
 impl UsedSpace {
     /// Create new `UsedSpace` tracker
-    pub fn new(max_capacity: usize) -> Self {
+    pub fn new(min_capacity: usize, max_capacity: usize) -> Self {
         Self {
+            min_capacity,
             max_capacity,
             used_space: Arc::new(AtomicUsize::new(0)),
         }
@@ -37,24 +46,26 @@ impl UsedSpace {
         let _ = self.used_space.fetch_sub(size, Ordering::Relaxed);
     }
 
+    /// This prevents the node to fill up actual disk space
+    /// beyond what a node operator deems convenient.
     pub(crate) fn can_add(&self, size: usize) -> bool {
         let current_used_space = self.used_space.load(Ordering::Relaxed);
         current_used_space + size <= self.max_capacity
     }
 
-    /// Checks if we've reached the limit of our storage.
-    pub(crate) fn has_reached_limit(&self) -> bool {
+    /// Checks if we've reached the minimum expected capacity.
+    pub(crate) fn has_reached_min_capacity(&self) -> bool {
         let current_used_space = self.used_space.load(Ordering::Relaxed);
-        current_used_space >= self.max_capacity
+        current_used_space >= self.min_capacity
     }
 
     #[allow(unused)]
     pub(crate) fn ratio(&self) -> f64 {
         let used = self.used_space.load(Ordering::Relaxed);
-        let max_capacity = self.max_capacity;
-        let used_space_ratio = used as f64 / max_capacity as f64;
+        let min_capacity = self.min_capacity;
+        let used_space_ratio = used as f64 / min_capacity as f64;
         info!("Used space: {:?}", used);
-        info!("Max capacity: {:?}", max_capacity);
+        info!("Min capacity: {:?}", min_capacity);
         info!("Used space ratio: {:?}", used_space_ratio);
         used_space_ratio
     }
