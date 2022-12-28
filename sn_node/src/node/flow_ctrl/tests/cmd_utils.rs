@@ -19,7 +19,7 @@ use sn_interface::{
 
 use assert_matches::assert_matches;
 use eyre::{eyre, Result};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, VecDeque};
 use tokio::sync::mpsc::{self, error::TryRecvError};
 use xor_name::XorName;
 
@@ -36,18 +36,17 @@ pub(crate) async fn handle_online_cmd(
     let node_state = NodeState::joined(*peer, None);
     let membership_decision = section_decision(sk_set, node_state);
 
-    let all_cmds = run_and_collect_cmds(
+    let mut all_cmds = ProcessAndInspectCmds::new(
         Cmd::HandleMembershipDecision(membership_decision),
         dispatcher,
-    )
-    .await?;
+    );
 
     let mut status = HandleOnlineStatus {
         node_approval_sent: false,
         relocate_details: None,
     };
 
-    for cmd in all_cmds {
+    while let Some(cmd) = all_cmds.next().await? {
         let (msg, recipients) = match cmd {
             Cmd::SendMsg {
                 recipients, msg, ..
@@ -58,7 +57,7 @@ pub(crate) async fn handle_online_cmd(
         match msg {
             NodeMsg::JoinResponse(JoinResponse::Approved { .. }) => {
                 assert_matches!(recipients, Peers::Multiple(peers) => {
-                    assert_eq!(peers, BTreeSet::from([*peer]));
+                    assert_eq!(peers, &BTreeSet::from([*peer]));
                 });
                 status.node_approval_sent = true;
             }
@@ -80,69 +79,87 @@ pub(crate) async fn handle_online_cmd(
     Ok(status)
 }
 
-pub(crate) async fn run_and_collect_cmds(
-    cmd: Cmd,
-    dispatcher: &Dispatcher,
-) -> crate::node::error::Result<Vec<Cmd>> {
-    let mut all_cmds = vec![];
-
-    let mut cmds = dispatcher.process_cmd(cmd).await?;
-
-    while !cmds.is_empty() {
-        all_cmds.extend(cmds.clone());
-        let mut new_cmds = vec![];
-        for cmd in cmds {
-            if !matches!(cmd, Cmd::SendMsg { .. }) {
-                new_cmds.extend(dispatcher.process_cmd(cmd).await?);
-            }
-        }
-        cmds = new_cmds;
-    }
-
-    Ok(all_cmds)
+pub(crate) struct ProcessAndInspectCmds<'a> {
+    pending_cmds: VecDeque<Cmd>,
+    cmds_to_inspect: VecDeque<usize>,
+    dispatcher: &'a Dispatcher,
 }
 
-pub(crate) async fn run_node_handle_client_msg_and_collect_cmds(
-    _msg: ClientMsg,
-    _peer: Peer,
-    dispatcher: &Dispatcher,
-) -> crate::node::error::Result<Vec<Cmd>> {
-    let mut all_cmds = vec![];
-
-    let node = dispatcher.node();
-    let the_node = node.read().await;
-
-    // let (msg_id, msg, auth) = get_client_msg_parts_for_handling(msg)?;
-
-    // TODO: decide how to test this, w/r/t no client stream.
-    let mut cmds = vec![];
-    // let mut cmds = the_node
-    //     .handle_valid_client_msg(
-    //         msg_id,
-    //         msg,
-    //         auth,
-    //         peer,
-    //     )
-    //     .await?;
-
-    // drop any read locks on the node here
-    // we may have commands editing the node, requiring a write lock
-    // coming after
-    drop(the_node);
-
-    while !cmds.is_empty() {
-        all_cmds.extend(cmds.clone());
-        let mut new_cmds = vec![];
-        for cmd in cmds {
-            if !matches!(cmd, Cmd::SendMsg { .. }) {
-                new_cmds.extend(dispatcher.process_cmd(cmd).await?);
-            }
+impl<'a> ProcessAndInspectCmds<'a> {
+    pub(crate) fn new(cmd: Cmd, dispatcher: &'a Dispatcher) -> Self {
+        Self {
+            pending_cmds: VecDeque::from([cmd]),
+            cmds_to_inspect: VecDeque::default(),
+            dispatcher,
         }
-
-        cmds = new_cmds;
     }
 
-    Ok(all_cmds)
+    pub(crate) fn new_with_client_msg(
+        _msg: ClientMsg,
+        _peer: Peer,
+        dispatcher: &'a Dispatcher,
+    ) -> crate::node::error::Result<Self> {
+        // let node = dispatcher.node();
+        // let the_node = node.read().await;
+
+        // let (msg_id, msg, auth) = get_client_msg_parts_for_handling(msg)?;
+
+        // TODO: decide how to test this, w/r/t no client stream.
+        // let mut cmds = the_node
+        //     .handle_valid_client_msg(
+        //         msg_id,
+        //         msg,
+        //         auth,
+        //         peer,
+        //     )
+        //     .await?;
+
+        // drop any read locks on the node here
+        // we may have commands editing the node, requiring a write lock
+        // coming after
+        // drop(the_node);
+
+        Ok(Self {
+            pending_cmds: VecDeque::default(),
+            cmds_to_inspect: VecDeque::default(),
+            dispatcher,
+        })
+    }
+
+    pub(crate) async fn next(&mut self) -> crate::node::error::Result<Option<&Cmd>> {
+        match self.cmds_to_inspect.pop_front() {
+            Some(index) => {
+                let cmd = self.pending_cmds.get(index);
+                assert!(cmd.is_some());
+                Ok(cmd)
+            }
+            None => {
+                while let Some(cmd) = self.pending_cmds.pop_front() {
+                    if !matches!(cmd, Cmd::SendMsg { .. }) {
+                        let new_cmds = self.dispatcher.process_cmd(cmd).await?;
+                        for cmd in new_cmds.into_iter() {
+                            let new_cmd_index = self.pending_cmds.len();
+                            self.pending_cmds.push_back(cmd);
+                            self.cmds_to_inspect.push_back(new_cmd_index);
+                        }
+
+                        if let Some(index) = self.cmds_to_inspect.pop_front() {
+                            let cmd = self.pending_cmds.get(index);
+                            assert!(cmd.is_some());
+                            return Ok(cmd);
+                        }
+                    }
+                }
+
+                Ok(None)
+            }
+        }
+    }
+
+    pub(crate) async fn process_all(&mut self) -> crate::node::error::Result<()> {
+        while self.next().await?.is_some() { /* we just process all cmds */ }
+        Ok(())
+    }
 }
 
 pub(crate) fn get_client_msg_parts_for_handling(

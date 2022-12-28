@@ -33,7 +33,7 @@ use tokio::sync::Mutex;
 /// a priority by which it is ordered in the queue
 /// among other pending cmd jobs, and the time the
 /// job was instantiated.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct CmdJob {
     id: usize,
     parent_id: Option<usize>,
@@ -49,7 +49,7 @@ pub(crate) struct CmdJob {
 /// and prioritization, which is not something e.g. tokio tasks allow.
 /// In other words, it enables enhanced flow control.
 #[allow(clippy::large_enum_variant)]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) enum Cmd {
     /// Validate `wire_msg` from `sender`.
     /// Holding the WireMsg that has been received from the network,
