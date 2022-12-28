@@ -373,32 +373,24 @@ impl MyNode {
                 data_address,
                 full,
             }) => {
-                info!("Processing CouldNotStoreData event with {msg_id:?} at : {data_address:?}");
+                info!("Processing CouldNotStoreData event with {msg_id:?} at: {data_address:?}, (node reporting full: {full})");
 
                 if !context.is_elder {
                     error!("Received unexpected message while Adult");
                     return Ok(vec![]);
                 }
 
-                let mut cmds = vec![];
-                if full {
-                    debug!("[NODE WRITE]: CouldNotStore write gottt...");
-                    // Kick out node!
-                    let nodes = BTreeSet::from([node_id.into()]);
-                    cmds.push(Cmd::ProposeVoteNodesOffline(nodes));
-                }
+                context.log_node_issue(node_id.into(), IssueType::Communication);
 
-                if !context.joins_allowed {
-                    cmds.push(Cmd::SetJoinsAllowed(true));
+                if context.joins_allowed {
+                    Ok(vec![])
+                } else {
+                    Ok(vec![Cmd::SetJoinsAllowed(true)])
                     // NB: we do not also set allowed until split, since we
                     // do not expect another node to run out of space before we ourselves
                     // have reached the storage limit (i.e. the `max_capacity` variable, which
                     // should be set by the node operator to be a little bit lower than the actual space).
                 }
-
-                context.log_node_issue(node_id.into(), IssueType::Communication);
-
-                Ok(vec![])
             }
             NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data)) => {
                 debug!("Attempting to store data locally: {:?}", data.address());
