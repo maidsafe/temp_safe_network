@@ -9,7 +9,7 @@
 pub(crate) mod cmd_ctrl;
 pub(crate) mod cmds;
 pub(super) mod dispatcher;
-pub(super) mod dysfunction;
+pub(super) mod fault_detection;
 mod periodic_checks;
 
 #[cfg(test)]
@@ -20,13 +20,13 @@ use crate::comm::MsgFromPeer;
 use crate::node::{
     flow_ctrl::{
         cmds::Cmd,
-        dysfunction::{DysCmds, DysfunctionChannels},
+        fault_detection::{FaultChannels, FaultsCmd},
     },
     messaging::Peers,
     MyNode, Result, STANDARD_CHANNEL_SIZE,
 };
 use periodic_checks::PeriodicChecksTimestamps;
-use sn_dysfunction::DysfunctionDetection;
+use sn_fault_detection::FaultDetection;
 use sn_interface::{
     messaging::system::{NodeDataCmd, NodeMsg},
     types::{log_markers::LogMarker, DataAddress, Peer},
@@ -42,11 +42,11 @@ use xor_name::XorName;
 pub struct RejoinNetwork;
 
 /// Listens for incoming msgs and forms Cmds for each,
-/// Periodically triggers other Cmd Processes (eg health checks, dysfunction etc)
+/// Periodically triggers other Cmd Processes (eg health checks, fault detection etc)
 pub(crate) struct FlowCtrl {
     node: Arc<RwLock<MyNode>>,
     cmd_sender_channel: mpsc::Sender<(Cmd, Vec<usize>)>,
-    dysfunction_channels: DysfunctionChannels,
+    fault_channels: FaultChannels,
     timestamps: PeriodicChecksTimestamps,
 }
 
@@ -57,7 +57,7 @@ impl FlowCtrl {
         cmd_ctrl: CmdCtrl,
         mut incoming_msg_events: mpsc::Receiver<MsgFromPeer>,
         data_replication_receiver: mpsc::Receiver<(Vec<DataAddress>, Peer)>,
-        dysfunction_cmds_channels: (mpsc::Sender<DysCmds>, mpsc::Receiver<DysCmds>),
+        fault_cmds_channels: (mpsc::Sender<FaultsCmd>, mpsc::Receiver<FaultsCmd>),
     ) -> (
         mpsc::Sender<(Cmd, Vec<usize>)>,
         mpsc::Receiver<RejoinNetwork>,
@@ -70,8 +70,8 @@ impl FlowCtrl {
 
         let node_identifier = node_context.info.name();
 
-        let dysfunction_channels = {
-            let dysfunction = DysfunctionDetection::new(
+        let fault_channels = {
+            let tracker = FaultDetection::new(
                 node_context
                     .network_knowledge
                     .members()
@@ -79,19 +79,18 @@ impl FlowCtrl {
                     .map(|peer| peer.name())
                     .collect::<Vec<XorName>>(),
             );
-            // start DysfunctionDetection in a new thread
-            let dysfunctional_nodes_receiver =
-                Self::start_dysfunction_detection(dysfunction, dysfunction_cmds_channels.1);
-            DysfunctionChannels {
-                cmds_sender: dysfunction_cmds_channels.0,
-                dys_nodes_receiver: dysfunctional_nodes_receiver,
+            // start FaultDetection in a new thread
+            let faulty_nodes_receiver = Self::start_fault_detection(tracker, fault_cmds_channels.1);
+            FaultChannels {
+                cmds_sender: fault_cmds_channels.0,
+                faulty_nodes_receiver,
             }
         };
 
         let flow_ctrl = Self {
             node: cmd_ctrl.node(),
             cmd_sender_channel: cmd_sender_channel.clone(),
-            dysfunction_channels,
+            fault_channels,
             timestamps: PeriodicChecksTimestamps::now(),
         };
 

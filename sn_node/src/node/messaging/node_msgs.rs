@@ -14,7 +14,7 @@ use crate::{
     storage::Error as StorageError,
 };
 use qp2p::SendStream;
-use sn_dysfunction::IssueType;
+use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
         data::{CmdResponse, StorageLevel},

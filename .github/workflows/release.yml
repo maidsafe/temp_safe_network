@@ -207,11 +207,11 @@ jobs:
             # The sn_interface crate doesn't have any dependencies so we can go ahead and publish.
             cd sn_interface && cargo publish --allow-dirty
           fi
-      - name: publish sn_dysfunction
+      - name: publish sn_fault_detection
         run: |
           commit_message="${{ github.event.head_commit.message }}"
-          if [[ $commit_message == *"sn_dysfunction"* ]]; then
-            ./resources/scripts/publish_crate_with_retries.sh "sn_dysfunction"
+          if [[ $commit_message == *"sn_fault_detection"* ]]; then
+            ./resources/scripts/publish_crate_with_retries.sh "sn_fault_detection"
           fi
       - name: publish sn_node
         run: |

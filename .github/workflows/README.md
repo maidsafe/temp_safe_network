@@ -65,7 +65,7 @@ To do so, follow these steps:
       publishing. If it has any errors, fix them until you can get the dry run to pass.
     - Create a PR to merge in the new crate along with the new CHANGELOG and README.
     - Get that PR merged into `main`.
-    - Tag the `main` branch using `crate_name-version_number`, e.g., `sn_dysfunction-0.1.0` and push
+    - Tag the `main` branch using `crate_name-version_number`, e.g., `sn_fault_detection-0.1.0` and push
       that tag.
     - Run `cd <crate_name> && cargo publish` from `main`.
 * If the new crate is a binary we want to release:

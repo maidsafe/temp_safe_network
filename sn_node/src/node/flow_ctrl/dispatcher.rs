@@ -93,7 +93,7 @@ impl Dispatcher {
                     .map(|(peer, msg)| comm.send_out_bytes(peer, msg_id, msg, send_stream.clone()));
                 let results = futures::future::join_all(tasks).await;
 
-                // Any failed sends are tracked via Cmd::HandlePeerFailedSend, which will log dysfunction for any peers
+                // Any failed sends are tracked via Cmd::HandlePeerFailedSend, which will track issues for any peers
                 // in the section (otherwise ignoring failed send to out of section nodes or clients)
                 let cmds = results
                     .into_iter()
@@ -107,9 +107,9 @@ impl Dispatcher {
 
                 Ok(cmds)
             }
-            Cmd::TrackNodeIssueInDysfunction { name, issue } => {
+            Cmd::TrackNodeIssue { name, issue } => {
                 let node = self.node.read().await;
-                debug!("[NODE READ]: dysf tracking read got");
+                debug!("[NODE READ]: fault tracking read got");
                 node.log_node_issue(name, issue);
                 Ok(vec![])
             }

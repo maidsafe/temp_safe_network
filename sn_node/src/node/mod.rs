@@ -60,7 +60,7 @@ mod core {
             bootstrap::JoiningAsRelocated,
             data::Capacity,
             dkg::DkgVoter,
-            flow_ctrl::{cmds::Cmd, dysfunction::DysCmds},
+            flow_ctrl::{cmds::Cmd, fault_detection::FaultsCmd},
             handover::Handover,
             membership::{elder_candidates, try_split_dkg, Membership},
             messaging::Peers,
@@ -69,7 +69,7 @@ mod core {
         UsedSpace,
     };
     use sn_consensus::Generation;
-    use sn_dysfunction::IssueType;
+    use sn_fault_detection::IssueType;
     use sn_interface::{
         messaging::{
             signature_aggregator::SignatureAggregator,
@@ -126,7 +126,7 @@ mod core {
         pub(crate) joins_allowed: bool,
         // Trackers
         pub(crate) capacity: Capacity,
-        pub(crate) dysfunction_cmds_sender: mpsc::Sender<DysCmds>,
+        pub(crate) fault_cmds_sender: mpsc::Sender<FaultsCmd>,
     }
 
     #[derive(custom_debug::Debug, Clone)]
@@ -143,7 +143,7 @@ mod core {
         pub(crate) comm: Comm,
         pub(crate) joins_allowed: bool,
         #[debug(skip)]
-        pub(crate) dysfunction_cmds_sender: mpsc::Sender<DysCmds>,
+        pub(crate) fault_cmds_sender: mpsc::Sender<FaultsCmd>,
     }
 
     impl NodeContext {
@@ -162,12 +162,12 @@ mod core {
         /// processing around this (as this can be called during dkg eg)
         pub(crate) fn log_node_issue(&self, name: XorName, issue: IssueType) {
             trace!("Logging issue {issue:?} in dysfunction for {name}");
-            let dysf_sender = self.dysfunction_cmds_sender.clone();
+            let dysf_sender = self.fault_cmds_sender.clone();
             // TODO: do we need to kill the node if we fail tracking dysf?
             let _handle = tokio::spawn(async move {
-                if let Err(error) = dysf_sender.send(DysCmds::TrackIssue(name, issue)).await {
+                if let Err(error) = dysf_sender.send(FaultsCmd::TrackIssue(name, issue)).await {
                     // Log the issue, and error. We need to be wary of actually hitting this.
-                    warn!("Could not send DysCmds through dysfunctional_cmds_tx: {error}");
+                    warn!("Could not send FaultsCmd through dysfunctional_cmds_tx: {error}");
                 }
             });
         }
@@ -189,7 +189,7 @@ mod core {
                 comm: self.comm.clone(),
                 joins_allowed: self.joins_allowed,
                 data_storage: self.data_storage.clone(),
-                dysfunction_cmds_sender: self.dysfunction_cmds_sender.clone(),
+                fault_cmds_sender: self.fault_cmds_sender.clone(),
             }
         }
 
@@ -201,7 +201,7 @@ mod core {
             section_key_share: Option<SectionKeyShare>,
             used_space: UsedSpace,
             root_storage_dir: PathBuf,
-            dysfunction_cmds_sender: mpsc::Sender<DysCmds>,
+            fault_cmds_sender: mpsc::Sender<FaultsCmd>,
         ) -> Result<Self> {
             let addr = comm.socket_addr();
             let membership = if let Some(key) = section_key_share.clone() {
@@ -258,7 +258,7 @@ mod core {
                 joins_allowed: true,
                 data_storage,
                 capacity: Capacity::default(),
-                dysfunction_cmds_sender,
+                fault_cmds_sender,
                 membership,
             };
 
@@ -657,30 +657,33 @@ mod core {
             Ok(cmds)
         }
 
-        /// Log an issue in dysfunction
+        /// Log an issue in fault tracker
         /// Spawns a process to send this incase the channel may be full, we don't hold up
         /// processing around this (as this can be called during dkg eg)
         pub(crate) fn log_node_issue(&self, name: XorName, issue: IssueType) {
-            trace!("Logging issue {issue:?} in dysfunction for {name}");
-            let dysf_sender = self.dysfunction_cmds_sender.clone();
-            // TODO: do we need to kill the node if we fail tracking dysf?
+            trace!("Logging issue {issue:?} in fault tracker for {name}");
+            let fault_sender = self.fault_cmds_sender.clone();
+            // TODO: do we need to kill the node if we fail tracking faults?
             let _handle = tokio::spawn(async move {
-                if let Err(error) = dysf_sender.send(DysCmds::TrackIssue(name, issue)).await {
+                if let Err(error) = fault_sender.send(FaultsCmd::TrackIssue(name, issue)).await {
                     // Log the issue, and error. We need to be wary of actually hitting this.
-                    warn!("Could not send DysCmds through dysfunctional_cmds_tx: {error}");
+                    warn!("Could not send FaultsCmd through fault_cmds_tx: {error}");
                 }
             });
         }
 
-        /// Sends `DysCmds::UntrackIssue` cmd
+        /// Sends `FaultsCmd::UntrackIssue` cmd
         /// Spawns a process to send this incase the channel may be full, we don't hold up
         /// processing around this (as this can be called during dkg eg)
         pub(crate) fn untrack_node_issue(&self, name: XorName, issue: IssueType) {
-            let dysf_sender = self.dysfunction_cmds_sender.clone();
-            // TODO: do we need to kill the node if we fail tracking dysf?
+            let fault_sender = self.fault_cmds_sender.clone();
+            // TODO: do we need to kill the node if we fail tracking faults?
             let _handle = tokio::spawn(async move {
-                if let Err(error) = dysf_sender.send(DysCmds::UntrackIssue(name, issue)).await {
-                    warn!("Could not send DysCmds through dysfunctional_cmds_tx: {error}");
+                if let Err(error) = fault_sender
+                    .send(FaultsCmd::UntrackIssue(name, issue))
+                    .await
+                {
+                    warn!("Could not send FaultsCmd through fault_cmds_tx: {error}");
                 }
             });
         }

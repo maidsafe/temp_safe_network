@@ -27,7 +27,7 @@ use tokio::sync::Mutex;
 
 /// These retries are how may _new_ connection attempts do we make.
 /// If we fail all of these, HandlePeerFailedSend will be triggered
-/// for section nodes, which in turn kicks off Dysfunction tracking
+/// for section nodes, which in turn kicks off fault tracking
 const MAX_SENDJOB_RETRIES: usize = 3;
 
 #[derive(Debug)]

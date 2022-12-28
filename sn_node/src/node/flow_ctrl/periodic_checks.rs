@@ -22,9 +22,9 @@ const PROBE_INTERVAL: Duration = Duration::from_secs(30);
 const MISSING_VOTE_INTERVAL: Duration = Duration::from_secs(5);
 const MISSING_DKG_MSG_INTERVAL: Duration = Duration::from_secs(5);
 const SECTION_PROBE_INTERVAL: Duration = Duration::from_secs(300);
-const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(5);
+const FAULT_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 // 30 adult nodes checked per minute., so each node should be queried 10x in 10 mins
-// Which should hopefully trigger dysfunction if we're not getting responses back
+// Which should hopefully trigger fault if we're not getting responses back
 // const ADULT_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(2);
 const ELDER_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(3);
 
@@ -35,7 +35,7 @@ pub(super) struct PeriodicChecksTimestamps {
     last_elder_health_check: Instant,
     last_vote_check: Instant,
     last_dkg_msg_check: Instant,
-    last_dysfunction_check: Instant,
+    last_fault_check: Instant,
 }
 
 impl PeriodicChecksTimestamps {
@@ -47,7 +47,7 @@ impl PeriodicChecksTimestamps {
             last_elder_health_check: Instant::now(),
             last_vote_check: Instant::now(),
             last_dkg_msg_check: Instant::now(),
-            last_dysfunction_check: Instant::now(),
+            last_fault_check: Instant::now(),
         }
     }
 }
@@ -127,7 +127,7 @@ impl FlowCtrl {
 
         // The above health check only queries for chunks
         // here we specifically ask for AE prob msgs and manually
-        // track dysfunction
+        // track faults
         if self.timestamps.last_elder_health_check.elapsed() > ELDER_HEALTH_CHECK_INTERVAL {
             self.timestamps.last_elder_health_check = now;
             for cmd in Self::health_check_elders_in_section(context).await {
@@ -155,10 +155,9 @@ impl FlowCtrl {
             debug!(" ----> dkg msg periodics done");
         }
 
-        if self.timestamps.last_dysfunction_check.elapsed() > DYSFUNCTION_CHECK_INTERVAL {
-            self.timestamps.last_dysfunction_check = now;
-            let dysf_cmds = self.check_for_dysfunction().await;
-            cmds.extend(dysf_cmds);
+        if self.timestamps.last_fault_check.elapsed() > FAULT_CHECK_INTERVAL {
+            self.timestamps.last_fault_check = now;
+            cmds.extend(self.vote_out_faulty_nodes().await);
         }
 
         for cmd in cmds {
@@ -190,7 +189,7 @@ impl FlowCtrl {
 
     //     let auth = auth(&node, &msg)?;
 
-    //     // generate the cmds, and ensure we go through dysfunction tracking
+    //     // generate the cmds, and ensure we go through fault tracking
     //     node.handle_valid_client_msg(
     //         msg_id,
     //         msg,
@@ -230,8 +229,8 @@ impl FlowCtrl {
     }
 
     /// Generates a probe msg, which goes to all section elders in order to
-    /// passively maintain network knowledge over time and track dysfunction
-    /// Tracking dysfunction while awaiting a response
+    /// passively maintain network knowledge over time and track faults.
+    /// Tracking faults while awaiting a response.
     async fn health_check_elders_in_section(context: &NodeContext) -> Vec<Cmd> {
         let mut cmds = vec![];
 
@@ -242,9 +241,9 @@ impl FlowCtrl {
         for elder in elders {
             // we track a knowledge issue
             // whhich is countered when an AE-Update is
-            cmds.push(Cmd::TrackNodeIssueInDysfunction {
+            cmds.push(Cmd::TrackNodeIssue {
                 name: elder.name(),
-                issue: sn_dysfunction::IssueType::AeProbeMsg,
+                issue: sn_fault_detection::IssueType::AeProbeMsg,
             });
         }
 
@@ -317,14 +316,14 @@ impl FlowCtrl {
         });
     }
 
-    async fn check_for_dysfunction(&mut self) -> Vec<Cmd> {
-        info!("Performing dysfunction checking");
+    async fn vote_out_faulty_nodes(&mut self) -> Vec<Cmd> {
+        info!("Voting out faulty nodes");
         let mut cmds = vec![];
-        let dysfunctional_nodes = self.get_dysfunctional_node_names().await;
+        let faulty_nodes = self.get_faulty_node_names().await;
 
-        if !dysfunctional_nodes.is_empty() {
-            debug!("{:?} : {dysfunctional_nodes:?}", LogMarker::ProposeOffline);
-            cmds.push(Cmd::ProposeVoteNodesOffline(dysfunctional_nodes))
+        if !faulty_nodes.is_empty() {
+            debug!("{:?} : {faulty_nodes:?}", LogMarker::ProposeOffline);
+            cmds.push(Cmd::ProposeVoteNodesOffline(faulty_nodes))
         }
 
         cmds
