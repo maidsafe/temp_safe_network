@@ -14,7 +14,7 @@ use crate::{
     storage::Error as StorageError,
 };
 use qp2p::SendStream;
-use sn_dysfunction::IssueType;
+use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
         data::{CmdResponse, StorageLevel},
@@ -77,7 +77,7 @@ impl MyNode {
                 error!("Not enough space to store data {data_addr:?}");
                 let msg = NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
                     node_id: PublicKey::from(context.keypair.public),
-                    data: data.clone(),
+                    data_address: data.address(),
                     full: true,
                 });
 
@@ -385,13 +385,10 @@ impl MyNode {
             }
             NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
                 node_id,
-                data,
+                data_address,
                 full,
             }) => {
-                info!(
-                    "Processing CouldNotStoreData event with MsgId: {:?}",
-                    msg_id
-                );
+                info!("Processing CouldNotStoreData event with {msg_id:?} at : {data_address:?}");
 
                 if !context.is_elder {
                     error!("Received unexpected message while Adult");
@@ -406,14 +403,10 @@ impl MyNode {
                     if changed {
                         // ..then we accept a new node in place of the full node
                         write_locked_node.joins_allowed = true;
+
+                        context.log_node_issue(node_id.into(), IssueType::Communication);
                     }
                 }
-
-                let targets = MyNode::target_data_holders(&context, data.name());
-
-                // TODO: handle responses where replication failed...
-                let _results =
-                    MyNode::replicate_data_to_adults(&context, data, msg_id, targets).await?;
 
                 Ok(vec![])
             }

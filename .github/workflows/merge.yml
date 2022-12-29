@@ -141,13 +141,13 @@ jobs:
         timeout-minutes: 25
         run: cd sn_interface && cargo test --release
 
-      - name: Build sn_dysfunction tests before running
-        run: cd sn_dysfunction && cargo test --no-run --release
+      - name: Build sn_fault_detection tests before running
+        run: cd sn_fault_detection && cargo test --no-run --release
         timeout-minutes: 50
 
-      - name: Run sn_dysfunction tests
+      - name: Run sn_fault_detection tests
         timeout-minutes: 15
-        run: cd sn_dysfunction && cargo test --release
+        run: cd sn_fault_detection && cargo test --release
 
       - name: Build sn_node tests before running
         run: cd sn_node && cargo test --no-run --release
@@ -215,7 +215,7 @@ jobs:
         id: section-startup
         env:
           SN_ADULT_RESPONSE_TIMEOUT: 70
-          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
+          RUST_LOG: "sn_node,sn_consensus,sn_fault_detection,sn_interface=trace"
 
       - name: Wait for all nodes to join
         shell: bash
@@ -232,10 +232,10 @@ jobs:
           SN_QUERY_TIMEOUT: 90
           RUST_LOG: "sn_client=trace,qp2p=debug"
         run: cd sn_client && cargo test --release --features check-replicas -- --test-threads=1
-        timeout-minutes: 50
+        timeout-minutes: 7
 
       - name: Run example app for file API against local network
-        timeout-minutes: 10
+        timeout-minutes: 2
         shell: bash
         run: cd sn_client && cargo run --release --example client_files
 
@@ -420,7 +420,7 @@ jobs:
   #       shell: bash
   #       run: cargo run --release --example churn
   #       env:
-  #         RUST_LOG: "sn_node,sn_client,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
+  #         RUST_LOG: "sn_node,sn_client,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
 
 
   #     # - name: Print Network Stats after churn test
@@ -440,7 +440,7 @@ jobs:
   #     #   shell: bash
   #     #   run: cargo run --release --example network_split
   #     #   env:
-  #     #     RUST_LOG: "sn_node,sn_client,sn_consensus,sn_dysfunction=trace"
+  #     #     RUST_LOG: "sn_node,sn_client,sn_consensus,sn_fault_detection=trace"
 
 
   #     # - name: Print Network Log Stats at start
@@ -591,7 +591,7 @@ jobs:
         run: ./target/release/testnet --interval 30000
         id: section-startup
         env:
-          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
+          RUST_LOG: "sn_node,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
 
       - name: Wait for all nodes to join
         shell: bash
@@ -606,7 +606,7 @@ jobs:
         env:
           RUST_LOG: "sn_client=trace"
         run: cd sn_api && cargo test --release --features check-replicas
-        timeout-minutes: 30
+        timeout-minutes: 7
 
       - name: Are nodes still running...?
         shell: bash
@@ -709,7 +709,7 @@ jobs:
         run: ./target/release/testnet --interval 30000
         id: section-startup
         env:
-          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
+          RUST_LOG: "sn_node,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
 
       - name: Wait for all nodes to join
         shell: bash
@@ -725,7 +725,7 @@ jobs:
 
       - name: Run CLI tests
         run: cd sn_cli && cargo test --release --features check-replicas -- --test-threads=1
-        timeout-minutes: 50
+        timeout-minutes: 7
 
       - name: Are nodes still running...?
         shell: bash

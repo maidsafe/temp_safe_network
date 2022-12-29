@@ -29,10 +29,8 @@ pub(crate) const JOIN_RELOCATE_MSG_PRIORITY: i32 = 2;
 pub(crate) const DATA_REPLICATION_MSG_PRIORITY: i32 = 3;
 // not maintaining network structure, so can wait
 pub(crate) const NODE_DATA_MSG_PRIORITY: i32 = -6;
-#[cfg(any(feature = "chunks", feature = "registers"))]
 // has payment throttle, but is not critical for network function
 pub(crate) const CLIENT_CMD_PRIORITY: i32 = -8;
-#[cfg(any(feature = "chunks", feature = "registers"))]
 // has no throttle and is sent by clients, lowest prio
 pub(crate) const CLIENT_QUERY_PRIORITY: i32 = -10;
 
@@ -42,7 +40,6 @@ pub(crate) const CLIENT_QUERY_PRIORITY: i32 = -10;
 #[derive(PartialEq, Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
 pub enum MsgType {
-    #[cfg(any(feature = "chunks", feature = "registers"))]
     /// Message from client to nodes.
     Client {
         /// Message ID
@@ -54,7 +51,6 @@ pub enum MsgType {
         /// the message
         msg: ClientMsg,
     },
-    #[cfg(any(feature = "chunks", feature = "registers"))]
     /// Message response for clients sent by nodes.
     ClientDataResponse {
         /// Message ID
@@ -71,7 +67,6 @@ pub enum MsgType {
         /// the message
         msg: NodeMsg,
     },
-    #[cfg(any(feature = "chunks", feature = "registers"))]
     /// The response to a NodeDataCmd or NodeDataQuery, containing the result.
     NodeDataResponse {
         /// Message ID
@@ -88,11 +83,8 @@ impl MsgType {
             // node <-> node system comms
             Self::Node { msg, .. } => msg.priority(),
             // client <-> node service comms
-            #[cfg(any(feature = "chunks", feature = "registers"))]
             Self::Client { msg, .. } => msg.priority(),
-            #[cfg(any(feature = "chunks", feature = "registers"))]
             Self::ClientDataResponse { msg, .. } => msg.priority(),
-            #[cfg(any(feature = "chunks", feature = "registers"))]
             Self::NodeDataResponse { msg, .. } => msg.priority(),
         }
     }

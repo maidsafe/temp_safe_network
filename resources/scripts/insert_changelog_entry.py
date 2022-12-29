@@ -30,7 +30,7 @@ def insert_changelog_entry(entry, pattern):
 
 def main(
         sn_interface_version,
-        sn_dysfunction_version,
+        sn_fault_detection_version,
         sn_client_version,
         sn_node_version,
         sn_api_version,
@@ -38,9 +38,9 @@ def main(
     if sn_interface_version:
         sn_node_changelog_entry = get_changelog_entry("sn_interface/CHANGELOG.md", sn_interface_version)
         insert_changelog_entry(sn_node_changelog_entry, "__SN_INTERFACE_CHANGELOG_TEXT__")
-    if sn_dysfunction_version:
-        sn_node_changelog_entry = get_changelog_entry("sn_dysfunction/CHANGELOG.md", sn_dysfunction_version)
-        insert_changelog_entry(sn_node_changelog_entry, "__SN_DYSFUNCTION_CHANGELOG_TEXT__")
+    if sn_fault_detection_version:
+        sn_node_changelog_entry = get_changelog_entry("sn_fault_detection/CHANGELOG.md", sn_fault_detection_version)
+        insert_changelog_entry(sn_node_changelog_entry, "__sn_fault_detection_CHANGELOG_TEXT__")
     if sn_client_version:
         sn_client_changelog_entry = get_changelog_entry("sn_client/CHANGELOG.md", sn_client_version)
         insert_changelog_entry(sn_client_changelog_entry, "__SN_CLIENT_CHANGELOG_TEXT__")
@@ -56,14 +56,14 @@ def main(
 
 if __name__ == "__main__":
     sn_interface_version = get_crate_version("sn_interface")
-    sn_dysfunction_version = get_crate_version("sn_dysfunction")
+    sn_fault_detection_version = get_crate_version("sn_fault_detection")
     sn_client_version = get_crate_version("sn_client")
     sn_node_version = get_crate_version("sn_node")
     sn_api_version = get_crate_version("sn_api")
     sn_cli_version = get_crate_version("sn_client")
     main(
         sn_interface_version,
-        sn_dysfunction_version,
+        sn_fault_detection_version,
         sn_client_version,
         sn_node_version,
         sn_api_version,

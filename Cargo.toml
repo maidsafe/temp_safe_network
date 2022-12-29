@@ -4,7 +4,7 @@ members = [
     "sn_api",
     "sn_client",
     "sn_cli",
-    "sn_dysfunction",
+    "sn_fault_detection",
     "sn_cmd_test_utilities",
     "log_cmds_inspector",
     "sn_interface",

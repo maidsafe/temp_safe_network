@@ -34,8 +34,6 @@ pub const ENV_QUERY_TIMEOUT: &str = "SN_QUERY_TIMEOUT";
 pub const ENV_MAX_BACKOFF_INTERVAL: &str = "SN_MAX_BACKOFF_INTERVAL";
 /// Environment variable used to convert into [`ClientBuilder::cmd_timeout`] (seconds)
 pub const ENV_CMD_TIMEOUT: &str = "SN_CMD_TIMEOUT";
-/// Environment variable used to convert into [`ClientBuilder::cmd_ack_wait`] (seconds)
-pub const ENV_AE_WAIT: &str = "SN_AE_WAIT";
 
 /// Bind by default to all network interfaces on a OS assigned port
 pub const DEFAULT_LOCAL_ADDR: (Ipv4Addr, u16) = (Ipv4Addr::UNSPECIFIED, 0);
@@ -43,12 +41,6 @@ pub const DEFAULT_LOCAL_ADDR: (Ipv4Addr, u16) = (Ipv4Addr::UNSPECIFIED, 0);
 pub const DEFAULT_QUERY_CMD_TIMEOUT: Duration = Duration::from_secs(90);
 /// Max amount of time for an operation backoff (time between attempts). In Seconds.
 pub const DEFAULT_MAX_QUERY_CMD_BACKOFF_INTERVAL: Duration = Duration::from_secs(3);
-
-// Default interval at which to send (QUIC) keep-alives msgs to maintain otherwise idle connections.
-const DEFAULT_KEEP_ALIVE_INTERVAL: Duration = Duration::from_secs(3);
-// In the absence of any (QUIC) keep-alive messages, connections will be closed
-// if they remain idle for at least this duration.
-const DEFAULT_IDLE_TIMEOUT: Duration = Duration::from_secs(18);
 
 /// Build a [`crate::Client`]
 #[derive(Debug, Default)]
@@ -60,7 +52,6 @@ pub struct ClientBuilder {
     query_timeout: Option<Duration>,
     max_backoff_interval: Option<Duration>,
     cmd_timeout: Option<Duration>,
-    cmd_ack_wait: Option<Duration>,
     network_contacts: Option<SectionTree>,
 }
 
@@ -115,12 +106,6 @@ impl ClientBuilder {
         self
     }
 
-    /// Time to wait after a cmd is sent for AE flows to complete
-    pub fn cmd_ack_wait(mut self, time: impl Into<Option<Duration>>) -> Self {
-        self.cmd_ack_wait = time.into();
-        self
-    }
-
     /// SectionTree used to bootstrap the client on the network
     pub fn network_contacts(mut self, pm: impl Into<Option<SectionTree>>) -> Self {
         self.network_contacts = pm.into();
@@ -131,7 +116,6 @@ impl ClientBuilder {
     /// - [`Self::query_timeout()`] from [`ENV_QUERY_TIMEOUT`]
     /// - [`Self::max_backoff_interval()`] from [`ENV_MAX_BACKOFF_INTERVAL`]
     /// - [`Self::cmd_timeout()`] from [`ENV_CMD_TIMEOUT`]
-    /// - [`Self::cmd_ack_wait()`] from [`ENV_AE_WAIT`]
     pub fn from_env(mut self) -> Self {
         if let Ok(Some(v)) = env_parse(ENV_QUERY_TIMEOUT) {
             self.query_timeout = Some(Duration::from_secs(v));
@@ -141,9 +125,6 @@ impl ClientBuilder {
         }
         if let Ok(Some(v)) = env_parse(ENV_CMD_TIMEOUT) {
             self.cmd_timeout = Some(Duration::from_secs(v));
-        }
-        if let Ok(Some(v)) = env_parse(ENV_AE_WAIT) {
-            self.cmd_ack_wait = Some(Duration::from_secs(v));
         }
 
         self
@@ -176,13 +157,15 @@ impl ClientBuilder {
 
         let mut qp2p = self.qp2p.unwrap_or_default();
         if qp2p.idle_timeout.is_none() {
-            qp2p.idle_timeout = Some(DEFAULT_IDLE_TIMEOUT);
+            let idle_timeout = if query_timeout > cmd_timeout {
+                query_timeout
+            } else {
+                cmd_timeout
+            };
+            qp2p.idle_timeout = Some(idle_timeout);
         }
 
-        if qp2p.keep_alive_interval.is_none() {
-            qp2p.keep_alive_interval = Some(DEFAULT_KEEP_ALIVE_INTERVAL);
-            debug!("Session config w/ keep alive: {:?}", qp2p);
-        }
+        debug!("Session config: {:?}", qp2p);
 
         let session = Session::new(
             qp2p,

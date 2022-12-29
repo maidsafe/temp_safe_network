@@ -7,12 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    core::NodeContext, flow_ctrl::dysfunction::DysCmds, messaging::Peers, Cmd, Error, MyNode,
+    core::NodeContext, flow_ctrl::fault_detection::FaultsCmd, messaging::Peers, Cmd, Error, MyNode,
     Prefix, Result,
 };
 use crate::storage::Error as StorageError;
 
-use sn_dysfunction::IssueType;
+use sn_fault_detection::IssueType;
 use sn_interface::{
     data_copy_count,
     messaging::{
@@ -298,10 +298,10 @@ impl MyNode {
             Err(_elapsed) => {
                 error!(
                     "{msg_id:?}: No response from {target:?} after {:?} timeout. \
-                    Marking adult as dysfunctional",
+                    Marking adult as faulty",
                     *ADULT_RESPONSE_TIMEOUT
                 );
-                return Ok(vec![Cmd::TrackNodeIssueInDysfunction {
+                return Ok(vec![Cmd::TrackNodeIssue {
                     name: target.name(),
                     // TODO: no need for op id tracking here, this can be a simple counter
                     issue: IssueType::RequestOperation(operation_id),
@@ -423,11 +423,11 @@ impl MyNode {
         self.capacity.retain_members_only(&members);
         // stop tracking liveness of absent holders
         if let Err(error) = self
-            .dysfunction_cmds_sender
-            .send(DysCmds::RetainNodes(members))
+            .fault_cmds_sender
+            .send(FaultsCmd::RetainNodes(members))
             .await
         {
-            warn!("Could not send RetainNodes through dysfunctional_cmds_tx: {error}");
+            warn!("Could not send RetainNodes through fault_cmds_tx: {error}");
         };
     }
 
@@ -435,12 +435,8 @@ impl MyNode {
     pub(crate) async fn add_new_adult_to_trackers(&mut self, adult: XorName) {
         info!("Adding new Adult: {adult} to trackers");
         self.capacity.add_new_adult(adult);
-        if let Err(error) = self
-            .dysfunction_cmds_sender
-            .send(DysCmds::AddNode(adult))
-            .await
-        {
-            warn!("Could not send AddNode through dysfunctional_cmds_tx: {error}");
+        if let Err(error) = self.fault_cmds_sender.send(FaultsCmd::AddNode(adult)).await {
+            warn!("Could not send AddNode through fault_cmds_tx: {error}");
         };
     }
 
@@ -503,7 +499,6 @@ impl MyNode {
         let has_replicated_data_in = !data_collection.is_empty();
 
         for data in data_collection {
-            // grab the write lock each time in the loop to not hold it over large data sets
             let store_result = context
                 .data_storage
                 .store(&data, section_pk, node_keypair.clone())
@@ -525,7 +520,7 @@ impl MyNode {
                     let node_id = PublicKey::from(context.keypair.public);
                     let msg = NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
                         node_id,
-                        data,
+                        data_address: data.address(),
                         full: true,
                     });
                     is_full = true;

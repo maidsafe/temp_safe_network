@@ -175,7 +175,6 @@ impl WireMsg {
     /// Deserialize the payload from this `WireMsg` returning a `MsgType` instance.
     pub fn into_msg(&self) -> Result<MsgType> {
         match self.header.msg_envelope.kind.clone() {
-            #[cfg(any(feature = "chunks", feature = "registers"))]
             MsgKind::Client(auth) => {
                 let msg: ClientMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Data message payload as Msgpack: {}", err))
@@ -190,7 +189,6 @@ impl WireMsg {
                     msg,
                 })
             }
-            #[cfg(any(feature = "chunks", feature = "registers"))]
             MsgKind::ClientDataResponse(_) => {
                 let msg: ClientDataResponse =
                     rmp_serde::from_slice(&self.payload).map_err(|err| {
@@ -213,7 +211,6 @@ impl WireMsg {
                     msg,
                 })
             }
-            #[cfg(any(feature = "chunks", feature = "registers"))]
             MsgKind::NodeDataResponse(_) => {
                 let msg: NodeDataResponse =
                     rmp_serde::from_slice(&self.payload).map_err(|err| {

@@ -117,11 +117,14 @@ impl RegisterStore {
         };
 
         if !path.exists() {
-            trace!("Register log does not exist yet: {}", path.display());
+            trace!(
+                "Register log path for {addr:?} does not exist yet: {}",
+                path.display()
+            );
             return Ok(stored_reg);
         }
 
-        trace!("Register log path exists: {}", path.display());
+        trace!("Register log path for {addr:?} exists: {}", path.display());
         for filepath in list_files_in(&path) {
             match read(&filepath)
                 .await
@@ -143,7 +146,7 @@ impl RegisterStore {
                 }
                 other => {
                     warn!(
-                        "Ignoring corrupted register cmd from storage found at {}: {other:?}",
+                        "Ignoring corrupted Register cmd from storage, for {addr:?}, found at {}: {other:?}",
                         filepath.display()
                     )
                 }
