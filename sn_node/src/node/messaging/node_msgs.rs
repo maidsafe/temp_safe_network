@@ -385,17 +385,29 @@ impl MyNode {
                     return Ok(vec![]);
                 }
 
-                context.log_node_issue(node_id.into(), IssueType::Communication);
+                let mut cmds = vec![];
 
-                if context.joins_allowed {
-                    Ok(vec![])
-                } else {
-                    Ok(vec![Cmd::SetJoinsAllowed(true)])
+                if !context.joins_allowed {
+                    cmds.push(Cmd::SetJoinsAllowed(true));
                     // NB: we do not also set allowed until split, since we
                     // do not expect another node to run out of space before we ourselves
                     // have reached the storage limit (i.e. the `max_capacity` variable, which
                     // should be set by the node operator to be a little bit lower than the actual space).
                 }
+
+                // only when the node is severely out of sync with the rest, do we vote it off straight away
+                // othwerwise we report it as an issue (see further down)
+                if full && context.data_storage.is_below_half_limit() {
+                    debug!("Node {node_id} prematurely reported full. Voting it off..");
+                    let nodes = BTreeSet::from([node_id.into()]);
+                    cmds.push(Cmd::ProposeVoteNodesOffline(nodes));
+                    return Ok(cmds);
+                }
+
+                // we report it as an issue, to give it some slack
+                context.log_node_issue(node_id.into(), IssueType::Communication);
+
+                Ok(cmds)
             }
             NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data)) => {
                 debug!("Attempting to store data locally: {:?}", data.address());

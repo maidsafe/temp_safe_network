@@ -109,7 +109,6 @@ impl UsedSpace {
         current_used_space >= self.min_capacity
     }
 
-    #[allow(unused)]
     pub(crate) fn ratio(&self) -> f64 {
         let used = self.used_space.load(Ordering::Relaxed);
         let min_capacity = self.min_capacity;

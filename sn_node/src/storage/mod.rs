@@ -63,6 +63,12 @@ impl DataStorage {
     pub(crate) fn has_reached_min_capacity(&self) -> bool {
         self.used_space.has_reached_min_capacity()
     }
+
+    /// Returns whether the we have less than half capacity used.
+    pub(crate) fn is_below_half_limit(&self) -> bool {
+        0.5 > self.used_space.ratio()
+    }
+
     /// Store data in the local store
     #[instrument(skip(self))]
     pub async fn store(
