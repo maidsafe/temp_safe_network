@@ -28,10 +28,7 @@ use dashmap::DashMap;
 use qp2p::{Endpoint, IncomingConnections};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
-    sync::{
-        mpsc::{self, Receiver, Sender},
-        Mutex,
-    },
+    sync::mpsc::{self, Receiver, Sender},
     task,
 };
 
@@ -100,10 +97,10 @@ impl Comm {
         peer: Peer,
         msg_id: MsgId,
         bytes: UsrMsgBytes,
-        send_stream: Option<Arc<Mutex<SendStream>>>,
+        send_stream: Option<SendStream>,
     ) -> Result<()> {
         let stream_info = if let Some(stream) = &send_stream {
-            format!(" on {}", stream.lock().await.id())
+            format!(" on {}", stream.id())
         } else {
             "".to_string()
         };
@@ -338,7 +335,7 @@ impl Comm {
         recipient: Peer,
         msg_id: MsgId,
         bytes: UsrMsgBytes,
-        send_stream: Option<Arc<Mutex<SendStream>>>,
+        send_stream: Option<SendStream>,
     ) -> Result<Option<SendWatcher>> {
         let bytes_len = {
             let (h, d, p) = bytes.clone();
@@ -432,7 +429,7 @@ fn listen_for_incoming_msgs(
 pub(crate) struct MsgFromPeer {
     pub(crate) sender: Peer,
     pub(crate) wire_msg: WireMsg,
-    pub(crate) send_stream: Option<Arc<Mutex<SendStream>>>,
+    pub(crate) send_stream: Option<SendStream>,
 }
 
 #[cfg(test)]

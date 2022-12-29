@@ -79,6 +79,8 @@ pub(crate) async fn handle_online_cmd(
     Ok(status)
 }
 
+// Process commands, allowing the user to inspect each and all of the intermediate
+// commands that are being returned by the Cmd dispatcher.
 pub(crate) struct ProcessAndInspectCmds<'a> {
     pending_cmds: VecDeque<Cmd>,
     cmds_to_inspect: VecDeque<usize>,
@@ -99,8 +101,14 @@ impl<'a> ProcessAndInspectCmds<'a> {
         _peer: Peer,
         dispatcher: &'a Dispatcher,
     ) -> crate::node::error::Result<Self> {
+        // TODO: decide how to impl this, w/r/t client response stream, to re-enable
+        // the currently ignored/disabled Spentbook tests. This used to work by
+        // calling `MyNode::handle_valid_client_msg` using the provided ClientMsg,
+        // and use the outcome (commands) as the starting set of cmds to process.
+        let pending_cmds = VecDeque::default();
+
         Ok(Self {
-            pending_cmds: VecDeque::default(),
+            pending_cmds,
             cmds_to_inspect: VecDeque::default(),
             dispatcher,
         })

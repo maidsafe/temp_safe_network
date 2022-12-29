@@ -87,11 +87,17 @@ impl Dispatcher {
                 };
 
                 let comm = context.comm.clone();
-
-                let tasks = peer_msgs
-                    .into_iter()
-                    .map(|(peer, msg)| comm.send_out_bytes(peer, msg_id, msg, send_stream.clone()));
-                let results = futures::future::join_all(tasks).await;
+                let results = if let Some(send_stream) = send_stream {
+                    let task = peer_msgs.get(0).map(|(peer, msg)| {
+                        comm.send_out_bytes(*peer, msg_id, msg.clone(), Some(send_stream))
+                    });
+                    futures::future::join_all(task).await
+                } else {
+                    let task = peer_msgs
+                        .into_iter()
+                        .map(|(peer, msg)| comm.send_out_bytes(peer, msg_id, msg, None));
+                    futures::future::join_all(task).await
+                };
 
                 // Any failed sends are tracked via Cmd::HandlePeerFailedSend, which will track issues for any peers
                 // in the section (otherwise ignoring failed send to out of section nodes or clients)

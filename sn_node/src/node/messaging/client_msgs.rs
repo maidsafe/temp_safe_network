@@ -32,10 +32,8 @@ use sn_interface::{
         Keypair, Peer, RegisterCmd, ReplicatedData, SPENTBOOK_TYPE_TAG,
     },
 };
-use tokio::sync::Mutex;
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Arc;
 use xor_name::XorName;
 
 impl MyNode {
@@ -46,7 +44,7 @@ impl MyNode {
         query: &DataQueryVariant,
         source_peer: Peer,
         correlation_id: MsgId,
-        send_stream: Arc<Mutex<SendStream>>,
+        send_stream: SendStream,
     ) -> Result<()> {
         let the_error_msg = ClientDataResponse::QueryResponse {
             response: query.to_error_response(error.into()),
@@ -72,7 +70,7 @@ impl MyNode {
         cmd: DataCmd,
         error: Error,
         correlation_id: MsgId,
-        send_stream: Arc<Mutex<SendStream>>,
+        send_stream: SendStream,
     ) -> Result<()> {
         let client_msg = ClientDataResponse::CmdResponse {
             response: cmd.to_error_response(error.into()),
@@ -102,7 +100,7 @@ impl MyNode {
         auth: ClientAuth,
         requesting_elder: Peer,
         msg_id: MsgId,
-        send_stream: Option<Arc<Mutex<SendStream>>>,
+        send_stream: Option<SendStream>,
     ) -> Result<()> {
         let response = context
             .data_storage
@@ -125,10 +123,9 @@ impl MyNode {
             msg_id,
         )?;
 
-        if let Some(send_stream) = send_stream {
+        if let Some(mut send_stream) = send_stream {
             // send response on the stream
             let stream_prio = 10;
-            let mut send_stream = send_stream.lock().await;
             send_stream.set_priority(stream_prio);
             let stream_id = send_stream.id();
             trace!("{msg_id:?} Sending response to {requesting_elder:?} over {stream_id}");
@@ -157,7 +154,7 @@ impl MyNode {
         msg: ClientMsg,
         auth: AuthorityProof<ClientAuth>,
         origin: Peer,
-        send_stream: Arc<Mutex<SendStream>>,
+        send_stream: SendStream,
     ) -> Result<Vec<Cmd>> {
         debug!("Handling client {msg_id:?}");
 
