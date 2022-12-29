@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1672221401468,
+  "lastUpdate": 1672307436995,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -48712,6 +48712,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 334080894,
             "range": "± 16207846",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "982bdfcb3ab275252895a9887a3d8eabaa99cf4c",
+          "message": "Merge #1834\n\n1834: Nr 1: Client to elder msg happy path r=oetyng a=oetyng\n\n- feat(cmds): add `cmd-happy-path` feature\r\nThis allows clients to default to a lower impact interaction with\r\nelders, only expanding the impact on failures.\r\n- feat(queries): add `query-happy-path` feature\r\nThis allows clients to default to a lower impact interaction with\r\nelders (todo: only expanding the impact on failures).\r\nAdds combined feat for both cmd and query happy path.\r\n- chore(ci): add `msg-happy-path` e2e ci job\r\n- chore(docs): update `sn_client` readme\r\n\r\n***\r\n\r\nA follow up PR (#1856, currently in draft) adds happy path in the next step of client data cmd; data replication from elders to adults.\n\nCo-authored-by: oetyng <oetyng@gmail.com>",
+          "timestamp": "2022-12-29T08:17:26Z",
+          "tree_id": "ace8b4d9d9fad5545edf1359b17ff9c828afa9a7",
+          "url": "https://github.com/maidsafe/safe_network/commit/982bdfcb3ab275252895a9887a3d8eabaa99cf4c"
+        },
+        "date": 1672307434879,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2417043,
+            "range": "± 400969",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 88109386,
+            "range": "± 1215498",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 104659881,
+            "range": "± 3637878",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 429455808,
+            "range": "± 5574916",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 74981805,
+            "range": "± 937141",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 87084281,
+            "range": "± 1105226",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 348700915,
+            "range": "± 3987337",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 24088641839,
+            "range": "± 164511016",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 56734070,
+            "range": "± 28892855",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2173252628,
+            "range": "± 315719132",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 8792392839,
+            "range": "± 1408163350",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 231055662,
+            "range": "± 16674008",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 2162654091,
+            "range": "± 207401108",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 7945202375,
+            "range": "± 771675550",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 47038086,
+            "range": "± 4226125",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 452339202,
+            "range": "± 16032995",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1780963191,
+            "range": "± 47985783",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11461247,
+            "range": "± 540983",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 97411342,
+            "range": "± 4925320",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 343884997,
+            "range": "± 11153014",
             "unit": "ns/iter"
           }
         ]
