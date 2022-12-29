@@ -19,7 +19,7 @@ use tokio::{sync::mpsc, task};
 use tracing::Instrument;
 
 #[derive(Debug)]
-pub(crate) enum ListenerEvent {
+pub(crate) enum ConnectionEvent {
     Connected {
         peer: Peer,
         connection: Arc<qp2p::Connection>,
@@ -32,13 +32,13 @@ pub(crate) enum ListenerEvent {
 
 #[derive(Clone)]
 pub(crate) struct MsgListener {
-    connection_events: mpsc::Sender<ListenerEvent>,
+    connection_events: mpsc::Sender<ConnectionEvent>,
     receive_msg: mpsc::Sender<MsgFromPeer>,
 }
 
 impl MsgListener {
     pub(crate) fn new(
-        connection_events: mpsc::Sender<ListenerEvent>,
+        connection_events: mpsc::Sender<ConnectionEvent>,
         receive_msg: mpsc::Sender<MsgFromPeer>,
     ) -> Self {
         Self {
@@ -101,7 +101,7 @@ impl MsgListener {
                         node_conn_cached = Some(peer);
                         let _ = self
                             .connection_events
-                            .send(ListenerEvent::Connected {
+                            .send(ConnectionEvent::Connected {
                                 peer,
                                 connection: conn.clone(),
                             })
@@ -138,7 +138,7 @@ impl MsgListener {
             trace!("Removing connection {conn_id} with node {peer} from cache");
             let _ = self
                 .connection_events
-                .send(ListenerEvent::ConnectionClosed {
+                .send(ConnectionEvent::ConnectionClosed {
                     peer,
                     connection: conn,
                 })

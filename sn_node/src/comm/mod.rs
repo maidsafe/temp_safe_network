@@ -12,7 +12,7 @@ mod peer_session;
 
 use self::{
     link::Link,
-    listener::{ListenerEvent, MsgListener},
+    listener::{ConnectionEvent, MsgListener},
     peer_session::{PeerSession, SendStatus, SendWatcher},
 };
 
@@ -52,7 +52,19 @@ impl Comm {
         let (our_endpoint, incoming_connections, _) =
             Endpoint::new_peer(local_addr, Default::default(), config).await?;
 
-        let (comm, _) = setup_comms(our_endpoint, incoming_connections, incoming_msg_pipe);
+        let (add_connection, conn_events_recv) = mpsc::channel(STANDARD_CHANNEL_SIZE);
+
+        let msg_listener = MsgListener::new(add_connection, incoming_msg_pipe);
+
+        let comm = Comm {
+            our_endpoint,
+            msg_listener: msg_listener.clone(),
+            sessions: Arc::new(DashMap::new()),
+        };
+
+        let _ = task::spawn(receive_conns(comm.clone(), conn_events_recv));
+
+        listen_for_incoming_msgs(msg_listener, incoming_connections);
 
         Ok(comm)
     }
@@ -363,43 +375,13 @@ impl Comm {
 }
 
 #[tracing::instrument(skip_all)]
-fn setup_comms(
-    our_endpoint: Endpoint,
-    incoming_connections: IncomingConnections,
-    incoming_msg_pipe: Sender<MsgFromPeer>,
-) -> (Comm, MsgListener) {
-    let (comm, msg_listener) = setup(our_endpoint, incoming_msg_pipe);
-
-    listen_for_incoming_msgs(msg_listener.clone(), incoming_connections);
-
-    (comm, msg_listener)
-}
-
-#[tracing::instrument(skip_all)]
-fn setup(our_endpoint: Endpoint, receive_msg: Sender<MsgFromPeer>) -> (Comm, MsgListener) {
-    let (add_connection, conn_events_recv) = mpsc::channel(STANDARD_CHANNEL_SIZE);
-
-    let msg_listener = MsgListener::new(add_connection, receive_msg);
-
-    let comm = Comm {
-        our_endpoint,
-        msg_listener: msg_listener.clone(),
-        sessions: Arc::new(DashMap::new()),
-    };
-
-    let _ = task::spawn(receive_conns(comm.clone(), conn_events_recv));
-
-    (comm, msg_listener)
-}
-
-#[tracing::instrument(skip_all)]
-async fn receive_conns(comm: Comm, mut conn_events_recv: Receiver<ListenerEvent>) {
+async fn receive_conns(comm: Comm, mut conn_events_recv: Receiver<ConnectionEvent>) {
     while let Some(event) = conn_events_recv.recv().await {
         match event {
-            ListenerEvent::Connected { peer, connection } => {
+            ConnectionEvent::Connected { peer, connection } => {
                 comm.add_incoming(&peer, connection).await
             }
-            ListenerEvent::ConnectionClosed { peer, connection } => {
+            ConnectionEvent::ConnectionClosed { peer, connection } => {
                 comm.remove_conn(&peer, connection).await
             }
         }
