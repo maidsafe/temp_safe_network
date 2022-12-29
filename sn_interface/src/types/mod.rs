@@ -35,7 +35,6 @@ pub use chunk::{Chunk, MAX_CHUNK_SIZE_IN_BYTES};
 pub use errors::{Error, Result};
 pub use keys::{
     keypair::{BlsKeypairShare, Encryption, Keypair, OwnerType, Signing},
-    node_keypairs::NodeKeypairs,
     public_key::PublicKey,
     secret_key::SecretKey,
     signature::{Signature, SignatureShare},
