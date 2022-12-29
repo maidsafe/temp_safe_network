@@ -29,11 +29,8 @@ use bytes::Bytes;
 use futures::FutureExt;
 use itertools::Itertools;
 use lazy_static::lazy_static;
-use std::{collections::BTreeSet, env::var, str::FromStr, sync::Arc};
-use tokio::{
-    sync::Mutex,
-    time::{timeout, Duration},
-};
+use std::{collections::BTreeSet, env::var, str::FromStr};
+use tokio::time::{timeout, Duration};
 use tracing::info;
 use xor_name::XorName;
 
@@ -127,7 +124,7 @@ impl MyNode {
         data: ReplicatedData,
         msg_id: MsgId,
         targets: BTreeSet<Peer>,
-        client_response_stream: Arc<Mutex<SendStream>>,
+        client_response_stream: SendStream,
     ) -> Result<()> {
         let targets_len = targets.len();
 
@@ -155,12 +152,8 @@ impl MyNode {
         // everything went fine, tell the client that
         if success_count == targets_len {
             if let Some(response) = ack_response {
-                MyNode::respond_to_client_on_stream(
-                    context,
-                    response,
-                    client_response_stream.clone(),
-                )
-                .await?;
+                MyNode::respond_to_client_on_stream(context, response, client_response_stream)
+                    .await?;
             } else {
                 // This should not be possible with above checks
                 error!("No valid response to send from all responses for {msg_id:?}")
@@ -187,7 +180,7 @@ impl MyNode {
     async fn respond_to_client_on_stream(
         context: &NodeContext,
         response: WireMsg,
-        send_stream: Arc<Mutex<SendStream>>,
+        send_stream: SendStream,
     ) -> Result<()> {
         if let MsgType::NodeDataResponse {
             msg:
@@ -229,7 +222,7 @@ impl MyNode {
         msg_id: MsgId,
         auth: AuthorityProof<ClientAuth>,
         source_client: Peer,
-        client_response_stream: Arc<Mutex<SendStream>>,
+        client_response_stream: SendStream,
     ) -> Result<Vec<Cmd>> {
         // We accept that we might be sending a WireMsg to ourselves.
         // The extra load is not that big. But we can optimize this later if necessary.
@@ -353,7 +346,7 @@ impl MyNode {
         section_key: bls::PublicKey,
         payload: Bytes,
         kind: MsgKind,
-        send_stream: Arc<Mutex<SendStream>>,
+        mut send_stream: SendStream,
         target_peer: Option<Peer>,
         original_msg_id: MsgId,
     ) -> Result<()> {
@@ -366,7 +359,6 @@ impl MyNode {
             original_msg_id,
         )?;
         let stream_prio = 10;
-        let mut send_stream = send_stream.lock_owned().await;
         let stream_id = send_stream.id();
         trace!("Sending {original_msg_id:?} to recipient over {stream_id}");
 

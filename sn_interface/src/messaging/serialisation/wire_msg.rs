@@ -10,7 +10,7 @@ use super::wire_msg_header::WireMsgHeader;
 use crate::messaging::{
     data::{ClientDataResponse, ClientMsg},
     system::{NodeDataResponse, NodeMsg},
-    AuthorityProof, ClientAuth, Dst, Error, MsgId, MsgKind, MsgType, Result,
+    AuthorityProof, Dst, Error, MsgId, MsgKind, MsgType, Result,
 };
 
 use bytes::{BufMut, Bytes, BytesMut};
@@ -249,11 +249,6 @@ impl WireMsg {
     /// bytes, returning the deserialized message.
     pub fn deserialize(bytes: UsrMsgBytes) -> Result<MsgType> {
         Self::from(bytes)?.into_msg()
-    }
-
-    /// Convenience function which validates the signature on a `ClientMsg`.
-    pub fn verify_sig(auth: ClientAuth, msg: ClientMsg) -> Result<AuthorityProof<ClientAuth>> {
-        Self::serialize_msg_payload(&msg).and_then(|payload| AuthorityProof::verify(auth, &payload))
     }
 }
 

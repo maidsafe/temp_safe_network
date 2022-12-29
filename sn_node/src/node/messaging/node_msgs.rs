@@ -22,7 +22,7 @@ use sn_interface::{
 };
 use std::collections::BTreeSet;
 use std::sync::Arc;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::RwLock;
 
 impl MyNode {
     /// Send a (`NodeMsg`) message to all Elders in our section
@@ -42,7 +42,7 @@ impl MyNode {
     pub(crate) async fn store_data_and_respond(
         context: &NodeContext,
         data: ReplicatedData,
-        response_stream: Option<Arc<Mutex<SendStream>>>,
+        response_stream: Option<SendStream>,
         target: Peer,
         original_msg_id: MsgId,
     ) -> Result<Vec<Cmd>> {
@@ -125,7 +125,7 @@ impl MyNode {
         msg_id: MsgId,
         msg: NodeMsg,
         sender: Peer,
-        send_stream: Option<Arc<Mutex<SendStream>>>,
+        send_stream: Option<SendStream>,
     ) -> Result<Vec<Cmd>> {
         trace!("{:?}: {msg_id:?}", LogMarker::NodeMsgToBeHandled);
 

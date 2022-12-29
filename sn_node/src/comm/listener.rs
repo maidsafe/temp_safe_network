@@ -15,10 +15,7 @@ use sn_interface::{
 
 use qp2p::ConnectionIncoming;
 use std::sync::Arc;
-use tokio::{
-    sync::{mpsc, Mutex},
-    task,
-};
+use tokio::{sync::mpsc, task};
 use tracing::Instrument;
 
 #[derive(Debug)]
@@ -121,7 +118,7 @@ impl MsgListener {
                         .send(MsgFromPeer {
                             sender: peer,
                             wire_msg,
-                            send_stream: send_stream.map(|s| Arc::new(Mutex::new(s))),
+                            send_stream,
                         })
                         .await
                     {

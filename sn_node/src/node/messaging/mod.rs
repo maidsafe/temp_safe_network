@@ -28,7 +28,7 @@ use sn_interface::{
 };
 
 use std::{collections::BTreeSet, sync::Arc};
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::RwLock;
 
 #[derive(Debug, Clone)]
 pub(crate) enum Peers {
@@ -66,7 +66,7 @@ impl MyNode {
         node: Arc<RwLock<MyNode>>,
         origin: Peer,
         wire_msg: WireMsg,
-        send_stream: Option<Arc<Mutex<SendStream>>>,
+        send_stream: Option<SendStream>,
     ) -> Result<Vec<Cmd>> {
         // Deserialize the payload of the incoming message
         let msg_id = wire_msg.msg_id();
@@ -83,26 +83,18 @@ impl MyNode {
         let context = node.read().await.context();
         trace!("[NODE READ]: Handle msg lock got");
         match msg_type {
-            MsgType::Node { msg_id, dst, msg } => {
+            MsgType::Node { dst, msg, .. } => {
                 // Check for entropy before we proceed further
-                // Anything returned here means there's an issue and we should
-                // short-circuit below
-                let ae_cmds = MyNode::check_ae_on_node_msg(
-                    &context,
-                    &origin,
-                    &msg,
+                MyNode::check_ae_on_node_msg(
+                    node,
+                    context,
+                    origin,
+                    msg,
                     &wire_msg,
-                    &dst,
-                    send_stream.clone(),
+                    dst,
+                    send_stream,
                 )
-                .await?;
-
-                if !ae_cmds.is_empty() {
-                    // short circuit and send those AE responses
-                    return Ok(ae_cmds);
-                }
-
-                MyNode::handle_valid_node_msg(node, context, msg_id, msg, origin, send_stream).await
+                .await
             }
             MsgType::Client {
                 msg_id,
@@ -113,26 +105,20 @@ impl MyNode {
                 debug!("Valid client msg {msg_id:?}");
 
                 let Some(send_stream) = send_stream else {
-                    return Err(Error::NoClientResponseStream)
+                    return Err(Error::NoClientResponseStream);
                 };
 
-                // Check for entropy before we proceed further, if AE response was sent
-                // to the client we should just short-circuit
-                if MyNode::is_ae_sent_to_client(
-                    &context,
-                    &origin,
-                    &wire_msg,
-                    &dst,
-                    send_stream.clone(),
+                // Check for entropy before we proceed further
+                MyNode::check_ae_on_client_msg(
+                    context,
+                    origin,
+                    wire_msg,
+                    dst,
+                    msg,
+                    auth,
+                    send_stream,
                 )
-                .await?
-                {
-                    return Ok(vec![]);
-                }
-
-                trace!("{msg_id:?} No AE needed for client message, proceeding to handle msg");
-                MyNode::handle_valid_client_msg(context, msg_id, msg, auth, origin, send_stream)
-                    .await
+                .await
             }
             other @ MsgType::ClientDataResponse { .. } => {
                 error!(

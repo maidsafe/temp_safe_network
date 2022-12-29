@@ -22,9 +22,7 @@ use sn_interface::{
 };
 
 use custom_debug::Debug;
-use std::sync::Arc;
 use std::{collections::BTreeSet, fmt, time::SystemTime};
-use tokio::sync::Mutex;
 
 /// A struct for the job of controlling the flow
 /// of a [`Cmd`] in the system.
@@ -56,7 +54,7 @@ pub(crate) enum Cmd {
     HandleMsg {
         origin: Peer,
         wire_msg: WireMsg,
-        send_stream: Option<Arc<Mutex<SendStream>>>,
+        send_stream: Option<SendStream>,
     },
     /// Allows joining of new nodes.
     SetJoinsAllowed(bool),
@@ -70,7 +68,7 @@ pub(crate) enum Cmd {
         msg_id: MsgId,
         msg: ClientMsg,
         origin: Peer,
-        send_stream: Arc<Mutex<SendStream>>,
+        send_stream: SendStream,
         /// Requester's authority over this message
         auth: AuthorityProof<ClientAuth>,
     },
@@ -112,7 +110,7 @@ pub(crate) enum Cmd {
         msg: NodeMsg,
         msg_id: MsgId,
         recipients: Peers,
-        send_stream: Option<Arc<Mutex<SendStream>>>,
+        send_stream: Option<SendStream>,
         #[debug(skip)]
         context: NodeContext,
     },
@@ -125,7 +123,7 @@ pub(crate) enum Cmd {
         msg: NodeMsg,
         msg_id: MsgId,
         recipients: Peers,
-        send_stream: Option<Arc<Mutex<SendStream>>>,
+        send_stream: Option<SendStream>,
     },
     /// Proposes peers as offline
     ProposeVoteNodesOffline(BTreeSet<XorName>),
@@ -160,7 +158,7 @@ impl Cmd {
     pub(crate) fn send_msg_via_response_stream(
         msg: NodeMsg,
         recipients: Peers,
-        send_stream: Option<Arc<Mutex<SendStream>>>,
+        send_stream: Option<SendStream>,
         context: NodeContext,
     ) -> Self {
         Cmd::SendMsg {
