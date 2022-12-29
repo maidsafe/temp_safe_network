@@ -70,8 +70,11 @@ impl DataStorage {
     }
 
     /// Tries to get rid of stored data that we are no longer responsible for.
-    /// We only do this if min capacity has been reached.
-    /// It is recommended to do this at least on split, but - to be sure - also on every node join.
+    /// We only do the actual cleanup if min capacity has been reached.
+    ///
+    /// We do the check on every net increase in node count, but it is a cheap
+    /// check and any actual cleanup won't happen back to back, due to the requirement
+    /// of `has_reached_min_capacity() == true` before doing it.
     pub(crate) fn try_retain_data_of(&self, prefix: xor_name::Prefix) {
         if self.has_reached_min_capacity() {
             let chunk_storage = self.chunks.clone();
