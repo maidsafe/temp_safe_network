@@ -69,6 +69,27 @@ impl DataStorage {
         0.5 > self.used_space.ratio()
     }
 
+    /// Tries to get rid of stored data that we are no longer responsible for.
+    /// We only do this if min capacity has been reached.
+    /// It is recommended to do this at least on split, but - to be sure - also on every node join.
+    pub(crate) fn try_retain_data_of(&self, prefix: xor_name::Prefix) {
+        if self.has_reached_min_capacity() {
+            let chunk_storage = self.chunks.clone();
+            // run this on another thread, since it can be a bit heavy
+            let _ = tokio::task::spawn(async move {
+                let chunk_addr_to_remove = chunk_storage
+                    .addrs()
+                    .into_iter()
+                    .filter(|addr| !prefix.matches(addr.name()));
+                for addr in chunk_addr_to_remove {
+                    if let Err(err) = chunk_storage.remove_chunk(&addr).await {
+                        warn!("Could not remove chunk {addr:?} due to {err}.");
+                    }
+                }
+            });
+        }
+    }
+
     /// Store data in the local store
     #[instrument(skip(self))]
     pub async fn store(
@@ -276,7 +297,7 @@ mod tests {
         // Cleaned up automatically after test completes
         let tmp_dir = tempdir()?;
         let path = tmp_dir.path();
-        let used_space = UsedSpace::new(usize::MAX / 2, usize::MAX);
+        let used_space = UsedSpace::default();
 
         // Create instance
         let mut storage = DataStorage::new(path, used_space)?;
@@ -328,7 +349,7 @@ mod tests {
         // Cleaned up automatically after test completes
         let tmp_dir = tempdir()?;
         let path = tmp_dir.path();
-        let used_space = UsedSpace::new(usize::MAX / 2, usize::MAX);
+        let used_space = UsedSpace::default();
 
         // Create instance
         let storage = DataStorage::new(path, used_space)?;
@@ -367,7 +388,7 @@ mod tests {
         // Cleaned up automatically after test completes
         let tmp_dir = tempdir()?;
         let path = tmp_dir.path();
-        let used_space = UsedSpace::new(usize::MAX / 2, usize::MAX);
+        let used_space = UsedSpace::default();
 
         // Create instance
         let storage = DataStorage::new(path, used_space)?;
@@ -464,7 +485,7 @@ mod tests {
         let mut model: BTreeMap<XorName, ReplicatedData> = BTreeMap::new();
         let temp_dir = tempdir()?;
         let path = temp_dir.path();
-        let used_space = UsedSpace::new(usize::MAX / 2, usize::MAX);
+        let used_space = UsedSpace::default();
         let runtime = Runtime::new()?;
         let mut storage = DataStorage::new(path, used_space)?;
         let owner_pk = PublicKey::Bls(bls::SecretKey::random().public_key());

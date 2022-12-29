@@ -74,7 +74,6 @@ impl ChunkStorage {
         Ok(path.join(filename))
     }
 
-    #[allow(dead_code)]
     pub(super) async fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
         trace!("Removing chunk, {:?}", address);
         let filepath = self.chunk_addr_to_filepath(address)?;
@@ -173,7 +172,7 @@ mod tests {
 
     fn init_file_store() -> ChunkStorage {
         let root = tempdir().expect("Failed to create temporary directory for chunk disk store");
-        ChunkStorage::new(root.path(), UsedSpace::new(usize::MAX / 2, usize::MAX))
+        ChunkStorage::new(root.path(), UsedSpace::default())
             .expect("Failed to create chunk disk store")
     }
 

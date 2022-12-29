@@ -21,10 +21,11 @@ use tokio::{
 };
 use tracing::{debug, error, warn, Level};
 
+pub(crate) const DEFAULT_MIN_CAPACITY: usize = 1024 * 1024 * 1024; // 1gb
+pub(crate) const DEFAULT_MAX_CAPACITY: usize = 2 * DEFAULT_MIN_CAPACITY;
+
 const CONFIG_FILE: &str = "node.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
-const DEFAULT_MIN_CAPACITY: usize = 1024 * 1024 * 1024; // 1gb
-const DEFAULT_MAX_CAPACITY: usize = 2 * DEFAULT_MIN_CAPACITY;
 
 // In the absence of any (QUIC) keep-alive messages, connections will be closed
 // if they remain idle for at least this duration.

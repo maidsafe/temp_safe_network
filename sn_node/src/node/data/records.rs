@@ -425,7 +425,7 @@ impl MyNode {
         };
     }
 
-    /// Adds the new adult to the Capacity and Liveness trackers.
+    /// Adds the new adult to the Liveness trackers.
     pub(crate) async fn add_new_adult_to_trackers(&mut self, adult: XorName) {
         info!("Adding new Adult: {adult} to trackers");
         if let Err(error) = self.fault_cmds_sender.send(FaultsCmd::AddNode(adult)).await {

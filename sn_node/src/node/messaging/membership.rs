@@ -253,6 +253,19 @@ impl MyNode {
             self.joins_allowed = true;
         }
 
+        // We do this check on every node join.
+        // It is a cheap check and any actual cleanup won't happen back to back,
+        // due to requirement of `has_reached_min_capacity() == true` before doing it.
+        if !joining_nodes.is_empty() {
+            self.data_storage.try_retain_data_of(our_prefix);
+        }
+
+        // Once we've grown the section, we do not need to allow more nodes in.
+        // (Unless we've triggered the storage critical fail safe to grow until split.)
+        if joining_nodes.len() > leaving_nodes.len() && !self.joins_allowed_until_split {
+            self.joins_allowed = false;
+        }
+
         self.log_section_stats();
         self.log_network_stats();
 
