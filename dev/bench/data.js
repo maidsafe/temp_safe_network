@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1672307436995,
+  "lastUpdate": 1672310839258,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -48856,6 +48856,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 343884997,
             "range": "± 11153014",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "acc88c5d94900c840cb6c3111ef92fc24b0f3a3d",
+          "message": "Merge #1926 #1936\n\n1926: Make elders also store data r=oetyng a=oetyng\n\n- Removes the storage level state and updates.\r\n- Removes the storage distinction between `Elders` and `Adults`, which means that `Elders` and `Adults` are all considered equal nodes, responsible for storing data in the same way.\r\n- Adds a `joins_allowed_until_split` variable + logic, which can now be used by `Elders` to split based on section storage level, without bookkeeping the levels of other nodes. They do this by assuming that the section general level of used space is similar to their own level.\r\n\r\n### Follow up PRs:\r\n- The `JoinsAllowedUntilSplit` addition could be split out to its own PR. But it's not a biggie.\r\n- To ensure as close to uniform distribution of nodes as possible (and handle cases where it is not).\n\n1936: Remove unused node keypairs r=grumbach a=grumbach\n\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\r\nRemoves unused Node Keypairs in `sn_interface`\r\nIn fact `sn_node` has its own:\r\n\r\n```\r\npub(crate) struct MyNode {\r\n        ...\r\n        pub(crate) keypair: Arc<Keypair>,\r\n        pub(crate) section_keys_provider: SectionKeysProvider,\r\n        ...\r\n}\r\n```\n\nCo-authored-by: oetyng <oetyng@gmail.com>\nCo-authored-by: grumbach <anselmega@gmail.com>\nCo-authored-by: Anselme <anselmega@gmail.com>",
+          "timestamp": "2022-12-29T09:02:41Z",
+          "tree_id": "ccd728e184ff4fb181f41fec2956b92aa48a3451",
+          "url": "https://github.com/maidsafe/safe_network/commit/acc88c5d94900c840cb6c3111ef92fc24b0f3a3d"
+        },
+        "date": 1672310837134,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2459930,
+            "range": "± 117603",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 92514579,
+            "range": "± 1306663",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 118267739,
+            "range": "± 4805247",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 437592123,
+            "range": "± 3801257",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 75348357,
+            "range": "± 647859",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 93374986,
+            "range": "± 2546709",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 349260662,
+            "range": "± 3200340",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 24486974121,
+            "range": "± 119955771",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 46460824,
+            "range": "± 8613502",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2254139094,
+            "range": "± 124847184",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 7742957799,
+            "range": "± 749211602",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 192945334,
+            "range": "± 17487228",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1849724703,
+            "range": "± 136014752",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 7000476993,
+            "range": "± 664898167",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 47914986,
+            "range": "± 1866742",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 456954321,
+            "range": "± 22962910",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1804957708,
+            "range": "± 35823841",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11631827,
+            "range": "± 465351",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 99209669,
+            "range": "± 4428160",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 332005479,
+            "range": "± 10020102",
             "unit": "ns/iter"
           }
         ]
