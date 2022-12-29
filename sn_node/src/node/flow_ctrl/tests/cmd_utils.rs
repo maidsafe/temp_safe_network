@@ -99,26 +99,6 @@ impl<'a> ProcessAndInspectCmds<'a> {
         _peer: Peer,
         dispatcher: &'a Dispatcher,
     ) -> crate::node::error::Result<Self> {
-        // let node = dispatcher.node();
-        // let the_node = node.read().await;
-
-        // let (msg_id, msg, auth) = get_client_msg_parts_for_handling(msg)?;
-
-        // TODO: decide how to test this, w/r/t no client stream.
-        // let mut cmds = the_node
-        //     .handle_valid_client_msg(
-        //         msg_id,
-        //         msg,
-        //         auth,
-        //         peer,
-        //     )
-        //     .await?;
-
-        // drop any read locks on the node here
-        // we may have commands editing the node, requiring a write lock
-        // coming after
-        // drop(the_node);
-
         Ok(Self {
             pending_cmds: VecDeque::default(),
             cmds_to_inspect: VecDeque::default(),
