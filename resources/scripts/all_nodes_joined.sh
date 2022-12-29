@@ -6,27 +6,55 @@ then
     exit 1
 fi
 
-DEFAULT_ELDER_COUNT=7
-ELDER_COUNT="${SN_ELDER_COUNT:-$DEFAULT_ELDER_COUNT}"
 DEFAULT_NODE_COUNT=30
+DEFAULT_LOG_DIR="$HOME/.safe/node/local-test-network"
+
 NODE_COUNT="${NODE_COUNT:-$DEFAULT_NODE_COUNT}"
 
-# It's better to use the network health test in rust as it's type safe.
-# This is needed for windows though at the moment due to the logfile locking...
-echo "Checking logfiles to check all nodes have joined"
-log_dir="$HOME/.safe/node/local-test-network"
+log_dir="${LOG_DIR:-$DEFAULT_LOG_DIR}"
+echo "Checking nodes log files to verify all nodes have joined. Logs path: $log_dir"
 
 # -u needed here to search log dirs
-nodes_joined=$(rg "ReceivedJoinApproval" "$log_dir" -g "*.log*"  -u -c | wc -l)
+nodes_ips=$(rg "connection info:.*" "$log_dir" -g "*.log*" -u | rg "(127.0.0.1:\d{5})" -or '$1')
+nodes_ips_count=$(echo "$nodes_ips" | wc -l)
 
-echo "Joined nodes found: $nodes_joined ."
+echo "Number of nodes: $nodes_ips_count"
 
-# Node count will always be 1 less than total nodes as genesis does not join anything.
-if ! [[ $nodes_joined -gt $(($NODE_COUNT - 2)) ]]
+if [[ $nodes_ips_count -ne $NODE_COUNT ]]
     then
-        echo "Some nodes have not joined successfully! expected $(($NODE_COUNT -1)), we have $nodes_joined"
+        echo "Unexpected number of joined nodes. Expected $NODE_COUNT, we have $nodes_ips_count:"
+        echo "$nodes_ips"
         exit 100
     else
-        echo "All nodes have joined!"
-        exit 0
+        echo "All nodes have joined. Nodes IPs:"
+        echo "$nodes_ips"
+fi
+
+# We'll use the logs from the last node that joined, to obtain the
+# list of members in the network knowledge they share with AE messages.
+last_node_log_dig="$log_dir/sn-node-$NODE_COUNT"
+members=$(rg ".* msg: AntiEntropy \{.* kind: Update \{ members: \{(SectionSigned \{.*\})+ \}.*" -or '$1' "$last_node_log_dig" -g "*.log*" | tail -1 | rg "(127.0.0.1:\d{5})" -or '$1')
+
+echo ""
+echo "Checking if nodes in network knowledge match the list of nodes IPs..."
+
+invalid_member_found=false
+for m in $members
+do
+    if grep -q "$m" <<< "$nodes_ips"
+    then
+      echo "Node $m is a valid member"
+    else
+      echo "Node $m in network knowledge was not found in the list of nodes IPs"
+      invalid_member_found=true
+    fi
+done
+
+echo ""
+if $invalid_member_found
+then
+  echo "At least one member in the network knowledge was found invalid"
+  exit 100
+else
+  echo "All good, members in the network knowledge found in the list of nodes IPs!"
 fi

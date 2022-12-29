@@ -17,15 +17,17 @@ use std::{
 use tokio::{
     fs::{self, File},
     io::AsyncWriteExt,
+    time::Duration,
 };
 use tracing::{debug, error, warn, Level};
 
 const CONFIG_FILE: &str = "node.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
-#[cfg(not(target_arch = "arm"))]
-const DEFAULT_MAX_CAPACITY: usize = 50 * 1024 * 1024 * 1024; // 50GB
-#[cfg(any(target_arch = "arm", target_arch = "armv7"))]
-const DEFAULT_MAX_CAPACITY: usize = usize::MAX; // This will be 2^32 on these architectures.
+const DEFAULT_MAX_CAPACITY: usize = 1024 * 1024 * 1024; // 1gb
+
+// In the absence of any (QUIC) keep-alive messages, connections will be closed
+// if they remain idle for at least this duration.
+const DEFAULT_IDLE_TIMEOUT_MSEC: u64 = 70_000;
 
 /// Node configuration
 #[derive(Default, Clone, Debug, Serialize, Deserialize, clap::StructOpt)]
@@ -106,6 +108,7 @@ pub struct Config {
     /// be used, if specified.
     #[clap(long, parse(try_from_str = parse_public_addr))]
     pub public_addr: Option<SocketAddr>,
+    /// DEPRECATED (to be removed)
     /// This flag can be used to skip automated port forwarding using IGD. This is used when running
     /// a network on a LAN or when a node is connected to the internet directly, without a router,
     /// e.g. Digital Ocean droplets.
@@ -131,9 +134,6 @@ pub struct Config {
     /// Duration of a UPnP port mapping.
     #[clap(long)]
     pub upnp_lease_duration: Option<u32>,
-    #[clap(skip)]
-    #[allow(missing_docs)]
-    pub network_config: NetworkConfig,
 }
 
 impl Config {
@@ -203,8 +203,8 @@ impl Config {
             self.wallet_id = Some(wallet_id.clone());
         }
 
-        if let Some(root_dir) = &config.root_dir {
-            self.root_dir = Some(root_dir.clone());
+        if config.root_dir.is_some() {
+            self.root_dir = config.root_dir.clone();
         }
 
         self.json_logs = config.json_logs;
@@ -214,12 +214,12 @@ impl Config {
             self.verbose = config.verbose;
         }
 
-        if let Some(completions) = &config.completions {
-            self.completions = Some(completions.clone());
+        if config.completions.is_some() {
+            self.completions = config.completions.clone();
         }
 
-        if let Some(log_dir) = &config.log_dir {
-            self.log_dir = Some(log_dir.clone());
+        if config.log_dir.is_some() {
+            self.log_dir = config.log_dir.clone();
         }
 
         self.logs_retained = config.logs_retained();
@@ -232,29 +232,29 @@ impl Config {
         self.clear_data = config.clear_data || self.clear_data;
         self.first = config.first || self.first;
 
-        if let Some(path) = config.network_contacts_file {
-            self.network_contacts_file = Some(path);
+        if config.network_contacts_file.is_some() {
+            self.network_contacts_file = config.network_contacts_file;
         }
 
-        if let Some(local_addr) = config.local_addr {
-            self.local_addr = Some(local_addr);
+        if config.local_addr.is_some() {
+            self.local_addr = config.local_addr;
         }
 
-        if let Some(public_addr) = config.public_addr {
+        if config.public_addr.is_some() {
             self.public_addr = config.public_addr;
-            self.network_config.external_port = Some(public_addr.port());
-            self.network_config.external_ip = Some(public_addr.ip());
         }
 
-        if let Some(max_msg_size) = config.max_msg_size_allowed {
-            self.max_msg_size_allowed = Some(max_msg_size);
+        if config.max_msg_size_allowed.is_some() {
+            self.max_msg_size_allowed = config.max_msg_size_allowed;
         }
 
-        if let Some(idle_timeout) = config.idle_timeout_msec {
-            self.idle_timeout_msec = Some(idle_timeout);
+        match config.idle_timeout_msec {
+            Some(t) => self.idle_timeout_msec = Some(t),
+            None => self.idle_timeout_msec = Some(DEFAULT_IDLE_TIMEOUT_MSEC),
         }
-        if let Some(keep_alive_interval_msec) = config.keep_alive_interval_msec {
-            self.keep_alive_interval_msec = Some(keep_alive_interval_msec);
+
+        if config.keep_alive_interval_msec.is_some() {
+            self.keep_alive_interval_msec = config.keep_alive_interval_msec;
         }
     }
 
@@ -316,13 +316,22 @@ impl Config {
     }
 
     /// Network configuration options.
-    pub fn network_config(&self) -> &NetworkConfig {
-        &self.network_config
-    }
+    pub fn network_config(&self) -> NetworkConfig {
+        let mut network_config = NetworkConfig::default();
+        if let Some(public_addr) = self.public_addr {
+            network_config.external_port = Some(public_addr.port());
+            network_config.external_ip = Some(public_addr.ip());
+        }
 
-    /// Set network configuration options.
-    pub fn set_network_config(&mut self, config: NetworkConfig) {
-        self.network_config = config;
+        if let Some(t) = self.idle_timeout_msec {
+            network_config.idle_timeout = Some(Duration::from_millis(t));
+        }
+
+        if let Some(t) = self.keep_alive_interval_msec {
+            network_config.keep_alive_interval = Some(Duration::from_millis(t.into()));
+        }
+
+        network_config
     }
 
     /// Get the completions option
@@ -456,7 +465,7 @@ fn smoke() -> Result<()> {
     // NOTE: IF this value is being changed due to a change in the config,
     // the change in config also be handled in Config::merge()
     // and in examples/config_handling.rs
-    let expected_size = 56;
+    let expected_size = 51;
 
     assert_eq!(bincode::serialize(&Config::default())?.len(), expected_size);
     Ok(())

@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+pub use sn_interface::test_utils::TestSectionTree;
+
 use crate::{Safe, SafeUrl};
 
 use sn_client::utils::test_utils::read_genesis_dbc_from_first_node;

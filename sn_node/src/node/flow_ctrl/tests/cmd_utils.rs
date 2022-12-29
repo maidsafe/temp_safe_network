@@ -1,7 +1,11 @@
-use crate::node::{flow_ctrl::dispatcher::Dispatcher, messaging::Peers, Cmd};
-use assert_matches::assert_matches;
-use eyre::eyre;
-use eyre::Result;
+use crate::{
+    comm::MsgFromPeer,
+    node::{
+        flow_ctrl::dispatcher::{into_msg_bytes, Dispatcher},
+        messaging::Peers,
+        Cmd,
+    },
+};
 use sn_interface::{
     messaging::{
         data::ClientMsg,
@@ -12,7 +16,12 @@ use sn_interface::{
     network_knowledge::{test_utils::*, MembershipState, NodeState, RelocateDetails},
     types::{Keypair, Peer, ReplicatedData},
 };
+
+use assert_matches::assert_matches;
+use eyre::{eyre, Result};
 use std::collections::BTreeSet;
+use tokio::sync::mpsc::{self, error::TryRecvError};
+use xor_name::XorName;
 
 pub(crate) struct HandleOnlineStatus {
     pub(crate) node_approval_sent: bool,
@@ -175,7 +184,7 @@ impl Cmd {
         match self {
             Cmd::SendMsg { msg, .. } => match msg {
                 NodeMsg::NodeDataCmd(node_cmd) => match node_cmd {
-                    NodeDataCmd::ReplicateData(data) => {
+                    NodeDataCmd::ReplicateDataBatch(data) => {
                         if data.len() != 1 {
                             return Err(eyre!("Only 1 replicated data instance is expected"));
                         }
@@ -216,4 +225,55 @@ impl Cmd {
     //         _ => Err(eyre!("A Cmd::SendMsg variant was expected")),
     //     }
     // }
+}
+
+impl Dispatcher {
+    // Sends out `NodeMsgs` to others synchronously, (process_cmd() spawns tasks to do it).
+    // Optionally drop the msgs to the provided set of peers.
+    pub(crate) async fn mock_send_msg(&self, cmd: Cmd, filter_recp: Option<BTreeSet<XorName>>) {
+        if let Cmd::SendMsg {
+            msg,
+            msg_id,
+            recipients,
+            send_stream,
+            context,
+        } = cmd
+        {
+            let _ = send_stream;
+            let peer_msgs = {
+                into_msg_bytes(
+                    &context.network_knowledge,
+                    context.name,
+                    msg.clone(),
+                    msg_id,
+                    recipients,
+                )
+                .expect("cannot convert msg into bytes")
+            };
+
+            for (peer, msg_bytes) in peer_msgs {
+                if let Some(filter) = &filter_recp {
+                    if filter.contains(&peer.name()) {
+                        continue;
+                    }
+                }
+                context
+                    .comm
+                    .send_out_bytes_sync(peer, msg_id, msg_bytes)
+                    .await;
+                info!("Sent {msg} to {}", peer.name());
+            }
+        } else {
+            panic!("mock_send_msg expects Cmd::SendMsg, got {cmd:?}");
+        }
+    }
+}
+
+// Receive the next `MsgFromPeer` if the buffer is not empty. Returns None if the buffer is currently empty
+pub(crate) fn get_next_msg(comm_rx: &mut mpsc::Receiver<MsgFromPeer>) -> Option<MsgFromPeer> {
+    match comm_rx.try_recv() {
+        Ok(msg) => Some(msg),
+        Err(TryRecvError::Empty) => None,
+        Err(TryRecvError::Disconnected) => panic!("the comm_rx channel is closed"),
+    }
 }

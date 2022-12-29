@@ -1113,30 +1113,24 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
-## v0.77.1 (2022-12-15)
-
-### Chore
-
- - <csr-id-7620ede57d6f01a63380ac144684b5d504ae4fb4/> removing unused 'url' dependency
- - <csr-id-80201067111349306a651a3f42a8ca740f48abaa/> use latest 0.33 qp2p
- - <csr-id-841a004786767c53ab9d60d4a310299d535b86bc/> make stream.finish non blocking where we can
- - <csr-id-89e1e40ed9100b28a1ad5ed196620a6d6415706e/> ignore qp2p::SendStream::finish errors
-   They dont mean a msg was not sent.
+## v0.77.7 (2022-12-27)
 
 ### Bug Fixes
 
- - <csr-id-b67adb74f03e4e8784ec4d391032d9a1eacb847d/> write all Register cmds to disk even if one or more failed
-   - When writting Register cmds log to disk, we log and return the error for
-   any of them failing, but we don't prevent the rest to be written to disk.
-   - Enable multi-threaded mode for sn_api tests in Bors.
-   - Some minor improvements to log msgs.
+ - <csr-id-220fd52ab3e1bac776ba74793d5042de220bb315/> set default keep-alive interval to be 1/2 of idle_timeout value set
+   - By default the sn_client keep_alive msgs interval will now be set to 1/2 the
+   value set for the idle_timeout value.
+   - Removing unused ClientBuilder::cmd_ack_wait config value.
+   - Decreasing the CI timeout for sn_client, sn_api, and CLI tests, to 7mins.
+   - New LogMarker::IncomingConnection logged by sn_node.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 7 commits contributed to the release.
- - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 5 days passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -1146,6 +1140,225 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1924 ([`be2cded`](https://github.com/maidsafe/safe_network/commit/be2cdedb19154adf324782d7178f0e25018cd16c))
+    - set default keep-alive interval to be 1/2 of idle_timeout value set ([`220fd52`](https://github.com/maidsafe/safe_network/commit/220fd52ab3e1bac776ba74793d5042de220bb315))
+</details>
+
+## v0.77.6 (2022-12-22)
+
+### Chore
+
+ - <csr-id-6bef36cadd09bba0bff9171a352813e3e860ee2c/> sn_interface-0.16.11/sn_client-0.77.6/sn_node-0.72.19
+
+### Bug Fixes
+
+ - <csr-id-c4b47f1fa7b3d814a0de236f8a50b2c9f89750f2/> dont bail on join if sap update errors
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.11/sn_client-0.77.6/sn_node-0.72.19 ([`6bef36c`](https://github.com/maidsafe/safe_network/commit/6bef36cadd09bba0bff9171a352813e3e860ee2c))
+    - Merge #1917 ([`94fecdf`](https://github.com/maidsafe/safe_network/commit/94fecdff1270a7f215095f7419cfa1bb649213ce))
+    - dont bail on join if sap update errors ([`c4b47f1`](https://github.com/maidsafe/safe_network/commit/c4b47f1fa7b3d814a0de236f8a50b2c9f89750f2))
+</details>
+
+## v0.77.5 (2022-12-21)
+
+<csr-id-2af98acaa6b078570fa24b7538705c61d6654f9e/>
+
+### Chore
+
+ - <csr-id-2af98acaa6b078570fa24b7538705c61d6654f9e/> sn_client-0.77.5
+
+### New Features
+
+ - <csr-id-79421d660dfcfebc8d8bf3955ee2534cc3d98e2d/> verify members in network knowledge are the expected
+   - Additional checks added to all_nodes_joined.sh script to be able
+   to detect nodes in the network knowledge which are not those that
+   effectively joined the network.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_client-0.77.5 ([`2af98ac`](https://github.com/maidsafe/safe_network/commit/2af98acaa6b078570fa24b7538705c61d6654f9e))
+    - Merge #1908 ([`8875a59`](https://github.com/maidsafe/safe_network/commit/8875a59d21db86edf0ca8f4affcc80ad7618231f))
+    - verify members in network knowledge are the expected ([`79421d6`](https://github.com/maidsafe/safe_network/commit/79421d660dfcfebc8d8bf3955ee2534cc3d98e2d))
+</details>
+
+<csr-unknown>
+Also some minor improvements to sn_client log msgs.<csr-unknown/>
+
+## v0.77.4 (2022-12-20)
+
+<csr-id-aed73cfa0eb0dc3271defa7de2a90a96c790bc8d/>
+
+### Chore
+
+ - <csr-id-aed73cfa0eb0dc3271defa7de2a90a96c790bc8d/> sn_interface-0.16.9/sn_client-0.77.4/sn_node-0.72.15
+
+### New Features
+
+ - <csr-id-96e8c7c5315090462e1269c48027cdba1bfea23a/> retry sending msg to peer cleaning up all cached bad connections
+   - When sending a msg to a peer, if it fails with an existing cached connection,
+   it will keep retrying till it either finds another cached connection which it
+   succeeds with, or it cleans them all up from the cache creating a new connection
+   to the peer as last attempt.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.9/sn_client-0.77.4/sn_node-0.72.15 ([`aed73cf`](https://github.com/maidsafe/safe_network/commit/aed73cfa0eb0dc3271defa7de2a90a96c790bc8d))
+    - Merge #1899 ([`d88b5dd`](https://github.com/maidsafe/safe_network/commit/d88b5dd5c8c5799c6896b19a9c4de094943b377f))
+    - retry sending msg to peer cleaning up all cached bad connections ([`96e8c7c`](https://github.com/maidsafe/safe_network/commit/96e8c7c5315090462e1269c48027cdba1bfea23a))
+</details>
+
+## v0.77.3 (2022-12-20)
+
+<csr-id-a6addd1dde96833d6629e75b418ac2a244ab31f3/>
+
+### Chore
+
+ - <csr-id-a6addd1dde96833d6629e75b418ac2a244ab31f3/> sn_interface-0.16.7/sn_client-0.77.3/sn_node-0.72.11/sn_api-0.75.3/sn_cli-0.68.3
+
+### Bug Fixes
+
+ - <csr-id-22402ca6acb0215ecfe9b1fdbf306c0f9cb87d95/> genesis_sap is required to create the `SectionTree`
+   - The fields of the tree are assumed to be in sync. But it is not the
+   case for a newly created tree.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 days passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.7/sn_client-0.77.3/sn_node-0.72.11/sn_api-0.75.3/sn_cli-0.68.3 ([`a6addd1`](https://github.com/maidsafe/safe_network/commit/a6addd1dde96833d6629e75b418ac2a244ab31f3))
+    - Merge #1848 ([`ddaf857`](https://github.com/maidsafe/safe_network/commit/ddaf8571749c142e9960407cfd9cfa94231a36ad))
+    - genesis_sap is required to create the `SectionTree` ([`22402ca`](https://github.com/maidsafe/safe_network/commit/22402ca6acb0215ecfe9b1fdbf306c0f9cb87d95))
+</details>
+
+## v0.77.2 (2022-12-16)
+
+<csr-id-01dc60676d5740dc7dd6250edb130b46a33cc168/>
+<csr-id-119ae2d7661d162371749b8466cfd2e9b85d910f/>
+
+### Chore
+
+ - <csr-id-01dc60676d5740dc7dd6250edb130b46a33cc168/> fix new clippy warnings
+
+### Chore
+
+ - <csr-id-119ae2d7661d162371749b8466cfd2e9b85d910f/> sn_interface-0.16.3/sn_client-0.77.2/sn_api-0.75.2/sn_cli-0.68.1
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 1 day passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.3/sn_client-0.77.2/sn_api-0.75.2/sn_cli-0.68.1 ([`119ae2d`](https://github.com/maidsafe/safe_network/commit/119ae2d7661d162371749b8466cfd2e9b85d910f))
+    - fix new clippy warnings ([`01dc606`](https://github.com/maidsafe/safe_network/commit/01dc60676d5740dc7dd6250edb130b46a33cc168))
+</details>
+
+## v0.77.1 (2022-12-15)
+
+<csr-id-7620ede57d6f01a63380ac144684b5d504ae4fb4/>
+<csr-id-80201067111349306a651a3f42a8ca740f48abaa/>
+<csr-id-841a004786767c53ab9d60d4a310299d535b86bc/>
+<csr-id-89e1e40ed9100b28a1ad5ed196620a6d6415706e/>
+<csr-id-82c0cf683f8052374eafbb859176c69d52956c72/>
+
+### Chore
+
+ - <csr-id-7620ede57d6f01a63380ac144684b5d504ae4fb4/> removing unused 'url' dependency
+ - <csr-id-80201067111349306a651a3f42a8ca740f48abaa/> use latest 0.33 qp2p
+ - <csr-id-841a004786767c53ab9d60d4a310299d535b86bc/> make stream.finish non blocking where we can
+ - <csr-id-89e1e40ed9100b28a1ad5ed196620a6d6415706e/> ignore qp2p::SendStream::finish errors
+   They dont mean a msg was not sent.
+
+### Chore
+
+ - <csr-id-82c0cf683f8052374eafbb859176c69d52956c72/> sn_interface-0.16.1/sn_client-0.77.1/sn_node-0.72.1/sn_api-0.75.1
+
+### Bug Fixes
+
+ - <csr-id-b67adb74f03e4e8784ec4d391032d9a1eacb847d/> write all Register cmds to disk even if one or more failed
+   - When writting Register cmds log to disk, we log and return the error for
+   any of them failing, but we don't prevent the rest to be written to disk.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 8 commits contributed to the release over the course of 1 calendar day.
+ - 1 day passed between releases.
+ - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.1/sn_client-0.77.1/sn_node-0.72.1/sn_api-0.75.1 ([`82c0cf6`](https://github.com/maidsafe/safe_network/commit/82c0cf683f8052374eafbb859176c69d52956c72))
     - Merge #1887 ([`2b66221`](https://github.com/maidsafe/safe_network/commit/2b6622144178d6a67db1392dfd4929232cb4ca62))
     - write all Register cmds to disk even if one or more failed ([`b67adb7`](https://github.com/maidsafe/safe_network/commit/b67adb74f03e4e8784ec4d391032d9a1eacb847d))
     - Merge #1885 ([`79439fb`](https://github.com/maidsafe/safe_network/commit/79439fb7c2d3ec01115960a893fcd8ce03da1790))
@@ -1252,6 +1465,8 @@ needed, as they keypair itself contains the Arcs we need.
 <csr-id-bdf50e7ad1214ef4bb48c0a12db8a7700193bb2a/>
 <csr-id-004263308ee31a9568c77aa9655dc186fde75e75/>
 <csr-id-a973b62a8ef48acc92af8735e7e7bcac94e0092f/>
+<csr-id-ea1d0490f0b67a9f39bd98b2bd5830a0f63fbf6e/>
+<csr-id-e3bb817e20843f68ee21e9a5dd7e52c8a6e92b88/>
 
 ### Chore
 
@@ -1366,14 +1581,6 @@ needed, as they keypair itself contains the Arcs we need.
  - <csr-id-707627f8915a6032390b035786e3e39d1f7bac8d/> allow to change the Elder-to-Adult query responses timeout by env var
    - feat(node): allow to change the timeout for Elder-to-Adult query responses
    by setting `SN_ADULT_RESPONSE_TIMEOUT` env var
-- chore(client): set 90secs for cmds (`SN_CMD_TIMEOUT`) and
-   queries (`SN_QUERY_TIMEOUT`) timeout period in sn-client as default.
-- chore(node): set 70secs for Elder-to-Adult query responses (`SN_ADULT_RESPONSE_TIMEOUT`)
-   timeout period in sn_node to as default.
-- chore(ci): setting the same values explicitly for sn_client e2e tests in CI/bors, just
-   to make sure whenever we start adjusting the default vaues we don't change those
-   for CI which have been shown to be adequate in current CI/bors setups so far.
-- Limiting the maximum number of chunks per file concurrently uploaded/retrieved to 5.
 * Debugging message to indicate a spend request being processed correctly, which proved useful when
      trying to get the automated test working.
 * Remove the current section key from the unknown section key error. It's not necessary to include
@@ -1395,8 +1602,6 @@ needed, as they keypair itself contains the Arcs we need.
 
  - <csr-id-de8ed40b9f1ad353c9a8ded58db5de76acee21e1/> reconnect upon any LinkError::Connection(_) error when sending a msg on a bi-stream
    - Upgrading qp2p to v0.32.0.
-- Also some minor improvements to logging msgs.
-- Removing unused error type and cargo feature.
 
 ### Other
 
@@ -1499,9 +1704,6 @@ needed, as they keypair itself contains the Arcs we need.
  - <csr-id-7afd7a95d39098fb5166785c215881233bab528a/> retry once if connection was lost when trying to send on a bi-stream
  - <csr-id-f225a2d84ad3422b4f466fa2bf713c3a767588dc/> adding more context info to some node Error types
    - Initialising logger in sn_client spentbook API tests.
-- Including stream id in log messages.
-- Report the error when a stream couldn't be finished when sending a response since that
-   could mean the recipient didn't received it.
 
 ### Refactor (BREAKING)
 
@@ -1717,9 +1919,6 @@ needed, as they keypair itself contains the Arcs we need.
     - replace `SecuredLinkedList` with `SectionsDAG` ([`0cd47ad`](https://github.com/maidsafe/safe_network/commit/0cd47ad56e0d93e3e99feb0dfcea8094f871ff6f))
     - verify client generate entry_hash ([`18bea3c`](https://github.com/maidsafe/safe_network/commit/18bea3c1e56268b28826643e1ff8936dfa6d4896))
 </details>
-
-<csr-unknown>
- cap the number of concurrent chunks to be uploaded/retrieved for a file cmd responses sent from adults over streamAdd in the stream initialisation from elders to adults. try to reconnect once when the client lost a connection to a peer use bi stream from client; process in Node move to event driven msg handlingput incoming msgs and cmd handling into their own threads force retries to use fresh connection remove node auth compiling sdkg integration client retry spend on unknown section keyWhen the client receives an unknown section key error, it will obtain the proof chain and SAP forthe unknown section and resubmit the request with this additional information.There is no automated client test for this scenario. We went to great lengths to try, but it provednot worth the effort. It was too difficult to modify the network knowledge with a fake section andstill have things function correctly. The scenario is unit tested on the node side, and we doneenough testing to know that the retry loop does what’s intended.There are a few misc changes along with this commit: retry dbc spend on unknown section keyThis is the client side for the scenario where the spent proofs are signed by section keys that theprocessing section is not aware of.Several retries will be attempted because it’s possible for there to be multiple section keys thatare not known, but the network will only return back one key at a time.Based on review feedback, this commit also changes the SpentbookCmd::Spend variant to use a singlefield for the updated network knowledge, along with some other more minor changes. replace SecuredLinkedList with SectionsDAG make client receive stream log clearer use latest client knowledge to get new target elders query adult update for query send changes do not consider as a data-not-found case when not enough spent-proof-shares were retrieved from SpentBook missing MsgKind import after rebase use repsonse_stream for ae responses to client.Also avoid going into Link at the ndoe layer when we have a send_streamto use spawn a task to read query/cmd responses from bi-stream retry cmd if any sends failed Fix for rename in benches making AE msg for clients to be a variant of client response msg type additional contextual information for a few sn_client::Error types<csr-unknown/>
 
 ## v0.76.0 (2022-09-19)
 

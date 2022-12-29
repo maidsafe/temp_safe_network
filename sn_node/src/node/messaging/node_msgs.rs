@@ -14,20 +14,19 @@ use crate::{
     storage::Error as StorageError,
 };
 use qp2p::SendStream;
-use sn_dysfunction::IssueType;
+use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
         data::{CmdResponse, StorageLevel},
         system::{JoinResponse, NodeDataCmd, NodeDataQuery, NodeDataResponse, NodeEvent, NodeMsg},
         MsgId,
     },
-    network_knowledge::NetworkKnowledge,
     types::{log_markers::LogMarker, Keypair, Peer, PublicKey, ReplicatedData},
 };
 use std::collections::BTreeSet;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
-use xor_name::{Prefix, XorName};
+use xor_name::XorName;
 
 impl MyNode {
     /// Send a (`NodeMsg`) message to all Elders in our section
@@ -78,7 +77,7 @@ impl MyNode {
                 error!("Not enough space to store data {data_addr:?}");
                 let msg = NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
                     node_id: PublicKey::from(context.keypair.public),
-                    data: data.clone(),
+                    data_address: data.address(),
                     full: true,
                 });
 
@@ -210,19 +209,11 @@ impl MyNode {
                                 previous_name, new_name, new_keypair
                             );
 
-                            let section_tree = node.network_knowledge.section_tree().clone();
-                            let section_tree_update = node
-                                .network_knowledge
-                                .section_tree()
-                                .generate_section_tree_update(&Prefix::default())?; // TODO: remove this dummy update
-                            let new_network_knowledge =
-                                NetworkKnowledge::new(section_tree, section_tree_update)?;
-
                             // TODO: confirm whether carry out the switch immediately here
                             //       or still using the cmd pattern.
                             //       As the sending of the JoinRequest as notification
                             //       may require the `node` to be switched to new already.
-                            node.relocate(new_keypair, new_network_knowledge)?;
+                            node.relocate(new_keypair, new_name)?;
 
                             trace!("{}", LogMarker::RelocateEnd);
                         } else {
@@ -394,20 +385,17 @@ impl MyNode {
             }
             NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
                 node_id,
-                data,
+                data_address,
                 full,
             }) => {
-                info!(
-                    "Processing CouldNotStoreData event with MsgId: {:?}",
-                    msg_id
-                );
+                info!("Processing CouldNotStoreData event with {msg_id:?} at : {data_address:?}");
 
                 if !context.is_elder {
                     error!("Received unexpected message while Adult");
                     return Ok(vec![]);
                 }
 
-                if full {
+                if full && !context.joins_allowed {
                     let mut write_locked_node = node.write().await;
                     debug!("[NODE WRITE]: CouldNotStore write gottt...");
                     let changed = write_locked_node
@@ -415,14 +403,10 @@ impl MyNode {
                     if changed {
                         // ..then we accept a new node in place of the full node
                         write_locked_node.joins_allowed = true;
+
+                        context.log_node_issue(node_id.into(), IssueType::Communication);
                     }
                 }
-
-                let targets = MyNode::target_data_holders(&context, data.name());
-
-                // TODO: handle responses where replication failed...
-                let _results =
-                    MyNode::replicate_data_to_adults(&context, data, msg_id, targets).await?;
 
                 Ok(vec![])
             }
@@ -442,60 +426,9 @@ impl MyNode {
                 MyNode::store_data_as_adult_and_respond(&context, data, send_stream, sender, msg_id)
                     .await
             }
-            NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateData(data_collection)) => {
+            NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateDataBatch(data_collection)) => {
                 info!("ReplicateData collection MsgId: {:?}", msg_id);
-
-                if context.is_elder {
-                    error!("Received unexpected message while Elder");
-                    return Ok(vec![]);
-                }
-
-                let mut cmds = vec![];
-
-                let section_pk = PublicKey::Bls(context.network_knowledge.section_key());
-                let node_keypair = Keypair::Ed25519(context.keypair.clone());
-
-                for data in data_collection {
-                    // grab the write lock each time in the loop to not hold it over large data sets
-                    let store_result = context
-                        .data_storage
-                        .store(&data, section_pk, node_keypair.clone())
-                        .await;
-
-                    // We are an adult here, so just store away!
-                    // This may return a DatabaseFull error... but we should have reported storage increase
-                    // well before this
-                    match store_result {
-                        Ok(level_report) => {
-                            info!("Storage level report: {:?}", level_report);
-                            cmds.extend(MyNode::record_storage_level_if_any(
-                                &context,
-                                level_report,
-                            )?);
-
-                            info!("End of message flow.");
-                        }
-                        Err(StorageError::NotEnoughSpace) => {
-                            // storage full
-                            error!("Not enough space to store more data");
-
-                            let node_id = PublicKey::from(context.keypair.public);
-                            let msg = NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
-                                node_id,
-                                data,
-                                full: true,
-                            });
-
-                            cmds.push(MyNode::send_msg_to_our_elders(&context, msg))
-                        }
-                        Err(error) => {
-                            // the rest seem to be non-problematic errors.. (?)
-                            error!("Problem storing data, but it was ignored: {error}");
-                        }
-                    }
-                }
-
-                Ok(cmds)
+                MyNode::replicate_data_batch(&context, sender, data_collection).await
             }
             NodeMsg::NodeDataCmd(NodeDataCmd::SendAnyMissingRelevantData(known_data_addresses)) => {
                 info!(
@@ -539,7 +472,7 @@ impl MyNode {
 
     /// Sets Cmd to locally record the storage level and send msgs to Elders
     /// Advising the same
-    fn record_storage_level_if_any(
+    pub(crate) fn record_storage_level_if_any(
         context: &NodeContext,
         level: Option<StorageLevel>,
     ) -> Result<Vec<Cmd>> {

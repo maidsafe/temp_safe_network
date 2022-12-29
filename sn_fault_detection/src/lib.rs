@@ -6,9 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//! Dysfunctional "Node" detection for the SAFE Network.
-//! All dysfunction detection should route through this for proper weighting in
-//! relation to other possible sources of dysfunction
+//! Node fault detection for the SAFE Network.
+//! All fault detection should route through this for proper weighting in
+//! relation to other possible sources of faults.
 
 // For quick_error
 #![recursion_limit = "256"]
@@ -55,15 +55,15 @@ use std::{
 };
 use xor_name::XorName;
 
-/// Some reproducible xorname derived from the operation. This is a permanent reference needed for logging all dysfunction.
+/// Some reproducible xorname derived from the operation. This is a permanent reference needed for logging all faults.
 type NodeIdentifier = XorName;
 
 pub(crate) type TimedTracker = BTreeMap<NodeIdentifier, VecDeque<Instant>>;
 
 #[derive(Clone, Debug)]
-/// Dysfunctional node tracking. Allows various potential issues to be tracked and weighted,
+/// Faulty nodes tracking. Allows various potential issues to be tracked and weighted,
 /// with unresposive or suspect nodes being noted on request, against which action can then be taken.
-pub struct DysfunctionDetection {
+pub struct FaultDetection {
     /// The communication issues logged against a node, along with a timestamp.
     pub communication_issues: TimedTracker,
     /// The dkg issues logged against a node, along with a timestamp to expire after some time.
@@ -78,8 +78,8 @@ pub struct DysfunctionDetection {
     nodes: Vec<XorName>,
 }
 
-impl DysfunctionDetection {
-    /// Set up a new Dysfunctional Node Tracker.
+impl FaultDetection {
+    /// Set up a new tracker.
     pub fn new(nodes: Vec<NodeIdentifier>) -> Self {
         Self {
             communication_issues: BTreeMap::new(),
@@ -91,11 +91,11 @@ impl DysfunctionDetection {
         }
     }
 
-    /// Adds an issue to the dysfunction tracker.
+    /// Adds an issue to the fault tracker.
     ///
     /// The `op_id` only applies when adding an operational issue.
     pub fn track_issue(&mut self, node_id: NodeIdentifier, issue_type: IssueType) {
-        debug!("Adding a new issue to {node_id:?} the dysfunction tracker: {issue_type:?}");
+        debug!("Adding a new issue to {node_id:?} the fault tracker: {issue_type:?}");
         match issue_type {
             IssueType::Dkg => {
                 let queue = self.dkg_issues.entry(node_id).or_default();
@@ -215,7 +215,7 @@ impl DysfunctionDetection {
 
     /// Add a new node to the tracker and recompute closest nodes.
     pub fn add_new_node(&mut self, node: XorName) {
-        info!("Adding new node:{node} to DysfunctionDetection tracker");
+        info!("Adding new node:{node} to FaultDetection tracker");
         self.nodes.push(node);
     }
 
@@ -276,7 +276,7 @@ fn std_deviation(data: &[f32]) -> Option<f32> {
 
 #[cfg(test)]
 mod tests {
-    use super::{DysfunctionDetection, IssueType};
+    use super::{FaultDetection, IssueType};
     use sn_interface::messaging::system::OperationId;
 
     use eyre::Error;
@@ -305,12 +305,12 @@ mod tests {
     #[tokio::test]
     async fn retain_members_should_remove_other_nodes() -> Result<()> {
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
+        let mut fault_detection = FaultDetection::new(nodes.clone());
         let nodes_to_retain = nodes[5..10].iter().cloned().collect::<BTreeSet<XorName>>();
 
-        dysfunctional_detection.retain_members_only(nodes_to_retain.clone());
+        fault_detection.retain_members_only(nodes_to_retain.clone());
 
-        let current_nodes = dysfunctional_detection.current_nodes();
+        let current_nodes = fault_detection.current_nodes();
         assert_eq!(current_nodes.len(), 5);
         for member in current_nodes {
             assert!(nodes_to_retain.contains(member));
@@ -322,29 +322,27 @@ mod tests {
     #[tokio::test]
     async fn retain_members_should_remove_issues_relating_to_nodes_not_retained() -> Result<()> {
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
+        let mut fault_detection = FaultDetection::new(nodes.clone());
 
         // Track some issues for nodes that are going to be removed.
         for node in nodes.iter().take(3) {
-            dysfunctional_detection.track_issue(*node, IssueType::Communication);
-            dysfunctional_detection.track_issue(*node, IssueType::Knowledge);
-            dysfunctional_detection
-                .track_issue(*node, IssueType::RequestOperation(OperationId([1; 32])));
+            fault_detection.track_issue(*node, IssueType::Communication);
+            fault_detection.track_issue(*node, IssueType::Knowledge);
+            fault_detection.track_issue(*node, IssueType::RequestOperation(OperationId([1; 32])));
         }
 
         // Track some issues for nodes that will be retained.
-        dysfunctional_detection.track_issue(nodes[5], IssueType::Communication);
-        dysfunctional_detection.track_issue(nodes[6], IssueType::Knowledge);
-        dysfunctional_detection
-            .track_issue(nodes[7], IssueType::RequestOperation(OperationId([1; 32])));
+        fault_detection.track_issue(nodes[5], IssueType::Communication);
+        fault_detection.track_issue(nodes[6], IssueType::Knowledge);
+        fault_detection.track_issue(nodes[7], IssueType::RequestOperation(OperationId([1; 32])));
 
         let nodes_to_retain = nodes[5..10].iter().cloned().collect::<BTreeSet<XorName>>();
 
-        dysfunctional_detection.retain_members_only(nodes_to_retain);
+        fault_detection.retain_members_only(nodes_to_retain);
 
-        assert_eq!(dysfunctional_detection.communication_issues.len(), 1);
-        assert_eq!(dysfunctional_detection.knowledge_issues.len(), 1);
-        assert_eq!(dysfunctional_detection.unfulfilled_ops.len(), 1);
+        assert_eq!(fault_detection.communication_issues.len(), 1);
+        assert_eq!(fault_detection.knowledge_issues.len(), 1);
+        assert_eq!(fault_detection.unfulfilled_ops.len(), 1);
 
         Ok(())
     }
@@ -352,52 +350,51 @@ mod tests {
     #[tokio::test]
     async fn track_issue_should_add_a_comm_issue() -> Result<()> {
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
+        let mut fault_detection = FaultDetection::new(nodes.clone());
 
-        dysfunctional_detection.track_issue(nodes[0], IssueType::Communication);
+        fault_detection.track_issue(nodes[0], IssueType::Communication);
 
-        assert_eq!(dysfunctional_detection.communication_issues.len(), 1);
-        assert_eq!(dysfunctional_detection.knowledge_issues.len(), 0);
-        assert_eq!(dysfunctional_detection.unfulfilled_ops.len(), 0);
+        assert_eq!(fault_detection.communication_issues.len(), 1);
+        assert_eq!(fault_detection.knowledge_issues.len(), 0);
+        assert_eq!(fault_detection.unfulfilled_ops.len(), 0);
         Ok(())
     }
 
     #[tokio::test]
     async fn track_issue_should_add_a_knowledge_issue() -> Result<()> {
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
+        let mut fault_detection = FaultDetection::new(nodes.clone());
 
-        dysfunctional_detection.track_issue(nodes[0], IssueType::Knowledge);
+        fault_detection.track_issue(nodes[0], IssueType::Knowledge);
 
-        assert_eq!(dysfunctional_detection.knowledge_issues.len(), 1);
-        assert_eq!(dysfunctional_detection.communication_issues.len(), 0);
-        assert_eq!(dysfunctional_detection.unfulfilled_ops.len(), 0);
+        assert_eq!(fault_detection.knowledge_issues.len(), 1);
+        assert_eq!(fault_detection.communication_issues.len(), 0);
+        assert_eq!(fault_detection.unfulfilled_ops.len(), 0);
         Ok(())
     }
 
     #[tokio::test]
     async fn track_issue_should_add_a_pending_op_issue() -> Result<()> {
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
+        let mut fault_detection = FaultDetection::new(nodes.clone());
 
-        dysfunctional_detection
-            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
+        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
 
-        assert_eq!(dysfunctional_detection.unfulfilled_ops.len(), 1);
-        assert_eq!(dysfunctional_detection.knowledge_issues.len(), 0);
-        assert_eq!(dysfunctional_detection.communication_issues.len(), 0);
+        assert_eq!(fault_detection.unfulfilled_ops.len(), 1);
+        assert_eq!(fault_detection.knowledge_issues.len(), 0);
+        assert_eq!(fault_detection.communication_issues.len(), 0);
         Ok(())
     }
 
     #[tokio::test]
     async fn add_new_node_should_track_new_node() -> Result<()> {
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new(nodes);
+        let mut fault_detection = FaultDetection::new(nodes);
 
         let new_adult = random_xorname();
-        dysfunctional_detection.add_new_node(new_adult);
+        fault_detection.add_new_node(new_adult);
 
-        let current_nodes = dysfunctional_detection.current_nodes();
+        let current_nodes = fault_detection.current_nodes();
 
         assert_eq!(current_nodes.len(), 11);
         Ok(())
@@ -406,16 +403,13 @@ mod tests {
     #[tokio::test]
     async fn get_unfulfilled_ops_should_return_op_ids() -> Result<()> {
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
+        let mut fault_detection = FaultDetection::new(nodes.clone());
 
-        dysfunctional_detection
-            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
-        dysfunctional_detection
-            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([2; 32])));
-        dysfunctional_detection
-            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([3; 32])));
+        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
+        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([2; 32])));
+        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([3; 32])));
 
-        let op_ids = dysfunctional_detection.get_unfulfilled_ops(nodes[0]);
+        let op_ids = fault_detection.get_unfulfilled_ops(nodes[0]);
 
         assert_eq!(3, op_ids.len());
         Ok(())
@@ -424,16 +418,13 @@ mod tests {
     #[tokio::test]
     async fn get_unfulfilled_ops_should_return_empty_list_for_node_with_no_ops() -> Result<()> {
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
+        let mut fault_detection = FaultDetection::new(nodes.clone());
 
-        dysfunctional_detection
-            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
-        dysfunctional_detection
-            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([2; 32])));
-        dysfunctional_detection
-            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([3; 32])));
+        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
+        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([2; 32])));
+        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([3; 32])));
 
-        let op_ids = dysfunctional_detection.get_unfulfilled_ops(nodes[1]);
+        let op_ids = fault_detection.get_unfulfilled_ops(nodes[1]);
 
         assert_eq!(0, op_ids.len());
         Ok(())
@@ -442,20 +433,17 @@ mod tests {
     #[tokio::test]
     async fn request_operation_fulfilled_should_remove_pending_op() -> Result<()> {
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
+        let mut fault_detection = FaultDetection::new(nodes.clone());
         let op_id = OperationId([2; 32]);
 
-        dysfunctional_detection
-            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
-        dysfunctional_detection
-            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([2; 32])));
-        dysfunctional_detection
-            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([3; 32])));
+        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
+        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([2; 32])));
+        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([3; 32])));
 
-        let has_removed = dysfunctional_detection.request_operation_fulfilled(&nodes[0], op_id);
+        let has_removed = fault_detection.request_operation_fulfilled(&nodes[0], op_id);
 
         assert!(has_removed);
-        let op_ids = dysfunctional_detection.get_unfulfilled_ops(nodes[0]);
+        let op_ids = fault_detection.get_unfulfilled_ops(nodes[0]);
         assert_eq!(2, op_ids.len());
         assert_eq!(OperationId([1; 32]), op_ids[0]);
         assert_eq!(OperationId([3; 32]), op_ids[1]);
@@ -465,17 +453,14 @@ mod tests {
     #[tokio::test]
     async fn request_operation_fulfilled_should_return_false_for_node_with_no_ops() -> Result<()> {
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
+        let mut fault_detection = FaultDetection::new(nodes.clone());
         let op_id = OperationId([2; 32]);
 
-        dysfunctional_detection
-            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
-        dysfunctional_detection
-            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([2; 32])));
-        dysfunctional_detection
-            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([3; 32])));
+        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
+        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([2; 32])));
+        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([3; 32])));
 
-        let has_removed = dysfunctional_detection.request_operation_fulfilled(&nodes[1], op_id);
+        let has_removed = fault_detection.request_operation_fulfilled(&nodes[1], op_id);
 
         assert!(!has_removed);
         Ok(())
@@ -485,20 +470,17 @@ mod tests {
     async fn request_operation_fulfilled_should_return_false_when_op_id_not_tracked() -> Result<()>
     {
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
+        let mut fault_detection = FaultDetection::new(nodes.clone());
         let op_id = OperationId([4; 32]);
 
-        dysfunctional_detection
-            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
-        dysfunctional_detection
-            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([2; 32])));
-        dysfunctional_detection
-            .track_issue(nodes[0], IssueType::RequestOperation(OperationId([3; 32])));
+        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
+        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([2; 32])));
+        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([3; 32])));
 
-        let has_removed = dysfunctional_detection.request_operation_fulfilled(&nodes[1], op_id);
+        let has_removed = fault_detection.request_operation_fulfilled(&nodes[1], op_id);
 
         assert!(!has_removed);
-        let op_ids = dysfunctional_detection.get_unfulfilled_ops(nodes[0]);
+        let op_ids = fault_detection.get_unfulfilled_ops(nodes[0]);
         assert_eq!(3, op_ids.len());
         Ok(())
     }

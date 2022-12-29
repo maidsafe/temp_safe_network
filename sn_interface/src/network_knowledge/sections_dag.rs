@@ -1059,7 +1059,7 @@ pub(crate) mod tests {
         })]
         #[test]
         #[allow(clippy::unwrap_used)]
-        fn proptest_merge_sections_dag((main_dag, list_of_partial_dags) in arb_sections_dag_and_proof_chains(100, false)) {
+        fn proptest_merge_sections_dag((_, main_dag, list_of_partial_dags) in arb_sections_dag_and_proof_chains(100, false)) {
                 let mut dag = SectionsDAG::new(main_dag.genesis_key);
                 for (partial_dag, _last_key_sap) in list_of_partial_dags {
                     dag.merge(partial_dag).unwrap();
@@ -1120,6 +1120,7 @@ pub(crate) mod tests {
         new_information_only: bool,
     ) -> impl Strategy<
         Value = (
+            SectionSigned<SectionAuthorityProvider>,
             SectionsDAG,
             Vec<(SectionsDAG, SectionSigned<SectionAuthorityProvider>)>,
         ),
@@ -1185,7 +1186,8 @@ pub(crate) mod tests {
                 let last_key_sap = map.get(&rand_to).unwrap();
                 list_of_part_dags.push((partial_dag, last_key_sap.clone()));
             }
-            (main_dag, list_of_part_dags)
+            let gen_sap = map.get(main_dag.genesis_key()).unwrap().clone();
+            (gen_sap, main_dag, list_of_part_dags)
         })
     }
 

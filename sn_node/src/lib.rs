@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//! Implementation of the "Node" node for the SAFE Network.
+//! Implementation of the Node in SAFE Network.
 
 // For quick_error
 #![recursion_limit = "256"]

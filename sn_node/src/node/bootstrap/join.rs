@@ -12,7 +12,7 @@ use crate::node::{messages::WireMsgUtils, Error, Result, STANDARD_CHANNEL_SIZE};
 
 use sn_interface::{
     messaging::{
-        system::{JoinRejectionReason, JoinRequest, JoinResponse, NodeMsg},
+        system::{JoinRejectionReason, JoinRequest, JoinResponse, NodeMsg, SectionSigned},
         Dst, MsgType, WireMsg,
     },
     network_knowledge::{
@@ -122,37 +122,40 @@ impl<'a> Joiner<'a> {
             })?
     }
 
-    fn join_target_sap(&self) -> Result<SectionAuthorityProvider> {
+    fn join_target_sap(&self) -> Result<SectionSigned<SectionAuthorityProvider>> {
         let our_name = self.node.name();
-        let sap = self.section_tree.section_by_name(&our_name)?;
+        let sap = self.section_tree.get_signed_by_name(&our_name)?;
         Ok(sap)
     }
 
     #[tracing::instrument(skip(self))]
     async fn join(mut self, response_timeout: Duration) -> Result<(MyNodeInfo, NetworkKnowledge)> {
-        self.bootstrap_section_tree(self.join_target_sap()?, response_timeout)
+        self.bootstrap_section_tree(self.join_target_sap()?.value, response_timeout)
             .await?;
 
-        let mut target_sap = self.join_target_sap()?;
+        let target_sap = self.join_target_sap()?;
         let section_key = target_sap.section_key();
         let msg = NodeMsg::JoinRequest(JoinRequest { section_key });
         self.send(msg, &target_sap.elders_vec(), section_key, false)
             .await?;
 
         loop {
-            let (response, sender) =
-                tokio::time::timeout(response_timeout, self.receive_join_response())
-                    .await
-                    .map_err(|e| {
-                        error!("Failed to receive join response: {:?}", e);
-                        Error::JoinTimeout
-                    })??;
+            let (response, sender) = tokio::time::timeout(
+                response_timeout,
+                self.receive_join_response_and_handle_ae_updates(),
+            )
+            .await
+            .map_err(|e| {
+                error!("Failed to receive join response: {:?}", e);
+                Error::JoinTimeout
+            })??;
+            let target_sap = self.join_target_sap()?;
 
             match response {
                 JoinResponse::Approved { decision } => {
                     info!("{}", LogMarker::ReceivedJoinApproval);
                     if let Err(e) = decision.validate(&target_sap.public_key_set()) {
-                        error!("Dropping invalid join decision: {e:?}");
+                        error!("Failed to validate with {target_sap:?}, dropping invalid join decision: {e:?}");
                         continue;
                     }
 
@@ -172,13 +175,8 @@ impl<'a> Joiner<'a> {
                         target_sap.prefix(),
                     );
 
-                    // TODO: NetworkKnowledge::new(..) should not be taking the section_tree_update
-                    let section_tree_update = self
-                        .section_tree
-                        .generate_section_tree_update(&target_sap.prefix())?;
-
                     let network_knowledge =
-                        NetworkKnowledge::new(self.section_tree, section_tree_update)?;
+                        NetworkKnowledge::new(target_sap.prefix(), self.section_tree)?;
 
                     return Ok((self.node, network_knowledge));
                 }
@@ -194,9 +192,9 @@ impl<'a> Joiner<'a> {
                         self.retry_responses_cache = Default::default();
 
                         trace!("Bootstrapping section tree for retry");
-                        self.bootstrap_section_tree(target_sap, response_timeout)
+                        self.bootstrap_section_tree(target_sap.value, response_timeout)
                             .await?;
-                        target_sap = self.join_target_sap()?;
+                        let target_sap = self.join_target_sap()?;
 
                         let new_keypair = ed25519::gen_keypair(
                             &target_sap.prefix().range_inclusive(),
@@ -289,7 +287,15 @@ impl<'a> Joiner<'a> {
 
                 info!("Received section tree update: {update:?}");
 
-                any_new_information = self.section_tree.update(update)?;
+                any_new_information = match self.section_tree.update_the_section_tree(update) {
+                    Ok(bool) => bool,
+                    Err(error) => {
+                        error!("Error updating section tree during join: {error:?}");
+                        // this error should not kill us though, so we otherwise ignore it and note there's
+                        // no new info
+                        false
+                    }
+                };
 
                 if any_new_information {
                     break;
@@ -298,7 +304,7 @@ impl<'a> Joiner<'a> {
 
             if any_new_information {
                 // Update the target sap since we've received new information and try again.
-                target_sap = self.join_target_sap()?;
+                target_sap = self.join_target_sap()?.value;
                 info!("Received new information in last AEProbe, updating target sap to {target_sap:?}");
             } else {
                 // We are up to date with these nodes so we can end the bootstrap
@@ -365,11 +371,38 @@ impl<'a> Joiner<'a> {
     }
 
     #[tracing::instrument(skip(self))]
-    async fn receive_join_response(&mut self) -> Result<(JoinResponse, Peer)> {
+    async fn receive_join_response_and_handle_ae_updates(
+        &mut self,
+    ) -> Result<(JoinResponse, Peer)> {
         loop {
             let (msg, sender) = self.receive_node_msg().await?;
             match msg {
                 NodeMsg::JoinResponse(resp) => return Ok((resp, sender)),
+                NodeMsg::AntiEntropy {
+                    section_tree_update,
+                    ..
+                } => {
+                    info!("After sent join request, received section tree update: {section_tree_update:?}");
+                    let old_target = self.join_target_sap()?;
+
+                    let any_new_information = match self
+                        .section_tree
+                        .update_the_section_tree(section_tree_update)
+                    {
+                        Ok(bool) => bool,
+                        Err(error) => {
+                            error!("Error updating section tree during join: {error:?}");
+                            // this error should not kill us though, so we otherwise ignore it and note there's
+                            // no new info
+                            false
+                        }
+                    };
+
+                    if any_new_information {
+                        let current_sap = self.join_target_sap()?;
+                        info!("After sent join request, network sap changed from {old_target:?} to {current_sap:?}");
+                    }
+                }
                 _ => {
                     trace!(
                         "Non-JoinResponse message received and discarded: sender: {sender:?} msg: {msg:?}"
@@ -464,7 +497,7 @@ mod tests {
     const JOIN_TIMEOUT_SEC: u64 = 15;
 
     #[tokio::test]
-    async fn join_as_adult() {
+    async fn join_as_adult() -> Result<()> {
         init_logger();
 
         let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
@@ -482,8 +515,7 @@ mod tests {
         );
 
         let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone());
-        let mut tree = SectionTree::new(genesis_pk);
-        assert!(tree.insert_without_chain(signed_genesis_sap));
+        let tree = SectionTree::new(signed_genesis_sap)?;
 
         let state = Joiner::new(node.clone(), send_tx, &mut recv_rx, tree);
 
@@ -535,7 +567,7 @@ mod tests {
 
             itertools::assert_equal(recipients, next_sap.elders());
             assert_eq!(dst.section_key, next_section_key);
-            assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest{ section_key }) => {
+            assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest{ section_key, .. }) => {
                 assert_eq!(section_key, next_section_key);
             });
 
@@ -557,6 +589,8 @@ mod tests {
         assert_eq!(section.section_auth(), next_sap);
         assert_eq!(section.section_key(), next_section_key);
         assert_eq!(node.age(), MIN_ADULT_AGE);
+
+        Ok(())
     }
 
     #[tokio::test]
@@ -578,8 +612,7 @@ mod tests {
         );
 
         let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone());
-        let mut tree = SectionTree::new(genesis_pk);
-        assert!(tree.insert_without_chain(signed_genesis_sap));
+        let tree = SectionTree::new(signed_genesis_sap)?;
 
         let state = Joiner::new(node, send_tx, &mut recv_rx, tree.clone());
 
@@ -663,7 +696,7 @@ mod tests {
             itertools::assert_equal(recipients, new_sap.elders());
 
             assert_eq!(dst.section_key, new_sap.section_key());
-            assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest{ section_key }) => {
+            assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest{ section_key, .. }) => {
                 assert_eq!(section_key, new_sap.section_key());
             });
 
@@ -680,13 +713,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn join_invalid_redirect_response() -> Result<()> {
+    async fn join_receive_approval_with_newer_sap_proceeds() {
         init_logger();
-        let _span = tracing::info_span!("join_invalid_redirect_response").entered();
 
         let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
-        let (send_tx, mut send_rx) = mpsc::channel(10);
-        let (recv_tx, mut recv_rx) = mpsc::channel(10);
+        let (send_tx, mut send_rx) = mpsc::channel(10); // elder side
+        let (recv_tx, mut recv_rx) = mpsc::channel(10); // joining side
 
         let (genesis_sap, genesis_sk_set, genesis_nodes, _) =
             TestSapBuilder::new(Prefix::default()).build();
@@ -699,8 +731,116 @@ mod tests {
         );
 
         let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone());
-        let mut tree = SectionTree::new(genesis_pk);
-        assert!(tree.insert_without_chain(signed_genesis_sap));
+        let tree = SectionTree::new(signed_genesis_sap).expect("Failed to create SectionTree");
+
+        let state = Joiner::new(node.clone(), send_tx, &mut recv_rx, tree.clone());
+
+        // Create the bootstrap task, but don't run it yet.
+        let bootstrap = async { state.try_join(join_timeout).await.expect("Failed to join") };
+
+        let (new_sap, new_sks, _new_elders, _) = TestSapBuilder::new(Prefix::default()).build();
+        let new_section_key = new_sks.public_keys().public_key();
+
+        let elders_tasks = async {
+            // Build up the initial network knowledge
+            let (node_msg, _, _) = recv_node_msg(&mut send_rx).await;
+            assert_matches!(node_msg, NodeMsg::AntiEntropyProbe { .. });
+
+            let section_tree_update = tree
+                .generate_section_tree_update(&prefix(""))
+                .expect("Failed to create update");
+            let ae_msg = NodeMsg::AntiEntropy {
+                section_tree_update,
+                kind: AntiEntropyKind::Update {
+                    members: Default::default(),
+                },
+            };
+            for node in genesis_nodes.iter() {
+                send_node_msg(&recv_tx, ae_msg.clone(), node, genesis_sap.section_key());
+            }
+
+            // Receive JoinRequest
+            let (node_msg, _, recipients) = recv_node_msg(&mut send_rx).await;
+            itertools::assert_equal(recipients, genesis_sap.elders());
+            assert_matches!(node_msg, NodeMsg::JoinRequest { .. });
+
+            // Create SectionTreeUpdate with newer sap
+            let mut proof_chain = SectionsDAG::new(genesis_pk);
+            proof_chain
+                .insert(
+                    &genesis_pk,
+                    new_sap.section_key(),
+                    TestKeys::get_section_signed(&genesis_sk, new_sap.section_key())
+                        .sig
+                        .signature,
+                )
+                .expect("Bad proof chain insert");
+            let section_tree_update = SectionTreeUpdate {
+                signed_sap: TestKeys::get_section_signed(&new_sks.secret_key(), new_sap.clone()),
+                proof_chain,
+            };
+
+            // Send JoinResponse::Approved decision interleaved with the AE messages
+            let decision = section_decision(&new_sks, NodeState::joined(node.peer(), None));
+            let new_ae_msg = NodeMsg::AntiEntropy {
+                section_tree_update,
+                kind: AntiEntropyKind::Update {
+                    members: Default::default(),
+                },
+            };
+            // The first JoinResponse::Approved will be dropped as using the newer sap.
+            // Then, the joining node's network knowledge will be updated by the follow up
+            // AEUpdate message. Which enables the second JoinResponse::Approved message.
+            send_join_response(
+                &recv_tx,
+                JoinResponse::Approved {
+                    decision: decision.clone(),
+                },
+                &genesis_nodes[0],
+                new_sap.section_key(),
+            );
+            send_node_msg(
+                &recv_tx,
+                new_ae_msg,
+                &genesis_nodes[0],
+                genesis_sap.section_key(),
+            );
+            send_join_response(
+                &recv_tx,
+                JoinResponse::Approved { decision },
+                &genesis_nodes[1],
+                new_sap.section_key(),
+            );
+        };
+
+        // Drive both tasks to completion concurrently (but on the same thread).
+        let ((node, section), _) = future::join(bootstrap, elders_tasks).await;
+
+        assert_eq!(section.section_auth(), new_sap);
+        assert_eq!(section.section_key(), new_section_key);
+        assert_eq!(node.age(), MIN_ADULT_AGE);
+    }
+
+    #[tokio::test]
+    async fn join_invalid_redirect_response() -> Result<()> {
+        init_logger();
+        let _span = tracing::info_span!("join_invalid_redirect_response").entered();
+
+        let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
+        let (send_tx, mut send_rx) = mpsc::channel(10);
+        let (recv_tx, mut recv_rx) = mpsc::channel(10);
+
+        let (genesis_sap, genesis_sk_set, genesis_nodes, _) =
+            TestSapBuilder::new(Prefix::default()).build();
+        let genesis_sk = genesis_sk_set.secret_key();
+
+        let node = MyNodeInfo::new(
+            ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
+            gen_addr(),
+        );
+
+        let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone());
+        let tree = SectionTree::new(signed_genesis_sap)?;
 
         let state = Joiner::new(node, send_tx, &mut recv_rx, tree.clone());
 
@@ -784,7 +924,6 @@ mod tests {
         let (genesis_sap, genesis_sk_set, genesis_nodes, _) =
             TestSapBuilder::new(Prefix::default()).build();
         let genesis_sk = genesis_sk_set.secret_key();
-        let genesis_pk = genesis_sk.public_key();
 
         let node = MyNodeInfo::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
@@ -792,8 +931,7 @@ mod tests {
         );
 
         let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone());
-        let mut tree = SectionTree::new(genesis_pk);
-        assert!(tree.insert_without_chain(signed_genesis_sap));
+        let tree = SectionTree::new(signed_genesis_sap)?;
 
         let state = Joiner::new(node, send_tx, &mut recv_rx, tree.clone());
 

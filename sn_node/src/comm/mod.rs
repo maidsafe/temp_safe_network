@@ -21,7 +21,7 @@ use qp2p::{Connection, SendStream, UsrMsgBytes};
 
 use sn_interface::{
     messaging::{MsgId, WireMsg},
-    types::Peer,
+    types::{log_markers::LogMarker, Peer},
 };
 
 use dashmap::DashMap;
@@ -167,6 +167,40 @@ impl Comm {
         Ok(())
     }
 
+    // Test helper to send out Msgs in a blocking fashion
+    #[cfg(test)]
+    pub(crate) async fn send_out_bytes_sync(&self, peer: Peer, msg_id: MsgId, bytes: UsrMsgBytes) {
+        let watcher = self.send_to_one(peer, msg_id, bytes, None).await;
+        match watcher {
+            Ok(Some(watcher)) => {
+                let (send_was_successful, should_remove) = Self::is_sent(watcher, msg_id, peer)
+                    .await
+                    .expect("Error in is_sent");
+
+                if send_was_successful {
+                    trace!("Msg {msg_id:?} sent to {peer:?}");
+                } else if should_remove {
+                    // do cleanup of that peer
+                    let perhaps_session = self.sessions.remove(&peer);
+                    if let Some((_peer, session)) = perhaps_session {
+                        session.disconnect().await;
+                    }
+                }
+            }
+            Ok(None) => {}
+            Err(error) => {
+                error!(
+                "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed as we have disconnected from the peer. (Error is: {})",
+                msg_id,
+                peer.addr(),
+                peer.name(),
+                error,
+            );
+                let _peer = self.sessions.remove(&peer);
+            }
+        }
+    }
+
     // TODO: tweak messaging to just allow passthrough
     #[tracing::instrument(skip(self, bytes))]
     pub(crate) async fn send_out_bytes_to_peer_and_return_response(
@@ -285,6 +319,18 @@ impl Comm {
         }
     }
 
+    /// Remove a qp2p:Connection from a peer's session.
+    async fn remove_conn(&self, peer: &Peer, conn: Arc<Connection>) {
+        debug!(
+            "Removing incoming conn to {peer:?} w/ conn_id : {:?}",
+            conn.id()
+        );
+        if let Some(entry) = self.sessions.get(peer) {
+            let peer_session = entry.value();
+            peer_session.remove(conn).await;
+        }
+    }
+
     // Helper to send a message to a single recipient.
     #[instrument(skip(self, bytes))]
     async fn send_to_one(
@@ -323,7 +369,6 @@ impl Comm {
 fn setup_comms(
     our_endpoint: Endpoint,
     incoming_connections: IncomingConnections,
-    // monitoring: RateLimits,
     incoming_msg_pipe: Sender<MsgFromPeer>,
 ) -> (Comm, MsgListener) {
     let (comm, msg_listener) = setup(our_endpoint, incoming_msg_pipe);
@@ -335,7 +380,7 @@ fn setup_comms(
 
 #[tracing::instrument(skip_all)]
 fn setup(our_endpoint: Endpoint, receive_msg: Sender<MsgFromPeer>) -> (Comm, MsgListener) {
-    let (add_connection, conn_receiver) = mpsc::channel(STANDARD_CHANNEL_SIZE);
+    let (add_connection, conn_events_recv) = mpsc::channel(STANDARD_CHANNEL_SIZE);
 
     let msg_listener = MsgListener::new(add_connection, receive_msg);
 
@@ -345,15 +390,22 @@ fn setup(our_endpoint: Endpoint, receive_msg: Sender<MsgFromPeer>) -> (Comm, Msg
         sessions: Arc::new(DashMap::new()),
     };
 
-    let _ = task::spawn(receive_conns(comm.clone(), conn_receiver));
+    let _ = task::spawn(receive_conns(comm.clone(), conn_events_recv));
 
     (comm, msg_listener)
 }
 
 #[tracing::instrument(skip_all)]
-async fn receive_conns(comm: Comm, mut conn_receiver: Receiver<ListenerEvent>) {
-    while let Some(ListenerEvent::Connected { peer, connection }) = conn_receiver.recv().await {
-        comm.add_incoming(&peer, connection).await;
+async fn receive_conns(comm: Comm, mut conn_events_recv: Receiver<ListenerEvent>) {
+    while let Some(event) = conn_events_recv.recv().await {
+        match event {
+            ListenerEvent::Connected { peer, connection } => {
+                comm.add_incoming(&peer, connection).await
+            }
+            ListenerEvent::ConnectionClosed { peer, connection } => {
+                comm.remove_conn(&peer, connection).await
+            }
+        }
     }
 }
 
@@ -365,7 +417,8 @@ fn listen_for_incoming_msgs(
     let _ = task::spawn(async move {
         while let Some((connection, incoming_msgs)) = incoming_connections.next().await {
             trace!(
-                "incoming_connection from {:?} with connection_id {:?}",
+                "{}: from {:?} with connection_id {}",
+                LogMarker::IncomingConnection,
                 connection.remote_address(),
                 connection.id()
             );

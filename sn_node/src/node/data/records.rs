@@ -7,18 +7,20 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    core::NodeContext, flow_ctrl::dysfunction::DysCmds, Cmd, Error, MyNode, Prefix, Result,
+    core::NodeContext, flow_ctrl::fault_detection::FaultsCmd, messaging::Peers, Cmd, Error, MyNode,
+    Prefix, Result,
 };
+use crate::storage::Error as StorageError;
 
-use sn_dysfunction::IssueType;
+use sn_fault_detection::IssueType;
 use sn_interface::{
     data_copy_count,
     messaging::{
         data::{ClientDataResponse, DataCmd, DataQuery, MetadataExchange, StorageLevel},
-        system::{NodeDataCmd, NodeDataQuery, NodeDataResponse, NodeMsg, OperationId},
+        system::{NodeDataCmd, NodeDataQuery, NodeDataResponse, NodeEvent, NodeMsg, OperationId},
         AuthorityProof, ClientAuth, Dst, MsgId, MsgKind, MsgType, WireMsg,
     },
-    types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData},
+    types::{log_markers::LogMarker, Keypair, Peer, PublicKey, ReplicatedData},
 };
 
 use qp2p::{SendStream, UsrMsgBytes};
@@ -66,15 +68,14 @@ lazy_static! {
 impl MyNode {
     // Locate ideal holders for this data, instruct them to store the data
     pub(crate) async fn replicate_data_to_adults(
-        snapshot: &NodeContext,
+        context: &NodeContext,
         data: ReplicatedData,
         msg_id: MsgId,
         targets: BTreeSet<Peer>,
     ) -> Result<Vec<(Peer, Result<WireMsg>)>> {
         info!(
-            "Replicating data from {msg_id:?} {:?} to holders {:?}",
-            data.name(),
-            &targets,
+            "Replicating data from {msg_id:?} {:?} to holders: {targets:?}",
+            data.name()
         );
 
         // TODO: general ReplicateData flow could go bidi?
@@ -83,23 +84,22 @@ impl MyNode {
         let msg = NodeMsg::NodeDataCmd(NodeDataCmd::ReplicateOneData(data));
         let mut send_tasks = vec![];
 
-        let (kind, payload) = MyNode::serialize_node_msg(snapshot.name, msg)?;
-        let section_key = snapshot.network_knowledge.section_key();
+        let (kind, payload) = MyNode::serialize_node_msg(context.name, msg)?;
+        let section_key = context.network_knowledge.section_key();
 
-        debug!("replication read locks got");
-        // drop the read lock before we do anything async
+        // We create a Dst with random dst name, but we'll update it for each target
+        let mut dst = Dst {
+            name: xor_name::rand::random(),
+            section_key,
+        };
+        let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
         for target in targets {
-            let bytes_to_adult = MyNode::form_usr_msg_bytes_to_node(
-                section_key,
-                payload.clone(),
-                kind.clone(),
-                Some(target),
-                msg_id,
-            )?;
+            dst.name = target.name();
+            let bytes_to_adult = wire_msg.serialize_with_new_dst(&dst)?;
 
-            let comm = snapshot.comm.clone();
-            info!("About to send {msg_id:?} to holder: {:?}", &target);
+            let comm = context.comm.clone();
+            info!("About to send {msg_id:?} to holder: {target:?}");
 
             send_tasks.push(
                 async move {
@@ -122,7 +122,7 @@ impl MyNode {
 
     // Locate ideal holders for this data, instruct them to store the data
     pub(crate) async fn replicate_data_to_adults_and_ack_to_client(
-        snapshot: &NodeContext,
+        context: &NodeContext,
         cmd: DataCmd,
         data: ReplicatedData,
         msg_id: MsgId,
@@ -131,7 +131,7 @@ impl MyNode {
     ) -> Result<()> {
         let targets_len = targets.len();
 
-        let responses = MyNode::replicate_data_to_adults(snapshot, data, msg_id, targets).await?;
+        let responses = MyNode::replicate_data_to_adults(context, data, msg_id, targets).await?;
         let mut success_count = 0;
         let mut ack_response = None;
         let mut last_error = None;
@@ -144,6 +144,9 @@ impl MyNode {
                 }
                 Err(error) => {
                     error!("{msg_id:?} Error when replicating to adult {peer:?}: {error:?}");
+                    if let Error::AdultCmdSendError(peer) = error {
+                        context.log_node_issue(peer.name(), IssueType::Communication);
+                    }
                     last_error = Some(error);
                 }
             }
@@ -153,7 +156,7 @@ impl MyNode {
         if success_count == targets_len {
             if let Some(response) = ack_response {
                 MyNode::respond_to_client_on_stream(
-                    snapshot,
+                    context,
                     response,
                     client_response_stream.clone(),
                 )
@@ -167,7 +170,7 @@ impl MyNode {
 
             if let Some(error) = last_error {
                 MyNode::send_cmd_error_response_over_stream(
-                    snapshot,
+                    context,
                     cmd,
                     error,
                     msg_id,
@@ -182,7 +185,7 @@ impl MyNode {
 
     /// Parses WireMsg and if DataStored Ack, we send a response to the client
     async fn respond_to_client_on_stream(
-        snapshot: &NodeContext,
+        context: &NodeContext,
         response: WireMsg,
         send_stream: Arc<Mutex<SendStream>>,
     ) -> Result<()> {
@@ -200,11 +203,11 @@ impl MyNode {
                 correlation_id,
             };
 
-            let (kind, payload) = MyNode::serialize_client_msg_response(snapshot.name, client_msg)?;
+            let (kind, payload) = MyNode::serialize_client_msg_response(context.name, client_msg)?;
 
             debug!("{correlation_id:?} sending cmd response ack back to client");
             MyNode::send_msg_on_stream(
-                snapshot.network_knowledge.section_key(),
+                context.network_knowledge.section_key(),
                 payload,
                 kind,
                 send_stream,
@@ -221,7 +224,7 @@ impl MyNode {
 
     /// Find target adult, sends a bidi msg, awaiting response, and then sends this on to the client
     pub(crate) async fn read_data_from_adult_and_respond_to_client(
-        snapshot: NodeContext,
+        context: NodeContext,
         query: DataQuery,
         msg_id: MsgId,
         auth: AuthorityProof<ClientAuth>,
@@ -239,7 +242,7 @@ impl MyNode {
             operation_id
         );
 
-        let targets = MyNode::target_data_holders(&snapshot, *address.name());
+        let targets = MyNode::target_data_holders(&context, *address.name());
 
         // Query only the nth adult
         let target = if let Some(peer) = targets.iter().nth(query.adult_index) {
@@ -247,13 +250,13 @@ impl MyNode {
         } else {
             debug!("No targets found for {msg_id:?}");
             let error = Error::InsufficientAdults {
-                prefix: snapshot.network_knowledge.prefix(),
+                prefix: context.network_knowledge.prefix(),
                 expected: query.adult_index as u8 + 1,
                 found: targets.len() as u8,
             };
 
             MyNode::send_query_error_response_on_stream(
-                snapshot,
+                context,
                 error,
                 &query.variant,
                 source_client,
@@ -272,12 +275,12 @@ impl MyNode {
             operation_id,
         });
 
-        let (kind, payload) = MyNode::serialize_node_msg(snapshot.name, msg)?;
+        let (kind, payload) = MyNode::serialize_node_msg(context.name, msg)?;
 
-        let comm = snapshot.comm.clone();
+        let comm = context.comm.clone();
 
         let bytes_to_adult = MyNode::form_usr_msg_bytes_to_node(
-            snapshot.network_knowledge.section_key(),
+            context.network_knowledge.section_key(),
             payload,
             kind,
             Some(target),
@@ -295,10 +298,10 @@ impl MyNode {
             Err(_elapsed) => {
                 error!(
                     "{msg_id:?}: No response from {target:?} after {:?} timeout. \
-                    Marking adult as dysfunctional",
+                    Marking adult as faulty",
                     *ADULT_RESPONSE_TIMEOUT
                 );
-                return Ok(vec![Cmd::TrackNodeIssueInDysfunction {
+                return Ok(vec![Cmd::TrackNodeIssue {
                     name: target.name(),
                     // TODO: no need for op id tracking here, this can be a simple counter
                     issue: IssueType::RequestOperation(operation_id),
@@ -318,10 +321,10 @@ impl MyNode {
                 correlation_id: msg_id,
             };
 
-            let (kind, payload) = MyNode::serialize_client_msg_response(snapshot.name, client_msg)?;
+            let (kind, payload) = MyNode::serialize_client_msg_response(context.name, client_msg)?;
 
             MyNode::send_msg_on_stream(
-                snapshot.network_knowledge.section_key(),
+                context.network_knowledge.section_key(),
                 payload,
                 kind,
                 client_response_stream,
@@ -356,14 +359,14 @@ impl MyNode {
             target_peer,
             original_msg_id,
         )?;
-        trace!("Sending {original_msg_id:?} to recipient over stream");
         let stream_prio = 10;
         let mut send_stream = send_stream.lock_owned().await;
         let stream_id = send_stream.id();
+        trace!("Sending {original_msg_id:?} to recipient over {stream_id}");
 
         trace!("Stream {stream_id} locked for {original_msg_id:?} to {target_peer:?}");
         send_stream.set_priority(stream_prio);
-        trace!("Prio set for {original_msg_id:?} to {target_peer:?}");
+        trace!("Prio set for {original_msg_id:?} to {target_peer:?}, over {stream_id}");
         if let Err(error) = send_stream.send_user_msg(bytes).await {
             error!(
                 "Could not send query response {original_msg_id:?} to \
@@ -372,14 +375,15 @@ impl MyNode {
             return Err(error.into());
         }
 
-        trace!("Msg away for {original_msg_id:?} to {target_peer:?}");
+        trace!("Msg away for {original_msg_id:?} to {target_peer:?}, over {stream_id}");
 
         // unblock + move finish off thread as it's not strictly related to the sending of the msg.
+        let stream_id_clone = stream_id.clone();
         let _handle = tokio::spawn(async move {
             // Attempt to gracefully terminate the stream.
             // If this errors it does _not_ mean our message has not been sent
-            let _ = send_stream.finish().await;
-            trace!("bidi stream finished for {original_msg_id:?} to: {target_peer:?}");
+            let result = send_stream.finish().await;
+            trace!("bidi {stream_id_clone} finished for {original_msg_id:?} to {target_peer:?}: {result:?}");
         });
 
         debug!("Sent the msg {original_msg_id:?} over {stream_id} to {target_peer:?}");
@@ -394,18 +398,12 @@ impl MyNode {
         target: Option<Peer>,
         msg_id: MsgId,
     ) -> Result<UsrMsgBytes> {
-        let dst_name = target.map_or(XorName::default(), |peer| peer.name());
-        // we first generate the XorName
         let dst = Dst {
-            name: dst_name,
+            name: target.map_or(XorName::default(), |peer| peer.name()),
             section_key,
         };
-
-        let mut wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
-
-        wire_msg
-            .serialize_and_cache_bytes()
-            .map_err(|_| Error::InvalidMessage)
+        let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
+        wire_msg.serialize().map_err(|_| Error::InvalidMessage)
     }
 
     pub(crate) fn get_metadata_of(&self, prefix: &Prefix) -> MetadataExchange {
@@ -425,11 +423,11 @@ impl MyNode {
         self.capacity.retain_members_only(&members);
         // stop tracking liveness of absent holders
         if let Err(error) = self
-            .dysfunction_cmds_sender
-            .send(DysCmds::RetainNodes(members))
+            .fault_cmds_sender
+            .send(FaultsCmd::RetainNodes(members))
             .await
         {
-            warn!("Could not send RetainNodes through dysfunctional_cmds_tx: {error}");
+            warn!("Could not send RetainNodes through fault_cmds_tx: {error}");
         };
     }
 
@@ -437,12 +435,8 @@ impl MyNode {
     pub(crate) async fn add_new_adult_to_trackers(&mut self, adult: XorName) {
         info!("Adding new Adult: {adult} to trackers");
         self.capacity.add_new_adult(adult);
-        if let Err(error) = self
-            .dysfunction_cmds_sender
-            .send(DysCmds::AddNode(adult))
-            .await
-        {
-            warn!("Could not send AddNode through dysfunctional_cmds_tx: {error}");
+        if let Err(error) = self.fault_cmds_sender.send(FaultsCmd::AddNode(adult)).await {
+            warn!("Could not send AddNode through fault_cmds_tx: {error}");
         };
     }
 
@@ -479,5 +473,79 @@ impl MyNode {
         trace!("Target holders of {:?} are : {:?}", target, candidates,);
 
         candidates
+    }
+
+    /// Replicate data in the batch locally and then trigger further update reqeusts
+    /// Requests for more data will go to sending node if there is more to come, or to the next
+    /// furthest nodes if there was no data sent.
+    pub(crate) async fn replicate_data_batch(
+        context: &NodeContext,
+        sender: Peer,
+        data_collection: Vec<ReplicatedData>,
+    ) -> Result<Vec<Cmd>> {
+        if context.is_elder {
+            error!("Received unexpected message while Elder");
+            return Ok(vec![]);
+        }
+
+        let mut cmds = vec![];
+
+        let section_pk = PublicKey::Bls(context.network_knowledge.section_key());
+        let node_keypair = Keypair::Ed25519(context.keypair.clone());
+
+        // To avoid duplication, only record storage level once.
+        let mut record_storage_level = None;
+        let mut is_full = false;
+        let has_replicated_data_in = !data_collection.is_empty();
+
+        for data in data_collection {
+            let store_result = context
+                .data_storage
+                .store(&data, section_pk, node_keypair.clone())
+                .await;
+
+            // We are an adult here, so just store away!
+            // This may return a DatabaseFull error... but we should have reported storage increase
+            // well before this
+            match store_result {
+                Ok(level_report) => {
+                    info!("Storage level report: {:?}", level_report);
+                    record_storage_level = Some(level_report);
+                    info!("End of message flow.");
+                }
+                Err(StorageError::NotEnoughSpace) => {
+                    // storage full
+                    error!("Not enough space to store more data");
+
+                    let node_id = PublicKey::from(context.keypair.public);
+                    let msg = NodeMsg::NodeEvent(NodeEvent::CouldNotStoreData {
+                        node_id,
+                        data_address: data.address(),
+                        full: true,
+                    });
+                    is_full = true;
+
+                    cmds.push(MyNode::send_msg_to_our_elders(context, msg))
+                }
+                Err(error) => {
+                    // the rest seem to be non-problematic errors.. (?)
+                    error!("Problem storing data, but it was ignored: {error}");
+                }
+            }
+        }
+
+        if let Some(level_report) = record_storage_level {
+            cmds.extend(MyNode::record_storage_level_if_any(context, level_report)?);
+        }
+
+        // Whenever there is a replicated data in, we send back a query again
+        if !is_full && has_replicated_data_in {
+            let data_i_have = context.data_storage.data_addrs().await;
+            let msg = NodeMsg::NodeDataCmd(NodeDataCmd::SendAnyMissingRelevantData(data_i_have));
+            let cmd = MyNode::send_system_msg(msg, Peers::Single(sender), context.clone());
+            cmds.push(cmd);
+        }
+
+        Ok(cmds)
     }
 }

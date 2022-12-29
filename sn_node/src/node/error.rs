@@ -158,8 +158,11 @@ pub enum Error {
     /// Error Sending Cmd in to node for processing
     #[error("Error Sending Cmd in to node for processing.")]
     CmdSendError,
+    /// Error Sending Cmd in to node for processing
+    #[error("Error Sending Cmd to adult {0:?} for processing.")]
+    AdultCmdSendError(Peer),
     /// Network Knowledge error.
-    #[error("Network data error:: {0}")]
+    #[error("Network knowledge error:: {0}")]
     NetworkKnowledge(#[from] sn_interface::network_knowledge::Error),
     /// Signature verification failed
     #[error("Invalid signature")]
@@ -218,6 +221,9 @@ pub enum Error {
     CannotHandleQuery(DataQuery),
     #[error("BLS error: {0}")]
     BlsError(#[from] bls::Error),
+    #[cfg(feature = "otlp")]
+    #[error("OpenTelemetry Tracing error: {0}")]
+    OpenTelemetryTracing(#[from] opentelemetry::trace::TraceError),
 }
 
 impl From<qp2p::ClientEndpointError> for Error {

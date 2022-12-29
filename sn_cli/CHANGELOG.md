@@ -4,7 +4,113 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.68.0 (2022-12-09)
+## v0.68.3 (2022-12-20)
+
+### Bug Fixes
+
+ - <csr-id-22402ca6acb0215ecfe9b1fdbf306c0f9cb87d95/> genesis_sap is required to create the `SectionTree`
+   - The fields of the tree are assumed to be in sync. But it is not the
+     case for a newly created tree.
+   - This can be fixed by accepting the genesis sap while creating the tree.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 3 days passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge #1848 ([`ddaf857`](https://github.com/maidsafe/safe_network/commit/ddaf8571749c142e9960407cfd9cfa94231a36ad))
+    - genesis_sap is required to create the `SectionTree` ([`22402ca`](https://github.com/maidsafe/safe_network/commit/22402ca6acb0215ecfe9b1fdbf306c0f9cb87d95))
+</details>
+
+## v0.68.2 (2022-12-16)
+
+### Chore
+
+ - <csr-id-4ce57cc7c349c209d2fa60d876706ad15dd07a04/> sn_node-0.72.6/sn_cli-0.68.2
+ - <csr-id-029b4edf99515569dbc6b4d694e514478ae82db8/> limit client upload size by default
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_node-0.72.6/sn_cli-0.68.2 ([`4ce57cc`](https://github.com/maidsafe/safe_network/commit/4ce57cc7c349c209d2fa60d876706ad15dd07a04))
+    - Merge #1896 #1897 ([`b4f5700`](https://github.com/maidsafe/safe_network/commit/b4f57007619856a368f635aac5a0e865d3f35bc5))
+    - limit client upload size by default ([`029b4ed`](https://github.com/maidsafe/safe_network/commit/029b4edf99515569dbc6b4d694e514478ae82db8))
+</details>
+
+## v0.68.1 (2022-12-16)
+
+<csr-id-01dc60676d5740dc7dd6250edb130b46a33cc168/>
+
+### Chore
+
+ - <csr-id-01dc60676d5740dc7dd6250edb130b46a33cc168/> fix new clippy warnings
+
+### Chore
+
+ - <csr-id-119ae2d7661d162371749b8466cfd2e9b85d910f/> sn_interface-0.16.3/sn_client-0.77.2/sn_api-0.75.2/sn_cli-0.68.1
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 days passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.3/sn_client-0.77.2/sn_api-0.75.2/sn_cli-0.68.1 ([`119ae2d`](https://github.com/maidsafe/safe_network/commit/119ae2d7661d162371749b8466cfd2e9b85d910f))
+    - fix new clippy warnings ([`01dc606`](https://github.com/maidsafe/safe_network/commit/01dc60676d5740dc7dd6250edb130b46a33cc168))
+</details>
+
+## v0.68.0 (2022-12-13)
+
+<csr-id-88388875e93adfedba62c25059526ae5e20f9d5a/>
+<csr-id-d43bac5ce07b0f08766858eadc4b8f98f9bcfc12/>
+<csr-id-11efb254d9fd2f92ece0f1d8a1066fb84f199610/>
+<csr-id-7f76b16e299a708c5834be742eb58d778fee97c2/>
+<csr-id-860f326a9baf7e62d191eec13359fa5313e6956d/>
+<csr-id-ee824e7785b8da770b5aa6bba3415a274a4e0d68/>
+<csr-id-2e937145c39039ee55505f00637cf484943f4471/>
+<csr-id-80446f5d9df88d5915dcf1d3ea2c213c22e40c14/>
+<csr-id-3f52833a8ce977aa79268ecaac61070f01e9c374/>
+<csr-id-77cb17c41bbf258c3f1b16934c4c71b5e5ad2456/>
+<csr-id-e973eee96c9065ce87a1fa65ae45d9be8d6f940c/>
+<csr-id-1152b2764e955edd80fb33921a8d8fe52654a896/>
+<csr-id-73f5531790ef8817ed3551fd9e4bcbcc7fc6f4f9/>
+<csr-id-096b9c67671324109aa2939e3806813501248cc6/>
+<csr-id-ff59202d1374c7e5dcc570d50ed8b399fafe488d/>
+<csr-id-ea1d0490f0b67a9f39bd98b2bd5830a0f63fbf6e/>
+<csr-id-e3bb817e20843f68ee21e9a5dd7e52c8a6e92b88/>
 
 ### Chore
 
@@ -20,7 +126,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - <csr-id-77cb17c41bbf258c3f1b16934c4c71b5e5ad2456/> add nightly fixes
  - <csr-id-e973eee96c9065ce87a1fa65ae45d9be8d6f940c/> remove redundant genesis_key argument in `NetworkKnowledge` constructor
 
+### Chore
+
+ - <csr-id-ea1d0490f0b67a9f39bd98b2bd5830a0f63fbf6e/> upgrade sn_dbc and blsttc
+   Upgrade both of these crates to resolve a publishing issue regarding a crate that had been yanked
+   being pulled in to the dependency graph.
+ - <csr-id-e3bb817e20843f68ee21e9a5dd7e52c8a6e92b88/> sn_interface-0.16.0/sn_dysfunction-0.15.0/sn_client-0.77.0/sn_node-0.72.0/sn_api-0.75.0/sn_cli-0.68.0
+
 ### New Features
+
+<csr-id-0cd47ad56e0d93e3e99feb0dfcea8094f871ff6f/>
 
  - <csr-id-464710fe8a964dc274e40327b85c0b17d9b92b0f/> provide `--config-dir-path` arg for `safe`
    Add a global `--config-dir-path` argument that will set the location of the config directory. If
@@ -41,12 +156,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
    There are a few misc changes along with this commit:
    
    * Debugging message to indicate a spend request being processed correctly, which proved useful when
-     trying to get the automated test working.
-   * Remove the current section key from the unknown section key error. It's not necessary to include
+   trying to get the automated test working.
+* Remove the current section key from the unknown section key error. It's not necessary to include
      this.
-   * When running the baby fleming network with the Makefile, include log messages from `sn_interface`.
-   * Fix up git-based references to `sn_dbc` crate.
- - <csr-id-0cd47ad56e0d93e3e99feb0dfcea8094f871ff6f/> replace `SecuredLinkedList` with `SectionsDAG`
+* When running the baby fleming network with the Makefile, include log messages from `sn_interface`.
+* Fix up git-based references to `sn_dbc` crate.
 
 ### Bug Fixes
 
@@ -102,9 +216,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 28 commits contributed to the release over the course of 79 calendar days.
- - 80 days passed between releases.
- - 21 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 31 commits contributed to the release over the course of 84 calendar days.
+ - 85 days passed between releases.
+ - 23 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -114,6 +228,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1882 ([`16e82d1`](https://github.com/maidsafe/safe_network/commit/16e82d13cfeee993c85c04f1c6f90e4305c90487))
+    - upgrade sn_dbc and blsttc ([`ea1d049`](https://github.com/maidsafe/safe_network/commit/ea1d0490f0b67a9f39bd98b2bd5830a0f63fbf6e))
+    - sn_interface-0.16.0/sn_dysfunction-0.15.0/sn_client-0.77.0/sn_node-0.72.0/sn_api-0.75.0/sn_cli-0.68.0 ([`e3bb817`](https://github.com/maidsafe/safe_network/commit/e3bb817e20843f68ee21e9a5dd7e52c8a6e92b88))
     - add upload limit to cli cfg ([`8855c50`](https://github.com/maidsafe/safe_network/commit/8855c50b2e47be4298220c9e1f79a57403fd4ac0))
     - add upload limit to cli cfg ([`fa82955`](https://github.com/maidsafe/safe_network/commit/fa82955cd4e8ad82372089fd08e11e19dcaee42b))
     - Merge branch 'main' into message_handling ([`80e4030`](https://github.com/maidsafe/safe_network/commit/80e4030820b1380450b86fa6e8c57ee41344a0ed))
@@ -145,6 +262,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 </details>
 
 ## v0.67.0 (2022-09-19)
+
+<csr-id-a8a9fb90791b29496e8559090dca4161e04054da/>
 
 ### Chore
 

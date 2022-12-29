@@ -118,6 +118,10 @@ async fn main() -> Result<()> {
             build_args.extend(["--features", "statemap"]);
         }
 
+        if cfg!(feature = "otlp") {
+            build_args.extend(["--features", "otlp"]);
+        }
+
         if cfg!(feature = "unstable-wiremsg-debuginfo") {
             build_args.extend(["--features", "unstable-wiremsg-debuginfo"]);
         }

@@ -1,6 +1,6 @@
 [package]
 name = "sn_api"
-version = "0.75.1"
+version = "0.75.3"
 description = "Safe API"
 authors = [
   "bochaco <gabrielviganotti@gmail.com>",
@@ -41,9 +41,9 @@ pbkdf2 = { version = "~0.7", default-features = false }
 serde = "1.0.123"
 serde_json = "1.0.62"
 sha3 = "~0.9"
-sn_client = { path = "../sn_client", version = "^0.77.1" }
+sn_client = { path = "../sn_client", version = "^0.77.3" }
 sn_dbc = { version = "8.1.2", features = ["serdes"] }
-sn_interface = { path = "../sn_interface", version = "^0.16.1" }
+sn_interface = { path = "../sn_interface", version = "^0.16.7" }
 thiserror = "1.0.23"
 time = { version = "~0.3.4", features = ["formatting"] }
 tiny-keccak = { version = "2.0.2", features = ["sha3"] }
@@ -62,7 +62,7 @@ authd_client = [ ]
 app = [ ]
 check-replicas = [ "sn_client/check-replicas" ]
 limit-client-upload-size = ["sn_client/limit-client-upload-size"]
-test-utils = [ "sn_client/test-utils", "anyhow", "async_once", "tracing-subscriber" ]
+test-utils = [ "sn_interface/test-utils", "sn_client/test-utils", "anyhow", "async_once", "tracing-subscriber" ]
 default = [ "authenticator", "authd_client", "app" ]
 
 [dev-dependencies]
@@ -73,6 +73,7 @@ async_once = "~0.2.6"
 hex = "~0.4"
 predicates = "2.0"
 proptest = "1.0.0"
-sn_client = { path = "../sn_client", version = "^0.77.1", features = ["test-utils"] }
+sn_client = { path = "../sn_client", version = "^0.77.3", features = ["test-utils"] }
+sn_interface = { path = "../sn_interface", version = "^0.16.7", features = ["test-utils"] }
 tokio = { version = "1.6.0", features = ["macros"] }
 tracing-subscriber = "~0.3.1"

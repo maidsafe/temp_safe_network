@@ -32,7 +32,7 @@ pub enum NodeDataCmd {
     /// Tells an Adult to store a data
     ReplicateOneData(ReplicatedData),
     /// Tells an Adult to store a replica of some data set
-    ReplicateData(Vec<ReplicatedData>),
+    ReplicateDataBatch(Vec<ReplicatedData>),
     /// Tells an Adult to fetch and replicate data from the sender
     SendAnyMissingRelevantData(Vec<DataAddress>),
     /// Sent to all promoted nodes (also sibling if any) after
@@ -47,13 +47,12 @@ pub enum NodeDataCmd {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeEvent {
-    #[cfg(any(feature = "chunks", feature = "registers"))]
     /// Sent by a full Adult, and tells the Elders to store a chunk at some other Adult in the section
     CouldNotStoreData {
         /// Node Id
         node_id: PublicKey,
-        /// The data that the Adult couldn't store
-        data: ReplicatedData,
+        /// The data that the Node couldn't store
+        data_address: DataAddress,
         /// Whether store failed due to full
         full: bool,
     },

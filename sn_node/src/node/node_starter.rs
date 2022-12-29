@@ -10,10 +10,11 @@ use crate::comm::{Comm, MsgFromPeer};
 use crate::node::{
     cfg::keypair_storage::{get_reward_pk, store_network_keypair, store_new_reward_keypair},
     flow_ctrl::{
-        cmds::Cmd, dispatcher::Dispatcher, dysfunction::DysCmds, CmdCtrl, FlowCtrl, RejoinNetwork,
+        cmds::Cmd, dispatcher::Dispatcher, fault_detection::FaultsCmd, CmdCtrl, FlowCtrl,
+        RejoinNetwork,
     },
     join_network,
-    logging::{log_ctx::LogCtx, run_system_logger},
+    logging::log_system_details,
     Config, Error, MyNode, Result, STANDARD_CHANNEL_SIZE,
 };
 use crate::UsedSpace;
@@ -121,9 +122,9 @@ async fn new_node(
             "Node PID: {:?}, prefix: {:?}, name: {:?}, age: {}, connection info: {}",
             our_pid, node_prefix, node_name, node_age, our_conn_info_json,
         );
-    }
 
-    run_system_logger(LogCtx::new(node.clone()), config.resource_logs).await;
+        log_system_details(node_prefix);
+    }
 
     Ok((node, cmd_channel, rejoin_network_rx))
 }
@@ -140,12 +141,12 @@ async fn bootstrap_node(
     mpsc::Receiver<RejoinNetwork>,
 )> {
     let (incoming_msg_pipe, mut incoming_msg_receiver) = mpsc::channel(STANDARD_CHANNEL_SIZE);
-    let (dysfunction_cmds_sender, dysfunction_cmds_receiver) =
-        mpsc::channel::<DysCmds>(STANDARD_CHANNEL_SIZE);
+    let (fault_cmds_sender, fault_cmds_receiver) =
+        mpsc::channel::<FaultsCmd>(STANDARD_CHANNEL_SIZE);
 
     let comm = Comm::new(
         config.local_addr(),
-        config.network_config().clone(),
+        config.network_config(),
         incoming_msg_pipe,
     )
     .await?;
@@ -155,7 +156,7 @@ async fn bootstrap_node(
             comm,
             used_space,
             root_storage_dir,
-            dysfunction_cmds_sender.clone(),
+            fault_cmds_sender.clone(),
         )
         .await?
     } else {
@@ -166,7 +167,7 @@ async fn bootstrap_node(
             join_timeout,
             used_space,
             root_storage_dir,
-            dysfunction_cmds_sender.clone(),
+            fault_cmds_sender.clone(),
         )
         .await?
     };
@@ -178,7 +179,7 @@ async fn bootstrap_node(
         cmd_ctrl,
         incoming_msg_receiver,
         data_replication_receiver,
-        (dysfunction_cmds_sender, dysfunction_cmds_receiver),
+        (fault_cmds_sender, fault_cmds_receiver),
     )
     .await;
 
@@ -189,7 +190,7 @@ async fn bootstrap_genesis_node(
     comm: Comm,
     used_space: UsedSpace,
     root_storage_dir: &Path,
-    dysfunction_cmds_sender: mpsc::Sender<DysCmds>,
+    fault_cmds_sender: mpsc::Sender<FaultsCmd>,
 ) -> Result<MyNode> {
     // Genesis node having a fix age of 255.
     let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), 255);
@@ -210,7 +211,7 @@ async fn bootstrap_genesis_node(
         used_space.clone(),
         root_storage_dir.to_path_buf(),
         genesis_sk_set,
-        dysfunction_cmds_sender,
+        fault_cmds_sender,
     )
     .await?;
 
@@ -239,7 +240,7 @@ async fn bootstrap_normal_node(
     join_timeout: Duration,
     used_space: UsedSpace,
     root_storage_dir: &Path,
-    dysfunction_cmds_sender: mpsc::Sender<DysCmds>,
+    fault_cmds_sender: mpsc::Sender<FaultsCmd>,
 ) -> Result<MyNode> {
     let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE);
     let node_name = ed25519::name(&keypair.public);
@@ -271,7 +272,7 @@ async fn bootstrap_normal_node(
         None,
         used_space.clone(),
         root_storage_dir.to_path_buf(),
-        dysfunction_cmds_sender,
+        fault_cmds_sender,
     )
     .await?;
     info!("{} Joined the network!", node.info().name());

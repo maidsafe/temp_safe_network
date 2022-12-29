@@ -27,6 +27,8 @@ pub enum Error {
     /// Failed to deserialise a section tree.
     #[error("Failed to deserialise section tree: {0}")]
     Deserialisation(String),
+    #[error("The provided SAP must belong to the genesis prefix")]
+    NonGenesisSap,
     #[error("The provided signature cannot be verified while inserting into the SectionsDAG")]
     InvalidSignature,
     #[error("Key not found in the SectionsDAG: {0:?}")]
@@ -37,6 +39,8 @@ pub enum Error {
     MultipleBranchError,
     #[error("Proof chain cannot be trusted: {0}")]
     UntrustedProofChain(String),
+    #[error("Provided proof_chain doesn't cover the SAP's key we currently know: {0}")]
+    SAPKeyNotCoveredByProofChain(String),
     #[error("Section authority provider cannot be trusted: {0}")]
     UntrustedSectionAuthProvider(String),
     #[error("The genesis key of the provided SectionTree is invalid: {0:?}")]

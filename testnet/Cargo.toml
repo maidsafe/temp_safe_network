@@ -15,6 +15,7 @@ version = "0.1.0"
 # required to pass on flag to node builds
 chaos = []
 statemap = []
+otlp = []
 
 [[bin]]
 path="bin.rs"

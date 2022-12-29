@@ -23,17 +23,14 @@ use xor_name::XorName;
 #[allow(clippy::large_enum_variant)]
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub enum DataCmd {
-    #[cfg(feature = "chunks")]
     /// [`Chunk`] write operation.
     ///
     /// [`Chunk`]: crate::types::Chunk
     StoreChunk(Chunk),
-    #[cfg(feature = "registers")]
     /// [`Register`] write operation.
     ///
     /// [`Register`]: crate::types::register::Register
     Register(RegisterCmd),
-    #[cfg(feature = "spentbook")]
     /// Spentbook write operation.
     Spentbook(SpentbookCmd),
 }
@@ -52,11 +49,8 @@ impl DataCmd {
     pub fn dst_name(&self) -> XorName {
         use DataCmd::*;
         match self {
-            #[cfg(feature = "chunks")]
             StoreChunk(c) => *c.name(),
-            #[cfg(feature = "registers")]
             Register(c) => c.name(), // TODO: c.dst_id(), as to not co-locate private and public and different tags of same name.
-            #[cfg(feature = "spentbook")]
             Spentbook(c) => c.name(),
         }
     }
@@ -66,11 +60,8 @@ impl DataCmd {
     pub fn to_error_response(&self, error: Error) -> CmdResponse {
         use DataCmd::*;
         match self {
-            #[cfg(feature = "chunks")]
             StoreChunk(_) => CmdResponse::StoreChunk(Err(error)),
-            #[cfg(feature = "registers")]
             Register(c) => c.to_error_response(error),
-            #[cfg(feature = "spentbook")]
             Spentbook(c) => c.to_error_response(error),
         }
     }

@@ -142,7 +142,6 @@ pub fn init_logger() {
         tracing_subscriber::fmt::fmt()
             // NOTE: uncomment this line for pretty printed log output.
             //.pretty()
-            .with_thread_names(true)
             .with_ansi(false)
             .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
             .with_target(false)
@@ -156,8 +155,7 @@ pub fn init_logger() {
 pub mod test_utils {
     pub use crate::{
         network_knowledge::{
-            section_authority_provider::test_utils::*, test_utils::*, test_utils_nw::*,
-            test_utils_st::*,
+            section_authority_provider::test_utils::*, test_utils::*, test_utils_st::*,
         },
         types::keys::test_utils::*,
     };

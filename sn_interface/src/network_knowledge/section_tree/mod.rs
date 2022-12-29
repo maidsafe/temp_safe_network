@@ -47,12 +47,17 @@ pub struct SectionTree {
 }
 
 impl SectionTree {
-    /// Create an empty container
-    pub fn new(genesis_pk: BlsPublicKey) -> Self {
-        Self {
-            sections: BTreeMap::new(),
-            sections_dag: SectionsDAG::new(genesis_pk),
+    /// Create a `SectionTree` with just the genesis section
+    pub fn new(genesis_sap: SectionSigned<SectionAuthorityProvider>) -> Result<Self> {
+        if genesis_sap.prefix() != Prefix::default() {
+            return Err(Error::NonGenesisSap);
         }
+
+        let genesis_pk = genesis_sap.public_key_set().public_key();
+        Ok(Self {
+            sections: BTreeMap::from([(Prefix::default(), genesis_sap)]),
+            sections_dag: SectionsDAG::new(genesis_pk),
+        })
     }
 
     /// Create a new SectionTree deserialised from bytes
@@ -168,9 +173,35 @@ impl SectionTree {
             .find(|&signed_sap| signed_sap.public_key_set().public_key() == *section_key)
     }
 
+    /// Returns the section authority provider for the prefix that matches `name`.
+    /// In case there is no prefix matches the `name`, we shall return the one with longest
+    /// common bits. i.e. for the name of `00xxx`, if we have `01` and `1`, then we shall return
+    /// with `01`.
+    pub fn get_signed_by_name(
+        &self,
+        name: &XorName,
+    ) -> Result<SectionSigned<SectionAuthorityProvider>> {
+        self.sections
+            .iter()
+            .max_by_key(|&(prefix, _)| prefix.common_prefix(name))
+            .ok_or(Error::NoMatchingSection)
+            .map(|(_, sap)| sap.clone())
+    }
+
+    /// Get the section that matches `prefix`. In case of multiple matches, returns the
+    /// one with the longest prefix.
+    pub fn get_signed_by_prefix(
+        &self,
+        prefix: &Prefix,
+    ) -> Result<SectionSigned<SectionAuthorityProvider>> {
+        self.get_signed_by_name(&prefix.name())
+    }
     /// Update our `SectionTree` if the provided update can be verified
     /// Returns true if an update was made
-    pub fn update(&mut self, section_tree_update: SectionTreeUpdate) -> Result<bool> {
+    pub fn update_the_section_tree(
+        &mut self,
+        section_tree_update: SectionTreeUpdate,
+    ) -> Result<bool> {
         let signed_sap = section_tree_update.signed_sap;
         let proof_chain = section_tree_update.proof_chain;
 
@@ -213,7 +244,7 @@ impl SectionTree {
         // the incoming prefix. If elder_count() is smaller at _all_ we
         // should warn! something so we can track this.
         if !incoming_prefix.is_empty() {
-            match self.section_by_prefix(incoming_prefix) {
+            match self.get_signed_by_prefix(incoming_prefix) {
                 Ok(sap) => {
                     let current_sap_elder_count = sap.elder_count();
                     let proposed_sap_elder_count = signed_sap.elder_count();
@@ -248,8 +279,8 @@ impl SectionTree {
                     // As an outdated node will got updated via AE triggered by other messages,
                     // there is no need to bounce back here (assuming the sender is outdated) to
                     // avoid potential looping.
-                    return Err(Error::UntrustedProofChain(format!(
-                        "Provided proof_chain doesn't cover the SAP's key we currently know: {proof_chain:?}, {:?}",
+                    return Err(Error::SAPKeyNotCoveredByProofChain(format!(
+                        "{proof_chain:?}, {:?}",
                         sap.value
                     )));
                 }
@@ -318,24 +349,6 @@ impl SectionTree {
             signed_sap,
             proof_chain,
         })
-    }
-
-    /// Returns the section authority provider for the prefix that matches `name`.
-    /// In case there is no prefix matches the `name`, we shall return the one with longest
-    /// common bits. i.e. for the name of `00xxx`, if we have `01` and `1`, then we shall return
-    /// with `01`.
-    pub fn section_by_name(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
-        self.sections
-            .iter()
-            .max_by_key(|&(prefix, _)| prefix.common_prefix(name))
-            .ok_or(Error::NoMatchingSection)
-            .map(|(_, sap)| sap.value.clone())
-    }
-
-    /// Get the section that matches `prefix`. In case of multiple matches, returns the
-    /// one with the longest prefix.
-    pub fn section_by_prefix(&self, prefix: &Prefix) -> Result<SectionAuthorityProvider> {
-        self.section_by_name(&prefix.name())
     }
 
     /// Get total number of known sections
@@ -476,8 +489,14 @@ impl SectionTreeUpdate {
 
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils {
+
     use super::{SectionTree, SectionTreeUpdate, SectionsDAG};
-    use crate::{messaging::system::SectionSigned, test_utils::TestKeys, SectionAuthorityProvider};
+    use crate::{
+        messaging::system::SectionSigned,
+        test_utils::{TestKeys, TestSapBuilder},
+        SectionAuthorityProvider,
+    };
+    use xor_name::Prefix;
 
     /// `SectionTree` related utils for testing
     pub struct TestSectionTree {}
@@ -485,10 +504,11 @@ pub mod test_utils {
     impl TestSectionTree {
         /// Get a random `SectionTree`
         pub fn random_tree() -> (SectionTree, bls::SecretKey) {
-            let genesis_sk = bls::SecretKey::random();
-            let tree = SectionTree::new(genesis_sk.public_key());
+            let (gen_sap, gen_sk_set, ..) = TestSapBuilder::new(Prefix::default()).build();
+            let gen_sap = TestKeys::get_section_signed(&gen_sk_set.secret_key(), gen_sap);
+            let tree = SectionTree::new(gen_sap).expect("SAP belongs to the genesis prefix");
 
-            (tree, genesis_sk)
+            (tree, gen_sk_set.secret_key())
         }
 
         /// Generate a `SectionTreeUpdate` where the SAP's section key is appended to the proof chain
@@ -589,8 +609,8 @@ mod tests {
         let _changed = tree.insert(sap0.clone());
 
         assert_eq!(
-            tree.section_by_name(&p1.substituted_in(xor_name::rand::random()))?,
-            sap0.value
+            tree.get_signed_by_name(&p1.substituted_in(xor_name::rand::random()))?,
+            sap0
         );
 
         // There are no matching prefixes, so return an opposite prefix.
@@ -679,34 +699,34 @@ mod tests {
         let _changed = tree.insert(sap.clone());
 
         assert_eq!(
-            tree.section_by_name(&p0.substituted_in(xor_name::rand::random()))?,
-            sap.value
+            tree.get_signed_by_name(&p0.substituted_in(xor_name::rand::random()))?,
+            sap
         );
 
         let _changed = tree.insert(sap0.clone());
 
         assert_eq!(
-            tree.section_by_name(&p1.substituted_in(xor_name::rand::random()))?,
-            sap0.value
+            tree.get_signed_by_name(&p1.substituted_in(xor_name::rand::random()))?,
+            sap0
         );
 
         let _changed = tree.insert(sap1);
         let _changed = tree.insert(sap10.clone());
 
         assert_eq!(
-            tree.section_by_name(&p0.substituted_in(xor_name::rand::random()))?,
-            sap0.value
+            tree.get_signed_by_name(&p0.substituted_in(xor_name::rand::random()))?,
+            sap0
         );
 
         // sap1 get pruned once sap10 inserted.
         assert_eq!(
-            tree.section_by_name(&prefix("11").substituted_in(xor_name::rand::random()))?,
-            sap10.value
+            tree.get_signed_by_name(&prefix("11").substituted_in(xor_name::rand::random()))?,
+            sap10
         );
 
         assert_eq!(
-            tree.section_by_name(&p10.substituted_in(xor_name::rand::random()))?,
-            sap10.value
+            tree.get_signed_by_name(&p10.substituted_in(xor_name::rand::random()))?,
+            sap10
         );
 
         Ok(())
@@ -727,14 +747,14 @@ mod tests {
         let _changed = tree.insert(sap1);
         let _changed = tree.insert(sap10.clone());
 
-        assert_eq!(tree.section_by_prefix(&p0)?, sap0.value);
+        assert_eq!(tree.get_signed_by_prefix(&p0)?, sap0);
 
         // sap1 get pruned once sap10 inserted.
-        assert_eq!(tree.section_by_prefix(&prefix("11"))?, sap10.value);
+        assert_eq!(tree.get_signed_by_prefix(&prefix("11"))?, sap10);
 
-        assert_eq!(tree.section_by_prefix(&p10)?, sap10.value);
+        assert_eq!(tree.get_signed_by_prefix(&p10)?, sap10);
 
-        assert_eq!(tree.section_by_prefix(&prefix("101"))?, sap10.value);
+        assert_eq!(tree.get_signed_by_prefix(&prefix("101"))?, sap10);
 
         Ok(())
     }
@@ -751,12 +771,12 @@ mod tests {
         let (sap01, _) = random_signed_sap(p01);
         let section_tree_update =
             TestSectionTree::get_section_tree_update(&sap01, &dag, &genesis_sk);
-        assert!(tree.update(section_tree_update)?);
+        assert!(tree.update_the_section_tree(section_tree_update)?);
 
         let (sap10, _) = random_signed_sap(p10);
         let section_tree_update =
             TestSectionTree::get_section_tree_update(&sap10, &dag, &genesis_sk);
-        assert!(tree.update(section_tree_update)?);
+        assert!(tree.update_the_section_tree(section_tree_update)?);
 
         let n01 = p01.substituted_in(xor_name::rand::random());
         let n10 = p10.substituted_in(xor_name::rand::random());
@@ -776,7 +796,7 @@ mod tests {
         let (sap0, _) = random_signed_sap(prefix("0"));
         let tree_update =
             TestSectionTree::get_section_tree_update(&sap0, tree.get_sections_dag(), &genesis_sk);
-        assert!(tree.update(tree_update)?);
+        assert!(tree.update_the_section_tree(tree_update)?);
 
         let (sap1, _) = random_signed_sap(prefix("1"));
         // instead of constructing a proof_chain from gen -> 1; we also include the branch '0'
@@ -784,7 +804,7 @@ mod tests {
         let tree_update =
             TestSectionTree::get_section_tree_update(&sap1, tree.get_sections_dag(), &genesis_sk);
         assert!(matches!(
-            tree.update(tree_update),
+            tree.update_the_section_tree(tree_update),
             Err(Error::MultipleBranchError)
         ));
 
@@ -800,10 +820,10 @@ mod tests {
         let tree_update =
             TestSectionTree::get_section_tree_update(&sap0, tree.get_sections_dag(), &genesis_sk);
         let tree_update_same = tree_update.clone();
-        assert!(tree.update(tree_update)?);
+        assert!(tree.update_the_section_tree(tree_update)?);
 
         // node tries to call update with the same information
-        assert!(!tree.update(tree_update_same)?);
+        assert!(!tree.update_the_section_tree(tree_update_same)?);
 
         Ok(())
     }
@@ -817,15 +837,15 @@ mod tests {
         let proof_chain = tree.get_sections_dag().clone();
         let tree_update =
             TestSectionTree::get_section_tree_update(&sap0, &proof_chain, &genesis_sk);
-        assert!(tree.update(tree_update)?);
+        assert!(tree.update_the_section_tree(tree_update)?);
 
         // node tries to update with sap signed by same parent for the same prefix
         let (sap0_same, _) = random_signed_sap(prefix("0"));
         let tree_update =
             TestSectionTree::get_section_tree_update(&sap0_same, &proof_chain, &genesis_sk);
         assert!(matches!(
-            tree.update(tree_update),
-            Err(Error::UntrustedProofChain(_))
+            tree.update_the_section_tree(tree_update),
+            Err(Error::SAPKeyNotCoveredByProofChain(_))
         ));
 
         Ok(())
@@ -840,18 +860,18 @@ mod tests {
         let tree_update =
             TestSectionTree::get_section_tree_update(&sap0, tree.get_sections_dag(), &genesis_sk);
         let tree_update_outdated = tree_update.clone();
-        assert!(tree.update(tree_update)?);
+        assert!(tree.update_the_section_tree(tree_update)?);
 
         // node updated with sap1 with same prefix
         let (sap1, _) = random_signed_sap(prefix("0"));
         let tree_update =
             TestSectionTree::get_section_tree_update(&sap1, tree.get_sections_dag(), &sk0);
-        assert!(tree.update(tree_update)?);
+        assert!(tree.update_the_section_tree(tree_update)?);
 
         // node receives an outdated AE update for sap0
         assert!(matches!(
-            tree.update(tree_update_outdated),
-            Err(Error::UntrustedProofChain(_))
+            tree.update_the_section_tree(tree_update_outdated),
+            Err(Error::SAPKeyNotCoveredByProofChain(_))
         ));
 
         Ok(())
@@ -867,11 +887,11 @@ mod tests {
         })]
         #[test]
         #[allow(clippy::unwrap_used)]
-        fn proptest_section_tree_fields_should_stay_in_sync((main_dag, list_of_proof_chains) in arb_sections_dag_and_proof_chains(100, true)) {
-            let mut section_tree = SectionTree::new(*main_dag.genesis_key());
+        fn proptest_section_tree_fields_should_stay_in_sync((genesis_sap, main_dag, list_of_proof_chains) in arb_sections_dag_and_proof_chains(100, true)) {
+            let mut section_tree = SectionTree::new(genesis_sap).expect("SAP belongs to the genesis prefix");
             for (proof_chain, sap) in &list_of_proof_chains {
                 let tree_update = SectionTreeUpdate::new(sap.clone(), proof_chain.clone());
-                assert!(section_tree.update(tree_update)?);
+                assert!(section_tree.update_the_section_tree(tree_update)?);
                 // The `sections` are supposed to hold the SAP of the `sections_dag`'s leaves. Verify it
                 assert_lists(
                     section_tree.sections.values().map(|sap| sap.section_key()),

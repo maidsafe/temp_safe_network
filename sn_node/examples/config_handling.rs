@@ -25,13 +25,11 @@ async fn main() -> Result<()> {
     let file_config = Config::new().await?;
 
     // TODO: Uncomment the below lines once we enable reading config from disk
-    // file_config.network_config.local_ip = Some(
-    //     "192.168.0.1"
-    //         .parse()
-    //         .map_err(|_| anyhow!("Invalid IP address format"))?,
-    // );
-    // file_config.network_config.local_port = Some(0);
-    // file_config.network_config.external_port = Some(12345);
+    // file_config.local_addr = Some("127.0.0.1".parse()?);
+    // file_config.public_addr = Some(std::net::SocketAddr::from((
+    //     std::net::Ipv4Addr::UNSPECIFIED,
+    //     12345,
+    // )));
     file_config.write_to_disk().await?;
 
     // This should load the config from disk and
@@ -98,12 +96,12 @@ async fn main() -> Result<()> {
         assert_eq!(command_line_args.public_addr, config.public_addr);
     } else {
         assert_eq!(
-            file_config.network_config.external_ip,
-            config.network_config.external_ip
+            file_config.network_config().external_ip,
+            config.network_config().external_ip
         );
         assert_eq!(
-            file_config.network_config.external_port,
-            config.network_config.external_port
+            file_config.network_config().external_port,
+            config.network_config().external_port
         );
     }
 
@@ -124,12 +122,12 @@ async fn main() -> Result<()> {
             command_line_args
                 .idle_timeout_msec
                 .map(Duration::from_millis),
-            config.network_config.idle_timeout
+            config.network_config().idle_timeout
         )
     } else {
         assert_eq!(
-            file_config.network_config.idle_timeout,
-            config.network_config.idle_timeout
+            file_config.network_config().idle_timeout,
+            config.network_config().idle_timeout
         )
     }
 
@@ -138,12 +136,12 @@ async fn main() -> Result<()> {
             command_line_args
                 .keep_alive_interval_msec
                 .map(|i| Duration::from_millis(i.into())),
-            config.network_config.keep_alive_interval
+            config.network_config().keep_alive_interval
         )
     } else {
         assert_eq!(
-            file_config.network_config.keep_alive_interval,
-            config.network_config.keep_alive_interval
+            file_config.network_config().keep_alive_interval,
+            config.network_config().keep_alive_interval
         )
     }
 

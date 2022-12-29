@@ -2,13 +2,13 @@
 
 dry_run_output=""
 commit_message=""
-sn_dysfunction_version=""
+sn_fault_detection_version=""
 sn_interface_version=""
 sn_client_version=""
 sn_node_version=""
 sn_api_version=""
 sn_cli_version=""
-sn_dysfunction_has_changes="false"
+sn_fault_detection_has_changes="false"
 sn_interface_has_changes="false"
 sn_client_has_changes="false"
 sn_node_has_changes="false"
@@ -24,7 +24,7 @@ function perform_smart_release_dry_run() {
     --no-changelog-preview \
     --allow-fully-generated-changelogs \
     --no-changelog-github-release \
-    "sn_dysfunction" "sn_interface" "sn_node" "sn_client" "sn_api" "sn_cli" 2>&1)
+    "sn_fault_detection" "sn_interface" "sn_node" "sn_client" "sn_api" "sn_cli" 2>&1)
   echo "Dry run output for smart-release:"
   echo $dry_run_output
 }
@@ -41,10 +41,10 @@ function crate_has_changes() {
 
 function determine_which_crates_have_changes() {
   local has_changes
-  has_changes=$(crate_has_changes "sn_dysfunction")
+  has_changes=$(crate_has_changes "sn_fault_detection")
   if [[ $has_changes == "true" ]]; then
-    echo "smart-release has determined sn_dysfunction crate has changes"
-    sn_dysfunction_has_changes="true"
+    echo "smart-release has determined sn_fault_detection crate has changes"
+    sn_fault_detection_has_changes="true"
   fi
 
   has_changes=$(crate_has_changes "sn_interface")
@@ -77,7 +77,7 @@ function determine_which_crates_have_changes() {
     sn_cli_has_changes="true"
   fi
 
-  if [[ $sn_dysfunction_has_changes == "false" ]] && \
+  if [[ $sn_fault_detection_has_changes == "false" ]] && \
      [[ $sn_interface_has_changes == "false" ]] && \
      [[ $sn_client_has_changes == "false" ]] && \
      [[ $sn_node_has_changes == "false" ]] && \
@@ -98,7 +98,7 @@ function generate_version_bump_commit() {
     --allow-fully-generated-changelogs \
     --no-changelog-github-release \
     --execute \
-    "sn_dysfunction" "sn_interface" "sn_node" "sn_client" "sn_api" "sn_cli"
+    "sn_fault_detection" "sn_interface" "sn_node" "sn_client" "sn_api" "sn_cli"
   exit_code=$?
   if [[ $exit_code -ne 0 ]]; then
     echo "smart-release did not run successfully. Exiting with failure code."
@@ -109,8 +109,8 @@ function generate_version_bump_commit() {
 function generate_new_commit_message() {
   sn_interface_version=$( \
     grep "^version" < sn_interface/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
-  sn_dysfunction_version=$( \
-    grep "^version" < sn_dysfunction/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
+  sn_fault_detection_version=$( \
+    grep "^version" < sn_fault_detection/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
   sn_client_version=$(grep "^version" < sn_client/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
   sn_node_version=$(grep "^version" < sn_node/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
   sn_api_version=$(grep "^version" < sn_api/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
@@ -120,8 +120,8 @@ function generate_new_commit_message() {
   if [[ $sn_interface_has_changes == "true" ]]; then
     commit_message="${commit_message}sn_interface-${sn_interface_version}/"
   fi
-  if [[ $sn_dysfunction_has_changes == "true" ]]; then
-    commit_message="${commit_message}sn_dysfunction-${sn_dysfunction_version}/"
+  if [[ $sn_fault_detection_has_changes == "true" ]]; then
+    commit_message="${commit_message}sn_fault_detection-${sn_fault_detection_version}/"
   fi
   if [[ $sn_client_has_changes == "true" ]]; then
     commit_message="${commit_message}sn_client-${sn_client_version}/"
@@ -149,8 +149,8 @@ function amend_tags() {
   if [[ $sn_interface_has_changes == "true" ]]; then
     git tag "sn_interface-v${sn_interface_version}" -f
   fi
-  if [[ $sn_dysfunction_has_changes == "true" ]]; then
-    git tag "sn_dysfunction-v${sn_dysfunction_version}" -f
+  if [[ $sn_fault_detection_has_changes == "true" ]]; then
+    git tag "sn_fault_detection-v${sn_fault_detection_version}" -f
   fi
   if [[ $sn_client_has_changes == "true" ]]; then git tag "sn_client-v${sn_client_version}" -f; fi
   if [[ $sn_node_has_changes == "true" ]]; then git tag "sn_node-v${sn_node_version}" -f; fi

@@ -248,21 +248,28 @@ impl<R: RngCore> TestNetworkBuilder<R> {
                 .map(|p| p.bit_count())
                 .max()
                 .expect("at-least one sap should be provided");
-            // the permutations of 0,1 with len = max_bit_count gives us the max_prefixes
-            let bits = ["0", "1"];
-            let max_prefixes: Vec<_> = (2..max_bit_count).fold(
-                bits.iter()
-                    .flat_map(|b1| bits.iter().map(|&b2| b2.to_string() + *b1))
-                    .collect(),
-                |acc, _| {
-                    acc.iter()
-                        .flat_map(|b1| bits.iter().map(|&b2| b2.to_string() + b1))
-                        .collect()
-                },
-            );
+
             // max_prefixes are used to construct the `SectionTree`
-            let max_prefixes: BTreeSet<_> =
-                max_prefixes.into_iter().map(|str| prefix(&str)).collect();
+            let bits = ["0", "1"];
+            let max_prefixes = if max_bit_count == 0 {
+                BTreeSet::from([Prefix::default()])
+            } else if max_bit_count == 1 {
+                bits.iter().map(|bit| prefix(bit)).collect()
+            } else {
+                // the permutations of 0,1 with len = max_bit_count gives us the max_prefixes
+                // works only if max_bit_count >= 2
+                let max_prefixes: Vec<_> = (2..max_bit_count).fold(
+                    bits.iter()
+                        .flat_map(|b1| bits.iter().map(|&b2| b2.to_string() + *b1))
+                        .collect(),
+                    |acc, _| {
+                        acc.iter()
+                            .flat_map(|b1| bits.iter().map(|&b2| b2.to_string() + b1))
+                            .collect()
+                    },
+                );
+                max_prefixes.into_iter().map(|str| prefix(&str)).collect()
+            };
 
             // missing_prefixes are used to construct saps
             let mut missing_prefixes: BTreeSet<Prefix> = BTreeSet::new();
@@ -345,9 +352,10 @@ impl<R: RngCore> TestNetworkBuilder<R> {
         let gen_prefix = &sections
             .get(&Prefix::default())
             .expect("Genesis section is absent. Provide at-least a single SAP");
-        let gen_sk = gen_prefix[0].1.secret_key();
+        let gen_sap = gen_prefix[0].0.clone();
 
-        let mut section_tree = SectionTree::new(gen_sk.public_key());
+        let mut section_tree =
+            SectionTree::new(gen_sap).expect("gen_sap belongs to the genesis prefix");
         let mut completed = BTreeSet::new();
         // need to insert the default prefix first
         let prefix_iter = if max_prefixes.contains(&Prefix::default()) {
@@ -420,7 +428,7 @@ impl<R: RngCore> TestNetworkBuilder<R> {
                     let update =
                         TestSectionTree::get_section_tree_update(sap, &proof_chain, &parent);
                     let _ = section_tree
-                        .update(update)
+                        .update_the_section_tree(update)
                         .expect("Failed to update section_tree");
                     parent = sk;
                     let _ = completed.insert(anc);
@@ -874,20 +882,27 @@ impl TestNetwork {
         sap: &SectionSigned<SectionAuthorityProvider>,
         sk_set: &SecretKeySet,
     ) -> NetworkKnowledge {
-        let gen = self.section_tree.genesis_key();
-        let section_key = sap.section_key();
-        let proof_chain = if *gen == section_key {
-            SectionsDAG::new(*gen)
-        } else {
-            self.section_tree
-                .get_sections_dag()
-                .partial_dag(gen, &sap.section_key())
-                .expect("failed to create proof chain")
-        };
-        let update = SectionTreeUpdate::new(sap.clone(), proof_chain);
+        let gen_sap = self
+            .get_sap_single_churn(Prefix::default(), Some(0))
+            .0
+            .clone();
+        let gen_section_key = gen_sap.section_key();
+        assert_eq!(&gen_section_key, self.section_tree.genesis_key());
 
-        let mut nw = NetworkKnowledge::new(SectionTree::new(*gen), update)
-            .expect("Failed to create NetworkKnowledge");
+        let mut tree = SectionTree::new(gen_sap).expect("gen_sap belongs to the default prefix");
+        if gen_section_key != sap.section_key() {
+            let proof_chain = self
+                .section_tree
+                .get_sections_dag()
+                .partial_dag(&gen_section_key, &sap.section_key())
+                .expect("failed to create proof chain");
+            let update = SectionTreeUpdate::new(sap.clone(), proof_chain);
+            let _ = tree
+                .update_the_section_tree(update)
+                .expect("Error updating the SectionTree");
+        };
+        let mut nw =
+            NetworkKnowledge::new(sap.prefix(), tree).expect("Failed to create NetworkKnowledge");
 
         for node_state in sap.members().cloned() {
             let sig = TestKeys::get_section_sig(&sk_set.secret_key(), &node_state);

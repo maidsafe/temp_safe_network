@@ -127,13 +127,10 @@ pub enum NodeMsg {
         /// BLS signature share of an Elder if Proposal::NewSectionsAgreement
         optional_sig_share: Option<SectionSigShare>,
     },
-    #[cfg(any(feature = "chunks", feature = "registers"))]
     /// Node events are Adult to Elder events about something that happened on an Adult.
     NodeEvent(NodeEvent),
-    #[cfg(any(feature = "chunks", feature = "registers"))]
     /// Data cmds are orders to perform some data operation, only sent internally in the network.
     NodeDataCmd(NodeDataCmd),
-    #[cfg(any(feature = "chunks", feature = "registers"))]
     /// Data queries is a read-only operation.
     NodeDataQuery(NodeDataQuery),
 }
@@ -160,7 +157,6 @@ pub enum NodeDataResponse {
 }
 
 impl NodeDataResponse {
-    #[cfg(any(feature = "chunks", feature = "registers"))]
     /// The priority of the message, when handled by lower level comms.
     pub fn priority(&self) -> i32 {
         super::msg_type::NODE_DATA_MSG_PRIORITY
@@ -212,10 +208,8 @@ impl NodeMsg {
                 JOIN_RELOCATE_MSG_PRIORITY
             }
 
-            #[cfg(any(feature = "chunks", feature = "registers"))]
             Self::NodeEvent(_) => DATA_REPLICATION_MSG_PRIORITY,
 
-            #[cfg(any(feature = "chunks", feature = "registers"))]
             // Inter-node comms related to processing client data requests
             Self::NodeDataCmd(_) | Self::NodeDataQuery(_) => NODE_DATA_MSG_PRIORITY,
         }
@@ -270,11 +264,8 @@ impl Display for NodeMsg {
             Self::HandoverVotes { .. } => write!(f, "NodeMsg::HandoverVotes"),
             Self::HandoverAE { .. } => write!(f, "NodeMsg::HandoverAE"),
             Self::Propose { .. } => write!(f, "NodeMsg::Propose"),
-            #[cfg(any(feature = "chunks", feature = "registers"))]
             Self::NodeEvent { .. } => write!(f, "NodeMsg::NodeEvent"),
-            #[cfg(any(feature = "chunks", feature = "registers"))]
             Self::NodeDataCmd { .. } => write!(f, "NodeMsg::NodeCmd"),
-            #[cfg(any(feature = "chunks", feature = "registers"))]
             Self::NodeDataQuery { .. } => write!(f, "NodeMsg::NodeQuery"),
         }
     }
