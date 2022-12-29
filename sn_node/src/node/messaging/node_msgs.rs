@@ -8,7 +8,7 @@
 
 use crate::{
     node::{core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, Result},
-    storage::Error as StorageError,
+    storage::{Error as StorageError, StorageLevel},
 };
 use qp2p::SendStream;
 use sn_fault_detection::IssueType;
@@ -61,9 +61,12 @@ impl MyNode {
             .store(&data, section_pk, node_keypair.clone())
             .await
         {
-            Ok(()) => {
+            Ok(storage_level) => {
                 trace!("Data has been stored: {data_addr:?}");
-                if context.data_storage.has_reached_min_capacity()
+                if matches!(storage_level, StorageLevel::Updated(_level)) {
+                    // we add a new node for every level increase of used space
+                    cmds.push(Cmd::SetJoinsAllowed(true));
+                } else if context.data_storage.has_reached_min_capacity()
                     && !context.joins_allowed_until_split
                 {
                     // we accept new nodes until split, since we have reached the min capacity (i.e. storage limit)

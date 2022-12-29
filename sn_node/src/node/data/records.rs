@@ -10,7 +10,7 @@ use crate::node::{
     core::NodeContext, flow_ctrl::fault_detection::FaultsCmd, messaging::Peers, Cmd, Error, MyNode,
     Result,
 };
-use crate::storage::Error as StorageError;
+use crate::storage::{Error as StorageError, StorageLevel};
 
 use sn_fault_detection::IssueType;
 use sn_interface::{
@@ -468,6 +468,8 @@ impl MyNode {
         let mut is_full = false;
         let data_batch_is_empty = data_batch.is_empty();
 
+        let mut new_storage_level_passed = false;
+
         for data in data_batch {
             let store_result = context
                 .data_storage
@@ -477,7 +479,15 @@ impl MyNode {
             // This may return a DatabaseFull error... but we should have reported StorageError::NotEnoughSpace
             // well before this
             match store_result {
-                Ok(()) => debug!("Data item replicated."),
+                Ok(StorageLevel::NoChange) => debug!("Data item stored."),
+                Ok(StorageLevel::Updated(_level)) => {
+                    debug!("Data item stored.");
+                    // we add a new node for every level of used space increment
+                    if !new_storage_level_passed && !context.joins_allowed {
+                        new_storage_level_passed = true;
+                        cmds.push(Cmd::SetJoinsAllowed(true));
+                    }
+                }
                 Err(StorageError::NotEnoughSpace) => {
                     // storage full
                     error!("Not enough space to store more data");

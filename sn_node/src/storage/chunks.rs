@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{list_files_in, prefix_tree_path, Error, Result, UsedSpace};
+use super::{list_files_in, prefix_tree_path, used_space::StorageLevel, Error, Result, UsedSpace};
 
 use sn_interface::{
     messaging::system::NodeQueryResponse,
@@ -115,7 +115,7 @@ impl ChunkStorage {
 
     /// Store a chunk in the local disk store unless it is already there
     #[instrument(skip_all)]
-    pub(super) async fn store(&self, chunk: &Chunk) -> Result<()> {
+    pub(super) async fn store(&self, chunk: &Chunk) -> Result<StorageLevel> {
         let addr = chunk.address();
         let filepath = self.chunk_addr_to_filepath(addr)?;
 
@@ -148,10 +148,10 @@ impl ChunkStorage {
         // concurrent reading failing by reading an empty/incomplete file
         file.sync_data().await?;
 
-        self.used_space.increase(chunk.value().len());
+        let storage_level = self.used_space.increase(chunk.value().len());
         trace!("{:?} {addr:?}", LogMarker::StoredNewChunk);
 
-        Ok(())
+        Ok(storage_level)
     }
 }
 
@@ -185,7 +185,7 @@ mod tests {
         for _ in 0..10 {
             let chunk = Chunk::new(random_bytes(100));
 
-            storage.store(&chunk).await.expect("Failed to write chunk.");
+            let _ = storage.store(&chunk).await.expect("Failed to write chunk.");
 
             let read_chunk = storage
                 .get_chunk(chunk.address())

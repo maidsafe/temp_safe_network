@@ -8,6 +8,7 @@
 
 use super::{
     register_store::{RegisterStore, StoredRegister},
+    used_space::StorageLevel,
     Error, Result,
 };
 
@@ -77,7 +78,7 @@ impl RegisterStorage {
     }
 
     /// Update our Register's replica on receiving data from other nodes.
-    pub(super) async fn update(&self, data: &ReplicatedRegisterLog) -> Result<()> {
+    pub(super) async fn update(&self, data: &ReplicatedRegisterLog) -> Result<StorageLevel> {
         debug!("Updating Register store: {:?}", data.address);
         let mut stored_reg = self.try_load_stored_register(&data.address).await?;
 
@@ -104,7 +105,7 @@ impl RegisterStorage {
 
     /// --- Writing ---
 
-    pub(super) async fn write(&self, cmd: &RegisterCmd) -> Result<()> {
+    pub(super) async fn write(&self, cmd: &RegisterCmd) -> Result<StorageLevel> {
         info!("Writing register cmd: {:?}", cmd);
         // Let's first try to load and reconstruct the replica of targetted Register
         // we have in local storage, to then try to apply the new command onto it.
@@ -246,7 +247,7 @@ impl RegisterStorage {
         cmd: &RegisterCmd,
         section_pk: PublicKey,
         node_keypair: Keypair,
-    ) -> Result<()> {
+    ) -> Result<StorageLevel> {
         let address = cmd.dst_address();
         trace!("Creating new spentbook register: {:?}", address);
 
@@ -446,7 +447,7 @@ mod test {
         assert!(stored_reg.op_log.is_empty());
         assert_eq!(stored_reg.op_log_path, log_path);
 
-        store.write(&cmd_create).await?;
+        let _ = store.write(&cmd_create).await?;
         let stored_reg = store.try_load_stored_register(&addr).await?;
         // it should contain the create cmd
         assert_eq!(stored_reg.state.as_ref(), Some(&register));
@@ -456,7 +457,7 @@ mod test {
 
         // let's now edit the register
         let cmd_edit = edit_register(&mut register, &keypair)?;
-        store.write(&cmd_edit).await?;
+        let _ = store.write(&cmd_edit).await?;
 
         let stored_reg = store.try_load_stored_register(&addr).await?;
         // it should contain the create and edit cmds
@@ -486,7 +487,7 @@ mod test {
 
         // let's first store an edit cmd for the register
         let cmd_edit = edit_register(&mut register, &keypair)?;
-        store.write(&cmd_edit).await?;
+        let _ = store.write(&cmd_edit).await?;
 
         let stored_reg = store.try_load_stored_register(&addr).await?;
         // it should contain the edit cmd only
@@ -495,7 +496,7 @@ mod test {
         assert_eq!(stored_reg.op_log_path, log_path);
 
         // and now store the create cmd for the register
-        store.write(&cmd_create).await?;
+        let _ = store.write(&cmd_create).await?;
 
         let stored_reg = store.try_load_stored_register(&addr).await?;
         // it should contain the create and edit cmds
@@ -656,7 +657,7 @@ mod test {
 
         // create register
         let (cmd, authority, _, _, _) = create_register()?;
-        store.write(&cmd).await?;
+        let _ = store.write(&cmd).await?;
 
         // get register
         let address = cmd.dst_address();
@@ -669,7 +670,7 @@ mod test {
         }
 
         match store.write(&cmd).await {
-            Ok(()) => Err(eyre!("An error should occur for this test case")),
+            Ok(_) => Err(eyre!("An error should occur for this test case")),
             Err(error @ Error::DataExists(_)) => {
                 assert_eq!(
                     error.to_string(),
@@ -694,15 +695,15 @@ mod test {
         let mut register = Register::new(*policy.owner(), name, 0, policy);
 
         // store the register along with a few edit ops
-        store.write(&cmd_create).await?;
+        let _ = store.write(&cmd_create).await?;
         for _ in 0..10 {
             let cmd_edit = edit_register(&mut register, &keypair)?;
-            store.write(&cmd_edit).await?;
+            let _ = store.write(&cmd_edit).await?;
         }
 
         // should fail to write same register again
         match store.write(&cmd_create).await {
-            Ok(()) => bail!("An error should occur for this test case"),
+            Ok(_) => bail!("An error should occur for this test case"),
             Err(error @ Error::DataExists(_)) => assert_eq!(
                 error.to_string(),
                 format!(
@@ -720,13 +721,13 @@ mod test {
         let new_store = new_store()?;
         for addr in all_addrs {
             let replica = store.get_register_replica(&addr).await?;
-            new_store.update(&replica).await?;
+            let _ = new_store.update(&replica).await?;
         }
 
         // assert the same tests hold as for the first store
         // should fail to write same register again, also on this new store
         match new_store.write(&cmd_create).await {
-            Ok(()) => bail!("An error should occur for this test case"),
+            Ok(_) => bail!("An error should occur for this test case"),
             Err(error @ Error::DataExists(_)) => assert_eq!(
                 error.to_string(),
                 format!(
@@ -758,7 +759,7 @@ mod test {
 
         // create register
         let (cmd_create, authority, _, _, _) = create_register()?;
-        store.write(&cmd_create).await?;
+        let _ = store.write(&cmd_create).await?;
 
         let hash = EntryHash(rand::thread_rng().gen::<[u8; 32]>());
 
@@ -787,7 +788,7 @@ mod test {
 
         // create register
         let (cmd_create, authority, _, _, _) = create_register()?;
-        store.write(&cmd_create).await?;
+        let _ = store.write(&cmd_create).await?;
 
         let (user, _) = random_user();
 

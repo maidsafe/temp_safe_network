@@ -15,6 +15,7 @@ mod used_space;
 pub use used_space::UsedSpace;
 
 pub(crate) use errors::{Error, Result};
+pub(crate) use used_space::StorageLevel;
 
 use chunks::ChunkStorage;
 use registers::RegisterStorage;
@@ -69,7 +70,7 @@ impl DataStorage {
         data: &ReplicatedData,
         section_pk: PublicKey,
         node_keypair: Keypair,
-    ) -> Result<()> {
+    ) -> Result<StorageLevel> {
         debug!("Replicating {data:?}");
         match data {
             ReplicatedData::Chunk(chunk) => self.chunks.store(chunk).await,
@@ -283,7 +284,7 @@ mod tests {
         let keypair = Keypair::new_ed25519();
 
         // Store the chunk
-        storage.store(&replicated_data, pk, keypair).await?;
+        let _ = storage.store(&replicated_data, pk, keypair).await?;
 
         // Test local fetch
         let fetched_data = storage
@@ -335,7 +336,7 @@ mod tests {
         let keypair = Keypair::new_ed25519();
 
         // Store the chunk
-        storage.store(&replicated_chunk, pk, keypair).await?;
+        let _ = storage.store(&replicated_chunk, pk, keypair).await?;
 
         let keys = storage.data_addrs().await;
 
@@ -402,7 +403,7 @@ mod tests {
         let keypair = Keypair::new_ed25519();
 
         // Store the chunk
-        storage.store(&replicated_register, pk, keypair).await?;
+        let _ = storage.store(&replicated_register, pk, keypair).await?;
 
         let keys = storage.data_addrs().await;
 
