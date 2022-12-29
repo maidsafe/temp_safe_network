@@ -98,16 +98,16 @@ pub enum Error {
     /// Database error.
     #[error("Database error:: {0}")]
     Database(#[from] crate::storage::Error),
-    /// Insufficient number of Adults found to perform data operation
+    /// Insufficient number of Nodes found to perform data operation
     #[error(
-        "Not enough Adults available at section {prefix:?}. Expected {expected}, found {found}."
+        "Not enough Nodes available at section {prefix:?}. Expected {expected}, found {found}."
     )]
-    InsufficientAdults {
+    InsufficientNodeCount {
         /// The prefix of the section.
         prefix: Prefix,
-        /// Expected number of Adults for minimum replication.
+        /// Expected number of Nodes for minimum replication.
         expected: u8,
-        /// Actual number of Adults found to hold the data.
+        /// Actual number of Nodes found to hold the data.
         found: u8,
     },
     /// Received a dkg message from an invalid Xorname
@@ -156,11 +156,11 @@ pub enum Error {
     #[error("Network data error:: {0}")]
     NetworkData(#[from] sn_interface::types::Error),
     /// Error Sending Cmd in to node for processing
-    #[error("Error Sending Cmd in to node for processing.")]
-    CmdSendError,
+    #[error("Error sending Cmd on node channel for processing.")]
+    CmdChannelSendError,
     /// Error Sending Cmd in to node for processing
-    #[error("Error Sending Cmd to adult {0:?} for processing.")]
-    AdultCmdSendError(Peer),
+    #[error("Error sending Cmd to node {0:?} for processing.")]
+    CmdSendError(Peer),
     /// Network Knowledge error.
     #[error("Network knowledge error:: {0}")]
     NetworkKnowledge(#[from] sn_interface::network_knowledge::Error),
@@ -248,11 +248,11 @@ impl From<qp2p::SendError> for Error {
 impl From<Error> for ErrorMsg {
     fn from(error: Error) -> ErrorMsg {
         match error {
-            Error::InsufficientAdults {
+            Error::InsufficientNodeCount {
                 prefix,
                 expected,
                 found,
-            } => ErrorMsg::InsufficientAdults {
+            } => ErrorMsg::InsufficientNodeCount {
                 prefix,
                 expected,
                 found,

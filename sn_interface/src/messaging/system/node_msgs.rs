@@ -8,46 +8,30 @@
 
 use super::OperationId;
 use crate::messaging::{
-    data::{DataQueryVariant, MetadataExchange, QueryResponse, StorageLevel},
+    data::{DataQueryVariant, QueryResponse},
     ClientAuth,
 };
 use crate::types::{DataAddress, PublicKey, ReplicatedData};
 
 use serde::{Deserialize, Serialize};
-use xor_name::XorName;
 
 /// cmd message sent among nodes
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeDataCmd {
-    /// Notify Elders on nearing max capacity
-    RecordStorageLevel {
-        /// Node Id
-        node_id: PublicKey,
-        /// Section to which the message needs to be sent to. (NB: this is the section of the node id).
-        section: XorName,
-        /// The storage level reported by the node.
-        level: StorageLevel,
-    },
-    /// Tells an Adult to store a data
-    ReplicateOneData(ReplicatedData),
-    /// Tells an Adult to store a replica of some data set
+    /// Tells a Node to store some data.
+    StoreData(ReplicatedData),
+    /// Tells a Node to store a replica of some data set.
     ReplicateDataBatch(Vec<ReplicatedData>),
-    /// Tells an Adult to fetch and replicate data from the sender
+    /// Tells a Node to fetch and replicate data from the sender.
     SendAnyMissingRelevantData(Vec<DataAddress>),
-    /// Sent to all promoted nodes (also sibling if any) after
-    /// a completed transition to a new constellation.
-    ReceiveMetadata {
-        /// Metadata
-        metadata: MetadataExchange,
-    },
 }
 
 /// Event message sent among nodes
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeEvent {
-    /// Sent by a full Adult, and tells the Elders to store a chunk at some other Adult in the section
+    /// Sent by a full Node, and tells the Elders to store a chunk at some other Node in the section
     CouldNotStoreData {
         /// Node Id
         node_id: PublicKey,

@@ -191,7 +191,6 @@ impl Dispatcher {
                 let node = self.node.read().await;
                 debug!("[NODE READ]: HandleFailedSendToNode agreements read got...");
                 node.handle_failed_send(&peer.addr());
-
                 Ok(vec![])
             }
             Cmd::HandleDkgOutcome {
@@ -204,7 +203,6 @@ impl Dispatcher {
                 node.handle_dkg_outcome(section_auth, outcome).await
             }
             Cmd::EnqueueDataForReplication {
-                // throttle_duration,
                 recipient,
                 data_batch,
             } => {
@@ -219,12 +217,17 @@ impl Dispatcher {
                 debug!("[NODE WRITE]: propose offline write got");
                 node.cast_offline_proposals(&names)
             }
-            Cmd::SetStorageLevel(new_level) => {
+            Cmd::SetJoinsAllowed(joins_allowed) => {
                 let mut node = self.node.write().await;
-                debug!("[NODE WRITE]: Setting storage level");
-
-                node.data_storage.set_storage_level(new_level);
-
+                debug!("[NODE WRITE]: Setting joins allowed..");
+                node.joins_allowed = joins_allowed;
+                Ok(vec![])
+            }
+            Cmd::SetJoinsAllowedUntilSplit(joins_allowed_until_split) => {
+                let mut node = self.node.write().await;
+                debug!("[NODE WRITE]: Setting joins allowed until split..");
+                node.joins_allowed = joins_allowed_until_split;
+                node.joins_allowed_until_split = joins_allowed_until_split;
                 Ok(vec![])
             }
         }

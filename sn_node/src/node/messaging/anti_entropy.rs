@@ -8,22 +8,24 @@
 
 use crate::node::core::NodeContext;
 use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Error, MyNode, Result};
-use bls::PublicKey as BlsPublicKey;
-use itertools::Itertools;
-use qp2p::{SendStream, UsrMsgBytes};
+
 use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
         data::ClientDataResponse,
-        system::{AntiEntropyKind, NodeDataCmd, NodeMsg},
+        system::{AntiEntropyKind, NodeMsg},
         Dst, MsgId, MsgType, WireMsg,
     },
     network_knowledge::SectionTreeUpdate,
     types::{log_markers::LogMarker, Peer, PublicKey},
 };
+
+use bls::PublicKey as BlsPublicKey;
+use itertools::Itertools;
+use qp2p::{SendStream, UsrMsgBytes};
 use std::{collections::BTreeSet, sync::Arc};
 use tokio::sync::{Mutex, RwLock};
-use xor_name::{Prefix, XorName};
+use xor_name::XorName;
 
 // Returned by `check_for_entropy` private helper to indicate the
 // type of AE response that needs to be sent back to either to the client/Node
@@ -187,16 +189,6 @@ impl MyNode {
         MyNode::send_system_msg(ae_msg, Peers::Multiple(recipients), context.clone())
     }
 
-    /// Send `MetadataExchange` packet to the specified nodes
-    pub(crate) fn send_metadata_updates(&self, recipients: BTreeSet<Peer>, prefix: &Prefix) -> Cmd {
-        let metadata = self.get_metadata_of(prefix);
-        MyNode::send_system_msg(
-            NodeMsg::NodeDataCmd(NodeDataCmd::ReceiveMetadata { metadata }),
-            Peers::Multiple(recipients),
-            self.context(),
-        )
-    }
-
     #[instrument(skip_all)]
     /// Send AntiEntropy update message to the nodes in our sibling section.
     pub(crate) fn send_updates_to_sibling_section(
@@ -224,19 +216,13 @@ impl MyNode {
             // Using previous_key as dst_section_key as newly promoted
             // sibling Elders shall still in the state of pre-split.
             let previous_section_key = prev_context.network_knowledge.section_key();
-            let sibling_prefix = sibling_sap.prefix();
 
-            let mut cmds =
-                vec![self.send_metadata_updates(promoted_sibling_elders.clone(), &sibling_prefix)];
-
-            // Also send AE update to sibling section's new Elders
-            cmds.push(MyNode::send_ae_update_to_nodes(
+            // Send AE update to sibling section's new Elders
+            Ok(vec![MyNode::send_ae_update_to_nodes(
                 prev_context,
                 promoted_sibling_elders,
                 previous_section_key,
-            ));
-
-            Ok(cmds)
+            )])
         } else {
             error!("Failed to get sibling SAP during split.");
             Ok(vec![])
@@ -321,9 +307,7 @@ impl MyNode {
         let latest_context = node.read().await.context();
         debug!("[NODE READ] Latest context got.");
         // Only trigger reorganize data when there is a membership change happens.
-        if updated && !latest_context.is_elder {
-            // only done if adult, since as an elder we dont want to get any more
-            // data for our name (elders will eventually be caching data in general)
+        if updated {
             cmds.push(MyNode::ask_for_any_new_data(&latest_context).await);
         }
 

@@ -262,8 +262,8 @@ mod tests {
     use super::*;
     use crate::{
         messaging::{
-            data::{ClientMsg, DataQuery, DataQueryVariant, StorageLevel},
-            system::{NodeDataCmd, NodeMsg},
+            data::{ClientMsg, DataQuery, DataQueryVariant},
+            system::NodeMsg,
             AuthorityProof, ClientAuth, MsgId,
         },
         types::{ChunkAddress, Keypair},
@@ -279,13 +279,8 @@ mod tests {
         };
 
         let msg_id = MsgId::new();
-        let pk = crate::types::PublicKey::Bls(dst.section_key);
 
-        let msg = NodeMsg::NodeDataCmd(NodeDataCmd::RecordStorageLevel {
-            node_id: pk,
-            section: pk.into(),
-            level: StorageLevel::zero(),
-        });
+        let msg = NodeMsg::HandoverAE(100);
 
         let payload = WireMsg::serialize_msg_payload(&msg)?;
         let kind = MsgKind::Node(Default::default());
@@ -324,7 +319,7 @@ mod tests {
         let msg_id = MsgId::new();
 
         let client_msg = ClientMsg::Query(DataQuery {
-            adult_index: 0,
+            node_index: 0,
             variant: DataQueryVariant::GetChunk(ChunkAddress(xor_name::rand::random())),
         });
 

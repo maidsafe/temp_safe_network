@@ -22,7 +22,7 @@ use registers::RegisterStorage;
 use sn_dbc::SpentProofShare;
 use sn_interface::{
     messaging::{
-        data::{DataQueryVariant, Error as MessagingError, RegisterQuery, StorageLevel},
+        data::{DataQueryVariant, Error as MessagingError, RegisterQuery},
         system::NodeQueryResponse,
     },
     types::{
@@ -46,7 +46,6 @@ pub struct DataStorage {
     chunks: ChunkStorage,
     registers: RegisterStorage,
     used_space: UsedSpace,
-    last_recorded_level: StorageLevel,
 }
 
 impl DataStorage {
@@ -56,16 +55,13 @@ impl DataStorage {
             chunks: ChunkStorage::new(path, used_space.clone())?,
             registers: RegisterStorage::new(path, used_space.clone())?,
             used_space,
-            last_recorded_level: StorageLevel::zero(),
         })
     }
 
-    /// Update the storage level on data storage
-    /// (To avoid needing a write lock for general storage ops, we separate out this state operation)
-    pub fn set_storage_level(&mut self, new_level: StorageLevel) {
-        self.last_recorded_level = new_level;
+    /// Returns whether the storage max capacity has been reached or not.
+    pub(crate) fn has_reached_limit(&self) -> bool {
+        self.used_space.has_reached_limit()
     }
-
     /// Store data in the local store
     #[instrument(skip(self))]
     pub async fn store(
@@ -73,40 +69,24 @@ impl DataStorage {
         data: &ReplicatedData,
         section_pk: PublicKey,
         node_keypair: Keypair,
-    ) -> Result<Option<StorageLevel>> {
+    ) -> Result<()> {
         debug!("Replicating {data:?}");
         match data {
-            ReplicatedData::Chunk(chunk) => self.chunks.store(chunk).await?,
+            ReplicatedData::Chunk(chunk) => self.chunks.store(chunk).await,
             ReplicatedData::RegisterLog(data) => {
                 info!("Updating register: {:?}", data.address);
-                self.registers.update(data).await?
+                self.registers.update(data).await
             }
-            ReplicatedData::RegisterWrite(cmd) => self.registers.write(cmd).await?,
+            ReplicatedData::RegisterWrite(cmd) => self.registers.write(cmd).await,
             ReplicatedData::SpentbookWrite(cmd) => {
                 // FIMXE: this is temporary logic to have spentbooks as Registers.
                 // Spentbooks shall always exist, and the section nodes shall create them by default.
                 self.registers
                     .write_spentbook_register(cmd, section_pk, node_keypair)
-                    .await?;
+                    .await
             }
-            ReplicatedData::SpentbookLog(data) => self.registers.update(data).await?,
-        };
-
-        // check if we've filled another approx. 10%-points of our storage
-        // if so, update the recorded level
-        let last_recorded_level = self.last_recorded_level;
-        if let Ok(next_level) = last_recorded_level.next() {
-            // used_space_ratio is a heavy task that's why we don't do it all the time
-            let used_space_ratio = self.used_space.ratio();
-            let used_space_level = 10.0 * used_space_ratio;
-            // every level represents 10 percentage points
-            if used_space_level as u8 >= next_level.value() {
-                debug!("Next level for storage has been reached");
-                return Ok(Some(next_level));
-            }
+            ReplicatedData::SpentbookLog(data) => self.registers.update(data).await,
         }
-
-        Ok(None)
     }
 
     // Query the local store and return NodeQueryResponse
@@ -303,7 +283,7 @@ mod tests {
         let keypair = Keypair::new_ed25519();
 
         // Store the chunk
-        let _ = storage.store(&replicated_data, pk, keypair).await?;
+        storage.store(&replicated_data, pk, keypair).await?;
 
         // Test local fetch
         let fetched_data = storage
@@ -355,7 +335,7 @@ mod tests {
         let keypair = Keypair::new_ed25519();
 
         // Store the chunk
-        let _ = storage.store(&replicated_chunk, pk, keypair).await?;
+        storage.store(&replicated_chunk, pk, keypair).await?;
 
         let keys = storage.data_addrs().await;
 
@@ -422,7 +402,7 @@ mod tests {
         let keypair = Keypair::new_ed25519();
 
         // Store the chunk
-        let _ = storage.store(&replicated_register, pk, keypair).await?;
+        storage.store(&replicated_register, pk, keypair).await?;
 
         let keys = storage.data_addrs().await;
 
