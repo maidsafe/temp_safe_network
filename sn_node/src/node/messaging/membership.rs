@@ -208,22 +208,7 @@ impl MyNode {
         cmds.push(self.send_node_approvals(decision.clone()));
 
         // Do not disable node joins in first section.
-        let our_prefix = self.network_knowledge.prefix();
-
-        let allow_startup_joins = {
-            const TEMP_SECTION_LIMIT: usize = 20;
-
-            let is_first_section = our_prefix.is_empty();
-            let members_count = self.network_knowledge.members().len();
-
-            if cfg!(feature = "limit-network-size") {
-                is_first_section && members_count <= TEMP_SECTION_LIMIT
-            } else {
-                is_first_section
-            }
-        };
-
-        if !allow_startup_joins {
+        if !self.is_startup_joining_allowed() {
             // ..otherwise, switch off joins_allowed on a node joining.
             // TODO: fix racing issues here? https://github.com/maidsafe/safe_network/issues/890
             self.joins_allowed = false;
@@ -253,10 +238,44 @@ impl MyNode {
             self.joins_allowed = true;
         }
 
+        let net_increase = joining_nodes.len() > leaving_nodes.len();
+
+        // We do this check on every net node join.
+        // It is a cheap check and any actual cleanup won't happen back to back,
+        // due to requirement of `has_reached_min_capacity() == true` before doing it.
+        if net_increase {
+            self.data_storage
+                .try_retain_data_of(self.network_knowledge.prefix());
+            // if we are _still_ at min capacity, then it's time to allow joins until split
+            if self.data_storage.has_reached_min_capacity() {
+                self.joins_allowed = true;
+                self.joins_allowed_until_split = true;
+            }
+        }
+
+        // Once we've grown the section, we do not need to allow more nodes in.
+        // (Unless we've triggered the storage critical fail safe to grow until split.)
+        if net_increase && !self.is_startup_joining_allowed() && !self.joins_allowed_until_split {
+            self.joins_allowed = false;
+        }
+
         self.log_section_stats();
         self.log_network_stats();
 
         Ok(cmds)
+    }
+
+    pub(crate) fn is_startup_joining_allowed(&self) -> bool {
+        const TEMP_SECTION_LIMIT: usize = 20;
+
+        let is_first_section = self.network_knowledge.prefix().is_empty();
+        let members_count = self.network_knowledge.members().len();
+
+        if cfg!(feature = "limit-network-size") {
+            is_first_section && members_count <= TEMP_SECTION_LIMIT
+        } else {
+            is_first_section
+        }
     }
 
     async fn handle_node_joined(&mut self, new_info: NodeState, signature: Signature) -> Vec<Cmd> {

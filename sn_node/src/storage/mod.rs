@@ -15,6 +15,7 @@ mod used_space;
 pub use used_space::UsedSpace;
 
 pub(crate) use errors::{Error, Result};
+pub(crate) use used_space::StorageLevel;
 
 use chunks::ChunkStorage;
 use registers::RegisterStorage;
@@ -58,10 +59,37 @@ impl DataStorage {
         })
     }
 
-    /// Returns whether the storage max capacity has been reached or not.
-    pub(crate) fn has_reached_limit(&self) -> bool {
-        self.used_space.has_reached_limit()
+    /// Returns whether the storage min capacity has been reached or not.
+    pub(crate) fn has_reached_min_capacity(&self) -> bool {
+        self.used_space.has_reached_min_capacity()
     }
+
+    /// Returns whether the we have less than half capacity used.
+    pub(crate) fn is_below_half_limit(&self) -> bool {
+        0.5 > self.used_space.ratio()
+    }
+
+    /// Tries to get rid of stored data that we are no longer responsible for.
+    /// We only do this if min capacity has been reached.
+    /// It is recommended to do this at least on split, but - to be sure - also on every node join.
+    pub(crate) fn try_retain_data_of(&self, prefix: xor_name::Prefix) {
+        if self.has_reached_min_capacity() {
+            let chunk_storage = self.chunks.clone();
+            // run this on another thread, since it can be a bit heavy
+            let _ = tokio::task::spawn(async move {
+                let chunk_addr_to_remove = chunk_storage
+                    .addrs()
+                    .into_iter()
+                    .filter(|addr| !prefix.matches(addr.name()));
+                for addr in chunk_addr_to_remove {
+                    if let Err(err) = chunk_storage.remove_chunk(&addr).await {
+                        warn!("Could not remove chunk {addr:?} due to {err}.");
+                    }
+                }
+            });
+        }
+    }
+
     /// Store data in the local store
     #[instrument(skip(self))]
     pub async fn store(
@@ -69,7 +97,7 @@ impl DataStorage {
         data: &ReplicatedData,
         section_pk: PublicKey,
         node_keypair: Keypair,
-    ) -> Result<()> {
+    ) -> Result<StorageLevel> {
         debug!("Replicating {data:?}");
         match data {
             ReplicatedData::Chunk(chunk) => self.chunks.store(chunk).await,
@@ -269,7 +297,7 @@ mod tests {
         // Cleaned up automatically after test completes
         let tmp_dir = tempdir()?;
         let path = tmp_dir.path();
-        let used_space = UsedSpace::new(usize::MAX);
+        let used_space = UsedSpace::default();
 
         // Create instance
         let mut storage = DataStorage::new(path, used_space)?;
@@ -283,7 +311,7 @@ mod tests {
         let keypair = Keypair::new_ed25519();
 
         // Store the chunk
-        storage.store(&replicated_data, pk, keypair).await?;
+        let _ = storage.store(&replicated_data, pk, keypair).await?;
 
         // Test local fetch
         let fetched_data = storage
@@ -321,7 +349,7 @@ mod tests {
         // Cleaned up automatically after test completes
         let tmp_dir = tempdir()?;
         let path = tmp_dir.path();
-        let used_space = UsedSpace::new(usize::MAX);
+        let used_space = UsedSpace::default();
 
         // Create instance
         let storage = DataStorage::new(path, used_space)?;
@@ -335,7 +363,7 @@ mod tests {
         let keypair = Keypair::new_ed25519();
 
         // Store the chunk
-        storage.store(&replicated_chunk, pk, keypair).await?;
+        let _ = storage.store(&replicated_chunk, pk, keypair).await?;
 
         let keys = storage.data_addrs().await;
 
@@ -360,7 +388,7 @@ mod tests {
         // Cleaned up automatically after test completes
         let tmp_dir = tempdir()?;
         let path = tmp_dir.path();
-        let used_space = UsedSpace::new(usize::MAX);
+        let used_space = UsedSpace::default();
 
         // Create instance
         let storage = DataStorage::new(path, used_space)?;
@@ -402,7 +430,7 @@ mod tests {
         let keypair = Keypair::new_ed25519();
 
         // Store the chunk
-        storage.store(&replicated_register, pk, keypair).await?;
+        let _ = storage.store(&replicated_register, pk, keypair).await?;
 
         let keys = storage.data_addrs().await;
 
@@ -457,7 +485,7 @@ mod tests {
         let mut model: BTreeMap<XorName, ReplicatedData> = BTreeMap::new();
         let temp_dir = tempdir()?;
         let path = temp_dir.path();
-        let used_space = UsedSpace::new(usize::MAX);
+        let used_space = UsedSpace::default();
         let runtime = Runtime::new()?;
         let mut storage = DataStorage::new(path, used_space)?;
         let owner_pk = PublicKey::Bls(bls::SecretKey::random().public_key());

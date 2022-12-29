@@ -1,8 +1,7 @@
 use crate::{
     comm::{Comm, MsgFromPeer},
     node::{
-        cfg::create_test_max_capacity_and_root_storage, core::MyNode,
-        flow_ctrl::dispatcher::Dispatcher,
+        cfg::create_test_capacity_and_root_storage, core::MyNode, flow_ctrl::dispatcher::Dispatcher,
     },
     UsedSpace,
 };
@@ -813,14 +812,14 @@ impl TestNetwork {
         let handle = Handle::current();
         let _ = handle.enter();
 
-        let (max_capacity, root_storage_dir) =
-            create_test_max_capacity_and_root_storage().expect("Failed to create root storage");
+        let (min_capacity, max_capacity, root_storage_dir) =
+            create_test_capacity_and_root_storage().expect("Failed to create root storage");
         let mut my_node = futures::executor::block_on(MyNode::new(
             comm.clone(),
             info.keypair.clone(),
             network_knowledge.clone(),
             sk_share.clone(),
-            UsedSpace::new(max_capacity),
+            UsedSpace::new(min_capacity, max_capacity),
             root_storage_dir,
             mpsc::channel(10).0,
         ))

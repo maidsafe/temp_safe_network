@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{list_files_in, prefix_tree_path, Error, Result};
+use super::{list_files_in, prefix_tree_path, Error, Result, StorageLevel};
 
 use crate::UsedSpace;
 
@@ -157,23 +157,38 @@ impl RegisterStore {
     }
 
     /// Persists a RegisterLog to disk
-    pub(super) async fn write_log_to_disk(&self, log: &RegisterLog, path: &Path) -> Result<()> {
+    pub(super) async fn write_log_to_disk(
+        &self,
+        log: &RegisterLog,
+        path: &Path,
+    ) -> Result<StorageLevel> {
         trace!(
             "Writing to register log with {} cmd/s at {}",
             log.len(),
             path.display()
         );
         if log.is_empty() {
-            return Ok(());
+            return Ok(StorageLevel::NoChange);
         }
 
         create_dir_all(path).await?;
 
         let mut last_err = None;
+        let mut storage_level = StorageLevel::NoChange;
+
         for cmd in log {
-            if let Err(err) = self.write_register_cmd(cmd, path).await {
-                error!("Failed to write Register cmd {cmd:?} to disk: {err:?}");
-                last_err = Some(err);
+            match self.write_register_cmd(cmd, path).await {
+                Ok(level) => {
+                    if matches!(level, StorageLevel::Updated(_))
+                        && matches!(storage_level, StorageLevel::NoChange)
+                    {
+                        storage_level = level;
+                    }
+                }
+                Err(err) => {
+                    error!("Failed to write Register cmd {cmd:?} to disk: {err:?}");
+                    last_err = Some(err);
+                }
             }
         }
 
@@ -185,12 +200,16 @@ impl RegisterStore {
                 log.len(),
                 path.display()
             );
-            Ok(())
+            Ok(storage_level)
         }
     }
 
     /// Persists a RegisterCmd to disk
-    pub(super) async fn write_register_cmd(&self, cmd: &RegisterCmd, path: &Path) -> Result<()> {
+    pub(super) async fn write_register_cmd(
+        &self,
+        cmd: &RegisterCmd,
+        path: &Path,
+    ) -> Result<StorageLevel> {
         // rough estimate of the RegisterCmd
         let required_space = size_of::<RegisterCmd>();
         if !self.used_space.can_add(required_space) {
@@ -224,7 +243,7 @@ impl RegisterStore {
         // it's deterministic, so they are exactly the same op so we can leave
         if path.exists() {
             trace!("RegisterCmd exists on disk for {addr:?}, entry hash: {entry_hash:?}, so was not written: {cmd:?}");
-            return Ok(());
+            return Ok(StorageLevel::NoChange);
         }
 
         let mut file = File::create(&path).await?;
@@ -235,13 +254,14 @@ impl RegisterStore {
         // concurrent reading failing by reading an empty/incomplete file
         file.sync_data().await?;
 
-        self.used_space.increase(required_space);
+        let storage_level = self.used_space.increase(required_space);
 
         trace!(
             "RegisterCmd writing successful for {addr:?}, id {reg_cmd_id}, at {}, entry hash: {entry_hash:?}",
             path.display()
         );
-        Ok(())
+
+        Ok(storage_level)
     }
 }
 

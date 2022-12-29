@@ -21,9 +21,11 @@ use tokio::{
 };
 use tracing::{debug, error, warn, Level};
 
+pub(crate) const DEFAULT_MIN_CAPACITY: usize = 1024 * 1024 * 1024; // 1gb
+pub(crate) const DEFAULT_MAX_CAPACITY: usize = 2 * DEFAULT_MIN_CAPACITY;
+
 const CONFIG_FILE: &str = "node.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
-const DEFAULT_MAX_CAPACITY: usize = 1024 * 1024 * 1024; // 1gb
 
 // In the absence of any (QUIC) keep-alive messages, connections will be closed
 // if they remain idle for at least this duration.
@@ -271,6 +273,11 @@ impl Config {
     /// Network contacts to bootstrap to if this is not the first node in a network
     pub fn network_contacts_file(&self) -> Option<PathBuf> {
         self.network_contacts_file.clone()
+    }
+
+    /// The minimum capacity in bytes required by the network, to avoid the risk of being kicked out.
+    pub fn min_capacity(&self) -> usize {
+        DEFAULT_MIN_CAPACITY
     }
 
     /// Upper limit in bytes for allowed network storage on this node.

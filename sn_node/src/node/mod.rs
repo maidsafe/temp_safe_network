@@ -641,7 +641,8 @@ mod core {
             // When we split, we have brought in new nodes since the flag was set
             // in order to bring down used space. It is therefore not needed anymore.
             // (the default mechanism of adding nodes is used again)
-            if section_split && old.is_elder {
+            if section_split && old.is_elder || new.is_elder {
+                // shouldn't be necessary for `new.is_elder`, but better unset it anyway
                 self.joins_allowed_until_split = false;
             }
 
