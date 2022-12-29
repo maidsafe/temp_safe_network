@@ -139,7 +139,7 @@ impl FlowCtrl {
                     }
                 };
 
-                if let Err(error) = cmd_channel_for_msgs.send((cmd.clone(), vec![])).await {
+                if let Err(error) = cmd_channel_for_msgs.send((cmd, vec![])).await {
                     error!("Error sending msg onto cmd channel {error:?}");
                 }
             }
