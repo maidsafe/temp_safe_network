@@ -280,6 +280,11 @@ impl Link {
         let _ = self.connections.insert(conn_id.clone(), conn);
         debug!("Connection INSERTED into link store: {conn_id}");
     }
+
+    /// Returns if the link has any connections cached
+    pub(crate) fn has_connections(&self) -> bool {
+        !self.connections.is_empty()
+    }
 }
 
 /// Errors that can be returned from `Comm::send_to_one`.

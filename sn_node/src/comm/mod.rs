@@ -329,14 +329,24 @@ impl Comm {
     }
 
     /// Remove a qp2p:Connection from a peer's session.
+    /// Cleans up the session if no more connections exist
     async fn remove_conn(&self, peer: &Peer, conn: Arc<Connection>) {
         debug!(
             "Removing incoming conn to {peer:?} w/ conn_id : {:?}",
             conn.id()
         );
+
+        let mut should_cleanup_session = true;
         if let Some(entry) = self.sessions.get(peer) {
             let peer_session = entry.value();
             peer_session.remove(conn).await;
+            if peer_session.has_connections() {
+                should_cleanup_session = false;
+            }
+        }
+
+        if should_cleanup_session {
+            let _dead_peer = self.sessions.remove(peer);
         }
     }
 
@@ -382,7 +392,7 @@ async fn receive_conns(comm: Comm, mut conn_events_recv: Receiver<ConnectionEven
                 comm.add_incoming(&peer, connection).await
             }
             ConnectionEvent::ConnectionClosed { peer, connection } => {
-                comm.remove_conn(&peer, connection).await
+                comm.remove_conn(&peer, connection).await;
             }
         }
     }

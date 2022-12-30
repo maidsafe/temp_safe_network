@@ -55,6 +55,11 @@ impl PeerSession {
         }
     }
 
+    /// Returns if the underlying link has any connection at all
+    pub(crate) fn has_connections(&self) -> bool {
+        self.link.has_connections()
+    }
+
     // this must be restricted somehow, we can't allow an unbounded inflow
     // of connections from a peer...
     pub(crate) async fn add(&self, conn: Arc<qp2p::Connection>) {
