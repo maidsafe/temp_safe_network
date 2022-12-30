@@ -13,7 +13,7 @@ use sn_consensus::Decision;
 use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
-        data::ClientMsg,
+        data::{ClientDataResponse, ClientMsg},
         system::{NodeMsg, SectionSig, SectionSigned},
         AuthorityProof, ClientAuth, MsgId, WireMsg,
     },
@@ -114,6 +114,14 @@ pub(crate) enum Cmd {
         #[debug(skip)]
         context: NodeContext,
     },
+    /// Performs serialisation and signing and sends the msg.
+    SendClientResponse {
+        msg: ClientDataResponse,
+        correlation_id: MsgId,
+        send_stream: SendStream,
+        #[debug(skip)]
+        context: NodeContext,
+    },
     /// Performs serialisation and signing and sends the msg after reading NodeContext
     /// from the node
     ///
@@ -173,7 +181,7 @@ impl Cmd {
     pub(crate) fn statemap_state(&self) -> sn_interface::statemap::State {
         use sn_interface::statemap::State;
         match self {
-            Cmd::SendMsg { .. } => State::Comms,
+            Cmd::SendMsg { .. } | Cmd::SendClientResponse { .. } => State::Comms,
             Cmd::SendLockingJoinMsg { .. } => State::Comms,
             Cmd::HandleFailedSendToNode { .. } => State::Comms,
             Cmd::HandleMsg { .. } => State::HandleMsg,
@@ -210,6 +218,7 @@ impl fmt::Display for Cmd {
             Cmd::HandleMembershipDecision(_) => write!(f, "HandleMembershipDecision"),
             Cmd::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
             Cmd::SendMsg { .. } => write!(f, "SendMsg"),
+            Cmd::SendClientResponse { .. } => write!(f, "SendClientResponse"),
             Cmd::SendLockingJoinMsg { .. } => write!(f, "SendLockingJoinMsg"),
             Cmd::EnqueueDataForReplication { .. } => write!(f, "EnqueueDataForReplication"),
             Cmd::TrackNodeIssue { name, issue } => {

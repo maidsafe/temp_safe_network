@@ -65,30 +65,25 @@ impl MyNode {
     }
 
     /// Forms a `CmdError` msg to send back to the client over the response stream
-    pub(crate) async fn send_cmd_error_response_over_stream(
-        context: &NodeContext,
+    pub(crate) fn send_cmd_error_response_over_stream(
+        context: NodeContext,
         cmd: DataCmd,
         error: Error,
         correlation_id: MsgId,
         send_stream: SendStream,
-    ) -> Result<()> {
-        let client_msg = ClientDataResponse::CmdResponse {
+    ) -> Cmd {
+        let msg = ClientDataResponse::CmdResponse {
             response: cmd.to_error_response(error.into()),
             correlation_id,
         };
 
-        let (kind, payload) = MyNode::serialize_client_msg_response(context.name, client_msg)?;
-
         debug!("{correlation_id:?} sending cmd response error back to client");
-        MyNode::send_msg_on_stream(
-            context.network_knowledge.section_key(),
-            payload,
-            kind,
-            send_stream,
-            None, // we shouldn't need this...
+        Cmd::SendClientResponse {
+            msg,
             correlation_id,
-        )
-        .await
+            send_stream,
+            context,
+        }
     }
 
     /// Handle data query
@@ -220,22 +215,19 @@ impl MyNode {
             Ok(data) => data,
             Err(error) => {
                 debug!("Will send error response back to client");
-                MyNode::send_cmd_error_response_over_stream(
-                    &context,
+                let cmd = MyNode::send_cmd_error_response_over_stream(
+                    context,
                     cmd,
                     error,
                     msg_id,
                     send_stream,
-                )
-                .await?;
-
-                return Ok(vec![]);
+                );
+                return Ok(vec![cmd]);
             }
         };
 
         trace!("{:?}: {:?}", LogMarker::DataStoreReceivedAtElder, data);
 
-        let cmds = vec![];
         let targets = MyNode::target_data_holders(&context, data.name());
 
         // make sure the expected replication factor is achieved
@@ -250,15 +242,20 @@ impl MyNode {
             debug!("Will send error response back to client");
 
             // TODO: Use response stream here. This wont work anymore!
-            MyNode::send_cmd_error_response_over_stream(&context, cmd, error, msg_id, send_stream)
-                .await?;
-            return Ok(vec![]);
+            let cmd = MyNode::send_cmd_error_response_over_stream(
+                context,
+                cmd,
+                error,
+                msg_id,
+                send_stream,
+            );
+            return Ok(vec![cmd]);
         }
 
         // the store msg sent to nodes
         // cmds here may be fault tracking.
         // CmdAcks are sent over the send stream herein
-        MyNode::store_data_at_nodes_and_ack_to_client(
+        let cmds = MyNode::store_data_at_nodes_and_ack_to_client(
             &context,
             cmd,
             data,

@@ -83,7 +83,7 @@ pub(crate) async fn handle_online_cmd(
 // commands that are being returned by the Cmd dispatcher.
 pub(crate) struct ProcessAndInspectCmds<'a> {
     pending_cmds: VecDeque<Cmd>,
-    cmds_to_inspect: VecDeque<usize>,
+    index_inspected: usize,
     dispatcher: &'a Dispatcher,
 }
 
@@ -91,7 +91,7 @@ impl<'a> ProcessAndInspectCmds<'a> {
     pub(crate) fn new(cmd: Cmd, dispatcher: &'a Dispatcher) -> Self {
         Self {
             pending_cmds: VecDeque::from([cmd]),
-            cmds_to_inspect: VecDeque::default(),
+            index_inspected: 0,
             dispatcher,
         }
     }
@@ -109,39 +109,35 @@ impl<'a> ProcessAndInspectCmds<'a> {
 
         Ok(Self {
             pending_cmds,
-            cmds_to_inspect: VecDeque::default(),
+            index_inspected: 0,
             dispatcher,
         })
     }
 
     pub(crate) async fn next(&mut self) -> crate::node::error::Result<Option<&Cmd>> {
-        match self.cmds_to_inspect.pop_front() {
-            Some(index) => {
-                let cmd = self.pending_cmds.get(index);
-                assert!(cmd.is_some());
-                Ok(cmd)
-            }
-            None => {
-                while let Some(cmd) = self.pending_cmds.pop_front() {
-                    if !matches!(cmd, Cmd::SendMsg { .. }) {
-                        let new_cmds = self.dispatcher.process_cmd(cmd).await?;
-                        for cmd in new_cmds.into_iter() {
-                            let new_cmd_index = self.pending_cmds.len();
-                            self.pending_cmds.push_back(cmd);
-                            self.cmds_to_inspect.push_back(new_cmd_index);
-                        }
+        let mut next_index = self.index_inspected + 1;
+        if next_index < self.pending_cmds.len() {
+            let cmd = self.pending_cmds.get(next_index);
+            assert!(cmd.is_some());
+            self.index_inspected = next_index;
+            return Ok(cmd);
+        }
 
-                        if let Some(index) = self.cmds_to_inspect.pop_front() {
-                            let cmd = self.pending_cmds.get(index);
-                            assert!(cmd.is_some());
-                            return Ok(cmd);
-                        }
-                    }
+        while let Some(cmd) = self.pending_cmds.pop_front() {
+            next_index -= 1;
+            if !matches!(cmd, Cmd::SendMsg { .. }) {
+                let new_cmds = self.dispatcher.process_cmd(cmd).await?;
+                self.pending_cmds.extend(new_cmds);
+
+                if next_index < self.pending_cmds.len() {
+                    let cmd = self.pending_cmds.get(next_index);
+                    assert!(cmd.is_some());
+                    self.index_inspected = next_index;
+                    return Ok(cmd);
                 }
-
-                Ok(None)
             }
         }
+        Ok(None)
     }
 
     pub(crate) async fn process_all(&mut self) -> crate::node::error::Result<()> {

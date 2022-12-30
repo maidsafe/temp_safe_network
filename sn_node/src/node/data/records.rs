@@ -125,7 +125,7 @@ impl MyNode {
         msg_id: MsgId,
         targets: BTreeSet<Peer>,
         client_response_stream: SendStream,
-    ) -> Result<()> {
+    ) -> Result<Vec<Cmd>> {
         let targets_len = targets.len();
 
         let responses = MyNode::store_data_at_nodes(context, data, msg_id, targets).await?;
@@ -152,36 +152,41 @@ impl MyNode {
         // everything went fine, tell the client that
         if success_count == targets_len {
             if let Some(response) = ack_response {
-                MyNode::respond_to_client_on_stream(context, response, client_response_stream)
-                    .await?;
+                MyNode::respond_to_client_on_stream(
+                    context.clone(),
+                    response,
+                    client_response_stream,
+                )
+                .await
             } else {
                 // This should not be possible with above checks
-                error!("No valid response to send from all responses for {msg_id:?}")
+                error!("No valid response to send from all responses for {msg_id:?}");
+                Ok(vec![])
             }
         } else {
             error!("Storage was not completely successful for {msg_id:?}");
 
             if let Some(error) = last_error {
-                MyNode::send_cmd_error_response_over_stream(
-                    context,
+                let cmd = MyNode::send_cmd_error_response_over_stream(
+                    context.clone(),
                     cmd,
                     error,
                     msg_id,
                     client_response_stream,
-                )
-                .await?;
+                );
+                Ok(vec![cmd])
+            } else {
+                Ok(vec![])
             }
         }
-
-        Ok(())
     }
 
     /// Parses WireMsg and if DataStored Ack, we send a response to the client
     async fn respond_to_client_on_stream(
-        context: &NodeContext,
+        context: NodeContext,
         response: WireMsg,
         send_stream: SendStream,
-    ) -> Result<()> {
+    ) -> Result<Vec<Cmd>> {
         if let MsgType::NodeDataResponse {
             msg:
                 NodeDataResponse::CmdResponse {
@@ -191,27 +196,22 @@ impl MyNode {
             ..
         } = response.into_msg()?
         {
-            let client_msg = ClientDataResponse::CmdResponse {
+            let msg = ClientDataResponse::CmdResponse {
                 response,
                 correlation_id,
             };
 
-            let (kind, payload) = MyNode::serialize_client_msg_response(context.name, client_msg)?;
-
             debug!("{correlation_id:?} sending cmd response ack back to client");
-            MyNode::send_msg_on_stream(
-                context.network_knowledge.section_key(),
-                payload,
-                kind,
-                send_stream,
-                None, // we shouldn't need this...
+            Ok(vec![Cmd::SendClientResponse {
+                msg,
                 correlation_id,
-            )
-            .await
+                send_stream,
+                context,
+            }])
         } else {
             error!("Unexpected response to data cmd from node. Response: {response:?}");
             // TODO: handle this bad response
-            Ok(())
+            Ok(vec![])
         }
     }
 
@@ -333,7 +333,7 @@ impl MyNode {
             .await?;
         } else {
             error!(
-                "Unexpected reponse to query from node. To : {msg_id:?}; response: {response:?}"
+                "Unexpected response to query from node. To : {msg_id:?}; response: {response:?}"
             );
         }
 
@@ -341,7 +341,7 @@ impl MyNode {
         Ok(vec![])
     }
 
-    /// Send an OutgoingMsg on a given stream
+    /// Send a msg on a given stream
     pub(crate) async fn send_msg_on_stream(
         section_key: bls::PublicKey,
         payload: Bytes,

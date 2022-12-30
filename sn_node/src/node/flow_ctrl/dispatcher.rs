@@ -113,6 +113,27 @@ impl Dispatcher {
 
                 Ok(cmds)
             }
+            Cmd::SendClientResponse {
+                msg,
+                correlation_id,
+                send_stream,
+                context,
+            } => {
+                trace!("Sending client response msg for {correlation_id:?}");
+                let (kind, payload) = MyNode::serialize_client_msg_response(context.name, msg)?;
+
+                MyNode::send_msg_on_stream(
+                    context.network_knowledge.section_key(),
+                    payload,
+                    kind,
+                    send_stream,
+                    None,
+                    correlation_id,
+                )
+                .await?;
+
+                Ok(vec![])
+            }
             Cmd::TrackNodeIssue { name, issue } => {
                 let node = self.node.read().await;
                 debug!("[NODE READ]: fault tracking read got");
