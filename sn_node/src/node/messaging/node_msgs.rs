@@ -35,7 +35,6 @@ impl MyNode {
     /// Send a (`NodeMsg`) message to a node
     /// Context is consumed and passed into the SendMsg command
     pub(crate) fn send_system_msg(msg: NodeMsg, recipients: Peers, context: NodeContext) -> Cmd {
-        trace!("{}: {:?}", LogMarker::SendToNodes, msg);
         Cmd::send_msg(msg, recipients, context)
     }
 
