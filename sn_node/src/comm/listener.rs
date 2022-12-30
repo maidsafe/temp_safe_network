@@ -84,12 +84,16 @@ impl MsgListener {
                         }
                     };
                     let mut is_from_client = false;
+                    let mut is_node_join_msg = false;
                     let src_name = match wire_msg.kind() {
                         MsgKind::Client(auth) => {
                             is_from_client = true;
                             auth.public_key.into()
                         }
-                        MsgKind::NodeJoin(name) => *name,
+                        MsgKind::NodeJoin(name) => {
+                            is_node_join_msg = true;
+                            *name
+                        }
                         MsgKind::Node(name)
                         | MsgKind::ClientDataResponse(name)
                         | MsgKind::NodeDataResponse(name) => *name,
@@ -98,7 +102,7 @@ impl MsgListener {
                     let peer = Peer::new(src_name, remote_address);
 
                     // we don't want to store PeerSessions from clients
-                    if node_conn_cached.is_none() && !is_from_client {
+                    if node_conn_cached.is_none() && !is_from_client && !is_node_join_msg {
                         node_conn_cached = Some(peer);
                         let _ = self
                             .connection_events
