@@ -89,6 +89,7 @@ impl MsgListener {
                             is_from_client = true;
                             auth.public_key.into()
                         }
+                        MsgKind::NodeJoin(name) => *name,
                         MsgKind::Node(name)
                         | MsgKind::ClientDataResponse(name)
                         | MsgKind::NodeDataResponse(name) => *name,

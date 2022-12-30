@@ -21,7 +21,6 @@ mod flow_ctrl;
 mod handover;
 mod logging;
 mod membership;
-mod messages;
 mod messaging;
 mod node_starter;
 mod node_test_api;

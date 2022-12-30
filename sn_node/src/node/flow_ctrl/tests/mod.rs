@@ -18,7 +18,6 @@ use crate::{
             dispatcher::Dispatcher,
             tests::network_builder::{TestNetwork, TestNetworkBuilder},
         },
-        messages::WireMsgUtils,
         messaging::Peers,
         relocation_check, ChurnId, Cmd, Error, Proposal,
     },
@@ -93,7 +92,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
     let signature_over_new_name =
         ed25519::sign(&relocated_node.name().0, &relocated_node_old_keypair);
 
-    let wire_msg = WireMsg::single_src(
+    let wire_msg = WireMsg::single_src_node_join(
         &relocated_node,
         Dst {
             name: XorName::from(PublicKey::Bls(section_key)),
@@ -379,7 +378,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
     // Create the `Sync` message containing the new `Section`.
     let sender = gen_info(MIN_ADULT_AGE, None);
-    let wire_msg = WireMsg::single_src(
+    let wire_msg = WireMsg::single_src_node(
         &sender,
         Dst {
             name: XorName::from(PublicKey::Bls(pk_0)),
@@ -449,7 +448,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
     };
 
     let sender = gen_info(MIN_ADULT_AGE, None);
-    let wire_msg = WireMsg::single_src(
+    let wire_msg = WireMsg::single_src_node(
         &sender,
         Dst {
             name: XorName::from(PublicKey::Bls(bogus_section_pk)),
