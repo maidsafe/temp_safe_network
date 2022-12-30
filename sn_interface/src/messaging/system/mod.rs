@@ -63,7 +63,6 @@ pub enum AntiEntropyKind {
 /// This can be a result of seeing a node go offline or deciding wether we want to accept new nodes
 /// Anything where we need section authority before action can be taken
 /// Section State Proposals are sent by elders to elders
-// #[allow(clippy::large_enum_variant)] NB TODO de we need this line?
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum SectionStateVote {
     /// Vote to remove a node from our section

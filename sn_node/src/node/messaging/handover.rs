@@ -120,8 +120,8 @@ impl MyNode {
         &mut self,
         candidate: SapCandidate,
     ) -> Result<Vec<Cmd>> {
-        let proposal_recipients = candidate.elders();
-        let (others, myself) = self.split_peers_and_self(proposal_recipients);
+        let recipients = candidate.elders();
+        let (others, myself) = self.split_peers_and_self(recipients);
         let peers = Peers::Multiple(others);
 
         // sends a promotion message to all of the to-be-Elders with our sig_share over their new pub key
