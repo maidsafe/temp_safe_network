@@ -683,7 +683,7 @@ async fn handle_elders_update() -> Result<()> {
     // Create `HandleNewEldersAgreement` cmd. This will demote one of the
     // current elders and promote the oldest peer.
     let elders_1: BTreeSet<_> = sap1.elders_set();
-    let bytes = bincode::serialize(&sap1).expect("Failed to serialize");
+    let bytes = bincode::serialize(&sap1.sig.public_key).expect("Failed to serialize");
     let sig = TestKeys::get_section_sig_bytes(&sk_set0.secret_key(), &bytes);
 
     let mut cmds = ProcessAndInspectCmds::new(
