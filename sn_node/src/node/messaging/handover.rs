@@ -17,8 +17,8 @@ use crate::node::{
 use sn_consensus::{Generation, SignedVote, VoteResponse};
 use sn_interface::{
     messaging::{system::SectionSigned, MsgId, SectionSigShare},
-    network_knowledge::{NodeState, SapCandidate, SectionAuthorityProvider},
-    types::log_markers::LogMarker,
+    network_knowledge::{NodeState, SapCandidate, SectionAuthUtils, SectionAuthorityProvider},
+    types::{log_markers::LogMarker, SectionSig},
 };
 use std::collections::{BTreeMap, BTreeSet};
 use tracing::warn;
@@ -62,6 +62,79 @@ impl MyNode {
                 error!("Failed to aggregate handover request {msg_id:?} from {sender}: {err:?}");
                 Ok(vec![])
             }
+        }
+    }
+
+    #[instrument(skip(self), level = "trace")]
+    fn handle_request_handover_agreement(
+        &mut self,
+        sap: SectionAuthorityProvider,
+        sig: SectionSig,
+    ) -> Result<Vec<Cmd>> {
+        // check if section matches our prefix
+        let equal_prefix = sap.prefix() == self.network_knowledge.prefix();
+        let is_extension_prefix = sap
+            .prefix()
+            .is_extension_of(&self.network_knowledge.prefix());
+        if !equal_prefix && !is_extension_prefix {
+            // Other section. We shouln't be receiving or updating a SAP for
+            // a remote section here, that is done with a AE msg response.
+            debug!(
+                "Ignoring handover request since prefix doesn't match ours: {:?}",
+                sap
+            );
+            return Ok(vec![]);
+        }
+        debug!("Handling section info with prefix: {:?}", sap.prefix());
+
+        // check if at the given memberhip gen, the elders candidates are matching
+        let membership_gen = sap.membership_gen();
+        let signed_sap = SectionSigned::new(sap, sig);
+        let dkg_sessions_info = self.best_elder_candidates_at_gen(membership_gen);
+
+        let elder_candidates = BTreeSet::from_iter(signed_sap.names());
+        if dkg_sessions_info
+            .iter()
+            .all(|session| !session.elder_names().eq(elder_candidates.iter().copied()))
+        {
+            error!("Elder candidates don't match best elder candidates at given gen in received section agreement, ignoring it.");
+            return Ok(vec![]);
+        };
+
+        // handle regular elder handover (1 to 1)
+        // trigger handover consensus among elders
+        if equal_prefix {
+            debug!("Propose elder handover to: {:?}", signed_sap.prefix());
+            return self.propose_handover_consensus(SapCandidate::ElderHandover(signed_sap));
+        }
+
+        // add to pending split SAP candidates
+        // those are stored in a mapping from Generation to BTreeSet so the order in the set is deterministic
+        let section_candidates_for_gen = self
+            .pending_split_sections
+            .entry(membership_gen)
+            .and_modify(|curr| {
+                let _ = curr.insert(signed_sap.clone());
+            })
+            .or_insert_with(|| BTreeSet::from([signed_sap]));
+
+        // if we have reached 2 split SAP candidates for this generation
+        // handle section split (1 to 2)
+        if let [sap1, sap2] = section_candidates_for_gen
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>()
+            .as_slice()
+        {
+            debug!(
+                "Propose section split handover to: {:?} {:?}",
+                sap1.prefix(),
+                sap2.prefix()
+            );
+            self.propose_handover_consensus(SapCandidate::SectionSplit(sap1.clone(), sap2.clone()))
+        } else {
+            debug!("Waiting for more split handover candidates");
+            Ok(vec![])
         }
     }
 

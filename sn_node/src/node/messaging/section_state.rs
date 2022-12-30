@@ -12,7 +12,8 @@ use sn_interface::{
         system::{NodeMsg, SectionSigShare},
         MsgId,
     },
-    types::Peer,
+    network_knowledge::NodeState,
+    types::{log_markers::LogMarker, Peer, SectionSig},
 };
 
 impl MyNode {
@@ -118,5 +119,34 @@ impl MyNode {
                 Ok(vec![])
             }
         }
+    }
+
+    #[instrument(skip(self), level = "trace")]
+    pub(crate) fn handle_section_decision_agreement(
+        &mut self,
+        proposal: SectionStateVote,
+        sig: SectionSig,
+    ) -> Result<Vec<Cmd>> {
+        debug!("{:?} {:?}", LogMarker::ProposalAgreed, proposal);
+        let mut cmds = Vec::new();
+        match proposal {
+            SectionStateVote::NodeIsOffline(node_state) => {
+                cmds.extend(self.handle_offline_agreement(node_state, sig));
+            }
+            SectionStateVote::JoinsAllowed(joins_allowed) => {
+                info!("Section reached agreement to set joins_allowed to: {joins_allowed:?}");
+                self.joins_allowed = joins_allowed;
+            }
+        }
+        Ok(cmds)
+    }
+
+    #[instrument(skip(self))]
+    fn handle_offline_agreement(&mut self, node_state: NodeState, sig: SectionSig) -> Option<Cmd> {
+        info!(
+            "Agreement - proposing membership change with node offline: {}",
+            node_state.peer()
+        );
+        self.propose_membership_change(node_state)
     }
 }

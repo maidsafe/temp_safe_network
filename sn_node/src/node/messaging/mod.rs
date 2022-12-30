@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod agreement;
 mod anti_entropy;
 mod client_msgs;
 mod dkg;
@@ -15,8 +14,8 @@ mod join;
 mod membership;
 mod node_msgs;
 mod promotion;
-mod proposal;
 mod relocation;
+mod section_state;
 mod serialize;
 mod signature;
 mod update_section;
