@@ -11,13 +11,13 @@ use crate::node::{
     dkg::{check_ephemeral_dkg_key, DkgPubKeys},
     flow_ctrl::cmds::Cmd,
     messaging::Peers,
-    Error, MyNode, Proposal, Result,
+    Error, MyNode, Result,
 };
 
 use sn_interface::{
     messaging::{
         system::{DkgSessionId, NodeMsg, SectionSigShare},
-        AuthorityProof, SectionSig,
+        AuthorityProof, MsgId, SectionSig,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
     types::{self, log_markers::LogMarker, Peer},
@@ -774,11 +774,25 @@ impl MyNode {
         let mut cmds = self.update_on_elder_change(&self.context()).await?;
 
         if !self.network_knowledge.has_chain_key(&sap.section_key()) {
-            // This proposal is sent to the current set of elders to be aggregated
-            // and section signed.
-            let proposal = Proposal::RequestHandover(sap);
-            let recipients: Vec<_> = self.network_knowledge.section_auth().elders_vec();
-            cmds.extend(self.send_proposal_with(recipients, proposal, &key_share)?);
+            // This request is sent to the current set of elders to be aggregated
+            let serialized_sap = bincode::serialize(&sap)?;
+            let sig_share = MyNode::sign_with_key_share(serialized_sap, &key_share);
+            let msg = NodeMsg::RequestHandover {
+                sap: sap.clone(),
+                sig_share: sig_share.clone(),
+            };
+            let current_elders: Vec<_> = self.network_knowledge.section_auth().elders_vec();
+            let (other_elders, myself) = self.split_peers_and_self(current_elders);
+            let peers = Peers::Multiple(other_elders);
+            cmds.push(MyNode::send_system_msg(msg, peers, self.context()));
+
+            // Handle it if we are an elder
+            if let Some(elder) = myself {
+                match self.handle_handover_request(MsgId::new(), sap, sig_share, elder) {
+                    Ok(c) => cmds.extend(c),
+                    Err(e) => error!("Failed to handle our own handover request: {e:?}"),
+                };
+            }
         }
 
         Ok(cmds)
@@ -800,7 +814,7 @@ mod tests {
         init_logger,
         messaging::{
             signature_aggregator::SignatureAggregator,
-            system::{DkgSessionId, NodeMsg, Proposal},
+            system::{DkgSessionId, NodeMsg, SectionStateVote},
             MsgType, SectionSigShare,
         },
         network_knowledge::{supermajority, NodeState, SectionKeyShare, SectionsDAG},
@@ -1005,8 +1019,8 @@ mod tests {
                                     let msg = assert_matches!(cmd, Cmd::SendMsg { msg, .. } => msg);
 
                                     match msg {
-                                        NodeMsg::Propose {
-                                            proposal: Proposal::JoinsAllowed(..),
+                                        NodeMsg::ProposeSectionState {
+                                            proposal: SectionStateVote::JoinsAllowed(..),
                                             ..
                                         } => (),
                                         NodeMsg::AntiEntropy { .. } => (),
@@ -1312,10 +1326,7 @@ mod tests {
             let msg = assert_matches!(cmd, Cmd::SendMsg { msg, .. } => msg);
 
             match msg {
-                NodeMsg::Propose {
-                    proposal: Proposal::RequestHandover(_),
-                    ..
-                } => (),
+                NodeMsg::RequestHandover { .. } => (),
                 NodeMsg::AntiEntropy { .. } => (),
                 msg => panic!("Unexpected msg {msg}"),
             }

@@ -14,9 +14,11 @@ mod handover;
 mod join;
 mod membership;
 mod node_msgs;
+mod promotion;
 mod proposal;
 mod relocation;
 mod serialize;
+mod signature;
 mod update_section;
 
 use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result};
@@ -137,5 +139,18 @@ impl MyNode {
                 Ok(vec![])
             }
         }
+    }
+
+    /// Utility to split a list of peers between others and ourself
+    pub(crate) fn split_peers_and_self(
+        &self,
+        all_peers: Vec<Peer>,
+    ) -> (BTreeSet<Peer>, Option<Peer>) {
+        let our_name = self.info().name();
+        let (peers, ourself): (BTreeSet<_>, BTreeSet<_>) = all_peers
+            .into_iter()
+            .partition(|peer| peer.name() != our_name);
+        let optional_self = ourself.into_iter().next();
+        (peers, optional_self)
     }
 }

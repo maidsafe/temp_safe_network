@@ -12,12 +12,11 @@ use crate::node::{
     handover::{Error as HandoverError, Handover},
     membership::{elder_candidates, try_split_dkg},
     messaging::Peers,
-    Error, MyNode, NodeMsg, Peer, Proposal, Result,
+    Error, MyNode, NodeMsg, Peer, Result,
 };
-use itertools::Either;
 use sn_consensus::{Generation, SignedVote, VoteResponse};
 use sn_interface::{
-    messaging::system::SectionSigned,
+    messaging::{system::SectionSigned, MsgId, SectionSigShare},
     network_knowledge::{NodeState, SapCandidate, SectionAuthorityProvider},
     types::log_markers::LogMarker,
 };
@@ -26,6 +25,46 @@ use tracing::warn;
 use xor_name::{Prefix, XorName};
 
 impl MyNode {
+    /// Handle a Handover consensus trigger request by a DKG member
+    pub(crate) fn handle_handover_request(
+        &mut self,
+        msg_id: MsgId,
+        sap: SectionAuthorityProvider,
+        sig_share: SectionSigShare,
+        sender: Peer,
+    ) -> Result<Vec<Cmd>> {
+        trace!("Handling post DKG handover request {msg_id:?} from {sender:?}: {sap:?}");
+
+        // check sender
+        if !sap.contains_elder(&sender.name()) {
+            trace!("Ignoring invalid handover request {msg_id:?}: not DKG participant");
+            return Ok(vec![]);
+        }
+
+        // try aggregate
+        let serialised_sap = bincode::serialize(&sap).map_err(|err| {
+            error!("Failed to serialise handover request {msg_id:?} from {sender}: {err:?}");
+            err
+        })?;
+        match self
+            .handover_request_aggregator
+            .try_aggregate(&serialised_sap, sig_share)
+        {
+            Ok(Some(sig)) => {
+                trace!("Handover request {msg_id:?} successfully aggregated");
+                self.handle_request_handover_agreement(sap, sig)
+            }
+            Ok(None) => {
+                trace!("Handover request {msg_id:?} acknowledged, waiting for more...");
+                Ok(vec![])
+            }
+            Err(err) => {
+                error!("Failed to aggregate handover request {msg_id:?} from {sender}: {err:?}");
+                Ok(vec![])
+            }
+        }
+    }
+
     /// Make a handover consensus proposal vote for a sap candidate
     pub(crate) fn propose_handover_consensus(
         &mut self,
@@ -50,7 +89,10 @@ impl MyNode {
                         LogMarker::HandoverConsensusTermination,
                         sap_candidates
                     );
-                    cmds.extend(self.broadcast_handover_completed(sap_candidates));
+                    match self.broadcast_handover_completed(sap_candidates) {
+                        Ok(c) => cmds.extend(c),
+                        Err(err) => error!("Error broadcasting handover complete: {err:?}"),
+                    }
                 }
             }
             None => {
@@ -74,15 +116,65 @@ impl MyNode {
     /// Broadcast the decision of the terminated handover consensus by proposing the HandoverCompleted SAP(s)
     /// for signature by the current elders
     #[instrument(skip(self), level = "trace")]
-    pub(crate) fn broadcast_handover_completed(&mut self, candidate: SapCandidate) -> Vec<Cmd> {
+    pub(crate) fn broadcast_handover_completed(
+        &mut self,
+        candidate: SapCandidate,
+    ) -> Result<Vec<Cmd>> {
         let proposal_recipients = candidate.elders();
-        let proposal = Proposal::HandoverCompleted(candidate);
-        // sends the `HandoverCompleted` proposal to all of the to-be-Elders so it's aggregated by them.
-        self.send_proposal(proposal_recipients, proposal)
-            .unwrap_or_else(|e| {
-                error!("Failed to propose new elders: {}", e);
-                vec![]
-            })
+        let (others, myself) = self.split_peers_and_self(proposal_recipients);
+        let peers = Peers::Multiple(others);
+
+        // sends a promotion message to all of the to-be-Elders with our sig_share over their new pub key
+        // it is aggregated by them to obtain a section signed section pub key (proof of inheritance)
+        let mut cmds = vec![];
+        match candidate {
+            SapCandidate::ElderHandover(sap) => {
+                let serialized_sap = bincode::serialize(&sap.sig.public_key)?;
+                let sig_share = self.sign_with_section_key_share(serialized_sap)?;
+                let msg = NodeMsg::SectionHandoverPromotion {
+                    sap: sap.clone(),
+                    sig_share: sig_share.clone(),
+                };
+                cmds.push(MyNode::send_system_msg(msg, peers, self.context()));
+
+                // handle our own if we are elder
+                if let Some(elder) = myself {
+                    match self.handle_handover_promotion(MsgId::new(), sap, sig_share, elder) {
+                        Ok(c) => cmds.extend(c),
+                        Err(e) => error!("Failed to handle our own handover promotion: {e:?}"),
+                    };
+                }
+            }
+            SapCandidate::SectionSplit(sap0, sap1) => {
+                let serialized_sap0_pk = bincode::serialize(&sap0.sig.public_key)?;
+                let sig_share0 = self.sign_with_section_key_share(serialized_sap0_pk)?;
+                let serialized_sap1_pk = bincode::serialize(&sap1.sig.public_key)?;
+                let sig_share1 = self.sign_with_section_key_share(serialized_sap1_pk)?;
+                let msg = NodeMsg::SectionSplitPromotion {
+                    sap0: sap0.clone(),
+                    sig_share0: sig_share0.clone(),
+                    sap1: sap1.clone(),
+                    sig_share1: sig_share1.clone(),
+                };
+                cmds.push(MyNode::send_system_msg(msg, peers, self.context()));
+
+                // handle our own if we are elder
+                if let Some(elder) = myself {
+                    match self.handle_section_split_promotion(
+                        MsgId::new(),
+                        sap0,
+                        sig_share0,
+                        sap1,
+                        sig_share1,
+                        elder,
+                    ) {
+                        Ok(c) => cmds.extend(c),
+                        Err(e) => error!("Failed to handle our own split promotion: {e:?}"),
+                    };
+                }
+            }
+        };
+        Ok(cmds)
     }
 
     /// helper to handle a handover vote
@@ -127,13 +219,9 @@ impl MyNode {
     /// Verifies the SAP signature and checks that the signature's public key matches the
     /// signature of the SAP, because SAP candidates are signed by the candidate section key
     fn check_sap_sig(&self, sap: &SectionSigned<SectionAuthorityProvider>) -> Result<()> {
-        match Proposal::RequestHandover(sap.value.clone()).as_signable_bytes()? {
-            Either::Right(_) => return Err(Error::InvalidSignature),
-            Either::Left(sap_bytes) => {
-                if !sap.sig.verify(&sap_bytes) {
-                    return Err(Error::InvalidSignature);
-                }
-            }
+        let sap_bytes = bincode::serialize(&sap.value)?;
+        if !sap.sig.verify(&sap_bytes) {
+            return Err(Error::InvalidSignature);
         }
         if sap.value.section_key() != sap.sig.public_key {
             return Err(Error::UntrustedSectionAuthProvider(format!(
@@ -306,8 +394,10 @@ impl MyNode {
                             candidates_sap
                         );
 
-                        let bcast_cmds = self.broadcast_handover_completed(candidates_sap);
-                        cmds.extend(bcast_cmds);
+                        match self.broadcast_handover_completed(candidates_sap) {
+                            Ok(c) => cmds.extend(c),
+                            Err(err) => error!("Failed to broadcast handover complete: {err:?}"),
+                        }
                     }
                 }
                 self.handover_voting = Some(state);

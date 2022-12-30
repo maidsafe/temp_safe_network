@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{core::NodeContext, messaging::Peers, Proposal, XorName};
+use crate::node::{core::NodeContext, messaging::Peers, SectionStateVote, XorName};
 
 use qp2p::SendStream;
 use sn_consensus::Decision;
@@ -75,7 +75,10 @@ pub(crate) enum Cmd {
     /// Handle peer that's been detected as lost.
     HandleFailedSendToNode { peer: Peer, msg_id: MsgId },
     /// Handle agreement on a proposal.
-    HandleAgreement { proposal: Proposal, sig: SectionSig },
+    HandleSectionDecisionAgreement {
+        proposal: SectionStateVote,
+        sig: SectionSig,
+    },
     /// Handle a membership decision.
     HandleMembershipDecision(Decision<NodeState>),
     /// Handle agree on elders. This blocks node message processing until complete.
@@ -179,7 +182,7 @@ impl Cmd {
             Cmd::HandleMsg { .. } => State::HandleMsg,
             Cmd::UpdateNetworkAndHandleValidClientMsg { .. } => State::ClientMsg,
             Cmd::TrackNodeIssue { .. } => State::FaultDetection,
-            Cmd::HandleAgreement { .. } => State::Agreement,
+            Cmd::HandleSectionDecisionAgreement { .. } => State::Agreement,
             Cmd::HandleMembershipDecision(_) => State::Membership,
             Cmd::ProposeVoteNodesOffline(_) => State::Membership,
             Cmd::HandleNewEldersAgreement { .. } => State::Handover,
@@ -204,7 +207,9 @@ impl fmt::Display for Cmd {
             Cmd::HandleFailedSendToNode { peer, msg_id } => {
                 write!(f, "HandlePeerFailedSend({:?}, {:?})", peer.name(), msg_id)
             }
-            Cmd::HandleAgreement { .. } => write!(f, "HandleAgreement"),
+            Cmd::HandleSectionDecisionAgreement { .. } => {
+                write!(f, "HandleSectionDecisionAgreement")
+            }
             Cmd::HandleNewEldersAgreement { .. } => write!(f, "HandleNewEldersAgreement"),
             Cmd::HandleNewSectionsAgreement { .. } => write!(f, "HandleNewSectionsAgreement"),
             Cmd::HandleMembershipDecision(_) => write!(f, "HandleMembershipDecision"),

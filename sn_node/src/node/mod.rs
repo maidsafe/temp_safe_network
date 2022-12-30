@@ -42,7 +42,7 @@ pub(crate) use relocation::{check as relocation_check, ChurnId};
 
 pub use sn_interface::network_knowledge::MIN_ADULT_AGE;
 use sn_interface::{
-    messaging::system::{NodeMsg, Proposal},
+    messaging::system::{NodeMsg, SectionStateVote},
     types::Peer,
 };
 
@@ -59,7 +59,7 @@ mod core {
             handover::Handover,
             membership::{elder_candidates, try_split_dkg, Membership},
             messaging::Peers,
-            DataStorage, Error, Proposal, Result, XorName,
+            DataStorage, Error, Result, XorName,
         },
         UsedSpace,
     };
@@ -68,7 +68,7 @@ mod core {
     use sn_interface::{
         messaging::{
             signature_aggregator::SignatureAggregator,
-            system::{DkgSessionId, SectionSigned},
+            system::{DkgSessionId, SectionSigned, SectionStateVote},
             AuthorityProof, SectionSig,
         },
         network_knowledge::{
@@ -106,22 +106,24 @@ mod core {
         // Network resources
         pub(crate) section_keys_provider: SectionKeysProvider,
         pub(crate) network_knowledge: NetworkKnowledge,
-        // Proposal aggregators
-        pub(crate) proposal_aggregator: SignatureAggregator,
         // DKG/Split/Churn modules
         pub(crate) dkg_start_aggregator: SignatureAggregator,
         pub(crate) dkg_sessions_info: HashMap<Digest256, DkgSessionInfo>,
         pub(crate) dkg_voter: DkgVoter,
+        pub(crate) elder_promotion_aggregator: SignatureAggregator,
         pub(crate) pending_split_sections:
             BTreeMap<Generation, BTreeSet<SectionSigned<SectionAuthorityProvider>>>,
         pub(crate) relocate_state: Option<Box<JoiningAsRelocated>>,
         // ======================== Elder only ========================
         pub(crate) membership: Option<Membership>,
         // Section handover consensus state (Some for Elders, None for others)
+        pub(crate) handover_request_aggregator: SignatureAggregator,
         pub(crate) handover_voting: Option<Handover>,
         pub(crate) joins_allowed: bool,
         pub(crate) joins_allowed_until_split: bool,
         pub(crate) fault_cmds_sender: mpsc::Sender<FaultsCmd>,
+        // Section administration
+        pub(crate) section_proposal_aggregator: SignatureAggregator,
     }
 
     #[derive(custom_debug::Debug, Clone)]
@@ -246,7 +248,6 @@ mod core {
                 section_keys_provider,
                 root_storage_dir,
                 dkg_sessions_info: HashMap::default(),
-                proposal_aggregator: SignatureAggregator::default(),
                 pending_split_sections: Default::default(),
                 dkg_start_aggregator: SignatureAggregator::default(),
                 dkg_voter: DkgVoter::default(),
@@ -257,6 +258,9 @@ mod core {
                 data_storage,
                 fault_cmds_sender,
                 membership,
+                elder_promotion_aggregator: SignatureAggregator::default(),
+                handover_request_aggregator: SignatureAggregator::default(),
+                section_proposal_aggregator: SignatureAggregator::default(),
             };
 
             let context = &node.context();
@@ -572,7 +576,7 @@ mod core {
 
                         // Whenever there is an elders change, casting a round of joins_allowed
                         // proposals to sync this particular state.
-                        cmds.extend(self.propose(Proposal::JoinsAllowed(
+                        cmds.extend(self.propose_section_state(SectionStateVote::JoinsAllowed(
                             self.joins_allowed || self.joins_allowed_until_split,
                         ))?);
                     }

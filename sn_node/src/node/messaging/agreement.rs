@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{flow_ctrl::cmds::Cmd, MyNode, Proposal, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, MyNode, Result, SectionStateVote};
 use sn_interface::{
     messaging::system::{SectionSig, SectionSigned},
     network_knowledge::{
@@ -19,24 +19,19 @@ use std::collections::BTreeSet;
 // Agreement
 impl MyNode {
     #[instrument(skip(self), level = "trace")]
-    pub(crate) fn handle_general_agreements(
+    pub(crate) fn handle_section_decision_agreement(
         &mut self,
-        proposal: Proposal,
+        proposal: SectionStateVote,
         sig: SectionSig,
     ) -> Result<Vec<Cmd>> {
         debug!("{:?} {:?}", LogMarker::ProposalAgreed, proposal);
         let mut cmds = Vec::new();
         match proposal {
-            Proposal::VoteNodeOffline(node_state) => {
+            SectionStateVote::NodeIsOffline(node_state) => {
                 cmds.extend(self.handle_offline_agreement(node_state, sig));
             }
-            Proposal::RequestHandover(sap) => {
-                cmds.extend(self.handle_request_handover_agreement(sap, sig)?);
-            }
-            Proposal::HandoverCompleted(_) => {
-                error!("Handover completed should be handled in a separate blocking fashion");
-            }
-            Proposal::JoinsAllowed(joins_allowed) => {
+            SectionStateVote::JoinsAllowed(joins_allowed) => {
+                info!("Section reached agreement to set joins_allowed to: {joins_allowed:?}");
                 self.joins_allowed = joins_allowed;
             }
         }
@@ -53,7 +48,7 @@ impl MyNode {
     }
 
     #[instrument(skip(self), level = "trace")]
-    fn handle_request_handover_agreement(
+    pub(crate) fn handle_request_handover_agreement(
         &mut self,
         sap: SectionAuthorityProvider,
         sig: SectionSig,
@@ -67,7 +62,7 @@ impl MyNode {
             // Other section. We shouln't be receiving or updating a SAP for
             // a remote section here, that is done with a AE msg response.
             debug!(
-                "Ignoring Proposal::RequestHandover since prefix doesn't match ours: {:?}",
+                "Ignoring handover request since prefix doesn't match ours: {:?}",
                 sap
             );
             return Ok(vec![]);

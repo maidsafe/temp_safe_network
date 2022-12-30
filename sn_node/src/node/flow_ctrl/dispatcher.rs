@@ -161,12 +161,11 @@ impl Dispatcher {
                 MyNode::handle_valid_client_msg(context, msg_id, msg, auth, origin, send_stream)
                     .await
             }
-            Cmd::HandleAgreement { proposal, sig } => {
-                debug!("[NODE WRITE]: general agreements node write...");
+            Cmd::HandleSectionDecisionAgreement { proposal, sig } => {
+                debug!("[NODE WRITE]: section decision agreements node write...");
                 let mut node = self.node.write().await;
-                debug!("[NODE WRITE]: general agreements node write got");
-
-                node.handle_general_agreements(proposal, sig)
+                debug!("[NODE WRITE]: section decision agreements node write got");
+                node.handle_section_decision_agreement(proposal, sig)
             }
             Cmd::HandleMembershipDecision(decision) => {
                 debug!("[NODE WRITE]: membership decision agreements write...");

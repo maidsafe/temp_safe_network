@@ -61,8 +61,9 @@ pub(crate) async fn handle_online_cmd(
                 });
                 status.node_approval_sent = true;
             }
-            NodeMsg::Propose {
-                proposal: sn_interface::messaging::system::Proposal::VoteNodeOffline(node_state),
+            NodeMsg::ProposeSectionState {
+                proposal:
+                    sn_interface::messaging::system::SectionStateVote::NodeIsOffline(node_state),
                 ..
             } => {
                 if let MembershipState::Relocated(details) = node_state.state() {

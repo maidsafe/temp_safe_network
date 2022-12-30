@@ -19,7 +19,7 @@ use crate::{
             tests::network_builder::{TestNetwork, TestNetworkBuilder},
         },
         messaging::Peers,
-        relocation_check, ChurnId, Cmd, Error, Proposal,
+        relocation_check, ChurnId, Cmd, Error, SectionStateVote,
     },
 };
 use cmd_utils::{handle_online_cmd, ProcessAndInspectCmds};
@@ -35,8 +35,8 @@ use sn_interface::{
     },
     network_knowledge::{
         recommended_section_size, supermajority, Error as NetworkKnowledgeError, MembershipState,
-        MyNodeInfo, NodeState, RelocateDetails, SapCandidate, SectionKeysProvider,
-        SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
+        MyNodeInfo, NodeState, RelocateDetails, SectionKeysProvider, SectionTreeUpdate,
+        SectionsDAG, MIN_ADULT_AGE,
     },
     test_utils::*,
     types::{keys::ed25519, PublicKey, ReplicatedData},
@@ -291,12 +291,15 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let node_state = env.get_nodes(prefix, 0, 1, None).remove(0).info().peer();
     let node_state = NodeState::left(node_state, None);
 
-    let proposal = Proposal::VoteNodeOffline(node_state.clone());
+    let proposal = SectionStateVote::NodeIsOffline(node_state.clone());
     let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &get_single_sig(&proposal));
 
-    ProcessAndInspectCmds::new(Cmd::HandleAgreement { proposal, sig }, &dispatcher)
-        .process_all()
-        .await?;
+    ProcessAndInspectCmds::new(
+        Cmd::HandleSectionDecisionAgreement { proposal, sig },
+        &dispatcher,
+    )
+    .process_all()
+    .await?;
 
     assert!(!dispatcher
         .node()
@@ -322,12 +325,15 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let remove_elder = NodeState::left(remove_elder, None);
 
     // Handle agreement on the Offline proposal
-    let proposal = Proposal::VoteNodeOffline(remove_elder.clone());
+    let proposal = SectionStateVote::NodeIsOffline(remove_elder.clone());
     let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &get_single_sig(&proposal));
 
-    ProcessAndInspectCmds::new(Cmd::HandleAgreement { proposal, sig }, &dispatcher)
-        .process_all()
-        .await?;
+    ProcessAndInspectCmds::new(
+        Cmd::HandleSectionDecisionAgreement { proposal, sig },
+        &dispatcher,
+    )
+    .process_all()
+    .await?;
 
     // Verify we initiated a membership churn
     assert!(dispatcher
@@ -502,7 +508,7 @@ async fn relocation_of_non_elder() -> Result<()> {
     relocation(RelocatedPeerRole::NonElder).await
 }
 
-/// Create a `Proposal::Online` whose agreement handling triggers relocation of a node with the
+/// Create a `SectionStateVote::Online` whose agreement handling triggers relocation of a node with the
 /// given age.
 ///
 /// NOTE: recommended to call this with low `age` (4 or 5), otherwise it might take very long time
@@ -576,8 +582,8 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
             _ => continue,
         };
 
-        if let NodeMsg::Propose {
-            proposal: system::Proposal::VoteNodeOffline(node_state),
+        if let NodeMsg::ProposeSectionState {
+            proposal: system::SectionStateVote::NodeIsOffline(node_state),
             ..
         } = msg
         {
@@ -674,11 +680,11 @@ async fn handle_elders_update() -> Result<()> {
         .insert(TestKeys::get_section_key_share(&sk_set1, 0));
     let (dispatcher, _) = Dispatcher::new(Arc::new(RwLock::new(node)));
 
-    // Create `HandleAgreement` cmd for an `NewElders` proposal. This will demote one of the
+    // Create `HandleNewEldersAgreement` cmd. This will demote one of the
     // current elders and promote the oldest peer.
     let elders_1: BTreeSet<_> = sap1.elders_set();
-    let proposal = Proposal::HandoverCompleted(SapCandidate::ElderHandover(sap1.clone()));
-    let sig = TestKeys::get_section_sig_bytes(&sk_set0.secret_key(), &get_single_sig(&proposal));
+    let bytes = bincode::serialize(&sap1).expect("Failed to serialize");
+    let sig = TestKeys::get_section_sig_bytes(&sk_set0.secret_key(), &bytes);
 
     let mut cmds = ProcessAndInspectCmds::new(
         Cmd::HandleNewEldersAgreement {
@@ -815,9 +821,8 @@ async fn handle_demote_during_split() -> Result<()> {
         let sap0 = TestKeys::get_section_signed(&sk_set0.secret_key(), sap0);
         let sap1 = TestKeys::get_section_signed(&sk_set1.secret_key(), sap1);
 
-        let proposal =
-            Proposal::HandoverCompleted(SapCandidate::SectionSplit(sap0.clone(), sap1.clone()));
-        let (bytes0, bytes1) = get_double_sig(&proposal);
+        let bytes0 = bincode::serialize(&sap0.sig.public_key).expect("Failed to serialize");
+        let bytes1 = bincode::serialize(&sap1.sig.public_key).expect("Failed to serialize");
 
         Cmd::HandleNewSectionsAgreement {
             sap1: sap0,
@@ -1092,16 +1097,6 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
     Ok(())
 }
 
-fn get_single_sig(proposal: &Proposal) -> Vec<u8> {
-    match proposal.as_signable_bytes().expect("Failed to serialize") {
-        itertools::Either::Left(bytes) => bytes,
-        _ => panic!("Invalid expectations! Use another proposal variant."),
-    }
-}
-
-fn get_double_sig(proposal: &Proposal) -> (Vec<u8>, Vec<u8>) {
-    match proposal.as_signable_bytes().expect("Failed to serialize") {
-        itertools::Either::Right((bytes1, bytes2)) => (bytes1, bytes2),
-        _ => panic!("Invalid expectations! Use another proposal variant."),
-    }
+fn get_single_sig(proposal: &SectionStateVote) -> Vec<u8> {
+    bincode::serialize(proposal).expect("Failed to serialize")
 }
