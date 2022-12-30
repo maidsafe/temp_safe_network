@@ -391,7 +391,7 @@ impl MyNode {
                     cmds.push(Cmd::SetJoinsAllowed(true));
                     // NB: we do not also set allowed until split, since we
                     // do not expect another node to run out of space before we ourselves
-                    // have reached the storage limit (i.e. the `max_capacity` variable, which
+                    // have reached the storage limit (i.e. the `min_capacity` variable, which
                     // should be set by the node operator to be a little bit lower than the actual space).
                 }
 

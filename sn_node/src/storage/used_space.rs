@@ -126,12 +126,12 @@ impl UsedSpace {
     }
 }
 
-/// We expect it to return a value between 0-(100 % recommended_section_size),
+/// We expect it to return a value between 0-(100 / recommended_section_size),
 /// where every step is a x% increase of the value.
 /// This gives an equal number of increments as the number of nodes necessary to
 /// bring a newly split section up to the size where it splits again.
 fn to_storage_level(value: f64) -> u8 {
-    ((value * 100.0) as usize % recommended_section_size()) as u8
+    ((value * 100.0) as usize / recommended_section_size()) as u8
 }
 
 impl Default for UsedSpace {
