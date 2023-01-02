@@ -422,7 +422,7 @@ impl<R: RngCore> TestNetworkBuilder<R> {
                     let sig = TestKeys::sign(&parent, &sk.public_key());
                     let mut proof_chain = SectionsDAG::new(parent.public_key());
                     proof_chain
-                        .insert(&parent.public_key(), sk.public_key(), sig)
+                        .verify_and_insert(&parent.public_key(), sk.public_key(), sig)
                         .expect("should not fail");
                     let update =
                         TestSectionTree::get_section_tree_update(sap, &proof_chain, &parent);

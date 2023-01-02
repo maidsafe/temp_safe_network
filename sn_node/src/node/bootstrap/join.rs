@@ -657,7 +657,7 @@ mod tests {
             let mut proof_chain = SectionsDAG::new(genesis_pk);
 
             proof_chain
-                .insert(
+                .verify_and_insert(
                     &genesis_pk,
                     new_sap.section_key(),
                     TestKeys::get_section_signed(&genesis_sk, new_sap.section_key())
@@ -767,7 +767,7 @@ mod tests {
             // Create SectionTreeUpdate with newer sap
             let mut proof_chain = SectionsDAG::new(genesis_pk);
             proof_chain
-                .insert(
+                .verify_and_insert(
                     &genesis_pk,
                     new_sap.section_key(),
                     TestKeys::get_section_signed(&genesis_sk, new_sap.section_key())
