@@ -38,8 +38,8 @@ use xor_name::XorName;
 
 impl MyNode {
     /// Forms a `QueryError` msg to send back to the client on a stream
-    pub(crate) async fn send_query_error_response_on_stream(
-        context: NodeContext,
+    pub(crate) async fn send_query_error_response_over_stream(
+        context: &NodeContext,
         error: Error,
         query: &DataQueryVariant,
         source_peer: Peer,
@@ -58,7 +58,7 @@ impl MyNode {
             payload,
             kind,
             send_stream,
-            Some(source_peer),
+            source_peer,
             correlation_id,
         )
         .await
@@ -71,22 +71,20 @@ impl MyNode {
         error: Error,
         correlation_id: MsgId,
         send_stream: SendStream,
+        source_client: Peer,
     ) -> Result<()> {
-        let client_msg = ClientDataResponse::CmdResponse {
+        let msg = ClientDataResponse::CmdResponse {
             response: cmd.to_error_response(error.into()),
             correlation_id,
         };
 
-        let (kind, payload) = MyNode::serialize_client_msg_response(context.name, client_msg)?;
-
         debug!("{correlation_id:?} sending cmd response error back to client");
-        MyNode::send_msg_on_stream(
-            context.network_knowledge.section_key(),
-            payload,
-            kind,
-            send_stream,
-            None, // we shouldn't need this...
+        MyNode::respond_to_client_over_stream(
+            msg,
             correlation_id,
+            send_stream,
+            context,
+            source_client,
         )
         .await
     }
@@ -107,38 +105,26 @@ impl MyNode {
             .query(query, User::Key(auth.public_key))
             .await;
 
-        trace!("{msg_id:?} data query response at node is: {:?}", response);
-        let msg = NodeDataResponse::QueryResponse {
-            response,
-            operation_id,
-        };
+        if let Some(send_stream) = send_stream {
+            trace!("{msg_id:?} data query response at node is: {response:?}");
+            let msg = NodeDataResponse::QueryResponse {
+                response,
+                operation_id,
+            };
 
-        let (kind, payload) = MyNode::serialize_node_msg_response(context.name, msg)?;
+            let (kind, payload) = MyNode::serialize_node_msg_response(context.name, msg)?;
 
-        let bytes = MyNode::form_usr_msg_bytes_to_node(
-            context.network_knowledge.section_key(),
-            payload,
-            kind,
-            Some(requesting_elder),
-            msg_id,
-        )?;
-
-        if let Some(mut send_stream) = send_stream {
-            // send response on the stream
-            let stream_prio = 10;
-            send_stream.set_priority(stream_prio);
-            let stream_id = send_stream.id();
-            trace!("{msg_id:?} Sending response to {requesting_elder:?} over {stream_id}");
-            if let Err(error) = send_stream.send_user_msg(bytes).await {
-                error!("Could not send msg {msg_id:?} over response {stream_id} to {requesting_elder:?}: {error:?}");
-                return Err(error.into());
-            }
-            // Attempt to gracefully terminate the stream.
-            // If this errors it does _not_ mean our message has not been sent
-            let result = send_stream.finish().await;
-            trace!("{msg_id:?} Response sent to {requesting_elder:?} over {stream_id}. Stream finished with result: {result:?}");
+            MyNode::send_msg_on_stream(
+                context.network_knowledge.section_key(),
+                payload,
+                kind,
+                send_stream,
+                requesting_elder,
+                msg_id,
+            )
+            .await?;
         } else {
-            error!("Send stream missing from {requesting_elder:?}, data request response was not sent out.")
+            error!("Send stream missing from {requesting_elder:?}, data request response was not sent out.");
         }
 
         Ok(())
@@ -164,7 +150,7 @@ impl MyNode {
             ClientMsg::Cmd(cmd) => cmd,
             ClientMsg::Query(query) => {
                 return MyNode::read_data_and_respond_to_client(
-                    context,
+                    &context,
                     query,
                     msg_id,
                     auth,
@@ -226,16 +212,15 @@ impl MyNode {
                     error,
                     msg_id,
                     send_stream,
+                    origin,
                 )
                 .await?;
-
                 return Ok(vec![]);
             }
         };
 
         trace!("{:?}: {:?}", LogMarker::DataStoreReceivedAtElder, data);
 
-        let cmds = vec![];
         let targets = MyNode::target_data_holders(&context, data.name());
 
         // make sure the expected replication factor is achieved
@@ -249,9 +234,15 @@ impl MyNode {
 
             debug!("Will send error response back to client");
 
-            // TODO: Use response stream here. This wont work anymore!
-            MyNode::send_cmd_error_response_over_stream(&context, cmd, error, msg_id, send_stream)
-                .await?;
+            MyNode::send_cmd_error_response_over_stream(
+                &context,
+                cmd,
+                error,
+                msg_id,
+                send_stream,
+                origin,
+            )
+            .await?;
             return Ok(vec![]);
         }
 
@@ -265,12 +256,13 @@ impl MyNode {
             msg_id,
             targets,
             send_stream,
+            origin,
         )
         .await?;
 
         // TODO: handle failed responses
 
-        Ok(cmds)
+        Ok(vec![])
     }
 
     // helper to extract the contents of the cmd as ReplicatedData

@@ -70,10 +70,8 @@ impl MyNode {
         msg_id: MsgId,
         targets: BTreeSet<Peer>,
     ) -> Result<Vec<(Peer, Result<WireMsg>)>> {
-        info!(
-            "Replicating data from {msg_id:?} {:?} to holders: {targets:?}",
-            data.name()
-        );
+        let data_name = data.name();
+        info!("Replicating data from {msg_id:?} {data_name:?} to holders: {targets:?}");
 
         // TODO: general ReplicateData flow could go bidi?
         // Right now we've a new msg for just one datum.
@@ -86,7 +84,7 @@ impl MyNode {
 
         // We create a Dst with random dst name, but we'll update it for each target
         let mut dst = Dst {
-            name: xor_name::rand::random(),
+            name: data_name,
             section_key,
         };
         let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
@@ -125,6 +123,7 @@ impl MyNode {
         msg_id: MsgId,
         targets: BTreeSet<Peer>,
         client_response_stream: SendStream,
+        source_client: Peer,
     ) -> Result<()> {
         let targets_len = targets.len();
 
@@ -136,7 +135,7 @@ impl MyNode {
             match the_response {
                 Ok(response) => {
                     success_count += 1;
-                    debug!("Response in from {peer:?} for {msg_id:?} {response:?}");
+                    debug!("Response in from {peer:?} for {msg_id:?}: {response:?}");
                     ack_response = Some(response);
                 }
                 Err(error) => {
@@ -152,15 +151,19 @@ impl MyNode {
         // everything went fine, tell the client that
         if success_count == targets_len {
             if let Some(response) = ack_response {
-                MyNode::respond_to_client_on_stream(context, response, client_response_stream)
-                    .await?;
+                MyNode::send_cmd_response_to_client(
+                    context,
+                    response.into_msg()?,
+                    client_response_stream,
+                    source_client,
+                )
+                .await?;
             } else {
                 // This should not be possible with above checks
-                error!("No valid response to send from all responses for {msg_id:?}")
+                error!("No valid response to send from all responses for {msg_id:?}");
             }
         } else {
             error!("Storage was not completely successful for {msg_id:?}");
-
             if let Some(error) = last_error {
                 MyNode::send_cmd_error_response_over_stream(
                     context,
@@ -168,6 +171,7 @@ impl MyNode {
                     error,
                     msg_id,
                     client_response_stream,
+                    source_client,
                 )
                 .await?;
             }
@@ -177,10 +181,11 @@ impl MyNode {
     }
 
     /// Parses WireMsg and if DataStored Ack, we send a response to the client
-    async fn respond_to_client_on_stream(
+    async fn send_cmd_response_to_client(
         context: &NodeContext,
-        response: WireMsg,
+        response: MsgType,
         send_stream: SendStream,
+        source_client: Peer,
     ) -> Result<()> {
         if let MsgType::NodeDataResponse {
             msg:
@@ -189,35 +194,33 @@ impl MyNode {
                     correlation_id,
                 },
             ..
-        } = response.into_msg()?
+        } = response
         {
-            let client_msg = ClientDataResponse::CmdResponse {
+            let msg = ClientDataResponse::CmdResponse {
                 response,
                 correlation_id,
             };
 
-            let (kind, payload) = MyNode::serialize_client_msg_response(context.name, client_msg)?;
-
             debug!("{correlation_id:?} sending cmd response ack back to client");
-            MyNode::send_msg_on_stream(
-                context.network_knowledge.section_key(),
-                payload,
-                kind,
-                send_stream,
-                None, // we shouldn't need this...
+            Self::respond_to_client_over_stream(
+                msg,
                 correlation_id,
+                send_stream,
+                context,
+                source_client,
             )
-            .await
+            .await?;
         } else {
-            error!("Unexpected response to data cmd from node. Response: {response:?}");
             // TODO: handle this bad response
-            Ok(())
+            error!("Unexpected response to data cmd from node. Response: {response:?}");
         }
+
+        Ok(())
     }
 
     /// Find target node, sends a bidi msg, awaiting response, and then sends this on to the client
     pub(crate) async fn read_data_and_respond_to_client(
-        context: NodeContext,
+        context: &NodeContext,
         query: DataQuery,
         msg_id: MsgId,
         auth: AuthorityProof<ClientAuth>,
@@ -232,13 +235,11 @@ impl MyNode {
         let operation_id = OperationId::from(&Bytes::copy_from_slice(msg_id.as_ref()));
         let address = query.variant.address();
         trace!(
-            "{:?} preparing to query other nodes for data at {:?} with op_id: {:?}",
+            "{:?} preparing to query other nodes for data at {address:?} with op_id: {operation_id:?}",
             LogMarker::DataQueryReceviedAtElder,
-            address,
-            operation_id
         );
 
-        let targets = MyNode::target_data_holders(&context, *address.name());
+        let targets = MyNode::target_data_holders(context, *address.name());
 
         // We accept the chance that we will be querying an Elder that the client already queried directly.
         // The extra load is not that big. But we can optimize this later if necessary.
@@ -254,7 +255,7 @@ impl MyNode {
                 found: targets.len() as u8,
             };
 
-            MyNode::send_query_error_response_on_stream(
+            MyNode::send_query_error_response_over_stream(
                 context,
                 error,
                 &query.variant,
@@ -282,7 +283,7 @@ impl MyNode {
             context.network_knowledge.section_key(),
             payload,
             kind,
-            Some(target),
+            target.name(),
             msg_id,
         )?;
 
@@ -309,71 +310,108 @@ impl MyNode {
         }?;
 
         debug!("Response in from peer for query {msg_id:?} {response:?}");
+        Self::send_query_response_to_client(
+            msg_id,
+            context,
+            response.into_msg()?,
+            client_response_stream,
+            source_client,
+        )
+        .await?;
 
-        if let MsgType::NodeDataResponse {
-            msg: NodeDataResponse::QueryResponse { response, .. },
-            ..
-        } = response.into_msg()?
-        {
-            let client_msg = ClientDataResponse::QueryResponse {
-                response,
-                correlation_id: msg_id,
-            };
-
-            let (kind, payload) = MyNode::serialize_client_msg_response(context.name, client_msg)?;
-
-            MyNode::send_msg_on_stream(
-                context.network_knowledge.section_key(),
-                payload,
-                kind,
-                client_response_stream,
-                Some(target),
-                msg_id,
-            )
-            .await?;
-        } else {
-            error!(
-                "Unexpected reponse to query from node. To : {msg_id:?}; response: {response:?}"
-            );
-        }
-
-        // Everything went okay, so no further cmds to handle
         Ok(vec![])
     }
 
-    /// Send an OutgoingMsg on a given stream
+    /// Parses WireMsg and if it's a query response, we send a response to the client
+    async fn send_query_response_to_client(
+        correlation_id: MsgId,
+        context: &NodeContext,
+        response: MsgType,
+        send_stream: SendStream,
+        source_client: Peer,
+    ) -> Result<()> {
+        if let MsgType::NodeDataResponse {
+            msg: NodeDataResponse::QueryResponse { response, .. },
+            ..
+        } = response
+        {
+            let msg = ClientDataResponse::QueryResponse {
+                response,
+                correlation_id,
+            };
+
+            Self::respond_to_client_over_stream(
+                msg,
+                correlation_id,
+                send_stream,
+                context,
+                source_client,
+            )
+            .await?;
+        } else {
+            // TODO: handle this bad response
+            error!("Unexpected response to query from node for {correlation_id:?}: {response:?}");
+        }
+
+        Ok(())
+    }
+
+    pub(crate) async fn respond_to_client_over_stream(
+        response: ClientDataResponse,
+        correlation_id: MsgId,
+        send_stream: SendStream,
+        context: &NodeContext,
+        source_client: Peer,
+    ) -> Result<()> {
+        trace!("Sending client response msg for {correlation_id:?}");
+        let (kind, payload) = MyNode::serialize_client_msg_response(context.name, response)?;
+
+        Self::send_msg_on_stream(
+            context.network_knowledge.section_key(),
+            payload,
+            kind,
+            send_stream,
+            source_client,
+            correlation_id,
+        )
+        .await?;
+
+        Ok(())
+    }
+
+    /// Send a msg on a given stream
     pub(crate) async fn send_msg_on_stream(
         section_key: bls::PublicKey,
         payload: Bytes,
         kind: MsgKind,
         mut send_stream: SendStream,
-        target_peer: Option<Peer>,
-        original_msg_id: MsgId,
+        target_peer: Peer,
+        correlation_id: MsgId,
     ) -> Result<()> {
-        // TODO why do we need dst here?
         let bytes = MyNode::form_usr_msg_bytes_to_node(
             section_key,
             payload,
             kind,
-            target_peer,
-            original_msg_id,
+            target_peer.name(),
+            correlation_id,
         )?;
-        let stream_prio = 10;
-        let stream_id = send_stream.id();
-        trace!("Sending {original_msg_id:?} to recipient over {stream_id}");
 
-        trace!("Stream {stream_id} locked for {original_msg_id:?} to {target_peer:?}");
+        let stream_id = send_stream.id();
+        trace!("Sending response {correlation_id:?} to {target_peer:?} over {stream_id}");
+
+        let stream_prio = 10;
         send_stream.set_priority(stream_prio);
-        trace!("Prio set for {original_msg_id:?} to {target_peer:?}, over {stream_id}");
+        trace!("Prio set for {correlation_id:?} to {target_peer:?}, over {stream_id}");
+
         if let Err(error) = send_stream.send_user_msg(bytes).await {
             error!(
-                "Could not send query response {original_msg_id:?} to \
-                peer {target_peer:?} over response {stream_id}: {error:?}"
+                "Could not send response {correlation_id:?} to peer {target_peer:?} \
+                over response {stream_id}: {error:?}"
             );
             return Err(error.into());
         }
 
-        trace!("Msg away for {original_msg_id:?} to {target_peer:?}, over {stream_id}");
+        trace!("Msg away for {correlation_id:?} to {target_peer:?}, over {stream_id}");
 
         // unblock + move finish off thread as it's not strictly related to the sending of the msg.
         let stream_id_clone = stream_id.clone();
@@ -381,10 +419,10 @@ impl MyNode {
             // Attempt to gracefully terminate the stream.
             // If this errors it does _not_ mean our message has not been sent
             let result = send_stream.finish().await;
-            trace!("bidi {stream_id_clone} finished for {original_msg_id:?} to {target_peer:?}: {result:?}");
+            trace!("Response {correlation_id:?} sent to {target_peer:?} over {stream_id_clone}. Stream finished with result: {result:?}");
         });
 
-        debug!("Sent the msg {original_msg_id:?} over {stream_id} to {target_peer:?}");
+        debug!("Sent the msg {correlation_id:?} to {target_peer:?} over {stream_id}");
 
         Ok(())
     }
@@ -393,11 +431,11 @@ impl MyNode {
         section_key: bls::PublicKey,
         payload: Bytes,
         kind: MsgKind,
-        target: Option<Peer>,
+        target_name: XorName,
         msg_id: MsgId,
     ) -> Result<UsrMsgBytes> {
         let dst = Dst {
-            name: target.map_or(XorName::default(), |peer| peer.name()),
+            name: target_name,
             section_key,
         };
         let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
