@@ -32,6 +32,7 @@ jobs:
   #     run: wget https://raw.githubusercontent.com/maidsafe/QA/master/misc-scripts/deny.toml
 
   #   - uses: EmbarkStudios/cargo-deny-action@v1
+
   cargo-udeps:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Unused dependency check
@@ -45,11 +46,11 @@ jobs:
           toolchain: nightly
           override: true
 
+      - name: Install cargo-udeps
+        run: cargo install cargo-udeps --locked
       - name: Run cargo-udeps
-        uses: aig787/cargo-udeps-action@v1
-        with:
-          version: "latest"
-          args: "--all-targets"
+        run: cargo +nightly udeps --all-targets
+
 
   checks:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
