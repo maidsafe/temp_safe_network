@@ -18,7 +18,7 @@ use sn_interface::{messaging::system::NodeMsg, types::log_markers::LogMarker};
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::RwLock, time::Instant};
 
-const PROBE_INTERVAL: Duration = Duration::from_secs(30);
+const PROBE_INTERVAL: Duration = Duration::from_secs(300);
 const MISSING_VOTE_INTERVAL: Duration = Duration::from_secs(5);
 const MISSING_DKG_MSG_INTERVAL: Duration = Duration::from_secs(5);
 // const SECTION_PROBE_INTERVAL: Duration = Duration::from_secs(300);
@@ -199,8 +199,8 @@ impl FlowCtrl {
     //     .await
     // }
 
-    /// Generates a probe msg, which goes to a random section in order to
-    /// passively maintain network knowledge over time
+    /// Generates a probe msg, which goes to up to three random sections in order to
+    /// passively maintain network knowledge over time.
     async fn probe_the_network(context: &NodeContext) -> Option<Cmd> {
         let prefix = context.network_knowledge.prefix();
 

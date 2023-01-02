@@ -80,8 +80,8 @@ impl MyNode {
             }
         };
 
-        let context = node.read().await.context();
-        trace!("[NODE READ]: Handle msg lock got");
+        trace!("[NODE READ]: Handle msg read lock attempt");
+        let context = { node.read().await.context() };
         match msg_type {
             MsgType::Node { dst, msg, .. } => {
                 // Check for entropy before we proceed further

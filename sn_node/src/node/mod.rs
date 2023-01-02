@@ -89,6 +89,7 @@ mod core {
 
     // File name where to cache this node's section tree (stored at this node's set root storage dir)
     const SECTION_TREE_FILE_NAME: &str = "section_tree";
+    const GOSSIP_SECTION_COUNT: usize = 3;
 
     #[derive(Debug, Clone)]
     pub(crate) struct DkgSessionInfo {
@@ -282,20 +283,41 @@ mod core {
 
         /// Generates a random AE probe for _anywhere_ on the network.
         pub(crate) fn generate_probe_msg(context: &NodeContext) -> Result<Cmd> {
-            // Generate a random address not belonging to our Prefix
-            let mut dst = xor_name::rand::random();
+            use rand::{rngs::OsRng, seq::SliceRandom};
 
-            // We don't probe ourselves
-            while context.network_knowledge.prefix().matches(&dst) {
-                dst = xor_name::rand::random();
+            // Get prefixes of other sections.
+            let our_prefix = context.network_knowledge.prefix();
+            let mut other_prefixes: Vec<_> = context
+                .network_knowledge
+                .prefixes()
+                .filter(|p| *p != &our_prefix)
+                .collect();
+
+            // take random three sections
+            other_prefixes.shuffle(&mut OsRng);
+            let target_prefixes = other_prefixes.into_iter().take(GOSSIP_SECTION_COUNT);
+
+            let mut recipients = BTreeSet::new();
+
+            for target in target_prefixes {
+                let matching_section = context.network_knowledge.section_auth_by_prefix(target)?;
+
+                // Take a random Elder.
+                // (We just need 1 Elder, since the ae probe will contain signed data.
+                // we keep calling a random elder out of a random section, so it's not a big deal if
+                // some times the call fails for what ever reason.)
+                let mut elders: Vec<_> = matching_section.elders().collect();
+                elders.shuffle(&mut OsRng);
+
+                // Should never be empty, but if so, then hopefully we'll eventually
+                // get updated on this section from somewhere else.
+                if let Some(elder) = elders.first() {
+                    let _ = recipients.insert(**elder);
+                }
             }
 
-            let matching_section = context.network_knowledge.section_auth_by_name(&dst)?;
-            let recipients = matching_section.elders_set();
-
             let probe = context.network_knowledge.anti_entropy_probe();
-
-            info!("ProbeMsg target {:?}: {probe:?}", matching_section.prefix());
+            info!("ProbeMsg targets {:?}: {probe:?}", recipients);
 
             Ok(MyNode::send_system_msg(
                 probe,
@@ -304,22 +326,22 @@ mod core {
             ))
         }
 
-        /// Generates a SectionProbeMsg with our current knowledge,
-        /// targetting our section elders.
-        /// Even if we're up to date, we expect a response.
-        pub(crate) fn generate_section_probe_msg(context: &NodeContext) -> Cmd {
-            let our_section = context.network_knowledge.section_auth();
-            let recipients = our_section.elders_set();
+        // /// Generates a SectionProbeMsg with our current knowledge,
+        // /// targetting our section elders.
+        // /// Even if we're up to date, we expect a response.
+        // pub(crate) fn generate_section_probe_msg(context: &NodeContext) -> Cmd {
+        //     let our_section = context.network_knowledge.section_auth();
+        //     let recipients = our_section.elders_set();
 
-            info!(
-                "ProbeMsg target our section {:?} recipients {:?}",
-                our_section.prefix(),
-                recipients,
-            );
+        //     info!(
+        //         "ProbeMsg target our section {:?} recipients {:?}",
+        //         our_section.prefix(),
+        //         recipients,
+        //     );
 
-            let probe = context.network_knowledge.anti_entropy_probe();
-            MyNode::send_system_msg(probe, Peers::Multiple(recipients), context.clone())
-        }
+        //     let probe = context.network_knowledge.anti_entropy_probe();
+        //     MyNode::send_system_msg(probe, Peers::Multiple(recipients), context.clone())
+        // }
 
         /// Generates section infos for the best elder candidate among the members at the given generation
         /// Returns a set of candidate `DkgSessionId`'s.
