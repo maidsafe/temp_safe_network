@@ -19,7 +19,7 @@ use tokio::{sync::mpsc, task};
 use tracing::Instrument;
 
 #[derive(Debug)]
-pub(crate) enum ListenerEvent {
+pub(crate) enum ConnectionEvent {
     Connected {
         peer: Peer,
         connection: Arc<qp2p::Connection>,
@@ -32,13 +32,13 @@ pub(crate) enum ListenerEvent {
 
 #[derive(Clone)]
 pub(crate) struct MsgListener {
-    connection_events: mpsc::Sender<ListenerEvent>,
+    connection_events: mpsc::Sender<ConnectionEvent>,
     receive_msg: mpsc::Sender<MsgFromPeer>,
 }
 
 impl MsgListener {
     pub(crate) fn new(
-        connection_events: mpsc::Sender<ListenerEvent>,
+        connection_events: mpsc::Sender<ConnectionEvent>,
         receive_msg: mpsc::Sender<MsgFromPeer>,
     ) -> Self {
         Self {
@@ -84,10 +84,15 @@ impl MsgListener {
                         }
                     };
                     let mut is_from_client = false;
+                    let mut is_node_join_msg = false;
                     let src_name = match wire_msg.kind() {
                         MsgKind::Client(auth) => {
                             is_from_client = true;
                             auth.public_key.into()
+                        }
+                        MsgKind::NodeJoin(name) => {
+                            is_node_join_msg = true;
+                            *name
                         }
                         MsgKind::Node(name)
                         | MsgKind::ClientDataResponse(name)
@@ -97,11 +102,11 @@ impl MsgListener {
                     let peer = Peer::new(src_name, remote_address);
 
                     // we don't want to store PeerSessions from clients
-                    if node_conn_cached.is_none() && !is_from_client {
+                    if node_conn_cached.is_none() && !is_from_client && !is_node_join_msg {
                         node_conn_cached = Some(peer);
                         let _ = self
                             .connection_events
-                            .send(ListenerEvent::Connected {
+                            .send(ConnectionEvent::Connected {
                                 peer,
                                 connection: conn.clone(),
                             })
@@ -138,7 +143,7 @@ impl MsgListener {
             trace!("Removing connection {conn_id} with node {peer} from cache");
             let _ = self
                 .connection_events
-                .send(ListenerEvent::ConnectionClosed {
+                .send(ConnectionEvent::ConnectionClosed {
                     peer,
                     connection: conn,
                 })

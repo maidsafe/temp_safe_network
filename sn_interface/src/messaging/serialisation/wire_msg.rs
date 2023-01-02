@@ -12,6 +12,7 @@ use crate::messaging::{
     system::{NodeDataResponse, NodeMsg},
     AuthorityProof, Dst, Error, MsgId, MsgKind, MsgType, Result,
 };
+use crate::network_knowledge::MyNodeInfo;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use custom_debug::Debug;
@@ -77,6 +78,31 @@ impl WireMsg {
     /// Serializes the dst on the WireMsg
     pub fn serialize_msg_dst(&self) -> Result<Bytes> {
         Self::serialize_dst_payload(&self.dst)
+    }
+
+    /// Serialize into a WireMsg for Node Join
+    pub fn single_src_node_join(node: &MyNodeInfo, dst: Dst, msg: NodeMsg) -> Result<WireMsg> {
+        let msg_payload = WireMsg::serialize_msg_payload(&msg)
+            .map_err(|_| Error::Serialisation("Could not serialise node join msg".to_string()))?;
+
+        let wire_msg = WireMsg::new_msg(
+            MsgId::new(),
+            msg_payload,
+            MsgKind::NodeJoin(node.name()),
+            dst,
+        );
+
+        Ok(wire_msg)
+    }
+
+    /// Serialize into a WireMsg for Node Join
+    pub fn single_src_node(node: &MyNodeInfo, dst: Dst, msg: NodeMsg) -> Result<WireMsg> {
+        let msg_payload = WireMsg::serialize_msg_payload(&msg)
+            .map_err(|_| Error::Serialisation("Could not serialise node msg".to_string()))?;
+
+        let wire_msg = WireMsg::new_msg(MsgId::new(), msg_payload, MsgKind::Node(node.name()), dst);
+
+        Ok(wire_msg)
     }
 
     /// Creates a new `WireMsg` with the provided serialized payload and `MsgKind`.
@@ -200,7 +226,7 @@ impl WireMsg {
                     msg,
                 })
             }
-            MsgKind::Node(_) => {
+            MsgKind::Node(_) | MsgKind::NodeJoin(_) => {
                 let msg: NodeMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Node signed message payload as Msgpack: {}", err))
                 })?;

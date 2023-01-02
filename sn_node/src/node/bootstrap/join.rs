@@ -8,7 +8,7 @@
 
 use crate::comm::{Comm, MsgFromPeer};
 use crate::log_sleep;
-use crate::node::{messages::WireMsgUtils, Error, Result, STANDARD_CHANNEL_SIZE};
+use crate::node::{Error, Result, STANDARD_CHANNEL_SIZE};
 
 use sn_interface::{
     messaging::{
@@ -353,7 +353,7 @@ impl<'a> Joiner<'a> {
             Vec::from_iter(recipients.iter().map(Peer::name))
         );
 
-        let wire_msg = WireMsg::single_src(
+        let wire_msg = WireMsg::single_src_node_join(
             &self.node,
             Dst {
                 name: self.node.name(), // we want to target a section where our name fits
@@ -477,7 +477,7 @@ async fn send_messages(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::node::{messages::WireMsgUtils, Error as RoutingError, MIN_ADULT_AGE};
+    use crate::node::{Error as RoutingError, MIN_ADULT_AGE};
     use assert_matches::assert_matches;
     use eyre::{eyre, Result};
     use futures::{
@@ -1005,7 +1005,7 @@ mod tests {
         sender: &MyNodeInfo,
         section_pk: BlsPublicKey,
     ) {
-        let wire_msg = WireMsg::single_src(
+        let wire_msg = WireMsg::single_src_node_join(
             sender,
             Dst {
                 name: XorName::from(PublicKey::Bls(section_pk)),
