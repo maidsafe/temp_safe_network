@@ -284,6 +284,11 @@ impl NetworkKnowledge {
         self.signed_sap.prefix()
     }
 
+    /// All other prefixes we know of.
+    pub fn prefixes(&self) -> impl Iterator<Item = &Prefix> {
+        self.section_tree.prefixes()
+    }
+
     // Returns reference to network section tree
     pub fn section_tree(&self) -> &SectionTree {
         &self.section_tree
@@ -308,6 +313,13 @@ impl NetworkKnowledge {
     pub fn section_auth_by_name(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
         self.section_tree
             .get_signed_by_name(name)
+            .map(|sap| sap.value)
+    }
+
+    // Returns the SAP for the prefix
+    pub fn section_auth_by_prefix(&self, prefix: &Prefix) -> Result<SectionAuthorityProvider> {
+        self.section_tree
+            .get_signed_by_prefix(prefix)
             .map(|sap| sap.value)
     }
 

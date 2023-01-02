@@ -99,37 +99,8 @@ impl SectionTree {
         &self.sections_dag
     }
 
-    /// Inserts new entry into the map. Replaces previous entry at the same prefix.
-    /// Removes those ancestors of the inserted prefix.
-    /// Does not insert anything if any descendant of the prefix of `entry` is already present in
-    /// the map.
-    /// Returns a boolean indicating whether anything changed.
-    //
-    // This is not a public API since we shall not allow any insert/update without a
-    // proof chain, users shall call the `update` API.
-    fn insert(&mut self, sap: SectionSigned<SectionAuthorityProvider>) -> bool {
-        let prefix = sap.prefix();
-        // Don't insert if any descendant is already present in the map.
-        if let Some(extension_p) = self.sections.keys().find(|p| p.is_extension_of(&prefix)) {
-            info!("Dropping update since we have a prefix '{extension_p}' that is an extension of '{prefix}'");
-            return false;
-        }
-
-        let _prev = self.sections.insert(prefix, sap);
-
-        if prefix.is_empty() {
-            return true;
-        }
-        let parent_prefix = prefix.popped();
-
-        self.prune(parent_prefix);
-        true
-    }
-
-    /// For testing purpose, we may need to populate a `section_tree` without a proof chain.
-    #[cfg(any(test, feature = "test-utils"))]
-    pub fn insert_without_chain(&mut self, sap: SectionSigned<SectionAuthorityProvider>) -> bool {
-        self.insert(sap)
+    pub fn prefixes(&self) -> impl Iterator<Item = &Prefix> {
+        self.sections.keys()
     }
 
     /// Returns the known section that is closest to the given name,
@@ -196,6 +167,47 @@ impl SectionTree {
     ) -> Result<SectionSigned<SectionAuthorityProvider>> {
         self.get_signed_by_name(&prefix.name())
     }
+
+    /// Returns the known section public keys.
+    pub fn section_keys(&self) -> Vec<bls::PublicKey> {
+        self.sections
+            .values()
+            .map(|sap| sap.section_key())
+            .collect()
+    }
+
+    /// Number of SAPs we know about.
+    pub fn len(&self) -> usize {
+        self.sections.len()
+    }
+
+    /// Is the section tree empty?
+    pub fn is_empty(&self) -> bool {
+        self.sections.is_empty()
+    }
+
+    /// Get total number of known sections
+    pub fn known_sections_count(&self) -> usize {
+        self.sections.len()
+    }
+
+    pub fn generate_section_tree_update(&self, prefix: &Prefix) -> Result<SectionTreeUpdate> {
+        let signed_sap = self
+            .sections
+            .get(prefix)
+            .ok_or(Error::NoMatchingSection)?
+            .clone();
+
+        let proof_chain = self
+            .sections_dag
+            .partial_dag(self.sections_dag.genesis_key(), &signed_sap.section_key())?;
+
+        Ok(SectionTreeUpdate {
+            signed_sap,
+            proof_chain,
+        })
+    }
+
     /// Update our `SectionTree` if the provided update can be verified
     /// Returns true if an update was made
     pub fn update_the_section_tree(
@@ -316,72 +328,10 @@ impl SectionTree {
         }
     }
 
-    /// Returns the known section public keys.
-    pub fn section_keys(&self) -> Vec<bls::PublicKey> {
-        self.sections
-            .values()
-            .map(|sap| sap.section_key())
-            .collect()
-    }
-
-    /// Number of SAPs we know about.
-    pub fn len(&self) -> usize {
-        self.sections.len()
-    }
-
-    /// Is the section tree empty?
-    pub fn is_empty(&self) -> bool {
-        self.sections.is_empty()
-    }
-
-    pub fn generate_section_tree_update(&self, prefix: &Prefix) -> Result<SectionTreeUpdate> {
-        let signed_sap = self
-            .sections
-            .get(prefix)
-            .ok_or(Error::NoMatchingSection)?
-            .clone();
-
-        let proof_chain = self
-            .sections_dag
-            .partial_dag(self.sections_dag.genesis_key(), &signed_sap.section_key())?;
-
-        Ok(SectionTreeUpdate {
-            signed_sap,
-            proof_chain,
-        })
-    }
-
-    /// Get total number of known sections
-    pub fn known_sections_count(&self) -> usize {
-        self.sections.len()
-    }
-
-    /// Returns network statistics.
-    pub fn network_stats(&self, our: &SectionAuthorityProvider) -> NetworkStats {
-        // Let's compute an estimate of the total number of elders in the network
-        // from the size of our routing table.
-        let section_prefixes = self.sections.keys().copied();
-        let known_prefixes: Vec<_> = section_prefixes.chain(iter::once(our.prefix())).collect();
-
-        let total_elders_exact = Prefix::default().is_covered_by(&known_prefixes);
-
-        // Estimated fraction of the network that we have in our RT.
-        // Computed as the sum of 1 / 2^(prefix.bit_count) for all known section prefixes.
-        let network_fraction: f64 = known_prefixes
-            .iter()
-            .map(|p| 1.0 / (p.bit_count() as f64).exp2())
-            .sum();
-
-        let network_elders_count: usize = self.sections.values().map(|sap| sap.elder_count()).sum();
-        let total = network_elders_count as f64 / network_fraction;
-
-        // `total_elders_exact` indicates whether `total_elders` is
-        // an exact number or an estimate.
-        NetworkStats {
-            known_elders: network_elders_count as u64,
-            total_elders: total.ceil() as u64,
-            total_elders_exact,
-        }
+    /// For testing purpose, we may need to populate a `section_tree` without a proof chain.
+    #[cfg(any(test, feature = "test-utils"))]
+    pub fn insert_without_chain(&mut self, sap: SectionSigned<SectionAuthorityProvider>) -> bool {
+        self.insert(sap)
     }
 
     /// Serialise and write it to disk on the provided file path
@@ -433,6 +383,34 @@ impl SectionTree {
         Ok(())
     }
 
+    /// Returns network statistics.
+    pub fn network_stats(&self, our: &SectionAuthorityProvider) -> NetworkStats {
+        // Let's compute an estimate of the total number of elders in the network
+        // from the size of our routing table.
+        let section_prefixes = self.sections.keys().copied();
+        let known_prefixes: Vec<_> = section_prefixes.chain(iter::once(our.prefix())).collect();
+
+        let total_elders_exact = Prefix::default().is_covered_by(&known_prefixes);
+
+        // Estimated fraction of the network that we have in our RT.
+        // Computed as the sum of 1 / 2^(prefix.bit_count) for all known section prefixes.
+        let network_fraction: f64 = known_prefixes
+            .iter()
+            .map(|p| 1.0 / (p.bit_count() as f64).exp2())
+            .sum();
+
+        let network_elders_count: usize = self.sections.values().map(|sap| sap.elder_count()).sum();
+        let total = network_elders_count as f64 / network_fraction;
+
+        // `total_elders_exact` indicates whether `total_elders` is
+        // an exact number or an estimate.
+        NetworkStats {
+            known_elders: network_elders_count as u64,
+            total_elders: total.ceil() as u64,
+            total_elders_exact,
+        }
+    }
+
     /// Remove `prefix` and any of its ancestors.
     fn prune(&mut self, mut prefix: Prefix) {
         loop {
@@ -444,6 +422,33 @@ impl SectionTree {
                 prefix = prefix.popped();
             }
         }
+    }
+
+    /// Inserts new entry into the map. Replaces previous entry at the same prefix.
+    /// Removes those ancestors of the inserted prefix.
+    /// Does not insert anything if any descendant of the prefix of `entry` is already present in
+    /// the map.
+    /// Returns a boolean indicating whether anything changed.
+    //
+    // This is not a public API since we shall not allow any insert/update without a
+    // proof chain, users shall call the `update` API.
+    fn insert(&mut self, sap: SectionSigned<SectionAuthorityProvider>) -> bool {
+        let prefix = sap.prefix();
+        // Don't insert if any descendant is already present in the map.
+        if let Some(extension_p) = self.sections.keys().find(|p| p.is_extension_of(&prefix)) {
+            info!("Dropping update since we have a prefix '{extension_p}' that is an extension of '{prefix}'");
+            return false;
+        }
+
+        let _prev = self.sections.insert(prefix, sap);
+
+        if prefix.is_empty() {
+            return true;
+        }
+        let parent_prefix = prefix.popped();
+
+        self.prune(parent_prefix);
+        true
     }
 }
 

@@ -18,21 +18,21 @@ use sn_interface::{messaging::system::NodeMsg, types::log_markers::LogMarker};
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::RwLock, time::Instant};
 
-const PROBE_INTERVAL: Duration = Duration::from_secs(30);
+const PROBE_INTERVAL: Duration = Duration::from_secs(300);
 const MISSING_VOTE_INTERVAL: Duration = Duration::from_secs(5);
 const MISSING_DKG_MSG_INTERVAL: Duration = Duration::from_secs(5);
-const SECTION_PROBE_INTERVAL: Duration = Duration::from_secs(300);
+// const SECTION_PROBE_INTERVAL: Duration = Duration::from_secs(300);
 const FAULT_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 // 30 adult nodes checked per minute., so each node should be queried 10x in 10 mins
 // Which should hopefully trigger fault if we're not getting responses back
 // const ADULT_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(2);
-const ELDER_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(3);
+// const ELDER_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(3);
 
 pub(super) struct PeriodicChecksTimestamps {
     last_probe: Instant,
-    last_section_probe: Instant,
+    // last_section_probe: Instant,
     // last_adult_health_check: Instant,
-    last_elder_health_check: Instant,
+    // last_elder_health_check: Instant,
     last_vote_check: Instant,
     last_dkg_msg_check: Instant,
     last_fault_check: Instant,
@@ -42,9 +42,9 @@ impl PeriodicChecksTimestamps {
     pub(super) fn now() -> Self {
         Self {
             last_probe: Instant::now(),
-            last_section_probe: Instant::now(),
+            // last_section_probe: Instant::now(),
             // last_adult_health_check: Instant::now(),
-            last_elder_health_check: Instant::now(),
+            // last_elder_health_check: Instant::now(),
             last_vote_check: Instant::now(),
             last_dkg_msg_check: Instant::now(),
             last_fault_check: Instant::now(),
@@ -64,7 +64,7 @@ impl FlowCtrl {
         };
 
         if !context.is_elder {
-            self.enqueue_cmds_for_adult_periodic_checks(context).await;
+            // self.enqueue_cmds_for_adult_periodic_checks(context).await;
 
             // we've pushed what we have as an adult and processed incoming msgs
             // and cmds... so we can return already
@@ -75,22 +75,22 @@ impl FlowCtrl {
             .await;
     }
 
-    /// Periodic tasks run for adults only
-    async fn enqueue_cmds_for_adult_periodic_checks(&mut self, context: &NodeContext) {
-        let mut cmds = vec![];
+    // /// Periodic tasks run for adults only
+    // async fn enqueue_cmds_for_adult_periodic_checks(&mut self, context: &NodeContext) {
+    //     let mut cmds = vec![];
 
-        // if we've passed enough time, section probe
-        if self.timestamps.last_section_probe.elapsed() > SECTION_PROBE_INTERVAL {
-            self.timestamps.last_section_probe = Instant::now();
-            cmds.push(Self::probe_the_section(context).await);
-        }
+    //     // if we've passed enough time, section probe
+    //     if self.timestamps.last_section_probe.elapsed() > SECTION_PROBE_INTERVAL {
+    //         self.timestamps.last_section_probe = Instant::now();
+    //         cmds.push(Self::probe_the_section(context).await);
+    //     }
 
-        for cmd in cmds {
-            if let Err(error) = self.cmd_sender_channel.send((cmd, vec![])).await {
-                error!("Error queuing adult periodic check: {error:?}");
-            }
-        }
-    }
+    //     for cmd in cmds {
+    //         if let Err(error) = self.cmd_sender_channel.send((cmd, vec![])).await {
+    //             error!("Error queuing adult periodic check: {error:?}");
+    //         }
+    //     }
+    // }
 
     /// Periodic tasks run for elders only
     async fn enqueue_cmds_for_elder_periodic_checks(
@@ -108,7 +108,7 @@ impl FlowCtrl {
             }
         }
 
-        // TODO: reevaluate health checks. Does this make sense mocking a client req?
+        // TODO: reevaluate both adult and elder health checks. Does this make sense mocking a client req?
         // how do we handle the need for a bidi stream (if using the whole client flow?)
 
         // if self.timestamps.last_adult_health_check.elapsed() > ADULT_HEALTH_CHECK_INTERVAL {
@@ -125,15 +125,15 @@ impl FlowCtrl {
         //     debug!(" ----> adult health periodics done");
         // }
 
-        // The above health check only queries for chunks
-        // here we specifically ask for AE prob msgs and manually
-        // track faults
-        if self.timestamps.last_elder_health_check.elapsed() > ELDER_HEALTH_CHECK_INTERVAL {
-            self.timestamps.last_elder_health_check = now;
-            for cmd in Self::health_check_elders_in_section(context).await {
-                cmds.push(cmd);
-            }
-        }
+        // // The above health check only queries for chunks
+        // // here we specifically ask for AE prob msgs and manually
+        // // track faults
+        // if self.timestamps.last_elder_health_check.elapsed() > ELDER_HEALTH_CHECK_INTERVAL {
+        //     self.timestamps.last_elder_health_check = now;
+        //     for cmd in Self::health_check_elders_in_section(context).await {
+        //         cmds.push(cmd);
+        //     }
+        // }
 
         if self.timestamps.last_vote_check.elapsed() > MISSING_VOTE_INTERVAL {
             debug!(" ----> vote periodics start");
@@ -199,8 +199,8 @@ impl FlowCtrl {
     //     .await
     // }
 
-    /// Generates a probe msg, which goes to a random section in order to
-    /// passively maintain network knowledge over time
+    /// Generates a probe msg, which goes to up to three random sections in order to
+    /// passively maintain network knowledge over time.
     async fn probe_the_network(context: &NodeContext) -> Option<Cmd> {
         let prefix = context.network_knowledge.prefix();
 
@@ -220,38 +220,38 @@ impl FlowCtrl {
         }
     }
 
-    /// Generates a probe msg, which goes to our elders in order to
-    /// passively maintain network knowledge over time
-    async fn probe_the_section(context: &NodeContext) -> Cmd {
-        // Send a probe message to an elder
-        info!("Starting to probe section");
-        MyNode::generate_section_probe_msg(context)
-    }
+    // /// Generates a probe msg, which goes to our elders in order to
+    // /// passively maintain network knowledge over time
+    // async fn probe_the_section(context: &NodeContext) -> Cmd {
+    //     // Send a probe message to an elder
+    //     info!("Starting to probe section");
+    //     MyNode::generate_section_probe_msg(context)
+    // }
 
-    /// Generates a probe msg, which goes to all section elders in order to
-    /// passively maintain network knowledge over time and track faults.
-    /// Tracking faults while awaiting a response.
-    async fn health_check_elders_in_section(context: &NodeContext) -> Vec<Cmd> {
-        let mut cmds = vec![];
+    // /// Generates a probe msg, which goes to all section elders in order to
+    // /// passively maintain network knowledge over time and track faults.
+    // /// Tracking faults while awaiting a response.
+    // async fn health_check_elders_in_section(context: &NodeContext) -> Vec<Cmd> {
+    //     let mut cmds = vec![];
 
-        // Send a probe message to an elder
-        debug!("Going to health check elders");
+    //     // Send a probe message to an elder
+    //     debug!("Going to health check elders");
 
-        let elders = context.network_knowledge.elders();
-        for elder in elders {
-            // we track a knowledge issue
-            // whhich is countered when an AE-Update is
-            cmds.push(Cmd::TrackNodeIssue {
-                name: elder.name(),
-                issue: sn_fault_detection::IssueType::AeProbeMsg,
-            });
-        }
+    //     let elders = context.network_knowledge.elders();
+    //     for elder in elders {
+    //         // we track a knowledge issue
+    //         // whhich is countered when an AE-Update is
+    //         cmds.push(Cmd::TrackNodeIssue {
+    //             name: elder.name(),
+    //             issue: sn_fault_detection::IssueType::AeProbeMsg,
+    //         });
+    //     }
 
-        // Send a probe message to an elder
-        cmds.push(MyNode::generate_section_probe_msg(context));
+    //     // Send a probe message to an elder
+    //     cmds.push(MyNode::generate_section_probe_msg(context));
 
-        cmds
-    }
+    //     cmds
+    // }
 
     /// Checks the interval since last vote received during a generation
     async fn check_for_missed_votes(
