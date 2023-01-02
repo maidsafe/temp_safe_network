@@ -8,27 +8,31 @@
 
 use crate::comm::{Comm, MsgFromPeer};
 use crate::log_sleep;
-use crate::node::{Error, Result, STANDARD_CHANNEL_SIZE};
+use crate::node::{joining::get_largest_range, Error, Result, STANDARD_CHANNEL_SIZE};
 
 use sn_interface::{
     messaging::{
-        system::{JoinRejectionReason, JoinRequest, JoinResponse, NodeMsg, SectionSigned},
+        system::{JoinRejectionReason, JoinRequest, JoinResponse, NodeMsg},
         Dst, MsgType, WireMsg,
     },
     network_knowledge::{
         MembershipState, MyNodeInfo, NetworkKnowledge, SectionTree, SectionTreeUpdate,
+        MIN_ADULT_AGE,
     },
-    types::{keys::ed25519, log_markers::LogMarker, Peer},
+    types::{
+        keys::ed25519::{self, gen_name_with_age},
+        log_markers::LogMarker,
+        Peer,
+    },
     SectionAuthorityProvider,
 };
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
-use bls::PublicKey as BlsPublicKey;
 use futures::future;
-
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, net::SocketAddr};
 use tokio::{sync::mpsc, time::Duration};
 use tracing::Instrument;
+use xor_name::XorName;
 
 /// Join the network as new node.
 ///
@@ -36,7 +40,7 @@ use tracing::Instrument;
 /// lost in transit or other reasons. It's the responsibility of the caller to handle this case,
 /// for example by using a timeout.
 pub(crate) async fn join_network(
-    node: MyNodeInfo,
+    my_addr: SocketAddr,
     comm: &Comm,
     incoming_msgs: &mut mpsc::Receiver<MsgFromPeer>,
     section_tree: SectionTree,
@@ -45,7 +49,7 @@ pub(crate) async fn join_network(
     let (outgoing_msgs_sender, outgoing_msgs_receiver) = mpsc::channel(STANDARD_CHANNEL_SIZE);
 
     let span = trace_span!("bootstrap");
-    let joiner = Joiner::new(node, outgoing_msgs_sender, incoming_msgs, section_tree);
+    let joiner = Joiner::new(my_addr, outgoing_msgs_sender, incoming_msgs, section_tree);
 
     let (res, _) = future::join(
         joiner.try_join(join_timeout),
@@ -64,22 +68,25 @@ pub(crate) async fn join_network(
     }
 }
 
-struct Joiner<'a> {
+pub(crate) struct Joiner<'a> {
+    join_target: XorName,
+    my_addr: SocketAddr,
     // Sender for outgoing messages.
     outgoing_msgs: mpsc::Sender<(WireMsg, Vec<Peer>)>,
     // Receiver for incoming messages.
     incoming_msgs: &'a mut mpsc::Receiver<MsgFromPeer>,
-    node: MyNodeInfo,
     section_tree: SectionTree,
     backoff: ExponentialBackoff,
     /// cache of retry response sending peers. When we exceed 1/3rd responses we retry
-    /// (the rety_response cache makes sure we retry only once per name/sap)
+    /// (the cache makes sure we retry only once per name/sap)
     retry_responses_cache: BTreeSet<Peer>,
+    /// The node we become when we have joined.
+    resulting_node: Option<MyNodeInfo>,
 }
 
 impl<'a> Joiner<'a> {
-    fn new(
-        node: MyNodeInfo,
+    pub(crate) fn new(
+        my_addr: SocketAddr,
         outgoing_msgs: mpsc::Sender<(WireMsg, Vec<Peer>)>,
         incoming_msgs: &'a mut mpsc::Receiver<MsgFromPeer>,
         section_tree: SectionTree,
@@ -95,12 +102,15 @@ impl<'a> Joiner<'a> {
         backoff.reset();
 
         Self {
+            // generate a random target
+            join_target: gen_name_with_age(MIN_ADULT_AGE),
+            my_addr,
             outgoing_msgs,
             incoming_msgs,
-            node,
             section_tree,
             backoff,
             retry_responses_cache: Default::default(),
+            resulting_node: None,
         }
     }
 
@@ -108,7 +118,10 @@ impl<'a> Joiner<'a> {
     // - `Retry`: repeat with the new info.
     // - `Redirect`: repeat with the new set of addresses.
     // - `Approval`: returns the decision proving the node was approved.
-    async fn try_join(self, join_timeout: Duration) -> Result<(MyNodeInfo, NetworkKnowledge)> {
+    pub(crate) async fn try_join(
+        self,
+        join_timeout: Duration,
+    ) -> Result<(MyNodeInfo, NetworkKnowledge)> {
         trace!(
             "Bootstrap run, section tree as we have it: {:?}",
             self.section_tree
@@ -122,22 +135,64 @@ impl<'a> Joiner<'a> {
             })?
     }
 
-    fn join_target_sap(&self) -> Result<SectionSigned<SectionAuthorityProvider>> {
-        let our_name = self.node.name();
-        let sap = self.section_tree.get_signed_by_name(&our_name)?;
-        Ok(sap)
+    fn get_target_sap(&self) -> Result<SectionAuthorityProvider> {
+        let sap = self.section_tree.get_signed_by_name(&self.join_target)?;
+        Ok(sap.value)
     }
 
-    #[tracing::instrument(skip(self))]
-    async fn join(mut self, response_timeout: Duration) -> Result<(MyNodeInfo, NetworkKnowledge)> {
-        self.bootstrap_section_tree(self.join_target_sap()?.value, response_timeout)
-            .await?;
-
-        let target_sap = self.join_target_sap()?;
+    async fn send_join_request(&mut self) -> Result<()> {
+        let target_sap = self.get_target_sap()?;
         let section_key = target_sap.section_key();
         let msg = NodeMsg::JoinRequest(JoinRequest { section_key });
         self.send(msg, &target_sap.elders_vec(), section_key, false)
+            .await
+    }
+
+    fn update_join_target(&mut self) -> Result<()> {
+        // get the updated target sap
+        let target_sap = self.get_target_sap()?;
+        let prefix = target_sap.prefix();
+
+        // Get the largest unpopulated range in the section.
+        let range = get_largest_range(&NetworkKnowledge::new(prefix, self.section_tree.clone())?);
+
+        // Generate keys in that range.
+        let new_keypair = ed25519::gen_keypair(&range, MIN_ADULT_AGE);
+        let my_node_info = MyNodeInfo::new(new_keypair, self.my_addr);
+        // Replace the random target with the name that is generated within the instructed range.
+        self.join_target = my_node_info.name();
+
+        trace!("Joining section {prefix}, using name: {}", self.join_target);
+
+        // this is now what we expect to be our resulting node
+        self.resulting_node = Some(my_node_info);
+
+        Ok(())
+    }
+
+    // 1. Connect to a random section and get ae update.
+    // 2. Update our target sap, and our join target (by generating keys in its largest range)
+    // 3. Send join request.
+    // 4. Await and handle response.
+    #[tracing::instrument(skip(self))]
+    async fn join(mut self, response_timeout: Duration) -> Result<(MyNodeInfo, NetworkKnowledge)> {
+        trace!(
+            "Contacting network, using join_target: {}",
+            self.join_target
+        );
+        // Performs steps 1-2.
+        self.bootstrap_section_tree(self.get_target_sap()?, response_timeout)
             .await?;
+
+        // in case we already had the info we need, i.e. did not update in the bootstrap call above
+        if self.resulting_node.is_none() {
+            self.update_join_target()?;
+        }
+
+        // 3. Send join request.
+        self.send_join_request().await?;
+
+        trace!("Node name {}, join request sent.", self.join_target);
 
         loop {
             let (response, sender) = tokio::time::timeout(
@@ -149,11 +204,45 @@ impl<'a> Joiner<'a> {
                 error!("Failed to receive join response: {:?}", e);
                 Error::JoinTimeout
             })??;
-            let target_sap = self.join_target_sap()?;
 
             match response {
+                // 4. Retry response
+                JoinResponse::Retry => {
+                    let target_sap = self.get_target_sap()?;
+
+                    trace!(
+                        "Network join attempt to {:?} - target: {:?} ; received a Retry from {}",
+                        target_sap.prefix(),
+                        self.join_target,
+                        sender.name(),
+                    );
+
+                    if self.should_retry_after_response(sender, target_sap.elders_set()) {
+                        // reset the retry cache
+                        self.retry_responses_cache = Default::default();
+
+                        trace!("Bootstrapping section tree for retry");
+                        // we ask for a knowledge update
+                        // this updates the join target, replacing the rejected result that we previously generated
+                        self.bootstrap_section_tree(target_sap, response_timeout)
+                            .await?;
+
+                        // we should now have been updated by ae, so send the join request again
+                        info!("Retrying join request with updated section tree..");
+                        self.send_join_request().await?;
+                    }
+                }
+                // 4. Approved response
                 JoinResponse::Approved { decision } => {
                     info!("{}", LogMarker::ReceivedJoinApproval);
+
+                    // it would be a logic error in this function if `self.resulting_node` was `None`
+                    let my_node_info = match &self.resulting_node {
+                        Some(node) => node,
+                        None => return Err(Error::BootstrapFailed),
+                    };
+                    let my_name = my_node_info.name();
+                    let target_sap = self.get_target_sap()?;
                     if let Err(e) = decision.validate(&target_sap.public_key_set()) {
                         error!("Failed to validate with {target_sap:?}, dropping invalid join decision: {e:?}");
                         continue;
@@ -164,9 +253,9 @@ impl<'a> Joiner<'a> {
                         .proposals
                         .keys()
                         .filter(|n| n.state() == MembershipState::Joined)
-                        .all(|n| n.name() != self.node.name())
+                        .all(|n| n.name() != my_name)
                     {
-                        trace!("MyNode named: {:?} Ignore join approval decision not for us: {decision:?}", self.node.name());
+                        trace!("My node named: {:?} Ignore join approval decision not for us: {decision:?}", my_name);
                         continue;
                     }
 
@@ -178,38 +267,9 @@ impl<'a> Joiner<'a> {
                     let network_knowledge =
                         NetworkKnowledge::new(target_sap.prefix(), self.section_tree)?;
 
-                    return Ok((self.node, network_knowledge));
+                    return Ok((my_node_info.clone(), network_knowledge));
                 }
-                JoinResponse::Retry => {
-                    trace!(
-                        "My joining node with {:?} - name: {:?} ; received a Retry from {}",
-                        target_sap.prefix(),
-                        self.node.name(),
-                        sender.name(),
-                    );
-
-                    if self.should_retry_after_response(sender, target_sap.elders_set()) {
-                        self.retry_responses_cache = Default::default();
-
-                        trace!("Bootstrapping section tree for retry");
-                        self.bootstrap_section_tree(target_sap.value, response_timeout)
-                            .await?;
-                        let target_sap = self.join_target_sap()?;
-
-                        let new_keypair = ed25519::gen_keypair(
-                            &target_sap.prefix().range_inclusive(),
-                            self.node.age(),
-                        );
-                        self.node = MyNodeInfo::new(new_keypair, self.node.addr);
-
-                        info!("Retrying with new name: {}", self.node.name());
-
-                        let section_key = target_sap.section_key();
-                        let msg = NodeMsg::JoinRequest(JoinRequest { section_key });
-                        self.send(msg, &target_sap.elders_vec(), section_key, true)
-                            .await?;
-                    }
-                }
+                // 4. Redirect response
                 JoinResponse::Redirect(section_auth) => {
                     // TODO: Replace Redirect with a Retry + AEProbe.
                     trace!("Received a redirect JoinResponse from {}. Sending request to the latest contacts", sender);
@@ -221,10 +281,10 @@ impl<'a> Joiner<'a> {
                         continue;
                     }
 
-                    if !section_auth.prefix().matches(&self.node.name()) {
+                    if !section_auth.prefix().matches(&self.join_target) {
                         warn!(
                             "Ignoring newer JoinResponse::Redirect response not for us {:?}, SAP {:?} from {:?}",
-                            self.node.name(),
+                            self.join_target,
                             section_auth,
                             sender,
                         );
@@ -233,25 +293,20 @@ impl<'a> Joiner<'a> {
 
                     info!(
                         "Newer JoinResponse::Redirect for us {:?}, SAP {:?} from {:?}",
-                        self.node.name(),
-                        section_auth,
-                        sender
+                        self.join_target, section_auth, sender
                     );
 
                     self.bootstrap_section_tree(section_auth, response_timeout)
                         .await?;
 
-                    let target_sap = self.join_target_sap()?;
-                    let section_key = target_sap.section_key();
-
-                    let msg = NodeMsg::JoinRequest(JoinRequest { section_key });
-                    self.send(msg, &target_sap.elders_vec(), section_key, true)
-                        .await?;
+                    self.send_join_request().await?;
                 }
+                // 4. Rejected response
                 JoinResponse::Rejected(JoinRejectionReason::JoinsDisallowed) => {
                     error!("Network is set to not taking any new joining node, try join later.");
                     return Err(Error::TryJoinLater);
                 }
+                // 4. Rejected response
                 JoinResponse::Rejected(JoinRejectionReason::NodeNotReachable(addr)) => {
                     error!("Join rejected since node is not externally reachable: {addr}");
                     return Err(Error::NodeNotReachable(addr));
@@ -266,6 +321,7 @@ impl<'a> Joiner<'a> {
         response_timeout: Duration,
     ) -> Result<()> {
         let mut target_sap = initial_target_sap;
+        let mut updated = false;
         loop {
             self.send(
                 NodeMsg::AntiEntropyProbe(target_sap.section_key()),
@@ -304,9 +360,13 @@ impl<'a> Joiner<'a> {
 
             if any_new_information {
                 // Update the target sap since we've received new information and try again.
-                target_sap = self.join_target_sap()?.value;
-                info!("Received new information in last AEProbe, updating target sap to {target_sap:?}");
+                updated = true;
+                target_sap = self.get_target_sap()?;
+                info!("Received new information in last AEProbe, updated target sap to {target_sap:?}");
             } else {
+                if updated {
+                    self.update_join_target()?;
+                }
                 // We are up to date with these nodes so we can end the bootstrap
                 info!("No new information was learned in last AEProbe, ending tree bootstrap");
                 return Ok(());
@@ -330,7 +390,7 @@ impl<'a> Joiner<'a> {
         &mut self,
         msg: NodeMsg,
         recipients: &[Peer],
-        section_key: BlsPublicKey,
+        section_key: bls::PublicKey,
         should_backoff: bool,
     ) -> Result<()> {
         if should_backoff {
@@ -354,9 +414,9 @@ impl<'a> Joiner<'a> {
         );
 
         let wire_msg = WireMsg::single_src_node_join(
-            &self.node,
+            self.join_target,
             Dst {
-                name: self.node.name(), // we want to target a section where our name fits
+                name: self.join_target, // we want to target a section where our name fits
                 section_key,
             },
             msg,
@@ -383,7 +443,7 @@ impl<'a> Joiner<'a> {
                     ..
                 } => {
                     info!("After sent join request, received section tree update: {section_tree_update:?}");
-                    let old_target = self.join_target_sap()?;
+                    let old_target = self.get_target_sap()?;
 
                     let any_new_information = match self
                         .section_tree
@@ -399,7 +459,7 @@ impl<'a> Joiner<'a> {
                     };
 
                     if any_new_information {
-                        let current_sap = self.join_target_sap()?;
+                        let current_sap = self.get_target_sap()?;
                         info!("After sent join request, network sap changed from {old_target:?} to {current_sap:?}");
                     }
                 }
@@ -476,22 +536,34 @@ async fn send_messages(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::node::{Error as RoutingError, MIN_ADULT_AGE};
+    use crate::comm::MsgFromPeer;
+    use crate::node::{
+        joining::{get_largest_range, Joiner},
+        Error as RoutingError, MIN_ADULT_AGE,
+    };
+
+    use sn_interface::{
+        init_logger,
+        messaging::{
+            system::{AntiEntropyKind, JoinRejectionReason, JoinRequest, JoinResponse, NodeMsg},
+            Dst, MsgType, WireMsg,
+        },
+        network_knowledge::{
+            NetworkKnowledge, NodeState, SectionAuthorityProvider, SectionTree, SectionTreeUpdate,
+            SectionsDAG,
+        },
+        test_utils::*,
+        types::{Peer, PublicKey},
+    };
+
     use assert_matches::assert_matches;
     use eyre::{eyre, Result};
     use futures::{
         future::{self, Either},
         pin_mut,
     };
-    use sn_interface::{
-        init_logger,
-        messaging::system::AntiEntropyKind,
-        network_knowledge::{NodeState, SectionAuthorityProvider, SectionsDAG},
-        test_utils::*,
-        types::PublicKey,
-    };
-    use tokio::task;
+    use std::collections::BTreeSet;
+    use tokio::{sync::mpsc, task, time::Duration};
     use xor_name::{Prefix, XorName};
 
     const JOIN_TIMEOUT_SEC: u64 = 15;
@@ -504,41 +576,41 @@ mod tests {
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(10);
 
-        let (genesis_sap, genesis_sk_set, genesis_elders, ..) =
-            TestSapBuilder::new(Prefix::default()).build();
-        let genesis_sk = genesis_sk_set.secret_key();
-        let genesis_pk = genesis_sk.public_key();
+        let prefix = Prefix::default();
 
-        let node = MyNodeInfo::new(
-            ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
-            gen_addr(),
-        );
+        let (first_sap, first_sk_set, first_elders, ..) = TestSapBuilder::new(prefix).build();
+        let first_sk = first_sk_set.secret_key();
+        let first_pk = first_sk.public_key();
 
-        let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone());
-        let tree = SectionTree::new(signed_genesis_sap)?;
+        let our_addr = gen_addr();
 
-        let state = Joiner::new(node.clone(), send_tx, &mut recv_rx, tree);
+        let first_section_tree =
+            SectionTree::new(TestKeys::get_section_signed(&first_sk, first_sap.clone()))?;
+
+        let joiner = Joiner::new(our_addr, send_tx, &mut recv_rx, first_section_tree.clone());
 
         // Create the bootstrap task, but don't run it yet.
-        let bootstrap = async { state.try_join(join_timeout).await.expect("Failed to join") };
+        let bootstrap = async { joiner.try_join(join_timeout).await.expect("Failed to join") };
 
-        let (next_sap, next_sk_set, next_elders, _) =
-            TestSapBuilder::new(Prefix::default()).build();
-
+        // Create the updated section
+        let (next_sap, next_sk_set, next_elders, _) = TestSapBuilder::new(prefix).build();
         let next_section_key = next_sk_set.public_keys().public_key();
         let section_tree_update = TestSectionTree::get_section_tree_update(
             &TestKeys::get_section_signed(&next_sk_set.secret_key(), next_sap.clone()),
-            &SectionsDAG::new(genesis_pk),
-            &genesis_sk,
+            &SectionsDAG::new(first_pk),
+            &first_sk,
         );
+
+        let mut next_section_tree = first_section_tree.clone();
+        assert!(next_section_tree.update_the_section_tree(section_tree_update.clone())?);
+        let next_network_knowledge = NetworkKnowledge::new(prefix, next_section_tree)?;
 
         // Create the task that executes the body of the test, but don't run it either.
         let others = async {
             // First the joining node bootstraps it's network knowledge.
-            // We expect two probes, one to the genesis elders, then another to the next sap elders.
-
-            for expected_elders in [genesis_elders, next_elders.clone()] {
-                let (node_msg, _, recipients) = recv_node_msg(&mut send_rx).await;
+            // We expect two probes, one to the first elders, then another to the next sap elders.
+            for expected_elders in [first_elders.clone(), next_elders.clone()] {
+                let (node_msg, _, _, recipients) = recv_node_msg(&mut send_rx).await;
 
                 assert_eq!(
                     BTreeSet::from_iter(recipients),
@@ -546,7 +618,7 @@ mod tests {
                 );
                 assert_matches!(node_msg, NodeMsg::AntiEntropyProbe(_));
 
-                info!("Received anti-entropy probe");
+                trace!("Network: Received anti-entropy probe");
 
                 let ae_update_msg = NodeMsg::AntiEntropy {
                     section_tree_update: section_tree_update.clone(),
@@ -556,31 +628,56 @@ mod tests {
                 };
 
                 for elder in expected_elders.iter() {
-                    send_node_msg(&recv_tx, ae_update_msg.clone(), elder, next_section_key);
+                    send_node_msg(
+                        &recv_tx,
+                        ae_update_msg.clone(),
+                        elder.peer(),
+                        next_section_key,
+                    );
                 }
             }
 
-            info!("Waiting on Join Request");
+            // ---------------------------------------------------------
+            // <------- 1. Receive the `JoinSection` request ---------->
+            let joiner_name = {
+                trace!("Network: Waiting on join request..");
 
-            // Receive the second JoinRequest with correct section info
-            let (node_msg, dst, recipients) = recv_node_msg(&mut send_rx).await;
+                // Receive the second JoinRequest with correct section info.
+                let (node_msg, dst, joiner_name, recipients) = recv_node_msg(&mut send_rx).await;
 
-            itertools::assert_equal(recipients, next_sap.elders());
-            assert_eq!(dst.section_key, next_section_key);
-            assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest{ section_key, .. }) => {
-                assert_eq!(section_key, next_section_key);
-            });
+                itertools::assert_equal(recipients, next_sap.elders());
+                assert_eq!(dst.section_key, next_section_key);
+                assert_matches!(node_msg, NodeMsg::JoinRequest(JoinRequest{ section_key }) => {
+                    assert_eq!(section_key, next_section_key);
+                });
 
-            // Name changed
-            let new_peer = Peer::new(dst.name, node.peer().addr());
-            // Send JoinResponse::Approved
-            let decision = section_decision(&next_sk_set, NodeState::joined(new_peer, None));
-            send_join_response(
-                &recv_tx,
-                JoinResponse::Approved { decision },
-                &next_elders[0],
-                next_sap.section_key(),
-            );
+                trace!("Network: Received join request.");
+
+                // Assert that the node name is within our largest available range.
+                let largest_range = get_largest_range(&next_network_knowledge);
+                let lower_bound = *largest_range.start();
+                let upper_bound = *largest_range.end();
+                assert!(upper_bound >= joiner_name && joiner_name >= lower_bound);
+
+                trace!("Network: Node name was within our largest empty range.");
+
+                joiner_name
+            };
+
+            // ---------------------------------------------------------
+            // <------- 2. Send the `Approved` request ---------------->
+            {
+                // Send the approval..
+                trace!("Network: Sending join approval..");
+                let new_peer = Peer::new(joiner_name, our_addr);
+                let decision = section_decision(&next_sk_set, NodeState::joined(new_peer, None));
+                send_join_response(
+                    &recv_tx,
+                    JoinResponse::Approved { decision },
+                    next_elders[0].peer(),
+                    next_sap.section_key(),
+                );
+            }
         };
 
         // Drive both tasks to completion concurrently (but on the same thread).
@@ -606,19 +703,16 @@ mod tests {
         let genesis_sk = genesis_sk_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
 
-        let node = MyNodeInfo::new(
-            ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
-            gen_addr(),
-        );
+        let our_addr = gen_addr();
 
         let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone());
         let tree = SectionTree::new(signed_genesis_sap)?;
 
-        let state = Joiner::new(node, send_tx, &mut recv_rx, tree.clone());
+        let state = Joiner::new(our_addr, send_tx, &mut recv_rx, tree.clone());
 
         let bootstrap_task = state.try_join(join_timeout);
         let test_task = async move {
-            let (node_msg, _, _) = recv_node_msg(&mut send_rx).await;
+            let (node_msg, _, _, _) = recv_node_msg(&mut send_rx).await;
             assert_matches!(node_msg, NodeMsg::AntiEntropyProbe { .. });
 
             let section_tree_update = tree
@@ -633,11 +727,16 @@ mod tests {
             };
 
             for node in genesis_nodes.iter() {
-                send_node_msg(&recv_tx, ae_msg.clone(), node, genesis_sap.section_key());
+                send_node_msg(
+                    &recv_tx,
+                    ae_msg.clone(),
+                    node.peer(),
+                    genesis_sap.section_key(),
+                );
             }
 
             // Receive JoinRequest
-            let (node_msg, _, recipients) = recv_node_msg(&mut send_rx).await;
+            let (node_msg, _, _, recipients) = recv_node_msg(&mut send_rx).await;
             itertools::assert_equal(recipients, genesis_sap.elders());
 
             assert_matches!(node_msg, NodeMsg::JoinRequest { .. });
@@ -648,7 +747,7 @@ mod tests {
             send_join_response(
                 &recv_tx,
                 JoinResponse::Redirect(new_sap.clone()),
-                &genesis_nodes[0],
+                genesis_nodes[0].peer(),
                 new_sap.section_key(),
             );
 
@@ -679,19 +778,24 @@ mod tests {
             };
 
             for _ in 0..2 {
-                let (node_msg, dst, recipients) = recv_node_msg(&mut send_rx).await;
+                let (node_msg, dst, _, recipients) = recv_node_msg(&mut send_rx).await;
                 itertools::assert_equal(recipients, new_sap.elders());
                 assert_eq!(dst.section_key, new_sap.section_key());
 
                 assert_matches!(node_msg, NodeMsg::AntiEntropyProbe { .. });
 
                 for node in genesis_nodes.iter() {
-                    send_node_msg(&recv_tx, ae_msg.clone(), node, genesis_sap.section_key());
+                    send_node_msg(
+                        &recv_tx,
+                        ae_msg.clone(),
+                        node.peer(),
+                        genesis_sap.section_key(),
+                    );
                 }
             }
 
             // Receive new JoinRequest with redirected bootstrap contacts
-            let (node_msg, dst, recipients) = recv_node_msg(&mut send_rx).await;
+            let (node_msg, dst, _, recipients) = recv_node_msg(&mut send_rx).await;
 
             itertools::assert_equal(recipients, new_sap.elders());
 
@@ -725,15 +829,12 @@ mod tests {
         let genesis_sk = genesis_sk_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
 
-        let node = MyNodeInfo::new(
-            ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
-            gen_addr(),
-        );
+        let our_addr = gen_addr();
 
         let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone());
         let tree = SectionTree::new(signed_genesis_sap).expect("Failed to create SectionTree");
 
-        let state = Joiner::new(node.clone(), send_tx, &mut recv_rx, tree.clone());
+        let state = Joiner::new(our_addr, send_tx, &mut recv_rx, tree.clone());
 
         // Create the bootstrap task, but don't run it yet.
         let bootstrap = async { state.try_join(join_timeout).await.expect("Failed to join") };
@@ -743,7 +844,7 @@ mod tests {
 
         let elders_tasks = async {
             // Build up the initial network knowledge
-            let (node_msg, _, _) = recv_node_msg(&mut send_rx).await;
+            let (node_msg, _, _, _) = recv_node_msg(&mut send_rx).await;
             assert_matches!(node_msg, NodeMsg::AntiEntropyProbe { .. });
 
             let section_tree_update = tree
@@ -756,11 +857,16 @@ mod tests {
                 },
             };
             for node in genesis_nodes.iter() {
-                send_node_msg(&recv_tx, ae_msg.clone(), node, genesis_sap.section_key());
+                send_node_msg(
+                    &recv_tx,
+                    ae_msg.clone(),
+                    node.peer(),
+                    genesis_sap.section_key(),
+                );
             }
 
             // Receive JoinRequest
-            let (node_msg, _, recipients) = recv_node_msg(&mut send_rx).await;
+            let (node_msg, _, sender, recipients) = recv_node_msg(&mut send_rx).await;
             itertools::assert_equal(recipients, genesis_sap.elders());
             assert_matches!(node_msg, NodeMsg::JoinRequest { .. });
 
@@ -780,8 +886,9 @@ mod tests {
                 proof_chain,
             };
 
+            let node = Peer::new(sender, our_addr);
             // Send JoinResponse::Approved decision interleaved with the AE messages
-            let decision = section_decision(&new_sks, NodeState::joined(node.peer(), None));
+            let decision = section_decision(&new_sks, NodeState::joined(node, None));
             let new_ae_msg = NodeMsg::AntiEntropy {
                 section_tree_update,
                 kind: AntiEntropyKind::Update {
@@ -796,19 +903,19 @@ mod tests {
                 JoinResponse::Approved {
                     decision: decision.clone(),
                 },
-                &genesis_nodes[0],
+                genesis_nodes[0].peer(),
                 new_sap.section_key(),
             );
             send_node_msg(
                 &recv_tx,
                 new_ae_msg,
-                &genesis_nodes[0],
+                genesis_nodes[0].peer(),
                 genesis_sap.section_key(),
             );
             send_join_response(
                 &recv_tx,
                 JoinResponse::Approved { decision },
-                &genesis_nodes[1],
+                genesis_nodes[1].peer(),
                 new_sap.section_key(),
             );
         };
@@ -834,19 +941,16 @@ mod tests {
             TestSapBuilder::new(Prefix::default()).build();
         let genesis_sk = genesis_sk_set.secret_key();
 
-        let node = MyNodeInfo::new(
-            ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
-            gen_addr(),
-        );
+        let our_addr = gen_addr();
 
         let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone());
         let tree = SectionTree::new(signed_genesis_sap)?;
 
-        let state = Joiner::new(node, send_tx, &mut recv_rx, tree.clone());
+        let state = Joiner::new(our_addr, send_tx, &mut recv_rx, tree.clone());
 
         let bootstrap_task = state.try_join(join_timeout);
         let test_task = async {
-            let (node_msg, _, _) = recv_node_msg(&mut send_rx).await;
+            let (node_msg, _, _, _) = recv_node_msg(&mut send_rx).await;
             assert_matches!(node_msg, NodeMsg::AntiEntropyProbe { .. });
 
             let section_tree_update = tree
@@ -861,10 +965,15 @@ mod tests {
             };
 
             for node in genesis_nodes.iter() {
-                send_node_msg(&recv_tx, ae_msg.clone(), node, genesis_sap.section_key());
+                send_node_msg(
+                    &recv_tx,
+                    ae_msg.clone(),
+                    node.peer(),
+                    genesis_sap.section_key(),
+                );
             }
 
-            let (node_msg, _, _) = recv_node_msg(&mut send_rx).await;
+            let (node_msg, _, _, _) = recv_node_msg(&mut send_rx).await;
 
             assert_matches!(node_msg, NodeMsg::JoinRequest { .. });
 
@@ -880,7 +989,7 @@ mod tests {
                     new_pk_set.clone(),
                     0,
                 )),
-                &genesis_nodes[0],
+                genesis_nodes[0].peer(),
                 new_sap.section_key(),
             );
             task::yield_now().await;
@@ -888,19 +997,24 @@ mod tests {
             send_join_response(
                 &recv_tx,
                 JoinResponse::Redirect(new_sap.clone()),
-                &genesis_nodes[0],
+                genesis_nodes[0].peer(),
                 new_sap.section_key(),
             );
             task::yield_now().await;
 
-            let (node_msg, _, _) = recv_node_msg(&mut send_rx).await;
+            let (node_msg, _, _, _) = recv_node_msg(&mut send_rx).await;
             assert_matches!(node_msg, NodeMsg::AntiEntropyProbe { .. });
 
             for node in genesis_nodes.iter() {
-                send_node_msg(&recv_tx, ae_msg.clone(), node, genesis_sap.section_key());
+                send_node_msg(
+                    &recv_tx,
+                    ae_msg.clone(),
+                    node.peer(),
+                    genesis_sap.section_key(),
+                );
             }
 
-            let (node_msg, _, _) = recv_node_msg(&mut send_rx).await;
+            let (node_msg, _, _, _) = recv_node_msg(&mut send_rx).await;
             assert_matches!(node_msg, NodeMsg::JoinRequest { .. });
 
             Ok(())
@@ -925,19 +1039,16 @@ mod tests {
             TestSapBuilder::new(Prefix::default()).build();
         let genesis_sk = genesis_sk_set.secret_key();
 
-        let node = MyNodeInfo::new(
-            ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
-            gen_addr(),
-        );
+        let our_addr = gen_addr();
 
         let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone());
         let tree = SectionTree::new(signed_genesis_sap)?;
 
-        let state = Joiner::new(node, send_tx, &mut recv_rx, tree.clone());
+        let state = Joiner::new(our_addr, send_tx, &mut recv_rx, tree.clone());
 
         let bootstrap_task = state.try_join(join_timeout);
         let test_task = async {
-            let (node_msg, _, _) = recv_node_msg(&mut send_rx).await;
+            let (node_msg, _, _, _) = recv_node_msg(&mut send_rx).await;
             assert_matches!(node_msg, NodeMsg::AntiEntropyProbe { .. });
 
             let section_tree_update = tree
@@ -952,16 +1063,21 @@ mod tests {
             };
 
             for node in genesis_nodes.iter() {
-                send_node_msg(&recv_tx, ae_msg.clone(), node, genesis_sap.section_key());
+                send_node_msg(
+                    &recv_tx,
+                    ae_msg.clone(),
+                    node.peer(),
+                    genesis_sap.section_key(),
+                );
             }
 
-            let (node_msg, _, _) = recv_node_msg(&mut send_rx).await;
+            let (node_msg, _, _, _) = recv_node_msg(&mut send_rx).await;
             assert_matches!(node_msg, NodeMsg::JoinRequest { .. });
 
             send_join_response(
                 &recv_tx,
                 JoinResponse::Rejected(JoinRejectionReason::JoinsDisallowed),
-                &genesis_nodes[0],
+                genesis_nodes[0].peer(),
                 genesis_sap.section_key(),
             );
 
@@ -972,7 +1088,7 @@ mod tests {
 
         if let Err(RoutingError::TryJoinLater) = join_result {
         } else {
-            return Err(eyre!("Not getting an execpted network rejection."));
+            return Err(eyre!("Not getting an expected network rejection."));
         }
 
         test_result
@@ -980,18 +1096,19 @@ mod tests {
 
     async fn recv_node_msg(
         channel: &mut mpsc::Receiver<(WireMsg, Vec<Peer>)>,
-    ) -> (NodeMsg, Dst, Vec<Peer>) {
+    ) -> (NodeMsg, Dst, XorName, Vec<Peer>) {
         let (wire_msg, recipients) = channel.recv().await.expect("Should have received node msg");
         let msg = wire_msg.into_msg().expect("Failed to decode msg");
-        let (node_msg, dst) = assert_matches!(msg, MsgType::Node { msg, dst,.. } => (msg, dst));
-        (node_msg, dst, recipients)
+        let (node_msg, dst, sender) =
+            assert_matches!(msg, MsgType::Node { msg, dst, sender,.. } => (msg, dst, sender));
+        (node_msg, dst, sender, recipients)
     }
 
     fn send_join_response(
         recv_tx: &mpsc::Sender<MsgFromPeer>,
         resp: JoinResponse,
-        sender: &MyNodeInfo,
-        section_pk: BlsPublicKey,
+        sender: Peer,
+        section_pk: bls::PublicKey,
     ) {
         let node_msg = NodeMsg::JoinResponse(resp);
         send_node_msg(recv_tx, node_msg, sender, section_pk);
@@ -1002,11 +1119,11 @@ mod tests {
     fn send_node_msg(
         recv_tx: &mpsc::Sender<MsgFromPeer>,
         msg: NodeMsg,
-        sender: &MyNodeInfo,
-        section_pk: BlsPublicKey,
+        sender: Peer,
+        section_pk: bls::PublicKey,
     ) {
         let wire_msg = WireMsg::single_src_node_join(
-            sender,
+            sender.name(),
             Dst {
                 name: XorName::from(PublicKey::Bls(section_pk)),
                 section_key: section_pk,
@@ -1017,7 +1134,7 @@ mod tests {
 
         recv_tx
             .try_send(MsgFromPeer {
-                sender: sender.peer(),
+                sender,
                 wire_msg,
                 send_stream: None,
             })

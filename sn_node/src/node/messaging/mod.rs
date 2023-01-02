@@ -11,7 +11,6 @@ mod anti_entropy;
 mod client_msgs;
 mod dkg;
 mod handover;
-mod join;
 mod membership;
 mod node_msgs;
 mod proposal;

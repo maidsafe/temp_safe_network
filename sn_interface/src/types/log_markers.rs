@@ -100,6 +100,7 @@ pub enum LogMarker {
     SendJoinRetryNotCorrectKey,
     SendJoinRetryAgeIssue,
     SendJoinRetryNotAdult,
+    SendJoinRetryRangeIssue,
     SendJoinsDisallowed,
     SendNodeApproval,
     // Approved to join

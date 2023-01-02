@@ -1329,7 +1329,7 @@ mod tests {
             let origin = msg.sender;
             let (msg_id, msg) = assert_matches!(
                 msg.wire_msg.into_msg().expect("Failed to deserialize wire_msg"),
-                MsgType::Node { msg_id, dst: _, msg } => (msg_id, msg)
+                MsgType::Node { msg_id, dst: _, sender: _, msg, } => (msg_id, msg)
             );
             MyNode::handle_valid_node_msg(self.node(), context, msg_id, msg, origin, None)
                 .await

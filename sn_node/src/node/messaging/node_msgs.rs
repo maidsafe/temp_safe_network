@@ -7,7 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    node::{core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, Result},
+    node::{
+        core::NodeContext, flow_ctrl::cmds::Cmd, joining::join_barrier, messaging::Peers, MyNode,
+        Result,
+    },
     storage::{Error as StorageError, StorageLevel},
 };
 use qp2p::SendStream;
@@ -252,7 +255,7 @@ impl MyNode {
             NodeMsg::JoinRequest(join_request) => {
                 trace!("Handling msg {:?}: JoinRequest from {}", msg_id, sender);
 
-                MyNode::handle_join_request(node, &context, sender, join_request)
+                join_barrier::handle_join_request(node, &context, sender, join_request)
                     .await
                     .map(|c| c.into_iter().collect())
             }
@@ -265,12 +268,15 @@ impl MyNode {
                     return Ok(vec![]);
                 }
 
-                Ok(
-                    MyNode::handle_join_as_relocated_request(node, &context, sender, *join_request)
-                        .await
-                        .into_iter()
-                        .collect(),
+                Ok(join_barrier::handle_join_as_relocated_request(
+                    node,
+                    &context,
+                    sender,
+                    *join_request,
                 )
+                .await
+                .into_iter()
+                .collect())
             }
             NodeMsg::MembershipVotes(votes) => {
                 let mut node = node.write().await;

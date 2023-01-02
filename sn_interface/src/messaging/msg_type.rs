@@ -66,6 +66,8 @@ pub enum MsgType {
         dst: Dst,
         /// the message
         msg: NodeMsg,
+        // the sender name
+        sender: xor_name::XorName,
     },
     /// The response to a NodeDataCmd or NodeDataQuery, containing the result.
     NodeDataResponse {

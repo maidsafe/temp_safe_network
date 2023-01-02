@@ -6,13 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod join;
-mod relocate;
+mod bootstrap;
+mod ranges;
 
-pub(crate) use join::join_network;
-pub(crate) use relocate::JoiningAsRelocated;
+pub(crate) mod join_barrier;
 
-use bls::PublicKey as BlsPublicKey;
-use std::{collections::HashSet, net::SocketAddr};
-
-type UsedRecipientSaps = HashSet<(SocketAddr, BlsPublicKey)>;
+#[cfg(test)]
+pub(super) use bootstrap::Joiner;
+pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
+pub(crate) use ranges::get_largest_range;

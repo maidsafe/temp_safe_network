@@ -20,7 +20,7 @@ use crate::node::{
 use crate::UsedSpace;
 
 use sn_interface::{
-    network_knowledge::{MyNodeInfo, SectionTree, MIN_ADULT_AGE},
+    network_knowledge::SectionTree,
     types::{keys::ed25519, log_markers::LogMarker, PublicKey as TypesPublicKey},
 };
 
@@ -192,8 +192,9 @@ async fn bootstrap_genesis_node(
     root_storage_dir: &Path,
     fault_cmds_sender: mpsc::Sender<FaultsCmd>,
 ) -> Result<MyNode> {
-    // Genesis node having a fix age of 255.
-    let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), 255);
+    // Genesis node having a fix age of 255,
+    let range = Prefix::default().range_inclusive();
+    let keypair = ed25519::gen_keypair(&range, u8::MAX);
     let node_name = ed25519::name(&keypair.public);
 
     info!(
@@ -242,29 +243,38 @@ async fn bootstrap_normal_node(
     root_storage_dir: &Path,
     fault_cmds_sender: mpsc::Sender<FaultsCmd>,
 ) -> Result<MyNode> {
-    let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE);
-    let node_name = ed25519::name(&keypair.public);
-    info!("{} Bootstrapping as a new node.", node_name);
+    // To join a network, we need at least one node to connect to, this information is found in the `network_contacts_file`.
+    // The actual file (path) is needed even if we are starting a new network as the first node.
+    info!("Reading network info from disk..");
     let section_tree_path = config.network_contacts_file().ok_or_else(|| {
         Error::Configuration("Could not obtain network contacts file path".to_string())
     })?;
     let section_tree = SectionTree::from_disk(&section_tree_path).await?;
+
+    // if we are not expecting to be the first, we need some information in the section tree
+    if !config.is_first() && section_tree.is_empty() {
+        error!("Cannot join a network, there are no nodes in the section tree.");
+        return Err(Error::Configuration(
+            "Cannot join a network, there are no nodes in the section tree.".to_string(),
+        ));
+    }
+
     info!(
-        "{} Joining as a new node (PID: {}) our socket: {}, network's genesis key: {:?}",
-        node_name,
+        "Bootstrapping as a new node (PID: {}) our socket: {}, network's genesis key: {:?}",
         std::process::id(),
         comm.socket_addr(),
         section_tree.genesis_key()
     );
-    let joining_node = MyNodeInfo::new(keypair, comm.socket_addr());
+
     let (info, network_knowledge) = join_network(
-        joining_node,
+        comm.socket_addr(),
         &comm,
         incoming_msg_receiver,
         section_tree,
         join_timeout,
     )
     .await?;
+
     let node = MyNode::new(
         comm,
         info.keypair.clone(),
@@ -275,7 +285,9 @@ async fn bootstrap_normal_node(
         fault_cmds_sender,
     )
     .await?;
+
     info!("{} Joined the network!", node.info().name());
     info!("Our AGE: {}", node.info().age());
+
     Ok(node)
 }

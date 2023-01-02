@@ -253,7 +253,7 @@ impl MyNode {
             }
         }
 
-        // Once we've grown the section, we do not need to allow more nodes in.
+        // Once we've grown the section, we do not need to allow more nodes in for a while.
         // (Unless we've triggered the storage critical fail safe to grow until split.)
         if net_increase && !self.is_startup_joining_allowed() && !self.joins_allowed_until_split {
             self.joins_allowed = false;

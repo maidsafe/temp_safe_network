@@ -12,13 +12,13 @@
 pub mod cfg;
 
 mod api;
-mod bootstrap;
 mod connectivity;
 mod data;
 mod dkg;
 pub(crate) mod error;
 mod flow_ctrl;
 mod handover;
+mod joining;
 mod logging;
 mod membership;
 mod messaging;
@@ -29,7 +29,8 @@ mod relocation;
 /// Standard channel size, to allow for large swings in throughput
 pub static STANDARD_CHANNEL_SIZE: usize = 100_000;
 
-use self::{bootstrap::join_network, core::MyNode, flow_ctrl::cmds::Cmd, node_starter::CmdChannel};
+use self::{core::MyNode, flow_ctrl::cmds::Cmd, joining::join_network, node_starter::CmdChannel};
+
 pub use self::{
     cfg::config_handler::Config,
     error::{Error, Result},
@@ -37,14 +38,16 @@ pub use self::{
     node_test_api::NodeTestApi,
 };
 pub use crate::storage::DataStorage;
-#[cfg(test)]
-pub(crate) use relocation::{check as relocation_check, ChurnId};
 
-pub use sn_interface::network_knowledge::MIN_ADULT_AGE;
+#[cfg(test)]
+use sn_interface::network_knowledge::MIN_ADULT_AGE;
 use sn_interface::{
     messaging::system::{NodeMsg, Proposal},
     types::Peer,
 };
+
+#[cfg(test)]
+pub(crate) use relocation::{check as relocation_check, ChurnId};
 
 pub use qp2p::{Config as NetworkConfig, SendStream};
 pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API update
@@ -53,10 +56,10 @@ mod core {
     use crate::{
         comm::Comm,
         node::{
-            bootstrap::JoiningAsRelocated,
             dkg::DkgVoter,
             flow_ctrl::{cmds::Cmd, fault_detection::FaultsCmd},
             handover::Handover,
+            joining::JoiningAsRelocated,
             membership::{elder_candidates, try_split_dkg, Membership},
             messaging::Peers,
             DataStorage, Error, Proposal, Result, XorName,
