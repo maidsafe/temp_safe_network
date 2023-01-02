@@ -300,10 +300,9 @@ impl FlowCtrl {
 
             if let Some(time) = last_received_dkg_message {
                 if time.elapsed() >= MISSING_DKG_MSG_INTERVAL {
-                    debug!("Dkg voting appears stalled...");
                     let cmds = node.dkg_gossip_msgs();
                     if !cmds.is_empty() {
-                        trace!("Dkg msg resending cmd");
+                        debug!("Dkg msg resending cmd, as Dkg voting appears stalled...");
                     }
 
                     for cmd in cmds {
