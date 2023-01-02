@@ -525,7 +525,7 @@ pub mod test_utils {
             let signed_key = TestKeys::get_section_signed(parent_sk, sap.section_key());
             let mut proof_chain = proof_chain.clone();
             proof_chain
-                .insert(
+                .verify_and_insert(
                     &parent_sk.public_key(),
                     signed_key.value,
                     signed_key.sig.signature,
@@ -544,7 +544,7 @@ pub mod test_utils {
             for key in other_keys {
                 let sig = parent.sign(key.public_key().to_bytes());
                 proof_chain
-                    .insert(&parent.public_key(), key.public_key(), sig)
+                    .verify_and_insert(&parent.public_key(), key.public_key(), sig)
                     .expect("Failed to insert into proof_chain");
                 parent = key.clone();
             }

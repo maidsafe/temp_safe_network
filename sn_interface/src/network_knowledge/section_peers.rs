@@ -158,7 +158,7 @@ mod tests {
             section_peers.update(node.clone());
         });
         let sig = TestKeys::sign(&sk_1, &sk_2.public_key());
-        proof_chain.insert(&sk_1.public_key(), sk_2.public_key(), sig)?;
+        proof_chain.verify_and_insert(&sk_1.public_key(), sk_2.public_key(), sig)?;
         // 1 -> 2 should be retained
         section_peers.prune_members_archive(&proof_chain, &sk_2.public_key())?;
         assert_lists(
@@ -173,7 +173,7 @@ mod tests {
             section_peers.update(node.clone());
         });
         let sig = TestKeys::sign(&sk_2, &sk_3.public_key());
-        proof_chain.insert(&sk_2.public_key(), sk_3.public_key(), sig)?;
+        proof_chain.verify_and_insert(&sk_2.public_key(), sk_3.public_key(), sig)?;
         // 1 -> 2 -> 3 should be retained
         section_peers.prune_members_archive(&proof_chain, &sk_3.public_key())?;
         assert_lists(
@@ -188,7 +188,7 @@ mod tests {
             section_peers.update(node.clone());
         });
         let sig = TestKeys::sign(&sk_3, &sk_4.public_key());
-        proof_chain.insert(&sk_3.public_key(), sk_4.public_key(), sig)?;
+        proof_chain.verify_and_insert(&sk_3.public_key(), sk_4.public_key(), sig)?;
         //  2 -> 3 -> 4 should be retained
         section_peers.prune_members_archive(&proof_chain, &sk_4.public_key())?;
         assert_lists(
@@ -206,7 +206,7 @@ mod tests {
             section_peers.update(node.clone());
         });
         let sig = TestKeys::sign(&sk_3, &sk_5.public_key());
-        proof_chain.insert(&sk_3.public_key(), sk_5.public_key(), sig)?;
+        proof_chain.verify_and_insert(&sk_3.public_key(), sk_5.public_key(), sig)?;
         // 2 -> 3 -> 5 should be retained
         section_peers.prune_members_archive(&proof_chain, &sk_5.public_key())?;
         assert_lists(

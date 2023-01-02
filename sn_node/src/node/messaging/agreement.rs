@@ -169,7 +169,7 @@ impl MyNode {
 
         // Finally we update our network knowledge with our sibling section SAP.
         // We use the parent proof chain to connect our current chain to sibling SAP.
-        parent_section_chain.insert(
+        parent_section_chain.verify_and_insert(
             &parent_key,
             their_sap.section_key(),
             sig_over_them.signature,
@@ -208,7 +208,11 @@ impl MyNode {
         // Let's update our network knowledge, including our
         // section SAP and chain if the new SAP's prefix matches our name
         // We need to generate the proof chain to connect our current chain to new SAP.
-        section_chain.insert(&last_key, signed_sap.section_key(), section_sig.signature)?;
+        section_chain.verify_and_insert(
+            &last_key,
+            signed_sap.section_key(),
+            section_sig.signature,
+        )?;
         let update = SectionTreeUpdate::new(signed_sap, section_chain);
         let name = self.context().name;
         let updated = self

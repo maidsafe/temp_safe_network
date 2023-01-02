@@ -943,7 +943,7 @@ mod tests {
                                     &initial_sk_set.secret_key(),
                                     &new_sap.section_key(),
                                 );
-                                dag.insert(&parent, new_sap.section_key(), sig)?;
+                                dag.verify_and_insert(&parent, new_sap.section_key(), sig)?;
                                 dag
                             };
                             TestSectionTree::get_section_tree_update(
