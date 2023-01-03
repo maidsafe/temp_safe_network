@@ -6,7 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::OutputFmt;
 use crate::operations::config::{Config, NetworkInfo};
+
 use clap::Subcommand;
 use color_eyre::Result;
 use std::path::PathBuf;
@@ -87,7 +89,7 @@ pub async fn config_commander(cmd: Option<ConfigSubCommands>, config: &mut Confi
             config.clear().await?;
             debug!("Config settings cleared out");
         }
-        None => config.print_networks().await,
+        None => config.print_network(OutputFmt::Pretty).await?,
     }
 
     Ok(())

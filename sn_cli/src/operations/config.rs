@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::subcommands::OutputFmt;
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use clap::Parser;
@@ -118,6 +119,14 @@ impl NetworkInfo {
             },
         }
     }
+}
+
+#[derive(Deserialize, Debug, Serialize, Clone)]
+struct NetworkPrinter {
+    current: bool,
+    name: String,
+    genesis_key: String,
+    network_info: String,
 }
 
 #[derive(Clone, Deserialize, Debug, Serialize, Default)]
@@ -459,23 +468,17 @@ impl Config {
         Ok(())
     }
 
-    pub async fn print_networks(&self) {
-        let mut table = Table::new();
-        table.add_row(&vec!["Networks"]);
-        table.add_row(&vec![
-            "Current",
-            "Network name",
-            "Genesis Key",
-            "Network map info",
-        ]);
+    // Get the list of networks to display
+    async fn get_networks(&self) -> Vec<NetworkPrinter> {
+        let mut networks = Vec::new();
+
         let current_network_contacts = self.read_default_network_contacts().await;
         let mut current_network_is_present = false;
-
         for (network_name, net_info) in self.networks_iter() {
-            let mut current = "";
+            let mut current = false;
             if let Ok((network_contacts, _)) = &current_network_contacts {
                 if net_info.matches(network_contacts.genesis_key()) {
-                    current = "*";
+                    current = true;
                     current_network_is_present = true;
                 }
             }
@@ -488,27 +491,57 @@ impl Config {
             } else {
                 "".to_string()
             };
-            table.add_row(&vec![
+            networks.push(NetworkPrinter {
                 current,
-                network_name,
-                &genesis_key,
-                simplified_net_info.as_str(),
-            ]);
+                name: network_name.clone(),
+                genesis_key: genesis_key.to_string(),
+                network_info: simplified_net_info,
+            });
         }
 
-        // If current_network_contacts is not present in the config file, display it
+        // If current_network_contacts is not present in the config file, add it
         if let (Ok((network_contacts, _)), false) =
             (&current_network_contacts, current_network_is_present)
         {
             let genesis_key = format!("{:?}", network_contacts.genesis_key());
-            table.add_row(&vec![
-                "*",
-                genesis_key.as_str(),
-                genesis_key.as_str(),
-                format!("Local: {:?}", self.network_contacts_dir.join("default")).as_str(),
-            ]);
+            networks.push(NetworkPrinter {
+                current: true,
+                name: genesis_key.clone(),
+                genesis_key,
+                network_info: format!("Local: {:?}", self.network_contacts_dir.join("default")),
+            });
         }
-        println!("{table}");
+        networks
+    }
+
+    // Print the list of networks
+    pub async fn print_network(&self, output_fmt: OutputFmt) -> Result<()> {
+        let networks = self.get_networks().await;
+        if output_fmt == OutputFmt::Json {
+            let json = serde_json::to_string(&networks)?;
+            println!("{json}");
+        } else {
+            let mut table = Table::new();
+            table.add_row(&vec!["Networks"]);
+            table.add_row(&vec![
+                "Current",
+                "Network name",
+                "Genesis Key",
+                "Network map info",
+            ]);
+
+            for network in networks {
+                let current = if network.current { "*" } else { "" };
+                table.add_row(&vec![
+                    current,
+                    network.name.as_str(),
+                    network.genesis_key.as_str(),
+                    network.network_info.as_str(),
+                ]);
+            }
+            println!("{table}");
+        }
+        Ok(())
     }
 
     pub async fn set_default_network_contacts(&self, genesis_key: &BlsPublicKey) -> Result<()> {
