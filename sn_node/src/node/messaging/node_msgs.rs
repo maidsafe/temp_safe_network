@@ -110,7 +110,7 @@ impl MyNode {
                 payload,
                 kind,
                 stream,
-                Some(target),
+                target,
                 original_msg_id,
             )
             .await?;

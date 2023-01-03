@@ -538,7 +538,7 @@ impl MyNode {
             payload,
             kind,
             client_response_stream,
-            Some(*sender),
+            *sender,
             msg_id,
         )
         .await
