@@ -87,7 +87,7 @@ impl MyNode {
 
         // Proposal from other sections shall be ignored.
         if !our_prefix.matches(&sender.name()) {
-            trace!("Ignore promotion message {msg_id:?} from other section");
+            trace!("Ignore promotion message {msg_id:?} from other section sent by {sender:?} when our prefix is {our_prefix:?}");
             return Ok(vec![]);
         }
         // Let's now verify the section key in the msg authority is trusted

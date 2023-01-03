@@ -77,7 +77,7 @@ impl MyNode {
             .prefix()
             .is_extension_of(&self.network_knowledge.prefix());
         if !equal_prefix && !is_extension_prefix {
-            // Other section. We shouln't be receiving or updating a SAP for
+            // Other section. We shouldn't be receiving or updating a SAP for
             // a remote section here, that is done with a AE msg response.
             debug!(
                 "Ignoring handover request since prefix doesn't match ours: {:?}",
@@ -197,7 +197,7 @@ impl MyNode {
         let (others, myself) = self.split_peers_and_self(recipients);
         let peers = Peers::Multiple(others);
 
-        // sends a promotion message to all of the to-be-Elders with our sig_share over their new pub key
+        // sends a promotion message to all of the to-be-Elders with our sig_share over the new sap's public_key
         // it is aggregated by them to obtain a section signed section pub key (proof of inheritance)
         let mut cmds = vec![];
         match candidate {

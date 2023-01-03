@@ -139,7 +139,7 @@ pub enum NodeMsg {
     /// Handover Anti-Entropy request
     HandoverAE(Generation),
     /// After Handover consensus, the elders inform the new elder candidates that they are promoted
-    /// The candidates can aggregate the sig_share an obtain SectionSigned proof that they are promoted
+    /// The candidates can aggregate the sig_share to obtain SectionSigned proof that they are promoted
     SectionHandoverPromotion {
         /// The promoted SAP (signed by themselves)
         sap: SectionSigned<SectionAuthorityProvider>,
@@ -147,7 +147,7 @@ pub enum NodeMsg {
         sig_share: SectionSigShare,
     },
     /// After Handover consensus, the elders inform the new elder candidates that they are promoted
-    /// The candidates can aggregate the sig_shares an obtain SectionSigned proof that they are promoted
+    /// The candidates can aggregate the sig_shares to obtain SectionSigned proof that they are promoted
     SectionSplitPromotion {
         /// The promoted SAP of section 0 (signed by themselves)
         sap0: SectionSigned<SectionAuthorityProvider>,
@@ -158,7 +158,8 @@ pub enum NodeMsg {
         /// BLS signature share of an Elder over the sap1's pubkey
         sig_share1: SectionSigShare,
     },
-    /// A vote about the state of a section to be aggregated in the SectionStateVote aggregator
+    /// Elders votes among themselves regarding SectionStates of joins_allowed and voting nodes off
+    /// Once fully aggregated in the SectionStateVote aggregator, the proposal is accepted
     ProposeSectionState {
         proposal: SectionStateVote,
         /// BLS signature share of an Elder over the vote
