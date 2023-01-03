@@ -63,7 +63,7 @@ pub(crate) async fn handle_online_cmd(
             }
             NodeMsg::ProposeSectionState {
                 proposal:
-                    sn_interface::messaging::system::SectionStateVote::NodeIsOffline(node_state),
+                    sn_interface::messaging::system::SectionStateVote::NodeStateChange(node_state),
                 ..
             } => {
                 if let MembershipState::Relocated(details) = node_state.state() {

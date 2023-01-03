@@ -291,7 +291,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let node_state = env.get_nodes(prefix, 0, 1, None).remove(0).info().peer();
     let node_state = NodeState::left(node_state, None);
 
-    let proposal = SectionStateVote::NodeIsOffline(node_state.clone());
+    let proposal = SectionStateVote::NodeStateChange(node_state.clone());
     let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &get_single_sig(&proposal));
 
     ProcessAndInspectCmds::new(
@@ -325,7 +325,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let remove_elder = NodeState::left(remove_elder, None);
 
     // Handle agreement on the Offline proposal
-    let proposal = SectionStateVote::NodeIsOffline(remove_elder.clone());
+    let proposal = SectionStateVote::NodeStateChange(remove_elder.clone());
     let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &get_single_sig(&proposal));
 
     ProcessAndInspectCmds::new(
@@ -583,7 +583,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
         };
 
         if let NodeMsg::ProposeSectionState {
-            proposal: system::SectionStateVote::NodeIsOffline(node_state),
+            proposal: system::SectionStateVote::NodeStateChange(node_state),
             ..
         } = msg
         {

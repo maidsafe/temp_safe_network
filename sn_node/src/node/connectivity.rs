@@ -41,7 +41,7 @@ impl MyNode {
                 let info = info.leave()?;
                 if let Ok(cmds) = self.send_section_state_proposal(
                     elders.clone(),
-                    SectionStateVote::NodeIsOffline(info),
+                    SectionStateVote::NodeStateChange(info),
                 ) {
                     result.extend(cmds);
                 }

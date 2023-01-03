@@ -65,8 +65,8 @@ pub enum AntiEntropyKind {
 /// Section State Proposals are sent by elders to elders
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum SectionStateVote {
-    /// Vote to remove a node from our section
-    NodeIsOffline(NodeState),
+    /// Vote to change the state of a node from our section (used for kicking or relocating nodes)
+    NodeStateChange(NodeState),
     /// Vote to change whether new nodes are allowed to join our section
     JoinsAllowed(bool),
 }

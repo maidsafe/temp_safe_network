@@ -130,7 +130,7 @@ impl MyNode {
         debug!("{:?} {:?}", LogMarker::ProposalAgreed, proposal);
         let mut cmds = Vec::new();
         match proposal {
-            SectionStateVote::NodeIsOffline(node_state) => {
+            SectionStateVote::NodeStateChange(node_state) => {
                 cmds.extend(self.handle_offline_agreement(node_state, sig));
             }
             SectionStateVote::JoinsAllowed(joins_allowed) => {

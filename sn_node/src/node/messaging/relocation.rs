@@ -51,9 +51,11 @@ impl MyNode {
                 relocate_details.dst,
             );
 
-            cmds.extend(self.propose_section_state(SectionStateVote::NodeIsOffline(
-                node_state.relocate(relocate_details),
-            ))?);
+            cmds.extend(
+                self.propose_section_state(SectionStateVote::NodeStateChange(
+                    node_state.relocate(relocate_details),
+                ))?,
+            );
         }
 
         Ok(cmds)
