@@ -296,24 +296,27 @@ impl MyNode {
                 .into_iter()
                 .collect())
             }
-            NodeMsg::Propose {
+            NodeMsg::ProposeSectionState {
                 proposal,
                 sig_share,
-                optional_sig_share,
             } => {
                 let mut node = node.write().await;
-                debug!("[NODE WRITE]: PROPOSE write gottt...");
+                debug!("[NODE WRITE]: ProposeSectionState write gottt...");
                 if node.is_not_elder() {
-                    trace!("Adult handling a Propose msg from {}: {:?}", sender, msg_id);
+                    trace!(
+                        "Adult handling a ProposeSectionState msg from {}: {:?}",
+                        sender,
+                        msg_id
+                    );
                 }
 
                 trace!(
-                    "Handling proposal msg: {proposal:?} from {}: {:?}",
+                    "Handling ProposeSectionState msg: {proposal:?} from {}: {:?}",
                     sender,
                     msg_id
                 );
 
-                node.handle_proposal(msg_id, proposal, sig_share, optional_sig_share, sender)
+                node.handle_section_state_proposal(msg_id, proposal, sig_share, sender)
             }
             NodeMsg::DkgStart(session_id, elder_sig) => {
                 trace!(
@@ -454,6 +457,34 @@ impl MyNode {
                 )
                 .await?;
                 Ok(vec![])
+            }
+            NodeMsg::RequestHandover { sap, sig_share } => {
+                info!("RequestHandover with msg_id {msg_id:?}");
+                let mut node = node.write().await;
+
+                debug!("[NODE WRITE]: RequestHandover write gottt...");
+                node.handle_handover_request(msg_id, sap, sig_share, sender)
+            }
+            NodeMsg::SectionHandoverPromotion { sap, sig_share } => {
+                info!("SectionHandoverPromotion with msg_id {msg_id:?}");
+                let mut node = node.write().await;
+
+                debug!("[NODE WRITE]: SectionHandoverPromotion write gottt...");
+                node.handle_handover_promotion(msg_id, sap, sig_share, sender)
+            }
+            NodeMsg::SectionSplitPromotion {
+                sap0,
+                sig_share0,
+                sap1,
+                sig_share1,
+            } => {
+                info!("SectionSplitPromotion with msg_id {msg_id:?}");
+                let mut node = node.write().await;
+
+                debug!("[NODE WRITE]: SectionSplitPromotion write gottt...");
+                node.handle_section_split_promotion(
+                    msg_id, sap0, sig_share0, sap1, sig_share1, sender,
+                )
             }
         }
     }
