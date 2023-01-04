@@ -245,10 +245,10 @@ jobs:
         # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
         run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
 
-      - name: Are nodes still running...?
+      - name: Verify nodes still running...?
         shell: bash
         timeout-minutes: 1
-        if: failure() && matrix.os != 'windows-latest'
+        if: matrix.os != 'windows-latest'
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
@@ -257,7 +257,7 @@ jobs:
       - name: Kill all nodes
         shell: bash
         timeout-minutes: 1
-        if: failure()
+        if: failure() && matrix.os != 'windows-latest'
         continue-on-error: true
         run: |
           pkill sn_node
@@ -443,9 +443,10 @@ jobs:
         # we just want to print out the info. If there is none, an exit code of 1 is returned, so here we return true
         run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left || true
 
-      - name: Are nodes still running...?
+      - name: Verify nodes still running...
         shell: bash
         timeout-minutes: 1
+        if: matrix.os != 'windows-latest'
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
@@ -455,7 +456,7 @@ jobs:
       - name: Kill all nodes
         shell: bash
         timeout-minutes: 1
-        if: failure()
+        if: failure() && matrix.os != 'windows-latest'
         continue-on-error: true
         run: |
           pkill sn_node
@@ -621,7 +622,8 @@ jobs:
   #      - name: Kill all nodes
   #        shell: bash
   #        timeout-minutes: 1
-  #        if: failure()
+  #        if: failure() && matrix.os != 'windows-latest'
+
   #        continue-on-error: true
   #        run: |
   #          pkill sn_node
@@ -734,9 +736,10 @@ jobs:
         run: cd sn_api && cargo test --release --features check-replicas
         timeout-minutes: 7
 
-      - name: Are nodes still running...?
+      - name: Verify nodes still running...?
         shell: bash
         timeout-minutes: 1
+        if: matrix.os != 'windows-latest'
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
@@ -745,7 +748,7 @@ jobs:
       - name: Kill all nodes
         shell: bash
         timeout-minutes: 1
-        if: failure()
+        if: failure() && matrix.os != 'windows-latest'
         continue-on-error: true
         run: |
           pkill sn_node
@@ -853,9 +856,10 @@ jobs:
         run: cd sn_cli && cargo test --release --features check-replicas -- --test-threads=1
         timeout-minutes: 7
 
-      - name: Are nodes still running...?
+      - name: Verify nodes still running...?
         shell: bash
         timeout-minutes: 1
+        if: matrix.os != 'windows-latest'
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
@@ -864,7 +868,7 @@ jobs:
       - name: Kill all nodes
         shell: bash
         timeout-minutes: 1
-        if: failure()
+        if: failure() && matrix.os != 'windows-latest'
         continue-on-error: true
         run: |
           pkill sn_node
