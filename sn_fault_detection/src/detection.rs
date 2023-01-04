@@ -6,18 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{get_mean_of, std_deviation, FaultDetection, OperationId};
+use crate::{get_mean_of, std_deviation, FaultDetection};
 
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
 use std::time::Duration;
 static RECENT_ISSUE_DURATION: Duration = Duration::from_secs(60 * 10); // 10 minutes
-
-#[cfg(test)]
-static OUTDATED_PENDING_REQUEST_DURATION: Duration = Duration::from_secs(0);
-#[cfg(not(test))]
-static OUTDATED_PENDING_REQUEST_DURATION: Duration = Duration::from_secs(10);
 
 static CONN_WEIGHTING: f32 = 20.0;
 static OP_WEIGHTING: f32 = 1.0;
@@ -42,7 +37,7 @@ pub enum IssueType {
     /// Represents a knowledge issue to be tracked by Fault Detection.
     Knowledge,
     /// Represents a pending request operation issue to be tracked by Fault Detection.
-    RequestOperation(OperationId),
+    RequestOperation,
 }
 
 #[derive(Debug)]
@@ -89,10 +84,7 @@ impl FaultDetection {
             );
             let _ = op_scores.insert(
                 *node,
-                self.calculate_node_score_for_type(
-                    node,
-                    &IssueType::RequestOperation(OperationId::random()),
-                ),
+                self.calculate_node_score_for_type(node, &IssueType::RequestOperation),
             );
         }
 
@@ -157,17 +149,9 @@ impl FaultDetection {
                     0
                 }
             }
-            IssueType::RequestOperation(_) => {
+            IssueType::RequestOperation => {
                 if let Some(issues) = self.unfulfilled_ops.get(node) {
-                    // To avoid the case that the check get carried out just after
-                    // burst of messages get inserted, only those issues has sat a
-                    // while will be considered as outdated.
-                    let count = issues
-                        .iter()
-                        .filter(|(_, time)| time.elapsed() > OUTDATED_PENDING_REQUEST_DURATION)
-                        .count();
-
-                    count
+                    issues.len()
                 } else {
                     0
                 }
@@ -284,7 +268,6 @@ mod tests {
     use itertools::Itertools;
 
     use crate::{detection::IssueType, tests::init_test_logger, FaultDetection};
-    use sn_interface::messaging::system::OperationId;
 
     use eyre::bail;
     use proptest::prelude::*;
@@ -344,8 +327,7 @@ mod tests {
             0 => Just(IssueType::Dkg),
             50 => Just(IssueType::AeProbeMsg),
             0 => Just(IssueType::Knowledge),
-            3400 => (any::<[u8; 32]>())
-                .prop_map(|x| IssueType::RequestOperation(OperationId(x)))
+            3400 => Just(IssueType::RequestOperation)
         ]
     }
 
@@ -496,7 +478,7 @@ mod tests {
                     IssueType::Knowledge => {
                         assert_eq!(score_results.knowledge_scores.len(), node_count);
                     },
-                    IssueType::RequestOperation(_) => {
+                    IssueType::RequestOperation => {
                         assert_eq!(score_results.op_scores.len(), node_count);
                     },
                 }
@@ -539,7 +521,7 @@ mod tests {
                     IssueType::Knowledge => {
                         score_results.knowledge_scores
                     },
-                    IssueType::RequestOperation(_) => {
+                    IssueType::RequestOperation => {
                         score_results.op_scores
                     },
                 };
@@ -847,7 +829,7 @@ mod tests {
                     IssueType::Knowledge => {
                         score_results.knowledge_scores
                     },
-                    IssueType::RequestOperation(_) => {
+                    IssueType::RequestOperation => {
                         score_results.op_scores
                     },
                 };
@@ -861,8 +843,6 @@ mod tests {
 
 #[cfg(test)]
 mod ops_tests {
-    use super::*;
-
     use crate::{tests::init_test_logger, FaultDetection, IssueType};
     use xor_name::{rand::random as random_xorname, XorName};
 
@@ -875,29 +855,18 @@ mod ops_tests {
         init_test_logger();
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
         let mut fault_detection = FaultDetection::new(nodes.clone());
-        let mut pending_operations = Vec::new();
-        for node in &nodes {
-            for _ in 0..NORMAL_OPERATIONS_ISSUES {
-                let op_id = OperationId::random();
-                pending_operations.push((node, op_id));
-                fault_detection.track_issue(*node, IssueType::RequestOperation(op_id));
-            }
+
+        // adding more issues though, and we should see this node as faulty
+        for _ in 0..NORMAL_OPERATIONS_ISSUES {
+            fault_detection.track_issue(nodes[0], IssueType::RequestOperation);
         }
 
-        assert_eq!(fault_detection.get_faulty_nodes().len(), 0);
-
-        // We now fulfill all operations except those for the nodes[0]
-        // to create a deviation
-        for op in pending_operations.iter().skip(NORMAL_OPERATIONS_ISSUES) {
-            assert!(fault_detection.request_operation_fulfilled(op.0, op.1));
-        }
         // as this is normal, we should not detect anything off
         assert_eq!(fault_detection.get_faulty_nodes().len(), 0);
 
         // adding more issues though, and we should see this node as faulty
         for _ in 0..300 {
-            let op_id = OperationId::random();
-            fault_detection.track_issue(nodes[0], IssueType::RequestOperation(op_id));
+            fault_detection.track_issue(nodes[0], IssueType::RequestOperation);
         }
 
         // Now we should start detecting...
