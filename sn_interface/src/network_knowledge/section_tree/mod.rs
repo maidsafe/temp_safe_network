@@ -217,62 +217,7 @@ impl SectionTree {
         let signed_sap = section_tree_update.signed_sap;
         let proof_chain = section_tree_update.proof_chain;
 
-        // Check if SAP signature is valid
-        if !signed_sap.self_verify() {
-            return Err(Error::UntrustedSectionAuthProvider(format!(
-                "Invalid signature: {:?}",
-                signed_sap.value
-            )));
-        }
-
-        // Check if SAP's section key matches SAP signature's key
-        if signed_sap.sig.public_key != signed_sap.section_key() {
-            return Err(Error::UntrustedSectionAuthProvider(format!(
-                "Section key does not match signature's key: {:?}",
-                signed_sap.value
-            )));
-        }
-
-        // Make sure the proof chain can be trusted,
-        // i.e. check each key is signed by its parent/predecessor key.
-        if !proof_chain.self_verify() {
-            return Err(Error::UntrustedProofChain(format!(
-                "Proof chain failed self verification: {proof_chain:?}",
-            )));
-        }
-
-        // SAP's key should be the last key of the proof chain
-        if proof_chain.last_key()? != signed_sap.section_key() {
-            return Err(Error::UntrustedProofChain(format!(
-                "Provided section key ({:?}, from prefix {:?}) is not the last key of the proof chain",
-                signed_sap.section_key(),
-                signed_sap.prefix(),
-            )));
-        }
-
         let incoming_prefix = &signed_sap.prefix();
-        // Lets warn if we're in a SAP that's shrinking for some reason.
-        // So we check the incoming elder count vs what we know of for
-        // the incoming prefix. If elder_count() is smaller at _all_ we
-        // should warn! something so we can track this.
-        if !incoming_prefix.is_empty() {
-            match self.get_signed_by_prefix(incoming_prefix) {
-                Ok(sap) => {
-                    let current_sap_elder_count = sap.elder_count();
-                    let proposed_sap_elder_count = signed_sap.elder_count();
-
-                    if proposed_sap_elder_count < current_sap_elder_count {
-                        warn!("Proposed SAP elder count is LESS than current...\
-                        proposed: {proposed_sap_elder_count:?}, current: {current_sap_elder_count:?} (proposed is: {signed_sap:?})");
-                    }
-                }
-                Err(e) => {
-                    warn!("Could not find related section to {incoming_prefix:?} in order to validate SAP's section is not shrinking");
-                    warn!("Error on prefix search: {e}");
-                }
-            };
-        }
-
         match self.get_signed(incoming_prefix) {
             Some(sap) if sap == &signed_sap => {
                 // It's the same SAP we are already aware of
@@ -280,8 +225,14 @@ impl SectionTree {
                 return Ok(false);
             }
             Some(sap) => {
-                // We are then aware of the prefix, let's just verify the new SAP can
-                // be trusted based on the SAP we aware of and the proof chain provided.
+                let current_sap_elder_count = sap.elder_count();
+                let proposed_sap_elder_count = signed_sap.elder_count();
+                if proposed_sap_elder_count < current_sap_elder_count {
+                    warn!("Proposed SAP elder count is LESS than current...\
+                    proposed: {proposed_sap_elder_count:?}, current: {current_sap_elder_count:?} (proposed is: {signed_sap:?})");
+                }
+
+                // Verify the new SAP with the SAP we know and the proof chain provided.
                 if !proof_chain.has_key(&sap.section_key()) {
                     // This case may happen when both the sender and receiver is about to using
                     // a new SAP. The AE-Update was sent before sender switching to use new SAP,
@@ -298,6 +249,7 @@ impl SectionTree {
                 }
             }
             None => {
+                warn!("Could not find related section to {incoming_prefix:?} in order to validate SAP's section is not shrinking");
                 // We are not aware of the prefix, let's then verify it can be
                 // trusted based on our own sections_dag and the provided proof chain.
                 if !proof_chain.check_trust(self.sections_dag.keys()) {
@@ -307,6 +259,36 @@ impl SectionTree {
                     )));
                 }
             }
+        }
+
+        // Check if SAP signature is valid
+        if !signed_sap.self_verify() {
+            return Err(Error::UntrustedSectionAuthProvider(format!(
+                "Invalid signature: {:?}",
+                signed_sap.value
+            )));
+        }
+        // Check if SAP's section key matches SAP signature's key
+        if signed_sap.sig.public_key != signed_sap.section_key() {
+            return Err(Error::UntrustedSectionAuthProvider(format!(
+                "Section key does not match signature's key: {:?}",
+                signed_sap.value
+            )));
+        }
+        // Make sure the proof chain can be trusted,
+        // i.e. check each key is signed by its parent/predecessor key.
+        if !proof_chain.self_verify() {
+            return Err(Error::UntrustedProofChain(format!(
+                "Proof chain failed self verification: {proof_chain:?}",
+            )));
+        }
+        // SAP's key should be the last key of the proof chain
+        if proof_chain.last_key()? != signed_sap.section_key() {
+            return Err(Error::UntrustedProofChain(format!(
+                "Provided section key ({:?}, from prefix {:?}) is not the last key of the proof chain",
+                signed_sap.section_key(),
+                signed_sap.prefix(),
+            )));
         }
 
         // We can now update our knowledge of the remote section's SAP.
