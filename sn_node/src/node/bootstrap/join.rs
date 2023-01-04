@@ -140,6 +140,7 @@ impl<'a> Joiner<'a> {
             .await?;
 
         loop {
+            info!("Attempting to join the network as {:?}", self.node.name());
             let (response, sender) = tokio::time::timeout(
                 response_timeout,
                 self.receive_join_response_and_handle_ae_updates(),
