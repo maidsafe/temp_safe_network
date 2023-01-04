@@ -252,7 +252,7 @@ jobs:
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
-          (($(pgrep sn_node | wc -l) == $NODE_COUNT))
+          (($(pgrep sn_node | wc -l) == $NODE_COUNT)) || echo "Incorrect node count found. Only $(pgrep sn_node | wc -l) exist, $NODE_COUNT was expected."; exit 1;
 
       - name: Kill all nodes
         shell: bash
@@ -450,7 +450,7 @@ jobs:
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
-          (($(pgrep sn_node | wc -l) == $NODE_COUNT))
+          (($(pgrep sn_node | wc -l) == $NODE_COUNT)) || echo "Incorrect node count found. Only $(pgrep sn_node | wc -l) exist, $NODE_COUNT was expected."; exit 1;
 
 
       - name: Kill all nodes
@@ -743,7 +743,7 @@ jobs:
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
-          (($(pgrep sn_node | wc -l) == $NODE_COUNT))
+          (($(pgrep sn_node | wc -l) == $NODE_COUNT)) || echo "Incorrect node count found. Only $(pgrep sn_node | wc -l) exist, $NODE_COUNT was expected."; exit 1;
 
       - name: Kill all nodes
         shell: bash
@@ -863,7 +863,7 @@ jobs:
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
-          (($(pgrep sn_node | wc -l) == $NODE_COUNT))
+          (($(pgrep sn_node | wc -l) == $NODE_COUNT)) || echo "Incorrect node count found. Only $(pgrep sn_node | wc -l) exist, $NODE_COUNT was expected."; exit 1;
 
       - name: Kill all nodes
         shell: bash
