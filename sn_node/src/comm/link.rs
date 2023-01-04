@@ -134,12 +134,12 @@ impl Link {
 
             let (conn, is_last_attempt) = if let Some(conn) = conn {
                 trace!(
-                    "Sending {msg_id:?} via bi-stream over existing connection {}, attempt #{attempt}.",
+                    "Sending {msg_id:?} via bi-di-stream over existing connection {}, attempt #{attempt}.",
                     conn.id()
                 );
                 (conn, false)
             } else {
-                trace!("Sending {msg_id:?} via bi-stream over new connection to {peer:?}, attempt #{attempt}.");
+                trace!("Sending {msg_id:?} via bi-di-stream over new connection to {peer:?}, attempt #{attempt}.");
                 let conn = self.create_connection(msg_id).await?;
                 (conn, true)
             };

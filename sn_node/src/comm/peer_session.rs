@@ -230,11 +230,11 @@ impl PeerSessionWorker {
     }
 
     async fn send_over_peer_connection(&mut self, mut job: SendJob) -> Result<SessionStatus> {
-        let id = job.msg_id;
-        trace!("Sending to peer over connection: {id:?}");
+        let msg_id = job.msg_id;
+        trace!("Sending to peer over connection: {msg_id:?}");
 
         if job.connection_retries > MAX_SENDJOB_RETRIES {
-            debug!("max retries reached... {id:?}");
+            debug!("max retries reached... {msg_id:?}");
             job.reporter.send(SendStatus::MaxRetriesReached);
             return Ok(SessionStatus::Ok);
         }
@@ -254,10 +254,10 @@ impl PeerSessionWorker {
         // Attempt to get a connection or make one to another node.
         // if there's no successful connection, we requeue the job after a wait
         // incase there's been a delay adding the connection to Comms
-        let conn = match link.get_or_connect(id).await {
+        let conn = match link.get_or_connect(msg_id).await {
             Ok(conn) => conn,
             Err(error) => {
-                error!("Error when attempting to send to peer. Job will be reenqueued for another attempt after a small timeout");
+                error!("Error when attempting to send {msg_id:?} to peer. Job will be reenqueued for another attempt after a small timeout");
 
                 // only increment connection attempts if our connections set is empty
                 // and so we'll be trying to create a fresh connection
@@ -272,7 +272,7 @@ impl PeerSessionWorker {
                 // we await here in case the connection is fresh and has not yet been added
                 tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
                 if let Err(e) = queue.send(SessionCmd::Send(job)).await {
-                    warn!("Failed to re-enqueue job {id:?} after failed connection retrieval error {e:?}");
+                    warn!("Failed to re-enqueue job {msg_id:?} after failed connection retrieval error {e:?}");
                 }
 
                 return Ok(SessionStatus::Ok);
@@ -281,7 +281,7 @@ impl PeerSessionWorker {
 
         let _handle = tokio::spawn(async move {
             let connection_id = conn.id();
-            debug!("Connection exists for sendjob: {id:?}, and has conn_id: {connection_id:?}");
+            debug!("Connection exists for sendjob: {msg_id:?}, and has conn_id: {connection_id:?}");
 
             let send_resp =
                 Link::send_with_connection(job.bytes.clone(), 0, conn, link_connections).await;
@@ -290,7 +290,7 @@ impl PeerSessionWorker {
                 Ok(()) => job.reporter.send(SendStatus::Sent),
                 Err(err) => {
                     if err.is_local_close() {
-                        debug!("Peer linked dropped when trying to send {:?}. But link has {:?} connections", id, conns_count );
+                        debug!("Peer linked dropped when trying to send {:?}. But link has {:?} connections", msg_id, conns_count );
                         error!("the error on send :{err:?}");
                         // we can retry if we've more connections!
                         if conns_count <= 1 {
@@ -303,7 +303,7 @@ impl PeerSessionWorker {
                     }
 
                     warn!(
-                        "Transient error while attempting to send, re-enqueing job {id:?} {err:?}. Connection id was {:?}",connection_id
+                        "Transient error while attempting to send, re-enqueing job {msg_id:?} {err:?}. Connection id was {:?}",connection_id
                     );
 
                     // we await here in case the connection is fresh and has not yet been added
@@ -313,7 +313,7 @@ impl PeerSessionWorker {
                         .send(SendStatus::TransientError(format!("{err:?}")));
 
                     if let Err(e) = queue.send(SessionCmd::Send(job)).await {
-                        warn!("Failed to re-enqueue job {id:?} after transient error {e:?}");
+                        warn!("Failed to re-enqueue job {msg_id:?} after transient error {e:?}");
                     }
                 }
             }
