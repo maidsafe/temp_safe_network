@@ -128,7 +128,7 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
 
         match outcome {
             Ok((_node, mut rejoin_network_rx)) => {
-                rt.block_on(async {
+                if let Err(error) = rt.block_on(async {
                     // Simulate failed node starts, and ensure that
                    #[cfg(feature = "chaos")]
                    {
@@ -151,10 +151,15 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
 
                    // this keeps node running
                    if rejoin_network_rx.recv().await.is_some() {
+                        error!("{:?}", NodeError::RemovedFromSection);
+
                        return Err(NodeError::RemovedFromSection).map_err(ErrReport::msg);
                    }
                    Ok(())
-                })?;
+                }) {
+                    rt.shutdown_timeout(Duration::from_secs(2));
+                    return Err(error)
+                }
             }
             Err(NodeError::TryJoinLater) => {
                 let message = format!(
@@ -173,6 +178,8 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
 
                 println!("{err:?}");
                 error!("{err:?}");
+                // actively shut down the runtime
+                rt.shutdown_timeout(Duration::from_secs(2));
                 return err;
             }
             Err(NodeError::JoinTimeout) => {
@@ -186,6 +193,8 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
                     "If this is the first node on the network pass the local address to be used using --first",
                 ));
                 error!("{err:?}");
+                // actively shut down the runtime
+                rt.shutdown_timeout(Duration::from_secs(2));
                 return err;
             }
         }
