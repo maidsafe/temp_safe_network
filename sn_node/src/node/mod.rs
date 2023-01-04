@@ -313,10 +313,13 @@ mod core {
                 let mut elders: Vec<_> = matching_section.elders().collect();
                 elders.shuffle(&mut OsRng);
 
-                // Should never be empty, but if so, then hopefully we'll eventually
-                // get updated on this section from somewhere else.
-                if let Some(elder) = elders.first() {
-                    let _ = recipients.insert(**elder);
+                // Should always get one non-self elder to send probe to. If cannot,
+                // hopefully we'll eventually get updated on this section from somewhere else.
+                for elder in elders.iter() {
+                    if elder.name() != context.name {
+                        let _ = recipients.insert(**elder);
+                        break;
+                    }
                 }
             }
 

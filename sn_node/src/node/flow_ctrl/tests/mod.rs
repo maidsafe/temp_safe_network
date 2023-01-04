@@ -437,14 +437,18 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
         .build();
     let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
     let section = env.get_network_knowledge(prefix, None);
+    let signed_sap = section.signed_sap();
     let sk_set = env.get_secret_key_set(prefix, None);
     let pk = sk_set.secret_key().public_key();
 
     // a valid AE msg but with a non-verifiable SAP...
-    let signed_sap = section.signed_sap();
+    let bogus_env = TestNetworkBuilder::new(thread_rng())
+        .sap(prefix, elder_count(), 0, None, None)
+        .build();
+    let bogus_sap = bogus_env.get_network_knowledge(prefix, None).signed_sap();
     let bogus_section_pk = bls::SecretKey::random().public_key();
     let bogus_section_tree_update =
-        SectionTreeUpdate::new(signed_sap.clone(), SectionsDAG::new(bogus_section_pk));
+        SectionTreeUpdate::new(bogus_sap, SectionsDAG::new(bogus_section_pk));
 
     let node_msg = NodeMsg::AntiEntropy {
         section_tree_update: bogus_section_tree_update,
@@ -476,7 +480,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
         .process_all()
         .await,
         Err(Error::NetworkKnowledge(
-            NetworkKnowledgeError::UntrustedProofChain(_)
+            NetworkKnowledgeError::SAPKeyNotCoveredByProofChain(_)
         ))
     ));
 
