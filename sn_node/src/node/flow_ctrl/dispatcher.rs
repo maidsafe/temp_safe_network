@@ -6,22 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{messaging::Peers, Cmd, Error, MyNode, Result, STANDARD_CHANNEL_SIZE};
+use crate::node::{Cmd, Error, MyNode, Result, STANDARD_CHANNEL_SIZE};
 
 use sn_interface::{
-    messaging::{system::NodeMsg, Dst, MsgId, WireMsg},
-    network_knowledge::{NetworkKnowledge, SectionTreeUpdate},
+    network_knowledge::SectionTreeUpdate,
     types::{DataAddress, Peer},
 };
-
-use qp2p::UsrMsgBytes;
 
 use std::sync::Arc;
 use tokio::sync::{
     mpsc::{channel, Receiver, Sender},
     RwLock,
 };
-use xor_name::XorName;
 
 // Cmd Dispatcher.
 pub(crate) struct Dispatcher {
@@ -33,13 +29,12 @@ impl Dispatcher {
     /// Creates dispatcher and returns a receiver for enqueing DataAddresses for replication to specific peers
     pub(crate) fn new(node: Arc<RwLock<MyNode>>) -> (Self, Receiver<(Vec<DataAddress>, Peer)>) {
         let (data_replication_sender, data_replication_receiver) = channel(STANDARD_CHANNEL_SIZE);
-        (
-            Self {
-                node,
-                data_replication_sender,
-            },
-            data_replication_receiver,
-        )
+        let dispatcher = Self {
+            node,
+            data_replication_sender,
+        };
+
+        (dispatcher, data_replication_receiver)
     }
 
     pub(crate) fn node(&self) -> Arc<RwLock<MyNode>> {
@@ -73,45 +68,56 @@ impl Dispatcher {
                 recipients,
                 send_stream,
                 context,
+            } => MyNode::send_msg(msg, msg_id, recipients, send_stream, context).await,
+            Cmd::SendClientResponse {
+                msg,
+                correlation_id,
+                send_stream,
+                context,
+                source_client,
             } => {
-                trace!("Sending msg: {msg_id:?}");
-
-                let peer_msgs = {
-                    into_msg_bytes(
-                        &context.network_knowledge,
-                        context.name,
-                        msg,
-                        msg_id,
-                        recipients,
-                    )?
-                };
-
-                let comm = context.comm.clone();
-                let results = if let Some(send_stream) = send_stream {
-                    let task = peer_msgs.get(0).map(|(peer, msg)| {
-                        comm.send_out_bytes(*peer, msg_id, msg.clone(), Some(send_stream))
-                    });
-                    futures::future::join_all(task).await
-                } else {
-                    let task = peer_msgs
-                        .into_iter()
-                        .map(|(peer, msg)| comm.send_out_bytes(peer, msg_id, msg, None));
-                    futures::future::join_all(task).await
-                };
-
-                // Any failed sends are tracked via Cmd::HandlePeerFailedSend, which will track issues for any peers
-                // in the section (otherwise ignoring failed send to out of section nodes or clients)
-                let cmds = results
-                    .into_iter()
-                    .filter_map(|result| match result {
-                        Err(Error::FailedSend(peer)) => {
-                            Some(Cmd::HandleFailedSendToNode { peer, msg_id })
-                        }
-                        _ => None,
-                    })
-                    .collect();
-
-                Ok(cmds)
+                MyNode::send_client_response(
+                    msg,
+                    correlation_id,
+                    send_stream,
+                    context,
+                    source_client,
+                )
+                .await
+            }
+            Cmd::SendNodeResponse {
+                msg,
+                correlation_id,
+                send_stream,
+                context,
+                requesting_peer,
+            } => {
+                MyNode::send_node_response(
+                    msg,
+                    correlation_id,
+                    send_stream,
+                    context,
+                    requesting_peer,
+                )
+                .await
+            }
+            Cmd::SendMsgAndAwaitResponse {
+                msg_id,
+                msg,
+                context,
+                recipient,
+                client_stream,
+                source_client,
+            } => {
+                MyNode::send_msg_and_await_response(
+                    msg_id,
+                    msg,
+                    context,
+                    recipient,
+                    client_stream,
+                    source_client,
+                )
+                .await
             }
             Cmd::TrackNodeIssue { name, issue } => {
                 let node = self.node.read().await;
@@ -237,47 +243,4 @@ impl Dispatcher {
             }
         }
     }
-}
-
-// Serializes and signs the msg if it's a Client message,
-// and produces one [`WireMsg`] instance per recipient -
-// the last step before passing it over to comms module.
-pub(crate) fn into_msg_bytes(
-    network_knowledge: &NetworkKnowledge,
-    our_node_name: XorName,
-    msg: NodeMsg,
-    msg_id: MsgId,
-    recipients: Peers,
-) -> Result<Vec<(Peer, UsrMsgBytes)>> {
-    let (kind, payload) = MyNode::serialize_node_msg(our_node_name, msg)?;
-    let recipients = match recipients {
-        Peers::Single(peer) => vec![peer],
-        Peers::Multiple(peers) => peers.into_iter().collect(),
-    };
-
-    // we first generate the XorName
-    let dst = Dst {
-        name: xor_name::rand::random(),
-        section_key: bls::SecretKey::random().public_key(),
-    };
-
-    let mut initial_wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
-
-    let _bytes = initial_wire_msg.serialize_and_cache_bytes()?;
-
-    let mut msgs = vec![];
-    for peer in recipients {
-        match network_knowledge.generate_dst(&peer.name()) {
-            Ok(dst) => {
-                // TODO log errror here isntead of throwing
-                let all_the_bytes = initial_wire_msg.serialize_with_new_dst(&dst)?;
-                msgs.push((peer, all_the_bytes));
-            }
-            Err(error) => {
-                error!("Could not get route for {peer:?}: {error}");
-            }
-        }
-    }
-
-    Ok(msgs)
 }

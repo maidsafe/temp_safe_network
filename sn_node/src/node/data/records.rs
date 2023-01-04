@@ -18,49 +18,19 @@ use sn_interface::{
     messaging::{
         data::{ClientDataResponse, DataCmd, DataQuery},
         system::{NodeDataCmd, NodeDataQuery, NodeDataResponse, NodeEvent, NodeMsg, OperationId},
-        AuthorityProof, ClientAuth, Dst, MsgId, MsgKind, MsgType, WireMsg,
+        AuthorityProof, ClientAuth, Dst, MsgId, MsgType, WireMsg,
     },
     types::{log_markers::LogMarker, Keypair, Peer, PublicKey, ReplicatedData},
 };
 
-use qp2p::{SendStream, UsrMsgBytes};
+use qp2p::SendStream;
 
 use bytes::Bytes;
 use futures::FutureExt;
 use itertools::Itertools;
-use lazy_static::lazy_static;
-use std::{collections::BTreeSet, env::var, str::FromStr};
-use tokio::time::{timeout, Duration};
+use std::collections::BTreeSet;
 use tracing::info;
 use xor_name::XorName;
-
-/// Environment variable to set timeout value (in seconds) for data queries
-/// forwarded to Adults. Default value (`NODE_RESPONSE_DEFAULT_TIMEOUT`) is otherwise used.
-const ENV_NODE_RESPONSE_TIMEOUT: &str = "SN_NODE_RESPONSE_TIMEOUT";
-
-// Default timeout period set for data queries forwarded to Adult.
-// TODO: how to determine this time properly?
-const NODE_RESPONSE_DEFAULT_TIMEOUT: Duration = Duration::from_secs(70);
-
-lazy_static! {
-    static ref NODE_RESPONSE_TIMEOUT: Duration = match var(ENV_NODE_RESPONSE_TIMEOUT)
-        .map(|v| u64::from_str(&v))
-    {
-        Ok(Ok(secs)) => {
-            let timeout = Duration::from_secs(secs);
-            info!("{ENV_NODE_RESPONSE_TIMEOUT} env var set, Node data query response timeout set to {timeout:?}");
-            timeout
-        }
-        Ok(Err(err)) => {
-            warn!(
-                "Failed to parse {ENV_NODE_RESPONSE_TIMEOUT} value, using \
-                default value ({NODE_RESPONSE_DEFAULT_TIMEOUT:?}): {err:?}"
-            );
-            NODE_RESPONSE_DEFAULT_TIMEOUT
-        }
-        Err(_) => NODE_RESPONSE_DEFAULT_TIMEOUT,
-    };
-}
 
 impl MyNode {
     // Locate ideal holders for this data, instruct them to store the data
@@ -124,7 +94,7 @@ impl MyNode {
         targets: BTreeSet<Peer>,
         client_response_stream: SendStream,
         source_client: Peer,
-    ) -> Result<()> {
+    ) -> Result<Vec<Cmd>> {
         let targets_len = targets.len();
 
         let responses = MyNode::store_data_at_nodes(context, data, msg_id, targets).await?;
@@ -151,13 +121,13 @@ impl MyNode {
         // everything went fine, tell the client that
         if success_count == targets_len {
             if let Some(response) = ack_response {
-                MyNode::send_cmd_response_to_client(
-                    context,
+                let cmds = MyNode::send_cmd_response_to_client(
+                    context.clone(),
                     response.into_msg()?,
                     client_response_stream,
                     source_client,
-                )
-                .await?;
+                );
+                return Ok(cmds);
             } else {
                 // This should not be possible with above checks
                 error!("No valid response to send from all responses for {msg_id:?}");
@@ -165,28 +135,28 @@ impl MyNode {
         } else {
             error!("Storage was not completely successful for {msg_id:?}");
             if let Some(error) = last_error {
-                MyNode::send_cmd_error_response_over_stream(
-                    context,
+                let cmd = MyNode::send_cmd_error_response_over_stream(
+                    context.clone(),
                     cmd,
                     error,
                     msg_id,
                     client_response_stream,
                     source_client,
-                )
-                .await?;
+                );
+                return Ok(vec![cmd]);
             }
         }
 
-        Ok(())
+        Ok(vec![])
     }
 
     /// Parses WireMsg and if DataStored Ack, we send a response to the client
-    async fn send_cmd_response_to_client(
-        context: &NodeContext,
+    fn send_cmd_response_to_client(
+        context: NodeContext,
         response: MsgType,
         send_stream: SendStream,
         source_client: Peer,
-    ) -> Result<()> {
+    ) -> Vec<Cmd> {
         if let MsgType::NodeDataResponse {
             msg:
                 NodeDataResponse::CmdResponse {
@@ -201,26 +171,24 @@ impl MyNode {
                 correlation_id,
             };
 
-            debug!("{correlation_id:?} sending cmd response ack back to client");
-            Self::respond_to_client_over_stream(
+            debug!("{correlation_id:?} sending cmd response ACK back to client");
+            vec![Cmd::SendClientResponse {
                 msg,
                 correlation_id,
                 send_stream,
                 context,
                 source_client,
-            )
-            .await?;
+            }]
         } else {
             // TODO: handle this bad response
             error!("Unexpected response to data cmd from node. Response: {response:?}");
+            vec![]
         }
-
-        Ok(())
     }
 
     /// Find target node, sends a bidi msg, awaiting response, and then sends this on to the client
     pub(crate) async fn read_data_and_respond_to_client(
-        context: &NodeContext,
+        context: NodeContext,
         query: DataQuery,
         msg_id: MsgId,
         auth: AuthorityProof<ClientAuth>,
@@ -239,7 +207,7 @@ impl MyNode {
             LogMarker::DataQueryReceviedAtElder,
         );
 
-        let targets = MyNode::target_data_holders(context, *address.name());
+        let targets = MyNode::target_data_holders(&context, *address.name());
 
         // We accept the chance that we will be querying an Elder that the client already queried directly.
         // The extra load is not that big. But we can optimize this later if necessary.
@@ -255,17 +223,15 @@ impl MyNode {
                 found: targets.len() as u8,
             };
 
-            MyNode::send_query_error_response_over_stream(
+            let cmd = MyNode::send_query_error_response_over_stream(
                 context,
                 error,
                 &query.variant,
                 source_client,
                 msg_id,
                 client_response_stream,
-            )
-            .await?;
-            // TODO: do error processing
-            return Ok(vec![]);
+            );
+            return Ok(vec![cmd]);
         };
 
         // Form a msg to the node
@@ -275,61 +241,26 @@ impl MyNode {
             operation_id,
         });
 
-        let (kind, payload) = MyNode::serialize_node_msg(context.name, msg)?;
-
-        let comm = context.comm.clone();
-
-        let bytes_to_node = MyNode::form_usr_msg_bytes_to_node(
-            context.network_knowledge.section_key(),
-            payload,
-            kind,
-            target.name(),
+        let cmd = Cmd::SendMsgAndAwaitResponse {
             msg_id,
-        )?;
-
-        debug!("Sending out {msg_id:?} to node {target:?}");
-        let response = match timeout(*NODE_RESPONSE_TIMEOUT, async {
-            comm.send_out_bytes_to_peer_and_return_response(target, msg_id, bytes_to_node)
-                .await
-        })
-        .await
-        {
-            Ok(resp) => resp,
-            Err(_elapsed) => {
-                error!(
-                    "{msg_id:?}: No response from {target:?} after {:?} timeout. \
-                    Marking node as faulty",
-                    *NODE_RESPONSE_TIMEOUT
-                );
-                return Ok(vec![Cmd::TrackNodeIssue {
-                    name: target.name(),
-                    // TODO: no need for op id tracking here, this can be a simple counter
-                    issue: IssueType::Communication,
-                }]);
-            }
-        }?;
-
-        debug!("Response in from peer for query {msg_id:?} {response:?}");
-        Self::send_query_response_to_client(
-            msg_id,
+            msg,
             context,
-            response.into_msg()?,
-            client_response_stream,
+            recipient: target,
+            client_stream: client_response_stream,
             source_client,
-        )
-        .await?;
+        };
 
-        Ok(vec![])
+        Ok(vec![cmd])
     }
 
     /// Parses WireMsg and if it's a query response, we send a response to the client
-    async fn send_query_response_to_client(
+    pub(crate) fn send_query_response_to_client(
         correlation_id: MsgId,
-        context: &NodeContext,
+        context: NodeContext,
         response: MsgType,
         send_stream: SendStream,
         source_client: Peer,
-    ) -> Result<()> {
+    ) -> Vec<Cmd> {
         if let MsgType::NodeDataResponse {
             msg: NodeDataResponse::QueryResponse { response, .. },
             ..
@@ -340,106 +271,18 @@ impl MyNode {
                 correlation_id,
             };
 
-            Self::respond_to_client_over_stream(
+            vec![Cmd::SendClientResponse {
                 msg,
                 correlation_id,
                 send_stream,
                 context,
                 source_client,
-            )
-            .await?;
+            }]
         } else {
             // TODO: handle this bad response
             error!("Unexpected response to query from node for {correlation_id:?}: {response:?}");
+            vec![]
         }
-
-        Ok(())
-    }
-
-    pub(crate) async fn respond_to_client_over_stream(
-        response: ClientDataResponse,
-        correlation_id: MsgId,
-        send_stream: SendStream,
-        context: &NodeContext,
-        source_client: Peer,
-    ) -> Result<()> {
-        trace!("Sending client response msg for {correlation_id:?}");
-        let (kind, payload) = MyNode::serialize_client_msg_response(context.name, response)?;
-
-        Self::send_msg_on_stream(
-            context.network_knowledge.section_key(),
-            payload,
-            kind,
-            send_stream,
-            source_client,
-            correlation_id,
-        )
-        .await?;
-
-        Ok(())
-    }
-
-    /// Send a msg on a given stream
-    pub(crate) async fn send_msg_on_stream(
-        section_key: bls::PublicKey,
-        payload: Bytes,
-        kind: MsgKind,
-        mut send_stream: SendStream,
-        target_peer: Peer,
-        correlation_id: MsgId,
-    ) -> Result<()> {
-        let bytes = MyNode::form_usr_msg_bytes_to_node(
-            section_key,
-            payload,
-            kind,
-            target_peer.name(),
-            correlation_id,
-        )?;
-
-        let stream_id = send_stream.id();
-        trace!("Sending response {correlation_id:?} to {target_peer:?} over {stream_id}");
-
-        let stream_prio = 10;
-        send_stream.set_priority(stream_prio);
-        trace!("Prio set for {correlation_id:?} to {target_peer:?}, over {stream_id}");
-
-        if let Err(error) = send_stream.send_user_msg(bytes).await {
-            error!(
-                "Could not send response {correlation_id:?} to peer {target_peer:?} \
-                over response {stream_id}: {error:?}"
-            );
-            return Err(error.into());
-        }
-
-        trace!("Msg away for {correlation_id:?} to {target_peer:?}, over {stream_id}");
-
-        // unblock + move finish off thread as it's not strictly related to the sending of the msg.
-        let stream_id_clone = stream_id.clone();
-        let _handle = tokio::spawn(async move {
-            // Attempt to gracefully terminate the stream.
-            // If this errors it does _not_ mean our message has not been sent
-            let result = send_stream.finish().await;
-            trace!("Response {correlation_id:?} sent to {target_peer:?} over {stream_id_clone}. Stream finished with result: {result:?}");
-        });
-
-        debug!("Sent the msg {correlation_id:?} to {target_peer:?} over {stream_id}");
-
-        Ok(())
-    }
-
-    pub(crate) fn form_usr_msg_bytes_to_node(
-        section_key: bls::PublicKey,
-        payload: Bytes,
-        kind: MsgKind,
-        target_name: XorName,
-        msg_id: MsgId,
-    ) -> Result<UsrMsgBytes> {
-        let dst = Dst {
-            name: target_name,
-            section_key,
-        };
-        let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
-        wire_msg.serialize().map_err(|_| Error::InvalidMessage)
     }
 
     /// Registered holders not present in provided list of members

@@ -1,8 +1,8 @@
 use crate::{
     comm::MsgFromPeer,
     node::{
-        flow_ctrl::dispatcher::{into_msg_bytes, Dispatcher},
-        messaging::Peers,
+        flow_ctrl::dispatcher::Dispatcher,
+        messaging::{streams::into_msg_bytes, Peers},
         Cmd,
     },
 };
@@ -246,16 +246,14 @@ impl Dispatcher {
         } = cmd
         {
             let _ = send_stream;
-            let peer_msgs = {
-                into_msg_bytes(
-                    &context.network_knowledge,
-                    context.name,
-                    msg.clone(),
-                    msg_id,
-                    recipients,
-                )
-                .expect("cannot convert msg into bytes")
-            };
+            let peer_msgs = into_msg_bytes(
+                &context.network_knowledge,
+                context.name,
+                msg.clone(),
+                msg_id,
+                recipients,
+            )
+            .expect("cannot convert msg into bytes");
 
             for (peer, msg_bytes) in peer_msgs {
                 if let Some(filter) = &filter_recp {
