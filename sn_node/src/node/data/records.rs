@@ -303,7 +303,7 @@ impl MyNode {
                 return Ok(vec![Cmd::TrackNodeIssue {
                     name: target.name(),
                     // TODO: no need for op id tracking here, this can be a simple counter
-                    issue: IssueType::RequestOperation(operation_id),
+                    issue: IssueType::Communication,
                 }]);
             }
         }?;
