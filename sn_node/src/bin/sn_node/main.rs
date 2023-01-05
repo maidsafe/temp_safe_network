@@ -145,7 +145,7 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
                            // tiny sleep so testnet doesn't detect a fauly node and exit
                            tokio::time::sleep(Duration::from_secs(1)).await;
                            warn!("[Chaos] (PID: {our_pid}): ChaoticStartupCrash");
-                           return Err(NodeError::ChaoticStartupCrash).map_err(ErrReport::msg);
+                           return Err(NodeError::ChaoticStartupCrash);
                        }
                    }
 
@@ -153,12 +153,27 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
                    if rejoin_network_rx.recv().await.is_some() {
                         error!("{:?}", NodeError::RemovedFromSection);
 
-                       return Err(NodeError::RemovedFromSection).map_err(ErrReport::msg);
+                       return Err(NodeError::RemovedFromSection);
                    }
                    Ok(())
                 }) {
                     rt.shutdown_timeout(Duration::from_secs(2));
-                    return Err(error)
+
+                    // These are our recoverable errors, anything we can just restart to handle, we do so here.
+                    match error {
+                        NodeError::RemovedFromSection => {
+                            continue;
+                        }
+                        #[cfg(feature = "chaos")]
+                        NodeError::ChaoticStartupCrash => {
+                            continue;
+                        }
+                        _ => {
+                            error!("Unrecoverable error, closing node program: {error:?}");
+                            return Err(error).map_err(ErrReport::msg)
+                        }
+                    }
+
                 }
             }
             Err(NodeError::TryJoinLater) => {
