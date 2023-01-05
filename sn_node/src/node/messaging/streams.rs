@@ -6,7 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{core::NodeContext, messaging::Peers, Cmd, Error, MyNode, Result};
+use crate::node::{
+    core::NodeContext, flow_ctrl::fault_detection::FaultsCmd, messaging::Peers, Cmd, Error, MyNode,
+    Result,
+};
 
 use sn_fault_detection::IssueType;
 use sn_interface::{
@@ -168,7 +171,22 @@ impl MyNode {
         })
         .await
         {
-            Ok(resp) => resp,
+            Ok(resp) => {
+                if resp.is_err() {
+                    if let Err(_error) = context
+                        .fault_cmds_sender
+                        .send(FaultsCmd::TrackIssue(
+                            recipient.name(),
+                            IssueType::RequestOperation,
+                        ))
+                        .await
+                    {
+                        error!("Could not track node fault against {:?}", recipient.name());
+                    }
+                }
+
+                resp
+            }
             Err(_elapsed) => {
                 error!(
                     "{msg_id:?}: No response from {recipient:?} after {:?} timeout. \

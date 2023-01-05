@@ -48,7 +48,6 @@ mod detection;
 
 pub use detection::IssueType;
 
-use sn_interface::messaging::system::OperationId;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     time::Instant,
@@ -74,7 +73,7 @@ pub struct FaultDetection {
     pub knowledge_issues: TimedTracker,
     /// The unfulfilled pending request operation issues logged against a node, along with an
     /// operation ID.
-    pub unfulfilled_ops: BTreeMap<NodeIdentifier, Vec<(OperationId, Instant)>>,
+    pub unfulfilled_ops: TimedTracker,
     nodes: Vec<XorName>,
 }
 
@@ -113,52 +112,11 @@ impl FaultDetection {
                 let queue = self.knowledge_issues.entry(node_id).or_default();
                 queue.push_back(Instant::now());
             }
-            IssueType::RequestOperation(op_id) => {
+            IssueType::RequestOperation => {
                 let queue = self.unfulfilled_ops.entry(node_id).or_default();
-                trace!("New issue has associated operation ID: {op_id:#?}");
-                queue.push((op_id, Instant::now()));
+                queue.push_back(Instant::now());
             }
         }
-    }
-
-    /// Removes a `pending_operation` from the node liveness records. Returns true if a record was removed
-    pub fn request_operation_fulfilled(
-        &mut self,
-        node_id: &NodeIdentifier,
-        operation_id: OperationId,
-    ) -> bool {
-        trace!(
-            "Attempting to remove pending_operation {:?} op: {:?}",
-            node_id,
-            operation_id
-        );
-        let mut has_removed = false;
-
-        if let Some(v) = self.unfulfilled_ops.get_mut(node_id) {
-            // only remove the first instance from the vec
-            v.retain(|(op_id, _)| {
-                if has_removed || op_id != &operation_id {
-                    true
-                } else {
-                    has_removed = true;
-                    false
-                }
-            });
-            if has_removed {
-                trace!(
-                    "Pending operation removed for node: {:?} op: {:?}",
-                    node_id,
-                    operation_id
-                );
-            } else {
-                trace!(
-                    "No Pending operation found for node: {:?} op: {:?}",
-                    node_id,
-                    operation_id
-                );
-            }
-        }
-        has_removed
     }
 
     /// Removes a DKG session from the node liveness records.
@@ -193,19 +151,6 @@ impl FaultDetection {
                 trace!("No Pending probe session found for node: {:?}", node_id);
             }
         }
-    }
-
-    /// Gets the unfulfilled operation IDs for a given node.
-    ///
-    /// This is for convenience, to wrap reading the concurrent data structure that stores the
-    /// values.
-    ///
-    /// If there are no unfulfilled operations tracked, an empty list will be returned.
-    pub fn get_unfulfilled_ops(&self, node: XorName) -> Vec<OperationId> {
-        if let Some(val) = self.unfulfilled_ops.get(&node) {
-            return val.clone().iter().map(|(op_id, _)| *op_id).collect();
-        }
-        Vec::new()
     }
 
     /// List all current tracked nodes
@@ -277,7 +222,6 @@ fn std_deviation(data: &[f32]) -> Option<f32> {
 #[cfg(test)]
 mod tests {
     use super::{FaultDetection, IssueType};
-    use sn_interface::messaging::system::OperationId;
 
     use eyre::Error;
     use std::{collections::BTreeSet, sync::Once};
@@ -328,13 +272,13 @@ mod tests {
         for node in nodes.iter().take(3) {
             fault_detection.track_issue(*node, IssueType::Communication);
             fault_detection.track_issue(*node, IssueType::Knowledge);
-            fault_detection.track_issue(*node, IssueType::RequestOperation(OperationId([1; 32])));
+            fault_detection.track_issue(*node, IssueType::RequestOperation);
         }
 
         // Track some issues for nodes that will be retained.
         fault_detection.track_issue(nodes[5], IssueType::Communication);
         fault_detection.track_issue(nodes[6], IssueType::Knowledge);
-        fault_detection.track_issue(nodes[7], IssueType::RequestOperation(OperationId([1; 32])));
+        fault_detection.track_issue(nodes[7], IssueType::RequestOperation);
 
         let nodes_to_retain = nodes[5..10].iter().cloned().collect::<BTreeSet<XorName>>();
 
@@ -378,7 +322,7 @@ mod tests {
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
         let mut fault_detection = FaultDetection::new(nodes.clone());
 
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
+        fault_detection.track_issue(nodes[0], IssueType::RequestOperation);
 
         assert_eq!(fault_detection.unfulfilled_ops.len(), 1);
         assert_eq!(fault_detection.knowledge_issues.len(), 0);
@@ -397,91 +341,6 @@ mod tests {
         let current_nodes = fault_detection.current_nodes();
 
         assert_eq!(current_nodes.len(), 11);
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn get_unfulfilled_ops_should_return_op_ids() -> Result<()> {
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut fault_detection = FaultDetection::new(nodes.clone());
-
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([2; 32])));
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([3; 32])));
-
-        let op_ids = fault_detection.get_unfulfilled_ops(nodes[0]);
-
-        assert_eq!(3, op_ids.len());
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn get_unfulfilled_ops_should_return_empty_list_for_node_with_no_ops() -> Result<()> {
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut fault_detection = FaultDetection::new(nodes.clone());
-
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([2; 32])));
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([3; 32])));
-
-        let op_ids = fault_detection.get_unfulfilled_ops(nodes[1]);
-
-        assert_eq!(0, op_ids.len());
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn request_operation_fulfilled_should_remove_pending_op() -> Result<()> {
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut fault_detection = FaultDetection::new(nodes.clone());
-        let op_id = OperationId([2; 32]);
-
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([2; 32])));
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([3; 32])));
-
-        let has_removed = fault_detection.request_operation_fulfilled(&nodes[0], op_id);
-
-        assert!(has_removed);
-        let op_ids = fault_detection.get_unfulfilled_ops(nodes[0]);
-        assert_eq!(2, op_ids.len());
-        assert_eq!(OperationId([1; 32]), op_ids[0]);
-        assert_eq!(OperationId([3; 32]), op_ids[1]);
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn request_operation_fulfilled_should_return_false_for_node_with_no_ops() -> Result<()> {
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut fault_detection = FaultDetection::new(nodes.clone());
-        let op_id = OperationId([2; 32]);
-
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([2; 32])));
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([3; 32])));
-
-        let has_removed = fault_detection.request_operation_fulfilled(&nodes[1], op_id);
-
-        assert!(!has_removed);
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn request_operation_fulfilled_should_return_false_when_op_id_not_tracked() -> Result<()>
-    {
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut fault_detection = FaultDetection::new(nodes.clone());
-        let op_id = OperationId([4; 32]);
-
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([1; 32])));
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([2; 32])));
-        fault_detection.track_issue(nodes[0], IssueType::RequestOperation(OperationId([3; 32])));
-
-        let has_removed = fault_detection.request_operation_fulfilled(&nodes[1], op_id);
-
-        assert!(!has_removed);
-        let op_ids = fault_detection.get_unfulfilled_ops(nodes[0]);
-        assert_eq!(3, op_ids.len());
         Ok(())
     }
 }
