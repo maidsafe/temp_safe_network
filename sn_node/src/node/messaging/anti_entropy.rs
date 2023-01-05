@@ -733,7 +733,10 @@ mod tests {
         Ok(WireMsg::new_msg(
             msg_id,
             payload,
-            MsgKind::Node(sender.name()),
+            MsgKind::Node {
+                name: sender.name(),
+                is_join: matches!(payload_msg, NodeMsg::JoinRequest(_)),
+            },
             dst,
         ))
     }

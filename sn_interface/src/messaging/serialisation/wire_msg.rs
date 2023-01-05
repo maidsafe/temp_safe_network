@@ -7,17 +7,18 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::wire_msg_header::WireMsgHeader;
+
 use crate::messaging::{
     data::{ClientDataResponse, ClientMsg},
     system::{NodeDataResponse, NodeMsg},
     AuthorityProof, Dst, Error, MsgId, MsgKind, MsgType, Result,
 };
-use crate::network_knowledge::MyNodeInfo;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use custom_debug::Debug;
 use qp2p::UsrMsgBytes;
 use serde::Serialize;
+use xor_name::XorName;
 
 /// In order to send a message over the wire, it needs to be serialized
 /// along with a header (`WireMsgHeader`) which contains the information needed
@@ -81,26 +82,19 @@ impl WireMsg {
     }
 
     /// Serialize into a WireMsg for Node Join
-    pub fn single_src_node_join(node: &MyNodeInfo, dst: Dst, msg: NodeMsg) -> Result<WireMsg> {
+    pub fn single_src_node(name: XorName, dst: Dst, msg: NodeMsg) -> Result<WireMsg> {
         let msg_payload = WireMsg::serialize_msg_payload(&msg)
-            .map_err(|_| Error::Serialisation("Could not serialise node join msg".to_string()))?;
+            .map_err(|_| Error::Serialisation("Could not serialise node msg".to_string()))?;
 
         let wire_msg = WireMsg::new_msg(
             MsgId::new(),
             msg_payload,
-            MsgKind::NodeJoin(node.name()),
+            MsgKind::Node {
+                name,
+                is_join: matches!(msg, NodeMsg::JoinRequest(_)),
+            },
             dst,
         );
-
-        Ok(wire_msg)
-    }
-
-    /// Serialize into a WireMsg for Node Join
-    pub fn single_src_node(node: &MyNodeInfo, dst: Dst, msg: NodeMsg) -> Result<WireMsg> {
-        let msg_payload = WireMsg::serialize_msg_payload(&msg)
-            .map_err(|_| Error::Serialisation("Could not serialise node msg".to_string()))?;
-
-        let wire_msg = WireMsg::new_msg(MsgId::new(), msg_payload, MsgKind::Node(node.name()), dst);
 
         Ok(wire_msg)
     }
@@ -226,7 +220,7 @@ impl WireMsg {
                     msg,
                 })
             }
-            MsgKind::Node(_) | MsgKind::NodeJoin(_) => {
+            MsgKind::Node { .. } => {
                 let msg: NodeMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Node signed message payload as Msgpack: {}", err))
                 })?;
@@ -304,7 +298,10 @@ mod tests {
         let msg = NodeMsg::HandoverAE(100);
 
         let payload = WireMsg::serialize_msg_payload(&msg)?;
-        let kind = MsgKind::Node(Default::default());
+        let kind = MsgKind::Node {
+            name: Default::default(),
+            is_join: true,
+        };
         let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
         let serialized = wire_msg.serialize()?;
 

@@ -90,13 +90,13 @@ impl MsgListener {
                             is_from_client = true;
                             auth.public_key.into()
                         }
-                        MsgKind::NodeJoin(name) => {
-                            is_node_join_msg = true;
+                        MsgKind::Node { name, is_join } => {
+                            is_node_join_msg = *is_join;
                             *name
                         }
-                        MsgKind::Node(name)
-                        | MsgKind::ClientDataResponse(name)
-                        | MsgKind::NodeDataResponse(name) => *name,
+                        MsgKind::ClientDataResponse(name) | MsgKind::NodeDataResponse(name) => {
+                            *name
+                        }
                     };
 
                     let peer = Peer::new(src_name, remote_address);
