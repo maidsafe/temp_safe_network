@@ -38,68 +38,63 @@ use xor_name::XorName;
 
 impl MyNode {
     /// Forms a `QueryError` msg to send back to the client on a stream
-    pub(crate) async fn send_query_error_response_over_stream(
-        context: &NodeContext,
+    pub(crate) fn send_query_error_response_over_stream(
+        context: NodeContext,
         error: Error,
         query: &DataQueryVariant,
-        source_peer: Peer,
+        source_client: Peer,
         correlation_id: MsgId,
         send_stream: SendStream,
-    ) -> Result<()> {
-        let the_error_msg = ClientDataResponse::QueryResponse {
+    ) -> Cmd {
+        let msg = ClientDataResponse::QueryResponse {
             response: query.to_error_response(error.into()),
             correlation_id,
         };
 
-        let (kind, payload) = MyNode::serialize_client_msg_response(context.name, the_error_msg)?;
-
-        MyNode::send_msg_on_stream(
-            context.network_knowledge.section_key(),
-            payload,
-            kind,
-            send_stream,
-            source_peer,
+        Cmd::SendClientResponse {
+            msg,
             correlation_id,
-        )
-        .await
+            send_stream,
+            context,
+            source_client,
+        }
     }
 
     /// Forms a `CmdError` msg to send back to the client over the response stream
-    pub(crate) async fn send_cmd_error_response_over_stream(
-        context: &NodeContext,
+    pub(crate) fn send_cmd_error_response_over_stream(
+        context: NodeContext,
         cmd: DataCmd,
         error: Error,
         correlation_id: MsgId,
         send_stream: SendStream,
         source_client: Peer,
-    ) -> Result<()> {
+    ) -> Cmd {
         let msg = ClientDataResponse::CmdResponse {
             response: cmd.to_error_response(error.into()),
             correlation_id,
         };
 
         debug!("{correlation_id:?} sending cmd response error back to client");
-        MyNode::respond_to_client_over_stream(
+        Cmd::SendClientResponse {
             msg,
             correlation_id,
             send_stream,
             context,
             source_client,
-        )
-        .await
+        }
     }
 
     /// Handle data query
     #[allow(clippy::too_many_arguments)]
     pub(crate) async fn handle_data_query_where_stored(
-        context: &NodeContext,
+        context: NodeContext,
         operation_id: OperationId,
         query: &DataQueryVariant,
         auth: ClientAuth,
-        requesting_elder: Peer,
+        requesting_peer: Peer,
         msg_id: MsgId,
         send_stream: Option<SendStream>,
-    ) -> Result<()> {
+    ) -> Vec<Cmd> {
         let response = context
             .data_storage
             .query(query, User::Key(auth.public_key))
@@ -112,22 +107,17 @@ impl MyNode {
                 operation_id,
             };
 
-            let (kind, payload) = MyNode::serialize_node_msg_response(context.name, msg)?;
-
-            MyNode::send_msg_on_stream(
-                context.network_knowledge.section_key(),
-                payload,
-                kind,
+            vec![Cmd::SendNodeResponse {
+                msg,
+                correlation_id: msg_id,
                 send_stream,
-                requesting_elder,
-                msg_id,
-            )
-            .await?;
+                context,
+                requesting_peer,
+            }]
         } else {
-            error!("Send stream missing from {requesting_elder:?}, data request response was not sent out.");
+            error!("Send stream missing from {requesting_peer:?}, data request response was not sent out.");
+            vec![]
         }
-
-        Ok(())
     }
 
     /// Handle incoming client msgs.
@@ -150,7 +140,7 @@ impl MyNode {
             ClientMsg::Cmd(cmd) => cmd,
             ClientMsg::Query(query) => {
                 return MyNode::read_data_and_respond_to_client(
-                    &context,
+                    context,
                     query,
                     msg_id,
                     auth,
@@ -206,16 +196,15 @@ impl MyNode {
             Ok(data) => data,
             Err(error) => {
                 debug!("Will send error response back to client");
-                MyNode::send_cmd_error_response_over_stream(
-                    &context,
+                let cmd = MyNode::send_cmd_error_response_over_stream(
+                    context,
                     cmd,
                     error,
                     msg_id,
                     send_stream,
                     origin,
-                )
-                .await?;
-                return Ok(vec![]);
+                );
+                return Ok(vec![cmd]);
             }
         };
 
@@ -234,22 +223,21 @@ impl MyNode {
 
             debug!("Will send error response back to client");
 
-            MyNode::send_cmd_error_response_over_stream(
-                &context,
+            let cmd = MyNode::send_cmd_error_response_over_stream(
+                context,
                 cmd,
                 error,
                 msg_id,
                 send_stream,
                 origin,
-            )
-            .await?;
-            return Ok(vec![]);
+            );
+            return Ok(vec![cmd]);
         }
 
         // the store msg sent to nodes
         // cmds here may be fault tracking.
         // CmdAcks are sent over the send stream herein
-        MyNode::store_data_at_nodes_and_ack_to_client(
+        let cmds = MyNode::store_data_at_nodes_and_ack_to_client(
             &context,
             cmd,
             data,
@@ -262,7 +250,7 @@ impl MyNode {
 
         // TODO: handle failed responses
 
-        Ok(vec![])
+        Ok(cmds)
     }
 
     // helper to extract the contents of the cmd as ReplicatedData

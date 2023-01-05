@@ -49,12 +49,11 @@ impl MyNode {
         let section_pk = PublicKey::Bls(context.network_knowledge.section_key());
         let node_keypair = Keypair::Ed25519(context.keypair.clone());
         let data_addr = data.address();
-        let our_node_name = context.name;
 
         trace!("About to store data from {original_msg_id:?}: {data_addr:?}");
 
-        // This may return a DatabaseFull error... but we should have reported StorageError::NotEnoughSpace
-        // well before this
+        // This may return a DatabaseFull error... but we should have
+        // reported StorageError::NotEnoughSpace well before this
         let response = match context
             .data_storage
             .store(&data, section_pk, node_keypair.clone())
@@ -98,22 +97,18 @@ impl MyNode {
             }
         };
 
-        if let Some(stream) = response_stream {
+        if let Some(send_stream) = response_stream {
             let msg = NodeDataResponse::CmdResponse {
                 response,
                 correlation_id: original_msg_id,
             };
-            let (kind, payload) = MyNode::serialize_node_msg_response(our_node_name, msg)?;
-
-            MyNode::send_msg_on_stream(
-                context.network_knowledge.section_key(),
-                payload,
-                kind,
-                stream,
-                target,
-                original_msg_id,
-            )
-            .await?;
+            cmds.push(Cmd::SendNodeResponse {
+                msg,
+                correlation_id: original_msg_id,
+                send_stream,
+                context: context.clone(),
+                requesting_peer: target,
+            });
         } else {
             error!("Cannot respond over stream, none exists after storing! {data_addr:?}");
         }
@@ -446,8 +441,8 @@ impl MyNode {
                     msg_id, operation_id
                 );
 
-                MyNode::handle_data_query_where_stored(
-                    &context,
+                let cmds = MyNode::handle_data_query_where_stored(
+                    context,
                     operation_id,
                     &query,
                     auth,
@@ -455,8 +450,8 @@ impl MyNode {
                     msg_id,
                     send_stream,
                 )
-                .await?;
-                Ok(vec![])
+                .await;
+                Ok(cmds)
             }
             NodeMsg::RequestHandover { sap, sig_share } => {
                 info!("RequestHandover with msg_id {msg_id:?}");

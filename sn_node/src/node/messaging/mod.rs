@@ -18,6 +18,7 @@ mod relocation;
 mod section_state;
 mod serialize;
 mod signature;
+pub(crate) mod streams;
 mod update_section;
 
 use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result};

@@ -13,8 +13,8 @@ use sn_consensus::Decision;
 use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
-        data::ClientMsg,
-        system::{NodeMsg, SectionSig, SectionSigned},
+        data::{ClientDataResponse, ClientMsg},
+        system::{NodeDataResponse, NodeMsg, SectionSig, SectionSigned},
         AuthorityProof, ClientAuth, MsgId, WireMsg,
     },
     network_knowledge::{NodeState, SectionAuthorityProvider, SectionKeyShare, SectionsDAG},
@@ -117,6 +117,35 @@ pub(crate) enum Cmd {
         #[debug(skip)]
         context: NodeContext,
     },
+    /// Performs serialisation and sends the msg to the client over the given stream.
+    SendClientResponse {
+        msg: ClientDataResponse,
+        correlation_id: MsgId,
+        send_stream: SendStream,
+        #[debug(skip)]
+        context: NodeContext,
+        source_client: Peer,
+    },
+    /// Performs serialisation and sends the msg to the peer node over the given stream.
+    SendNodeResponse {
+        msg: NodeDataResponse,
+        correlation_id: MsgId,
+        send_stream: SendStream,
+        #[debug(skip)]
+        context: NodeContext,
+        requesting_peer: Peer,
+    },
+    /// Performs serialisation and sends the msg to the peer node over a new bi-stream,
+    /// awaiting for a response which is forwarded to the client.
+    SendMsgAndAwaitResponse {
+        msg_id: MsgId,
+        msg: NodeMsg,
+        #[debug(skip)]
+        context: NodeContext,
+        recipient: Peer,
+        client_stream: SendStream,
+        source_client: Peer,
+    },
     /// Performs serialisation and signing and sends the msg after reading NodeContext
     /// from the node
     ///
@@ -176,7 +205,10 @@ impl Cmd {
     pub(crate) fn statemap_state(&self) -> sn_interface::statemap::State {
         use sn_interface::statemap::State;
         match self {
-            Cmd::SendMsg { .. } => State::Comms,
+            Cmd::SendMsg { .. }
+            | Cmd::SendClientResponse { .. }
+            | Cmd::SendNodeResponse { .. }
+            | Cmd::SendMsgAndAwaitResponse { .. } => State::Comms,
             Cmd::SendLockingJoinMsg { .. } => State::Comms,
             Cmd::HandleFailedSendToNode { .. } => State::Comms,
             Cmd::HandleMsg { .. } => State::HandleMsg,
@@ -215,6 +247,9 @@ impl fmt::Display for Cmd {
             Cmd::HandleMembershipDecision(_) => write!(f, "HandleMembershipDecision"),
             Cmd::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
             Cmd::SendMsg { .. } => write!(f, "SendMsg"),
+            Cmd::SendClientResponse { .. } => write!(f, "SendClientResponse"),
+            Cmd::SendNodeResponse { .. } => write!(f, "SendNodeResponse"),
+            Cmd::SendMsgAndAwaitResponse { .. } => write!(f, "SendMsgAndAwaitResponse"),
             Cmd::SendLockingJoinMsg { .. } => write!(f, "SendLockingJoinMsg"),
             Cmd::EnqueueDataForReplication { .. } => write!(f, "EnqueueDataForReplication"),
             Cmd::TrackNodeIssue { name, issue } => {

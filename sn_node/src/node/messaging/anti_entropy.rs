@@ -109,15 +109,15 @@ impl MyNode {
         if !context.is_elder {
             trace!("Redirecting from Adult to our section Elders upon {msg_id:?}");
             let section_tree_update = MyNode::generate_ae_section_tree_update(&context, None);
-            MyNode::send_ae_response_to_client(
-                &context,
-                &origin,
+            let cmd = MyNode::send_ae_response_to_client(
+                msg_id,
+                context,
+                origin,
                 send_stream,
                 wire_msg.serialize()?,
                 section_tree_update,
-            )
-            .await?;
-            return Ok(vec![]);
+            );
+            return Ok(vec![cmd]);
         }
 
         match MyNode::check_for_entropy(&context, msg_id, &dst)? {
@@ -136,16 +136,16 @@ impl MyNode {
                 );
 
                 let bounced_msg = wire_msg.serialize()?;
-                MyNode::send_ae_response_to_client(
-                    &context,
-                    &origin,
+                let cmd = MyNode::send_ae_response_to_client(
+                    msg_id,
+                    context,
+                    origin,
                     send_stream,
                     bounced_msg,
                     section_tree_update,
-                )
-                .await?;
+                );
 
-                Ok(vec![])
+                Ok(vec![cmd])
             }
         }
     }
@@ -514,34 +514,29 @@ impl MyNode {
     }
 
     // Generate an AE response msg for the given message and send it to the client
-    async fn send_ae_response_to_client(
-        context: &NodeContext,
-        sender: &Peer,
-        client_response_stream: SendStream,
+    fn send_ae_response_to_client(
+        correlation_id: MsgId,
+        context: NodeContext,
+        source_client: Peer,
+        response_stream: SendStream,
         bounced_msg: UsrMsgBytes,
         section_tree_update: SectionTreeUpdate,
-    ) -> Result<()> {
+    ) -> Cmd {
         trace!(
-            "{} in send_ae_response_to_client {sender:?} ",
+            "{} in send_ae_response_to_client {source_client:?} in response to {correlation_id:?}",
             LogMarker::AeSendRetryAsOutdated
         );
 
-        let ae_msg = ClientDataResponse::AntiEntropy {
-            section_tree_update,
-            bounced_msg,
-        };
-        let (kind, payload) = MyNode::serialize_client_msg_response(context.name, ae_msg)?;
-        let msg_id = MsgId::new();
-
-        MyNode::send_msg_on_stream(
-            context.network_knowledge.section_key(),
-            payload,
-            kind,
-            client_response_stream,
-            *sender,
-            msg_id,
-        )
-        .await
+        Cmd::SendClientResponse {
+            msg: ClientDataResponse::AntiEntropy {
+                section_tree_update,
+                bounced_msg,
+            },
+            correlation_id,
+            send_stream: response_stream,
+            context,
+            source_client,
+        }
     }
 }
 
