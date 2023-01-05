@@ -8,6 +8,7 @@
 
 mod anti_entropy;
 mod client_msgs;
+mod data;
 mod dkg;
 mod handover;
 mod join;
