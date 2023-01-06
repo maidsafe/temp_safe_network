@@ -49,7 +49,6 @@ impl Dispatcher {
                 msg,
                 msg_id,
                 recipients,
-                send_stream,
             } => {
                 info!("[NODE READ]: getting lock for joins endmsg");
                 let context = self.node().read().await.context();
@@ -58,7 +57,7 @@ impl Dispatcher {
                     msg,
                     msg_id,
                     recipients,
-                    send_stream,
+                    send_stream: None,
                     context,
                 }])
             }
