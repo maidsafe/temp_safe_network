@@ -58,3 +58,24 @@ pub enum JoinRejectionReason {
     /// The requesting node is not externally reachable
     NodeNotReachable(SocketAddr),
 }
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum InfantJoinResponse {
+    /// Message sent to joining infant
+    Approved,
+    /// Join was rejected
+    Rejected(InfantJoinRejectionReason),
+}
+
+/// Reason of a join request being rejected
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum InfantJoinRejectionReason {
+    /// No new infants are currently accepted for joining.
+    Full,
+    /// The provided name/key does not match the section.
+    WrongSection,
+    /// The called node is not an Elder.
+    WrongNodeCalled,
+    /// The age encoded in the infant name/key does not equal the expected age for new infants.
+    InvalidAge { provided: u8, expected: u8 },
+}

@@ -227,6 +227,12 @@ impl Dispatcher {
                 debug!("[NODE WRITE]: propose offline write got");
                 node.cast_offline_proposals(&names)
             }
+            Cmd::RemoveInfant(name) => {
+                let mut node = self.node.write().await;
+                debug!("[NODE WRITE]: Removing infant..");
+                node.infants.remove(name);
+                Ok(vec![])
+            }
             Cmd::SetJoinsAllowed(joins_allowed) => {
                 let mut node = self.node.write().await;
                 debug!("[NODE WRITE]: Setting joins allowed..");

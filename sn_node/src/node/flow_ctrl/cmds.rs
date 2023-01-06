@@ -60,6 +60,8 @@ pub(crate) enum Cmd {
     SetJoinsAllowed(bool),
     /// Allows joining of new nodes until the section splits.
     SetJoinsAllowedUntilSplit(bool),
+    /// Removes an infant.
+    RemoveInfant(XorName),
     /// Add an issue to the tracking of a node's faults
     TrackNodeIssue { name: XorName, issue: IssueType },
     UpdateNetworkAndHandleValidClientMsg {
@@ -221,6 +223,7 @@ impl Cmd {
             Cmd::EnqueueDataForReplication { .. } => State::Replication,
             Cmd::SetJoinsAllowed { .. } => State::Data,
             Cmd::SetJoinsAllowedUntilSplit { .. } => State::Data,
+            Cmd::RemoveInfant(_) => State::Data,
         }
     }
 }
@@ -256,6 +259,7 @@ impl fmt::Display for Cmd {
             Cmd::ProposeVoteNodesOffline(_) => write!(f, "ProposeOffline"),
             Cmd::SetJoinsAllowed { .. } => write!(f, "SetJoinsAllowed"),
             Cmd::SetJoinsAllowedUntilSplit { .. } => write!(f, "SetJoinsAllowedUntilSplit"),
+            Cmd::RemoveInfant(_) => write!(f, "RemoveInfant"),
         }
     }
 }

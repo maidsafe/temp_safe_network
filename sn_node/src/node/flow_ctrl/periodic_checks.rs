@@ -318,7 +318,22 @@ impl FlowCtrl {
     async fn vote_out_faulty_nodes(&mut self) -> Vec<Cmd> {
         info!("Voting out faulty nodes");
         let mut cmds = vec![];
-        let faulty_nodes = self.get_faulty_node_names().await;
+        let mut faulty_nodes = self.get_faulty_node_names().await;
+
+        {
+            // do not put load on voting system for infants, simply remove them..
+            let node = self.node.read().await;
+            // todo: replace with drain_filter
+            let mut infants = faulty_nodes.clone();
+            infants.retain(|name| node.infants.exists(*name));
+            faulty_nodes.retain(|name| !infants.contains(name));
+            if !infants.is_empty() {
+                let mut node = self.node.write().await;
+                infants
+                    .into_iter()
+                    .for_each(|name| node.infants.remove(name));
+            }
+        }
 
         if !faulty_nodes.is_empty() {
             debug!("{:?} : {faulty_nodes:?}", LogMarker::ProposeOffline);

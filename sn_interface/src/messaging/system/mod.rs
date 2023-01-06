@@ -20,7 +20,9 @@ use crate::network_knowledge::{NodeState, SapCandidate, SectionTreeUpdate};
 use crate::SectionAuthorityProvider;
 
 pub use dkg::DkgSessionId;
-pub use join::{JoinRejectionReason, JoinRequest, JoinResponse};
+pub use join::{
+    InfantJoinRejectionReason, InfantJoinResponse, JoinRejectionReason, JoinRequest, JoinResponse,
+};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use node_msgs::{NodeDataCmd, NodeDataQuery, NodeEvent, NodeQueryResponse};
 pub use op_id::OperationId;
@@ -93,6 +95,10 @@ pub enum NodeMsg {
     MembershipVotes(Vec<SignedVote<NodeState>>),
     /// Membership Anti-Entropy request
     MembershipAE(Generation),
+    /// The request to join as an infant.
+    JoinAsInfant,
+    /// The response to a request to join as an infant.
+    InfantJoinResponse(InfantJoinResponse),
     /// Sent from a bootstrapping peer to the section requesting to join as a new member
     JoinRequest(JoinRequest),
     /// Response to a `JoinRequest`
@@ -253,6 +259,9 @@ impl NodeMsg {
 
             // Inter-node comms related to processing client data requests
             Self::NodeDataCmd(_) | Self::NodeDataQuery(_) => NODE_DATA_MSG_PRIORITY,
+
+            // Node joining as infant, lowest priority.
+            Self::JoinAsInfant | Self::InfantJoinResponse(_) => NODE_DATA_MSG_PRIORITY - 1,
         }
     }
 
@@ -264,6 +273,8 @@ impl NodeMsg {
             Self::Relocate(_) => State::Relocate,
             Self::MembershipAE(_) => State::Membership,
             Self::MembershipVotes(_) => State::Membership,
+            Self::JoinAsInfant => State::Join,
+            Self::InfantJoinResponse(_) => State::Join,
             Self::JoinRequest(_) => State::Join,
             Self::JoinResponse(_) => State::Join,
             Self::JoinAsRelocatedRequest(_) => State::Join,
@@ -293,6 +304,8 @@ impl Display for NodeMsg {
             Self::Relocate { .. } => write!(f, "NodeMsg::Relocate"),
             Self::MembershipVotes { .. } => write!(f, "NodeMsg::MembershipVotes"),
             Self::MembershipAE { .. } => write!(f, "NodeMsg::MembershipAE"),
+            Self::JoinAsInfant { .. } => write!(f, "NodeMsg::JoinAsInfant"),
+            Self::InfantJoinResponse { .. } => write!(f, "NodeMsg::InfantJoinResponse"),
             Self::JoinRequest { .. } => write!(f, "NodeMsg::JoinRequest"),
             Self::JoinResponse { .. } => write!(f, "NodeMsg::JoinResponse"),
             Self::JoinAsRelocatedRequest { .. } => {

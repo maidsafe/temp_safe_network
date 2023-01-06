@@ -19,6 +19,7 @@ mod dkg;
 pub(crate) mod error;
 mod flow_ctrl;
 mod handover;
+mod infants;
 mod logging;
 mod membership;
 mod messaging;
@@ -57,6 +58,7 @@ mod core {
             dkg::DkgVoter,
             flow_ctrl::{cmds::Cmd, fault_detection::FaultsCmd},
             handover::Handover,
+            infants::Infants,
             membership::{elder_candidates, try_split_dkg, Membership},
             messaging::Peers,
             DataStorage, Error, Result, XorName,
@@ -116,6 +118,7 @@ mod core {
         pub(crate) relocate_state: Option<Box<JoiningAsRelocated>>,
         // ======================== Elder only ========================
         pub(crate) membership: Option<Membership>,
+        pub(crate) infants: Infants,
         // Section handover consensus state (Some for Elders, None for others)
         pub(crate) handover_request_aggregator: SignatureAggregator,
         pub(crate) handover_voting: Option<Handover>,
@@ -142,6 +145,7 @@ mod core {
         pub(crate) joins_allowed_until_split: bool,
         #[debug(skip)]
         pub(crate) fault_cmds_sender: mpsc::Sender<FaultsCmd>,
+        pub(crate) infants: Infants,
     }
 
     impl NodeContext {
@@ -189,6 +193,7 @@ mod core {
                 joins_allowed_until_split: self.joins_allowed_until_split,
                 data_storage: self.data_storage.clone(),
                 fault_cmds_sender: self.fault_cmds_sender.clone(),
+                infants: self.infants.clone(),
             }
         }
 
@@ -258,6 +263,7 @@ mod core {
                 data_storage,
                 fault_cmds_sender,
                 membership,
+                infants: Infants::new(),
                 elder_promotion_aggregator: SignatureAggregator::default(),
                 handover_request_aggregator: SignatureAggregator::default(),
                 section_proposal_aggregator: SignatureAggregator::default(),

@@ -188,6 +188,14 @@ impl MyNode {
                 ));
                 Ok(cmds)
             }
+            NodeMsg::InfantJoinResponse(response) => {
+                // these responses are handled in separate flow, just like
+                // current join logic. (NB: Not yet added.)
+                debug!(
+                    "Relocation: Ignoring unexpected infant join response message: {response:?}"
+                );
+                Ok(vec![])
+            }
             // The AcceptedOnlineShare for relocation will be received here.
             NodeMsg::JoinResponse(join_response) => {
                 let mut node = node.write().await;
@@ -250,6 +258,12 @@ impl MyNode {
                 MyNode::handle_join_request(node, &context, sender, join_request)
                     .await
                     .map(|c| c.into_iter().collect())
+            }
+            NodeMsg::JoinAsInfant => {
+                trace!("Handling msg {:?}: JoinAsInfant from {}", msg_id, sender);
+                Ok(vec![
+                    MyNode::handle_infant_join(node, &context, sender).await,
+                ])
             }
             NodeMsg::JoinAsRelocatedRequest(join_request) => {
                 trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
@@ -395,8 +409,14 @@ impl MyNode {
                 // only when the node is severely out of sync with the rest, do we vote it off straight away
                 // othwerwise we report it as an issue (see further down)
                 if full && context.data_storage.is_below_half_limit() {
+                    let name = node_id.into();
+                    if context.infants.exists(name) {
+                        // infants add/remove are handled without consensus
+                        cmds.push(Cmd::RemoveInfant(name));
+                        return Ok(cmds);
+                    }
                     debug!("Node {node_id} prematurely reported full. Voting it off..");
-                    let nodes = BTreeSet::from([node_id.into()]);
+                    let nodes = BTreeSet::from([name]);
                     cmds.push(Cmd::ProposeVoteNodesOffline(nodes));
                     return Ok(cmds);
                 }

@@ -10,8 +10,8 @@ use crate::node::{core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Peers, MyN
 
 use sn_interface::{
     messaging::system::{
-        JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest,
-        JoinResponse, NodeMsg,
+        InfantJoinRejectionReason, InfantJoinResponse, JoinAsRelocatedRequest,
+        JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest, JoinResponse, NodeMsg,
     },
     network_knowledge::{MembershipState, NodeState, SectionAuthUtils, MIN_ADULT_AGE},
     types::{log_markers::LogMarker, Peer},
@@ -22,6 +22,51 @@ use tokio::sync::RwLock;
 
 // Message handling
 impl MyNode {
+    /// The handling of the infant nodes,
+    /// i.e. the newly joined nodes in the network.
+    ///
+    /// NB: This is a side-by-side impl and
+    /// does not interfere with current join logic.
+    pub(crate) async fn handle_infant_join(
+        node: Arc<RwLock<MyNode>>,
+        context: &NodeContext,
+        peer: Peer,
+    ) -> Cmd {
+        let our_prefix = context.network_knowledge.prefix();
+
+        let validation_error = if !context.is_elder {
+            // only Elders handle infants
+            Some(InfantJoinResponse::Rejected(
+                InfantJoinRejectionReason::WrongNodeCalled,
+            ))
+        } else if !our_prefix.matches(&peer.name()) {
+            // we need to have a name that is within the section prefix
+            Some(InfantJoinResponse::Rejected(
+                InfantJoinRejectionReason::WrongSection,
+            ))
+        } else {
+            None
+        };
+
+        if let Some(rejection) = validation_error {
+            return MyNode::send_system_msg(
+                NodeMsg::InfantJoinResponse(rejection),
+                Peers::Single(peer),
+                context.clone(),
+            );
+        }
+
+        let mut node = node.write().await;
+        let result = node.infants.add(peer);
+
+        trace!("Sending {:?} to {}", result, peer);
+        MyNode::send_system_msg(
+            NodeMsg::InfantJoinResponse(result),
+            Peers::Single(peer),
+            context.clone(),
+        )
+    }
+
     pub(crate) async fn handle_join_request(
         node: Arc<RwLock<MyNode>>,
         context: &NodeContext,
