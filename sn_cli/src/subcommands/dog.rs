@@ -13,7 +13,7 @@ use super::{
     OutputFmt,
 };
 use clap::Args;
-use color_eyre::Result;
+use color_eyre::{eyre::eyre, Help, Result};
 use sn_api::{
     resolver::{ContentType, SafeData},
     Safe, SafeUrl,
@@ -24,12 +24,16 @@ use tracing::debug;
 pub struct DogCommands {
     /// The safe:// location to inspect
     location: Option<String>,
+    /// Query all the data replicas matching the given indexes to check they hold a
+    /// copy of the content. E.g. -r0 -r2 will query replicas at index 0 and 2.
+    #[clap(short = 'r', long = "replicas")]
+    replicas: Vec<usize>,
 }
 
 pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &Safe) -> Result<()> {
     let link = get_from_arg_or_stdin(cmd.location, None)?;
     let url = get_target_url(&link)?;
-    debug!("Running dog for: {}", &url);
+    debug!("Running dog for: {url}");
 
     let resolved_content = safe.inspect(&url.to_string()).await?;
     if OutputFmt::Pretty != output_fmt {
@@ -38,6 +42,8 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &Safe)
             serialise_output(&(url.to_string(), resolved_content), output_fmt)
         );
     } else {
+        let num_of_resolutions = resolved_content.len();
+        let replicas_indexes = cmd.replicas;
         for (i, ref content) in resolved_content.iter().enumerate() {
             println!();
             println!("== URL resolution step {} ==", i + 1);
@@ -51,13 +57,13 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &Safe)
                     ..
                 } => {
                     println!("= NRS Map Container =");
-                    println!("XOR-URL: {}", xorurl);
-                    println!("Type tag: {}", type_tag);
+                    println!("XOR-URL: {xorurl}");
+                    println!("Type tag: {type_tag}");
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
-                    println!("Native data type: {}", data_type);
+                    println!("Native data type: {data_type}");
                     let mut safeurl = SafeUrl::from_url(xorurl)?;
                     safeurl.set_content_type(ContentType::Raw)?;
-                    println!("Native data XOR-URL: {}", safeurl);
+                    println!("Native data XOR-URL: {safeurl}");
                     print_nrs_map(nrs_map);
                 }
                 SafeData::NrsEntry {
@@ -68,12 +74,12 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &Safe)
                     resolved_from,
                     version,
                 } => {
-                    println!("Resolved from: {}", resolved_from);
+                    println!("Resolved from: {resolved_from}");
                     println!("= NrsEntry =");
-                    println!("Public name: {}", public_name);
-                    println!("Target XOR-URL: {}", xorurl);
-                    println!("Target native data type: {}", data_type);
-                    println!("Resolves into: {}", resolves_into);
+                    println!("Public name: {public_name}");
+                    println!("Target XOR-URL: {xorurl}");
+                    println!("Target native data type: {data_type}");
+                    println!("Resolves into: {resolves_into}");
                     println!(
                         "Version: {}",
                         version.map_or("none".to_string(), |v| v.to_string())
@@ -88,19 +94,19 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &Safe)
                     resolved_from,
                     ..
                 } => {
-                    println!("Resolved from: {}", resolved_from);
+                    println!("Resolved from: {resolved_from}");
                     println!("= FilesContainer =");
-                    println!("XOR-URL: {}", xorurl);
+                    println!("XOR-URL: {xorurl}");
                     println!(
                         "Version: {}",
                         version.map_or("none".to_string(), |v| v.to_string())
                     );
-                    println!("Type tag: {}", type_tag);
+                    println!("Type tag: {type_tag}");
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
-                    println!("Native data type: {}", data_type);
+                    println!("Native data type: {data_type}");
                     let mut safeurl = SafeUrl::from_url(xorurl)?;
                     safeurl.set_content_type(ContentType::Raw)?;
-                    println!("Native data XOR-URL: {}", safeurl);
+                    println!("Native data XOR-URL: {safeurl}");
                 }
                 SafeData::PublicFile {
                     xorurl,
@@ -109,9 +115,9 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &Safe)
                     resolved_from,
                     ..
                 } => {
-                    println!("Resolved from: {}", resolved_from);
+                    println!("Resolved from: {resolved_from}");
                     println!("= File =");
-                    println!("XOR-URL: {}", xorurl);
+                    println!("XOR-URL: {xorurl}");
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
                     println!("Native data type: PublicFile");
                     println!(
@@ -130,14 +136,14 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &Safe)
                     ..
                 } => {
                     let safeurl = SafeUrl::from_xorurl(xorurl)?;
-                    println!("Resolved from: {}", resolved_from);
+                    println!("Resolved from: {resolved_from}");
                     if safeurl.content_type() == ContentType::Wallet {
                         println!("= Wallet =");
                     } else {
                         println!("= Multimap =");
                     }
-                    println!("XOR-URL: {}", xorurl);
-                    println!("Type tag: {}", type_tag);
+                    println!("XOR-URL: {xorurl}");
+                    println!("Type tag: {type_tag}");
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
                     println!("Native data type: Register");
                 }
@@ -148,12 +154,45 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &Safe)
                     type_tag,
                     ..
                 } => {
-                    println!("Resolved from: {}", resolved_from);
+                    println!("Resolved from: {resolved_from}");
                     println!("= Register =");
-                    println!("XOR-URL: {}", xorurl);
-                    println!("Type tag: {}", type_tag);
+                    println!("XOR-URL: {xorurl}");
+                    println!("Type tag: {type_tag}");
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
                     println!("Native data type: Register");
+                }
+            }
+
+            // If this is the last resolution step, and a set of replicas indexes was provided,
+            // then query all data replicas and print out a report.
+            if !replicas_indexes.is_empty() && i == num_of_resolutions - 1 {
+                println!();
+                println!("== Checking data replicas of resolved content ==");
+                let xorurl = content.xorurl();
+                println!("XOR-URL: {xorurl}");
+                let replicated_content = safe
+                    .check_replicas(&xorurl, &replicas_indexes)
+                    .await
+                    .map_err(|err| {
+                        eyre!(err)
+                            .wrap_err(format!(
+                                "Could not check data replicas for content at {xorurl}."
+                            ))
+                            .suggestion("Try the command again with an appropriate Url.")
+                    })?;
+
+                println!("Replicas indexes queried: {replicas_indexes:?}");
+                println!("Content composed of {} chunk/s:", replicated_content.len());
+                for content in replicated_content {
+                    println!("= Chunk at XOR name 0x{} =", xorname_to_hex(&content.name));
+                    for (replica_index, outcome) in content.outcomes {
+                        if let Err(err) = outcome {
+                            println!("Replica #{replica_index}: {err}");
+                        } else {
+                            println!("Replica #{replica_index}: Ok!");
+                        }
+                    }
+                    println!();
                 }
             }
         }

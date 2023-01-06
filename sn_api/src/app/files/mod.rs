@@ -11,6 +11,8 @@ mod files_map;
 mod metadata;
 mod realpath;
 
+use sn_client::QueriedDataReplicas;
+
 use crate::{
     app::consts::*, app::nrs::VersionHash, resolver::Range, ContentType, DataType, Error, Result,
     Safe, SafeUrl, XorUrl,
@@ -661,7 +663,7 @@ impl Safe {
     }
 
     async fn get_bytes(&self, address: XorName, range: Range) -> Result<Bytes> {
-        debug!("Attempting to fetch data from {:?}", address);
+        debug!("Attempting to fetch data from {address:?}");
         let client = self.get_safe_client()?;
         let data = if let Some((start, end)) = range {
             let start = start.map(|start_index| start_index as usize).unwrap_or(0);
@@ -673,15 +675,39 @@ impl Safe {
         } else {
             client.read_bytes(address).await
         }
-        .map_err(|e| Error::NetDataError(format!("Failed to GET file: {:?}", e)))?;
+        .map_err(|err| Error::NetDataError(format!("Failed to GET file: {err:?}")))?;
 
         debug!(
-            "{} bytes of data successfully retrieved from: {:?}",
+            "{} bytes of data successfully retrieved from: {address:?}",
             data.len(),
-            address
         );
 
         Ok(data)
+    }
+
+    /// Fetch a file with the provided `SafeUrl`, without performing any type of URL resolution,
+    /// from each of the data replicas on the network that match each of the indexes provided.
+    pub(crate) async fn fetch_data_replicas(
+        &self,
+        safe_url: &SafeUrl,
+        replicas_indexes: &[usize],
+    ) -> Result<Vec<QueriedDataReplicas>> {
+        match safe_url.data_type() {
+            DataType::File => {
+                let addr = safe_url.xorname();
+                debug!("Attempting to fetch data from {addr:?}, with replicas indexes: {replicas_indexes:?}");
+                let client = self.get_safe_client()?;
+                client
+                    .read_bytes_from_replicas(addr, replicas_indexes)
+                    .await
+                    .map_err(|err| {
+                        Error::NetDataError(format!("Failed to GET file from replicas: {err:?}"))
+                    })
+            }
+            other => Err(Error::ContentError(format!(
+                "Cannot fetch a File from data replicas since the Url targets a {other}"
+            ))),
+        }
     }
 
     // Private helper to serialise a FilesMap and store it in a file
@@ -690,8 +716,7 @@ impl Safe {
         // an entry containing the XOR-URL of the file that contains the serialised NrsMap.
         let serialised_files_map = serde_json::to_string(&files_map).map_err(|err| {
             Error::Serialisation(format!(
-                "Couldn't serialise the FilesMap generated: {:?}",
-                err
+                "Couldn't serialise the FilesMap generated: {err:?}"
             ))
         })?;
 
