@@ -155,7 +155,6 @@ pub(crate) enum Cmd {
         msg: NodeMsg,
         msg_id: MsgId,
         recipients: Peers,
-        send_stream: Option<SendStream>,
     },
     /// Proposes peers as offline
     ProposeVoteNodesOffline(BTreeSet<XorName>),
@@ -183,7 +182,6 @@ impl Cmd {
             msg,
             msg_id,
             recipients,
-            send_stream: None,
         }
     }
 
