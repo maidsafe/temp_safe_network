@@ -23,9 +23,7 @@ pub enum MsgKind {
     /// A data response sent from a Node (along with its name) to the client
     ClientDataResponse(XorName),
     /// A message from a Node along with its name
-    Node(XorName),
-    /// A message from a Node waiting to join along with its name
-    NodeJoin(XorName),
+    Node { name: XorName, is_join: bool },
     /// A data response sent from an Adult (along with its name) to Elders
     NodeDataResponse(XorName),
 }

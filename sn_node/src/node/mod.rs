@@ -14,7 +14,6 @@ pub mod cfg;
 mod api;
 mod bootstrap;
 mod connectivity;
-mod data;
 mod dkg;
 pub(crate) mod error;
 mod flow_ctrl;
@@ -310,7 +309,10 @@ mod core {
                 // (We just need 1 Elder, since the ae probe will contain signed data.
                 // we keep calling a random elder out of a random section, so it's not a big deal if
                 // some times the call fails for what ever reason.)
-                let mut elders: Vec<_> = matching_section.elders().collect();
+                let mut elders: Vec<_> = matching_section
+                    .elders()
+                    .filter(|p| p.name() != context.name)
+                    .collect();
                 elders.shuffle(&mut OsRng);
 
                 // Should always get one non-self elder to send probe to. If cannot,

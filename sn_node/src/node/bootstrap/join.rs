@@ -354,8 +354,8 @@ impl<'a> Joiner<'a> {
             Vec::from_iter(recipients.iter().map(Peer::name))
         );
 
-        let wire_msg = WireMsg::single_src_node_join(
-            &self.node,
+        let wire_msg = WireMsg::single_src_node(
+            self.node.name(),
             Dst {
                 name: self.node.name(), // we want to target a section where our name fits
                 section_key,
@@ -1006,8 +1006,8 @@ mod tests {
         sender: &MyNodeInfo,
         section_pk: BlsPublicKey,
     ) {
-        let wire_msg = WireMsg::single_src_node_join(
-            sender,
+        let wire_msg = WireMsg::single_src_node(
+            sender.name(),
             Dst {
                 name: XorName::from(PublicKey::Bls(section_pk)),
                 section_key: section_pk,

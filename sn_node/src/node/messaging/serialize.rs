@@ -34,7 +34,10 @@ impl MyNode {
         msg: NodeMsg,
     ) -> Result<(MsgKind, Bytes)> {
         let payload = WireMsg::serialize_msg_payload(&msg)?;
-        let kind = MsgKind::Node(our_node_name);
+        let kind = MsgKind::Node {
+            name: our_node_name,
+            is_join: matches!(msg, NodeMsg::JoinRequest(_)),
+        };
         Ok((kind, payload))
     }
 
