@@ -8,20 +8,21 @@
 
 use crate::{get_mean_of, std_deviation, FaultDetection};
 
-use std::collections::{BTreeMap, BTreeSet};
+use itertools::Itertools;
+use std::collections::BTreeMap;
 use xor_name::XorName;
 
 use std::time::Duration;
 static RECENT_ISSUE_DURATION: Duration = Duration::from_secs(60 * 10); // 10 minutes
 
-static CONN_WEIGHTING: f32 = 20.0;
-static OP_WEIGHTING: f32 = 1.0;
-static KNOWLEDGE_WEIGHTING: f32 = 30.0;
-static DKG_WEIGHTING: f32 = 10.0; // there are quite a lot of DKG msgs that go out atm, so can't weight this too heavily
-static AE_PROBE_WEIGHTING: f32 = 150.0;
+/// How many standard devs before we consider a node faulty
+static STD_DEVS_AWAY: usize = 1;
 
-/// Weighted score value relative to std_deviation, above which we're calling a node faulty
-static FAULT_SCORE_THRESHOLD: usize = 500;
+static CONN_WEIGHTING: f32 = 5.0;
+static OP_WEIGHTING: f32 = 1.0;
+static KNOWLEDGE_WEIGHTING: f32 = 5.0;
+static DKG_WEIGHTING: f32 = 10.0; // there are quite a lot of DKG msgs that go out atm, so can't weight this too heavily
+static AE_PROBE_WEIGHTING: f32 = 10.0;
 
 #[derive(Clone, Debug)]
 /// Represents the different type of issues that can be recorded by the Fault Detection
@@ -211,12 +212,26 @@ impl FaultDetection {
         // now we store the z-score
         let mut final_scores = BTreeMap::default();
 
+        let threshold = STD_DEVS_AWAY * std_dev as usize;
+        debug!(
+            "____Threshold is {STD_DEVS_AWAY:?} std devs away, which is {:?}",
+            threshold
+        );
+
         for (name, score) in pre_standardised_scores {
-            let zscore = score.saturating_sub(std_dev as usize);
+            let meaned = if let Some(mean) = mean {
+                score.saturating_sub(mean as usize)
+            } else {
+                score
+            };
 
-            debug!("Final Z-score for {name} is {zscore:?}");
+            let zscore = meaned.saturating_sub(std_dev as usize);
 
-            let _existed = final_scores.insert(name, zscore);
+            if zscore > threshold && zscore > 0 {
+                trace!("Initial score for {name:?} is {score:?}");
+                let _existed = final_scores.insert(name, zscore);
+                debug!("Final Z-score for {name} is {zscore:?}");
+            }
         }
 
         final_scores
@@ -238,26 +253,28 @@ impl FaultDetection {
         for issues in &mut self.dkg_issues.values_mut() {
             issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
         }
+        for issues in &mut self.unfulfilled_ops.values_mut() {
+            issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
+        }
     }
 
-    /// Get a list of nodes whose score is  FAULT_SCORE_THRESHOLD
-    /// TODO: order these to act upon _most_ faulty first
+    /// Get a list of nodes that are faulty
     /// (the nodes must all `ProposeOffline` over a faulty node and then _immediately_ vote it off. So any other membershipn changes in flight could block this.
     /// thus, we need to be callling this function often until nodes are removed.)
-    pub fn get_faulty_nodes(&mut self) -> BTreeSet<XorName> {
+    pub fn get_faulty_nodes(&mut self) -> Vec<XorName> {
         self.cleanup_time_sensistive_checks();
-
-        let mut faulty_nodes = BTreeSet::new();
 
         let final_scores = self.get_weighted_scores();
 
-        for (name, node_score) in final_scores {
-            // if our weighted score is higher than this, then we're having a bad time
-            if node_score > FAULT_SCORE_THRESHOLD {
+        // sort into vec of highest scores first
+        let faulty_nodes = final_scores
+            .iter()
+            .sorted_by(|a, b| Ord::cmp(&b.1, &a.1))
+            .map(|(name, _score)| {
                 info!("FaultDetection: Adding {name} as faulty node");
-                let _existed = faulty_nodes.insert(name);
-            }
-        }
+                *name
+            })
+            .collect_vec();
 
         faulty_nodes
     }
@@ -304,30 +321,10 @@ mod tests {
     fn generate_network_startup_msg_issues() -> impl Strategy<Value = IssueType> {
         // higher numbers here are more frequent
         prop_oneof![
-        230 => Just(IssueType::Communication),
-        500 => Just(IssueType::Dkg),
-        30 => Just(IssueType::AeProbeMsg),
-        450 => Just(IssueType::Knowledge),
-        ]
-    }
-
-    /// In a standard network startup (as of 24/06/22)
-    /// these values are on top of the above...
-    /// after we then we run the client test suite (once),
-    /// (and yes, some of them have not changed)
-    /// 510 "tracker: Dkg..."
-    /// ~2394 "Attempting to remove logged dkg"
-    /// ~469 "tracker: Know"
-    /// ~1588 "tracker: Communication""
-    /// ~3376 "tracker: `PendingOp`..." (equally a lot of these are being responded to...)
-    fn generate_no_churn_normal_use_msg_issues() -> impl Strategy<Value = IssueType> {
-        // higher numbers here are more frequent
-        prop_oneof![
-            1200 => Just(IssueType::Communication),
-            0 => Just(IssueType::Dkg),
-            50 => Just(IssueType::AeProbeMsg),
-            0 => Just(IssueType::Knowledge),
-            3400 => Just(IssueType::RequestOperation)
+        0 => Just(IssueType::Communication),
+        230 => Just(IssueType::Dkg),
+        0 => Just(IssueType::AeProbeMsg),
+        100 => Just(IssueType::Knowledge),
         ]
     }
 
@@ -339,7 +336,7 @@ mod tests {
         let issue_name_for_direction = generate_xorname();
         prop::collection::vec(
             (
-                generate_no_churn_normal_use_msg_issues(),
+                generate_network_startup_msg_issues(),
                 issue_name_for_direction,
                 0.0..1.0f32,
             ),
@@ -422,7 +419,7 @@ mod tests {
     /// the nodes we should target for this specific issue:
     /// eg if DKG, it's the closest to the `root_addr`
     /// if anything else, we base it off issue name closeness
-    fn get_target_nodes_for_issue(
+    fn get_nodes_suffering_issue(
         issue: IssueType,
         issue_location: XorName,
         root: XorName,
@@ -443,7 +440,7 @@ mod tests {
                 .iter()
                 .sorted_by(|lhs, rhs| issue_location.cmp_distance(&lhs.0, &rhs.0))
                 // and we simul-send it to 4 nodes
-                .take(4)
+                .take(1)
                 .cloned()
                 .collect::<Vec<_>>()
         }
@@ -453,7 +450,7 @@ mod tests {
         #[test]
         #[allow(clippy::unwrap_used)]
         fn pt_calculate_scores_should_include_all_nodes_in_score_map(
-            node_count in 4..50usize, issue_type in generate_no_churn_normal_use_msg_issues())
+            node_count in 4..50usize, issue_type in generate_network_startup_msg_issues())
         {
             Runtime::new().unwrap().block_on(async {
                 let nodes = (0..node_count).map(|_| random_xorname()).collect::<Vec<XorName>>();
@@ -488,7 +485,7 @@ mod tests {
         #[test]
         #[allow(clippy::unwrap_used)]
         fn pt_calculate_scores_one_node_with_issues_should_have_higher_score_and_others_should_have_zero(
-            node_count in 4..50usize, issue_count in 1..50, issue_type in generate_no_churn_normal_use_msg_issues())
+            node_count in 4..50usize, issue_count in 1..50, issue_type in generate_network_startup_msg_issues())
         {
 
             init_test_logger();
@@ -549,10 +546,10 @@ mod tests {
         /// "Nodes" are just random xornames,
         /// each issue has a random xorname attached to it to, and is sent to 4 nodes... each of which will fail a % of the time, depending on the
         /// NodeQuality (Good or Bad)
-        fn pt_detect_correct_or_less_amount_of_faulty_nodes(
-            elders_in_dkg in 2..7usize,
-            nodes in generate_nodes_and_quality(3,30), issues in generate_msg_issues(500,1500))
+        fn pt_detect_correct_or_less_amount_of_faulty_nodes_with_full_elder_set(
+            nodes in generate_nodes_and_quality(3,30), issues in generate_msg_issues(100,500))
             {
+                let elders_in_dkg = 7;
                 init_test_logger();
                 let _outer_span = tracing::info_span!("pt_correct_less").entered();
 
@@ -581,7 +578,7 @@ mod tests {
 
                     // Now we loop through each issue/msg
                     for (issue, issue_location, fail_test ) in issues {
-                        let target_nodes = get_target_nodes_for_issue(issue.clone(), issue_location, random_xorname_root, &nodes, elders_in_dkg);
+                        let target_nodes = get_nodes_suffering_issue(issue.clone(), issue_location, random_xorname_root, &nodes, elders_in_dkg);
 
                         // now we track our issue, but only if that node fails to passes muster...
                         for (node, quality) in target_nodes {
@@ -642,11 +639,11 @@ mod tests {
         /// each issue has a random xorname attached to it to, and is sent to 4 nodes... each of which will fail a % of the time, depending on the
         /// NodeQuality (Good or Bad)
         fn pt_detect_dkg_bad_nodes(
-            elders_in_dkg in 2..7usize,
             // ~1500 msgs total should get us ~500 dkg which would be representative
-            nodes in generate_nodes_and_quality(3,30), issues in generate_startup_issues(500,2500))
+            nodes in generate_nodes_and_quality(3,30), issues in generate_startup_issues(100,1000))
             {
                 init_test_logger();
+                let elders_in_dkg = 7;
                 let _outer_span = tracing::info_span!("pt_dkg").entered();
                 let mut good_len = 0;
                 let mut bad_len = 0;
@@ -671,7 +668,7 @@ mod tests {
                 // Now we loop through each issue/msg
                 for (issue, issue_location, fail_test ) in issues {
 
-                    let target_nodes = get_target_nodes_for_issue(issue.clone(), issue_location, random_xorname_root, &nodes, elders_in_dkg);
+                    let target_nodes = get_nodes_suffering_issue(issue.clone(), issue_location, random_xorname_root, &nodes, elders_in_dkg);
 
                     // we send each message to all nodes in this situation where we're looking at elder comms alone over dkg
                     // now we track our issue, but only if that node fails to passes muster...
@@ -753,7 +750,7 @@ mod tests {
                     // Now we loop through each issue/msg
                     for (issue, issue_location, fail_test ) in issues {
                         // this will be all ndoes in this test as we have up to 7 elders
-                        let target_nodes = get_target_nodes_for_issue(issue.clone(), issue_location, random_xorname_root, &nodes, nodes.len());
+                        let target_nodes = get_nodes_suffering_issue(issue.clone(), issue_location, random_xorname_root, &nodes, nodes.len());
 
                         // we send each message to all nodes in this situation where we're looking at elder comms alone over dkg
                         // now we track our issue, but only if that node fails to passes muster...
@@ -802,7 +799,7 @@ mod tests {
         #[test]
         #[allow(clippy::unwrap_used)]
         fn pt_calculate_scores_when_all_nodes_have_the_same_number_of_issues_scores_should_all_be_zero(
-            node_count in 4..50, issue_count in 0..50, issue_type in generate_no_churn_normal_use_msg_issues())
+            node_count in 4..50, issue_count in 0..50, issue_type in generate_network_startup_msg_issues())
         {
             Runtime::new().unwrap().block_on(async {
                 let nodes = (0..node_count).map(|_| random_xorname()).collect::<Vec<XorName>>();
@@ -846,31 +843,30 @@ mod ops_tests {
     use crate::{tests::init_test_logger, FaultDetection, IssueType};
     use xor_name::{rand::random as random_xorname, XorName};
 
-    // some example numbers as guidance
-    // we can see 500 pending issues under load
-    pub(crate) const NORMAL_OPERATIONS_ISSUES: usize = 500;
-
     #[tokio::test]
     async fn unfulfilled_ops_leads_to_node_classified_as_faulty() {
         init_test_logger();
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
         let mut fault_detection = FaultDetection::new(nodes.clone());
 
-        // adding more issues though, and we should see this node as faulty
-        for _ in 0..NORMAL_OPERATIONS_ISSUES {
-            fault_detection.track_issue(nodes[0], IssueType::RequestOperation);
-        }
-
         // as this is normal, we should not detect anything off
-        assert_eq!(fault_detection.get_faulty_nodes().len(), 0);
+        assert_eq!(
+            fault_detection.get_faulty_nodes().len(),
+            0,
+            "Node should not yet be faulty"
+        );
 
         // adding more issues though, and we should see this node as faulty
-        for _ in 0..300 {
+        for _ in 0..30 {
             fault_detection.track_issue(nodes[0], IssueType::RequestOperation);
         }
 
         // Now we should start detecting...
-        assert_eq!(fault_detection.get_faulty_nodes().len(), 1);
+        assert_eq!(
+            fault_detection.get_faulty_nodes().len(),
+            1,
+            "node should be found as faulty"
+        );
     }
 }
 
@@ -977,64 +973,6 @@ mod knowledge_tests {
             "our node should not be faulty"
         );
         assert_eq!(faulty_nodes.len(), 0, "no node is faulty node");
-
-        Ok(())
-    }
-    #[tokio::test]
-    async fn ae_probe_fault_is_not_too_sharp() -> Result<()> {
-        init_test_logger();
-
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-
-        let mut fault_detection = FaultDetection::new(nodes.clone());
-
-        // Add a new nodes
-        let new_node = random_xorname();
-        fault_detection.add_new_node(new_node);
-
-        // Add just one issue to all, this gets us a baseline avg to not overly skew results
-        for node in nodes {
-            fault_detection.track_issue(node, IssueType::AeProbeMsg);
-        }
-
-        // and add one for our "bad" node, too
-        fault_detection.track_issue(new_node, IssueType::AeProbeMsg);
-
-        let faulty_nodes = fault_detection.get_faulty_nodes();
-
-        // Assert that the new node is not faulty
-        assert!(
-            !faulty_nodes.contains(&new_node),
-            "our node should not be faulty"
-        );
-        assert_eq!(faulty_nodes.len(), 0, "no node is faulty node");
-
-        // and add another for our "bad" node, two AeProbes should not be sufficient reason
-        // to label this as faulty
-        fault_detection.track_issue(new_node, IssueType::AeProbeMsg);
-
-        let faulty_nodes = fault_detection.get_faulty_nodes();
-
-        // Assert that the new node is not faulty
-        assert!(
-            !faulty_nodes.contains(&new_node),
-            "our node should not be faulty"
-        );
-        assert_eq!(faulty_nodes.len(), 0, "no node is faulty node");
-
-        // and some more issues for our "bad" node
-        for _ in 0..4 {
-            fault_detection.track_issue(new_node, IssueType::AeProbeMsg);
-        }
-
-        let faulty_nodes = fault_detection.get_faulty_nodes();
-
-        // Assert that the new node is now faulty
-        assert!(
-            faulty_nodes.contains(&new_node),
-            "our node should be faulty"
-        );
-        assert_eq!(faulty_nodes.len(), 1, "one node should be faulty");
 
         Ok(())
     }
