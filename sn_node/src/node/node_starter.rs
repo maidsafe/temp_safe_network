@@ -235,7 +235,7 @@ async fn bootstrap_genesis_node(
 #[allow(clippy::too_many_arguments)]
 async fn bootstrap_normal_node(
     config: &Config,
-    comm: Comm,
+    mut comm: Comm,
     incoming_msg_receiver: &mut tokio::sync::mpsc::Receiver<MsgFromPeer>,
     join_timeout: Duration,
     used_space: UsedSpace,
@@ -265,6 +265,9 @@ async fn bootstrap_normal_node(
         join_timeout,
     )
     .await?;
+
+    comm.update_members(network_knowledge.members()).await;
+
     let node = MyNode::new(
         comm,
         info.keypair.clone(),
