@@ -451,7 +451,7 @@ mod tests {
     proptest! {
         #[test]
         #[allow(clippy::unwrap_used)]
-        fn model_based_test(ops in arbitrary_ops(0..MAX_N_OPS)){
+        fn proptest_model_based_test(ops in arbitrary_ops(0..MAX_N_OPS)){
             model_based_test_imp(ops).unwrap();
         }
     }

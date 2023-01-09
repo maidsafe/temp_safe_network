@@ -33,6 +33,9 @@ pub enum Error {
     /// Client messages always need a response, so should come in on bidi streams
     #[error("No client response stream. Client message came in on a unidirectional stream. All client messages should be bidirectional.")]
     NoClientResponseStream,
+    /// Client messages always need a response, so should come in on bidi streams
+    #[error("No node response stream. Message requiring response cam in on unidirectional stream. All response requiring messages should be bidirectional.")]
+    NoNodeResponseStream,
     #[error("The bootstrap connection unexpectedly closed")]
     BootstrapConnectionClosed,
     /// SendChannel error for the data replication flow. This is a critical error and the node no longer functions.

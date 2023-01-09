@@ -11,7 +11,7 @@ use crate::{
         core::NodeContext,
         flow_ctrl::cmds::Cmd,
         messaging::{streams::into_msg_bytes, Peers},
-        MyNode, Result,
+        Error, MyNode, Result,
     },
     storage::{Error as StorageError, StorageLevel},
 };
@@ -225,13 +225,19 @@ impl MyNode {
                 }
 
                 trace!("Received Probe message from {}: {:?}", sender, msg_id);
-                let recipients = BTreeSet::from_iter([sender]);
-                cmds.push(MyNode::send_ae_update_to_nodes(
-                    &context,
-                    recipients,
-                    section_key,
-                ));
-                Ok(cmds)
+
+                if let Some(stream) = send_stream {
+                    cmds.push(MyNode::respond_with_ae_update_to_node(
+                        &context,
+                        sender,
+                        section_key,
+                        stream,
+                    ));
+
+                    Ok(cmds)
+                } else {
+                    Err(Error::NoNodeResponseStream)
+                }
             }
             // The AcceptedOnlineShare for relocation will be received here.
             NodeMsg::JoinResponse(join_response) => {

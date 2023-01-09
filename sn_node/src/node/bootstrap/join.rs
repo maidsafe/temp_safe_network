@@ -43,13 +43,20 @@ pub(crate) async fn join_network(
     join_timeout: Duration,
 ) -> Result<(MyNodeInfo, NetworkKnowledge)> {
     let (outgoing_msgs_sender, outgoing_msgs_receiver) = mpsc::channel(STANDARD_CHANNEL_SIZE);
+    let (msg_response_sender, incoming_response_msgs) = mpsc::channel(STANDARD_CHANNEL_SIZE);
 
     let span = trace_span!("bootstrap");
-    let joiner = Joiner::new(node, outgoing_msgs_sender, incoming_msgs, section_tree);
+    let joiner = Joiner::new(
+        node,
+        outgoing_msgs_sender,
+        incoming_msgs,
+        incoming_response_msgs,
+        section_tree,
+    );
 
     let (res, _) = future::join(
         joiner.try_join(join_timeout),
-        send_messages(outgoing_msgs_receiver, comm),
+        send_messages(outgoing_msgs_receiver, comm, msg_response_sender),
     )
     .instrument(span)
     .await;
@@ -69,6 +76,8 @@ struct Joiner<'a> {
     outgoing_msgs: mpsc::Sender<(WireMsg, Vec<Peer>)>,
     // Receiver for incoming messages.
     incoming_msgs: &'a mut mpsc::Receiver<MsgFromPeer>,
+    /// Receiver for returned response msgs (from bidi conns)
+    incoming_response_msgs: mpsc::Receiver<(WireMsg, Peer)>,
     node: MyNodeInfo,
     section_tree: SectionTree,
     backoff: ExponentialBackoff,
@@ -82,6 +91,8 @@ impl<'a> Joiner<'a> {
         node: MyNodeInfo,
         outgoing_msgs: mpsc::Sender<(WireMsg, Vec<Peer>)>,
         incoming_msgs: &'a mut mpsc::Receiver<MsgFromPeer>,
+        // msgs returned ona  bidi connection during join
+        incoming_response_msgs: mpsc::Receiver<(WireMsg, Peer)>,
         section_tree: SectionTree,
     ) -> Self {
         let mut backoff = ExponentialBackoff {
@@ -97,6 +108,7 @@ impl<'a> Joiner<'a> {
         Self {
             outgoing_msgs,
             incoming_msgs,
+            incoming_response_msgs,
             node,
             section_tree,
             backoff,
@@ -376,70 +388,77 @@ impl<'a> Joiner<'a> {
         &mut self,
     ) -> Result<(JoinResponse, Peer)> {
         loop {
-            let (msg, sender) = self.receive_node_msg().await?;
-            match msg {
-                NodeMsg::JoinResponse(resp) => return Ok((resp, sender)),
-                NodeMsg::AntiEntropy {
-                    section_tree_update,
-                    ..
-                } => {
-                    info!("After sent join request, received section tree update: {section_tree_update:?}");
-                    let old_target = self.join_target_sap()?;
+            if let Some((msg, sender)) = self.receive_node_msg()? {
+                match msg {
+                    NodeMsg::JoinResponse(resp) => return Ok((resp, sender)),
+                    NodeMsg::AntiEntropy {
+                        section_tree_update,
+                        ..
+                    } => {
+                        info!("After sent join request, received section tree update: {section_tree_update:?}");
+                        let old_target = self.join_target_sap()?;
 
-                    let any_new_information = match self
-                        .section_tree
-                        .update_the_section_tree(section_tree_update)
-                    {
-                        Ok(bool) => bool,
-                        Err(error) => {
-                            error!("Error updating section tree during join: {error:?}");
-                            // this error should not kill us though, so we otherwise ignore it and note there's
-                            // no new info
-                            false
+                        let any_new_information = match self
+                            .section_tree
+                            .update_the_section_tree(section_tree_update)
+                        {
+                            Ok(bool) => bool,
+                            Err(error) => {
+                                error!("Error updating section tree during join: {error:?}");
+                                // this error should not kill us though, so we otherwise ignore it and note there's
+                                // no new info
+                                false
+                            }
+                        };
+
+                        if any_new_information {
+                            let current_sap = self.join_target_sap()?;
+                            info!("After sent join request, network sap changed from {old_target:?} to {current_sap:?}");
                         }
-                    };
-
-                    if any_new_information {
-                        let current_sap = self.join_target_sap()?;
-                        info!("After sent join request, network sap changed from {old_target:?} to {current_sap:?}");
+                    }
+                    _ => {
+                        trace!(
+                            "Non-JoinResponse message received and discarded: sender: {sender:?} msg: {msg:?}"
+                        )
                     }
                 }
-                _ => {
-                    trace!(
-                        "Non-JoinResponse message received and discarded: sender: {sender:?} msg: {msg:?}"
-                    )
-                }
             }
+
+            // small wait to avoid hard loop
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await
         }
     }
 
     #[tracing::instrument(skip(self))]
     async fn receive_section_tree_update(&mut self) -> Result<SectionTreeUpdate> {
         loop {
-            let (msg, sender) = self.receive_node_msg().await?;
-            match msg {
-                NodeMsg::AntiEntropy {
-                    section_tree_update,
-                    ..
-                } => return Ok(section_tree_update),
-                _ => {
-                    trace!(
-                        "Non-SectionTreeUpdate message discarded: sender: {sender:?} msg: {msg:?}"
-                    )
+            if let Some((msg, sender)) = self.receive_node_msg()? {
+                match msg {
+                    NodeMsg::AntiEntropy {
+                        section_tree_update,
+                        ..
+                    } => return Ok(section_tree_update),
+                    _ => {
+                        trace!(
+                            "Non-SectionTreeUpdate message discarded: sender: {sender:?} msg: {msg:?}"
+                        )
+                    }
                 }
             }
+            // small wait to avoid hard loop
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await
         }
     }
 
     #[tracing::instrument(skip(self))]
-    async fn receive_node_msg(&mut self) -> Result<(NodeMsg, Peer)> {
-        while let Some(MsgFromPeer {
+    fn receive_node_msg(&mut self) -> Result<Option<(NodeMsg, Peer)>> {
+        if let Ok(MsgFromPeer {
             sender, wire_msg, ..
-        }) = self.incoming_msgs.recv().await
+        }) = self.incoming_msgs.try_recv()
         {
             // We are interested only in `Node` type of messages
             match wire_msg.into_msg()? {
-                MsgType::Node { msg, .. } => return Ok((msg, sender)),
+                MsgType::Node { msg, .. } => return Ok(Some((msg, sender))),
                 MsgType::Client { msg_id, .. }
                 | MsgType::ClientDataResponse { msg_id, .. }
                 | MsgType::NodeDataResponse { msg_id, .. } => {
@@ -448,8 +467,19 @@ impl<'a> Joiner<'a> {
             };
         }
 
-        error!("NodeMsg sender unexpectedly closed");
-        Err(Error::BootstrapConnectionClosed)
+        if let Ok((wire_msg, sender)) = self.incoming_response_msgs.try_recv() {
+            // We are interested only in `Node` type of messages
+            match wire_msg.into_msg()? {
+                MsgType::Node { msg, .. } => return Ok(Some((msg, sender))),
+                MsgType::Client { msg_id, .. }
+                | MsgType::ClientDataResponse { msg_id, .. }
+                | MsgType::NodeDataResponse { msg_id, .. } => {
+                    trace!("Non-NodeMsg bootstrap message discarded: sender: {sender:?} msg_id: {msg_id:?}")
+                }
+            };
+        }
+
+        Ok(None)
     }
 }
 
@@ -457,6 +487,7 @@ impl<'a> Joiner<'a> {
 async fn send_messages(
     mut outgoing_msgs: mpsc::Receiver<(WireMsg, Vec<Peer>)>,
     comm: &Comm,
+    response_sender: mpsc::Sender<(WireMsg, Peer)>,
 ) -> Result<()> {
     while let Some((msg, peers)) = outgoing_msgs.recv().await {
         for peer in peers {
@@ -464,8 +495,17 @@ async fn send_messages(
             let msg_id = msg.msg_id();
 
             let bytes = msg.serialize()?;
-            match comm.send_out_bytes(peer, msg_id, bytes).await {
-                Ok(()) => trace!("Msg {msg_id:?} sent on {dst:?}"),
+            match comm
+                .send_out_bytes_to_peer_and_return_response(peer, msg_id, bytes)
+                .await
+            {
+                Ok(response) => {
+                    trace!("Msg {msg_id:?} sent on {dst:?}, response is in: {response:?}");
+
+                    if let Err(error) = response_sender.send((response.clone(), peer)).await {
+                        error!("Problem sending join msg response from {peer:?}, response: {response:?}. Error is : {error:?}");
+                    }
+                }
                 Err(error) => {
                     warn!("Error in comms when sending msg {msg_id:?} to peer {peer:?}: {error}")
                 }
@@ -504,6 +544,7 @@ mod tests {
         let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(10);
+        let (_recv_tx2, recv_rx2) = mpsc::channel(10);
 
         let (genesis_sap, genesis_sk_set, genesis_elders, ..) =
             TestSapBuilder::new(Prefix::default()).build();
@@ -518,7 +559,7 @@ mod tests {
         let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone());
         let tree = SectionTree::new(signed_genesis_sap)?;
 
-        let state = Joiner::new(node.clone(), send_tx, &mut recv_rx, tree);
+        let state = Joiner::new(node.clone(), send_tx, &mut recv_rx, recv_rx2, tree);
 
         // Create the bootstrap task, but don't run it yet.
         let bootstrap = async { state.try_join(join_timeout).await.expect("Failed to join") };
@@ -601,6 +642,7 @@ mod tests {
         let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
         let (send_tx, mut send_rx) = mpsc::channel(10);
         let (recv_tx, mut recv_rx) = mpsc::channel(10);
+        let (_recv_tx2, recv_rx2) = mpsc::channel(10);
 
         let (genesis_sap, genesis_sk_set, genesis_nodes, _) =
             TestSapBuilder::new(Prefix::default()).build();
@@ -615,7 +657,7 @@ mod tests {
         let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone());
         let tree = SectionTree::new(signed_genesis_sap)?;
 
-        let state = Joiner::new(node, send_tx, &mut recv_rx, tree.clone());
+        let state = Joiner::new(node, send_tx, &mut recv_rx, recv_rx2, tree.clone());
 
         let bootstrap_task = state.try_join(join_timeout);
         let test_task = async move {
@@ -720,6 +762,7 @@ mod tests {
         let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
         let (send_tx, mut send_rx) = mpsc::channel(10); // elder side
         let (recv_tx, mut recv_rx) = mpsc::channel(10); // joining side
+        let (_recv_tx2, recv_rx2) = mpsc::channel(10);
 
         let (genesis_sap, genesis_sk_set, genesis_nodes, _) =
             TestSapBuilder::new(Prefix::default()).build();
@@ -734,7 +777,7 @@ mod tests {
         let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone());
         let tree = SectionTree::new(signed_genesis_sap).expect("Failed to create SectionTree");
 
-        let state = Joiner::new(node.clone(), send_tx, &mut recv_rx, tree.clone());
+        let state = Joiner::new(node.clone(), send_tx, &mut recv_rx, recv_rx2, tree.clone());
 
         // Create the bootstrap task, but don't run it yet.
         let bootstrap = async { state.try_join(join_timeout).await.expect("Failed to join") };
@@ -830,6 +873,7 @@ mod tests {
         let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
         let (send_tx, mut send_rx) = mpsc::channel(10);
         let (recv_tx, mut recv_rx) = mpsc::channel(10);
+        let (_recv_tx2, recv_rx2) = mpsc::channel(10);
 
         let (genesis_sap, genesis_sk_set, genesis_nodes, _) =
             TestSapBuilder::new(Prefix::default()).build();
@@ -843,7 +887,7 @@ mod tests {
         let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone());
         let tree = SectionTree::new(signed_genesis_sap)?;
 
-        let state = Joiner::new(node, send_tx, &mut recv_rx, tree.clone());
+        let state = Joiner::new(node, send_tx, &mut recv_rx, recv_rx2, tree.clone());
 
         let bootstrap_task = state.try_join(join_timeout);
         let test_task = async {
@@ -921,6 +965,7 @@ mod tests {
         let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
         let (send_tx, mut send_rx) = mpsc::channel(10);
         let (recv_tx, mut recv_rx) = mpsc::channel(10);
+        let (_recv_tx2, recv_rx2) = mpsc::channel(10);
 
         let (genesis_sap, genesis_sk_set, genesis_nodes, _) =
             TestSapBuilder::new(Prefix::default()).build();
@@ -934,7 +979,7 @@ mod tests {
         let signed_genesis_sap = TestKeys::get_section_signed(&genesis_sk, genesis_sap.clone());
         let tree = SectionTree::new(signed_genesis_sap)?;
 
-        let state = Joiner::new(node, send_tx, &mut recv_rx, tree.clone());
+        let state = Joiner::new(node, send_tx, &mut recv_rx, recv_rx2, tree.clone());
 
         let bootstrap_task = state.try_join(join_timeout);
         let test_task = async {

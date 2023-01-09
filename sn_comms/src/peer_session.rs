@@ -8,7 +8,7 @@
 
 use super::{Error, Link, Result, STANDARD_CHANNEL_SIZE};
 
-use qp2p::UsrMsgBytes;
+use qp2p::{SendStream, UsrMsgBytes};
 use sn_interface::messaging::MsgId;
 
 use custom_debug::Debug;
@@ -96,10 +96,11 @@ impl PeerSession {
     }
 
     #[instrument(skip(self, bytes))]
-    pub(crate) async fn send_using_session(
+    pub(crate) async fn send_using_session_or_stream(
         &self,
         msg_id: MsgId,
         bytes: UsrMsgBytes,
+        send_stream: Option<SendStream>,
     ) -> Result<SendWatcher> {
         let (watcher, reporter) = status_watching();
 
@@ -108,6 +109,7 @@ impl PeerSession {
             bytes,
             connection_retries: 0,
             reporter,
+            send_stream,
         };
 
         self.channel
@@ -155,6 +157,36 @@ impl PeerSessionWorker {
             trace!("Processing session {peer:?} cmd: {session_cmd:?}");
 
             let status = match session_cmd {
+                SessionCmd::Send(SendJob {
+                    msg_id,
+                    bytes,
+                    reporter,
+                    send_stream: Some(mut send_stream),
+                    ..
+                }) => {
+                    // send response on the stream
+                    let _handle = tokio::spawn(async move {
+                        let stream_prio = 10;
+                        send_stream.set_priority(stream_prio);
+                        let stream_id = send_stream.id();
+                        debug!("Sending on {stream_id} via PeerSessionWorker");
+                        if let Err(error) = send_stream.send_user_msg(bytes).await {
+                            error!("Could not send msg {msg_id:?} over response {stream_id} to {peer:?}: {error:?}");
+                            reporter.send(SendStatus::TransientError(format!("Could not send msg on response {stream_id} to {peer:?} for {msg_id:?}")));
+                        } else {
+                            // Attempt to gracefully terminate the stream.
+                            // If this errors it does _not_ mean our message has not been sent
+                            let result = send_stream.finish().await;
+                            trace!(
+                                "bidi {stream_id} finished for {msg_id:?} to {peer:?}: {result:?}"
+                            );
+
+                            reporter.send(SendStatus::Sent);
+                        }
+                    });
+
+                    SessionStatus::Ok
+                }
                 SessionCmd::Send(job) => match self.send_over_peer_connection(job).await {
                     Ok(status) => status,
                     Err(error) => {
@@ -296,6 +328,7 @@ pub(crate) struct SendJob {
     bytes: UsrMsgBytes,
     connection_retries: usize, // TAI: Do we need this if we are using QP2P's retry
     reporter: StatusReporting,
+    send_stream: Option<SendStream>,
 }
 
 impl PartialEq for SendJob {

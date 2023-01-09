@@ -41,8 +41,8 @@ impl MyNode {
         Ok((kind, payload))
     }
 
-    /// Serialize a message for a Node
-    pub(crate) fn serialize_node_msg_response(
+    /// Serialize a message for a NodeDataResponse
+    pub(crate) fn serialize_node_data_msg_response(
         our_node_name: XorName,
         msg: NodeDataResponse,
     ) -> Result<(MsgKind, Bytes)> {

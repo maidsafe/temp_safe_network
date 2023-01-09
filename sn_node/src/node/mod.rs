@@ -193,7 +193,7 @@ mod core {
 
         #[allow(clippy::too_many_arguments)]
         pub(crate) async fn new(
-            comm: Comm,
+            mut comm: Comm,
             keypair: Arc<Keypair>,
             network_knowledge: NetworkKnowledge,
             section_key_share: Option<SectionKeyShare>,
@@ -238,6 +238,8 @@ mod core {
             } else {
                 None
             };
+
+            comm.update_members(network_knowledge.members()).await;
 
             let node = Self {
                 comm,

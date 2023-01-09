@@ -83,7 +83,10 @@ impl MyNode {
             }
         };
 
-        trace!("[NODE READ]: Handle msg read lock attempt");
+        trace!(
+            "[NODE READ]: Handle msg read lock attempt. Response stream exists {:?}",
+            send_stream.is_some()
+        );
         let context = { node.read().await.context() };
         match msg_type {
             MsgType::Node { dst, msg, .. } => {

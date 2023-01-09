@@ -306,7 +306,7 @@ impl MyNode {
         vec![]
     }
 
-    // Send `NodeApproval` to a joining node which makes it a section member
+    /// Send `NodeApproval` to a joining node which makes it a section member
     pub(crate) fn send_node_approvals(&self, decision: Decision<NodeState>) -> Cmd {
         let peers: BTreeSet<_> = decision
             .proposals

@@ -17,8 +17,8 @@ use crate::node::{
     Config, Error, MyNode, Result, STANDARD_CHANNEL_SIZE,
 };
 use crate::UsedSpace;
-
 use sn_comms::{Comm, MsgFromPeer};
+
 use sn_interface::{
     network_knowledge::{MyNodeInfo, SectionTree, MIN_ADULT_AGE},
     types::{keys::ed25519, log_markers::LogMarker, PublicKey as TypesPublicKey},
@@ -153,7 +153,7 @@ async fn bootstrap_node(
 
     let node = if config.is_first() {
         bootstrap_genesis_node(
-            comm,
+            comm.clone(),
             used_space,
             root_storage_dir,
             fault_cmds_sender.clone(),
@@ -162,7 +162,7 @@ async fn bootstrap_node(
     } else {
         bootstrap_normal_node(
             config,
-            comm,
+            comm.clone(),
             &mut incoming_msg_receiver,
             join_timeout,
             used_space,
@@ -173,6 +173,7 @@ async fn bootstrap_node(
     };
 
     let node = Arc::new(RwLock::new(node));
+
     let (dispatcher, data_replication_receiver) = Dispatcher::new(node.clone());
     let cmd_ctrl = CmdCtrl::new(dispatcher);
     let (cmd_channel, rejoin_network_rx) = FlowCtrl::start(
@@ -235,7 +236,7 @@ async fn bootstrap_genesis_node(
 #[allow(clippy::too_many_arguments)]
 async fn bootstrap_normal_node(
     config: &Config,
-    mut comm: Comm,
+    comm: Comm,
     incoming_msg_receiver: &mut tokio::sync::mpsc::Receiver<MsgFromPeer>,
     join_timeout: Duration,
     used_space: UsedSpace,
@@ -265,8 +266,6 @@ async fn bootstrap_normal_node(
         join_timeout,
     )
     .await?;
-
-    comm.update_members(network_knowledge.members()).await;
 
     let node = MyNode::new(
         comm,

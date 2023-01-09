@@ -200,6 +200,29 @@ impl MyNode {
         MyNode::send_system_msg(ae_msg, Peers::Multiple(recipients), context.clone())
     }
 
+    /// Send `AntiEntropy` update message to the specified nodes.
+    pub(crate) fn respond_with_ae_update_to_node(
+        context: &NodeContext,
+        recipient: Peer,
+        section_pk: BlsPublicKey,
+        send_stream: SendStream,
+    ) -> Cmd {
+        let members = context.network_knowledge.section_signed_members();
+
+        let ae_msg = NodeMsg::AntiEntropy {
+            section_tree_update: MyNode::generate_ae_section_tree_update(context, Some(section_pk)),
+            kind: AntiEntropyKind::Update { members },
+        };
+
+        Cmd::SendNodeMsgResponse {
+            msg: ae_msg,
+            msg_id: MsgId::new(),
+            send_stream,
+            context: context.clone(),
+            recipient,
+        }
+    }
+
     #[instrument(skip_all)]
     /// Send AntiEntropy update message to the nodes in our sibling section.
     pub(crate) fn send_updates_to_sibling_section(
