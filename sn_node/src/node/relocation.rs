@@ -19,6 +19,18 @@ use std::{
 };
 use xor_name::XorName;
 
+/// The age when a node is in stable_set.
+///
+/// All nodes under this age are with future
+/// changes to be considered `Infants` (name separation TBD).
+/// Currently though, at first both `Elders` and `Adults`
+/// will relocate, until they reach age 7 (and after that
+/// the `Infants` are still made up of `Adults`until name
+/// separation has been implemented).
+///
+/// Temporary value of 7, to be evaluated
+const STABLE_SET_AGE: u8 = 7;
+
 // Unique identifier for a churn event, which is used to select nodes to relocate.
 pub(crate) struct ChurnId(pub(crate) [u8; bls::SIG_SIZE]);
 
@@ -43,7 +55,8 @@ pub(super) fn find_nodes_to_relocate(
     // Capped by criteria that cannot relocate too many node at once.
     let joined_nodes = network_knowledge.section_members();
 
-    if joined_nodes.len() < recommended_section_size() {
+    // min or equal, since `allowed_relocations` will be zero when `joined_nodes.len()` equals req size.
+    if joined_nodes.len() <= recommended_section_size() {
         return vec![];
     }
 
@@ -53,13 +66,17 @@ pub(super) fn find_nodes_to_relocate(
         max_reloctions,
     );
 
-    // Find the peers that pass the relocation check
+    // Find the peers that pass the relocation check.
+    // 1. Only age < 7. (with future changes will be know as `infants`)
+    // 2. Trailing zeros of sig >= age.
+    // 3. Not among excluded (`joined` in current `membership decision`, i.e. newly joined do not relocate).
     let mut candidates: Vec<_> = joined_nodes
         .into_iter()
-        .filter(|info| check(info.age(), churn_id))
-        // the newly joined node shall not be relocated immediately
-        .filter(|info| !excluded.contains(&info.name()))
+        .filter(|peer| STABLE_SET_AGE > peer.age())
+        .filter(|peer| check(peer.age(), churn_id))
+        .filter(|peer| !excluded.contains(&peer.name()))
         .collect();
+
     // To avoid a node to manipulate its name to gain priority of always being first in XorName,
     // here we sort the nodes by its distance to the churn_id.
     let target_name = XorName::from_content(&churn_id.0);
@@ -207,10 +224,11 @@ mod tests {
             0
         };
 
-        // Only the oldest matching peers should be relocated.
+        // Only the oldest matching peers, but still under STABLE_SET_AGE, should be relocated.
         let expected_relocated_age = peers
             .iter()
             .map(Peer::age)
+            .filter(|age| *age < STABLE_SET_AGE)
             .filter(|age| *age <= signature_trailing_zeros)
             .max();
 
