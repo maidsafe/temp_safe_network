@@ -103,10 +103,8 @@ impl NodeState {
             return Err(Error::WrongSection);
         }
 
-        self.validate_relocation_details(prefix)?;
-
-        match self.state {
-            MembershipState::Joined | MembershipState::Relocated(_) => {
+        match &self.state {
+            MembershipState::Joined => {
                 if members.contains_key(&name) {
                     info!("Rejecting join from existing member {name}");
                     Err(Error::ExistingMemberConflict)
@@ -133,31 +131,30 @@ impl NodeState {
                     Ok(())
                 }
             }
-        }
-    }
+            MembershipState::Relocated(details) => {
+                if !members.contains_key(&name) {
+                    info!("Rejecting relocation from non-existing member");
+                    return Err(Error::NotAMember);
+                }
 
-    fn validate_relocation_details(&self, prefix: &Prefix) -> Result<()> {
-        if let MembershipState::Relocated(details) = &self.state {
-            let name = self.name();
-            let dest = details.dst;
+                let name = self.name();
+                let dest = details.dst;
 
-            if !prefix.matches(&dest) {
-                info!("Invalid relocation request from {name} - {dest} doesn't match our prefix {prefix:?}.");
-                return Err(Error::WrongSection);
+                if !prefix.matches(&dest) {
+                    info!("Invalid relocation request from {name} - {dest} doesn't match our prefix {prefix:?}.");
+                    return Err(Error::WrongSection);
+                }
+
+                // We requires the node name matches the relocation details age.
+                let age = details.age;
+                let state_age = self.age();
+                if age != state_age {
+                    info!("Invalid relocation request from {name} - relocation age ({age}) doesn't match peer's age ({state_age}).");
+                    return Err(Error::InvalidRelocationDetails);
+                }
+                Ok(())
             }
-
-            // We requires the node name matches the relocation details age.
-            let age = details.age;
-            let state_age = self.age();
-            if age != state_age {
-                info!(
-		    "Invalid relocation request from {name} - relocation age ({age}) doesn't match peer's age ({state_age})."
-		);
-                return Err(Error::InvalidRelocationDetails);
-            }
         }
-
-        Ok(())
     }
 
     pub fn peer(&self) -> &Peer {
