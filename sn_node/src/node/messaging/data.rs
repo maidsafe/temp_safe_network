@@ -75,7 +75,8 @@ impl MyNode {
                             msg_id,
                             bytes_to_node.clone(),
                         )
-                        .await,
+                        .await
+                        .map_err(Error::Comms),
                     )
                 }
                 .boxed(),

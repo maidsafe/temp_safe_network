@@ -161,6 +161,11 @@ impl Comm {
         result
     }
 
+    /// Closes the endpoint.
+    pub fn close_endpoint(&self) {
+        self.our_endpoint.close()
+    }
+
     /// Updates cached connections for passed members set only.
     pub async fn update_members(&mut self, members: BTreeSet<Peer>) {
         let new_members = members.clone();
@@ -243,8 +248,8 @@ impl Comm {
         Ok(())
     }
 
-    // Test helper to send out Msgs in a blocking fashion
-    #[cfg(test)]
+    /// Test helper to send out Msgs in a blocking fashion
+    // #[cfg(test)]
     pub async fn send_out_bytes_sync(&self, peer: Peer, msg_id: MsgId, bytes: UsrMsgBytes) {
         let watcher = self.send_to_one(peer, msg_id, bytes, None).await;
         match watcher {

@@ -95,6 +95,9 @@ pub enum Error {
     /// Join occured during section churn and new elders missed it, need to re-join the network
     #[error("Node was removed from the section")]
     RemovedFromSection,
+    /// Comms error.
+    #[error("Comms error:: {0}")]
+    Comms(#[from] sn_comms::Error),
     /// Database error.
     #[error("Database error:: {0}")]
     Database(#[from] crate::storage::Error),

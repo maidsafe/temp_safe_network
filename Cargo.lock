@@ -4155,6 +4155,7 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "signature",
+ "sn_comms",
  "sn_consensus",
  "sn_dbc",
  "sn_fault_detection",
