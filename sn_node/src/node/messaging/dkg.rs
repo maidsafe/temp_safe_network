@@ -801,7 +801,6 @@ impl MyNode {
 
 #[cfg(test)]
 mod tests {
-    use super::MyNode;
     use crate::node::flow_ctrl::{
         cmds::Cmd,
         dispatcher::Dispatcher,
@@ -814,7 +813,7 @@ mod tests {
         messaging::{
             signature_aggregator::SignatureAggregator,
             system::{DkgSessionId, NodeMsg, SectionStateVote},
-            MsgType, SectionSigShare,
+            SectionSigShare,
         },
         network_knowledge::{supermajority, NodeState, SectionKeyShare, SectionsDAG},
         test_utils::{TestKeys, TestSectionTree},
@@ -864,7 +863,7 @@ mod tests {
                     if empty_at_first_try {
                         empty_at_first_try = false;
                     }
-                    let cmds = dispatcher.mock_handle_node_msg(msg).await;
+                    let cmds = dispatcher.mock_handle_node_msg_skip_ae(msg).await;
                     for cmd in cmds {
                         info!("Got cmd {}", cmd);
                         if let Cmd::SendMsg { .. } = &cmd {
@@ -928,7 +927,7 @@ mod tests {
                     if empty_at_first_try {
                         empty_at_first_try = false;
                     }
-                    let cmds = dispatcher.mock_handle_node_msg(msg).await;
+                    let cmds = dispatcher.mock_handle_node_msg_skip_ae(msg).await;
 
                     // If supermajority of the nodes have terminated, then the remaining nodes
                     // can be considered as 'lagging'. So use the supermajority of the shares
@@ -1079,7 +1078,7 @@ mod tests {
                     if empty_at_first_try {
                         empty_at_first_try = false;
                     }
-                    let cmds = dispatcher.mock_handle_node_msg(msg).await;
+                    let cmds = dispatcher.mock_handle_node_msg_skip_ae(msg).await;
                     for cmd in cmds {
                         info!("Got cmd {}", cmd);
                         if let Cmd::SendMsg { .. } = cmd {
@@ -1132,7 +1131,7 @@ mod tests {
                     if empty_at_first_try {
                         empty_at_first_try = false;
                     }
-                    let cmds = dispatcher.mock_handle_node_msg(msg).await;
+                    let cmds = dispatcher.mock_handle_node_msg_skip_ae(msg).await;
                     for cmd in cmds {
                         info!("Got cmd {}", cmd);
                         if let Cmd::SendMsg { .. } = &cmd {
@@ -1329,21 +1328,6 @@ mod tests {
                 NodeMsg::AntiEntropy { .. } => (),
                 msg => panic!("Unexpected msg {msg}"),
             }
-        }
-    }
-
-    impl Dispatcher {
-        // the actual handler has an AE check. Skipping it here
-        async fn mock_handle_node_msg(&self, msg: MsgFromPeer) -> Vec<Cmd> {
-            let context = self.node().read().await.context();
-            let origin = msg.sender;
-            let (msg_id, msg) = assert_matches!(
-                msg.wire_msg.into_msg().expect("Failed to deserialize wire_msg"),
-                MsgType::Node { msg_id, msg, .. } => (msg_id, msg)
-            );
-            MyNode::handle_valid_node_msg(self.node(), context, msg_id, msg, origin, None)
-                .await
-                .expect("Error while handling node msg")
         }
     }
 }

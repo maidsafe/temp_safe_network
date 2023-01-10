@@ -18,7 +18,7 @@ use sn_interface::{
         data::ClientMsg,
         serialisation::WireMsg,
         system::{JoinResponse, NodeMsg},
-        AuthorityProof, ClientAuth, Dst, MsgId, MsgKind,
+        AuthorityProof, ClientAuth, Dst, MsgId, MsgKind, MsgType,
     },
     network_knowledge::{test_utils::*, MembershipState, NodeState, RelocateDetails},
     types::{Keypair, Peer},
@@ -273,6 +273,19 @@ impl Dispatcher {
         } else {
             panic!("mock_send_msg expects Cmd::SendMsg, got {cmd:?}");
         }
+    }
+
+    // the actual handler has an AE check. Skipping it here
+    pub(crate) async fn mock_handle_node_msg_skip_ae(&self, msg: MsgFromPeer) -> Vec<Cmd> {
+        let context = self.node().read().await.context();
+        let origin = msg.sender;
+        let (msg_id, msg) = assert_matches!(
+            msg.wire_msg.into_msg().expect("Failed to deserialize wire_msg"),
+            MsgType::Node { msg_id, msg, .. } => (msg_id, msg)
+        );
+        MyNode::handle_valid_node_msg(self.node(), context, msg_id, msg, origin, None)
+            .await
+            .expect("Error while handling node msg")
     }
 }
 
