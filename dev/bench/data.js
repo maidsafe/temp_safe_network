@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1673265447423,
+  "lastUpdate": 1673388393102,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -52744,6 +52744,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 347568558,
             "range": "± 4352010",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "6f08edb32a0e93c879ddd13cda1abc6e6b098889",
+          "message": "Merge #1964\n\n1964: feat(client): expose a public API to query chunks to specific data replicas r=bochaco a=bochaco\n\n- Exposing also an `sn_api` public API to fetch a file from a specified set of data replicas indexes and a `SafeUrl`.\r\n- Adding `--replicas` arg to CLI `dog` command which allows the user to perform a check on several data replicas for the content being targeted by specifying their indexes.\r\n- It currently supports querying data replicas only for `Files`, either with a `File`'s `XorUrl` or with any `SafeUrl` which resolves to a File.\r\n- Non-pretty printing is also supported for the data replicas report, i.e. when passing `--output <format>` arg.\r\n\r\nExample output from CLI querying `my-file.txt` linked from a FilesContainer to replicas with indexes 0, 2, 3, and 10 (index out of range of actual replicas), when some chunks were not found in any replica:\r\n```\r\n$ safe dog safe://hyryyrytx4imnzxfrwydbuy7fmtru56q5mjhnw1ig4ro6o1ea7u43adwh6wnra/my-file.txt -r0 -r2 -r3 -r10\r\n\r\n== URL resolution step 1 ==\r\nResolved from: safe://hyryyrytx4imnzxfrwydbuy7fmtru56q5mjhnw1ig4ro6o1ea7u43adwh6wnra\r\n= FilesContainer =\r\nXOR-URL: safe://hyryyrytx4imnzxfrwydbuy7fmtru56q5mjhnw1ig4ro6o1ea7u43adwh6wnra\r\nVersion: hxhtb38edw54getr4onmjrrndmp1ry6ohne5m9f71iofe474h91hy\r\nType tag: 1100\r\nXOR name: 0x2fd5562bbca4a0061983a55c493df9db5a782a4aa6d121e84918ecf59c0e9cf5\r\nNative data type: Register\r\nNative data XOR-URL: safe://hyryyyytx4imnzxfrwydbuy7fmtru56q5mjhnw1ig4ro6o1ea7u43adwh6wnra\r\n\r\n== URL resolution step 2 ==\r\nResolved from: safe://hyryyyyxwih81u5xiwhtk9hfo47qyrnjpusryucx1barp7nkrfn7uqdkkfr\r\n= File =\r\nXOR-URL: safe://hyryyyyxwih81u5xiwhtk9hfo47qyrnjpusryucx1barp7nkrfn7uqdkkfr\r\nXOR name: 0xf4af0f29edf5a722aff0b0d75c02092d9d8809b1f20e08de894428bb370d4a29\r\nNative data type: PublicFile\r\nMedia type: Unknown\r\n\r\n== Checking data replicas of resolved content ==\r\nXOR-URL: safe://hyryyyyxwih81u5xiwhtk9hfo47qyrnjpusryucx1barp7nkrfn7uqdkkfr\r\nReplicas indexes queried: [0, 2, 3, 10]\r\nContent composed of 4 chunk/s:\r\n= Chunk at XOR name 0xf4af0f29edf5a722aff0b0d75c02092d9d8809b1f20e08de894428bb370d4a29 =\r\nReplica #0: Ok!\r\nReplica #2: Ok!\r\nReplica #3: Ok!\r\nReplica #10: Error received from the network: InsufficientNodeCount { prefix: Prefix(), expected: 11, found: 4 }\r\n\r\n= Chunk at XOR name 0x7086f5f1570884db5d062cb4a0d1334d88db83a5dda8263aa74cc2bc81bbc4d9 =\r\nReplica #0: Ok!\r\nReplica #2: Error received from the network: DataNotFound(Bytes(ChunkAddress(7086f5(01110000)..)))\r\nReplica #3: Ok!\r\nReplica #10: Error received from the network: InsufficientNodeCount { prefix: Prefix(), expected: 11, found: 4 }\r\n\r\n= Chunk at XOR name 0xb1551a74e9a3404f0afa086c511f11e0d797eaa80143c5206dcce0875b2af52b =\r\nReplica #0: Ok!\r\nReplica #2: Ok!\r\nReplica #3: Ok!\r\nReplica #10: Error received from the network: InsufficientNodeCount { prefix: Prefix(), expected: 11, found: 4 }\r\n\r\n= Chunk at XOR name 0x53127c013fdd0fa1d2b385d55d30843e8b0fbd0752fe43db4a93d41dd7af9aeb =\r\nReplica #0: Error received from the network: DataNotFound(Bytes(ChunkAddress(53127c(01010011)..)))\r\nReplica #2: Ok!\r\nReplica #3: Ok!\r\nReplica #10: Error received from the network: InsufficientNodeCount { prefix: Prefix(), expected: 11, found: 4 }\r\n```\n\nCo-authored-by: bochaco <gabrielviganotti@gmail.com>",
+          "timestamp": "2023-01-10T20:25:50Z",
+          "tree_id": "10462786e8ee3f437c8d267ca669ecc173b8047d",
+          "url": "https://github.com/maidsafe/safe_network/commit/6f08edb32a0e93c879ddd13cda1abc6e6b098889"
+        },
+        "date": 1673388390588,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2527228,
+            "range": "± 117531",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 131883852,
+            "range": "± 1188528",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 157911400,
+            "range": "± 4625579",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 569130081,
+            "range": "± 9433324",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 112263615,
+            "range": "± 2226486",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 134731887,
+            "range": "± 2974711",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 476110700,
+            "range": "± 10519605",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 31213253240,
+            "range": "± 1606322866",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 71252298,
+            "range": "± 41889262",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2969140714,
+            "range": "± 158281412",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 11242110856,
+            "range": "± 434808869",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 295748941,
+            "range": "± 14604437",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 2701132402,
+            "range": "± 126558137",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 10548259251,
+            "range": "± 362774091",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 58916844,
+            "range": "± 2617649",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 585160935,
+            "range": "± 17380987",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 2204330706,
+            "range": "± 94785095",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 13713011,
+            "range": "± 977684",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 133066635,
+            "range": "± 11640202",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 439649610,
+            "range": "± 25354163",
             "unit": "ns/iter"
           }
         ]
