@@ -111,7 +111,7 @@ impl MyNode {
                 }
                 Err(error) => {
                     error!("{msg_id:?} Error when replicating to node {peer:?}: {error:?}");
-                    if let Error::CmdSendError(peer) = error {
+                    if let Error::Comms(sn_comms::Error::CmdSendError(peer)) = error {
                         context.log_node_issue(peer.name(), IssueType::Communication);
                     }
                     last_error = Some(error);
