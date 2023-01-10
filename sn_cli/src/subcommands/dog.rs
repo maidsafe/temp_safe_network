@@ -16,7 +16,7 @@ use clap::Args;
 use color_eyre::{eyre::eyre, Help, Result};
 use sn_api::{
     resolver::{ContentType, SafeData},
-    Safe, SafeUrl,
+    Safe, SafeUrl, XorName,
 };
 use tracing::debug;
 
@@ -26,6 +26,10 @@ pub struct DogCommands {
     location: Option<String>,
     /// Query all the data replicas matching the given indexes to check they hold a
     /// copy of the content. E.g. -r0 -r2 will query replicas at index 0 and 2.
+    /// The network sorts nodes (data replicas) in a section by comparing the data's name with
+    /// nodes' names, it's a measure of "closeness to the data" in XOR-namespace. The index of a
+    /// node in such list is what it's referred as a data replica index. At least the
+    /// first 'data_copy_count' nodes should hold this data, more may well hold it too.
     #[clap(short = 'r', long = "replicas")]
     replicas: Vec<usize>,
 }
@@ -35,15 +39,27 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &Safe)
     let url = get_target_url(&link)?;
     debug!("Running dog for: {url}");
 
+    let mut replicas_indexes = cmd.replicas;
+    replicas_indexes.sort();
+
     let resolved_content = safe.inspect(&url.to_string()).await?;
     if OutputFmt::Pretty != output_fmt {
+        let replicas_report =
+            if let Some(xorurl) = resolved_content.last().map(|content| content.xorurl()) {
+                gen_replicas_report(safe, &xorurl, &replicas_indexes).await?
+            } else {
+                vec![]
+            };
+
         println!(
             "{}",
-            serialise_output(&(url.to_string(), resolved_content), output_fmt)
+            serialise_output(
+                &(url.to_string(), resolved_content, replicas_report),
+                output_fmt
+            )
         );
     } else {
         let num_of_resolutions = resolved_content.len();
-        let replicas_indexes = cmd.replicas;
         for (i, ref content) in resolved_content.iter().enumerate() {
             println!();
             println!("== URL resolution step {} ==", i + 1);
@@ -170,26 +186,17 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &Safe)
                 println!("== Checking data replicas of resolved content ==");
                 let xorurl = content.xorurl();
                 println!("XOR-URL: {xorurl}");
-                let replicated_content = safe
-                    .check_replicas(&xorurl, &replicas_indexes)
-                    .await
-                    .map_err(|err| {
-                        eyre!(err)
-                            .wrap_err(format!(
-                                "Could not check data replicas for content at {xorurl}."
-                            ))
-                            .suggestion("Try the command again with an appropriate Url.")
-                    })?;
+                let replicas_report = gen_replicas_report(safe, &xorurl, &replicas_indexes).await?;
 
                 println!("Replicas indexes queried: {replicas_indexes:?}");
-                println!("Content composed of {} chunk/s:", replicated_content.len());
-                for content in replicated_content {
-                    println!("= Chunk at XOR name 0x{} =", xorname_to_hex(&content.name));
-                    for (replica_index, outcome) in content.outcomes {
-                        if let Err(err) = outcome {
-                            println!("Replica #{replica_index}: {err}");
-                        } else {
+                println!("Content composed of {} chunk/s:", replicas_report.len());
+                for (chunk_name, outcomes) in replicas_report {
+                    println!("= Chunk at XOR name 0x{} =", xorname_to_hex(&chunk_name));
+                    for (replica_index, outcome) in outcomes {
+                        if outcome.is_empty() {
                             println!("Replica #{replica_index}: Ok!");
+                        } else {
+                            println!("Replica #{replica_index}: {outcome}");
                         }
                     }
                     println!();
@@ -200,4 +207,48 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &Safe)
     }
 
     Ok(())
+}
+
+// Query data replicas and collect the outcomes
+async fn gen_replicas_report(
+    safe: &Safe,
+    xorurl: &str,
+    replicas_indexes: &[usize],
+) -> Result<Vec<(XorName, Vec<(usize, String)>)>> {
+    // If a set of replicas indexes was provided, let's obtain data from replicas
+    if replicas_indexes.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let replicated_content = safe
+        .check_replicas(xorurl, replicas_indexes)
+        .await
+        .map_err(|err| {
+            eyre!(err)
+                .wrap_err(format!(
+                    "Could not check data replicas for content at {xorurl}."
+                ))
+                .suggestion("Try the command again with an appropriate Url.")
+        })?;
+
+    let report = replicated_content
+        .into_iter()
+        .map(|content| {
+            let outcomes: Vec<(usize, String)> = content
+                .outcomes
+                .into_iter()
+                .map(|(replica_index, outcome)| {
+                    if let Err(err) = outcome {
+                        (replica_index, format!("{err}"))
+                    } else {
+                        (replica_index, "".to_string())
+                    }
+                })
+                .collect();
+
+            (content.name, outcomes)
+        })
+        .collect();
+
+    Ok(report)
 }
