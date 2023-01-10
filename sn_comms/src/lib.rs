@@ -132,13 +132,21 @@ impl Comm {
     }
 
     /// Fake function used as replacement for testing only.
-    #[cfg(test)]
+    ///
+    /// NB: Testing this from an external crate will require referencing
+    /// this crate with the feature "test", otherwise this fn will not be called.
+    /// <https://github.com/rust-lang/rust/issues/59168#issuecomment-962214945>
+    #[cfg(any(test, feature = "test"))]
     pub async fn is_reachable(&self, _peer: &SocketAddr) -> Result<(), Error> {
         Ok(())
     }
 
     /// Tests whether the peer is reachable.
-    #[cfg(not(test))]
+    ///
+    /// NB: If testing comms from an external crate, this fn will be called instead
+    /// of the intended test fn above, unless referencing this crate with the feature "test".
+    /// <https://github.com/rust-lang/rust/issues/59168#issuecomment-962214945>
+    #[cfg(not(any(test, feature = "test")))]
     pub async fn is_reachable(&self, peer: &SocketAddr) -> Result<(), Error> {
         let qp2p_config = qp2p::Config {
             ..Default::default()
@@ -249,7 +257,7 @@ impl Comm {
     }
 
     /// Test helper to send out Msgs in a blocking fashion
-    // #[cfg(test)]
+    #[cfg(any(test, feature = "test"))]
     pub async fn send_out_bytes_sync(&self, peer: Peer, msg_id: MsgId, bytes: UsrMsgBytes) {
         let watcher = self.send_to_one(peer, msg_id, bytes, None).await;
         match watcher {
