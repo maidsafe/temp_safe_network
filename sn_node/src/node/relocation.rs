@@ -43,6 +43,12 @@ pub(super) fn find_nodes_to_relocate(
     // Capped by criteria that cannot relocate too many node at once.
     let joined_nodes = network_knowledge.section_members();
 
+    debug!(
+        "Finding relocation candidates, having {:?} members, recommended section_size {:?}",
+        joined_nodes.len(),
+        recommended_section_size(),
+    );
+
     if joined_nodes.len() < recommended_section_size() {
         return vec![];
     }
@@ -64,6 +70,8 @@ pub(super) fn find_nodes_to_relocate(
     // here we sort the nodes by its distance to the churn_id.
     let target_name = XorName::from_content(&churn_id.0);
     candidates.sort_by(|lhs, rhs| target_name.cmp_distance(&lhs.name(), &rhs.name()));
+
+    debug!("Finding relocation candidates {candidates:?}");
 
     let max_age = if let Some(age) = candidates.iter().map(|info| info.age()).max() {
         age

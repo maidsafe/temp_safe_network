@@ -35,9 +35,14 @@ impl MyNode {
         if self.network_knowledge.prefix().is_empty() {
             return Ok(vec![]);
         }
-
+        debug!("Try to find relocate peers, excluded {excluded:?}");
         // Do not carry out relocation when there is not enough elder nodes.
         if self.network_knowledge.section_auth().elder_count() < elder_count() {
+            debug!(
+                "Not enough elders current {:?} vs. expected {:?}",
+                self.network_knowledge.section_auth().elder_count(),
+                elder_count()
+            );
             return Ok(vec![]);
         }
 
@@ -63,6 +68,7 @@ impl MyNode {
         &mut self,
         relocate_proof: SectionSigned<NodeState>,
     ) -> Result<Option<Cmd>> {
+        trace!("Handle relocate {:?}", relocate_proof);
         let (dst_xorname, dst_section_key, new_age) =
             if let MembershipState::Relocated(ref relocate_details) = relocate_proof.state() {
                 (
@@ -79,11 +85,14 @@ impl MyNode {
             };
 
         let node = self.info();
-        if dst_xorname != node.name() {
-            // This `Relocate` message is not for us - it's most likely a duplicate of a previous
-            // message that we already handled.
-            return Ok(None);
-        }
+        // `relocate_details.dst` is not the name of the relocated node,
+        // but the target section for the peer to be relocated to.
+        // TODO: having an additional field within reolocate_details for that info?
+        // if dst_xorname != node.name() {
+        //     // This `Relocate` message is not for us - it's most likely a duplicate of a previous
+        //     // message that we already handled.
+        //     return Ok(None);
+        // }
 
         debug!("Received Relocate message to join the section at {dst_xorname}");
 

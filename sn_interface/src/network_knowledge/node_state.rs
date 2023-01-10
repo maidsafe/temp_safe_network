@@ -103,10 +103,10 @@ impl NodeState {
             return Err(Error::WrongSection);
         }
 
-        self.validate_relocation_details(prefix)?;
+        self.validate_relocation_details()?;
 
         match self.state {
-            MembershipState::Joined | MembershipState::Relocated(_) => {
+            MembershipState::Joined => {
                 if members.contains_key(&name) {
                     info!("Rejecting join from existing member {name}");
                     Err(Error::ExistingMemberConflict)
@@ -125,6 +125,10 @@ impl NodeState {
                     Ok(())
                 }
             }
+            MembershipState::Relocated(_) => {
+                // A node relocation is always OK
+                Ok(())
+            }
             MembershipState::Left => {
                 if !members.contains_key(&name) {
                     info!("Rejecting leave from non-existing member");
@@ -136,23 +140,19 @@ impl NodeState {
         }
     }
 
-    fn validate_relocation_details(&self, prefix: &Prefix) -> Result<()> {
+    fn validate_relocation_details(&self) -> Result<()> {
         if let MembershipState::Relocated(details) = &self.state {
             let name = self.name();
-            let dest = details.dst;
-
-            if !prefix.matches(&dest) {
-                info!("Invalid relocation request from {name} - {dest} doesn't match our prefix {prefix:?}.");
-                return Err(Error::WrongSection);
-            }
 
             // We requires the node name matches the relocation details age.
+            // However, for relocation, the node_state was created using old name.
+            // Which is one less than the age within the relocation details.
             let age = details.age;
             let state_age = self.age();
-            if age != state_age {
+            if age != (state_age + 1) {
                 info!(
-		    "Invalid relocation request from {name} - relocation age ({age}) doesn't match peer's age ({state_age})."
-		);
+        		    "Invalid relocation request from {name} - relocation age ({age}) doesn't match peer's age ({state_age})."
+        		);
                 return Err(Error::InvalidRelocationDetails);
             }
         }
@@ -201,8 +201,10 @@ impl NodeState {
 
     // Convert this info into one with the state changed to `Relocated`.
     pub fn relocate(self, relocate_details: RelocateDetails) -> Self {
+        let previous_name = Some(relocate_details.previous_name);
         Self {
             state: MembershipState::Relocated(Box::new(relocate_details)),
+            previous_name,
             ..self
         }
     }

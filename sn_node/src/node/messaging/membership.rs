@@ -182,7 +182,7 @@ impl MyNode {
         &mut self,
         decision: Decision<NodeState>,
     ) -> Result<Vec<Cmd>> {
-        debug!("{}", LogMarker::AgreementOfOnline);
+        debug!("{}", LogMarker::AgreementOfMembership);
         let mut cmds = vec![];
 
         let (joining_nodes, leaving_nodes): (Vec<_>, Vec<_>) = decision
@@ -351,6 +351,7 @@ impl MyNode {
         // containing the relocation details.
         if node_state.is_relocated() {
             let peer = *node_state.peer();
+            info!("Notify relocation to node {:?}", peer);
             let msg = NodeMsg::Relocate(node_state);
             Some(MyNode::send_system_msg(
                 msg,

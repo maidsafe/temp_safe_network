@@ -64,7 +64,11 @@ impl MyNode {
         Ok((node, genesis_dbc))
     }
 
-    pub(crate) fn relocate(&mut self, new_keypair: Arc<Keypair>, new_name: XorName) -> Result<()> {
+    pub(crate) fn relocate_to(
+        &mut self,
+        new_keypair: Arc<Keypair>,
+        new_name: XorName,
+    ) -> Result<()> {
         // try to relocate to the section that matches our current name
         self.network_knowledge.relocate_to(new_name)?;
 
