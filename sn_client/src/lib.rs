@@ -58,7 +58,9 @@ mod connections;
 mod errors;
 
 // Export public API.
-pub use api::{Client, RegisterWriteAheadLog, DEFAULT_NETWORK_CONTACTS_FILE_NAME};
+pub use api::{
+    Client, QueriedDataReplicas, RegisterWriteAheadLog, DEFAULT_NETWORK_CONTACTS_FILE_NAME,
+};
 pub use connections::LinkError;
 pub use errors::{Error, Result};
 pub use qp2p::Config as QuicP2pConfig;

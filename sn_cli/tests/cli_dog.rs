@@ -10,7 +10,10 @@ use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
 use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
-use sn_api::resolver::{SafeData, SafeUrl};
+use sn_api::{
+    resolver::{SafeData, SafeUrl},
+    XorName,
+};
 use sn_cmd_test_utilities::util::{
     get_random_string, parse_files_put_or_sync_output, parse_wallet_create_output, safe_cmd,
     safe_cmd_stdout, upload_path, use_isolated_safe_config_dir,
@@ -18,6 +21,9 @@ use sn_cmd_test_utilities::util::{
 use std::path::PathBuf;
 
 const TEST_FILE: &str = "../resources/testdata/test.md";
+const LARGE_TEST_FILE: &str = "../resources/testdata/large_markdown_file.md";
+
+type DataReplicasReport = Vec<(XorName, Vec<(usize, String)>)>;
 
 #[test]
 fn dog_should_resolve_files_container_from_nrs_url_without_safe_prefix() -> Result<()> {
@@ -33,7 +39,7 @@ fn dog_should_resolve_files_container_from_nrs_url_without_safe_prefix() -> Resu
     )?;
 
     let dog_output = safe_cmd_stdout(&config_dir, ["dog", &nrsurl, "--json"], Some(0))?;
-    let (url, mut content): (String, Vec<SafeData>) =
+    let (url, mut content, _): (String, Vec<SafeData>, DataReplicasReport) =
         serde_json::from_str(&dog_output).expect("Failed to parse output of `safe dog` on file");
     assert_eq!(url, format!("safe://{}", nrsurl));
 
@@ -60,7 +66,7 @@ fn dog_should_resolve_files_container_from_nrs_url_with_safe_prefix() -> Result<
     )?;
 
     let dog_output = safe_cmd_stdout(&config_dir, ["dog", &nrsurl, "--json"], Some(0))?;
-    let (url, mut content): (String, Vec<SafeData>) =
+    let (url, mut content, _): (String, Vec<SafeData>, DataReplicasReport) =
         serde_json::from_str(&dog_output).expect("Failed to parse output of `safe dog` on file");
     assert_eq!(url, nrsurl);
 
@@ -94,7 +100,7 @@ fn dog_should_resolve_files_container_using_json_compact_output_from_nrs_url() -
         ["dog", &nrsurl, "--output=jsoncompact"],
         Some(0),
     )?;
-    let (url, mut content): (String, Vec<SafeData>) =
+    let (url, mut content, _): (String, Vec<SafeData>, DataReplicasReport) =
         serde_json::from_str(&dog_output).expect("Failed to parse output of `safe dog`");
     assert_eq!(url, format!("safe://{}", nrsurl));
 
@@ -119,7 +125,7 @@ fn dog_should_resolve_files_container_using_yaml_output_from_nrs_url() -> Result
         Some(0),
     )?;
     let dog_output = safe_cmd_stdout(&config_dir, ["dog", &nrsurl, "--output=yaml"], Some(0))?;
-    let (url, mut content): (String, Vec<SafeData>) =
+    let (url, mut content, _): (String, Vec<SafeData>, DataReplicasReport) =
         serde_yaml::from_str(&dog_output).expect("Failed to parse output of `safe dog`");
     assert_eq!(url, format!("safe://{}", nrsurl));
 
@@ -219,5 +225,65 @@ fn dog_should_resolve_nrs_container_from_nrs_url() -> Result<()> {
             "another.{site_name}: {}",
             another_file_link
         )));
+    Ok(())
+}
+
+#[test]
+fn dog_should_query_data_replicas_from_nrs_url() -> Result<()> {
+    let config_dir = use_isolated_safe_config_dir()?;
+    let content = safe_cmd_stdout(
+        &config_dir,
+        ["files", "put", LARGE_TEST_FILE, "/myfile", "--json"],
+        Some(0),
+    )?;
+    let (container_xorurl, _) = parse_files_put_or_sync_output(&content)?;
+
+    let nrsurl = get_random_string();
+    let _ = safe_cmd_stdout(
+        &config_dir,
+        ["nrs", "register", &nrsurl, "-l", &container_xorurl],
+        Some(0),
+    )?;
+    // let's query all valid four replicas, plus replica with index 99 we should get an error for.
+    let out_of_index = 99;
+    let dog_output = safe_cmd_stdout(
+        &config_dir,
+        [
+            "dog",
+            &format!("safe://{nrsurl}/myfile"),
+            "-r0",
+            "-r1",
+            "-r2",
+            "-r3",
+            "-r",
+            &out_of_index.to_string(),
+            "--json",
+        ],
+        Some(0),
+    )?;
+    #[allow(clippy::type_complexity)]
+    let (_, _, replicas_report): (String, Vec<SafeData>, DataReplicasReport) =
+        serde_json::from_str(&dog_output).expect("Failed to parse output of `safe dog`");
+
+    assert_eq!(replicas_report.len(), 4); // it's a 4-chunks file
+
+    let expected_error = format!(
+        "Error received from the network: \
+        InsufficientNodeCount {{ prefix: Prefix(), expected: {}, found: 4 }}",
+        out_of_index + 1
+    );
+    assert!(replicas_report.iter().all(|(_, outcomes)| {
+        // for each chunk, replica with index 0, 1, 2 and 3, shall be ok,
+        // error is expected on index 99
+        assert_eq!(outcomes.len(), 5);
+        outcomes
+            == &[
+                (0, "".to_string()),
+                (1, "".to_string()),
+                (2, "".to_string()),
+                (3, "".to_string()),
+                (out_of_index, expected_error.clone()),
+            ]
+    }));
     Ok(())
 }
