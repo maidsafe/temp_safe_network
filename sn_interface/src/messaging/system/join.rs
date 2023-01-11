@@ -18,6 +18,14 @@ use std::net::SocketAddr;
 pub struct JoinRequest {
     /// The public key of the section to join.
     pub section_key: bls::PublicKey,
+    /// The public address the node expects to have.
+    ///
+    /// This is used to detect if the joining node is behind a NAT. If this
+    /// addr does not match the addr of the connection we received this
+    /// join request on, then we reject the request.
+    ///
+    /// NAT hole punching is a can of worms we're punting on right now.
+    pub addr: SocketAddr,
 }
 
 impl JoinRequest {
