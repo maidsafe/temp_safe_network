@@ -113,7 +113,15 @@ pub(crate) enum Cmd {
         msg: NodeMsg,
         msg_id: MsgId,
         recipients: Peers,
-        send_stream: Option<SendStream>,
+        #[debug(skip)]
+        context: NodeContext,
+    },
+    /// Performs serialisation and sends the response NodeMsg to the peer over the given stream.
+    SendNodeMsgResponse {
+        msg: NodeMsg,
+        msg_id: MsgId,
+        recipient: Peer,
+        send_stream: SendStream,
         #[debug(skip)]
         context: NodeContext,
     },
@@ -126,8 +134,9 @@ pub(crate) enum Cmd {
         context: NodeContext,
         source_client: Peer,
     },
-    /// Performs serialisation and sends the msg to the peer node over the given stream.
-    SendNodeResponse {
+    /// Performs serialisation and sends the response NodeDataResponse msg to the peer
+    /// over the given stream.
+    SendNodeDataResponse {
         msg: NodeDataResponse,
         correlation_id: MsgId,
         send_stream: SendStream,
@@ -168,7 +177,6 @@ impl Cmd {
             msg,
             msg_id,
             recipients,
-            send_stream: None,
             context,
         }
     }
@@ -185,27 +193,13 @@ impl Cmd {
         }
     }
 
-    pub(crate) fn send_msg_via_response_stream(
-        msg: NodeMsg,
-        recipients: Peers,
-        send_stream: Option<SendStream>,
-        context: NodeContext,
-    ) -> Self {
-        Cmd::SendMsg {
-            msg,
-            msg_id: MsgId::new(),
-            recipients,
-            send_stream,
-            context,
-        }
-    }
-
     pub(crate) fn statemap_state(&self) -> sn_interface::statemap::State {
         use sn_interface::statemap::State;
         match self {
             Cmd::SendMsg { .. }
+            | Cmd::SendNodeMsgResponse { .. }
             | Cmd::SendClientResponse { .. }
-            | Cmd::SendNodeResponse { .. }
+            | Cmd::SendNodeDataResponse { .. }
             | Cmd::SendMsgAndAwaitResponse { .. } => State::Comms,
             Cmd::SendLockingJoinMsg { .. } => State::Comms,
             Cmd::HandleFailedSendToNode { .. } => State::Comms,
@@ -245,8 +239,9 @@ impl fmt::Display for Cmd {
             Cmd::HandleMembershipDecision(_) => write!(f, "HandleMembershipDecision"),
             Cmd::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
             Cmd::SendMsg { .. } => write!(f, "SendMsg"),
+            Cmd::SendNodeMsgResponse { .. } => write!(f, "SendNodeMsgResponse"),
             Cmd::SendClientResponse { .. } => write!(f, "SendClientResponse"),
-            Cmd::SendNodeResponse { .. } => write!(f, "SendNodeResponse"),
+            Cmd::SendNodeDataResponse { .. } => write!(f, "SendNodeDataResponse"),
             Cmd::SendMsgAndAwaitResponse { .. } => write!(f, "SendMsgAndAwaitResponse"),
             Cmd::SendLockingJoinMsg { .. } => write!(f, "SendLockingJoinMsg"),
             Cmd::EnqueueDataForReplication { .. } => write!(f, "EnqueueDataForReplication"),

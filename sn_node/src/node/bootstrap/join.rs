@@ -464,7 +464,7 @@ async fn send_messages(
             let msg_id = msg.msg_id();
 
             let bytes = msg.serialize()?;
-            match comm.send_out_bytes(peer, msg_id, bytes, None).await {
+            match comm.send_out_bytes(peer, msg_id, bytes).await {
                 Ok(()) => trace!("Msg {msg_id:?} sent on {dst:?}"),
                 Err(error) => {
                     warn!("Error in comms when sending msg {msg_id:?} to peer {peer:?}: {error}")

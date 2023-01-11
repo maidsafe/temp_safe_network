@@ -189,15 +189,8 @@ impl Comm {
         peer: Peer,
         msg_id: MsgId,
         bytes: UsrMsgBytes,
-        send_stream: Option<SendStream>,
     ) -> Result<()> {
-        let stream_info = if let Some(stream) = &send_stream {
-            format!(" on {}", stream.id())
-        } else {
-            "".to_string()
-        };
-
-        let watcher = self.send_to_one(peer, msg_id, bytes, send_stream).await;
+        let watcher = self.send_to_one(peer, msg_id, bytes).await;
 
         let sessions = self.sessions.clone();
 
@@ -213,7 +206,7 @@ impl Comm {
                         Self::is_sent(watcher, msg_id, peer).await?;
 
                     if send_was_successful {
-                        trace!("Msg {msg_id:?} sent to {peer:?}{stream_info}");
+                        trace!("Msg {msg_id:?} sent to {peer:?}");
                         Ok(())
                     } else {
                         if should_remove {
@@ -235,19 +228,13 @@ impl Comm {
                     // which should not happen (be reachable) if we only access PeerSession from Comm
                     // The error means we accessed a peer that we disconnected from.
                     // So, this would potentially be a bug!
-                    warn!(
-                        "Accessed a disconnected peer: {}. This is potentially a bug!",
-                        peer
-                    );
+                    warn!("Accessed a disconnected peer: {peer}. This is potentially a bug!");
 
                     let _peer = sessions.remove(&peer);
                     error!(
-                            "Sending message (msg_id: {:?}) to {:?} (name {:?}){stream_info} failed as we have disconnected from the peer. (Error is: {})",
-                            msg_id,
-                            peer.addr(),
-                            peer.name(),
-                            error,
-                        );
+                        "Sending message (msg_id: {msg_id:?}) to {peer} failed \
+                        as we have disconnected from the peer. (Error is: {error})",
+                    );
                     Err(Error::FailedSend(peer))
                 }
             }
@@ -259,7 +246,7 @@ impl Comm {
     /// Test helper to send out Msgs in a blocking fashion
     #[cfg(any(test, feature = "test"))]
     pub async fn send_out_bytes_sync(&self, peer: Peer, msg_id: MsgId, bytes: UsrMsgBytes) {
-        let watcher = self.send_to_one(peer, msg_id, bytes, None).await;
+        let watcher = self.send_to_one(peer, msg_id, bytes).await;
         match watcher {
             Ok(Some(watcher)) => {
                 let (send_was_successful, should_remove) = Self::is_sent(watcher, msg_id, peer)
@@ -445,26 +432,17 @@ impl Comm {
         recipient: Peer,
         msg_id: MsgId,
         bytes: UsrMsgBytes,
-        send_stream: Option<SendStream>,
     ) -> Result<Option<SendWatcher>> {
         let bytes_len = {
             let (h, d, p) = bytes.clone();
             h.len() + d.len() + p.len()
         };
 
-        trace!(
-            "Sending message bytes ({} bytes) w/ {:?} to {:?}",
-            bytes_len,
-            msg_id,
-            recipient
-        );
+        trace!("Sending message bytes ({bytes_len} bytes) w/ {msg_id:?} to {recipient:?}");
 
         if let Some(peer) = self.get_or_create(&recipient).await {
             debug!("Peer session retrieved");
-            Ok(Some(
-                peer.send_using_session_or_stream(msg_id, bytes, send_stream)
-                    .await?,
-            ))
+            Ok(Some(peer.send_using_session(msg_id, bytes).await?))
         } else {
             debug!("No client conn exists to send this msg on.... {msg_id:?}");
             Ok(None)
@@ -537,9 +515,9 @@ mod tests {
         let peer0_msg = new_test_msg(dst(peer0))?;
         let peer1_msg = new_test_msg(dst(peer1))?;
 
-        comm.send_out_bytes(peer0, peer0_msg.msg_id(), peer0_msg.serialize()?, None)
+        comm.send_out_bytes(peer0, peer0_msg.msg_id(), peer0_msg.serialize()?)
             .await?;
-        comm.send_out_bytes(peer1, peer1_msg.msg_id(), peer1_msg.serialize()?, None)
+        comm.send_out_bytes(peer1, peer1_msg.msg_id(), peer1_msg.serialize()?)
             .await?;
 
         if let Some(bytes) = rx0.recv().await {
@@ -572,7 +550,7 @@ mod tests {
         let invalid_addr = invalid_peer.addr();
         let msg = new_test_msg(dst(invalid_peer))?;
         let result = comm
-            .send_out_bytes(invalid_peer, msg.msg_id(), msg.serialize()?, None)
+            .send_out_bytes(invalid_peer, msg.msg_id(), msg.serialize()?)
             .await;
 
         assert_matches!(result, Err(Error::FailedSend(peer)) => assert_eq!(peer.addr(), invalid_addr));
@@ -593,7 +571,7 @@ mod tests {
         let msg0 = new_test_msg(dst(peer))?;
 
         send_comm
-            .send_out_bytes(peer, msg0.msg_id(), msg0.serialize()?, None)
+            .send_out_bytes(peer, msg0.msg_id(), msg0.serialize()?)
             .await?;
 
         let mut msg0_received = false;
@@ -612,7 +590,7 @@ mod tests {
 
         let msg1 = new_test_msg(dst(peer))?;
         send_comm
-            .send_out_bytes(peer, msg1.msg_id(), msg1.serialize()?, None)
+            .send_out_bytes(peer, msg1.msg_id(), msg1.serialize()?)
             .await?;
 
         let mut msg1_received = false;
@@ -641,7 +619,7 @@ mod tests {
         let msg = new_test_msg(dst(peer))?;
         // Send a message to establish the connection
         comm1
-            .send_out_bytes(peer, msg.msg_id(), msg.serialize()?, None)
+            .send_out_bytes(peer, msg.msg_id(), msg.serialize()?)
             .await?;
 
         assert_matches!(rx0.recv().await, Some(MsgFromPeer { .. }));

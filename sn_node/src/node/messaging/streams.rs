@@ -11,7 +11,6 @@ use crate::node::{
     Result,
 };
 
-use sn_comms::Error as CommsError;
 use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
@@ -59,50 +58,45 @@ lazy_static! {
     };
 }
 
-// Message handling
+// Message handling over streams
 impl MyNode {
-    pub(crate) async fn send_msg(
+    pub(crate) async fn send_node_msg_response(
         msg: NodeMsg,
         msg_id: MsgId,
-        recipients: Peers,
-        send_stream: Option<SendStream>,
+        recipient: Peer,
         context: NodeContext,
+        send_stream: SendStream,
     ) -> Result<Vec<Cmd>> {
-        trace!("Sending msg: {msg_id:?}");
-        let peer_msgs = into_msg_bytes(
-            &context.network_knowledge,
-            context.name,
-            msg,
+        let stream_id = send_stream.id();
+        trace!("Sending response msg {msg_id:?} over {stream_id}");
+        let (kind, payload) = MyNode::serialize_node_msg(context.name, msg)?;
+
+        match send_msg_on_stream(
+            context.network_knowledge.section_key(),
+            payload,
+            kind,
+            send_stream,
+            recipient,
             msg_id,
-            recipients,
-        )?;
-
-        let comm = context.comm.clone();
-        let results = if let Some(send_stream) = send_stream {
-            let task = peer_msgs.get(0).map(|(peer, msg)| {
-                comm.send_out_bytes(*peer, msg_id, msg.clone(), Some(send_stream))
-            });
-            futures::future::join_all(task).await
-        } else {
-            let task = peer_msgs
-                .into_iter()
-                .map(|(peer, msg)| comm.send_out_bytes(peer, msg_id, msg, None));
-            futures::future::join_all(task).await
-        };
-
-        // Any failed sends are tracked via Cmd::HandlePeerFailedSend, which will track issues for any peers
-        // in the section (otherwise ignoring failed send to out of section nodes or clients)
-        let cmds = results
-            .into_iter()
-            .filter_map(|result| match result {
-                Err(CommsError::FailedSend(peer)) => {
-                    Some(Cmd::HandleFailedSendToNode { peer, msg_id })
+        )
+        .await
+        {
+            Ok(()) => Ok(vec![]),
+            Err(err) => {
+                error!(
+                    "Could not send response msg {msg_id:?} \
+                    to {recipient:?} over {stream_id}: {err:?}"
+                );
+                if let Error::Comms(_) = err {
+                    Ok(vec![Cmd::HandleFailedSendToNode {
+                        peer: recipient,
+                        msg_id,
+                    }])
+                } else {
+                    Ok(vec![])
                 }
-                _ => None,
-            })
-            .collect();
-
-        Ok(cmds)
+            }
+        }
     }
 
     pub(crate) async fn send_client_response(
@@ -111,7 +105,7 @@ impl MyNode {
         send_stream: SendStream,
         context: NodeContext,
         source_client: Peer,
-    ) -> Result<Vec<Cmd>> {
+    ) -> Result<()> {
         trace!("Sending client response msg for {correlation_id:?}");
         let (kind, payload) = MyNode::serialize_client_msg_response(context.name, msg)?;
         send_msg_on_stream(
@@ -122,18 +116,16 @@ impl MyNode {
             source_client,
             correlation_id,
         )
-        .await?;
-
-        Ok(vec![])
+        .await
     }
 
-    pub(crate) async fn send_node_response(
+    pub(crate) async fn send_node_data_response(
         msg: NodeDataResponse,
         correlation_id: MsgId,
         send_stream: SendStream,
         context: NodeContext,
         requesting_peer: Peer,
-    ) -> Result<Vec<Cmd>> {
+    ) -> Result<()> {
         trace!("Sending node response msg for {correlation_id:?}");
         let (kind, payload) = MyNode::serialize_node_msg_response(context.name, msg)?;
         send_msg_on_stream(
@@ -144,9 +136,7 @@ impl MyNode {
             requesting_peer,
             correlation_id,
         )
-        .await?;
-
-        Ok(vec![])
+        .await
     }
 
     pub(crate) async fn send_msg_and_await_response(
@@ -244,7 +234,7 @@ pub(crate) fn into_msg_bytes(
     for peer in recipients {
         match network_knowledge.generate_dst(&peer.name()) {
             Ok(dst) => {
-                // TODO log errror here isntead of throwing
+                // TODO log error here isntead of throwing
                 let all_the_bytes = initial_wire_msg.serialize_with_new_dst(&dst)?;
                 msgs.push((peer, all_the_bytes));
             }

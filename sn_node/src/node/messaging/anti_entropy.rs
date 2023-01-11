@@ -65,14 +65,15 @@ impl MyNode {
             };
 
             if let Some(ae_msg) = ae_msg {
-                let ae_cmd = if send_stream.is_some() {
+                let ae_cmd = if let Some(send_stream) = send_stream {
                     debug!("Sending AE response over send_stream for {msg_id:?}");
-                    Cmd::send_msg_via_response_stream(
-                        ae_msg,
-                        Peers::Single(origin),
+                    Cmd::SendNodeMsgResponse {
+                        msg: ae_msg,
+                        msg_id,
                         send_stream,
+                        recipient: origin,
                         context,
-                    )
+                    }
                 } else {
                     debug!("Sending AE response over fresh conn for {msg_id:?}");
                     Cmd::send_msg(ae_msg, Peers::Single(origin), context)

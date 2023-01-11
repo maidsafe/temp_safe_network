@@ -107,7 +107,7 @@ impl MyNode {
                 operation_id,
             };
 
-            vec![Cmd::SendNodeResponse {
+            vec![Cmd::SendNodeDataResponse {
                 msg,
                 correlation_id: msg_id,
                 send_stream,

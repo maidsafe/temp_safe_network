@@ -7,11 +7,16 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    node::{core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, Result},
+    node::{
+        core::NodeContext,
+        flow_ctrl::cmds::Cmd,
+        messaging::{streams::into_msg_bytes, Peers},
+        MyNode, Result,
+    },
     storage::{Error as StorageError, StorageLevel},
 };
-use qp2p::SendStream;
-use sn_fault_detection::IssueType;
+
+use sn_comms::Error as CommsError;
 use sn_interface::{
     messaging::{
         data::CmdResponse,
@@ -20,11 +25,51 @@ use sn_interface::{
     },
     types::{log_markers::LogMarker, Keypair, Peer, PublicKey, ReplicatedData},
 };
+
+use qp2p::SendStream;
+use sn_fault_detection::IssueType;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
 impl MyNode {
+    /// Send a (`NodeMsg`) message to peers
+    pub(crate) async fn send_msg(
+        msg: NodeMsg,
+        msg_id: MsgId,
+        recipients: Peers,
+        context: NodeContext,
+    ) -> Result<Vec<Cmd>> {
+        trace!("Sending msg: {msg_id:?}");
+        let peer_msgs = into_msg_bytes(
+            &context.network_knowledge,
+            context.name,
+            msg,
+            msg_id,
+            recipients,
+        )?;
+
+        let comm = context.comm.clone();
+        let tasks = peer_msgs
+            .into_iter()
+            .map(|(peer, msg)| comm.send_out_bytes(peer, msg_id, msg));
+        let results = futures::future::join_all(tasks).await;
+
+        // Any failed sends are tracked via Cmd::HandlePeerFailedSend, which will track issues for any peers
+        // in the section (otherwise ignoring failed send to out of section nodes or clients)
+        let cmds = results
+            .into_iter()
+            .filter_map(|result| match result {
+                Err(CommsError::FailedSend(peer)) => {
+                    Some(Cmd::HandleFailedSendToNode { peer, msg_id })
+                }
+                _ => None,
+            })
+            .collect();
+
+        Ok(cmds)
+    }
+
     /// Send a (`NodeMsg`) message to all Elders in our section
     pub(crate) fn send_msg_to_our_elders(context: &NodeContext, msg: NodeMsg) -> Cmd {
         let sap = context.network_knowledge.section_auth();
@@ -102,7 +147,7 @@ impl MyNode {
                 response,
                 correlation_id: original_msg_id,
             };
-            cmds.push(Cmd::SendNodeResponse {
+            cmds.push(Cmd::SendNodeDataResponse {
                 msg,
                 correlation_id: original_msg_id,
                 send_stream,
