@@ -6,9 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Link;
-
-use crate::node::{Error, Result, STANDARD_CHANNEL_SIZE};
+use super::{Error, Link, Result, STANDARD_CHANNEL_SIZE};
 
 use qp2p::{SendStream, UsrMsgBytes};
 use sn_interface::messaging::MsgId;

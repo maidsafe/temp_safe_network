@@ -16,7 +16,6 @@ mod periodic_checks;
 pub(crate) mod tests;
 pub(crate) use cmd_ctrl::CmdCtrl;
 
-use crate::comm::MsgFromPeer;
 use crate::node::{
     flow_ctrl::{
         cmds::Cmd,
@@ -26,6 +25,8 @@ use crate::node::{
     MyNode, Result, STANDARD_CHANNEL_SIZE,
 };
 use periodic_checks::PeriodicChecksTimestamps;
+
+use sn_comms::MsgFromPeer;
 use sn_fault_detection::FaultDetection;
 use sn_interface::{
     messaging::system::{NodeDataCmd, NodeMsg},

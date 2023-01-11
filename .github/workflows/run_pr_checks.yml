@@ -198,7 +198,7 @@ jobs:
       - name: Start the network
         run: ./artifacts/testnet --interval 30000
         env:
-          RUST_LOG: "sn_node,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
+          RUST_LOG: "sn_node,sn_comms,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
 
       - name: Wait for all nodes to join
         shell: bash
@@ -314,7 +314,7 @@ jobs:
       - name: Start the network
         run: ./artifacts/testnet --interval 30000
         env:
-          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
+          RUST_LOG: "sn_node,sn_comms,sn_consensus,sn_dysfunction=trace,sn_interface=trace"
 
       - name: Wait for all nodes to join
         shell: bash
@@ -496,7 +496,7 @@ jobs:
       - name: Start the network
         run: ./artifacts/testnet --interval 30000
         env:
-          RUST_LOG: "sn_node,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
+          RUST_LOG: "sn_node,sn_comms,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
 
       - name: Wait for all nodes to join
         shell: bash
@@ -601,7 +601,7 @@ jobs:
       - name: Start the network
         run: ./artifacts/testnet --interval 30000
         env:
-          RUST_LOG: "sn_node,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
+          RUST_LOG: "sn_node,sn_comms,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
 
       - name: Wait for all nodes to join
         shell: bash

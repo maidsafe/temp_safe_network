@@ -802,14 +802,13 @@ impl MyNode {
 #[cfg(test)]
 mod tests {
     use super::MyNode;
-    use crate::{
-        comm::MsgFromPeer,
-        node::flow_ctrl::{
-            cmds::Cmd,
-            dispatcher::Dispatcher,
-            tests::{cmd_utils::get_next_msg, network_builder::TestNetworkBuilder},
-        },
+    use crate::node::flow_ctrl::{
+        cmds::Cmd,
+        dispatcher::Dispatcher,
+        tests::{cmd_utils::get_next_msg, network_builder::TestNetworkBuilder},
     };
+
+    use sn_comms::MsgFromPeer;
     use sn_interface::{
         init_logger,
         messaging::{

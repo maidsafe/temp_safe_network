@@ -50,7 +50,6 @@ pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API upd
 
 mod core {
     use crate::{
-        comm::Comm,
         node::{
             bootstrap::JoiningAsRelocated,
             dkg::DkgVoter,
@@ -62,6 +61,7 @@ mod core {
         },
         UsedSpace,
     };
+    use sn_comms::Comm;
     use sn_consensus::Generation;
     use sn_fault_detection::IssueType;
     use sn_interface::{

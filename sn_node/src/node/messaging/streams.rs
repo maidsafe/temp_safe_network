@@ -11,6 +11,7 @@ use crate::node::{
     Result,
 };
 
+use sn_comms::Error as CommsError;
 use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
@@ -94,7 +95,9 @@ impl MyNode {
         let cmds = results
             .into_iter()
             .filter_map(|result| match result {
-                Err(Error::FailedSend(peer)) => Some(Cmd::HandleFailedSendToNode { peer, msg_id }),
+                Err(CommsError::FailedSend(peer)) => {
+                    Some(Cmd::HandleFailedSendToNode { peer, msg_id })
+                }
                 _ => None,
             })
             .collect();

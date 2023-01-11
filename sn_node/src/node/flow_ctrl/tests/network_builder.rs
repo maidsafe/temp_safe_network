@@ -1,10 +1,11 @@
 use crate::{
-    comm::{Comm, MsgFromPeer},
     node::{
         cfg::create_test_capacity_and_root_storage, core::MyNode, flow_ctrl::dispatcher::Dispatcher,
     },
     UsedSpace,
 };
+
+use sn_comms::{Comm, MsgFromPeer};
 use sn_interface::{
     elder_count,
     messaging::system::SectionSigned,

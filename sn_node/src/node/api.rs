@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::comm::Comm;
 use crate::{
     node::{
         flow_ctrl::{cmds::Cmd, fault_detection::FaultsCmd},
@@ -15,6 +14,7 @@ use crate::{
     UsedSpace,
 };
 
+use sn_comms::Comm;
 use sn_interface::{
     dbcs::gen_genesis_dbc,
     network_knowledge::{

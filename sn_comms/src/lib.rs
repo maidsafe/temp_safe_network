@@ -6,9 +6,49 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+//! Comms for the SAFE Network.
+//! All comms with nodes are done though this.
+
+// For quick_error
+#![recursion_limit = "256"]
+#![doc(
+    html_logo_url = "https://github.com/maidsafe/QA/raw/master/Images/maidsafe_logo.png",
+    html_favicon_url = "https://maidsafe.net/img/favicon.ico",
+    test(attr(deny(warnings)))
+)]
+// Forbid some very bad patterns. Forbid is stronger than `deny`, preventing us from suppressing the
+// lint with `#[allow(...)]` et-all.
+#![forbid(
+    arithmetic_overflow,
+    mutable_transmutes,
+    no_mangle_const_items,
+    unknown_crate_types,
+    unsafe_code
+)]
+// Turn on some additional warnings to encourage good style.
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    trivial_casts,
+    trivial_numeric_casts,
+    unreachable_pub,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    unused_results,
+    clippy::unicode_not_nfc,
+    clippy::unwrap_used
+)]
+
+#[macro_use]
+extern crate tracing;
+
+mod error;
 mod link;
 mod listener;
 mod peer_session;
+
+pub use self::error::{Error, Result};
 
 use self::{
     link::Link,
@@ -16,16 +56,14 @@ use self::{
     peer_session::{PeerSession, SendStatus, SendWatcher},
 };
 
-use crate::node::{Error, Result, STANDARD_CHANNEL_SIZE};
-use qp2p::{Connection, SendStream, UsrMsgBytes};
-
 use sn_interface::{
     messaging::{MsgId, WireMsg},
     types::{log_markers::LogMarker, Peer},
 };
 
+use qp2p::{Connection, Endpoint, IncomingConnections, SendStream, UsrMsgBytes};
+
 use dashmap::DashMap;
-use qp2p::{Endpoint, IncomingConnections};
 use std::{collections::BTreeSet, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     sync::mpsc::{self, Receiver, Sender},
@@ -33,24 +71,40 @@ use tokio::{
     task,
 };
 
-// Communication component of the node to interact with other nodes.
+/// Standard channel size, to allow for large swings in throughput
+static STANDARD_CHANNEL_SIZE: usize = 100_000;
+
+/// A msg received on the wire.
+#[derive(Debug)]
+pub struct MsgFromPeer {
+    /// The peer that sent us the msg.
+    pub sender: Peer,
+    /// The msg that we received.
+    pub wire_msg: WireMsg,
+    /// An optional stream to return msgs on, if
+    /// this msg came on a bidi-stream.
+    pub send_stream: Option<SendStream>,
+}
+
+/// Communication component of the node to interact with other nodes.
+#[allow(missing_debug_implementations)]
 #[derive(Clone)]
-pub(crate) struct Comm {
-    pub(crate) our_endpoint: Endpoint,
+pub struct Comm {
+    our_endpoint: Endpoint,
     msg_listener: MsgListener,
     sessions: Arc<DashMap<Peer, PeerSession>>,
     members: Arc<RwLock<BTreeSet<Peer>>>,
 }
 
 impl Comm {
+    /// Creates a new instance of Comm with an endpoint
+    /// and starts listening to the incoming messages from other nodes.
     #[tracing::instrument(skip_all)]
-    pub(crate) async fn new(
+    pub async fn new(
         local_addr: SocketAddr,
         config: qp2p::Config,
         incoming_msg_pipe: Sender<MsgFromPeer>,
     ) -> Result<Self> {
-        // Doesn't bootstrap, just creates an endpoint to listen to
-        // the incoming messages from other nodes.
         let (our_endpoint, incoming_connections, _) =
             Endpoint::new_peer(local_addr, Default::default(), config).await?;
 
@@ -72,19 +126,28 @@ impl Comm {
         Ok(comm)
     }
 
-    pub(crate) fn socket_addr(&self) -> SocketAddr {
+    /// The socket address of our endpoint.
+    pub fn socket_addr(&self) -> SocketAddr {
         self.our_endpoint.public_addr()
     }
 
     /// Fake function used as replacement for testing only.
-    #[cfg(test)]
-    pub(crate) async fn is_reachable(&self, _peer: &SocketAddr) -> Result<(), Error> {
+    ///
+    /// NB: Testing this from an external crate will require referencing
+    /// this crate with the feature "test", otherwise this fn will not be called.
+    /// <https://github.com/rust-lang/rust/issues/59168#issuecomment-962214945>
+    #[cfg(any(test, feature = "test"))]
+    pub async fn is_reachable(&self, _peer: &SocketAddr) -> Result<(), Error> {
         Ok(())
     }
 
     /// Tests whether the peer is reachable.
-    #[cfg(not(test))]
-    pub(crate) async fn is_reachable(&self, peer: &SocketAddr) -> Result<(), Error> {
+    ///
+    /// NB: If testing comms from an external crate, this fn will be called instead
+    /// of the intended test fn above, unless referencing this crate with the feature "test".
+    /// <https://github.com/rust-lang/rust/issues/59168#issuecomment-962214945>
+    #[cfg(not(any(test, feature = "test")))]
+    pub async fn is_reachable(&self, peer: &SocketAddr) -> Result<(), Error> {
         let qp2p_config = qp2p::Config {
             ..Default::default()
         };
@@ -106,15 +169,22 @@ impl Comm {
         result
     }
 
+    /// Closes the endpoint.
+    pub fn close_endpoint(&self) {
+        self.our_endpoint.close()
+    }
+
     /// Updates cached connections for passed members set only.
-    pub(crate) async fn update_members(&mut self, members: BTreeSet<Peer>) {
+    pub async fn update_members(&mut self, members: BTreeSet<Peer>) {
         let new_members = members.clone();
         *self.members.write().await = members;
         self.sessions.retain(|p, _| new_members.contains(p));
     }
 
+    /// Sends the payload on a new or existing connection,
+    /// or on the provided send stream if any.
     #[tracing::instrument(skip(self, bytes))]
-    pub(crate) async fn send_out_bytes(
+    pub async fn send_out_bytes(
         &self,
         peer: Peer,
         msg_id: MsgId,
@@ -186,9 +256,9 @@ impl Comm {
         Ok(())
     }
 
-    // Test helper to send out Msgs in a blocking fashion
-    #[cfg(test)]
-    pub(crate) async fn send_out_bytes_sync(&self, peer: Peer, msg_id: MsgId, bytes: UsrMsgBytes) {
+    /// Test helper to send out Msgs in a blocking fashion
+    #[cfg(any(test, feature = "test"))]
+    pub async fn send_out_bytes_sync(&self, peer: Peer, msg_id: MsgId, bytes: UsrMsgBytes) {
         let watcher = self.send_to_one(peer, msg_id, bytes, None).await;
         match watcher {
             Ok(Some(watcher)) => {
@@ -220,14 +290,16 @@ impl Comm {
         }
     }
 
-    // TODO: tweak messaging to just allow passthrough
+    /// Sends the payload on a new bidi-stream and returns
+    /// the response.
     #[tracing::instrument(skip(self, bytes))]
-    pub(crate) async fn send_out_bytes_to_peer_and_return_response(
+    pub async fn send_out_bytes_to_peer_and_return_response(
         &self,
         peer: Peer,
         msg_id: MsgId,
         bytes: UsrMsgBytes,
     ) -> Result<WireMsg> {
+        // TODO: tweak messaging to just allow passthrough
         debug!("trying to get {peer:?} session in order to send: {msg_id:?}");
         if let Some(mut peer) = self.get_or_create(&peer).await {
             debug!("Session of {peer:?} retrieved for {msg_id:?}");
@@ -431,13 +503,6 @@ fn listen_for_incoming_msgs(
             msg_listener.listen(Arc::new(connection), incoming_msgs);
         }
     });
-}
-
-#[derive(Debug)]
-pub(crate) struct MsgFromPeer {
-    pub(crate) sender: Peer,
-    pub(crate) wire_msg: WireMsg,
-    pub(crate) send_stream: Option<SendStream>,
 }
 
 #[cfg(test)]

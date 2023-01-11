@@ -6,10 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::comm::{Comm, MsgFromPeer};
 use crate::log_sleep;
 use crate::node::{Error, Result, STANDARD_CHANNEL_SIZE};
 
+use sn_comms::{Comm, MsgFromPeer};
 use sn_interface::{
     messaging::{
         system::{JoinRejectionReason, JoinRequest, JoinResponse, NodeMsg, SectionSigned},
@@ -57,8 +57,8 @@ pub(crate) async fn join_network(
     match res {
         Ok(node) => Ok(node),
         Err(error) => {
-            // We need to manually closing endpoint or listeners will persist
-            comm.our_endpoint.close();
+            // We need to manually close endpoint or listeners will persist
+            comm.close_endpoint();
             Err(error)
         }
     }

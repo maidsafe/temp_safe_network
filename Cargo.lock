@@ -3982,6 +3982,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "sn_comms"
+version = "0.1.0"
+dependencies = [
+ "assert_matches",
+ "blsttc",
+ "custom_debug",
+ "dashmap",
+ "eyre",
+ "futures",
+ "proptest",
+ "qp2p",
+ "sn_interface",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "xor_name",
+]
+
+[[package]]
 name = "sn_consensus"
 version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4136,6 +4155,7 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "signature",
+ "sn_comms",
  "sn_consensus",
  "sn_dbc",
  "sn_fault_detection",

@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::comm::{Comm, MsgFromPeer};
 use crate::node::{
     cfg::keypair_storage::{get_reward_pk, store_network_keypair, store_new_reward_keypair},
     flow_ctrl::{
@@ -19,6 +18,7 @@ use crate::node::{
 };
 use crate::UsedSpace;
 
+use sn_comms::{Comm, MsgFromPeer};
 use sn_interface::{
     network_knowledge::{MyNodeInfo, SectionTree, MIN_ADULT_AGE},
     types::{keys::ed25519, log_markers::LogMarker, PublicKey as TypesPublicKey},

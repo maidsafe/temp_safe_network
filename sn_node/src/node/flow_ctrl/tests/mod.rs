@@ -11,18 +11,17 @@ pub(crate) mod cmd_utils;
 pub(crate) mod dbc_utils;
 pub(crate) mod network_builder;
 
-use crate::{
-    comm::MsgFromPeer,
-    node::{
-        flow_ctrl::{
-            dispatcher::Dispatcher,
-            tests::network_builder::{TestNetwork, TestNetworkBuilder},
-        },
-        messaging::Peers,
-        relocation_check, ChurnId, Cmd, Error, SectionStateVote,
+use crate::node::{
+    flow_ctrl::{
+        dispatcher::Dispatcher,
+        tests::network_builder::{TestNetwork, TestNetworkBuilder},
     },
+    messaging::Peers,
+    relocation_check, ChurnId, Cmd, Error, SectionStateVote,
 };
 use cmd_utils::{handle_online_cmd, ProcessAndInspectCmds};
+
+use sn_comms::MsgFromPeer;
 use sn_consensus::Decision;
 use sn_dbc::Hash;
 use sn_interface::{
