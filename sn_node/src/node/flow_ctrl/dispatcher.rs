@@ -10,7 +10,7 @@ use crate::node::{Cmd, Error, MyNode, Result, STANDARD_CHANNEL_SIZE};
 
 use sn_interface::{
     network_knowledge::SectionTreeUpdate,
-    types::{DataAddress, Peer},
+    types::{log_markers::LogMarker, DataAddress, Peer},
 };
 
 use std::sync::Arc;
@@ -230,8 +230,10 @@ impl Dispatcher {
                 Ok(vec![])
             }
             Cmd::ProposeVoteNodesOffline(names) => {
+                debug!("{:?} : {names:?}", LogMarker::ProposeOffline);
+
                 let mut node = self.node.write().await;
-                debug!("[NODE WRITE]: propose offline write got");
+                debug!("[NODE WRITE]: propose offline write.");
                 node.cast_offline_proposals(&names)
             }
             Cmd::SetJoinsAllowed(joins_allowed) => {

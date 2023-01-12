@@ -8,6 +8,7 @@
 
 use crate::messaging::system::{SectionSig, SectionSigShare};
 use crate::types::keys::ed25519::Digest256;
+use crate::types::Peer;
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 use tiny_keccak::{Hasher, Sha3};
@@ -26,7 +27,7 @@ use tiny_keccak::{Hasher, Sha3};
 #[derive(Debug, Default)]
 pub struct SignatureAggregator {
     /// a map of the hash(payload + bls pubkey) to the signature shares
-    map: BTreeMap<Digest256, BTreeSet<SectionSigShare>>,
+    map: BTreeMap<Digest256, BTreeSet<(Peer, SectionSigShare)>>,
 }
 
 /// AggregatorErrors returned from `SignatureAggregator::add`.
@@ -45,14 +46,15 @@ pub enum AggregatorError {
 
 impl SignatureAggregator {
     /// Add new share into the aggregator. If enough valid signature shares were collected, returns
-    /// the aggregated signature: `Some(SectionSig)` else returns None.
+    /// the aggregated signature and those that voted for it: `Some((SectionSig, BTreeSet<Peer>))` else returns None.
     /// Checks if the signature are valid
     /// Resets current shares upon completion of a signature so we don't accumulate finished aggregations endlessly
     pub fn try_aggregate(
         &mut self,
+        peer: Peer,
         payload: &[u8],
         sig_share: SectionSigShare,
-    ) -> Result<Option<SectionSig>, AggregatorError> {
+    ) -> Result<Option<(SectionSig, BTreeSet<Peer>)>, AggregatorError> {
         if !sig_share.verify(payload) {
             return Err(AggregatorError::InvalidSigShare);
         }
@@ -69,17 +71,19 @@ impl SignatureAggregator {
 
         // save the sig share
         let current_shares = self.map.entry(hash).or_default();
-        let _ = current_shares.insert(sig_share.clone());
+        let _ = current_shares.insert((peer, sig_share.clone()));
 
+        // TODO: Should we test for peers sending many shares?
+
+        let mut _peers_that_proposed = BTreeSet::new();
         // try aggregate
         if current_shares.len() > sig_share.public_key_set.threshold() {
             let signature = sig_share
                 .public_key_set
-                .combine_signatures(
-                    current_shares
-                        .iter()
-                        .map(|s| (s.index, s.signature_share.clone())),
-                )
+                .combine_signatures(current_shares.iter().map(|(p, s)| {
+                    let _p = _peers_that_proposed.insert(*p);
+                    (s.index, s.signature_share.clone())
+                }))
                 .map_err(AggregatorError::FailedToCombineSigShares)?;
             let section_sig = SectionSig {
                 public_key,
@@ -88,7 +92,7 @@ impl SignatureAggregator {
 
             // reset current shares upon completion
             self.map.remove(&hash);
-            Ok(Some(section_sig))
+            Ok(Some((section_sig, _peers_that_proposed)))
         } else {
             Ok(None)
         }

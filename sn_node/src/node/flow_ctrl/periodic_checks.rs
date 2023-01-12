@@ -13,7 +13,7 @@ use crate::node::{
     MyNode,
 };
 
-use sn_interface::{messaging::system::NodeMsg, types::log_markers::LogMarker};
+use sn_interface::messaging::system::NodeMsg;
 
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tokio::{sync::RwLock, time::Instant};
@@ -321,7 +321,6 @@ impl FlowCtrl {
         let faulty_nodes = self.get_faulty_node_names().await;
 
         if !faulty_nodes.is_empty() {
-            debug!("{:?} : {faulty_nodes:?}", LogMarker::ProposeOffline);
             let mut fault_set = BTreeSet::new();
             for node in faulty_nodes {
                 let _prev = fault_set.insert(node);

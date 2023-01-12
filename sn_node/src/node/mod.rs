@@ -74,7 +74,7 @@ mod core {
             supermajority, MyNodeInfo, NetworkKnowledge, NodeState, SectionAuthorityProvider,
             SectionKeyShare, SectionKeysProvider,
         },
-        types::{keys::ed25519::Digest256, log_markers::LogMarker},
+        types::{keys::ed25519::Digest256, log_markers::LogMarker, Peer},
     };
 
     use ed25519_dalek::Keypair;
@@ -189,6 +189,11 @@ mod core {
                 data_storage: self.data_storage.clone(),
                 fault_cmds_sender: self.fault_cmds_sender.clone(),
             }
+        }
+
+        /// Returns Self as a Peer
+        pub(crate) fn as_peer(&self) -> Peer {
+            Peer::new(self.name(), self.addr)
         }
 
         #[allow(clippy::too_many_arguments)]

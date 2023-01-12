@@ -369,7 +369,7 @@ impl MyNode {
                 let mut node = node.write().await;
                 debug!("[NODE WRITE]: DKGstart write gottt...");
                 node.untrack_node_issue(sender.name(), IssueType::Dkg);
-                node.handle_dkg_start(session_id, elder_sig)
+                node.handle_dkg_start(sender, session_id, elder_sig)
             }
             NodeMsg::DkgEphemeralPubKey {
                 session_id,

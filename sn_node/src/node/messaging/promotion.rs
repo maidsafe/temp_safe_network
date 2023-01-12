@@ -51,9 +51,10 @@ impl MyNode {
         let serialised_pk = bincode::serialize(&sap.sig.public_key).map_err(serialize_err)?;
         match self
             .elder_promotion_aggregator
-            .try_aggregate(&serialised_pk, sig_share)
+            .try_aggregate(sender, &serialised_pk, sig_share)
         {
-            Ok(Some(sig)) => {
+            Ok(Some((sig, _peers_that_proposed))) => {
+                // TODO: Handle peers that did NOT propose
                 trace!("Promotion message {msg_id:?} successfully aggregated");
                 Ok(vec![Cmd::HandleNewEldersAgreement {
                     new_elders: sap,
@@ -106,15 +107,16 @@ impl MyNode {
         };
         let serialised_pk1 = bincode::serialize(&sap1.sig.public_key).map_err(serialize_err)?;
         let serialised_pk2 = bincode::serialize(&sap2.sig.public_key).map_err(serialize_err)?;
-        let res1 = self
-            .elder_promotion_aggregator
-            .try_aggregate(&serialised_pk1, sig_share1);
-        let res2 = self
-            .elder_promotion_aggregator
-            .try_aggregate(&serialised_pk2, sig_share2);
+        let res1 =
+            self.elder_promotion_aggregator
+                .try_aggregate(sender, &serialised_pk1, sig_share1);
+        let res2 =
+            self.elder_promotion_aggregator
+                .try_aggregate(sender, &serialised_pk2, sig_share2);
 
         match (res1, res2) {
-            (Ok(Some(sig1)), Ok(Some(sig2))) => {
+            (Ok(Some((sig1, _peers_that_proposed1))), Ok(Some((sig2, _peers_that_proposed2)))) => {
+                // TODO: Handle faults for peers that did NOT propose
                 trace!("Promotion message {msg_id:?} successfully aggregated");
                 Ok(vec![Cmd::HandleNewSectionsAgreement {
                     sap1,

@@ -111,7 +111,7 @@ impl MyNode {
 
         // handle our own
         if we_are_a_participant {
-            cmds.extend(self.handle_dkg_start(session_id, section_sig_share)?);
+            cmds.extend(self.handle_dkg_start(self.as_peer(), session_id, section_sig_share)?);
         }
 
         Ok(cmds)
@@ -170,9 +170,10 @@ impl MyNode {
 
     fn aggregate_dkg_start(
         &mut self,
+        sender: Peer,
         session_id: &DkgSessionId,
         elder_sig: SectionSigShare,
-    ) -> Result<Option<SectionSig>> {
+    ) -> Result<Option<(SectionSig, BTreeSet<Peer>)>> {
         // check sig share
         let public_key = elder_sig.public_key_set.public_key();
         if self.network_knowledge.section_key() != public_key {
@@ -182,7 +183,7 @@ impl MyNode {
 
         // try aggregate
         self.dkg_start_aggregator
-            .try_aggregate(&serialized_session_id, elder_sig)
+            .try_aggregate(sender, &serialized_session_id, elder_sig)
             .map_err(|err| {
                 warn!(
                     "Error aggregating signature in DkgStart s{}: {err:?}",
@@ -194,12 +195,14 @@ impl MyNode {
 
     pub(crate) fn handle_dkg_start(
         &mut self,
+        sending_peer: Peer,
         session_id: DkgSessionId,
         elder_sig: SectionSigShare,
     ) -> Result<Vec<Cmd>> {
         // try to create a section sig by aggregating the elder_sig
-        match self.aggregate_dkg_start(&session_id, elder_sig) {
-            Ok(Some(section_sig)) => {
+        match self.aggregate_dkg_start(sending_peer, &session_id, elder_sig) {
+            Ok(Some((section_sig, _peers_that_proposed))) => {
+                // TODO: handle faults on peers that did NOT propose
                 trace!(
                     "DkgStart: section key aggregated, starting session s{}",
                     session_id.sh()

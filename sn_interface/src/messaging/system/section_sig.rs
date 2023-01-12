@@ -6,10 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{
-    signature_aggregator::{AggregatorError, SignatureAggregator},
-    AuthorityProof,
-};
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Borrow,
@@ -37,21 +33,6 @@ impl SectionSig {
     /// Verifies this signature against the payload.
     pub fn verify(&self, payload: &[u8]) -> bool {
         self.public_key.verify(&self.signature, payload)
-    }
-
-    /// Try to construct verified section authority by aggregating a new share.
-    pub fn try_authorize(
-        aggregator: &mut SignatureAggregator,
-        share: SectionSigShare,
-        payload: impl AsRef<[u8]>,
-    ) -> Result<Option<AuthorityProof<Self>>, AggregatorError> {
-        match aggregator.try_aggregate(payload.as_ref(), share)? {
-            Some(sig) => Ok(Some(AuthorityProof(Self {
-                public_key: sig.public_key,
-                signature: sig.signature,
-            }))),
-            None => Ok(None),
-        }
     }
 }
 

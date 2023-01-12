@@ -103,11 +103,15 @@ impl MyNode {
             error!("Failed to serialise section state proposal {msg_id:?} from {sender}: {proposal:?}: {err:?}");
             err
         })?;
-        match self
-            .section_proposal_aggregator
-            .try_aggregate(&serialized_proposal, sig_share)
-        {
-            Ok(Some(sig)) => Ok(vec![Cmd::HandleSectionDecisionAgreement { proposal, sig }]),
+        match self.section_proposal_aggregator.try_aggregate(
+            sender,
+            &serialized_proposal,
+            sig_share,
+        ) {
+            Ok(Some((sig, _peers_that_proposed))) => {
+                // TODO: handle fault on peers that did NOT propose
+                Ok(vec![Cmd::HandleSectionDecisionAgreement { proposal, sig }])
+            }
             Ok(None) => {
                 trace!("Section state proposal {msg_id:?} acknowledged, waiting for more...");
                 Ok(vec![])
