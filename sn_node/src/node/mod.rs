@@ -66,7 +66,7 @@ mod core {
     use sn_fault_detection::IssueType;
     use sn_interface::{
         messaging::{
-            signature_aggregator::SignatureAggregator,
+            signature_aggregator::{SignatureAggregator, TotalParticipationAggregator},
             system::{DkgSessionId, SectionSigned, SectionStateVote},
             AuthorityProof, SectionSig,
         },
@@ -116,7 +116,7 @@ mod core {
         // ======================== Elder only ========================
         pub(crate) membership: Option<Membership>,
         // Section handover consensus state (Some for Elders, None for others)
-        pub(crate) handover_request_aggregator: SignatureAggregator,
+        pub(crate) handover_request_aggregator: TotalParticipationAggregator,
         pub(crate) handover_voting: Option<Handover>,
         pub(crate) joins_allowed: bool,
         pub(crate) joins_allowed_until_split: bool,
@@ -258,7 +258,7 @@ mod core {
                 fault_cmds_sender,
                 membership,
                 elder_promotion_aggregator: SignatureAggregator::default(),
-                handover_request_aggregator: SignatureAggregator::default(),
+                handover_request_aggregator: TotalParticipationAggregator::default(),
                 section_proposal_aggregator: SignatureAggregator::default(),
             };
 
