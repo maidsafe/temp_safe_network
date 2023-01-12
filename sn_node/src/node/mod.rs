@@ -154,17 +154,17 @@ mod core {
                 .map_err(Error::from)
         }
 
-        /// Log an issue in dysfunction
+        /// Log an issue in fault_detection
         /// Spawns a process to send this incase the channel may be full, we don't hold up
         /// processing around this (as this can be called during dkg eg)
         pub(crate) fn log_node_issue(&self, name: XorName, issue: IssueType) {
-            trace!("Logging issue {issue:?} in dysfunction for {name}");
-            let dysf_sender = self.fault_cmds_sender.clone();
+            trace!("Logging issue {issue:?} in fault_detection for {name}");
+            let fault_sender = self.fault_cmds_sender.clone();
             // TODO: do we need to kill the node if we fail tracking dysf?
             let _handle = tokio::spawn(async move {
-                if let Err(error) = dysf_sender.send(FaultsCmd::TrackIssue(name, issue)).await {
+                if let Err(error) = fault_sender.send(FaultsCmd::TrackIssue(name, issue)).await {
                     // Log the issue, and error. We need to be wary of actually hitting this.
-                    warn!("Could not send FaultsCmd through dysfunctional_cmds_tx: {error}");
+                    warn!("Could not send FaultsCmd through fault_cmds_tx: {error}");
                 }
             });
         }
@@ -283,6 +283,39 @@ mod core {
 
         pub(crate) fn name(&self) -> XorName {
             self.info().name()
+        }
+
+        /// Given a set of elders that aggregated a proposal, we check our current knowledge and trigger
+        /// fault logging for any nodes that had failed to propse.
+        ///
+        /// This should _over time_ average out and weed out any elderrs that are consistently failing
+        /// to be involved in decisions
+        pub(crate) fn log_proposal_fault_for_any_missing_elders(
+            &self,
+            peers_that_proposed: BTreeSet<Peer>,
+        ) {
+            let elder_set = self.network_knowledge.elders();
+
+            for missing_elder in elder_set
+                .into_iter()
+                .filter(|e| !peers_that_proposed.contains(e))
+            {
+                info!("{missing_elder:?} has failed to Propose a change, and so a fault will be tracked");
+
+                let fault_sender = self.fault_cmds_sender.clone();
+                let _handle = tokio::spawn(async move {
+                    if let Err(error) = fault_sender
+                        .send(FaultsCmd::TrackIssue(
+                            missing_elder.name(),
+                            IssueType::Knowledge,
+                        ))
+                        .await
+                    {
+                        // Log the issue, and error. We need to be wary of actually hitting this.
+                        warn!("Could not send FaultsCmd through fault_cmds_tx: {error}");
+                    }
+                });
+            }
         }
 
         ////////////////////////////////////////////////////////////////////////////

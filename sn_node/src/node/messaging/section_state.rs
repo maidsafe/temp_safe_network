@@ -108,8 +108,12 @@ impl MyNode {
             &serialized_proposal,
             sig_share,
         ) {
-            Ok(Some((sig, _peers_that_proposed))) => {
-                // TODO: handle fault on peers that did NOT propose
+            Ok(Some((sig, peers_that_proposed))) => {
+                trace!("Section state message {msg_id:?} successfully aggregated. Peers that proposed: {peers_that_proposed:?}");
+
+                // handle faults on peers that did NOT propose
+                self.log_proposal_fault_for_any_missing_elders(peers_that_proposed);
+
                 Ok(vec![Cmd::HandleSectionDecisionAgreement { proposal, sig }])
             }
             Ok(None) => {

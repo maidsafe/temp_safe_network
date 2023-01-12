@@ -201,12 +201,14 @@ impl MyNode {
     ) -> Result<Vec<Cmd>> {
         // try to create a section sig by aggregating the elder_sig
         match self.aggregate_dkg_start(sending_peer, &session_id, elder_sig) {
-            Ok(Some((section_sig, _peers_that_proposed))) => {
-                // TODO: handle faults on peers that did NOT propose
+            Ok(Some((section_sig, peers_that_proposed))) => {
                 trace!(
                     "DkgStart: section key aggregated, starting session s{}",
                     session_id.sh()
                 );
+                trace!("DkgStart was proposed by: {peers_that_proposed:?}");
+                // handle faults on peers that did NOT propose
+                self.log_proposal_fault_for_any_missing_elders(peers_that_proposed);
                 self.dkg_start(session_id, section_sig)
             }
             Ok(None) => {
@@ -828,9 +830,10 @@ mod tests {
     use assert_matches::assert_matches;
     use bls::SecretKeySet;
     use eyre::{eyre, Result};
-    use rand::{Rng, RngCore};
+    use rand::{rngs::OsRng, Rng, RngCore};
     use std::{
         collections::{BTreeMap, BTreeSet},
+        net::{IpAddr, Ipv4Addr, SocketAddr},
         sync::Arc,
     };
     use tokio::sync::{mpsc, RwLock};
@@ -1302,17 +1305,21 @@ mod tests {
         assert_eq!(pub_key_set.len(), 1);
         let mut agg = SignatureAggregator::default();
         let mut sig_count = 1;
+        let peer = Peer::new(
+            XorName::random(&mut OsRng),
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+        );
         for sig_share in sig_shares {
             // threshold = 4 i.e, we need 5 shares to gen the complete sig; Thus the first 4 return None, and 5th one
             // gives us the complete sig;
             if sig_count < supermajority(node_count) || sig_count > supermajority(node_count) {
                 assert!(agg
-                    .try_aggregate("msg".as_bytes(), sig_share)
+                    .try_aggregate(peer, "msg".as_bytes(), sig_share)
                     .expect("Failed to aggregate sigs")
                     .is_none());
             } else if sig_count == supermajority(node_count) {
-                let sig = agg
-                    .try_aggregate("msg".as_bytes(), sig_share)
+                let (sig, _peers_that_proposed) = agg
+                    .try_aggregate(peer, "msg".as_bytes(), sig_share)
                     .expect("Failed to aggregate sigs")
                     .expect("Should return the SectionSig");
                 assert!(sig.verify("msg".as_bytes()), "Failed to verify SectionSig");

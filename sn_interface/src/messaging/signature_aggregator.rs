@@ -73,15 +73,13 @@ impl SignatureAggregator {
         let current_shares = self.map.entry(hash).or_default();
         let _ = current_shares.insert((peer, sig_share.clone()));
 
-        // TODO: Should we test for peers sending many shares?
-
-        let mut _peers_that_proposed = BTreeSet::new();
+        let mut peers_that_proposed = BTreeSet::new();
         // try aggregate
         if current_shares.len() > sig_share.public_key_set.threshold() {
             let signature = sig_share
                 .public_key_set
                 .combine_signatures(current_shares.iter().map(|(p, s)| {
-                    let _p = _peers_that_proposed.insert(*p);
+                    let _p = peers_that_proposed.insert(*p);
                     (s.index, s.signature_share.clone())
                 }))
                 .map_err(AggregatorError::FailedToCombineSigShares)?;
@@ -92,7 +90,7 @@ impl SignatureAggregator {
 
             // reset current shares upon completion
             self.map.remove(&hash);
-            Ok(Some((section_sig, _peers_that_proposed)))
+            Ok(Some((section_sig, peers_that_proposed)))
         } else {
             Ok(None)
         }
@@ -162,13 +160,20 @@ impl TotalParticipationAggregator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::rngs::OsRng;
     use rand::thread_rng;
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+    use xor_name::XorName;
 
     #[test]
     fn test_signature_aggregator() -> Result<(), AggregatorError> {
         let mut rng = thread_rng();
         let threshold = 3;
         let sk_set = bls::SecretKeySet::random(threshold, &mut rng);
+        let some_peer = Peer::new(
+            XorName::random(&mut OsRng),
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+        );
 
         let mut aggregator = SignatureAggregator::default();
         let payload = b"hello";
@@ -176,7 +181,7 @@ mod tests {
         // Not enough shares yet
         for index in 0..threshold {
             let sig_share = create_sig_share(&sk_set, index, payload);
-            let result = aggregator.try_aggregate(payload, sig_share);
+            let result = aggregator.try_aggregate(some_peer, payload, sig_share);
 
             match result {
                 Ok(None) => (),
@@ -186,13 +191,15 @@ mod tests {
 
         // Enough shares now
         let sig_share = create_sig_share(&sk_set, threshold, payload);
-        let sig = aggregator.try_aggregate(payload, sig_share)?;
+        let (sig, _peers_that_proposed) = aggregator
+            .try_aggregate(some_peer, payload, sig_share)?
+            .expect("some key");
 
-        assert!(sig.expect("some key").verify(payload));
+        assert!(sig.verify(payload));
 
         // Extra shares start another round
         let sig_share = create_sig_share(&sk_set, threshold + 1, payload);
-        let result = aggregator.try_aggregate(payload, sig_share);
+        let result = aggregator.try_aggregate(some_peer, payload, sig_share);
 
         match result {
             Ok(None) => Ok(()),
@@ -242,6 +249,10 @@ mod tests {
         let mut rng = thread_rng();
         let threshold = 3;
         let sk_set = bls::SecretKeySet::random(threshold, &mut rng);
+        let some_peer = Peer::new(
+            XorName::random(&mut OsRng),
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+        );
 
         let mut aggregator = SignatureAggregator::default();
         let payload = b"good";
@@ -249,12 +260,12 @@ mod tests {
         // First insert less than threshold + 1 valid shares.
         for index in 0..threshold {
             let sig_share = create_sig_share(&sk_set, index, payload);
-            let _keyed_sig = aggregator.try_aggregate(payload, sig_share);
+            let _keyed_sig = aggregator.try_aggregate(some_peer, payload, sig_share);
         }
 
         // Then try to insert invalid share.
         let invalid_sig_share = create_sig_share(&sk_set, threshold, b"bad");
-        let result = aggregator.try_aggregate(payload, invalid_sig_share);
+        let result = aggregator.try_aggregate(some_peer, payload, invalid_sig_share);
 
         match result {
             Err(AggregatorError::InvalidSigShare) => (),
@@ -264,8 +275,11 @@ mod tests {
         // The invalid share doesn't spoil the aggregation - we can still aggregate once enough
         // valid shares are inserted.
         let sig_share = create_sig_share(&sk_set, threshold + 1, payload);
-        let sig = aggregator.try_aggregate(payload, sig_share)?;
-        assert!(sig.expect("some key").verify(payload));
+        let (sig, _peers_that_proposed) = aggregator
+            .try_aggregate(some_peer, payload, sig_share)?
+            .expect("some key");
+
+        assert!(sig.verify(payload));
 
         Ok(())
     }
@@ -279,20 +293,24 @@ mod tests {
         let mut aggregator = SignatureAggregator::default();
 
         let payload = b"hello";
+        let some_peer = Peer::new(
+            XorName::random(&mut OsRng),
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+        );
 
         // round 1
 
         for index in 0..threshold {
             let sig_share = create_sig_share(&sk_set, index, payload);
             assert!(matches!(
-                aggregator.try_aggregate(payload, sig_share),
+                aggregator.try_aggregate(some_peer, payload, sig_share),
                 Ok(None)
             ));
         }
 
         let sig_share = create_sig_share(&sk_set, threshold, payload);
         assert!(matches!(
-            aggregator.try_aggregate(payload, sig_share),
+            aggregator.try_aggregate(some_peer, payload, sig_share),
             Ok(Some(_))
         ));
 
@@ -303,14 +321,14 @@ mod tests {
         for index in offset..(threshold + offset) {
             let sig_share = create_sig_share(&sk_set, index, payload);
             assert!(matches!(
-                aggregator.try_aggregate(payload, sig_share),
+                aggregator.try_aggregate(some_peer, payload, sig_share),
                 Ok(None)
             ));
         }
 
         let sig_share = create_sig_share(&sk_set, threshold + offset + 1, payload);
         assert!(matches!(
-            aggregator.try_aggregate(payload, sig_share),
+            aggregator.try_aggregate(some_peer, payload, sig_share),
             Ok(Some(_))
         ));
     }

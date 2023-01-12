@@ -53,9 +53,12 @@ impl MyNode {
             .elder_promotion_aggregator
             .try_aggregate(sender, &serialised_pk, sig_share)
         {
-            Ok(Some((sig, _peers_that_proposed))) => {
-                // TODO: Handle peers that did NOT propose
-                trace!("Promotion message {msg_id:?} successfully aggregated");
+            Ok(Some((sig, peers_that_proposed))) => {
+                trace!("Promotion message {msg_id:?} successfully aggregated. Peers that proposed: {peers_that_proposed:?}");
+
+                // handle faults on peers that did NOT propose
+                self.log_proposal_fault_for_any_missing_elders(peers_that_proposed);
+
                 Ok(vec![Cmd::HandleNewEldersAgreement {
                     new_elders: sap,
                     sig,
@@ -115,9 +118,15 @@ impl MyNode {
                 .try_aggregate(sender, &serialised_pk2, sig_share2);
 
         match (res1, res2) {
-            (Ok(Some((sig1, _peers_that_proposed1))), Ok(Some((sig2, _peers_that_proposed2)))) => {
-                // TODO: Handle faults for peers that did NOT propose
-                trace!("Promotion message {msg_id:?} successfully aggregated");
+            (Ok(Some((sig1, peers_that_proposed1))), Ok(Some((sig2, peers_that_proposed2)))) => {
+                // TODO: Handle peers that did NOT propose
+                trace!("Promotion message {msg_id:?} successfully aggregated. Peers that proposed1: {peers_that_proposed1:?}");
+                trace!("Promotion message {msg_id:?} successfully aggregated. Peers that proposed2: {peers_that_proposed2:?}");
+
+                // handle faults on peers that did NOT propose
+                self.log_proposal_fault_for_any_missing_elders(peers_that_proposed1);
+                self.log_proposal_fault_for_any_missing_elders(peers_that_proposed2);
+
                 Ok(vec![Cmd::HandleNewSectionsAgreement {
                     sap1,
                     sig1,
