@@ -248,11 +248,9 @@ impl Dispatcher {
             msg,
             msg_id,
             recipients,
-            send_stream,
             context,
         } = cmd
         {
-            let _ = send_stream;
             let peer_msgs = into_msg_bytes(
                 &context.network_knowledge,
                 context.name,

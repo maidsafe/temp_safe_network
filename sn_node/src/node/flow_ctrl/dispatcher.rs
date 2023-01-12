@@ -57,7 +57,6 @@ impl Dispatcher {
                     msg,
                     msg_id,
                     recipients,
-                    send_stream: None,
                     context,
                 }])
             }
@@ -65,9 +64,15 @@ impl Dispatcher {
                 msg,
                 msg_id,
                 recipients,
+                context,
+            } => MyNode::send_msg(msg, msg_id, recipients, context).await,
+            Cmd::SendNodeMsgResponse {
+                msg,
+                msg_id,
+                recipient,
                 send_stream,
                 context,
-            } => MyNode::send_msg(msg, msg_id, recipients, send_stream, context).await,
+            } => MyNode::send_node_msg_response(msg, msg_id, recipient, context, send_stream).await,
             Cmd::SendClientResponse {
                 msg,
                 correlation_id,
@@ -82,23 +87,25 @@ impl Dispatcher {
                     context,
                     source_client,
                 )
-                .await
+                .await?;
+                Ok(vec![])
             }
-            Cmd::SendNodeResponse {
+            Cmd::SendNodeDataResponse {
                 msg,
                 correlation_id,
                 send_stream,
                 context,
                 requesting_peer,
             } => {
-                MyNode::send_node_response(
+                MyNode::send_node_data_response(
                     msg,
                     correlation_id,
                     send_stream,
                     context,
                     requesting_peer,
                 )
-                .await
+                .await?;
+                Ok(vec![])
             }
             Cmd::SendMsgAndAwaitResponse {
                 msg_id,
