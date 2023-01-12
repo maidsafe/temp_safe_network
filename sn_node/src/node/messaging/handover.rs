@@ -42,14 +42,16 @@ impl MyNode {
         }
 
         // try aggregate
+        let total_participants = sap.elder_count();
         let serialised_sap = bincode::serialize(&sap).map_err(|err| {
             error!("Failed to serialise handover request {msg_id:?} from {sender}: {err:?}");
             err
         })?;
-        match self
-            .handover_request_aggregator
-            .try_aggregate(&serialised_sap, sig_share)
-        {
+        match self.handover_request_aggregator.try_aggregate(
+            &serialised_sap,
+            sig_share,
+            total_participants,
+        ) {
             Ok(Some(sig)) => {
                 trace!("Handover request {msg_id:?} successfully aggregated");
                 self.handle_request_handover_agreement(sap, sig)
