@@ -10,7 +10,7 @@ For a node to successfully join the network it first needs to contact a node tha
 
 Once contacted the Joining node and the Network go through a set of verifications after which the Network gives a thumbs up to the joining node along with details for it to function as a part of the SAFE Network.
 
-## The Process
+## The Join Process
 1. The joining node fetches its closest section from the network contacts file.
 2. A JoinRequest::Initiate is then sent to that closest section’s elders with their respective section PK.
 3. The Elders then run the below set of verifications in sequence on the joining node:
@@ -28,3 +28,18 @@ Once contacted the Joining node and the Network go through a set of verification
 10. With the JoinResponse::Approved and all of the information that was sent along is used by the joining node to initiate its necessary modules to start performing tasks as a part of the network
 
 Note: If there is no response from the network nodes during this to-and-fro exchange the joining node will timeout after the JOIN_TIMEOUT duration is elapsed(this is currently set to 100 seconds).
+
+## The Relocation Process
+For node ageing, there is also Relocation process to make node having its age increased and name changed correspondently.
+
+The detailed process is as following:
+1. When elder detected a relocation candidate, the elders sign and send the vote SectionStateVote::NodeIsOffline(NodeState.state::Relocated) to each other.
+2. Once the vote aggregated, elders attempt to propose a membership change of the section signed NodeState.
+3. Once the membership votes aggregated, elders updates its network_knowledge(i.e. remove that node from the active member list) AND send a notification to the relocation candidate.
+4. When the candidate received the notification, it send FIRST JoiningAsRelocatedRequest to the elders of the target section, note this is using the old name
+5. When the target section elders received the request, they respond with their latest sap within JoiningAsRelocatedResponse
+6. When the candidate received the JoiningAsRelocatedResponse, it generate new keypair and switch to it, then send SECOND JoiningAsRelocatedRequest to the elders of the target section, note this is using the new name
+7. When the target section elders received the second request, they start vote for membership change of NodeIsOnline,
+8. Once the vote of NodeIsOnline aggregated, the candidate will receive the notifications and consider the Relocation process completed.
+
+

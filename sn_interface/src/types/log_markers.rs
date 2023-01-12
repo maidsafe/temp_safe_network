@@ -21,7 +21,7 @@ pub enum LogMarker {
     SplitAttempt,
     NewPrefix,
     AeSendUpdateToSiblings,
-    AgreementOfOnline,
+    AgreementOfMembership,
     // ProposalAgreed
     ProposalAgreed,
     // Handover

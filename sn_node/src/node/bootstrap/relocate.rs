@@ -31,6 +31,7 @@ pub(crate) struct JoiningAsRelocated {
     dst_section_key: BlsPublicKey,
     new_age: u8,
     old_keypair: Arc<Keypair>,
+    has_new_name: bool,
 }
 
 impl JoiningAsRelocated {
@@ -49,10 +50,10 @@ impl JoiningAsRelocated {
             .map(|addr| Peer::new(dst_xorname, *addr))
             .collect();
 
-        let used_recipient_saps = bootstrap_addrs
-            .iter()
-            .map(|addr| (*addr, dst_section_key))
-            .collect();
+        // The first request is actually for fetching latest SAP only.
+        // Hence shall not be counted as used.
+
+        trace!("JoiningAsRelocated::start with proof of {relocate_proof:?}");
 
         // We send a first join request to obtain the section prefix, which
         // we will then used calculate our new name and send the `JoinAsRelocatedRequest` again.
@@ -64,15 +65,20 @@ impl JoiningAsRelocated {
         let relocating = Self {
             node,
             relocate_proof,
-            used_recipient_saps,
+            used_recipient_saps: Default::default(),
             dst_xorname,
             dst_section_key,
             new_age,
             old_keypair,
+            has_new_name: false,
         };
         let cmd = relocating.build_join_request_cmd(recipients, dummy_signature)?;
 
         Ok((relocating, cmd))
+    }
+
+    pub(crate) fn has_new_name(&self) -> bool {
+        self.has_new_name
     }
 
     // Handles a `JoinAsRelocatedResponse`, if it's a:
@@ -85,15 +91,22 @@ impl JoiningAsRelocated {
         join_response: JoinAsRelocatedResponse,
         sender: SocketAddr,
     ) -> Result<Option<Cmd>> {
-        trace!("Hanlde JoinResponse {:?}", join_response);
+        trace!("Hanlde JoinAsRelocatedResponse {:?}", join_response);
         match join_response {
             JoinAsRelocatedResponse::Retry(section_auth) => {
                 if !self.check_autority_provider(&section_auth, &self.dst_xorname) {
                     trace!("failed to check authority");
                     return Ok(None);
                 }
-
-                if section_auth.section_key() == self.dst_section_key {
+                let current_name = Some(self.node.name());
+                if section_auth.section_key() == self.dst_section_key
+                    && self.relocate_proof.previous_name() != current_name
+                {
+                    trace!(
+                        "self.relocate_proof.previous_name() {:?} current_name {:?}",
+                        self.relocate_proof.previous_name(),
+                        current_name
+                    );
                     trace!("equal destination section key");
                     return Ok(None);
                 }
@@ -190,6 +203,7 @@ impl JoiningAsRelocated {
 
         info!("Changing name to {}", new_name);
         self.node = MyNodeInfo::new(new_keypair, self.node.addr);
+        self.has_new_name = true;
 
         signature_over_new_name
     }

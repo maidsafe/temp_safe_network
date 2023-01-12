@@ -183,12 +183,25 @@ impl MyNode {
             }
             NodeMsg::JoinAsRelocatedResponse(join_response) => {
                 let mut node = node.write().await;
-                debug!("[NODE WRITE]: joinasreloac write gottt...");
+                debug!("[NODE WRITE]: JoinAsRelocatedResponse write gottt...");
                 trace!("Handling msg: JoinAsRelocatedResponse from {}", sender);
                 if let Some(ref mut joining_as_relocated) = node.relocate_state {
                     if let Some(cmd) =
                         joining_as_relocated.handle_join_response(*join_response, sender.addr())?
                     {
+                        // Shall switch to the new name whenever generated
+                        if joining_as_relocated.has_new_name() {
+                            let new_node = joining_as_relocated.node.clone();
+                            let new_name = new_node.name();
+                            let previous_name = context.name;
+                            let new_keypair = new_node.keypair;
+
+                            info!(
+                                "Relocation: switching from {:?} to {:?} with keypair {:?}",
+                                previous_name, new_name, new_keypair
+                            );
+                            node.relocate_to(new_keypair, new_name)?;
+                        }
                         return Ok(vec![cmd]);
                     }
                 } else {
@@ -234,6 +247,8 @@ impl MyNode {
                 Ok(cmds)
             }
             // The AcceptedOnlineShare for relocation will be received here.
+            // TO_FIX: This actually happenes for normal join.
+            //         And strangely became a no-effect messaging path.
             NodeMsg::JoinResponse(join_response) => {
                 let mut node = node.write().await;
 
@@ -243,24 +258,8 @@ impl MyNode {
                             "Relocation: Aggregating received ApprovalShare from {:?}",
                             sender
                         );
-                        info!("Relocation: Successfully aggregated ApprovalShares for joining the network");
-                        if let Some(ref mut joining_as_relocated) = node.relocate_state {
-                            let new_node = joining_as_relocated.node.clone();
-                            let new_name = new_node.name();
-                            let previous_name = context.name;
-                            let new_keypair = new_node.keypair;
-
-                            info!(
-                                "Relocation: switching from {:?} to {:?} with keypair {:?}",
-                                previous_name, new_name, new_keypair
-                            );
-
-                            // TODO: confirm whether carry out the switch immediately here
-                            //       or still using the cmd pattern.
-                            //       As the sending of the JoinRequest as notification
-                            //       may require the `node` to be switched to new already.
-                            node.relocate(new_keypair, new_name)?;
-
+                        if node.relocate_state.is_some() {
+                            node.relocate_state = None;
                             trace!("{}", LogMarker::RelocateEnd);
                         } else {
                             warn!("Relocation:  node.relocate_state is not in Progress");

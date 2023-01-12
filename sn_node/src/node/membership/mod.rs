@@ -300,6 +300,9 @@ impl Membership {
         };
         let signed_vote = self.sign_vote(vote)?;
 
+        // For relocation, the `validate_proposals` will call `NodeState::validate`,
+        // where the name of the node_state is using old_name, and won't match the relocate_details
+        // within the node_state, hence fail the `expected age` check.
         self.validate_proposals(&signed_vote, prefix)?;
         if let Err(e) = signed_vote.detect_byzantine_faults(
             &self.consensus.elders,
