@@ -176,7 +176,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     // Handle agreement on Online of a peer that is older than the youngest
     // current elder - that means this peer is going to be promoted.
     let new_peer = gen_peer(MIN_ADULT_AGE + 1);
-    let node_state = NodeState::joined(new_peer, Some(xor_name::rand::random()));
+    let node_state = NodeState::joined(new_peer, None);
 
     let membership_decision = section_decision(&sk_set, node_state.clone());
 

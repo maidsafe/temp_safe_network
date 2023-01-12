@@ -389,6 +389,11 @@ impl Membership {
                 let _ = self
                     .history
                     .insert(vote_gen, (decision.clone(), decided_consensus));
+                info!(
+                    "Membership - updated generation from {:?} to {:?}",
+                    self.gen, vote_gen
+                );
+                info!("Membership - history is {:?}", self.history);
                 self.gen = vote_gen;
 
                 Some(decision)
@@ -439,7 +444,16 @@ impl Membership {
         let archived_members = self.archived_members();
 
         for proposal in signed_vote.proposals() {
-            proposal.validate(prefix, &members, &archived_members)?;
+            if let Err(err) = proposal.validate(prefix, &members, &archived_members) {
+                warn!("Failed to validate {proposal:?} with error {:?}", err);
+                warn!(
+                    "Members at generation {} are: {:?}",
+                    signed_vote.vote.gen - 1,
+                    members
+                );
+                warn!("Archived members are {:?}", archived_members);
+                return Err(Error::NetworkKnowledge(err));
+            }
         }
 
         Ok(())
