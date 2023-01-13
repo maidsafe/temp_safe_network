@@ -111,7 +111,7 @@ impl Dispatcher {
                 msg_id,
                 msg,
                 context,
-                recipient,
+                targets,
                 client_stream,
                 source_client,
             } => {
@@ -119,7 +119,7 @@ impl Dispatcher {
                     msg_id,
                     msg,
                     context,
-                    recipient,
+                    targets,
                     client_stream,
                     source_client,
                 )

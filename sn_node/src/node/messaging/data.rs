@@ -12,179 +12,76 @@ use crate::node::{
 };
 use crate::storage::{Error as StorageError, StorageLevel};
 
-use sn_fault_detection::IssueType;
 use sn_interface::{
     data_copy_count,
     messaging::{
-        data::{ClientDataResponse, DataCmd, DataQuery},
-        system::{NodeDataCmd, NodeDataQuery, NodeDataResponse, NodeEvent, NodeMsg, OperationId},
-        AuthorityProof, ClientAuth, Dst, MsgId, MsgType, WireMsg,
+        data::{DataCmd, DataQuery},
+        system::{NodeDataCmd, NodeDataQuery, NodeEvent, NodeMsg, OperationId},
+        AuthorityProof, ClientAuth, MsgId,
     },
     types::{log_markers::LogMarker, Keypair, Peer, PublicKey, ReplicatedData},
 };
 
 use qp2p::SendStream;
+use xor_name::XorName;
 
 use bytes::Bytes;
-use futures::FutureExt;
 use itertools::Itertools;
 use std::collections::BTreeSet;
 use tracing::info;
-use xor_name::XorName;
 
 impl MyNode {
-    // Locate ideal holders for this data, instruct them to store the data
-    pub(crate) async fn store_data_at_nodes(
-        context: &NodeContext,
+    // Instruct data holders to store the data awaiting for their confirmation response to ack the client
+    pub(crate) async fn store_data_at_nodes_and_ack_to_client(
+        context: NodeContext,
+        data_cmd: DataCmd,
         data: ReplicatedData,
         msg_id: MsgId,
-        targets: BTreeSet<Peer>,
-    ) -> Result<Vec<(Peer, Result<WireMsg>)>> {
+        client_stream: SendStream,
+        source_client: Peer,
+    ) -> Result<Vec<Cmd>> {
         let data_name = data.name();
+        let targets = Self::target_data_holders(&context, data_name);
+
+        // make sure the expected replication factor is achieved
+        if data_copy_count() > targets.len() {
+            error!("InsufficientNodeCount for storing data reliably for {msg_id:?}");
+            let error = Error::InsufficientNodeCount {
+                prefix: context.network_knowledge.prefix(),
+                expected: data_copy_count() as u8,
+                found: targets.len() as u8,
+            };
+
+            debug!("Will send error response back to client");
+
+            let cmd = MyNode::send_cmd_error_response_over_stream(
+                context,
+                data_cmd,
+                error,
+                msg_id,
+                client_stream,
+                source_client,
+            );
+            return Ok(vec![cmd]);
+        }
+
         info!("Replicating data from {msg_id:?} {data_name:?} to holders: {targets:?}");
 
         // TODO: general ReplicateData flow could go bidi?
         // Right now we've a new msg for just one datum.
         // Atm that's perhaps more bother than its worth..
         let msg = NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data));
-        let mut send_tasks = vec![];
 
-        let (kind, payload) = MyNode::serialize_node_msg(context.name, msg)?;
-        let section_key = context.network_knowledge.section_key();
-
-        // We create a Dst with random dst name, but we'll update it for each target
-        let mut dst = Dst {
-            name: data_name,
-            section_key,
+        let cmd = Cmd::SendMsgAndAwaitResponse {
+            msg_id,
+            msg,
+            context,
+            targets,
+            client_stream,
+            source_client,
         };
-        let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
-        for target in targets {
-            dst.name = target.name();
-            let bytes_to_node = wire_msg.serialize_with_new_dst(&dst)?;
-
-            let comm = context.comm.clone();
-            info!("About to send {msg_id:?} to holder: {target:?}");
-
-            send_tasks.push(
-                async move {
-                    (
-                        target,
-                        comm.send_out_bytes_to_peer_and_return_response(
-                            target,
-                            msg_id,
-                            bytes_to_node.clone(),
-                        )
-                        .await
-                        .map_err(Error::Comms),
-                    )
-                }
-                .boxed(),
-            );
-        }
-
-        Ok(futures::future::join_all(send_tasks).await)
-    }
-
-    // Locate ideal holders for this data, instruct them to store the data
-    pub(crate) async fn store_data_at_nodes_and_ack_to_client(
-        context: &NodeContext,
-        cmd: DataCmd,
-        data: ReplicatedData,
-        msg_id: MsgId,
-        targets: BTreeSet<Peer>,
-        client_response_stream: SendStream,
-        source_client: Peer,
-    ) -> Result<Vec<Cmd>> {
-        let targets_len = targets.len();
-
-        let responses = MyNode::store_data_at_nodes(context, data, msg_id, targets).await?;
-        let mut success_count = 0;
-        let mut ack_response = None;
-        let mut last_error = None;
-        for (peer, the_response) in responses {
-            match the_response {
-                Ok(response) => {
-                    success_count += 1;
-                    debug!("Response in from {peer:?} for {msg_id:?}: {response:?}");
-                    ack_response = Some(response);
-                }
-                Err(error) => {
-                    error!("{msg_id:?} Error when replicating to node {peer:?}: {error:?}");
-                    if let Error::Comms(sn_comms::Error::CmdSendError(peer)) = error {
-                        context.log_node_issue(peer.name(), IssueType::Communication);
-                    }
-                    last_error = Some(error);
-                }
-            }
-        }
-
-        // everything went fine, tell the client that
-        if success_count == targets_len {
-            if let Some(response) = ack_response {
-                let cmds = MyNode::send_cmd_response_to_client(
-                    context.clone(),
-                    response.into_msg()?,
-                    client_response_stream,
-                    source_client,
-                );
-                return Ok(cmds);
-            } else {
-                // This should not be possible with above checks
-                error!("No valid response to send from all responses for {msg_id:?}");
-            }
-        } else {
-            error!("Storage was not completely successful for {msg_id:?}");
-            if let Some(error) = last_error {
-                let cmd = MyNode::send_cmd_error_response_over_stream(
-                    context.clone(),
-                    cmd,
-                    error,
-                    msg_id,
-                    client_response_stream,
-                    source_client,
-                );
-                return Ok(vec![cmd]);
-            }
-        }
-
-        Ok(vec![])
-    }
-
-    /// Parses WireMsg and if DataStored Ack, we send a response to the client
-    fn send_cmd_response_to_client(
-        context: NodeContext,
-        response: MsgType,
-        send_stream: SendStream,
-        source_client: Peer,
-    ) -> Vec<Cmd> {
-        if let MsgType::NodeDataResponse {
-            msg:
-                NodeDataResponse::CmdResponse {
-                    response,
-                    correlation_id,
-                },
-            ..
-        } = response
-        {
-            let msg = ClientDataResponse::CmdResponse {
-                response,
-                correlation_id,
-            };
-
-            debug!("{correlation_id:?} sending cmd response ACK back to client");
-            vec![Cmd::SendClientResponse {
-                msg,
-                correlation_id,
-                send_stream,
-                context,
-                source_client,
-            }]
-        } else {
-            // TODO: handle this bad response
-            error!("Unexpected response to data cmd from node. Response: {response:?}");
-            vec![]
-        }
+        Ok(vec![cmd])
     }
 
     /// Find target node, sends a bidi msg, awaiting response, and then sends this on to the client
@@ -194,7 +91,7 @@ impl MyNode {
         msg_id: MsgId,
         auth: AuthorityProof<ClientAuth>,
         source_client: Peer,
-        client_response_stream: SendStream,
+        client_stream: SendStream,
     ) -> Result<Vec<Cmd>> {
         // We accept that we might be sending a WireMsg to ourselves.
         // The extra load is not that big. But we can optimize this later if necessary.
@@ -208,13 +105,13 @@ impl MyNode {
             LogMarker::DataQueryReceviedAtElder,
         );
 
-        let targets = MyNode::target_data_holders(&context, *address.name());
+        let targets = Self::target_data_holders(&context, *address.name());
 
         // We accept the chance that we will be querying an Elder that the client already queried directly.
         // The extra load is not that big. But we can optimize this later if necessary.
 
         // Query only the nth node
-        let target = if let Some(peer) = targets.iter().nth(query.node_index) {
+        let recipient = if let Some(peer) = targets.iter().nth(query.node_index) {
             *peer
         } else {
             debug!("No targets found for {msg_id:?}");
@@ -230,7 +127,7 @@ impl MyNode {
                 &query.variant,
                 source_client,
                 msg_id,
-                client_response_stream,
+                client_stream,
             );
             return Ok(vec![cmd]);
         };
@@ -246,44 +143,12 @@ impl MyNode {
             msg_id,
             msg,
             context,
-            recipient: target,
-            client_stream: client_response_stream,
+            targets: BTreeSet::from([recipient]),
+            client_stream,
             source_client,
         };
 
         Ok(vec![cmd])
-    }
-
-    /// Parses WireMsg and if it's a query response, we send a response to the client
-    pub(crate) fn send_query_response_to_client(
-        correlation_id: MsgId,
-        context: NodeContext,
-        response: MsgType,
-        send_stream: SendStream,
-        source_client: Peer,
-    ) -> Vec<Cmd> {
-        if let MsgType::NodeDataResponse {
-            msg: NodeDataResponse::QueryResponse { response, .. },
-            ..
-        } = response
-        {
-            let msg = ClientDataResponse::QueryResponse {
-                response,
-                correlation_id,
-            };
-
-            vec![Cmd::SendClientResponse {
-                msg,
-                correlation_id,
-                send_stream,
-                context,
-                source_client,
-            }]
-        } else {
-            // TODO: handle this bad response
-            error!("Unexpected response to query from node for {correlation_id:?}: {response:?}");
-            vec![]
-        }
     }
 
     /// Registered holders not present in provided list of members
@@ -309,7 +174,7 @@ impl MyNode {
 
     /// Used to fetch the list of holders for given name of data.
     /// Sorts members by closeness to data address, returns data_copy_count of them
-    pub(crate) fn target_data_holders(context: &NodeContext, target: XorName) -> BTreeSet<Peer> {
+    fn target_data_holders(context: &NodeContext, target: XorName) -> BTreeSet<Peer> {
         // TODO: reuse our_members_sorted_by_distance_to API when core is merged into upper layer
         let members = context.network_knowledge.members();
 

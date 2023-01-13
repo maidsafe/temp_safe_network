@@ -7,12 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    node::{
-        core::NodeContext,
-        flow_ctrl::cmds::Cmd,
-        messaging::{streams::into_msg_bytes, Peers},
-        MyNode, Result,
-    },
+    node::{core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, Result},
     storage::{Error as StorageError, StorageLevel},
 };
 
@@ -21,13 +16,16 @@ use sn_interface::{
     messaging::{
         data::CmdResponse,
         system::{JoinResponse, NodeDataCmd, NodeDataQuery, NodeDataResponse, NodeEvent, NodeMsg},
-        MsgId,
+        Dst, MsgId, WireMsg,
     },
+    network_knowledge::NetworkKnowledge,
     types::{log_markers::LogMarker, Keypair, Peer, PublicKey, ReplicatedData},
 };
 
-use qp2p::SendStream;
+use qp2p::{SendStream, UsrMsgBytes};
 use sn_fault_detection::IssueType;
+use xor_name::XorName;
+
 use std::collections::BTreeSet;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -527,4 +525,45 @@ impl MyNode {
             }
         }
     }
+}
+
+// Serializes the msg, producing one [`WireMsg`] instance
+// per recipient - the last step before passing it over to comms module.
+pub(crate) fn into_msg_bytes(
+    network_knowledge: &NetworkKnowledge,
+    our_node_name: XorName,
+    msg: NodeMsg,
+    msg_id: MsgId,
+    recipients: Peers,
+) -> Result<Vec<(Peer, UsrMsgBytes)>> {
+    let (kind, payload) = MyNode::serialize_node_msg(our_node_name, &msg)?;
+    let recipients = match recipients {
+        Peers::Single(peer) => vec![peer],
+        Peers::Multiple(peers) => peers.into_iter().collect(),
+    };
+
+    // we first generate the XorName
+    let dst = Dst {
+        name: xor_name::rand::random(),
+        section_key: bls::SecretKey::random().public_key(),
+    };
+
+    let mut initial_wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
+    let _bytes = initial_wire_msg.serialize_and_cache_bytes()?;
+
+    let mut msgs = vec![];
+    for peer in recipients {
+        match network_knowledge.generate_dst(&peer.name()) {
+            Ok(dst) => {
+                // TODO log error here isntead of throwing
+                let all_the_bytes = initial_wire_msg.serialize_with_new_dst(&dst)?;
+                msgs.push((peer, all_the_bytes));
+            }
+            Err(error) => {
+                error!("Could not get route for {peer:?}: {error}");
+            }
+        }
+    }
+
+    Ok(msgs)
 }

@@ -8,7 +8,7 @@
 
 use crate::node::{
     flow_ctrl::dispatcher::Dispatcher,
-    messaging::{streams::into_msg_bytes, Peers},
+    messaging::{node_msgs::into_msg_bytes, Peers},
     Cmd,
 };
 
