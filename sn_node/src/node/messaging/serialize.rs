@@ -21,9 +21,9 @@ impl MyNode {
     /// Serialize a message for a Client
     pub(crate) fn serialize_client_msg_response(
         our_node_name: XorName,
-        msg: ClientDataResponse,
+        msg: &ClientDataResponse,
     ) -> Result<(MsgKind, Bytes)> {
-        let payload = WireMsg::serialize_msg_payload(&msg)?;
+        let payload = WireMsg::serialize_msg_payload(msg)?;
         let kind = MsgKind::ClientDataResponse(our_node_name);
         Ok((kind, payload))
     }
@@ -31,9 +31,9 @@ impl MyNode {
     /// Serialize a message for a Node
     pub(crate) fn serialize_node_msg(
         our_node_name: XorName,
-        msg: NodeMsg,
+        msg: &NodeMsg,
     ) -> Result<(MsgKind, Bytes)> {
-        let payload = WireMsg::serialize_msg_payload(&msg)?;
+        let payload = WireMsg::serialize_msg_payload(msg)?;
         let kind = MsgKind::Node {
             name: our_node_name,
             is_join: matches!(msg, NodeMsg::JoinRequest(_)),
@@ -42,11 +42,11 @@ impl MyNode {
     }
 
     /// Serialize a message for a Node
-    pub(crate) fn serialize_node_msg_response(
+    pub(crate) fn serialize_node_data_response(
         our_node_name: XorName,
-        msg: NodeDataResponse,
+        msg: &NodeDataResponse,
     ) -> Result<(MsgKind, Bytes)> {
-        let payload = WireMsg::serialize_msg_payload(&msg)?;
+        let payload = WireMsg::serialize_msg_payload(msg)?;
         let kind = MsgKind::NodeDataResponse(our_node_name);
         Ok((kind, payload))
     }

@@ -28,7 +28,7 @@ pub enum Error {
     FailedSend(Peer),
     /// Error Sending Cmd in to node for processing
     #[error("Error sending Cmd to node {0:?} for processing.")]
-    CmdSendError(Peer),
+    SendError(Peer),
 }
 
 impl From<qp2p::ClientEndpointError> for Error {

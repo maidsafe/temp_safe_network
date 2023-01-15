@@ -87,11 +87,9 @@ impl PeerSession {
             .send_on_new_bi_di_stream(bytes, msg_id)
             .await
             .map_err(|err| {
-                error!(
-                    "Failed sending {msg_id:?} to {:?} {err:?}",
-                    self.link.peer()
-                );
-                Error::CmdSendError(*self.link.peer())
+                let peer = *self.link.peer();
+                error!("Failed sending {msg_id:?} to {peer:?} {err:?}");
+                Error::SendError(peer)
             })
     }
 

@@ -16,7 +16,6 @@ use sn_dbc::{
     SpentProofShare,
 };
 use sn_interface::{
-    data_copy_count,
     messaging::{
         data::{
             ClientDataResponse, ClientMsg, DataCmd, DataQueryVariant, EditRegister,
@@ -134,7 +133,7 @@ impl MyNode {
     ) -> Result<Vec<Cmd>> {
         debug!("Handling client {msg_id:?}");
 
-        trace!("{:?}: {:?} ", LogMarker::ClientMsgToBeHandled, msg);
+        trace!("{:?}: {msg:?} ", LogMarker::ClientMsgToBeHandled);
 
         let cmd = match msg {
             ClientMsg::Cmd(cmd) => cmd,
@@ -210,47 +209,18 @@ impl MyNode {
 
         trace!("{:?}: {:?}", LogMarker::DataStoreReceivedAtElder, data);
 
-        let targets = MyNode::target_data_holders(&context, data.name());
-
-        // make sure the expected replication factor is achieved
-        if data_copy_count() > targets.len() {
-            error!("InsufficientNodeCount for storing data reliably");
-            let error = Error::InsufficientNodeCount {
-                prefix: context.network_knowledge.prefix(),
-                expected: data_copy_count() as u8,
-                found: targets.len() as u8,
-            };
-
-            debug!("Will send error response back to client");
-
-            let cmd = MyNode::send_cmd_error_response_over_stream(
-                context,
-                cmd,
-                error,
-                msg_id,
-                send_stream,
-                origin,
-            );
-            return Ok(vec![cmd]);
-        }
-
         // the store msg sent to nodes
         // cmds here may be fault tracking.
         // CmdAcks are sent over the send stream herein
-        let cmds = MyNode::store_data_at_nodes_and_ack_to_client(
-            &context,
+        MyNode::store_data_at_nodes_and_ack_to_client(
+            context,
             cmd,
             data,
             msg_id,
-            targets,
             send_stream,
             origin,
         )
-        .await?;
-
-        // TODO: handle failed responses
-
-        Ok(cmds)
+        .await
     }
 
     // helper to extract the contents of the cmd as ReplicatedData

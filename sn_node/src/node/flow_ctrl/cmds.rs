@@ -151,7 +151,7 @@ pub(crate) enum Cmd {
         msg: NodeMsg,
         #[debug(skip)]
         context: NodeContext,
-        recipient: Peer,
+        targets: BTreeSet<Peer>,
         client_stream: SendStream,
         source_client: Peer,
     },
