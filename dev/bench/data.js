@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1673525717035,
+  "lastUpdate": 1673794902121,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -53464,6 +53464,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 334169271,
             "range": "± 3265070",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "fde67106242ad3d47f04ce99261a1e6299e94047",
+          "message": "Merge #1978\n\n1978: refactor(node): sending client data cmds and queries to holders through Cmd::SendMsgAndAwaitResponse r=joshuef a=bochaco\n\n- Unifying and simplifying logic to send client data cmds and queries to holders so in both cases the sn_node `Cmd::SendMsgAndAwaitResponse` is used.\r\n- Renaming `sn_comms::Error::CmdSendError` to `SendError` since it's not specific for cmds but for any msg.\r\n- Some internal sn_node helper functions were moved to different files/mods so they are closer to the logic making use of them.\n\nCo-authored-by: bochaco <gabrielviganotti@gmail.com>",
+          "timestamp": "2023-01-15T13:33:06Z",
+          "tree_id": "6f85ef4a1cb3976ca3846d4d53c9db0d11336169",
+          "url": "https://github.com/maidsafe/safe_network/commit/fde67106242ad3d47f04ce99261a1e6299e94047"
+        },
+        "date": 1673794899265,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2465347,
+            "range": "± 3729",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 81859219,
+            "range": "± 900241",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 104108592,
+            "range": "± 3076627",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 395742967,
+            "range": "± 19125718",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 68494185,
+            "range": "± 572699",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 84629921,
+            "range": "± 645186",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 317104484,
+            "range": "± 1164953",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 25640705908,
+            "range": "± 1548190256",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 40207924,
+            "range": "± 4737354",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 1404734859,
+            "range": "± 640600142",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 7996594396,
+            "range": "± 1328017924",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 152505620,
+            "range": "± 14869526",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1495194993,
+            "range": "± 122740158",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 5234124304,
+            "range": "± 788051035",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 45894493,
+            "range": "± 2113198",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 432211037,
+            "range": "± 8347870",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1699995421,
+            "range": "± 57453058",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11184178,
+            "range": "± 190188",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 96226918,
+            "range": "± 2807757",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 326734996,
+            "range": "± 5843123",
             "unit": "ns/iter"
           }
         ]
