@@ -134,6 +134,26 @@ impl FaultDetection {
             }
         }
     }
+
+    /// Removes a Knowledge issue from the node liveness records.
+    pub fn knowledge_updated(&mut self, node_id: &NodeIdentifier) {
+        trace!(
+            "Attempting to remove logged knowledge issue for {:?}",
+            node_id,
+        );
+
+        if let Some(v) = self.knowledge_issues.get_mut(node_id) {
+            // only remove the first instance from the vec
+            let prev = v.pop_front();
+
+            if prev.is_some() {
+                trace!("Pending knowledge issue removed for node: {:?}", node_id,);
+            } else {
+                trace!("No Pending knowledge issue found for node: {:?}", node_id);
+            }
+        }
+    }
+
     /// Removes a probe tracker from the node liveness records.
     pub fn ae_update_msg_received(&mut self, node_id: &NodeIdentifier) {
         trace!(
