@@ -194,13 +194,6 @@ pub enum NodeDataResponse {
     },
 }
 
-impl NodeDataResponse {
-    /// The priority of the message, when handled by lower level comms.
-    pub fn priority(&self) -> i32 {
-        super::msg_type::NODE_DATA_MSG_PRIORITY
-    }
-}
-
 impl Display for NodeDataResponse {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
@@ -215,47 +208,6 @@ impl Display for NodeDataResponse {
 }
 
 impl NodeMsg {
-    /// The priority of the message, when handled by lower level comms.
-    pub fn priority(&self) -> i32 {
-        use super::msg_type::{
-            ANTIENTROPY_MSG_PRIORITY, DATA_REPLICATION_MSG_PRIORITY, DKG_MSG_PRIORITY,
-            JOIN_RELOCATE_MSG_PRIORITY, JOIN_RESPONSE_PRIORITY, MEMBERSHIP_PRIORITY,
-            NODE_DATA_MSG_PRIORITY,
-        };
-        match self {
-            // DKG messages
-            Self::DkgStart { .. }
-            | Self::DkgEphemeralPubKey { .. }
-            | Self::DkgVotes { .. }
-            | Self::RequestHandover { .. }
-            | Self::DkgAE { .. } => DKG_MSG_PRIORITY,
-
-            // Inter-node comms for AE updates
-            Self::AntiEntropy { .. } | Self::AntiEntropyProbe(_) => ANTIENTROPY_MSG_PRIORITY,
-
-            // Join responses
-            Self::JoinResponse(_) | Self::JoinAsRelocatedResponse(_) => JOIN_RESPONSE_PRIORITY,
-
-            Self::ProposeSectionState { .. }
-            | Self::MembershipVotes(_)
-            | Self::MembershipAE(_)
-            | Self::HandoverAE(_)
-            | Self::SectionHandoverPromotion { .. }
-            | Self::SectionSplitPromotion { .. }
-            | Self::HandoverVotes(_) => MEMBERSHIP_PRIORITY,
-
-            // Inter-node comms for joining, relocating etc.
-            Self::Relocate(_) | Self::JoinRequest(_) | Self::JoinAsRelocatedRequest(_) => {
-                JOIN_RELOCATE_MSG_PRIORITY
-            }
-
-            Self::NodeEvent(_) => DATA_REPLICATION_MSG_PRIORITY,
-
-            // Inter-node comms related to processing client data requests
-            Self::NodeDataCmd(_) | Self::NodeDataQuery(_) => NODE_DATA_MSG_PRIORITY,
-        }
-    }
-
     pub fn statemap_states(&self) -> crate::statemap::State {
         use crate::statemap::State;
         match self {
