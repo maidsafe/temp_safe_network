@@ -333,22 +333,20 @@ mod tests {
     /// In a standard network startup (as of 24/06/22)
     /// we see:
     /// 0 op requests
-    /// 2407 `DkgBroadcastVote` DKG (each are tracked as an eror until a respnose comes in...) this is total across all nodes...
-    ///
     /// This includes:
-    /// 510 "tracker: Dkg..." (the initial black mark)
-    /// ~2394 "Logging Dkg session as responded to in faults." (aka removing a black mark) < -- we're not simulating this,
-    /// only the stains that stick... So in reality, over time we' see 0 DKG issues in a normal startup
-    /// ~469 "tracker: Know"
-    /// ~230 "tracker: Communication""
+    /// 510 "tracker: Dkg..." (the initial black mark), 1258 cleared...
+    /// ~252 "tracker: NetworkKnowledge"
+    /// 592 elderVoting + 592 cleard
+    /// 0 "tracker: Communication""
     /// 0 "tracker: `PendingOp`..." (equally a lot of these are being responded to...)
     fn generate_network_startup_msg_issues() -> impl Strategy<Value = IssueType> {
         // higher numbers here are more frequent
         prop_oneof![
         0 => Just(IssueType::Communication),
-        230 => Just(IssueType::Dkg),
+        510 => Just(IssueType::Dkg),
+        592 => Just(IssueType::ElderVoting), //
         0 => Just(IssueType::AeProbeMsg),
-        100 => Just(IssueType::NetworkKnowledge),
+        252 => Just(IssueType::NetworkKnowledge),
         ]
     }
 
@@ -450,7 +448,9 @@ mod tests {
         nodes: &[(XorName, NodeQualityScored)],
         elders_count: usize,
     ) -> Vec<(XorName, NodeQualityScored)> {
-        if matches!(issue, IssueType::Dkg) || matches!(issue, IssueType::AeProbeMsg) {
+        if matches!(issue, IssueType::Dkg)
+            || matches!(issue, IssueType::AeProbeMsg) | matches!(issue, IssueType::ElderVoting)
+        {
             nodes
                 .iter()
                 .sorted_by(|lhs, rhs| root.clone().cmp_distance(&lhs.0, &rhs.0))
