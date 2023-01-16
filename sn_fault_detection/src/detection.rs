@@ -22,6 +22,7 @@ static CONN_WEIGHTING: f32 = 5.0;
 static OP_WEIGHTING: f32 = 1.0;
 static KNOWLEDGE_WEIGHTING: f32 = 5.0;
 static DKG_WEIGHTING: f32 = 10.0; // there are quite a lot of DKG msgs that go out atm, so can't weight this too heavily
+static ELDER_VOTE_WEIGHTING: f32 = 7.0; // Not as severe as DKG votes missing, as these are not always required
 static AE_PROBE_WEIGHTING: f32 = 10.0;
 
 #[derive(Clone, Debug)]
@@ -33,6 +34,9 @@ pub enum IssueType {
     AeProbeMsg,
     /// Represents a Dkg issue to be tracked by Fault Detection.
     Dkg,
+    /// Tracks when we are expecting votes from Elders (ie, adds to this when we have voted).
+    /// Less severe than Dkg as we don't always require a vote in each and every round.
+    ElderVoting,
     /// Represents a communication issue to be tracked by Fault Detection.
     Communication,
     /// Represents a knowledge issue to be tracked by Fault Detection.
@@ -45,6 +49,7 @@ pub enum IssueType {
 pub struct ScoreResults {
     pub communication_scores: BTreeMap<XorName, f32>,
     pub dkg_scores: BTreeMap<XorName, f32>,
+    pub elder_voting_scores: BTreeMap<XorName, f32>,
     pub knowledge_scores: BTreeMap<XorName, f32>,
     pub op_scores: BTreeMap<XorName, f32>,
     pub probe_scores: BTreeMap<XorName, f32>,
@@ -64,12 +69,17 @@ impl FaultDetection {
         let mut knowledge_scores = BTreeMap::new();
         let mut op_scores = BTreeMap::new();
         let mut dkg_scores = BTreeMap::new();
+        let mut elder_voting_scores = BTreeMap::new();
         let mut probe_scores = BTreeMap::new();
 
         for node in &self.nodes {
             let _ = dkg_scores.insert(
                 *node,
                 self.calculate_node_score_for_type(node, &IssueType::Dkg),
+            );
+            let _ = elder_voting_scores.insert(
+                *node,
+                self.calculate_node_score_for_type(node, &IssueType::ElderVoting),
             );
             let _ = probe_scores.insert(
                 *node,
@@ -92,6 +102,7 @@ impl FaultDetection {
         ScoreResults {
             communication_scores,
             dkg_scores,
+            elder_voting_scores,
             knowledge_scores,
             op_scores,
             probe_scores,
@@ -150,6 +161,13 @@ impl FaultDetection {
                     0
                 }
             }
+            IssueType::ElderVoting => {
+                if let Some(issues) = self.elder_voting_issues.get(node) {
+                    issues.len()
+                } else {
+                    0
+                }
+            }
             IssueType::RequestOperation => {
                 if let Some(issues) = self.unfulfilled_ops.get(node) {
                     issues.len()
@@ -167,6 +185,7 @@ impl FaultDetection {
         let ops_scores = scores.op_scores;
         let conn_scores = scores.communication_scores;
         let dkg_scores = scores.dkg_scores;
+        let elder_voting_scores = scores.elder_voting_scores;
         let knowledge_scores = scores.knowledge_scores;
         let probe_scores = scores.probe_scores;
 
@@ -182,6 +201,9 @@ impl FaultDetection {
             let node_dkg_score = *dkg_scores.get(&name).unwrap_or(&1.0);
             let node_dkg_score = node_dkg_score * DKG_WEIGHTING;
 
+            let node_elder_voting_score = *elder_voting_scores.get(&name).unwrap_or(&1.0);
+            let node_elder_voting_score = node_elder_voting_score * ELDER_VOTE_WEIGHTING;
+
             let node_knowledge_score = *knowledge_scores.get(&name).unwrap_or(&1.0);
             let node_knowledge_score = node_knowledge_score * KNOWLEDGE_WEIGHTING;
 
@@ -191,12 +213,14 @@ impl FaultDetection {
             let final_score = ops_score
                 + node_conn_score
                 + node_knowledge_score
+                + node_elder_voting_score
                 + node_dkg_score
                 + node_probe_score;
             debug!(
                 "Node {name} has a final score of {final_score} |
-                (Conns score({node_conn_score}), Dkg score({node_dkg_score}), |
-                Knowledge score({node_knowledge_score}), Ops score({score})), AeProbe score ({node_probe_score})"
+                ElderVoting score({node_elder_voting_score})
+                Conns score({node_conn_score}), Dkg score({node_dkg_score}), |
+                Knowledge score({node_knowledge_score}), Ops score({score}), AeProbe score ({node_probe_score})"
             );
 
             scores_only.push(final_score);
@@ -466,6 +490,9 @@ mod tests {
                     IssueType::Dkg => {
                         assert_eq!(score_results.dkg_scores.len(), node_count);
                     },
+                    IssueType::ElderVoting => {
+                        assert_eq!(score_results.elder_voting_scores.len(), node_count);
+                    },
                     IssueType::AeProbeMsg => {
                         assert_eq!(score_results.probe_scores.len(), node_count);
                     },
@@ -508,6 +535,9 @@ mod tests {
                     let scores = match issue_type {
                     IssueType::Dkg => {
                         score_results.dkg_scores
+                    },
+                    IssueType::ElderVoting => {
+                        score_results.elder_voting_scores
                     },
                     IssueType::AeProbeMsg => {
                         score_results.probe_scores
@@ -822,6 +852,9 @@ mod tests {
                     },
                     IssueType::Dkg => {
                         score_results.dkg_scores
+                    },
+                    IssueType::ElderVoting => {
+                        score_results.elder_voting_scores
                     },
                     IssueType::NetworkKnowledge => {
                         score_results.knowledge_scores

@@ -46,7 +46,7 @@ impl FlowCtrl {
                         match issue {
                             IssueType::AeProbeMsg => tracker.ae_update_msg_received(&node),
                             IssueType::Dkg => tracker.dkg_ack_fulfilled(&node),
-                            IssueType::NetworkKnowledge => tracker.knowledge_updated(&node),
+                            IssueType::ElderVoting => tracker.elder_vote_received(&node),
                             _ => {}
                         };
                     }
