@@ -144,31 +144,21 @@ impl Dispatcher {
                 origin,
                 auth,
                 send_stream,
+                context,
             } => {
                 debug!("Updating network knowledge before handling message");
-                let mut context = self.node.read().await.context();
-                debug!("[NODE READ]: update client knowledge got");
-
-                let name = context.name;
-                let there_was_an_update = context.network_knowledge.update_knowledge_if_valid(
-                    SectionTreeUpdate::new(signed_sap.clone(), proof_chain.clone()),
-                    None,
-                    &name,
-                )?;
-
-                if there_was_an_update {
-                    // okay lets do it for real
+                // we create a block to make sure the node's lock is released
+                let updated = {
                     let mut node = self.node.write().await;
+                    let name = node.name();
                     debug!("[NODE WRITE]: update client write got");
-                    let updated = node.network_knowledge.update_knowledge_if_valid(
+                    node.network_knowledge.update_knowledge_if_valid(
                         SectionTreeUpdate::new(signed_sap, proof_chain),
                         None,
                         &name,
-                    )?;
-                    debug!("Network knowledge was updated: {updated}");
-                }
-
-                debug!("[NODE READ]: update & validate msg lock got");
+                    )?
+                };
+                debug!("Network knowledge was updated: {updated}");
 
                 MyNode::handle_valid_client_msg(context, msg_id, msg, auth, origin, send_stream)
                     .await

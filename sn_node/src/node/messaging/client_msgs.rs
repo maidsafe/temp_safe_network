@@ -24,7 +24,7 @@ use sn_interface::{
         system::{NodeDataResponse, OperationId},
         AuthorityProof, ClientAuth, MsgId,
     },
-    network_knowledge::section_keys::build_spent_proof_share,
+    network_knowledge::{section_keys::build_spent_proof_share, SectionTreeUpdate},
     types::{
         log_markers::LogMarker,
         register::{Permissions, Policy, Register, User},
@@ -124,7 +124,7 @@ impl MyNode {
     /// the `data_copy_count()` nodes, then we will send a wiremsg
     /// to ourselves, among the msgs sent to the other holders.
     pub(crate) async fn handle_valid_client_msg(
-        context: NodeContext,
+        mut context: NodeContext,
         msg_id: MsgId,
         msg: ClientMsg,
         auth: AuthorityProof<ClientAuth>,
@@ -167,25 +167,35 @@ impl MyNode {
                         "Received updated network knowledge with the request. Will return new command \
                         to update the node network knowledge before processing the spend."
                     );
-                    // To avoid a loop, recompose the message without the updated proof_chain.
-                    let updated_client_msg =
-                        ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
-                            key_image,
-                            tx,
-                            spent_proofs,
-                            spent_transactions,
-                            network_knowledge: None,
-                        }));
-                    let update_command = Cmd::UpdateNetworkAndHandleValidClientMsg {
-                        proof_chain,
-                        signed_sap,
-                        msg_id,
-                        msg: updated_client_msg,
-                        origin,
-                        send_stream,
-                        auth,
-                    };
-                    return Ok(vec![update_command]);
+                    let name = context.name;
+                    let there_was_an_update = context.network_knowledge.update_knowledge_if_valid(
+                        SectionTreeUpdate::new(signed_sap.clone(), proof_chain.clone()),
+                        None,
+                        &name,
+                    )?;
+
+                    if there_was_an_update {
+                        // To avoid a loop, recompose the message without the updated proof_chain.
+                        let updated_client_msg =
+                            ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                                key_image,
+                                tx,
+                                spent_proofs,
+                                spent_transactions,
+                                network_knowledge: None,
+                            }));
+                        let update_command = Cmd::UpdateNetworkAndHandleValidClientMsg {
+                            proof_chain,
+                            signed_sap,
+                            msg_id,
+                            msg: updated_client_msg,
+                            origin,
+                            send_stream,
+                            auth,
+                            context,
+                        };
+                        return Ok(vec![update_command]);
+                    }
                 }
                 MyNode::extract_contents_as_replicated_data(&context, cmd)
             }

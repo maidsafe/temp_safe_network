@@ -71,6 +71,8 @@ pub(crate) enum Cmd {
         send_stream: SendStream,
         /// Requester's authority over this message
         auth: AuthorityProof<ClientAuth>,
+        #[debug(skip)]
+        context: NodeContext,
     },
     /// Handle peer that's been detected as lost.
     HandleFailedSendToNode { peer: Peer, msg_id: MsgId },
