@@ -352,7 +352,7 @@ impl MyNode {
                     sender,
                     msg_id
                 );
-                node.untrack_node_issue(sender.name(), IssueType::Knowledge);
+                node.untrack_node_issue(sender.name(), IssueType::NetworkKnowledge);
                 node.handle_section_state_proposal(msg_id, proposal, sig_share, sender)
             }
             NodeMsg::DkgStart(session_id, elder_sig) => {

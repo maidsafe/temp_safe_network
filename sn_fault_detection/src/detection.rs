@@ -36,7 +36,7 @@ pub enum IssueType {
     /// Represents a communication issue to be tracked by Fault Detection.
     Communication,
     /// Represents a knowledge issue to be tracked by Fault Detection.
-    Knowledge,
+    NetworkKnowledge,
     /// Represents a pending request operation issue to be tracked by Fault Detection.
     RequestOperation,
 }
@@ -81,7 +81,7 @@ impl FaultDetection {
             );
             let _ = knowledge_scores.insert(
                 *node,
-                self.calculate_node_score_for_type(node, &IssueType::Knowledge),
+                self.calculate_node_score_for_type(node, &IssueType::NetworkKnowledge),
             );
             let _ = op_scores.insert(
                 *node,
@@ -143,8 +143,8 @@ impl FaultDetection {
                     0
                 }
             }
-            IssueType::Knowledge => {
-                if let Some(issues) = self.knowledge_issues.get(node) {
+            IssueType::NetworkKnowledge => {
+                if let Some(issues) = self.network_knowledge_issues.get(node) {
                     issues.len()
                 } else {
                     0
@@ -246,7 +246,7 @@ impl FaultDetection {
             issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
         }
 
-        for issues in &mut self.knowledge_issues.values_mut() {
+        for issues in &mut self.network_knowledge_issues.values_mut() {
             issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
         }
 
@@ -324,7 +324,7 @@ mod tests {
         0 => Just(IssueType::Communication),
         230 => Just(IssueType::Dkg),
         0 => Just(IssueType::AeProbeMsg),
-        100 => Just(IssueType::Knowledge),
+        100 => Just(IssueType::NetworkKnowledge),
         ]
     }
 
@@ -472,7 +472,7 @@ mod tests {
                     IssueType::Communication => {
                         assert_eq!(score_results.communication_scores.len(), node_count);
                     },
-                    IssueType::Knowledge => {
+                    IssueType::NetworkKnowledge => {
                         assert_eq!(score_results.knowledge_scores.len(), node_count);
                     },
                     IssueType::RequestOperation => {
@@ -515,7 +515,7 @@ mod tests {
                     IssueType::Communication => {
                         score_results.communication_scores
                     },
-                    IssueType::Knowledge => {
+                    IssueType::NetworkKnowledge => {
                         score_results.knowledge_scores
                     },
                     IssueType::RequestOperation => {
@@ -823,7 +823,7 @@ mod tests {
                     IssueType::Dkg => {
                         score_results.dkg_scores
                     },
-                    IssueType::Knowledge => {
+                    IssueType::NetworkKnowledge => {
                         score_results.knowledge_scores
                     },
                     IssueType::RequestOperation => {
@@ -928,7 +928,7 @@ mod knowledge_tests {
         // Write data NORMAL_KNOWLEDGE_ISSUES times to the 10 nodes
         for node in &nodes {
             for _ in 0..NORMAL_KNOWLEDGE_ISSUES {
-                fault_detection.track_issue(*node, IssueType::Knowledge);
+                fault_detection.track_issue(*node, IssueType::NetworkKnowledge);
             }
         }
 
@@ -957,12 +957,12 @@ mod knowledge_tests {
 
         // Add just one issue to all, this gets us a baseline avg to not overly skew results
         for node in nodes {
-            fault_detection.track_issue(node, IssueType::Knowledge);
+            fault_detection.track_issue(node, IssueType::NetworkKnowledge);
         }
 
         // Add just one knowledge issue...
         for _ in 0..1 {
-            fault_detection.track_issue(new_node, IssueType::Knowledge);
+            fault_detection.track_issue(new_node, IssueType::NetworkKnowledge);
         }
 
         let faulty_nodes = fault_detection.get_faulty_nodes();
