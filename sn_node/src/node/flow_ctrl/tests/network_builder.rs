@@ -146,7 +146,7 @@ impl<R: RngCore> TestNetworkBuilder<R> {
             let (tx, rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
             let socket_addr: SocketAddr = (Ipv4Addr::LOCALHOST, 0).into();
             let comm = futures::executor::block_on(Comm::new(socket_addr, Default::default(), tx))
-                .expect("failed to create comm");
+                .expect("failed to create Comm");
             let mut node = node.clone();
             node.addr = comm.socket_addr();
 
@@ -186,9 +186,10 @@ impl<R: RngCore> TestNetworkBuilder<R> {
             .iter()
             .map(|(n, _)| n.public_key())
             .collect::<BTreeSet<_>>();
-        if !elder_keys.iter().all(|k| member_keys.contains(k)) {
-            panic!("some elders are not part of the members list");
-        }
+        assert!(
+            elder_keys.iter().all(|k| member_keys.contains(k)),
+            "some elders are not part of the members list"
+        );
 
         let elder_count = elders.len();
         let elders_iter = elders.iter().map(|(node, _)| MyNodeInfo::peer(node));
@@ -411,7 +412,7 @@ impl<R: RngCore> TestNetworkBuilder<R> {
                 // each anc can have multiple churns
                 for (sap, sk) in sections
                     .get(&anc)
-                    .expect("The ancestor {anc:?} should be present")
+                    .unwrap_or_else(|| panic!("The ancestor {anc:?} should be present"))
                 {
                     // to skip the first iteration of Prefix() since we have used that to create the
                     // SectionTree
@@ -516,13 +517,16 @@ impl TestNetwork {
         let nodes = self.get_nodes_single_churn(prefix, churn_idx);
         let sap_details = self.get_sap_single_churn(prefix, churn_idx);
 
-        if elder_count > sap_details.0.elder_count() {
-            panic!("elder_count should be <= {}", sap_details.0.elder_count());
-        }
+        assert!(
+            elder_count <= sap_details.0.elder_count(),
+            "elder_count should be <= {}",
+            sap_details.0.elder_count()
+        );
         let sap_adult_count = sap_details.0.members().count() - sap_details.0.elder_count();
-        if adult_count > sap_adult_count {
-            panic!("adult_count should be <= {}", sap_adult_count);
-        }
+        assert!(
+            adult_count <= sap_adult_count,
+            "adult_count should be <= {sap_adult_count}",
+        );
 
         let network_knowledge = self.build_network_knowledge(&sap_details.0, &sap_details.1);
 
@@ -653,13 +657,16 @@ impl TestNetwork {
         let nodes = self.get_nodes_single_churn(prefix, churn_idx);
         let sap_details = self.get_sap_single_churn(prefix, churn_idx);
 
-        if elder_count > sap_details.0.elder_count() {
-            panic!("elder_count should be <= {}", sap_details.0.elder_count());
-        }
+        assert!(
+            elder_count <= sap_details.0.elder_count(),
+            "elder_count should be <= {}",
+            sap_details.0.elder_count()
+        );
         let sap_adult_count = sap_details.0.members().count() - sap_details.0.elder_count();
-        if adult_count > sap_adult_count {
-            panic!("adult_count should be <= {}", sap_adult_count);
-        }
+        assert!(
+            adult_count <= sap_adult_count,
+            "adult_count should be <= {sap_adult_count}"
+        );
 
         let elder_iter = nodes.iter().take(elder_count).map(|(node, ..)| node.peer());
         let adult_iter = nodes
@@ -926,7 +933,7 @@ impl TestNetwork {
         let churn_idx = churn_idx.unwrap_or(all_sap_details.len() - 1);
         all_sap_details
             .get(churn_idx)
-            .expect("invalid churn idx: {churn_idx}")
+            .unwrap_or_else(|| panic!("invalid churn idx: {churn_idx}"))
     }
 
     // Get the SAP, sk_set for all the churns of a section
@@ -936,7 +943,7 @@ impl TestNetwork {
     ) -> &Vec<(SectionSigned<SectionAuthorityProvider>, SecretKeySet)> {
         self.sections
             .get(&prefix)
-            .expect("section not found for {prefix:?}")
+            .unwrap_or_else(|| panic!("section not found for {prefix:?}"))
     }
 
     // Get the all the nodes for a particular churn of a section
@@ -949,7 +956,7 @@ impl TestNetwork {
         let churn_idx = churn_idx.unwrap_or(nodes.len() - 1);
         nodes
             .get(churn_idx)
-            .expect("invalid churn idx: {churn_idx}")
+            .unwrap_or_else(|| panic!("invalid churn idx: {churn_idx}"))
     }
 
     // Get all the nodes for all the churns of a section
@@ -959,6 +966,6 @@ impl TestNetwork {
     ) -> &Vec<Vec<(MyNodeInfo, Comm, TestMemberType)>> {
         self.nodes
             .get(&prefix)
-            .expect("nodes not found for {prefix:?}")
+            .unwrap_or_else(|| panic!("nodes not found for {prefix:?}"))
     }
 }
