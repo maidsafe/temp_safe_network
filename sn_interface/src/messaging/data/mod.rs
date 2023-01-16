@@ -30,13 +30,7 @@ use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register, User},
     Chunk,
 };
-use crate::{
-    messaging::{
-        msg_type::{CLIENT_CMD_PRIORITY, CLIENT_QUERY_PRIORITY},
-        MsgId,
-    },
-    types::ReplicatedData,
-};
+use crate::{messaging::MsgId, types::ReplicatedData};
 
 use qp2p::UsrMsgBytes;
 use serde::{Deserialize, Serialize};
@@ -67,16 +61,6 @@ pub enum ClientMsg {
     /// reply.
     /// [`QueryResponse`]: Self::QueryResponse
     Query(DataQuery),
-}
-
-impl ClientMsg {
-    /// The priority of the message, when handled by lower level comms.
-    pub fn priority(&self) -> i32 {
-        match self {
-            Self::Cmd(_) => CLIENT_CMD_PRIORITY,
-            Self::Query(_) => CLIENT_QUERY_PRIORITY,
-        }
-    }
 }
 
 impl Display for ClientMsg {
@@ -122,13 +106,6 @@ pub enum ClientDataResponse {
         #[debug(skip)]
         bounced_msg: UsrMsgBytes,
     },
-}
-
-impl ClientDataResponse {
-    /// The priority of the message, when handled by lower level comms.
-    pub fn priority(&self) -> i32 {
-        CLIENT_QUERY_PRIORITY
-    }
 }
 
 impl Display for ClientDataResponse {
