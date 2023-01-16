@@ -157,7 +157,7 @@ mod core {
         /// Log an issue in dysfunction
         /// Spawns a process to send this incase the channel may be full, we don't hold up
         /// processing around this (as this can be called during dkg eg)
-        pub(crate) fn log_node_issue(&self, name: XorName, issue: IssueType) {
+        pub(crate) fn track_node_issue(&self, name: XorName, issue: IssueType) {
             trace!("Logging issue {issue:?} in dysfunction for {name}");
             let dysf_sender = self.fault_cmds_sender.clone();
             // TODO: do we need to kill the node if we fail tracking dysf?
@@ -390,11 +390,11 @@ mod core {
                 // So, shall only track the side that we are in as well.
                 if zero_dkg_id.elders.contains_key(&self.info().name()) {
                     for candidate in zero_dkg_id.elders.keys() {
-                        self.log_node_issue(*candidate, IssueType::Dkg);
+                        self.track_node_issue(*candidate, IssueType::Dkg);
                     }
                 } else if one_dkg_id.elders.contains_key(&self.info().name()) {
                     for candidate in one_dkg_id.elders.keys() {
-                        self.log_node_issue(*candidate, IssueType::Dkg);
+                        self.track_node_issue(*candidate, IssueType::Dkg);
                     }
                 }
 
@@ -447,7 +447,7 @@ mod core {
                 };
                 // track init of DKG
                 for candidate in session_id.elders.keys() {
-                    self.log_node_issue(*candidate, IssueType::Dkg);
+                    self.track_node_issue(*candidate, IssueType::Dkg);
                 }
 
                 vec![session_id]
@@ -682,7 +682,7 @@ mod core {
         /// Log an issue in fault tracker
         /// Spawns a process to send this incase the channel may be full, we don't hold up
         /// processing around this (as this can be called during dkg eg)
-        pub(crate) fn log_node_issue(&self, name: XorName, issue: IssueType) {
+        pub(crate) fn track_node_issue(&self, name: XorName, issue: IssueType) {
             trace!("Logging issue {issue:?} in fault tracker for {name}");
             let fault_sender = self.fault_cmds_sender.clone();
             // TODO: do we need to kill the node if we fail tracking faults?

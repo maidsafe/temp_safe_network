@@ -57,7 +57,7 @@ impl MyNode {
         for node in &other_peers {
             // log a knowledge issue for each that we're proposing
             // when they vote, this will be untracked
-            self.log_node_issue(node.name(), IssueType::Knowledge);
+            self.track_node_issue(node.name(), IssueType::Knowledge);
         }
 
         let peers = Peers::Multiple(other_peers);
