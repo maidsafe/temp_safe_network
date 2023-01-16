@@ -22,7 +22,7 @@ impl MyNode {
             return;
         };
 
-        self.log_node_issue(name, IssueType::Communication);
+        self.track_node_issue(name, IssueType::Communication);
     }
 
     pub(crate) fn cast_offline_proposals(&mut self, names: &BTreeSet<XorName>) -> Result<Vec<Cmd>> {

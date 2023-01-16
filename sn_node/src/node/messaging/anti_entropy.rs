@@ -82,7 +82,7 @@ impl MyNode {
                 // we want to log issues with any node repeatedly out of sync here...
                 let track_node_cmd = Cmd::TrackNodeIssue {
                     name: origin.name(),
-                    issue: sn_fault_detection::IssueType::Knowledge,
+                    issue: sn_fault_detection::IssueType::NetworkKnowledge,
                 };
 
                 return Ok(vec![ae_cmd, track_node_cmd]);

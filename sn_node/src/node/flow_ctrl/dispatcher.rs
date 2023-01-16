@@ -128,7 +128,7 @@ impl Dispatcher {
             Cmd::TrackNodeIssue { name, issue } => {
                 let node = self.node.read().await;
                 debug!("[NODE READ]: fault tracking read got");
-                node.log_node_issue(name, issue);
+                node.track_node_issue(name, issue);
                 Ok(vec![])
             }
             Cmd::HandleMsg {

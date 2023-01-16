@@ -22,6 +22,7 @@ static CONN_WEIGHTING: f32 = 5.0;
 static OP_WEIGHTING: f32 = 1.0;
 static KNOWLEDGE_WEIGHTING: f32 = 5.0;
 static DKG_WEIGHTING: f32 = 10.0; // there are quite a lot of DKG msgs that go out atm, so can't weight this too heavily
+static ELDER_VOTE_WEIGHTING: f32 = 7.0; // Not as severe as DKG votes missing, as these are not always required
 static AE_PROBE_WEIGHTING: f32 = 10.0;
 
 #[derive(Clone, Debug)]
@@ -33,10 +34,13 @@ pub enum IssueType {
     AeProbeMsg,
     /// Represents a Dkg issue to be tracked by Fault Detection.
     Dkg,
+    /// Tracks when we are expecting votes from Elders (ie, adds to this when we have voted).
+    /// Less severe than Dkg as we don't always require a vote in each and every round.
+    ElderVoting,
     /// Represents a communication issue to be tracked by Fault Detection.
     Communication,
     /// Represents a knowledge issue to be tracked by Fault Detection.
-    Knowledge,
+    NetworkKnowledge,
     /// Represents a pending request operation issue to be tracked by Fault Detection.
     RequestOperation,
 }
@@ -45,6 +49,7 @@ pub enum IssueType {
 pub struct ScoreResults {
     pub communication_scores: BTreeMap<XorName, f32>,
     pub dkg_scores: BTreeMap<XorName, f32>,
+    pub elder_voting_scores: BTreeMap<XorName, f32>,
     pub knowledge_scores: BTreeMap<XorName, f32>,
     pub op_scores: BTreeMap<XorName, f32>,
     pub probe_scores: BTreeMap<XorName, f32>,
@@ -64,12 +69,17 @@ impl FaultDetection {
         let mut knowledge_scores = BTreeMap::new();
         let mut op_scores = BTreeMap::new();
         let mut dkg_scores = BTreeMap::new();
+        let mut elder_voting_scores = BTreeMap::new();
         let mut probe_scores = BTreeMap::new();
 
         for node in &self.nodes {
             let _ = dkg_scores.insert(
                 *node,
                 self.calculate_node_score_for_type(node, &IssueType::Dkg),
+            );
+            let _ = elder_voting_scores.insert(
+                *node,
+                self.calculate_node_score_for_type(node, &IssueType::ElderVoting),
             );
             let _ = probe_scores.insert(
                 *node,
@@ -81,7 +91,7 @@ impl FaultDetection {
             );
             let _ = knowledge_scores.insert(
                 *node,
-                self.calculate_node_score_for_type(node, &IssueType::Knowledge),
+                self.calculate_node_score_for_type(node, &IssueType::NetworkKnowledge),
             );
             let _ = op_scores.insert(
                 *node,
@@ -92,6 +102,7 @@ impl FaultDetection {
         ScoreResults {
             communication_scores,
             dkg_scores,
+            elder_voting_scores,
             knowledge_scores,
             op_scores,
             probe_scores,
@@ -143,8 +154,15 @@ impl FaultDetection {
                     0
                 }
             }
-            IssueType::Knowledge => {
-                if let Some(issues) = self.knowledge_issues.get(node) {
+            IssueType::NetworkKnowledge => {
+                if let Some(issues) = self.network_knowledge_issues.get(node) {
+                    issues.len()
+                } else {
+                    0
+                }
+            }
+            IssueType::ElderVoting => {
+                if let Some(issues) = self.elder_voting_issues.get(node) {
                     issues.len()
                 } else {
                     0
@@ -167,6 +185,7 @@ impl FaultDetection {
         let ops_scores = scores.op_scores;
         let conn_scores = scores.communication_scores;
         let dkg_scores = scores.dkg_scores;
+        let elder_voting_scores = scores.elder_voting_scores;
         let knowledge_scores = scores.knowledge_scores;
         let probe_scores = scores.probe_scores;
 
@@ -182,6 +201,9 @@ impl FaultDetection {
             let node_dkg_score = *dkg_scores.get(&name).unwrap_or(&1.0);
             let node_dkg_score = node_dkg_score * DKG_WEIGHTING;
 
+            let node_elder_voting_score = *elder_voting_scores.get(&name).unwrap_or(&1.0);
+            let node_elder_voting_score = node_elder_voting_score * ELDER_VOTE_WEIGHTING;
+
             let node_knowledge_score = *knowledge_scores.get(&name).unwrap_or(&1.0);
             let node_knowledge_score = node_knowledge_score * KNOWLEDGE_WEIGHTING;
 
@@ -191,12 +213,14 @@ impl FaultDetection {
             let final_score = ops_score
                 + node_conn_score
                 + node_knowledge_score
+                + node_elder_voting_score
                 + node_dkg_score
                 + node_probe_score;
             debug!(
                 "Node {name} has a final score of {final_score} |
-                (Conns score({node_conn_score}), Dkg score({node_dkg_score}), |
-                Knowledge score({node_knowledge_score}), Ops score({score})), AeProbe score ({node_probe_score})"
+                ElderVoting score({node_elder_voting_score})
+                Conns score({node_conn_score}), Dkg score({node_dkg_score}), |
+                Knowledge score({node_knowledge_score}), Ops score({score}), AeProbe score ({node_probe_score})"
             );
 
             scores_only.push(final_score);
@@ -246,7 +270,7 @@ impl FaultDetection {
             issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
         }
 
-        for issues in &mut self.knowledge_issues.values_mut() {
+        for issues in &mut self.network_knowledge_issues.values_mut() {
             issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
         }
 
@@ -309,22 +333,20 @@ mod tests {
     /// In a standard network startup (as of 24/06/22)
     /// we see:
     /// 0 op requests
-    /// 2407 `DkgBroadcastVote` DKG (each are tracked as an eror until a respnose comes in...) this is total across all nodes...
-    ///
     /// This includes:
-    /// 510 "tracker: Dkg..." (the initial black mark)
-    /// ~2394 "Logging Dkg session as responded to in faults." (aka removing a black mark) < -- we're not simulating this,
-    /// only the stains that stick... So in reality, over time we' see 0 DKG issues in a normal startup
-    /// ~469 "tracker: Know"
-    /// ~230 "tracker: Communication""
+    /// 510 "tracker: Dkg..." (the initial black mark), 1258 cleared...
+    /// ~252 "tracker: NetworkKnowledge"
+    /// 592 elderVoting + 592 cleard
+    /// 0 "tracker: Communication""
     /// 0 "tracker: `PendingOp`..." (equally a lot of these are being responded to...)
     fn generate_network_startup_msg_issues() -> impl Strategy<Value = IssueType> {
         // higher numbers here are more frequent
         prop_oneof![
         0 => Just(IssueType::Communication),
-        230 => Just(IssueType::Dkg),
+        510 => Just(IssueType::Dkg),
+        592 => Just(IssueType::ElderVoting), //
         0 => Just(IssueType::AeProbeMsg),
-        100 => Just(IssueType::Knowledge),
+        252 => Just(IssueType::NetworkKnowledge),
         ]
     }
 
@@ -426,7 +448,9 @@ mod tests {
         nodes: &[(XorName, NodeQualityScored)],
         elders_count: usize,
     ) -> Vec<(XorName, NodeQualityScored)> {
-        if matches!(issue, IssueType::Dkg) || matches!(issue, IssueType::AeProbeMsg) {
+        if matches!(issue, IssueType::Dkg)
+            || matches!(issue, IssueType::AeProbeMsg) | matches!(issue, IssueType::ElderVoting)
+        {
             nodes
                 .iter()
                 .sorted_by(|lhs, rhs| root.clone().cmp_distance(&lhs.0, &rhs.0))
@@ -466,13 +490,16 @@ mod tests {
                     IssueType::Dkg => {
                         assert_eq!(score_results.dkg_scores.len(), node_count);
                     },
+                    IssueType::ElderVoting => {
+                        assert_eq!(score_results.elder_voting_scores.len(), node_count);
+                    },
                     IssueType::AeProbeMsg => {
                         assert_eq!(score_results.probe_scores.len(), node_count);
                     },
                     IssueType::Communication => {
                         assert_eq!(score_results.communication_scores.len(), node_count);
                     },
-                    IssueType::Knowledge => {
+                    IssueType::NetworkKnowledge => {
                         assert_eq!(score_results.knowledge_scores.len(), node_count);
                     },
                     IssueType::RequestOperation => {
@@ -509,13 +536,16 @@ mod tests {
                     IssueType::Dkg => {
                         score_results.dkg_scores
                     },
+                    IssueType::ElderVoting => {
+                        score_results.elder_voting_scores
+                    },
                     IssueType::AeProbeMsg => {
                         score_results.probe_scores
                     },
                     IssueType::Communication => {
                         score_results.communication_scores
                     },
-                    IssueType::Knowledge => {
+                    IssueType::NetworkKnowledge => {
                         score_results.knowledge_scores
                     },
                     IssueType::RequestOperation => {
@@ -823,7 +853,10 @@ mod tests {
                     IssueType::Dkg => {
                         score_results.dkg_scores
                     },
-                    IssueType::Knowledge => {
+                    IssueType::ElderVoting => {
+                        score_results.elder_voting_scores
+                    },
+                    IssueType::NetworkKnowledge => {
                         score_results.knowledge_scores
                     },
                     IssueType::RequestOperation => {
@@ -928,7 +961,7 @@ mod knowledge_tests {
         // Write data NORMAL_KNOWLEDGE_ISSUES times to the 10 nodes
         for node in &nodes {
             for _ in 0..NORMAL_KNOWLEDGE_ISSUES {
-                fault_detection.track_issue(*node, IssueType::Knowledge);
+                fault_detection.track_issue(*node, IssueType::NetworkKnowledge);
             }
         }
 
@@ -957,12 +990,12 @@ mod knowledge_tests {
 
         // Add just one issue to all, this gets us a baseline avg to not overly skew results
         for node in nodes {
-            fault_detection.track_issue(node, IssueType::Knowledge);
+            fault_detection.track_issue(node, IssueType::NetworkKnowledge);
         }
 
         // Add just one knowledge issue...
         for _ in 0..1 {
-            fault_detection.track_issue(new_node, IssueType::Knowledge);
+            fault_detection.track_issue(new_node, IssueType::NetworkKnowledge);
         }
 
         let faulty_nodes = fault_detection.get_faulty_nodes();

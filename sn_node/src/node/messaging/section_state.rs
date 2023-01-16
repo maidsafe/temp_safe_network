@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, Result, SectionStateVote};
+use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
         system::{NodeMsg, SectionSigShare},
@@ -52,6 +53,13 @@ impl MyNode {
         // broadcast the proposal to the recipients
         let mut cmds = vec![];
         let (other_peers, myself) = self.split_peers_and_self(recipients);
+
+        for node in &other_peers {
+            // log a knowledge issue for each that we're proposing
+            // when they vote, this will be untracked
+            self.track_node_issue(node.name(), IssueType::ElderVoting);
+        }
+
         let peers = Peers::Multiple(other_peers);
         let msg = NodeMsg::ProposeSectionState {
             proposal: proposal.clone(),

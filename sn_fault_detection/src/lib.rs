@@ -67,10 +67,12 @@ pub struct FaultDetection {
     pub communication_issues: TimedTracker,
     /// The dkg issues logged against a node, along with a timestamp to expire after some time.
     pub dkg_issues: TimedTracker,
+    /// The elder voting issues logged against a node, along with a timestamp to expire after some time.
+    pub elder_voting_issues: TimedTracker,
     /// The probe issues logged against a node and as yet unfulfilled, along with a timestamp to expire after some time.
     pub probe_issues: TimedTracker,
-    /// The knowledge issues logged against a node, along with a timestamp.
-    pub knowledge_issues: TimedTracker,
+    /// The network knowledge issues logged against a node, along with a timestamp.
+    pub network_knowledge_issues: TimedTracker,
     /// The unfulfilled pending request operation issues logged against a node, along with an
     /// operation ID.
     pub unfulfilled_ops: TimedTracker,
@@ -83,8 +85,9 @@ impl FaultDetection {
         Self {
             communication_issues: BTreeMap::new(),
             dkg_issues: BTreeMap::new(),
+            elder_voting_issues: BTreeMap::new(),
             probe_issues: BTreeMap::new(),
-            knowledge_issues: BTreeMap::new(),
+            network_knowledge_issues: BTreeMap::new(),
             unfulfilled_ops: BTreeMap::new(),
             nodes,
         }
@@ -100,6 +103,10 @@ impl FaultDetection {
                 let queue = self.dkg_issues.entry(node_id).or_default();
                 queue.push_back(Instant::now());
             }
+            IssueType::ElderVoting => {
+                let queue = self.elder_voting_issues.entry(node_id).or_default();
+                queue.push_back(Instant::now());
+            }
             IssueType::AeProbeMsg => {
                 let queue = self.probe_issues.entry(node_id).or_default();
                 queue.push_back(Instant::now());
@@ -108,8 +115,8 @@ impl FaultDetection {
                 let queue = self.communication_issues.entry(node_id).or_default();
                 queue.push_back(Instant::now());
             }
-            IssueType::Knowledge => {
-                let queue = self.knowledge_issues.entry(node_id).or_default();
+            IssueType::NetworkKnowledge => {
+                let queue = self.network_knowledge_issues.entry(node_id).or_default();
                 queue.push_back(Instant::now());
             }
             IssueType::RequestOperation => {
@@ -134,6 +141,26 @@ impl FaultDetection {
             }
         }
     }
+
+    /// Removes a Knowledge issue from the node liveness records.
+    pub fn elder_vote_received(&mut self, node_id: &NodeIdentifier) {
+        trace!(
+            "Attempting to remove logged elder_vote issue for {:?}",
+            node_id,
+        );
+
+        if let Some(v) = self.elder_voting_issues.get_mut(node_id) {
+            // only remove the first instance from the vec
+            let prev = v.pop_front();
+
+            if prev.is_some() {
+                trace!("Pending elder_vote issue removed for node: {:?}", node_id,);
+            } else {
+                trace!("No Pending elder_vote issue found for node: {:?}", node_id);
+            }
+        }
+    }
+
     /// Removes a probe tracker from the node liveness records.
     pub fn ae_update_msg_received(&mut self, node_id: &NodeIdentifier) {
         trace!(
@@ -179,8 +206,9 @@ impl FaultDetection {
 
         for node in &nodes_being_removed {
             let _ = self.communication_issues.remove(node);
-            let _ = self.knowledge_issues.remove(node);
+            let _ = self.network_knowledge_issues.remove(node);
             let _ = self.dkg_issues.remove(node);
+            let _ = self.elder_voting_issues.remove(node);
             let _ = self.probe_issues.remove(node);
             let _ = self.unfulfilled_ops.remove(node);
         }
@@ -271,13 +299,13 @@ mod tests {
         // Track some issues for nodes that are going to be removed.
         for node in nodes.iter().take(3) {
             fault_detection.track_issue(*node, IssueType::Communication);
-            fault_detection.track_issue(*node, IssueType::Knowledge);
+            fault_detection.track_issue(*node, IssueType::NetworkKnowledge);
             fault_detection.track_issue(*node, IssueType::RequestOperation);
         }
 
         // Track some issues for nodes that will be retained.
         fault_detection.track_issue(nodes[5], IssueType::Communication);
-        fault_detection.track_issue(nodes[6], IssueType::Knowledge);
+        fault_detection.track_issue(nodes[6], IssueType::NetworkKnowledge);
         fault_detection.track_issue(nodes[7], IssueType::RequestOperation);
 
         let nodes_to_retain = nodes[5..10].iter().cloned().collect::<BTreeSet<XorName>>();
@@ -285,7 +313,7 @@ mod tests {
         fault_detection.retain_members_only(nodes_to_retain);
 
         assert_eq!(fault_detection.communication_issues.len(), 1);
-        assert_eq!(fault_detection.knowledge_issues.len(), 1);
+        assert_eq!(fault_detection.network_knowledge_issues.len(), 1);
         assert_eq!(fault_detection.unfulfilled_ops.len(), 1);
 
         Ok(())
@@ -299,7 +327,7 @@ mod tests {
         fault_detection.track_issue(nodes[0], IssueType::Communication);
 
         assert_eq!(fault_detection.communication_issues.len(), 1);
-        assert_eq!(fault_detection.knowledge_issues.len(), 0);
+        assert_eq!(fault_detection.network_knowledge_issues.len(), 0);
         assert_eq!(fault_detection.unfulfilled_ops.len(), 0);
         Ok(())
     }
@@ -309,9 +337,9 @@ mod tests {
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
         let mut fault_detection = FaultDetection::new(nodes.clone());
 
-        fault_detection.track_issue(nodes[0], IssueType::Knowledge);
+        fault_detection.track_issue(nodes[0], IssueType::NetworkKnowledge);
 
-        assert_eq!(fault_detection.knowledge_issues.len(), 1);
+        assert_eq!(fault_detection.network_knowledge_issues.len(), 1);
         assert_eq!(fault_detection.communication_issues.len(), 0);
         assert_eq!(fault_detection.unfulfilled_ops.len(), 0);
         Ok(())
@@ -325,7 +353,7 @@ mod tests {
         fault_detection.track_issue(nodes[0], IssueType::RequestOperation);
 
         assert_eq!(fault_detection.unfulfilled_ops.len(), 1);
-        assert_eq!(fault_detection.knowledge_issues.len(), 0);
+        assert_eq!(fault_detection.network_knowledge_issues.len(), 0);
         assert_eq!(fault_detection.communication_issues.len(), 0);
         Ok(())
     }
