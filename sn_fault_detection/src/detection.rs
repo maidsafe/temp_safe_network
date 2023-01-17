@@ -228,7 +228,9 @@ impl FaultDetection {
         }
 
         let mean = get_mean_of(&scores_only);
-        let std_dev = std_deviation(&scores_only).unwrap_or(0.0);
+
+        // we're working in integers here, lets not have a std dev of less than one as that's not useful
+        let std_dev = std_deviation(&scores_only).unwrap_or(1.0).ceil() as usize;
 
         trace!("avg weighted score across all nodes: {mean:?}");
         trace!("std dev: {std_dev:?}");
@@ -236,7 +238,9 @@ impl FaultDetection {
         // now we store the z-score
         let mut final_scores = BTreeMap::default();
 
-        let threshold = STD_DEVS_AWAY * std_dev as usize;
+        // threshold needs to always be at least 1, and with the std dev always at least one
+        // that should be fine.
+        let threshold = STD_DEVS_AWAY * std_dev;
         debug!(
             "____Threshold is {STD_DEVS_AWAY:?} std devs away, which is {:?}",
             threshold
@@ -249,9 +253,9 @@ impl FaultDetection {
                 score
             };
 
-            let zscore = meaned.saturating_sub(std_dev as usize);
+            let zscore = meaned.saturating_sub(std_dev);
 
-            if zscore > threshold && zscore > 0 {
+            if zscore > threshold {
                 trace!("Initial score for {name:?} is {score:?}");
                 let _existed = final_scores.insert(name, zscore);
                 debug!("Final Z-score for {name} is {zscore:?}");
@@ -715,7 +719,7 @@ mod tests {
                     }
                 }
                 // now we can see what we have...
-                    let faulty_nodes_found = fault_detection.get_faulty_nodes();
+                let faulty_nodes_found = fault_detection.get_faulty_nodes();
 
                 info!("======================");
                 info!("faulty nodes found len {:?}:, expected {:}?", faulty_nodes_found.len(), bad_len );
