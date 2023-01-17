@@ -226,7 +226,7 @@ jobs:
         env:
           RUST_LOG: "sn_client,sn_interface"
         run: cargo test --release --features check-replicas --package sn_client -- --test-threads=1
-        timeout-minutes: 50
+        timeout-minutes: 10
 
       - name: Run example app for file API against local network
         timeout-minutes: 10
