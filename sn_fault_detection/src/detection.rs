@@ -72,7 +72,7 @@ impl FaultDetection {
         let mut elder_voting_scores = BTreeMap::new();
         let mut probe_scores = BTreeMap::new();
 
-        for node in &self.nodes {
+        for node in &self.non_elder_nodes {
             let _ = dkg_scores.insert(
                 *node,
                 self.calculate_node_score_for_type(node, &IssueType::Dkg),
@@ -120,7 +120,7 @@ impl FaultDetection {
 
         debug!("node {node} {issue_type:?} count: {:?}", node_issue_count);
         let mut other_node_counts = Vec::new();
-        for itr in &self.nodes {
+        for itr in &self.non_elder_nodes {
             if itr == node {
                 continue;
             }

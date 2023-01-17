@@ -76,7 +76,7 @@ impl FlowCtrl {
             .members()
             .iter()
             .map(|peer| peer.name())
-            .collect::<Vec<XorName>>();
+            .collect::<BTreeSet<XorName>>();
         let elders = node_context
             .network_knowledge
             .elders()

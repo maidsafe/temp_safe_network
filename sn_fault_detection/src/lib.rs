@@ -76,13 +76,18 @@ pub struct FaultDetection {
     /// The unfulfilled pending request operation issues logged against a node, along with an
     /// operation ID.
     pub unfulfilled_ops: TimedTracker,
-    nodes: Vec<XorName>,
+    /// All non elder nodes to be tracked
+    non_elder_nodes: BTreeSet<XorName>,
+    /// All elders in the section (we distinguish between elders and all other nodes as their roles mean elders may have relatively higher fault levels during normal operation)
     elders: BTreeSet<XorName>,
 }
 
 impl FaultDetection {
     /// Set up a new tracker.
-    pub fn new(nodes: Vec<NodeIdentifier>, elders: BTreeSet<NodeIdentifier>) -> Self {
+    pub fn new(
+        non_elder_nodes: BTreeSet<NodeIdentifier>,
+        elders: BTreeSet<NodeIdentifier>,
+    ) -> Self {
         Self {
             elders,
             communication_issues: BTreeMap::new(),
@@ -91,12 +96,13 @@ impl FaultDetection {
             probe_issues: BTreeMap::new(),
             network_knowledge_issues: BTreeMap::new(),
             unfulfilled_ops: BTreeMap::new(),
-            nodes,
+            non_elder_nodes,
         }
     }
 
     /// Update the nodes that fault detection tracks as elders
     pub fn update_elders(&mut self, elders: BTreeSet<NodeIdentifier>) {
+        info!("Setting elder nodes:{elders:?} in FaultDetection tracker");
         self.elders = elders
     }
 
@@ -188,14 +194,14 @@ impl FaultDetection {
     }
 
     /// List all current tracked nodes
-    pub fn current_nodes(&self) -> &Vec<XorName> {
-        &self.nodes
+    fn current_nodes(&self) -> &BTreeSet<XorName> {
+        &self.non_elder_nodes
     }
 
     /// Add a new node to the tracker and recompute closest nodes.
     pub fn add_new_node(&mut self, node: XorName) {
-        info!("Adding new node:{node} to FaultDetection tracker");
-        self.nodes.push(node);
+        info!("Adding new non-elder node:{node} to FaultDetection tracker");
+        let _prev = self.non_elder_nodes.insert(node);
     }
 
     /// Removes tracked nodes not present in `current_members`.
@@ -209,7 +215,7 @@ impl FaultDetection {
             .copied()
             .collect::<Vec<XorName>>();
 
-        self.nodes.retain(|x| current_members.contains(x));
+        self.non_elder_nodes.retain(|x| current_members.contains(x));
 
         for node in &nodes_being_removed {
             let _ = self.communication_issues.remove(node);
