@@ -34,7 +34,7 @@ use sn_interface::{
 };
 
 use super::DataStorage;
-use std::sync::Arc;
+use std::{collections::BTreeSet, sync::Arc};
 use tokio::sync::{mpsc, RwLock};
 use xor_name::XorName;
 
@@ -71,15 +71,20 @@ impl FlowCtrl {
 
         let node_identifier = node_context.info.name();
 
+        let all_members = node_context
+            .network_knowledge
+            .members()
+            .iter()
+            .map(|peer| peer.name())
+            .collect::<Vec<XorName>>();
+        let elders = node_context
+            .network_knowledge
+            .elders()
+            .iter()
+            .map(|peer| peer.name())
+            .collect::<BTreeSet<XorName>>();
         let fault_channels = {
-            let tracker = FaultDetection::new(
-                node_context
-                    .network_knowledge
-                    .members()
-                    .iter()
-                    .map(|peer| peer.name())
-                    .collect::<Vec<XorName>>(),
-            );
+            let tracker = FaultDetection::new(all_members, elders);
             // start FaultDetection in a new thread
             let faulty_nodes_receiver = Self::start_fault_detection(tracker, fault_cmds_channels.1);
             FaultChannels {

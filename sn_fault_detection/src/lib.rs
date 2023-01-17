@@ -77,12 +77,14 @@ pub struct FaultDetection {
     /// operation ID.
     pub unfulfilled_ops: TimedTracker,
     nodes: Vec<XorName>,
+    elders: BTreeSet<XorName>,
 }
 
 impl FaultDetection {
     /// Set up a new tracker.
-    pub fn new(nodes: Vec<NodeIdentifier>) -> Self {
+    pub fn new(nodes: Vec<NodeIdentifier>, elders: BTreeSet<NodeIdentifier>) -> Self {
         Self {
+            elders,
             communication_issues: BTreeMap::new(),
             dkg_issues: BTreeMap::new(),
             elder_voting_issues: BTreeMap::new(),
@@ -91,6 +93,11 @@ impl FaultDetection {
             unfulfilled_ops: BTreeMap::new(),
             nodes,
         }
+    }
+
+    /// Update the nodes that fault detection tracks as elders
+    pub fn update_elders(&mut self, elders: BTreeSet<NodeIdentifier>) {
+        self.elders = elders
     }
 
     /// Adds an issue to the fault tracker.
