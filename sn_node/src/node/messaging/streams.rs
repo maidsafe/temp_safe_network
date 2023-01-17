@@ -137,7 +137,7 @@ impl MyNode {
         .await
     }
 
-    pub(crate) async fn send_msg_and_await_response(
+    pub(crate) async fn send_msg_await_response_and_send_to_client(
         msg_id: MsgId,
         msg: NodeMsg,
         context: NodeContext,
@@ -290,7 +290,7 @@ fn build_and_send_response_to_client(
             }
         }
         other_msg_sent => {
-            // this shouldn't happen as we don't send other type of msg with Cmd::SendMsgAndAwaitResponse
+            // this shouldn't happen as we don't send other type of msg with Cmd::SendMsgAwaitResponseAndRespondToClient
             error!("Unexpected type of msg sent to holder node/s for {correlation_id:?}: {other_msg_sent:?}");
             return vec![];
         }

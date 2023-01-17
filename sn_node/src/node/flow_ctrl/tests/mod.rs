@@ -895,7 +895,7 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
     .await?;
 
     while let Some(cmd) = cmds.next().await? {
-        if let Cmd::SendMsgAndAwaitResponse {
+        if let Cmd::SendMsgAwaitResponseAndRespondToClient {
             msg: NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data)),
             targets,
             ..

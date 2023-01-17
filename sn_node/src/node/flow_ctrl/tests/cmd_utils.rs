@@ -181,7 +181,7 @@ impl<'a> ProcessAndInspectCmds<'a> {
             if !matches!(
                 cmd,
                 Cmd::SendMsg { .. }
-                    | Cmd::SendMsgAndAwaitResponse { .. }
+                    | Cmd::SendMsgAwaitResponseAndRespondToClient { .. }
                     | Cmd::SendClientResponse { .. }
                     | Cmd::SendNodeDataResponse { .. }
                     | Cmd::SendNodeMsgResponse { .. }
