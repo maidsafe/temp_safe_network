@@ -232,8 +232,7 @@ impl FaultDetection {
 
         let mean = get_mean_of(&scores_only);
 
-        // we're working in integers here, lets not have a std dev of less than one as that's not useful
-        let std_dev = std_deviation(&scores_only).unwrap_or(1.0).ceil();
+        let std_dev = std_deviation(&scores_only).unwrap_or(1.0);
 
         trace!("avg weighted score across all nodes: {mean:?}");
         trace!("std dev: {std_dev:?}");
@@ -312,7 +311,15 @@ impl FaultDetection {
             })
             .collect_vec();
 
-        for (name, _score) in final_non_elder_scores {
+        for name in final_non_elder_scores
+            .iter()
+            .sorted_by(|a, b| Ord::cmp(&b.1, &a.1))
+            .map(|(name, _score)| {
+                info!("FaultDetection: Adding elder {name} as faulty node");
+                *name
+            })
+            .collect_vec()
+        {
             info!("FaultDetection: Adding non-elder {name} as faulty node");
             faulty_nodes.push(name)
         }
@@ -675,7 +682,7 @@ mod tests {
 
         #[test]
         #[allow(clippy::unwrap_used)]
-        /// Test to check if we have normal startup msgs that bad nodes are found, within our expected issue count
+        /// Test to check that when we have normal startup msgs, bad nodes have the expected issue count, and we can reliably detect those nodes.
         /// we then check that we can reliably detect those nodes
         ///
         /// We do not want false positives, We do want -- over longer timeframes -- to find all bad nodes... there's a tough balance to strike here.
@@ -795,7 +802,7 @@ mod tests {
 
                 let _res = Runtime::new().unwrap().block_on(async {
 
-                    // track faults of all_nodes as allare elders in this situation
+                    // track faults of all_nodes as all are elders in this situation
                     let elders = nodes.clone().iter().map(|(name, _)| *name).collect::<BTreeSet<XorName>>();
 
                     let mut fault_detection = FaultDetection::new(BTreeSet::new(), elders.clone());
@@ -856,8 +863,7 @@ mod tests {
         {
             Runtime::new().unwrap().block_on(async {
                 let nodes = (0..node_count).map(|_| random_xorname()).collect::<BTreeSet<XorName>>();
-                // we're not testing elders vs members here
-                let mut fault_detection = FaultDetection::new(nodes.clone(), nodes.clone());
+                let mut fault_detection = FaultDetection::new(nodes.clone(), BTreeSet::new());
                 for node in &nodes {
                     for _ in 0..issue_count {
                         fault_detection.track_issue(
@@ -1018,8 +1024,7 @@ mod knowledge_tests {
             .map(|_| random_xorname())
             .collect::<BTreeSet<XorName>>();
 
-        // we're not testin elders vs ndoes here
-        let mut fault_detection = FaultDetection::new(nodes.clone(), nodes.clone());
+        let mut fault_detection = FaultDetection::new(nodes.clone(), BTreeSet::new());
 
         // Add a new nodes
         let new_node = random_xorname();

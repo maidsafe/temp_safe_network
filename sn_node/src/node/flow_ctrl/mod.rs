@@ -73,7 +73,7 @@ impl FlowCtrl {
 
         let all_members = node_context
             .network_knowledge
-            .members()
+            .adults()
             .iter()
             .map(|peer| peer.name())
             .collect::<BTreeSet<XorName>>();

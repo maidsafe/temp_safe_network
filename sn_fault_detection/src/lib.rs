@@ -78,7 +78,8 @@ pub struct FaultDetection {
     pub unfulfilled_ops: TimedTracker,
     /// All non elder nodes to be tracked
     non_elder_nodes: BTreeSet<XorName>,
-    /// All elders in the section (we distinguish between elders and all other nodes as their roles mean elders may have relatively higher fault levels during normal operation)
+    /// All elders in the section (we distinguish between elders and all other nodes as their roles mean
+    /// elders may have relatively higher fault levels during normal operation)
     elders: BTreeSet<XorName>,
 }
 
@@ -100,7 +101,7 @@ impl FaultDetection {
         }
     }
 
-    /// Update the nodes that fault detection tracks as elders
+    /// Set to track provided elders
     pub fn update_elders(&mut self, elders: BTreeSet<NodeIdentifier>) {
         info!("Setting elder nodes:{elders:?} in FaultDetection tracker");
         self.elders = elders
