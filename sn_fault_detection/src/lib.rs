@@ -89,6 +89,7 @@ impl FaultDetection {
         non_elder_nodes: BTreeSet<NodeIdentifier>,
         elders: BTreeSet<NodeIdentifier>,
     ) -> Self {
+        debug!("Starting faults with elders: {elders:?}, non_elder_nodes: {non_elder_nodes:?}");
         Self {
             elders,
             communication_issues: BTreeMap::new(),

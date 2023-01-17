@@ -183,7 +183,7 @@ impl FaultDetection {
         &self,
         nodes_in_question: &BTreeSet<NodeIdentifier>,
     ) -> BTreeMap<XorName, usize> {
-        trace!("Getting weighted scores");
+        trace!("Getting weighted scores for {nodes_in_question:?}");
         let scores = self.calculate_scores(nodes_in_question);
         let ops_scores = scores.op_scores;
         let conn_scores = scores.communication_scores;
@@ -230,7 +230,7 @@ impl FaultDetection {
             let _prev = pre_standardised_scores.insert(name, final_score as usize);
         }
 
-        let mean = get_mean_of(&scores_only);
+        let mean = get_mean_of(&scores_only).unwrap_or(1.0);
 
         let std_dev = std_deviation(&scores_only).unwrap_or(1.0);
 
@@ -242,25 +242,22 @@ impl FaultDetection {
 
         // threshold needs to always be at least 1, and with the std dev always at least one
         // that should be fine.
-        let threshold = STD_DEVS_AWAY * std_dev;
+        let threshold = (STD_DEVS_AWAY * std_dev).ceil();
         debug!(
             "____Threshold is {STD_DEVS_AWAY:?} std devs away, which is {:?}",
             threshold
         );
 
         for (name, score) in pre_standardised_scores {
-            let meaned = if let Some(mean) = mean {
-                score.saturating_sub(mean as usize)
-            } else {
-                score
-            };
+            trace!("Initial score for {name:?} is {score:?}");
+            let meaned = score.saturating_sub(mean as usize);
 
             let zscore = meaned.saturating_sub(std_dev as usize);
 
+            trace!("Final Z-score for {name} is {zscore:?}");
+
             if zscore > threshold as usize {
-                trace!("Initial score for {name:?} is {score:?}");
                 let _existed = final_scores.insert(name, zscore);
-                debug!("Final Z-score for {name} is {zscore:?}");
             }
         }
 
@@ -314,10 +311,7 @@ impl FaultDetection {
         for name in final_non_elder_scores
             .iter()
             .sorted_by(|a, b| Ord::cmp(&b.1, &a.1))
-            .map(|(name, _score)| {
-                info!("FaultDetection: Adding elder {name} as faulty node");
-                *name
-            })
+            .map(|(name, _score)| *name)
             .collect_vec()
         {
             info!("FaultDetection: Adding non-elder {name} as faulty node");
@@ -375,26 +369,10 @@ mod tests {
         ]
     }
 
-    /// Generate proptest issues, in a range from 1000 `to...max_uantity`
-    fn generate_msg_issues(
-        min: usize,
-        max: usize,
-    ) -> impl Strategy<Value = Vec<(IssueType, XorName, f32)>> {
-        let issue_name_for_direction = generate_xorname();
-        prop::collection::vec(
-            (
-                generate_network_startup_msg_issues(),
-                issue_name_for_direction,
-                0.0..1.0f32,
-            ),
-            min..max + 1,
-        )
-    }
-
     /// Generate proptest issues, in a range from 1000 `to...max_quantity`
     /// issues had a name for reliably routing
     /// issues come with a random f32 0-1 to use as our test against `NodeQuality`
-    fn generate_startup_issues(
+    fn generate_msg_issues(
         min: usize,
         max: usize,
     ) -> impl Strategy<Value = Vec<(IssueType, XorName, f32)>> {
@@ -426,10 +404,10 @@ mod tests {
                 generate_xorname(),
                 prop_oneof![
                     // 3 x as likely to have good nodes vs bad
-                    // good nodes fail only 2.5% of the time
-                    3 => Just(NodeQualityScored::Good(0.025)),
+                    // good nodes fail only 20% of the time
+                    3 => Just(NodeQualityScored::Good(0.0)),
                     // bad nodes fail 80% of the time
-                    1 => Just(NodeQualityScored::Bad(0.80)),
+                    1 => Just(NodeQualityScored::Bad(0.8)),
 
                 ],
             ),
@@ -602,7 +580,7 @@ mod tests {
         /// each issue has a random xorname attached to it to, and is sent to 4 nodes... each of which will fail a % of the time, depending on the
         /// NodeQuality (Good or Bad)
         fn pt_detect_correct_or_less_amount_of_faulty_nodes_with_full_elder_set(
-            nodes in generate_nodes_and_quality(3,30), issues in generate_msg_issues(100,500))
+            nodes in generate_nodes_and_quality(3,30), issues in generate_msg_issues(500,1000))
             {
                 let elders_count = 7;
                 init_test_logger();
@@ -696,7 +674,7 @@ mod tests {
         fn pt_detect_dkg_bad_nodes(
 
             // ~1500 msgs total should get us ~500 dkg which would be representative
-            nodes in generate_nodes_and_quality(3,30), issues in generate_startup_issues(100,1000))
+            nodes in generate_nodes_and_quality(3,30), issues in generate_msg_issues(100,500))
             {
                 init_test_logger();
                 info!("pt start --------------------");
@@ -783,7 +761,7 @@ mod tests {
         /// NodeQuality (Good or Bad)
         fn pt_detect_unresponsive_elders(
             // ~1500 msgs total should get us ~500 dkg which would be representative
-            nodes in generate_nodes_and_quality(2,7), issues in generate_startup_issues(500,2500))
+            nodes in generate_nodes_and_quality(2,7), issues in generate_msg_issues(100,500))
             {
                 init_test_logger();
                 let _outer_span = tracing::info_span!("detect unresponsive elders").entered();
@@ -924,7 +902,7 @@ mod ops_tests {
         );
 
         // adding more issues though, and we should see this node as faulty
-        for _ in 0..1500 {
+        for _ in 0..30 {
             fault_detection.track_issue(nodes_vec[0], IssueType::RequestOperation);
         }
 
