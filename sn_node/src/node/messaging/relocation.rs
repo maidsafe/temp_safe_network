@@ -10,7 +10,7 @@ use crate::node::{
     bootstrap::JoiningAsRelocated,
     flow_ctrl::cmds::Cmd,
     relocation::{find_nodes_to_relocate, ChurnId},
-    MyNode, Result, SectionStateVote,
+    MyNode, Result,
 };
 
 use sn_interface::{
@@ -56,9 +56,8 @@ impl MyNode {
                 relocate_details.dst,
             );
 
-            cmds.extend(self.propose_section_state(SectionStateVote::NodeIsOffline(
-                node_state.relocate(relocate_details),
-            ))?);
+            let relocated_node_state = node_state.relocate(relocate_details);
+            cmds.extend(self.propose_membership_change(relocated_node_state));
         }
 
         Ok(cmds)
