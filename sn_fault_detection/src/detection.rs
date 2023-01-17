@@ -6,17 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{get_mean_of, std_deviation, FaultDetection};
+use crate::{get_mean_of, std_deviation, FaultDetection, NodeIdentifier};
 
 use itertools::Itertools;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
 use std::time::Duration;
 static RECENT_ISSUE_DURATION: Duration = Duration::from_secs(60 * 10); // 10 minutes
 
 /// How many standard devs before we consider a node faulty
-static STD_DEVS_AWAY: usize = 1;
+static STD_DEVS_AWAY: f32 = 1.5;
 
 static CONN_WEIGHTING: f32 = 5.0;
 static OP_WEIGHTING: f32 = 1.0;
@@ -64,7 +64,7 @@ impl FaultDetection {
     ///
     /// These scores can then be used to highlight nodes that have a higher score than some
     /// particular ratio.
-    pub fn calculate_scores(&self) -> ScoreResults {
+    pub fn calculate_scores(&self, nodes_in_question: &BTreeSet<NodeIdentifier>) -> ScoreResults {
         let mut communication_scores = BTreeMap::new();
         let mut knowledge_scores = BTreeMap::new();
         let mut op_scores = BTreeMap::new();
@@ -72,7 +72,7 @@ impl FaultDetection {
         let mut elder_voting_scores = BTreeMap::new();
         let mut probe_scores = BTreeMap::new();
 
-        for node in &self.non_elder_nodes {
+        for node in nodes_in_question {
             let _ = dkg_scores.insert(
                 *node,
                 self.calculate_node_score_for_type(node, &IssueType::Dkg),
@@ -179,9 +179,12 @@ impl FaultDetection {
     }
 
     /// get scores mapped by name, to score and z-score, which is std dev's from the mean
-    fn get_weighted_scores(&self) -> BTreeMap<XorName, usize> {
+    fn get_weighted_scores(
+        &self,
+        nodes_in_question: &BTreeSet<NodeIdentifier>,
+    ) -> BTreeMap<XorName, usize> {
         trace!("Getting weighted scores");
-        let scores = self.calculate_scores();
+        let scores = self.calculate_scores(nodes_in_question);
         let ops_scores = scores.op_scores;
         let conn_scores = scores.communication_scores;
         let dkg_scores = scores.dkg_scores;
@@ -230,7 +233,7 @@ impl FaultDetection {
         let mean = get_mean_of(&scores_only);
 
         // we're working in integers here, lets not have a std dev of less than one as that's not useful
-        let std_dev = std_deviation(&scores_only).unwrap_or(1.0).ceil() as usize;
+        let std_dev = std_deviation(&scores_only).unwrap_or(1.0).ceil();
 
         trace!("avg weighted score across all nodes: {mean:?}");
         trace!("std dev: {std_dev:?}");
@@ -253,9 +256,9 @@ impl FaultDetection {
                 score
             };
 
-            let zscore = meaned.saturating_sub(std_dev);
+            let zscore = meaned.saturating_sub(std_dev as usize);
 
-            if zscore > threshold {
+            if zscore > threshold as usize {
                 trace!("Initial score for {name:?} is {score:?}");
                 let _existed = final_scores.insert(name, zscore);
                 debug!("Final Z-score for {name} is {zscore:?}");
@@ -289,20 +292,30 @@ impl FaultDetection {
     /// Get a list of nodes that are faulty
     /// (the nodes must all `ProposeOffline` over a faulty node and then _immediately_ vote it off. So any other membershipn changes in flight could block this.
     /// thus, we need to be callling this function often until nodes are removed.)
+    ///
+    /// The vec is ordered from fauliest to least faulty (returning faulty elders first)
     pub fn get_faulty_nodes(&mut self) -> Vec<XorName> {
         self.cleanup_time_sensistive_checks();
 
-        let final_scores = self.get_weighted_scores();
+        info!("Non-elder fault calculations...");
+        let final_non_elder_scores = self.get_weighted_scores(&self.non_elder_nodes);
+        info!("Elder fault calculations...");
+        let final_elder_scores = self.get_weighted_scores(&self.elders);
 
         // sort into vec of highest scores first
-        let faulty_nodes = final_scores
+        let mut faulty_nodes = final_elder_scores
             .iter()
             .sorted_by(|a, b| Ord::cmp(&b.1, &a.1))
             .map(|(name, _score)| {
-                info!("FaultDetection: Adding {name} as faulty node");
+                info!("FaultDetection: Adding elder {name} as faulty node");
                 *name
             })
             .collect_vec();
+
+        for (name, _score) in final_non_elder_scores {
+            info!("FaultDetection: Adding non-elder {name} as faulty node");
+            faulty_nodes.push(name)
+        }
 
         faulty_nodes
     }
@@ -316,6 +329,7 @@ mod tests {
 
     use eyre::bail;
     use proptest::prelude::*;
+    use std::collections::BTreeSet;
     use tokio::runtime::Runtime;
     use xor_name::{rand::random as random_xorname, XorName};
 
@@ -448,17 +462,15 @@ mod tests {
     fn get_nodes_suffering_issue(
         issue: IssueType,
         issue_location: XorName,
-        root: XorName,
         nodes: &[(XorName, NodeQualityScored)],
-        elders_count: usize,
+        elders: &BTreeSet<XorName>,
     ) -> Vec<(XorName, NodeQualityScored)> {
         if matches!(issue, IssueType::Dkg)
             || matches!(issue, IssueType::AeProbeMsg) | matches!(issue, IssueType::ElderVoting)
         {
             nodes
                 .iter()
-                .sorted_by(|lhs, rhs| root.clone().cmp_distance(&lhs.0, &rhs.0))
-                .take(elders_count)
+                .filter(|(e, _q)| elders.contains(e))
                 .cloned()
                 .collect::<Vec<_>>()
         } else {
@@ -481,15 +493,17 @@ mod tests {
             node_count in 4..50usize, issue_type in generate_network_startup_msg_issues())
         {
             Runtime::new().unwrap().block_on(async {
-                let nodes = (0..node_count).map(|_| random_xorname()).collect::<Vec<XorName>>();
-                let mut fault_detection = FaultDetection::new(nodes.clone());
+                let nodes = (0..node_count).map(|_| random_xorname()).collect::<BTreeSet<XorName>>();
+                let nodes_vec = nodes.iter().cloned().collect::<Vec<XorName>>();
+
+                let mut fault_detection = FaultDetection::new(nodes.clone(), BTreeSet::new());
                 for _ in 0..5 {
                     fault_detection.track_issue(
-                        nodes[0], issue_type.clone());
+                        nodes_vec[0], issue_type.clone());
                 }
 
                 let score_results = fault_detection
-                    .calculate_scores();
+                    .calculate_scores(&nodes);
                 match issue_type {
                     IssueType::Dkg => {
                         assert_eq!(score_results.dkg_scores.len(), node_count);
@@ -524,17 +538,17 @@ mod tests {
 
             Runtime::new().unwrap().block_on(async {
 
-                let nodes = (0..node_count).map(|_| random_xorname()).collect::<Vec<XorName>>();
-                let mut fault_detection = FaultDetection::new(nodes.clone());
-
+                let nodes = (0..node_count).map(|_| random_xorname()).collect::<BTreeSet<XorName>>();
+                let mut fault_detection = FaultDetection::new(nodes.clone(), BTreeSet::new());
+                let nodes_vec = nodes.iter().cloned().collect::<Vec<XorName>>();
                 // one node keeps getting the issues applied to it
                 for _ in 0..issue_count {
                     fault_detection.track_issue(
-                        nodes[0], issue_type.clone());
+                        nodes_vec[0], issue_type.clone());
                 }
 
                 let score_results = fault_detection
-                    .calculate_scores();
+                    .calculate_scores(&nodes);
 
                     let scores = match issue_type {
                     IssueType::Dkg => {
@@ -558,8 +572,8 @@ mod tests {
                 };
 
 
-                debug!("Actual node score: {:?}", scores.get(&nodes[0]).unwrap());
-                assert!(*scores.get(&nodes[0]).unwrap() > 0 as f32);
+                debug!("Actual node score: {:?}", scores.get(&nodes_vec[0]).unwrap());
+                assert!(*scores.get(&nodes_vec[0]).unwrap() > 0 as f32);
                 for node in nodes.iter().take(node_count).skip(1) {
                     assert_eq!(*scores.get(node).unwrap(), 0.0);
                 }
@@ -583,7 +597,7 @@ mod tests {
         fn pt_detect_correct_or_less_amount_of_faulty_nodes_with_full_elder_set(
             nodes in generate_nodes_and_quality(3,30), issues in generate_msg_issues(100,500))
             {
-                let elders_in_dkg = 7;
+                let elders_count = 7;
                 init_test_logger();
                 let _outer_span = tracing::info_span!("pt_correct_less").entered();
 
@@ -600,19 +614,19 @@ mod tests {
                 debug!("Good {good_len}");
                 debug!("Bad {bad_len}");
 
-                // random xorname to pick 7 nodes as "elders" for DKG
-                let random_xorname_root = nodes[0].0;
-
-
                 let _res = Runtime::new().unwrap().block_on(async {
-                    // track faults of all_nodes
-                    let all_node_names = nodes.clone().iter().map(|(name, _)| *name).collect::<Vec<XorName>>();
 
-                    let mut fault_detection = FaultDetection::new(all_node_names);
+                    // add fault detection of our all_nodes
+                    let elders = nodes.clone().iter().take(elders_count).map(|(name, _)| *name).collect::<BTreeSet<XorName>>();
+
+                    let all_non_elder_nodes = nodes.clone().iter().filter(|(e, _)| !elders.contains(e)).map(|(name, _)| *name).collect::<BTreeSet<XorName>>();
+
+
+                    let mut fault_detection = FaultDetection::new(all_non_elder_nodes, elders.clone());
 
                     // Now we loop through each issue/msg
                     for (issue, issue_location, fail_test ) in issues {
-                        let target_nodes = get_nodes_suffering_issue(issue.clone(), issue_location, random_xorname_root, &nodes, elders_in_dkg);
+                        let target_nodes = get_nodes_suffering_issue(issue.clone(), issue_location, &nodes, &elders);
 
                         // now we track our issue, but only if that node fails to passes muster...
                         for (node, quality) in target_nodes {
@@ -661,7 +675,7 @@ mod tests {
 
         #[test]
         #[allow(clippy::unwrap_used)]
-        /// Test to check if we have more DKG messages, that bad nodes are found, within our expected issue count
+        /// Test to check if we have normal startup msgs that bad nodes are found, within our expected issue count
         /// we then check that we can reliably detect those nodes
         ///
         /// We do not want false positives, We do want -- over longer timeframes -- to find all bad nodes... there's a tough balance to strike here.
@@ -673,15 +687,17 @@ mod tests {
         /// each issue has a random xorname attached to it to, and is sent to 4 nodes... each of which will fail a % of the time, depending on the
         /// NodeQuality (Good or Bad)
         fn pt_detect_dkg_bad_nodes(
+
             // ~1500 msgs total should get us ~500 dkg which would be representative
             nodes in generate_nodes_and_quality(3,30), issues in generate_startup_issues(100,1000))
             {
                 init_test_logger();
-                let elders_in_dkg = 7;
+                info!("pt start --------------------");
+                init_test_logger();
+                let elders_count = 7;
                 let _outer_span = tracing::info_span!("pt_dkg").entered();
                 let mut good_len = 0;
                 let mut bad_len = 0;
-                let random_xorname_root = nodes[0].0;
 
                 for (_, quality) in &nodes {
                     match quality {
@@ -695,14 +711,17 @@ mod tests {
 
                 let _res = Runtime::new().unwrap().block_on(async {
                 // add fault detection of our all_nodes
-                let all_node_names = nodes.clone().iter().map(|(name, _)| *name).collect::<Vec<XorName>>();
+                let elders = nodes.clone().iter().take(elders_count).map(|(name, _)| *name).collect::<BTreeSet<XorName>>();
 
-                let mut fault_detection = FaultDetection::new(all_node_names);
+                let all_non_elder_nodes = nodes.clone().iter().filter(|(e, _)| !elders.contains(e)).map(|(name, _)| *name).collect::<BTreeSet<XorName>>();
+
+
+                let mut fault_detection = FaultDetection::new(all_non_elder_nodes, elders.clone());
 
                 // Now we loop through each issue/msg
                 for (issue, issue_location, fail_test ) in issues {
 
-                    let target_nodes = get_nodes_suffering_issue(issue.clone(), issue_location, random_xorname_root, &nodes, elders_in_dkg);
+                    let target_nodes = get_nodes_suffering_issue(issue.clone(), issue_location, &nodes, &elders);
 
                     // we send each message to all nodes in this situation where we're looking at elder comms alone over dkg
                     // now we track our issue, but only if that node fails to passes muster...
@@ -763,7 +782,6 @@ mod tests {
                 let _outer_span = tracing::info_span!("detect unresponsive elders").entered();
                 let mut good_len = 0;
                 let mut bad_len = 0;
-                let random_xorname_root = nodes[0].0;
 
                 for (_, quality) in &nodes {
                     match quality {
@@ -776,15 +794,16 @@ mod tests {
                 debug!("Bad {bad_len}");
 
                 let _res = Runtime::new().unwrap().block_on(async {
-                    // track faults of all_nodes
-                    let all_node_names = nodes.clone().iter().map(|(name, _)| *name).collect::<Vec<XorName>>();
 
-                    let mut fault_detection = FaultDetection::new(all_node_names);
+                    // track faults of all_nodes as allare elders in this situation
+                    let elders = nodes.clone().iter().map(|(name, _)| *name).collect::<BTreeSet<XorName>>();
+
+                    let mut fault_detection = FaultDetection::new(BTreeSet::new(), elders.clone());
 
                     // Now we loop through each issue/msg
                     for (issue, issue_location, fail_test ) in issues {
                         // this will be all ndoes in this test as we have up to 7 elders
-                        let target_nodes = get_nodes_suffering_issue(issue.clone(), issue_location, random_xorname_root, &nodes, nodes.len());
+                        let target_nodes = get_nodes_suffering_issue(issue.clone(), issue_location, &nodes, &elders);
 
                         // we send each message to all nodes in this situation where we're looking at elder comms alone over dkg
                         // now we track our issue, but only if that node fails to passes muster...
@@ -836,8 +855,9 @@ mod tests {
             node_count in 4..50, issue_count in 0..50, issue_type in generate_network_startup_msg_issues())
         {
             Runtime::new().unwrap().block_on(async {
-                let nodes = (0..node_count).map(|_| random_xorname()).collect::<Vec<XorName>>();
-                let mut fault_detection = FaultDetection::new(nodes.clone());
+                let nodes = (0..node_count).map(|_| random_xorname()).collect::<BTreeSet<XorName>>();
+                // we're not testing elders vs members here
+                let mut fault_detection = FaultDetection::new(nodes.clone(), nodes.clone());
                 for node in &nodes {
                     for _ in 0..issue_count {
                         fault_detection.track_issue(
@@ -846,7 +866,7 @@ mod tests {
                 }
 
                 let score_results = fault_detection
-                    .calculate_scores();
+                    .calculate_scores(&nodes);
                 let scores = match issue_type {
                     IssueType::Communication => {
                         score_results.communication_scores
@@ -878,13 +898,17 @@ mod tests {
 #[cfg(test)]
 mod ops_tests {
     use crate::{tests::init_test_logger, FaultDetection, IssueType};
+    use std::collections::BTreeSet;
     use xor_name::{rand::random as random_xorname, XorName};
 
     #[tokio::test]
     async fn unfulfilled_ops_leads_to_node_classified_as_faulty() {
         init_test_logger();
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut fault_detection = FaultDetection::new(nodes.clone());
+        let nodes = (0..10)
+            .map(|_| random_xorname())
+            .collect::<BTreeSet<XorName>>();
+        let mut fault_detection = FaultDetection::new(nodes.clone(), BTreeSet::new());
+        let nodes_vec = nodes.iter().cloned().collect::<Vec<XorName>>();
 
         // as this is normal, we should not detect anything off
         assert_eq!(
@@ -894,8 +918,8 @@ mod ops_tests {
         );
 
         // adding more issues though, and we should see this node as faulty
-        for _ in 0..30 {
-            fault_detection.track_issue(nodes[0], IssueType::RequestOperation);
+        for _ in 0..1500 {
+            fault_detection.track_issue(nodes_vec[0], IssueType::RequestOperation);
         }
 
         // Now we should start detecting...
@@ -912,6 +936,7 @@ mod comm_tests {
     use crate::{FaultDetection, IssueType};
 
     use eyre::Error;
+    use std::collections::BTreeSet;
     use xor_name::{rand::random as random_xorname, XorName};
 
     type Result<T, E = Error> = std::result::Result<T, E>;
@@ -922,9 +947,11 @@ mod comm_tests {
 
     #[tokio::test]
     async fn conn_fault_is_tolerant_of_norms() -> Result<()> {
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let nodes = (0..10)
+            .map(|_| random_xorname())
+            .collect::<BTreeSet<XorName>>();
 
-        let mut fault_detection = FaultDetection::new(nodes.clone());
+        let mut fault_detection = FaultDetection::new(nodes.clone(), nodes.clone());
 
         for node in &nodes {
             for _ in 0..NORMAL_CONNECTION_PROBLEM_COUNT {
@@ -948,6 +975,7 @@ mod knowledge_tests {
     use crate::{FaultDetection, IssueType};
 
     use eyre::Error;
+    use std::collections::BTreeSet;
     use xor_name::{rand::random as random_xorname, XorName};
 
     type Result<T, E = Error> = std::result::Result<T, E>;
@@ -958,9 +986,11 @@ mod knowledge_tests {
 
     #[tokio::test]
     async fn knowledge_fault_is_tolerant_of_norms() -> Result<()> {
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let nodes = (0..10)
+            .map(|_| random_xorname())
+            .collect::<BTreeSet<XorName>>();
 
-        let mut fault_detection = FaultDetection::new(nodes.clone());
+        let mut fault_detection = FaultDetection::new(nodes.clone(), nodes.clone());
 
         // Write data NORMAL_KNOWLEDGE_ISSUES times to the 10 nodes
         for node in &nodes {
@@ -984,9 +1014,12 @@ mod knowledge_tests {
     async fn knowledge_fault_is_not_too_sharp() -> Result<()> {
         init_test_logger();
 
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let nodes = (0..10)
+            .map(|_| random_xorname())
+            .collect::<BTreeSet<XorName>>();
 
-        let mut fault_detection = FaultDetection::new(nodes.clone());
+        // we're not testin elders vs ndoes here
+        let mut fault_detection = FaultDetection::new(nodes.clone(), nodes.clone());
 
         // Add a new nodes
         let new_node = random_xorname();

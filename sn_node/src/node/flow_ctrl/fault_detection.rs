@@ -21,7 +21,7 @@ pub(crate) struct FaultChannels {
 /// Set of cmds to interact with the `FaultDetection` module
 pub(crate) enum FaultsCmd {
     AddNode(XorName),
-    RetainNodes(BTreeSet<XorName>),
+    UpdateNodes(BTreeSet<XorName>, BTreeSet<XorName>),
     TrackIssue(XorName, IssueType),
     UntrackIssue(XorName, IssueType),
     GetFaultyNodes,
@@ -39,7 +39,9 @@ impl FlowCtrl {
             while let Some(cmd) = fault_cmds_from_node.recv().await {
                 match cmd {
                     FaultsCmd::AddNode(node) => tracker.add_new_node(node),
-                    FaultsCmd::RetainNodes(nodes) => tracker.retain_members_only(nodes),
+                    FaultsCmd::UpdateNodes(adults, elders) => {
+                        tracker.update_and_only_retain_members(adults, elders)
+                    }
                     FaultsCmd::TrackIssue(node, issue) => tracker.track_issue(node, issue),
                     FaultsCmd::UntrackIssue(node, issue) => {
                         debug!("Attempting to remove {issue:?} from {node:?}");
