@@ -28,7 +28,10 @@ use sn_interface::{
     dbcs::gen_genesis_dbc,
     elder_count, init_logger,
     messaging::{
-        data::{ClientMsg, DataCmd, SpentbookCmd},
+        data::{
+            ClientDataResponse, ClientMsg, CmdResponse, DataCmd, Error as MessagingDataError,
+            SpentbookCmd,
+        },
         system::{AntiEntropyKind, JoinAsRelocatedRequest, NodeDataCmd, NodeMsg},
         Dst, MsgType, WireMsg,
     },
@@ -38,7 +41,7 @@ use sn_interface::{
         SectionsDAG, MIN_ADULT_AGE,
     },
     test_utils::*,
-    types::{keys::ed25519, PublicKey, ReplicatedData},
+    types::{keys::ed25519, PublicKey},
 };
 
 use assert_matches::assert_matches;
@@ -176,7 +179,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     // Handle agreement on Online of a peer that is older than the youngest
     // current elder - that means this peer is going to be promoted.
     let new_peer = gen_peer(MIN_ADULT_AGE + 1);
-    let node_state = NodeState::joined(new_peer, Some(xor_name::rand::random()));
+    let node_state = NodeState::joined(new_peer, None);
 
     let membership_decision = section_decision(&sk_set, node_state.clone());
 
@@ -862,24 +865,23 @@ async fn handle_demote_during_split() -> Result<()> {
 }
 
 #[tokio::test]
-#[ignore = "This needs to be refactored away from Cmd handling, as we need/use a client response stream therein"]
 async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack() -> Result<()> {
     init_logger();
     let prefix = Prefix::default();
     let replication_count = 5;
     std::env::set_var("SN_DATA_COPY_COUNT", replication_count.to_string());
 
-    let env = TestNetworkBuilder::new(thread_rng())
+    let mut env = TestNetworkBuilder::new(thread_rng())
         .sap(prefix, elder_count(), 6, None, Some(0))
         .build();
     let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
-    let peer = dispatcher.node().read().await.info().peer();
     let sk_set = env.get_secret_key_set(prefix, None);
 
     let (key_image, tx, spent_proofs, spent_transactions) =
         dbc_utils::get_genesis_dbc_spend_info(&sk_set)?;
 
-    let mut cmds = ProcessAndInspectCmds::new_with_client_msg(
+    let comm_rx = env.take_comm_rx(dispatcher.node().read().await.info().public_key());
+    let mut cmds = ProcessAndInspectCmds::new_from_client_msg(
         ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
             key_image,
             tx: tx.clone(),
@@ -887,43 +889,45 @@ async fn spentbook_spend_client_message_should_replicate_to_adults_and_send_ack(
             spent_transactions,
             network_knowledge: None,
         })),
-        peer,
         &dispatcher,
-    )?;
+        comm_rx,
+    )
+    .await?;
 
-    let replicate_cmd = cmds.next().await?.expect("Recplicate cmd not found");
-    let recipients = replicate_cmd.recipients()?;
-    assert_eq!(recipients.len(), replication_count);
+    while let Some(cmd) = cmds.next().await? {
+        if let Cmd::SendMsgAndAwaitResponse {
+            msg: NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data)),
+            targets,
+            ..
+        } = cmd
+        {
+            assert_eq!(targets.len(), replication_count);
+            let spent_proof_share =
+                dbc_utils::get_spent_proof_share_from_replicated_data(data.clone())?;
+            assert_eq!(key_image.to_hex(), spent_proof_share.key_image().to_hex());
+            assert_eq!(Hash::from(tx.hash()), spent_proof_share.transaction_hash());
+            assert_eq!(
+                sk_set.public_keys().public_key().to_hex(),
+                spent_proof_share.spentbook_pks().public_key().to_hex()
+            );
+            return Ok(());
+        }
+    }
 
-    let replicated_data = replicate_cmd.get_replicated_data()?;
-    assert_matches!(replicated_data, ReplicatedData::SpentbookWrite(_));
-
-    let spent_proof_share = dbc_utils::get_spent_proof_share_from_replicated_data(replicated_data)?;
-    assert_eq!(key_image.to_hex(), spent_proof_share.key_image().to_hex());
-    assert_eq!(Hash::from(tx.hash()), spent_proof_share.transaction_hash());
-    assert_eq!(
-        sk_set.public_keys().public_key().to_hex(),
-        spent_proof_share.spentbook_pks().public_key().to_hex()
-    );
-
-    // let client_msg = cmds[1].clone().get_client_msg()?;
-    // assert_matches!(client_msg, ClientMsg::CmdResponse { response, .. } => response.is_success());
-    Ok(())
+    bail!("No cmd msg was generate to replicate the data to node holders");
 }
 
 #[tokio::test]
-#[ignore = "This needs to be refactored away from Cmd handling, as we need/use a client response stream therein"]
 async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_error() -> Result<()> {
     init_logger();
     let prefix = prefix("1");
     let replication_count = 5;
     std::env::set_var("SN_DATA_COPY_COUNT", replication_count.to_string());
 
-    let env = TestNetworkBuilder::new(thread_rng())
+    let mut env = TestNetworkBuilder::new(thread_rng())
         .sap(prefix, elder_count(), 6, None, Some(0))
         .build();
     let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
-    let peer = dispatcher.node().read().await.info().peer();
     let section = env.get_network_knowledge(prefix, None);
     let sk_set = env.get_secret_key_set(prefix, None);
 
@@ -941,7 +945,8 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
     let new_dbc2_sk = bls::SecretKey::random();
     let new_dbc2 = dbc_utils::reissue_invalid_dbc_with_no_inputs(&new_dbc, 5, &new_dbc2_sk)?;
 
-    let mut _cmds = ProcessAndInspectCmds::new_with_client_msg(
+    let comm_rx = env.take_comm_rx(dispatcher.node().read().await.info().public_key());
+    let mut cmds = ProcessAndInspectCmds::new_from_client_msg(
         ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
             key_image: new_dbc2_sk.public_key(),
             tx: new_dbc2.transaction,
@@ -949,38 +954,31 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
             spent_transactions: new_dbc.spent_transactions,
             network_knowledge: None,
         })),
-        peer,
         &dispatcher,
-    )?;
+        comm_rx,
+    )
+    .await?;
 
-    // while let Some(cmd) = cmds.next().await? {
-    //     match cmd {
-    //         Cmd::SendMsg {
-    //             msg:
-    //                 OutgoingMsg::Client(ClientMsg::CmdResponse {
-    //                     response: CmdResponse::SpendKey(result),
-    //                     ..
-    //                 }),
-    //             ..
-    //         } => {
-    //             if let Some(error) = result.err() {
-    //                 assert_eq!(
-    //                     error.to_string(),
-    //                     MessagingDataError::from(Error::SpentbookError(
-    //                         "The DBC transaction must have at least one input".to_string()
-    //                     ))
-    //                     .to_string(),
-    //                     "A different error was expected for this case: {:?}",
-    //                     error
-    //                 );
-    //                 return Ok(());
-    //             } else {
-    //                 bail!("We expected an error to be returned");
-    //             }
-    //         }
-    //         _ => continue,
-    //     }
-    // }
+    while let Some(cmd) = cmds.next().await? {
+        if let Cmd::SendClientResponse {
+            msg:
+                ClientDataResponse::CmdResponse {
+                    response: CmdResponse::SpendKey(Err(error)),
+                    ..
+                },
+            ..
+        } = cmd
+        {
+            assert_eq!(
+                error,
+                &MessagingDataError::from(Error::SpentbookError(
+                    "The DBC transaction must have at least one input".to_string()
+                )),
+                "A different error was expected for this case: {error:?}"
+            );
+            return Ok(());
+        }
+    }
 
     bail!("We expected an error to be returned");
 }
@@ -989,21 +987,26 @@ async fn spentbook_spend_transaction_with_no_inputs_should_return_spentbook_erro
 /// with the spend request, but I don't know exactly what the conditions are for getting the
 /// network knowledge to update correctly.
 #[tokio::test]
-#[ignore = "Needs to be refactored to take into account that ClientMsgs require a stream (or to avoid this)"]
 async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node() -> Result<()> {
     init_logger();
     let replication_count = 5;
     let prefix1 = prefix("1");
     std::env::set_var("SN_DATA_COPY_COUNT", replication_count.to_string());
 
-    let env = TestNetworkBuilder::new(thread_rng())
-        .sap(prefix("0"), elder_count(), 6, None, Some(0))
-        .sap(prefix1, elder_count(), 6, None, Some(0))
+    let mut env = TestNetworkBuilder::new(thread_rng())
+        .sap(Prefix::default(), elder_count(), 0, None, Some(0))
+        .sap(prefix("0"), elder_count(), 0, None, Some(0))
+        .sap(prefix1, elder_count(), 0, None, Some(0))
         .build();
+
     let dispatcher = env.get_dispatchers(Prefix::default(), 1, 0, None).remove(0);
     let info = dispatcher.node().read().await.info();
     let genesis_sk_set = env.get_secret_key_set(Prefix::default(), None);
-    let other_section_key_share = env.get_section_key_share(prefix1, info.public_key(), None);
+
+    let other_dispatcher = env.get_dispatchers(prefix1, 1, 0, None).remove(0);
+    let other_node_info = other_dispatcher.node().read().await.info();
+    let other_section_key_share =
+        env.get_section_key_share(prefix1, other_node_info.public_key(), None);
     let other_section = env.get_network_knowledge(prefix1, None);
     let other_section_key = env.get_secret_key_set(prefix1, None);
 
@@ -1053,7 +1056,8 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
     let proof_chain = other_section.section_chain();
     let (key_image, tx) = get_input_dbc_spend_info(&new_dbc2, 2, &bls::SecretKey::random())?;
 
-    ProcessAndInspectCmds::new_with_client_msg(
+    let comm_rx = env.take_comm_rx(info.public_key());
+    let mut cmds = ProcessAndInspectCmds::new_from_client_msg(
         ClientMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
             key_image,
             tx,
@@ -1061,18 +1065,21 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
             spent_transactions: new_dbc2.spent_transactions,
             network_knowledge: Some((proof_chain, sap)),
         })),
-        info.peer(),
         &dispatcher,
-    )?
-    .process_all()
+        comm_rx,
+    )
     .await?;
 
     // // The commands returned here should include the new command to update the network
     // // knowledge and also the other two commands to replicate the spent proof shares and
     // // the ack command, but we've already validated the other two as part of another test.
-    // assert_eq!(cmds.len(), 3);
-    // let update_cmd = cmds[0].clone();
-    // assert_matches!(update_cmd, Cmd::UpdateNetworkAndHandleValidClientMsg { .. });
+    let mut found = false;
+    while let Some(cmd) = cmds.next().await? {
+        if let Cmd::UpdateNetworkAndHandleValidClientMsg { .. } = cmd {
+            found = true;
+        }
+    }
+    assert!(found, "UpdateNetworkAndHandleValidClientMsg was not generated to update the node's network knowledge");
 
     // Now the proof chain should have the other section key.
     let tree = dispatcher

@@ -96,7 +96,7 @@ impl NodeState {
         archived: &BTreeSet<XorName>,
     ) -> Result<()> {
         let name = self.name();
-        info!("Validating node state for {name}");
+        info!("Validating node state for {name} - {:?}", self.state);
 
         if !prefix.matches(&name) {
             info!("Membership - rejecting node {name}, name doesn't match our prefix {prefix:?}");

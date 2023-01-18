@@ -17,7 +17,7 @@ use std::{
     collections::BTreeSet,
     fmt::{self, Display, Formatter},
 };
-use xor_name::XorName;
+use xor_name::{Prefix, XorName};
 
 // Unique identifier for a churn event, which is used to select nodes to relocate.
 pub(crate) struct ChurnId(pub(crate) [u8; bls::SIG_SIZE]);
@@ -82,7 +82,13 @@ pub(super) fn find_nodes_to_relocate(
     let mut relocating_nodes = vec![];
     for node_state in candidates {
         if node_state.age() == max_age {
-            let dst = dst(&node_state.name(), churn_id);
+            // In case the candidate is an elder, it shall only got relocated to other sections.
+            // This is to avoid this elder cause elder election conflict and extra data replication
+            // to the self-section.
+            let is_elder = network_knowledge.is_elder(&node_state.name());
+            let current_prefix = network_knowledge.prefix();
+
+            let dst = dst(&node_state.name(), churn_id, is_elder, current_prefix);
             let age = node_state.age().saturating_add(1);
             let relocate_details =
                 RelocateDetails::with_age(network_knowledge, node_state.peer(), dst, age);
@@ -105,8 +111,18 @@ pub(crate) fn check(age: u8, churn_id: &ChurnId) -> bool {
 }
 
 // Compute the destination for the node with `relocating_name` to be relocated to.
-fn dst(relocating_name: &XorName, churn_id: &ChurnId) -> XorName {
-    XorName::from_content_parts(&[&relocating_name.0, &churn_id.0])
+fn dst(
+    relocating_name: &XorName,
+    churn_id: &ChurnId,
+    is_elder: bool,
+    current_prefix: Prefix,
+) -> XorName {
+    let mut dst = XorName::from_content_parts(&[&relocating_name.0, &churn_id.0]);
+    if is_elder && current_prefix.matches(&dst) {
+        let sibling_prefix = current_prefix.sibling();
+        dst = sibling_prefix.substituted_in(dst);
+    }
+    dst
 }
 
 // Returns the number of trailing zero bits of the bytes slice.

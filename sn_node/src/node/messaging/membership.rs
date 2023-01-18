@@ -18,6 +18,7 @@ use crate::node::{
 use bls::Signature;
 use sn_consensus::{Decision, Generation, SignedVote, VoteResponse};
 use sn_interface::{
+    elder_count,
     messaging::system::{JoinResponse, NodeMsg, SectionSig, SectionSigned},
     network_knowledge::{MembershipState, NodeState},
     types::{log_markers::LogMarker, Peer},
@@ -222,7 +223,18 @@ impl MyNode {
             cmds.extend(self.relocate_peers(churn_id, excluded_from_relocation)?);
         }
 
-        cmds.extend(self.trigger_dkg()?);
+        // In case the newly joined node is a relocated node, and we have enough elders,
+        // we don't try to promote it even if it is qualified.
+        let we_have_enough_elders = self.network_knowledge.elders().len() == elder_count();
+        let everything_joined_was_relocated = joining_nodes
+            .iter()
+            .all(|(node_state, _sig)| node_state.previous_name().is_some());
+        let we_should_look_for_new_elders =
+            !(we_have_enough_elders && everything_joined_was_relocated);
+        if we_should_look_for_new_elders {
+            cmds.extend(self.trigger_dkg()?);
+        }
+
         cmds.extend(self.send_ae_update_to_our_section()?);
 
         self.fault_detection_retain_only(
