@@ -20,10 +20,6 @@ use tracing::Instrument;
 
 #[derive(Debug)]
 pub(crate) enum ConnectionEvent {
-    Connected {
-        peer: Peer,
-        connection: Arc<qp2p::Connection>,
-    },
     ConnectionClosed {
         peer: Peer,
         connection: Arc<qp2p::Connection>,
@@ -61,7 +57,8 @@ impl MsgListener {
     ) {
         let conn_id = conn.id();
         let remote_address = conn.remote_address();
-        let mut node_conn_cached = None;
+
+        let mut established_peer = None;
 
         while let Some(result) = incoming_msgs.next_with_stream().await.transpose() {
             match result {
@@ -83,15 +80,12 @@ impl MsgListener {
                             continue;
                         }
                     };
-                    let mut is_from_client = false;
-                    let mut is_node_join_msg = false;
+
+                    // let mut is_node_join_msg = false;
                     let src_name = match wire_msg.kind() {
-                        MsgKind::Client(auth) => {
-                            is_from_client = true;
-                            auth.public_key.into()
-                        }
-                        MsgKind::Node { name, is_join } => {
-                            is_node_join_msg = *is_join;
+                        MsgKind::Client(auth) => auth.public_key.into(),
+                        MsgKind::Node { name, .. } => {
+                            // is_node_join_msg = *is_join;
                             *name
                         }
                         MsgKind::ClientDataResponse(name) | MsgKind::NodeDataResponse(name) => {
@@ -101,18 +95,16 @@ impl MsgListener {
 
                     let peer = Peer::new(src_name, remote_address);
 
+                    if established_peer.is_none() {
+                        established_peer = Some(peer);
+                    }
+
                     let msg_id = wire_msg.msg_id();
                     debug!(
                         "Msg {msg_id:?} received, over conn_id={conn_id}, from: {peer:?}{stream_info} was: {wire_msg:?}"
                     );
 
                     let msg_sender = self.receive_msg.clone();
-                    let connection_event_sender = self.connection_events.clone();
-                    let connection = conn.clone();
-
-                    if node_conn_cached.is_none() && !is_from_client && !is_node_join_msg {
-                        node_conn_cached = Some(peer);
-                    }
 
                     // move this channel sending off thread so we dont hold up incoming msgs at all.
                     let _handle = tokio::spawn(async move {
@@ -127,13 +119,6 @@ impl MsgListener {
                         {
                             error!("Error pushing msg {msg_id:?} onto internal msg handling channel: {error:?}");
                         }
-
-                        // we don't want to store PeerSessions from clients
-                        if node_conn_cached.is_none() && !is_from_client && !is_node_join_msg {
-                            let _ = connection_event_sender
-                                .send(ConnectionEvent::Connected { peer, connection })
-                                .await;
-                        }
                     });
                 }
                 Err(error) => {
@@ -144,9 +129,9 @@ impl MsgListener {
 
         trace!(%conn_id, %remote_address, "{}", LogMarker::ConnectionClosed);
 
-        // if the connection was from a (non client) peer was cached, we shall remove it
-        if let Some(peer) = node_conn_cached {
-            trace!("Removing connection {conn_id} with node {peer} from cache");
+        // remove this closed connection
+        if let Some(peer) = established_peer {
+            trace!("Removing connection {conn_id} with node {established_peer:?} from cache");
             let _ = self
                 .connection_events
                 .send(ConnectionEvent::ConnectionClosed {
