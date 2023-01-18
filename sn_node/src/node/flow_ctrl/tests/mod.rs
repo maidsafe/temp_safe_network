@@ -29,7 +29,7 @@ use sn_interface::{
     elder_count, init_logger,
     messaging::{
         data::{ClientMsg, DataCmd, SpentbookCmd},
-        system::{self, AntiEntropyKind, JoinAsRelocatedRequest, NodeDataCmd, NodeMsg},
+        system::{AntiEntropyKind, JoinAsRelocatedRequest, NodeDataCmd, NodeMsg},
         Dst, MsgType, WireMsg,
     },
     network_knowledge::{
@@ -544,6 +544,8 @@ enum RelocatedPeerRole {
 }
 
 async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
+    init_logger();
+
     let prefix: Prefix = prefix("0");
     let section_size = match relocated_peer_role {
         RelocatedPeerRole::Elder => elder_count(),
@@ -561,7 +563,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
         // our node is elder idx 0, so remove the second elder
         RelocatedPeerRole::Elder => env.get_peers(prefix, 2, 0, None).remove(1),
         RelocatedPeerRole::NonElder => {
-            let non_elder_peer = gen_peer(MIN_ADULT_AGE - 1);
+            let non_elder_peer = gen_peer_in_prefix(MIN_ADULT_AGE - 1, prefix);
             let node_state = NodeState::joined(non_elder_peer, None);
             let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state);
             assert!(section.update_member(node_state));
@@ -585,15 +587,15 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
             _ => continue,
         };
 
-        if let NodeMsg::ProposeSectionState {
-            proposal: system::SectionStateVote::NodeIsOffline(node_state),
-            ..
-        } = msg
-        {
-            assert_eq!(node_state.name(), relocated_peer.name());
-            if let MembershipState::Relocated(relocate_details) = node_state.state() {
-                assert_eq!(relocate_details.age, relocated_peer.age() + 1);
-                offline_relocate_sent = true;
+        // Verify that there was a membership vote to relocate this node.
+        if let NodeMsg::MembershipVotes(votes) = msg {
+            let node_state_proposals = votes.iter().flat_map(|v| v.proposals());
+            for node_state in node_state_proposals {
+                assert_eq!(node_state.name(), relocated_peer.name());
+                if let MembershipState::Relocated(relocate_details) = node_state.state() {
+                    assert_eq!(relocate_details.age, relocated_peer.age() + 1);
+                    offline_relocate_sent = true;
+                }
             }
         }
     }
