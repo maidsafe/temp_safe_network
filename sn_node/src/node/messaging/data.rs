@@ -152,12 +152,16 @@ impl MyNode {
     }
 
     /// Registered holders not present in provided list of members
-    /// will no longer be tracked for liveness.
-    pub(crate) async fn liveness_retain_only(&mut self, members: BTreeSet<XorName>) {
+    /// will no longer be tracked for faults.
+    pub(crate) async fn fault_detection_retain_only(
+        &mut self,
+        adults: BTreeSet<XorName>,
+        elders: BTreeSet<XorName>,
+    ) {
         // stop tracking liveness of absent holders
         if let Err(error) = self
             .fault_cmds_sender
-            .send(FaultsCmd::RetainNodes(members))
+            .send(FaultsCmd::UpdateNodes(adults, elders))
             .await
         {
             warn!("Could not send RetainNodes through fault_cmds_tx: {error}");

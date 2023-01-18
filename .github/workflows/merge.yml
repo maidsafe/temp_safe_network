@@ -146,6 +146,8 @@ jobs:
 
       - name: Run sn_fault_detection tests
         timeout-minutes: 15
+        env:
+           RUST_LOG: sn_fault_detection
         run: cd sn_fault_detection && cargo test --release
 
       - name: Build sn_node tests before running

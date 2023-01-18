@@ -636,9 +636,14 @@ mod core {
                 }
 
                 cmds.extend(self.send_updates_to_sibling_section(old)?);
-                self.liveness_retain_only(
+                self.fault_detection_retain_only(
                     self.network_knowledge
                         .adults()
+                        .iter()
+                        .map(|peer| peer.name())
+                        .collect(),
+                    self.network_knowledge
+                        .elders()
                         .iter()
                         .map(|peer| peer.name())
                         .collect(),

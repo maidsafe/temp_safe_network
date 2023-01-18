@@ -225,9 +225,14 @@ impl MyNode {
         cmds.extend(self.trigger_dkg()?);
         cmds.extend(self.send_ae_update_to_our_section()?);
 
-        self.liveness_retain_only(
+        self.fault_detection_retain_only(
             self.network_knowledge
                 .adults()
+                .iter()
+                .map(|peer| peer.name())
+                .collect(),
+            self.network_knowledge
+                .elders()
                 .iter()
                 .map(|peer| peer.name())
                 .collect(),
