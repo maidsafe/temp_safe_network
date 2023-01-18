@@ -21,7 +21,7 @@ use sn_interface::{
             ClientDataResponse, ClientMsg, DataCmd, DataQueryVariant, EditRegister,
             SignedRegisterEdit, SpentbookCmd,
         },
-        system::{NodeDataResponse, OperationId},
+        system::{NodeMsgResponse, OperationId},
         AuthorityProof, ClientAuth, MsgId,
     },
     network_knowledge::{section_keys::build_spent_proof_share, SectionTreeUpdate},
@@ -101,17 +101,17 @@ impl MyNode {
 
         if let Some(send_stream) = send_stream {
             trace!("{msg_id:?} data query response at node is: {response:?}");
-            let msg = NodeDataResponse::QueryResponse {
+            let msg = NodeMsgResponse::QueryResponse {
                 response,
                 operation_id,
             };
 
-            vec![Cmd::SendNodeDataResponse {
+            vec![Cmd::SendNodeMsgResponse {
                 msg,
                 correlation_id: msg_id,
                 send_stream,
+                recipient: requesting_peer,
                 context,
-                requesting_peer,
             }]
         } else {
             error!("Send stream missing from {requesting_peer:?}, data request response was not sent out.");

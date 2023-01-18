@@ -75,13 +75,14 @@ pub enum SectionStateVote {
 #[allow(clippy::large_enum_variant, clippy::derive_partial_eq_without_eq)]
 /// Message sent over the among nodes
 pub enum NodeMsg {
-    AntiEntropy {
+    /// This AE message is sent to (proactively) update a peer when we notice they are or could be behind
+    AntiEntropyUpdate {
         /// The update to our NetworkKnowledge containing the current `SectionAuthorityProvider`
         /// and the section chain truncated from the triggering msg's dst section_key or genesis_key
         /// if the the dst section_key is not a direct ancestor to our section_key
         section_tree_update: SectionTreeUpdate,
-        /// The kind of anti-entropy response.
-        kind: AntiEntropyKind,
+        /// List of peers in the section
+        members: SectionPeers,
     },
     /// Probes the network by sending a message to a random or chosen dst triggering an AE flow.
     /// Sends the current section key of target section which we know
@@ -176,7 +177,15 @@ pub enum NodeMsg {
 /// Messages sent from adults to the elders in response to client queries or commands
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum NodeDataResponse {
+pub enum NodeMsgResponse {
+    AntiEntropy {
+        /// The update to our NetworkKnowledge containing the current `SectionAuthorityProvider`
+        /// and the section chain truncated from the triggering msg's dst section_key or genesis_key
+        /// if the the dst section_key is not a direct ancestor to our section_key
+        section_tree_update: SectionTreeUpdate,
+        /// The kind of anti-entropy response.
+        kind: AntiEntropyKind,
+    },
     /// The response to a query, containing the query result.
     QueryResponse {
         /// The result of the query.
@@ -194,14 +203,15 @@ pub enum NodeDataResponse {
     },
 }
 
-impl Display for NodeDataResponse {
+impl Display for NodeMsgResponse {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
+            Self::AntiEntropy { kind, .. } => write!(f, "NodeMsgResponse::AntiEntropy({kind:?})"),
             Self::QueryResponse { response, .. } => {
-                write!(f, "NodeDataResponse::QueryResponse({response:?})")
+                write!(f, "NodeMsgResponse::QueryResponse({response:?})")
             }
             Self::CmdResponse { response, .. } => {
-                write!(f, "NodeDataResponse::CmdResponse({response:?})")
+                write!(f, "NodeMsgResponse::CmdResponse({response:?})")
             }
         }
     }
@@ -211,7 +221,7 @@ impl NodeMsg {
     pub fn statemap_states(&self) -> crate::statemap::State {
         use crate::statemap::State;
         match self {
-            Self::AntiEntropy { .. } => State::AntiEntropy,
+            Self::AntiEntropyUpdate { .. } => State::AntiEntropy,
             Self::AntiEntropyProbe { .. } => State::AntiEntropy,
             Self::Relocate(_) => State::Relocate,
             Self::MembershipAE(_) => State::Membership,
@@ -240,7 +250,7 @@ impl NodeMsg {
 impl Display for NodeMsg {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::AntiEntropy { .. } => write!(f, "NodeMsg::AntiEntropy"),
+            Self::AntiEntropyUpdate { .. } => write!(f, "NodeMsg::AntiEntropyUpdate"),
             Self::AntiEntropyProbe { .. } => write!(f, "NodeMsg::AntiEntropyProbe"),
             Self::Relocate { .. } => write!(f, "NodeMsg::Relocate"),
             Self::MembershipVotes { .. } => write!(f, "NodeMsg::MembershipVotes"),

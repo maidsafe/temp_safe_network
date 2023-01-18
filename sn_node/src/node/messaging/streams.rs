@@ -13,7 +13,7 @@ use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
         data::{ClientDataResponse, CmdResponse},
-        system::{NodeDataCmd, NodeDataResponse, NodeMsg},
+        system::{NodeDataCmd, NodeMsg, NodeMsgResponse},
         Dst, MsgId, MsgKind, MsgType, WireMsg,
     },
     types::Peer,
@@ -59,15 +59,15 @@ lazy_static! {
 // Message handling over streams
 impl MyNode {
     pub(crate) async fn send_node_msg_response(
-        msg: NodeMsg,
-        msg_id: MsgId,
+        msg: NodeMsgResponse,
+        correlation_id: MsgId,
         recipient: Peer,
         context: NodeContext,
         send_stream: SendStream,
     ) -> Result<Vec<Cmd>> {
         let stream_id = send_stream.id();
-        trace!("Sending response msg {msg_id:?} over {stream_id}");
-        let (kind, payload) = MyNode::serialize_node_msg(context.name, &msg)?;
+        trace!("Sending response msg {correlation_id:?} over {stream_id}");
+        let (kind, payload) = MyNode::serialize_node_msg_response(context.name, &msg)?;
 
         match send_msg_on_stream(
             context.network_knowledge.section_key(),
@@ -75,20 +75,20 @@ impl MyNode {
             kind,
             send_stream,
             recipient,
-            msg_id,
+            correlation_id,
         )
         .await
         {
             Ok(()) => Ok(vec![]),
             Err(err) => {
                 error!(
-                    "Could not send response msg {msg_id:?} \
+                    "Could not send response msg {correlation_id:?} \
                     to {recipient:?} over {stream_id}: {err:?}"
                 );
                 if let Error::Comms(_) = err {
                     Ok(vec![Cmd::HandleFailedSendToNode {
                         peer: recipient,
-                        msg_id,
+                        msg_id: correlation_id,
                     }])
                 } else {
                     Ok(vec![])
@@ -112,26 +112,6 @@ impl MyNode {
             kind,
             send_stream,
             source_client,
-            correlation_id,
-        )
-        .await
-    }
-
-    pub(crate) async fn send_node_data_response(
-        msg: NodeDataResponse,
-        correlation_id: MsgId,
-        send_stream: SendStream,
-        context: NodeContext,
-        requesting_peer: Peer,
-    ) -> Result<()> {
-        trace!("Sending node response msg for {correlation_id:?}");
-        let (kind, payload) = MyNode::serialize_node_data_response(context.name, &msg)?;
-        send_msg_on_stream(
-            context.network_knowledge.section_key(),
-            payload,
-            kind,
-            send_stream,
-            requesting_peer,
             correlation_id,
         )
         .await
@@ -233,8 +213,8 @@ fn build_and_send_response_to_client(
     let msg = match msg_sent {
         NodeMsg::NodeDataQuery(query) => {
             match response {
-                Ok(MsgType::NodeDataResponse {
-                    msg: NodeDataResponse::QueryResponse { response, .. },
+                Ok(MsgType::NodeMsgResponse {
+                    msg: NodeMsgResponse::QueryResponse { response, .. },
                     ..
                 }) => {
                     // We sent a data query and we received a query response,
@@ -258,8 +238,8 @@ fn build_and_send_response_to_client(
         }
         NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(replicated_data)) => {
             match response {
-                Ok(MsgType::NodeDataResponse {
-                    msg: NodeDataResponse::CmdResponse { response, .. },
+                Ok(MsgType::NodeMsgResponse {
+                    msg: NodeMsgResponse::CmdResponse { response, .. },
                     ..
                 }) => {
                     // We sent a data cmd to store client data and we received a
@@ -347,7 +327,7 @@ async fn send_to_holders_and_await_responses(
     Ok(futures::future::join_all(send_tasks).await)
 }
 
-// Send a msg on a given stream
+// Send a msg on a given stream. We set the MsgId to be the same as the correlation MsgId
 async fn send_msg_on_stream(
     section_key: bls::PublicKey,
     payload: Bytes,

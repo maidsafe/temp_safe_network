@@ -10,7 +10,7 @@ use crate::node::{MyNode, Result};
 
 use sn_interface::messaging::{
     data::ClientDataResponse,
-    system::{NodeDataResponse, NodeMsg},
+    system::{NodeMsg, NodeMsgResponse},
     MsgKind, WireMsg,
 };
 
@@ -41,13 +41,13 @@ impl MyNode {
         Ok((kind, payload))
     }
 
-    /// Serialize a message for a Node
-    pub(crate) fn serialize_node_data_response(
+    /// Serialize a message response for a Node
+    pub(crate) fn serialize_node_msg_response(
         our_node_name: XorName,
-        msg: &NodeDataResponse,
+        msg: &NodeMsgResponse,
     ) -> Result<(MsgKind, Bytes)> {
         let payload = WireMsg::serialize_msg_payload(msg)?;
-        let kind = MsgKind::NodeDataResponse(our_node_name);
+        let kind = MsgKind::NodeMsgResponse(our_node_name);
         Ok((kind, payload))
     }
 }

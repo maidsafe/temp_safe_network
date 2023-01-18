@@ -74,11 +74,14 @@ impl Dispatcher {
             } => MyNode::send_msg(msg, msg_id, recipients, context).await,
             Cmd::SendNodeMsgResponse {
                 msg,
-                msg_id,
+                correlation_id,
                 recipient,
                 send_stream,
                 context,
-            } => MyNode::send_node_msg_response(msg, msg_id, recipient, context, send_stream).await,
+            } => {
+                MyNode::send_node_msg_response(msg, correlation_id, recipient, context, send_stream)
+                    .await
+            }
             Cmd::SendClientResponse {
                 msg,
                 correlation_id,
@@ -96,22 +99,14 @@ impl Dispatcher {
                 .await?;
                 Ok(vec![])
             }
-            Cmd::SendNodeDataResponse {
+            Cmd::SendNodeMsgResponseOverUniStream {
                 msg,
                 correlation_id,
-                send_stream,
+                recipients,
                 context,
-                requesting_peer,
             } => {
-                MyNode::send_node_data_response(
-                    msg,
-                    correlation_id,
-                    send_stream,
-                    context,
-                    requesting_peer,
-                )
-                .await?;
-                Ok(vec![])
+                MyNode::send_node_msg_response_over_uni(msg, correlation_id, recipients, context)
+                    .await
             }
             Cmd::SendMsgAndAwaitResponse {
                 msg_id,

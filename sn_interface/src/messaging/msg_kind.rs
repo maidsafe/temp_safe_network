@@ -25,5 +25,5 @@ pub enum MsgKind {
     /// A message from a Node along with its name
     Node { name: XorName, is_join: bool },
     /// A data response sent from an Adult (along with its name) to Elders
-    NodeDataResponse(XorName),
+    NodeMsgResponse(XorName),
 }

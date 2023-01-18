@@ -17,8 +17,11 @@ use sn_comms::Error as CommsError;
 use sn_interface::{
     messaging::{
         data::CmdResponse,
-        system::{JoinResponse, NodeDataCmd, NodeDataQuery, NodeDataResponse, NodeEvent, NodeMsg},
-        Dst, MsgId, WireMsg,
+        system::{
+            AntiEntropyKind, JoinResponse, NodeDataCmd, NodeDataQuery, NodeEvent, NodeMsg,
+            NodeMsgResponse,
+        },
+        Dst, MsgId, MsgKind, WireMsg,
     },
     network_knowledge::{MembershipState, NetworkKnowledge},
     types::{log_markers::LogMarker, Keypair, Peer, PublicKey, ReplicatedData},
@@ -26,8 +29,8 @@ use sn_interface::{
 
 use qp2p::{SendStream, UsrMsgBytes};
 use sn_fault_detection::IssueType;
-use xor_name::XorName;
 
+use bytes::Bytes;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -41,13 +44,8 @@ impl MyNode {
         context: NodeContext,
     ) -> Result<Vec<Cmd>> {
         trace!("Sending msg: {msg_id:?}");
-        let peer_msgs = into_msg_bytes(
-            &context.network_knowledge,
-            context.name,
-            msg,
-            msg_id,
-            recipients,
-        )?;
+        let content = MyNode::serialize_node_msg(context.name, &msg)?;
+        let peer_msgs = into_msg_bytes(&context.network_knowledge, msg_id, recipients, content)?;
 
         let comm = context.comm.clone();
         let tasks = peer_msgs
@@ -63,6 +61,45 @@ impl MyNode {
                 Err(CommsError::FailedSend(peer)) => {
                     Some(Cmd::HandleFailedSendToNode { peer, msg_id })
                 }
+                _ => None,
+            })
+            .collect();
+
+        Ok(cmds)
+    }
+
+    /// Send a (`NodeMsgResponse`) message to peers over uni-streams
+    pub(crate) async fn send_node_msg_response_over_uni(
+        msg: NodeMsgResponse,
+        correlation_id: MsgId,
+        recipients: Peers,
+        context: NodeContext,
+    ) -> Result<Vec<Cmd>> {
+        // we use the correlation MsgId vaalue for the response MsgId
+        trace!("Sending msg: {correlation_id:?}");
+        let content = MyNode::serialize_node_msg_response(context.name, &msg)?;
+        let peer_msgs = into_msg_bytes(
+            &context.network_knowledge,
+            correlation_id,
+            recipients,
+            content,
+        )?;
+
+        let comm = context.comm.clone();
+        let tasks = peer_msgs
+            .into_iter()
+            .map(|(peer, msg)| comm.send_out_bytes(peer, correlation_id, msg));
+        let results = futures::future::join_all(tasks).await;
+
+        // Any failed sends are tracked via Cmd::HandlePeerFailedSend, which will track issues for any peers
+        // in the section (otherwise ignoring failed send to out of section nodes or clients)
+        let cmds = results
+            .into_iter()
+            .filter_map(|result| match result {
+                Err(CommsError::FailedSend(peer)) => Some(Cmd::HandleFailedSendToNode {
+                    peer,
+                    msg_id: correlation_id,
+                }),
                 _ => None,
             })
             .collect();
@@ -143,16 +180,16 @@ impl MyNode {
         };
 
         if let Some(send_stream) = response_stream {
-            let msg = NodeDataResponse::CmdResponse {
+            let msg = NodeMsgResponse::CmdResponse {
                 response,
                 correlation_id: original_msg_id,
             };
-            cmds.push(Cmd::SendNodeDataResponse {
+            cmds.push(Cmd::SendNodeMsgResponse {
                 msg,
                 correlation_id: original_msg_id,
                 send_stream,
+                recipient: target,
                 context: context.clone(),
-                requesting_peer: target,
             });
         } else {
             error!("Cannot respond over stream, none exists after storing! {data_addr:?}");
@@ -219,21 +256,25 @@ impl MyNode {
 
                 Ok(vec![])
             }
-            NodeMsg::AntiEntropy {
+            NodeMsg::AntiEntropyUpdate {
                 section_tree_update,
-                kind,
+                members,
             } => {
                 trace!("Handling msg: AE from {sender}: {msg_id:?}");
-                // as we've data storage reqs inside here for reorganisation, we have async calls to
-                // the fs
-                MyNode::handle_anti_entropy_msg(node, context, section_tree_update, kind, sender)
-                    .await
+                MyNode::handle_anti_entropy_msg(
+                    node,
+                    context,
+                    section_tree_update,
+                    AntiEntropyKind::Update { members },
+                    sender,
+                )
+                .await
             }
             // Respond to a probe msg
-            // We always respond to probe msgs if we're an elder as health checks use this to see if a node is alive
-            // and repsonsive, as well as being a method of keeping nodes up to date.
+            // We always respond to probe msgs if we're an elder as health checks use this to see
+            // if a node is alive and responsive, as well as being a method of keeping nodes up to date.
             NodeMsg::AntiEntropyProbe(section_key) => {
-                debug!("Aeprobe in");
+                debug!("AE-Probe in");
 
                 let mut cmds = vec![];
                 if !context.is_elder {
@@ -244,12 +285,13 @@ impl MyNode {
                 }
 
                 trace!("Received Probe message from {}: {:?}", sender, msg_id);
-                let recipients = BTreeSet::from_iter([sender]);
-                cmds.push(MyNode::send_ae_update_to_nodes(
+                cmds.push(MyNode::send_ae_update_response(
+                    msg_id,
                     &context,
-                    recipients,
+                    sender,
                     section_key,
                 ));
+
                 Ok(cmds)
             }
             // The approval or rejection of a join (approval both for new network joiner as well as
@@ -548,12 +590,10 @@ impl MyNode {
 // per recipient - the last step before passing it over to comms module.
 pub(crate) fn into_msg_bytes(
     network_knowledge: &NetworkKnowledge,
-    our_node_name: XorName,
-    msg: NodeMsg,
     msg_id: MsgId,
     recipients: Peers,
+    content: (MsgKind, Bytes),
 ) -> Result<Vec<(Peer, UsrMsgBytes)>> {
-    let (kind, payload) = MyNode::serialize_node_msg(our_node_name, &msg)?;
     let recipients = match recipients {
         Peers::Single(peer) => vec![peer],
         Peers::Multiple(peers) => peers.into_iter().collect(),
@@ -565,6 +605,7 @@ pub(crate) fn into_msg_bytes(
         section_key: bls::SecretKey::random().public_key(),
     };
 
+    let (kind, payload) = content;
     let mut initial_wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
     let _bytes = initial_wire_msg.serialize_and_cache_bytes()?;
 

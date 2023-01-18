@@ -183,8 +183,8 @@ impl<'a> ProcessAndInspectCmds<'a> {
                 Cmd::SendMsg { .. }
                     | Cmd::SendMsgAndAwaitResponse { .. }
                     | Cmd::SendClientResponse { .. }
-                    | Cmd::SendNodeDataResponse { .. }
                     | Cmd::SendNodeMsgResponse { .. }
+                    | Cmd::SendNodeMsgResponseOverUniStream { .. }
             ) {
                 let new_cmds = self.dispatcher.process_cmd(cmd).await?;
                 self.pending_cmds.extend(new_cmds);
@@ -249,14 +249,10 @@ impl Dispatcher {
             context,
         } = cmd
         {
-            let peer_msgs = into_msg_bytes(
-                &context.network_knowledge,
-                context.name,
-                msg.clone(),
-                msg_id,
-                recipients,
-            )
-            .expect("cannot convert msg into bytes");
+            let content =
+                MyNode::serialize_node_msg(context.name, &msg).expect("failed to serialise msg");
+            let peer_msgs = into_msg_bytes(&context.network_knowledge, msg_id, recipients, content)
+                .expect("cannot convert msg into bytes");
 
             for (peer, msg_bytes) in peer_msgs {
                 if let Some(filter) = &filter_recp {

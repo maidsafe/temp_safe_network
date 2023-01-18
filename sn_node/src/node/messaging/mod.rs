@@ -131,7 +131,11 @@ impl MyNode {
                 );
                 Ok(vec![])
             }
-            other @ MsgType::NodeDataResponse { .. } => {
+            other @ MsgType::NodeMsgResponse { .. } => {
+                // *****************************
+                // FIXME!!! handle AE responses
+                // *****************************
+
                 error!(
                     "Node data response {msg_id:?}, from {}, has been dropped since it's not \
                     meant to be handled this way (it is directly forwarded to client): {other:?}",

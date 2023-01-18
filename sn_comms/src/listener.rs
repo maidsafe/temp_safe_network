@@ -94,9 +94,7 @@ impl MsgListener {
                             is_node_join_msg = *is_join;
                             *name
                         }
-                        MsgKind::ClientDataResponse(name) | MsgKind::NodeDataResponse(name) => {
-                            *name
-                        }
+                        MsgKind::ClientDataResponse(name) | MsgKind::NodeMsgResponse(name) => *name,
                     };
 
                     let peer = Peer::new(src_name, remote_address);

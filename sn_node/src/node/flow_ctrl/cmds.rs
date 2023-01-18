@@ -14,7 +14,7 @@ use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
         data::{ClientDataResponse, ClientMsg},
-        system::{NodeDataResponse, NodeMsg, SectionSig, SectionSigned},
+        system::{NodeMsg, NodeMsgResponse, SectionSig, SectionSigned},
         AuthorityProof, ClientAuth, MsgId, WireMsg,
     },
     network_knowledge::{NodeState, SectionAuthorityProvider, SectionKeyShare, SectionsDAG},
@@ -127,8 +127,8 @@ pub(crate) enum Cmd {
     },
     /// Performs serialisation and sends the response NodeMsg to the peer over the given stream.
     SendNodeMsgResponse {
-        msg: NodeMsg,
-        msg_id: MsgId,
+        msg: NodeMsgResponse,
+        correlation_id: MsgId,
         recipient: Peer,
         send_stream: SendStream,
         #[debug(skip)]
@@ -143,15 +143,13 @@ pub(crate) enum Cmd {
         context: NodeContext,
         source_client: Peer,
     },
-    /// Performs serialisation and sends the response NodeDataResponse msg to the peer
-    /// over the given stream.
-    SendNodeDataResponse {
-        msg: NodeDataResponse,
+    /// Performs serialisation and sends the msg response over uni-streams.
+    SendNodeMsgResponseOverUniStream {
+        msg: NodeMsgResponse,
         correlation_id: MsgId,
-        send_stream: SendStream,
+        recipients: Peers,
         #[debug(skip)]
         context: NodeContext,
-        requesting_peer: Peer,
     },
     /// Performs serialisation and sends the msg to the peer node over a new bi-stream,
     /// awaiting for a response which is forwarded to the client.
@@ -208,7 +206,7 @@ impl Cmd {
             Cmd::SendMsg { .. }
             | Cmd::SendNodeMsgResponse { .. }
             | Cmd::SendClientResponse { .. }
-            | Cmd::SendNodeDataResponse { .. }
+            | Cmd::SendNodeMsgResponseOverUniStream { .. }
             | Cmd::SendMsgAndAwaitResponse { .. } => State::Comms,
             Cmd::SendLockingJoinMsg { .. } => State::Comms,
             Cmd::HandleFailedSendToNode { .. } => State::Comms,
@@ -251,7 +249,9 @@ impl fmt::Display for Cmd {
             Cmd::SendMsg { .. } => write!(f, "SendMsg"),
             Cmd::SendNodeMsgResponse { .. } => write!(f, "SendNodeMsgResponse"),
             Cmd::SendClientResponse { .. } => write!(f, "SendClientResponse"),
-            Cmd::SendNodeDataResponse { .. } => write!(f, "SendNodeDataResponse"),
+            Cmd::SendNodeMsgResponseOverUniStream { .. } => {
+                write!(f, "SendNodeMsgResponseOverUniStream")
+            }
             Cmd::SendMsgAndAwaitResponse { .. } => write!(f, "SendMsgAndAwaitResponse"),
             Cmd::SendLockingJoinMsg { .. } => write!(f, "SendLockingJoinMsg"),
             Cmd::EnqueueDataForReplication { .. } => write!(f, "EnqueueDataForReplication"),
