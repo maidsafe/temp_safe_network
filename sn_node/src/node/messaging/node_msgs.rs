@@ -244,10 +244,9 @@ impl MyNode {
                 }
 
                 trace!("Received Probe message from {}: {:?}", sender, msg_id);
-                let recipients = BTreeSet::from_iter([sender]);
                 cmds.push(MyNode::send_ae_update_to_nodes(
                     &context,
-                    recipients,
+                    Peers::Single(sender),
                     section_key,
                 ));
                 Ok(cmds)
