@@ -1,5 +1,10 @@
 name: Version Bump
 
+# this should prevent bors merge run, and main release/commits from running concurrently
+#(as long as both are sporting this check)
+concurrency:
+  group: "main-modifying-workflow"
+
 on:
   push:
     branches:
