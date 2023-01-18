@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1674032609575,
+  "lastUpdate": 1674035552473,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -54184,6 +54184,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 326391957,
             "range": "± 1594629",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "424e4903838f3f89d84443278a8a553b8deebb13",
+          "message": "Merge #1988\n\n1988: fix(relocation): skip the propose NodeIsOffline flow for relocations. r=joshuef a=davidrusu\n\nCurrently node relocations first go through a NodeIsOffline proposal flow. This flow was originally intended to check that enough elders agree that a node is faulty, i.e. detecting network connection errors, etc.\r\n\r\nIt's not needed for relocations since the relocation details has all the information we need to verify if a relocation request is valid.\r\n\r\nThis PR drops the NodeIsOffline proposal in favor of simply triggering the membership change directly.\r\n\r\nThis should allow us to more easily retry failed relocations\n\nCo-authored-by: David Rusu <davidrusu.me@gmail.com>",
+          "timestamp": "2023-01-18T08:15:04Z",
+          "tree_id": "feede41d1246852c8df2f351e25d483ef7460cd5",
+          "url": "https://github.com/maidsafe/safe_network/commit/424e4903838f3f89d84443278a8a553b8deebb13"
+        },
+        "date": 1674035549250,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2490874,
+            "range": "± 4388",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 84698786,
+            "range": "± 910283",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 105665952,
+            "range": "± 4366868",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 397417724,
+            "range": "± 22779808",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 69535296,
+            "range": "± 711135",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 86736200,
+            "range": "± 785937",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 322516189,
+            "range": "± 1698362",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 23893321615,
+            "range": "± 189233389",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 41276861,
+            "range": "± 9360373",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2045758828,
+            "range": "± 322844371",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 9704385617,
+            "range": "± 1159676327",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 271702932,
+            "range": "± 27034154",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 3052046838,
+            "range": "± 625050670",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 9174920498,
+            "range": "± 893259079",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 45253945,
+            "range": "± 333208",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 434471394,
+            "range": "± 3221504",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1683011094,
+            "range": "± 7008200",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11255833,
+            "range": "± 127245",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 95607444,
+            "range": "± 3088212",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 328864518,
+            "range": "± 1838242",
             "unit": "ns/iter"
           }
         ]
