@@ -51,6 +51,34 @@ jobs:
       - name: Run cargo-udeps
         run: cargo +nightly udeps --all-targets
 
+  build-arm:
+    name: build arm
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: arm-unknown-linux-musleabi
+          - os: ubuntu-latest
+            target: armv7-unknown-linux-musleabihf
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        id: toolchain
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - shell: bash
+        run: make gha-build-${{ matrix.target }}
+      - uses: actions/upload-artifact@main
+        with:
+          name: safe_network-${{ matrix.target }}
+          path: |
+            artifacts
+            !artifacts/.cargo-lock
 
   checks:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
