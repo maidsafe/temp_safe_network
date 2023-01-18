@@ -5,9 +5,10 @@ on:
   push:
     branches: [staging, trying]
 
+# this should prevent bors merge run, and main release/commits from running concurrently
+#(as long as both are sporting this check)
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: "main-modifying-workflow"
 
 env:
   CARGO_INCREMENTAL: 0  # bookkeeping for incremental builds has overhead, not useful in CI.
