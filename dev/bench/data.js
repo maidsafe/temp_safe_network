@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1674039487334,
+  "lastUpdate": 1674056274059,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -54472,6 +54472,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 410557291,
             "range": "± 16156747",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "85da86cd0d4914489fc74125bb7a2655136f3508",
+          "message": "Merge #1981\n\n1981: Use existing msg-flow for joins r=oetyng a=oetyng\n\nThis simplifies the join process and removes a lot of duplicated code and logic.\r\n\r\n- Ae checks are made on `TryJoin` msg.\r\n- Elders drop msgs with invalid/unreachable parameters.\r\n- Unit tests more of unit-style than e2e.\n\nCo-authored-by: oetyng <oetyng@gmail.com>\nCo-authored-by: joshuef <joshuef@gmail.com>",
+          "timestamp": "2023-01-18T14:11:13Z",
+          "tree_id": "dd7c002f25a253171588efa6593160b8b9c2e602",
+          "url": "https://github.com/maidsafe/safe_network/commit/85da86cd0d4914489fc74125bb7a2655136f3508"
+        },
+        "date": 1674056271601,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2475642,
+            "range": "± 29032",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 81987058,
+            "range": "± 1602008",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 105901291,
+            "range": "± 2969791",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 393027122,
+            "range": "± 6520767",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 66746802,
+            "range": "± 813839",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 84381716,
+            "range": "± 644522",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 316602725,
+            "range": "± 1576577",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 23268993516,
+            "range": "± 112086110",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 38559471,
+            "range": "± 9513890",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 1380377430,
+            "range": "± 351409737",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 8010224265,
+            "range": "± 1158767029",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 184112962,
+            "range": "± 17928399",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1475481705,
+            "range": "± 164571912",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 5595416125,
+            "range": "± 282389756",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 45325651,
+            "range": "± 298868",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 435355130,
+            "range": "± 1441209",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1685715330,
+            "range": "± 5666989",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11323235,
+            "range": "± 243996",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 95861990,
+            "range": "± 2464561",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 327245963,
+            "range": "± 1738914",
             "unit": "ns/iter"
           }
         ]
