@@ -49,6 +49,7 @@ pub(crate) struct CmdJob {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub(crate) enum Cmd {
+    TryJoinNetwork,
     /// Validate `wire_msg` from `sender`.
     /// Holding the WireMsg that has been received from the network,
     HandleMsg {
@@ -61,7 +62,10 @@ pub(crate) enum Cmd {
     /// Allows joining of new nodes until the section splits.
     SetJoinsAllowedUntilSplit(bool),
     /// Add an issue to the tracking of a node's faults
-    TrackNodeIssue { name: XorName, issue: IssueType },
+    TrackNodeIssue {
+        name: XorName,
+        issue: IssueType,
+    },
     UpdateNetworkAndHandleValidClientMsg {
         proof_chain: SectionsDAG,
         signed_sap: SectionSigned<SectionAuthorityProvider>,
@@ -75,7 +79,10 @@ pub(crate) enum Cmd {
         context: NodeContext,
     },
     /// Handle peer that's been detected as lost.
-    HandleFailedSendToNode { peer: Peer, msg_id: MsgId },
+    HandleFailedSendToNode {
+        peer: Peer,
+        msg_id: MsgId,
+    },
     /// Handle agreement on a proposal.
     HandleSectionDecisionAgreement {
         proposal: SectionStateVote,
@@ -217,6 +224,7 @@ impl Cmd {
             Cmd::EnqueueDataForReplication { .. } => State::Replication,
             Cmd::SetJoinsAllowed { .. } => State::Data,
             Cmd::SetJoinsAllowedUntilSplit { .. } => State::Data,
+            Cmd::TryJoinNetwork => State::Join,
         }
     }
 }
@@ -253,6 +261,7 @@ impl fmt::Display for Cmd {
             Cmd::ProposeVoteNodesOffline(_) => write!(f, "ProposeOffline"),
             Cmd::SetJoinsAllowed { .. } => write!(f, "SetJoinsAllowed"),
             Cmd::SetJoinsAllowedUntilSplit { .. } => write!(f, "SetJoinsAllowedUntilSplit"),
+            Cmd::TryJoinNetwork => write!(f, "TryJoinNetwork"),
         }
     }
 }
