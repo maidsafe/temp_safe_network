@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1674152792343,
+  "lastUpdate": 1674171500128,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -55768,6 +55768,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 430619483,
             "range": "± 7974136",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "chriso83@protonmail.com",
+            "name": "Chris O'Neil",
+            "username": "jacderida"
+          },
+          "committer": {
+            "email": "chris.oneil@gmail.com",
+            "name": "Chris O'Neil",
+            "username": "jacderida"
+          },
+          "distinct": true,
+          "id": "59889e8f053e1ee741b18030929f8b1a7e2892d3",
+          "message": "fix: correctly trigger failure notifications\n\nThe `failure` function in Github Actions only checks the failure of previous *steps* in a job, so it\ncan only really be used on a per job basis.\n\nIt's cumbersome to have this on every job, but there appears to be no alternative way. Luckily there\naren't many release-related jobs in the relevant workflows.",
+          "timestamp": "2023-01-19T22:50:27Z",
+          "tree_id": "725b2f692baa9ffdd841e4a3cbcbb145c0976138",
+          "url": "https://github.com/maidsafe/safe_network/commit/59889e8f053e1ee741b18030929f8b1a7e2892d3"
+        },
+        "date": 1674171498314,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2713606,
+            "range": "± 94118",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 118229869,
+            "range": "± 2142831",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 144130468,
+            "range": "± 3829740",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 538971458,
+            "range": "± 5828959",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 95215426,
+            "range": "± 1550095",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 114906928,
+            "range": "± 1941486",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 433647454,
+            "range": "± 6091340",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 29570302133,
+            "range": "± 238494293",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 65217618,
+            "range": "± 31045278",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2721208349,
+            "range": "± 149331348",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 10061216539,
+            "range": "± 642538398",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 271788261,
+            "range": "± 13426153",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 2414501603,
+            "range": "± 147893694",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 9400128288,
+            "range": "± 287464317",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 52222704,
+            "range": "± 1517332",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 568873913,
+            "range": "± 14647992",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 2173957932,
+            "range": "± 45323064",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 13413357,
+            "range": "± 633191",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 123960515,
+            "range": "± 6247962",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 417163405,
+            "range": "± 4758945",
             "unit": "ns/iter"
           }
         ]
