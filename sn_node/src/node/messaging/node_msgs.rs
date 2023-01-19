@@ -283,9 +283,12 @@ impl MyNode {
                             target_sap.prefix(),
                         );
 
-                        let read_only = node.read().await;
-                        if read_only.relocate_state.is_some() {
+                        debug!("[NODE READ]: relocation_state read");
+                        let relocate_state_present = node.read().await.relocate_state.is_some();
+                        debug!("[NODE READ]: relocation_state read got");
+                        if relocate_state_present {
                             let mut node = node.write().await;
+                            debug!("[NODE WRITE]: relocation_state write got...");
                             node.relocate_state = None;
                             trace!("{}", LogMarker::RelocateEnd);
                         }
