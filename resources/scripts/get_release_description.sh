@@ -4,6 +4,8 @@ sn_fault_detection_version=$( \
   grep "^version" < sn_fault_detection/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
 sn_interface_version=$( \
   grep "^version" < sn_interface/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
+sn_comms_version=$( \
+  grep "^version" < sn_comms/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
 sn_client_version=$( \
   grep "^version" < sn_client/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
 sn_node_version=$(grep "^version" < sn_node/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
@@ -13,8 +15,9 @@ sn_cli_version=$(grep "^version" < sn_cli/Cargo.toml | head -n 1 | awk '{ print 
 # The single quotes around EOF is to stop attempted variable and backtick expansion.
 read -r -d '' release_description << 'EOF'
 This release of Safe Network consists of:
-* Safe Node Fault Detection v__sn_fault_detection_VERSION__
+* Safe Node Fault Detection v__SN_FAULT_DETECTION_VERSION__
 * Safe Network Interface v__SN_INTERFACE_VERSION__
+* Safe Node Comms v__SN_COMMS_VERSION__
 * Safe Client v__SN_CLIENT_VERSION__
 * Safe Node v__SN_NODE_VERSION__
 * Safe API v__SN_API_VERSION__
@@ -26,7 +29,11 @@ __SN_INTERFACE_CHANGELOG_TEXT__
 
 ## Safe Node Fault Detection Changelog
 
-__sn_fault_detection_CHANGELOG_TEXT__
+__SN_FAULT_DETECTION_CHANGELOG_TEXT__
+
+## Safe Node Comms Changelog
+
+__SN_COMMS_CHANGELOG_TEXT__
 
 ## Safe Node Changelog
 
@@ -173,8 +180,9 @@ sn_cli_tar_aarch64_checksum=$(sha256sum \
     "./deploy/prod/safe/sn_cli-$sn_cli_version-aarch64-unknown-linux-musl.tar.gz" | \
     awk '{ print $1 }')
 
-release_description=$(sed "s/__sn_fault_detection_VERSION__/$sn_fault_detection_version/g" <<< "$release_description")
+release_description=$(sed "s/__SN_FAULT_DETECTION_VERSION__/$sn_fault_detection_version/g" <<< "$release_description")
 release_description=$(sed "s/__SN_INTERFACE_VERSION__/$sn_interface_version/g" <<< "$release_description")
+release_description=$(sed "s/__SN_COMMS_CHANGELOG_TEXT__/$sn_comms_version/g" <<< "$release_description")
 release_description=$(sed "s/__SN_CLIENT_VERSION__/$sn_client_version/g" <<< "$release_description")
 release_description=$(sed "s/__SN_NODE_VERSION__/$sn_node_version/g" <<< "$release_description")
 release_description=$(sed "s/__SN_API_VERSION__/$sn_api_version/g" <<< "$release_description")

@@ -61,13 +61,11 @@ impl Link {
             .map_err(LinkError::Send)?;
         debug!("{msg_id:?} bidi msg sent to {peer:?}");
 
-        // move finish off thread as it's not strictly related to the sending of the msg.
-        let _handle = tokio::spawn(async move {
-            // Attempt to gracefully terminate the stream.
-            // If this errors it does _not_ mean our message has not been sent
-            let result = send_stream.finish().await;
-            debug!("{msg_id:?} to {peer:?} bidi finished: {result:?}");
-        });
+        // Attempt to gracefully terminate the stream.
+        // If this errors it does _not_ necessarily mean our message has not been sent,
+        // but we'll be retrying anyways...
+        send_stream.finish().await.map_err(LinkError::Send)?;
+        debug!("{msg_id:?} to {peer:?} bidi finished");
 
         Ok(recv_stream)
     }

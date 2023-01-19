@@ -11,7 +11,7 @@ concurrency:
   group: "main-modifying-workflow"
 
 env:
-  CARGO_INCREMENTAL: 0  # bookkeeping for incremental builds has overhead, not useful in CI.
+  CARGO_INCREMENTAL: 0 # bookkeeping for incremental builds has overhead, not useful in CI.
   NODE_COUNT: 15
 
 jobs:
@@ -69,14 +69,14 @@ jobs:
   #   - uses: EmbarkStudios/cargo-deny-action@v1
 
   lint:
-      runs-on: ubuntu-latest
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      steps:
-        - uses: actions/checkout@v2
-          with:
-            fetch-depth: 0
-        - uses: wagoid/commitlint-github-action@f114310111fdbd07e99f47f9ca13d62b3ec98372
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: wagoid/commitlint-github-action@f114310111fdbd07e99f47f9ca13d62b3ec98372
 
   checks:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -103,11 +103,39 @@ jobs:
       - shell: bash
         run: cargo clippy --all-targets --all-features -- -Dwarnings
 
-
       - name: Check documentation
         # Deny certain `rustdoc` lints that are unwanted.
         # See https://doc.rust-lang.org/rustdoc/lints.html for lints that are 'warning' by default.
         run: RUSTDOCFLAGS="--deny=warnings" cargo doc --no-deps
+
+  build-arm:
+    name: build arm
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: arm-unknown-linux-musleabi
+          - os: ubuntu-latest
+            target: armv7-unknown-linux-musleabihf
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        id: toolchain
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - shell: bash
+        run: make gha-build-${{ matrix.target }}
+      - uses: actions/upload-artifact@main
+        with:
+          name: safe_network-${{ matrix.target }}
+          path: |
+            artifacts
+            !artifacts/.cargo-lock
 
   unit:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -148,7 +176,7 @@ jobs:
       - name: Run sn_fault_detection tests
         timeout-minutes: 15
         env:
-           RUST_LOG: sn_fault_detection
+          RUST_LOG: sn_fault_detection
         run: cd sn_fault_detection && cargo test --release
 
       - name: Build sn_node tests before running
@@ -233,7 +261,7 @@ jobs:
           SN_CMD_TIMEOUT: 90
           SN_QUERY_TIMEOUT: 90
           RUST_LOG: "sn_client=trace,qp2p=debug"
-        run: cd sn_client && cargo test --release --features check-replicas -- --test-threads=1
+        run: cd sn_client && cargo test --release --features check-replicas
         timeout-minutes: 7
 
       - name: Run example app for file API against local network
@@ -493,7 +521,6 @@ jobs:
         if: failure()
         continue-on-error: true
 
-
   # e2e-split:
   #   #if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
   #   # disabled temporarily since `self-hosted-ubuntu` runner not available for NodeRefactorBranch branch
@@ -519,17 +546,17 @@ jobs:
   #         cache-on-failure: true
   #         sharedKey: ${{github.run_id}}
 
-      # - name: install ripgrep ubuntu
-      #   run: sudo apt-get install ripgrep
-      #   if: matrix.os == 'ubuntu-latest'
+  # - name: install ripgrep ubuntu
+  #   run: sudo apt-get install ripgrep
+  #   if: matrix.os == 'ubuntu-latest'
 
-      # - name: install ripgrep mac
-      #   run: brew install ripgrep
-      #   if: matrix.os == 'macos-latest'
+  # - name: install ripgrep mac
+  #   run: brew install ripgrep
+  #   if: matrix.os == 'macos-latest'
 
-      # - name: install ripgrep windows
-      #   run: choco install ripgrep
-      #   if: matrix.os == 'windows-latest'
+  # - name: install ripgrep windows
+  #   run: choco install ripgrep
+  #   if: matrix.os == 'windows-latest'
 
   #     - name: Build sn bins
   #       run: cd sn_node && cargo build --release --bins
@@ -551,11 +578,9 @@ jobs:
   #       env:
   #         RUST_LOG: "sn_node,sn_client,sn_comms,sn_consensus,sn_fault_detection=trace,sn_interface=trace"
 
-
   #     # - name: Print Network Stats after churn test
   #     #   shell: bash
   #     #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-
 
   #     # - name: Cleanup churn test
   #     #   run: |
@@ -570,7 +595,6 @@ jobs:
   #     #   run: cargo run --release --example network_split
   #     #   env:
   #     #     RUST_LOG: "sn_node,sn_client,sn_comms,sn_consensus,sn_fault_detection=trace"
-
 
   #     # - name: Print Network Log Stats at start
   #     #   shell: bash
