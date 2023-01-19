@@ -7,8 +7,12 @@ on:
 
 # this should prevent bors merge run, and main release/commits from running concurrently
 #(as long as both are sporting this check)
+# ${GITHUB_REF##*/} here should result in "staging" or "trying", we'll only want "staging"
+# to prevent runs here or in main, so we hard-set that there.
+# This should also mean that staging/trying branch runs do not conflict (and so `bors try`
+# is no longer blocked by `bors r+`)
 concurrency:
-  group: "main-modifying-workflow"
+  group: "main-${GITHUB_REF##*/}-workflow"
 
 env:
   CARGO_INCREMENTAL: 0  # bookkeeping for incremental builds has overhead, not useful in CI.
