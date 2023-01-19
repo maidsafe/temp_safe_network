@@ -12,7 +12,7 @@ on:
 # This should also mean that staging/trying branch runs do not conflict (and so `bors try`
 # is no longer blocked by `bors r+`)
 concurrency:
-  group: "main-${GITHUB_REF##*/}-workflow"
+  group: "main-${{ github.ref }}-workflow"
 
 env:
   CARGO_INCREMENTAL: 0 # bookkeeping for incremental builds has overhead, not useful in CI.
