@@ -64,7 +64,6 @@ pub use api::{
 };
 pub use connections::LinkError;
 pub use errors::{Error, Result};
-pub use qp2p::Config as QuicP2pConfig;
 pub use sn_interface::messaging::data::Error as ErrorMsg;
 
 /// Client trait and related constants.

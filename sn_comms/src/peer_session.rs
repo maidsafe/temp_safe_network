@@ -158,20 +158,8 @@ impl PeerSession {
                 trace!("{msg_id:?} finished {stream_id_clone} to {peer:?}: {result:?}");
             });
 
-            match recv_stream.next().await {
-                Ok(Some(response)) => break Ok(response),
-                Ok(None) => {
-                    error!(
-                        "Stream closed by peer when awaiting response to {msg_id:?} from {peer:?} over {stream_id}."
-                    );
-                    let _conn = self.connections.remove(&conn_id);
-                    if is_last_attempt {
-                        break Err(PeerSessionError::RecvClosed(peer));
-                    }
-
-                    // tiny wait for comms/dashmap to cope with removal
-                    sleep(CONN_RETRY_WAIT).await;
-                }
+            match recv_stream.read().await {
+                Ok(response) => break Ok(response),
                 Err(err) => {
                     error!("Error receiving response to {msg_id:?} from {peer:?} over {stream_id}: {err:?}");
                     let _conn = self.connections.remove(&conn_id);
@@ -445,8 +433,6 @@ pub(super) enum PeerSessionError {
     Send(qp2p::SendError),
     #[error("Failed to receive a message: {0:?}")]
     Recv(qp2p::RecvError),
-    #[error("Remote peer closed the bi-stream we expected a msg on: {0:?}")]
-    RecvClosed(Peer),
     #[error("Max number of attempts ({0}) to send msg to the peer has been reached")]
     MaxRetriesReached(usize),
     #[error("Status of sending the msg is unknown")]

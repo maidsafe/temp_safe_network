@@ -9,7 +9,6 @@
 use clap::Parser;
 use eyre::Result;
 use sn_node::node::Config;
-use std::time::Duration;
 use tokio::{fs::remove_file, io};
 
 // This example is to demonstrate how the node configuration is constructed
@@ -92,19 +91,6 @@ async fn main() -> Result<()> {
         assert!(config.first);
     }
 
-    if command_line_args.public_addr.is_some() {
-        assert_eq!(command_line_args.public_addr, config.public_addr);
-    } else {
-        assert_eq!(
-            file_config.network_config().external_ip,
-            config.network_config().external_ip
-        );
-        assert_eq!(
-            file_config.network_config().external_port,
-            config.network_config().external_port
-        );
-    }
-
     if command_line_args.max_msg_size_allowed.is_some() {
         assert_eq!(
             command_line_args.max_msg_size_allowed,
@@ -114,34 +100,6 @@ async fn main() -> Result<()> {
         assert_eq!(
             file_config.max_msg_size_allowed,
             config.max_msg_size_allowed
-        )
-    }
-
-    if command_line_args.idle_timeout_msec.is_some() {
-        assert_eq!(
-            command_line_args
-                .idle_timeout_msec
-                .map(Duration::from_millis),
-            config.network_config().idle_timeout
-        )
-    } else {
-        assert_eq!(
-            file_config.network_config().idle_timeout,
-            config.network_config().idle_timeout
-        )
-    }
-
-    if command_line_args.keep_alive_interval_msec.is_some() {
-        assert_eq!(
-            command_line_args
-                .keep_alive_interval_msec
-                .map(|i| Duration::from_millis(i.into())),
-            config.network_config().keep_alive_interval
-        )
-    } else {
-        assert_eq!(
-            file_config.network_config().keep_alive_interval,
-            config.network_config().keep_alive_interval
         )
     }
 

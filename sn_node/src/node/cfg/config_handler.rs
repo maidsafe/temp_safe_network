@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{Error, NetworkConfig, Result};
+use crate::node::{Error, Result};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -17,7 +17,6 @@ use std::{
 use tokio::{
     fs::{self, File},
     io::AsyncWriteExt,
-    time::Duration,
 };
 use tracing::{debug, error, warn, Level};
 
@@ -104,12 +103,6 @@ pub struct Config {
     /// non-local nodes).
     #[clap(long)]
     pub local_addr: Option<SocketAddr>,
-    /// External address of the node, to use when writing connection info.
-    ///
-    /// If unspecified, it will be queried from a peer; if there are no peers, the `local-addr` will
-    /// be used, if specified.
-    #[clap(long, parse(try_from_str = parse_public_addr))]
-    pub public_addr: Option<SocketAddr>,
     /// DEPRECATED (to be removed)
     /// This flag can be used to skip automated port forwarding using IGD. This is used when running
     /// a network on a LAN or when a node is connected to the internet directly, without a router,
@@ -170,31 +163,31 @@ impl Config {
             ));
         }
 
-        if let Some(local_addr) = self.local_addr {
-            if local_addr.ip().is_loopback() && self.public_addr.is_some() {
-                return Err(Error::Configuration(
-                    "Cannot specify --public-addr when --local-addr uses a loopback IP. \
-                    When local-addr uses a loopback IP, the node will never be reachable publicly. \
-                    You can drop public-addr if this is a local-only node, or change local-addr to \
-                    a public or unspecified IP."
-                        .to_string(),
-                ));
-            }
-        }
+        // if let Some(local_addr) = self.local_addr {
+        //     if local_addr.ip().is_loopback() && self.public_addr.is_some() {
+        //         return Err(Error::Configuration(
+        //             "Cannot specify --public-addr when --local-addr uses a loopback IP. \
+        //             When local-addr uses a loopback IP, the node will never be reachable publicly. \
+        //             You can drop public-addr if this is a local-only node, or change local-addr to \
+        //             a public or unspecified IP."
+        //                 .to_string(),
+        //         ));
+        //     }
+        // }
 
-        let local_ip_unspecified = self
-            .local_addr
-            .map(|addr| addr.ip().is_unspecified())
-            .unwrap_or(true);
-        if local_ip_unspecified && self.first && self.public_addr.is_none() {
-            return Err(Error::Configuration(
-                "Must specify public address for --first node. \
-                The first node cannot query its public address from peers, so one must be \
-                specifed. This can be specified with --public-addr, or by setting a concrete IP \
-                for --local-addr."
-                    .to_string(),
-            ));
-        }
+        // let local_ip_unspecified = self
+        //     .local_addr
+        //     .map(|addr| addr.ip().is_unspecified())
+        //     .unwrap_or(true);
+        // if local_ip_unspecified && self.first && self.public_addr.is_none() {
+        //     return Err(Error::Configuration(
+        //         "Must specify public address for --first node. \
+        //         The first node cannot query its public address from peers, so one must be \
+        //         specifed. This can be specified with --public-addr, or by setting a concrete IP \
+        //         for --local-addr."
+        //             .to_string(),
+        //     ));
+        // }
 
         Ok(())
     }
@@ -242,9 +235,9 @@ impl Config {
             self.local_addr = config.local_addr;
         }
 
-        if config.public_addr.is_some() {
-            self.public_addr = config.public_addr;
-        }
+        // if config.public_addr.is_some() {
+        //     self.public_addr = config.public_addr;
+        // }
 
         if config.max_msg_size_allowed.is_some() {
             self.max_msg_size_allowed = config.max_msg_size_allowed;
@@ -322,24 +315,19 @@ impl Config {
             .unwrap_or_else(|| SocketAddr::from((std::net::Ipv4Addr::UNSPECIFIED, 0)))
     }
 
-    /// Network configuration options.
-    pub fn network_config(&self) -> NetworkConfig {
-        let mut network_config = NetworkConfig::default();
-        if let Some(public_addr) = self.public_addr {
-            network_config.external_port = Some(public_addr.port());
-            network_config.external_ip = Some(public_addr.ip());
-        }
+    // /// Network configuration options.
+    // pub fn network_config(&self) -> NetworkConfig {
+    //     let mut network_config = NetworkConfig::default();
+    //     if let Some(t) = self.idle_timeout_msec {
+    //         network_config.idle_timeout = Some(Duration::from_millis(t));
+    //     }
 
-        if let Some(t) = self.idle_timeout_msec {
-            network_config.idle_timeout = Some(Duration::from_millis(t));
-        }
+    //     if let Some(t) = self.keep_alive_interval_msec {
+    //         network_config.keep_alive_interval = Some(Duration::from_millis(t.into()));
+    //     }
 
-        if let Some(t) = self.keep_alive_interval_msec {
-            network_config.keep_alive_interval = Some(Duration::from_millis(t.into()));
-        }
-
-        network_config
-    }
+    //     network_config
+    // }
 
     /// Get the completions option
     pub fn completions(&self) -> &Option<String> {
@@ -433,28 +421,6 @@ impl Config {
 
         Ok(())
     }
-}
-
-fn parse_public_addr(public_addr: &str) -> Result<SocketAddr, String> {
-    let public_addr: SocketAddr = public_addr.parse().map_err(|err| format!("{err}"))?;
-
-    if public_addr.ip().is_unspecified() {
-        return Err("Cannot use unspecified IP for public address. \
-            You can drop this option to query the public IP from a peer instead."
-            .to_string());
-    }
-    if public_addr.ip().is_loopback() {
-        return Err("Cannot use loopback IP for public address. \
-            You can drop this option for a local-only network."
-            .to_string());
-    }
-    if public_addr.port() == 0 {
-        return Err("Cannot use unspecified port for public address. \
-            You must specify the concrete port on which the node will be reachable."
-            .to_string());
-    }
-
-    Ok(public_addr)
 }
 
 fn project_dirs() -> Result<PathBuf> {
