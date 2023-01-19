@@ -17,8 +17,8 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[allow(missing_docs)]
 pub enum Error {
     /// Any unknown node comms should be bidi, initiated by the other side
-    #[error("Attempted to create a connection to an unkown node")]
-    CreatingConnectionToUnknownNode,
+    #[error("Attempted to create a connection to an unknown node: {0:?}")]
+    CreatingConnectionToUnknownNode(Peer),
     #[error("Peer channel errored")]
     PeerSessionChannel,
     #[error("Cannot connect to the endpoint: {0}")]

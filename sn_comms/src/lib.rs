@@ -364,7 +364,7 @@ impl Comm {
             );
             Ok(session)
         } else {
-            Err(Error::CreatingConnectionToUnknownNode)
+            Err(Error::CreatingConnectionToUnknownNode(*peer))
         }
     }
 
