@@ -29,18 +29,6 @@ pub enum Error {
     FailedSend(Peer),
 }
 
-impl From<qp2p::ClientEndpointError> for Error {
-    fn from(error: qp2p::ClientEndpointError) -> Self {
-        let endpoint_err = match error {
-            qp2p::ClientEndpointError::Config(error) => qp2p::EndpointError::Config(error),
-            qp2p::ClientEndpointError::Socket(error) => qp2p::EndpointError::Socket(error),
-            qp2p::ClientEndpointError::Io(error) => qp2p::EndpointError::IoError(error),
-        };
-
-        Self::CannotConnectEndpoint(endpoint_err)
-    }
-}
-
 impl From<qp2p::SendError> for Error {
     fn from(error: qp2p::SendError) -> Self {
         Self::AddressNotReachable(qp2p::RpcError::Send(error))

@@ -27,7 +27,7 @@ use sn_interface::{
 use assert_matches::assert_matches;
 use bytes::Bytes;
 use eyre::{eyre, Result};
-use qp2p::{Config, Endpoint};
+use qp2p::Endpoint;
 use std::{
     collections::{BTreeSet, VecDeque},
     net::{Ipv4Addr, SocketAddr},
@@ -114,7 +114,9 @@ impl<'a> ProcessAndInspectCmds<'a> {
         let (msg_id, serialised_payload, msg_kind, auth) = get_client_msg_parts_for_handling(&msg)?;
 
         let client_addr: SocketAddr = (Ipv4Addr::LOCALHOST, 0).into();
-        let client_endpoint = Endpoint::new_client(client_addr, Config::default())
+        let client_endpoint = Endpoint::builder()
+            .addr(client_addr)
+            .client()
             .expect("failed to create new client endpoint");
 
         let peer = context.info.peer();

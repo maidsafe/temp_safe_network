@@ -229,7 +229,7 @@ pub enum Error {
     IoError(#[from] io::Error),
     /// Endpoint setup error.
     #[error(transparent)]
-    EndpointSetup(#[from] qp2p::ClientEndpointError),
+    EndpointSetup(#[from] qp2p::EndpointError),
     /// QuicP2p Recv error.
     #[error(transparent)]
     QuicP2p(#[from] qp2p::RecvError),

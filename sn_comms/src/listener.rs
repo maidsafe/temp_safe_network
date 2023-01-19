@@ -62,7 +62,7 @@ impl MsgListener {
                         "New msg arrived over conn_id={conn_id} from {remote_address:?}{stream_info}"
                     );
 
-                    let wire_msg = match WireMsg::from(msg_bytes) {
+                    let wire_msg = match WireMsg::from(msg_bytes.0) {
                         Ok(wire_msg) => wire_msg,
                         Err(error) => {
                             // TODO: should perhaps rather drop this connection.. as it is a spam vector

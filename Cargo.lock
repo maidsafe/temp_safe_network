@@ -3032,9 +3032,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.34.0"
+version = "0.35.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0dbb644fbe34b976649f3cbdb1d4b534b83e845dba1f4bafe696834d61adeb18"
+checksum = "cd4c0beab550e3cc390d88d1f6dc36e478502f28ad58902ddc8844d08d12d81e"
 dependencies = [
  "bincode",
  "bytes",
@@ -3047,6 +3047,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+ "webpki 0.22.0",
 ]
 
 [[package]]

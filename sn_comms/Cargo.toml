@@ -20,7 +20,7 @@ dashmap = {version = "5.1.0", features = [ "serde" ]}
 tokio = { version = "1.0.23", features = [ "sync" ] }
 tracing = "~0.1.26"
 xor_name = "~5.0.0"
-qp2p = "~0.34.0"
+qp2p = "~0.35.0"
 sn_interface = { path = "../sn_interface", version = "^0.16.18" }
 thiserror = "1.0.23"
 
