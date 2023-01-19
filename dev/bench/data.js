@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1674111615673,
+  "lastUpdate": 1674117416598,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -54904,6 +54904,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 331759104,
             "range": "± 2374194",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "1d2a8220f77743b03ff85c6a7083b8ee22534f44",
+          "message": "Merge #1930 #1993\n\n1930: fix(client): retry only once when check-replicas test query fails due to diff responses r=joshuef a=bochaco\n\n- Re-enabling e2e sn_client tests multi-threaded mode.\r\n- If a connection times out right after we sent a msg, but before we try to finish the stream, since we don’t await for the `finish` result we miss the chance to detect it and retry with new conn. This was made this way to avoid the await, but it seems, that at least for the client, we may want to wait for the `finish` result so we can retry in such scenarios.\r\n- Retrying a test query only once, and only if the failure was due to receiving different responses from the data replicas, which may be due to a temporary out of sync. We've seen this very occasionally in CI with Register queries/entries.\n\n1993: Misc Release Process Updates r=joshuef a=jacderida\n\n- 2badf68d6 **ci: add arm builds to merge workflow**\r\n\r\n  We seen a failure on a release because an ARM build failed. The failure occurred because the `cross`\r\n  utility (which we use for cross compilation) wouldn't build correctly. Strangely, I wasn't able to\r\n  reproduce this problem, but I think it highlights the need for building on ARM before we merge. If\r\n  we are going to release on every merge, we will need to check that we can build on ARM.\r\n  \r\n- bfc96acdc **ci: slack notifications for workflow failures**\r\n\r\n  We didn't become aware of our latest release workflow failure for weeks after the event, so I've\r\n  enabled notifications for failures of either the version bumping or release workflows.\r\n  \r\n- d14f34bde **ci: add sn_comms crate to the release process**\r\n\r\n  This new crate is added to all the necessary mechanisms for the release process.  \n\nCo-authored-by: bochaco <gabrielviganotti@gmail.com>\nCo-authored-by: Chris O'Neil <chriso83@protonmail.com>",
+          "timestamp": "2023-01-19T06:19:30Z",
+          "tree_id": "9886dca402ae543c022a74c192c063f6c8c5bb13",
+          "url": "https://github.com/maidsafe/safe_network/commit/1d2a8220f77743b03ff85c6a7083b8ee22534f44"
+        },
+        "date": 1674117414063,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2471674,
+            "range": "± 2540",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 85497588,
+            "range": "± 1330529",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 106038253,
+            "range": "± 2127687",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 394915671,
+            "range": "± 22621670",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 68644855,
+            "range": "± 666465",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 85937865,
+            "range": "± 852639",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 318935623,
+            "range": "± 1714438",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 23138475939,
+            "range": "± 220202968",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 40566400,
+            "range": "± 8821536",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 1482059909,
+            "range": "± 409035020",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 7147318831,
+            "range": "± 1669379140",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 344036504,
+            "range": "± 70201862",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1496729852,
+            "range": "± 513831058",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 6050572224,
+            "range": "± 1477867670",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 44834609,
+            "range": "± 419796",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 432616437,
+            "range": "± 1871714",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1683424627,
+            "range": "± 7143417",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11427581,
+            "range": "± 187885",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 95712440,
+            "range": "± 3043064",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 328546820,
+            "range": "± 1816701",
             "unit": "ns/iter"
           }
         ]
