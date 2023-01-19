@@ -213,6 +213,12 @@ jobs:
           if [[ $commit_message == *"sn_fault_detection"* ]]; then
             ./resources/scripts/publish_crate_with_retries.sh "sn_fault_detection"
           fi
+      - name: publish sn_comms
+        run: |
+          commit_message="${{ github.event.head_commit.message }}"
+          if [[ $commit_message == *"sn_comms"* ]]; then
+            ./resources/scripts/publish_crate_with_retries.sh "sn_comms"
+          fi
       - name: publish sn_node
         run: |
           commit_message="${{ github.event.head_commit.message }}"
