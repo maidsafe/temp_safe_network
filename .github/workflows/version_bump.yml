@@ -44,12 +44,8 @@ jobs:
           github_token: ${{ secrets.VERSION_BUMP_COMMIT_PAT }}
           branch: main
           tags: true
-  notify-if-failure:
-    name: send slack notification on failure
-    if: ${{ failure() }}
-    runs-on: ubuntu-22.04
-    steps:
       - name: post notification to slack on failure
+        if: ${{ failure() }}
         uses: bryannice/gitactions-slack-notification@2.0.0
         env:
           SLACK_INCOMING_WEBHOOK: ${{ secrets.SLACK_GH_ACTIONS_WEBHOOK_URL }}
