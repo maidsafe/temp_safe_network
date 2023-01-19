@@ -169,6 +169,23 @@ mod core {
                 }
             });
         }
+
+        /// Sends `FaultsCmd::UntrackIssue` cmd
+        /// Spawns a process to send this incase the channel may be full, we don't hold up
+        /// processing around this (as this can be called during dkg eg)
+        pub(crate) fn untrack_node_issue(&self, name: XorName, issue: IssueType) {
+            trace!("UnTracking issue {issue:?} in fault detection for {name}");
+            let fault_sender = self.fault_cmds_sender.clone();
+            // TODO: do we need to kill the node if we fail tracking faults?
+            let _handle = tokio::spawn(async move {
+                if let Err(error) = fault_sender
+                    .send(FaultsCmd::UntrackIssue(name, issue))
+                    .await
+                {
+                    warn!("Could not send FaultsCmd through fault_cmds_tx: {error}");
+                }
+            });
+        }
     }
 
     impl MyNode {
