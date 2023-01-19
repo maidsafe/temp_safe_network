@@ -43,6 +43,13 @@ jobs:
           path: |
             artifacts
             !artifacts/.cargo-lock
+      - name: post notification to slack on failure
+        if: ${{ failure() }}
+        uses: bryannice/gitactions-slack-notification@2.0.0
+        env:
+          SLACK_INCOMING_WEBHOOK: ${{ secrets.SLACK_GH_ACTIONS_WEBHOOK_URL }}
+          SLACK_MESSAGE: "Please check the logs for the run at ${{ env.WORKFLOW_URL }}/${{ github.run_id }}"
+          SLACK_TITLE: "Release Failed"
 
   gh_release:
     if: |
@@ -177,6 +184,13 @@ jobs:
           aws_bucket: sn-cli
           source_dir: deploy/prod/safe
           destination_dir: ""
+      - name: post notification to slack on failure
+        if: ${{ failure() }}
+        uses: bryannice/gitactions-slack-notification@2.0.0
+        env:
+          SLACK_INCOMING_WEBHOOK: ${{ secrets.SLACK_GH_ACTIONS_WEBHOOK_URL }}
+          SLACK_MESSAGE: "Please check the logs for the run at ${{ env.WORKFLOW_URL }}/${{ github.run_id }}"
+          SLACK_TITLE: "Release Failed"
 
   publish:
     name: publish
@@ -243,15 +257,10 @@ jobs:
           if [[ $commit_message == *"sn_cli-"* ]]; then
             ./resources/scripts/publish_crate_with_retries.sh "sn_cli"
           fi
-
-  notify-if-failure:
-    name: send slack notification on failure
-    if: ${{ failure() }}
-    runs-on: ubuntu-22.04
-    steps:
       - name: post notification to slack on failure
+        if: ${{ failure() }}
         uses: bryannice/gitactions-slack-notification@2.0.0
         env:
           SLACK_INCOMING_WEBHOOK: ${{ secrets.SLACK_GH_ACTIONS_WEBHOOK_URL }}
           SLACK_MESSAGE: "Please check the logs for the run at ${{ env.WORKFLOW_URL }}/${{ github.run_id }}"
-          SLACK_TITLE: "Version Bumping Failed"
+          SLACK_TITLE: "Release Failed"
