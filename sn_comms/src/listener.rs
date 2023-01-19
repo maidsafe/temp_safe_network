@@ -101,34 +101,40 @@ impl MsgListener {
 
                     let peer = Peer::new(src_name, remote_address);
 
-                    // we don't want to store PeerSessions from clients
-                    if node_conn_cached.is_none() && !is_from_client && !is_node_join_msg {
-                        node_conn_cached = Some(peer);
-                        let _ = self
-                            .connection_events
-                            .send(ConnectionEvent::Connected {
-                                peer,
-                                connection: conn.clone(),
-                            })
-                            .await;
-                    }
-
                     let msg_id = wire_msg.msg_id();
                     debug!(
                         "Msg {msg_id:?} received, over conn_id={conn_id}, from: {peer:?}{stream_info} was: {wire_msg:?}"
                     );
 
-                    if let Err(error) = self
-                        .receive_msg
-                        .send(MsgFromPeer {
-                            sender: peer,
-                            wire_msg,
-                            send_stream,
-                        })
-                        .await
-                    {
-                        error!("Error pushing msg {msg_id:?} onto internal msg handling channel: {error:?}");
+                    let msg_sender = self.receive_msg.clone();
+                    let connection_event_sender = self.connection_events.clone();
+                    let connection = conn.clone();
+
+                    if node_conn_cached.is_none() && !is_from_client && !is_node_join_msg {
+                        node_conn_cached = Some(peer);
                     }
+
+                    // move this channel sending off thread so we dont hold up incoming msgs at all.
+                    let _handle = tokio::spawn(async move {
+                        // handle the message first
+                        if let Err(error) = msg_sender
+                            .send(MsgFromPeer {
+                                sender: peer,
+                                wire_msg,
+                                send_stream,
+                            })
+                            .await
+                        {
+                            error!("Error pushing msg {msg_id:?} onto internal msg handling channel: {error:?}");
+                        }
+
+                        // we don't want to store PeerSessions from clients
+                        if node_conn_cached.is_none() && !is_from_client && !is_node_join_msg {
+                            let _ = connection_event_sender
+                                .send(ConnectionEvent::Connected { peer, connection })
+                                .await;
+                        }
+                    });
                 }
                 Err(error) => {
                     warn!("Error on connection {conn_id} with {remote_address}: {error:?}");
