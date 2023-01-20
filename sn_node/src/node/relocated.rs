@@ -40,16 +40,11 @@ impl JoiningAsRelocated {
     pub(crate) fn start(
         node: MyNodeInfo,
         relocate_proof: SectionSigned<NodeState>,
-        bootstrap_addrs: Vec<SocketAddr>,
+        bootstrap_nodes: BTreeSet<Peer>,
         dst_xorname: XorName,
         dst_section_key: BlsPublicKey,
         new_age: u8,
     ) -> Result<(Self, Cmd)> {
-        let recipients: BTreeSet<_> = bootstrap_addrs
-            .iter()
-            .map(|addr| Peer::new(dst_xorname, *addr))
-            .collect();
-
         // The first request is actually for fetching latest SAP only.
         // Hence shall not be counted as used.
 
@@ -72,7 +67,7 @@ impl JoiningAsRelocated {
             old_keypair,
             has_new_name: false,
         };
-        let cmd = relocating.build_join_request_cmd(recipients, dummy_signature)?;
+        let cmd = relocating.build_join_request_cmd(bootstrap_nodes, dummy_signature)?;
 
         Ok((relocating, cmd))
     }
@@ -260,7 +255,7 @@ mod tests {
         test_utils::{gen_addr, TestKeys},
         types::{keys::ed25519, Peer},
     };
-    use std::{collections::BTreeSet, net::SocketAddr};
+    use std::collections::BTreeSet;
     use tokio;
     use xor_name::Prefix;
 
@@ -277,7 +272,7 @@ mod tests {
         // to_sap
         let (to_sap, _) = generate_sap();
 
-        let bootstrap: Vec<SocketAddr> = to_sap.elders().map(|peer| peer.addr()).collect();
+        let bootstrap = to_sap.elders_set();
         let (_, cmd) = JoiningAsRelocated::start(
             node.clone(),
             signed_node_state,
@@ -325,11 +320,10 @@ mod tests {
             // to_sap
             let (to_sap, to_sk_set) = generate_sap();
 
-            let bootstrap: Vec<SocketAddr> = to_sap.elders().map(|peer| peer.addr()).collect();
             let (mut joining, _) = JoiningAsRelocated::start(
                 node.clone(),
                 signed_node_state,
-                bootstrap,
+                to_sap.elders_set(),
                 // initially with our own xorname
                 node.name(),
                 // initially we have outdated destination section key
@@ -391,11 +385,10 @@ mod tests {
             // to_sap
             let (to_sap, to_sk_set) = generate_sap();
 
-            let bootstrap: Vec<SocketAddr> = to_sap.elders().map(|peer| peer.addr()).collect();
             let (mut joining, _) = JoiningAsRelocated::start(
                 node.clone(),
                 signed_node_state,
-                bootstrap,
+                to_sap.elders_set(),
                 node.name(),
                 // latest section key of the destination
                 to_sk_set.secret_key().public_key(),

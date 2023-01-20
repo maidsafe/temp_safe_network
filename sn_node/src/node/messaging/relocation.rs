@@ -107,9 +107,9 @@ impl MyNode {
         // flow. This same instance will handle responses till relocation is complete.
         let bootstrap_addrs =
             if let Ok(sap) = self.network_knowledge.section_auth_by_name(&dst_xorname) {
-                sap.addresses()
+                sap.elders_set()
             } else {
-                self.network_knowledge.section_auth().addresses()
+                self.network_knowledge.section_auth().elders_set()
             };
         let (joining_as_relocated, cmd) = JoiningAsRelocated::start(
             node,
