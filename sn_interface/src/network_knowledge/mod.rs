@@ -497,6 +497,15 @@ impl NetworkKnowledge {
             .collect()
     }
 
+    /// Returns the list of members that have left our section
+    pub fn section_archived_members(&self) -> BTreeSet<NodeState> {
+        self.section_peers
+            .archived_members()
+            .into_iter()
+            .map(|state| state.value)
+            .collect()
+    }
+
     /// Returns current list of section signed members.
     pub fn section_signed_members(&self) -> BTreeSet<SectionSigned<NodeState>> {
         self.section_peers.members()

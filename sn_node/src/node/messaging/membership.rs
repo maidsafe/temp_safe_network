@@ -206,7 +206,9 @@ impl MyNode {
             cmds.extend(self.handle_node_left(new_info, signature).into_iter());
         }
 
-        cmds.push(self.send_node_approvals(decision.clone()));
+        if let Some(cmd) = self.send_node_approvals(decision.clone()) {
+            cmds.push(cmd);
+        }
 
         // Do not disable node joins in first section.
         if !self.is_startup_joining_allowed() {
@@ -280,9 +282,7 @@ impl MyNode {
         self.log_network_stats();
 
         // updates comm with new members and removes connections that are not from our members
-        self.comm
-            .update_members(self.network_knowledge.members())
-            .await;
+        self.comm.update_members(&self.network_knowledge).await;
 
         Ok(cmds)
     }
@@ -324,20 +324,28 @@ impl MyNode {
     }
 
     // Send `NodeApproval` to a joining node which makes it a section member
-    pub(crate) fn send_node_approvals(&self, decision: Decision<NodeState>) -> Cmd {
+    pub(crate) fn send_node_approvals(&self, decision: Decision<NodeState>) -> Option<Cmd> {
         let peers: BTreeSet<_> = decision
             .proposals
             .keys()
             .filter(|n| n.state() == MembershipState::Joined)
             .map(|n| *n.peer())
             .collect();
-        let prefix = self.network_knowledge.prefix();
-        info!("Section {prefix:?} has approved new peers {peers:?}.");
+        if !peers.is_empty() {
+            let prefix = self.network_knowledge.prefix();
+            info!("Section {prefix:?} has approved new peers {peers:?}.");
 
-        let msg = NodeMsg::JoinResponse(JoinResponse::Approved(decision));
+            let msg = NodeMsg::JoinResponse(JoinResponse::Approved(decision));
 
-        trace!("{}", LogMarker::SendNodeApproval);
-        MyNode::send_system_msg(msg, Peers::Multiple(peers), self.context())
+            trace!("{}", LogMarker::SendNodeApproval);
+            Some(MyNode::send_system_msg(
+                msg,
+                Peers::Multiple(peers),
+                self.context(),
+            ))
+        } else {
+            None
+        }
     }
 
     pub(crate) fn handle_node_left(

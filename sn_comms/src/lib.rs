@@ -58,6 +58,7 @@ use self::{
 
 use sn_interface::{
     messaging::{MsgId, WireMsg},
+    network_knowledge::NetworkKnowledge,
     types::{log_markers::LogMarker, Peer},
 };
 
@@ -174,11 +175,23 @@ impl Comm {
         self.our_endpoint.close()
     }
 
-    /// Updates cached connections for passed members set only.
-    pub async fn update_members(&mut self, members: BTreeSet<Peer>) {
-        let new_members = members.clone();
-        *self.members.write().await = members;
-        self.sessions.retain(|p, _| new_members.contains(p));
+    /// Updates cached connections for the current members and the members undergoing relocation
+    pub async fn update_members(&mut self, network_knowledge: &NetworkKnowledge) {
+        let relocated_members = network_knowledge
+            .section_archived_members()
+            .into_iter()
+            .filter_map(|state| {
+                if state.is_relocated() {
+                    Some(*state.peer())
+                } else {
+                    None
+                }
+            });
+        let mut members = network_knowledge.members();
+        members.extend(relocated_members);
+
+        *self.members.write().await = members.clone();
+        self.sessions.retain(|p, _| members.contains(p));
     }
 
     /// Sends the payload on a new or existing connection,
