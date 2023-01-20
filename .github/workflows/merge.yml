@@ -256,6 +256,10 @@ jobs:
         run: ./resources/scripts/wait_for_nodes_to_join.sh
         timeout-minutes: 5
 
+      - name: Check we have expected elders
+        shell: bash
+        run: rg "7 Elders, " ~/.safe/node/local-test-network -u
+
       - name: Build all tests before running non ubuntu
         run: cd sn_client && cargo test --no-run --release --features check-replicas
         timeout-minutes: 50
@@ -382,6 +386,10 @@ jobs:
         shell: bash
         run: ./resources/scripts/wait_for_nodes_to_join.sh
         timeout-minutes: 5
+
+      - name: Check we have expected elders
+        shell: bash
+        run: rg "7 Elders, " ~/.safe/node/local-test-network -u
 
       - name: Build all tests before running non ubuntu
         run: cd sn_client && cargo test --no-run --release --features msg-happy-path
