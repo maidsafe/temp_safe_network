@@ -1113,24 +1113,42 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
-## v0.77.7 (2022-12-27)
+## v0.77.8 (2023-01-20)
+
+### Chore
+
+ - <csr-id-21af053a5be2317be356e760c2b581c0f870a396/> happy new year 2023
+ - <csr-id-4b1bc4edfad3ad25711a4833181a629746abba19/> update sn_client readme
+ - <csr-id-04525595bc5de39f85a128cfb691644b71a3fb79/> disabling keep-alive msgs from client to nodes
+   - Setting sn_node idle-timeout to 70secs (to match ADULT_RESPONSE_TIMEOUT),
+   which allows the node to keep client connections a bit longer since it may
+   need more time (when under stress) to send back a response before closing them.
+   - Setting sn_client default idle_timeout to match query/cmd timeout values.
+
+### New Features
+
+ - <csr-id-cf6daa778c1d4278b444f1a61da3513506c14ea9/> expose a public API to query chunks to specific data replicas
+   - Exposing also an `sn_api` public API to fetch a file from a specified set of
+   data replicas indexes and a `SafeUrl`.
+   - Adding `--replicas` arg to CLI `dog` command which allows the user to perform
+   a check on several data replicas for the content being targeted by specifying their indexes.
 
 ### Bug Fixes
 
- - <csr-id-220fd52ab3e1bac776ba74793d5042de220bb315/> set default keep-alive interval to be 1/2 of idle_timeout value set
-   - By default the sn_client keep_alive msgs interval will now be set to 1/2 the
-   value set for the idle_timeout value.
-   - Removing unused ClientBuilder::cmd_ack_wait config value.
-   - Decreasing the CI timeout for sn_client, sn_api, and CLI tests, to 7mins.
-   - New LogMarker::IncomingConnection logged by sn_node.
+ - <csr-id-986ef817c053c4b5d8de78d13429fa85244228d9/> retry only once when check-replicas test query fails due to diff responses
+   - Run e2e sn_client tests in multi-threaded mode.
+   - Retrying a test query only once, and only if the failure was due to receiving
+   different responses from the data replicas, which may be due to a temporary out
+   of sync. We've seen this very occasionally in CI.
+   - Wait for stream to be finished to consider msg was sent successfully by sn_client.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 5 days passed between releases.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 19 commits contributed to the release over the course of 23 calendar days.
+ - 23 days passed between releases.
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -1140,11 +1158,66 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1930 #1993 ([`1d2a822`](https://github.com/maidsafe/safe_network/commit/1d2a8220f77743b03ff85c6a7083b8ee22534f44))
+    - retry only once when check-replicas test query fails due to diff responses ([`986ef81`](https://github.com/maidsafe/safe_network/commit/986ef817c053c4b5d8de78d13429fa85244228d9))
+    - Merge #1964 ([`6f08edb`](https://github.com/maidsafe/safe_network/commit/6f08edb32a0e93c879ddd13cda1abc6e6b098889))
+    - expose a public API to query chunks to specific data replicas ([`cf6daa7`](https://github.com/maidsafe/safe_network/commit/cf6daa778c1d4278b444f1a61da3513506c14ea9))
+    - Merge #1951 ([`24ca31f`](https://github.com/maidsafe/safe_network/commit/24ca31fd53c570c7c97849b74ded850c05273353))
+    - happy new year 2023 ([`21af053`](https://github.com/maidsafe/safe_network/commit/21af053a5be2317be356e760c2b581c0f870a396))
+    - Merge #1926 #1936 ([`acc88c5`](https://github.com/maidsafe/safe_network/commit/acc88c5d94900c840cb6c3111ef92fc24b0f3a3d))
+    - Merge branch 'main' into proposal_refactor ([`c9cf412`](https://github.com/maidsafe/safe_network/commit/c9cf4124bc88d4d739ba6e443b1c429c3f3855e0))
+    - Merge #1834 ([`982bdfc`](https://github.com/maidsafe/safe_network/commit/982bdfcb3ab275252895a9887a3d8eabaa99cf4c))
+    - Merge branch 'main' into proposal_refactor ([`0bc7f94`](https://github.com/maidsafe/safe_network/commit/0bc7f94c72c374d667a9b455c4f4f1830366e4a4))
+    - feat(storage): use nodes where adults were used - This continues the move over to also using elders for storage. ([`250da72`](https://github.com/maidsafe/safe_network/commit/250da72ea38b82037ae928ac0eeb8c4b91568448))
+    - fix(cmds): eventually try all elders in happy path - The last elder was mistakenly left out previously. - Also fixes so that we only require 1 ack on happy path. ([`729b4ee`](https://github.com/maidsafe/safe_network/commit/729b4eefc7ddb54acd4a5cbf9b8b3241e4ec9546))
+    - chore(ci): add msg-happy-path test job to merge - Adds `check-replicas` to the `msg-happy-path` feature. ([`c276929`](https://github.com/maidsafe/safe_network/commit/c276929180ef3c6524db797efdbbda409070db89))
+    - fix(naming): disambiguate fn name - Renames from `send_to` to `send_msg_and_check_acks`. ([`dfe116c`](https://github.com/maidsafe/safe_network/commit/dfe116cbed79d3f0f42c30105a7210a1e53da6b2))
+    - update sn_client readme ([`4b1bc4e`](https://github.com/maidsafe/safe_network/commit/4b1bc4edfad3ad25711a4833181a629746abba19))
+    - feat(queries): add happy path feature - This allows clients to default to a lower impact interaction with elders (todo: only expanding the impact on failures). - Adds combined feat for both cmd and query happy path. ([`a77d95b`](https://github.com/maidsafe/safe_network/commit/a77d95b57ff179d1f8fedc00529c69204a8f89e0))
+    - feat(cmds): add happy path feature - This allows clients to default to a lower impact interaction with elders, only expanding the impact on failures. ([`21b4167`](https://github.com/maidsafe/safe_network/commit/21b4167f68b7bd145d02dcdf1b5d8f9acb7971a8))
+    - Merge #1927 ([`8f7f2a4`](https://github.com/maidsafe/safe_network/commit/8f7f2a4fc2e1d6cabb4f4849510234df4e1255be))
+    - disabling keep-alive msgs from client to nodes ([`0452559`](https://github.com/maidsafe/safe_network/commit/04525595bc5de39f85a128cfb691644b71a3fb79))
+</details>
+
+## v0.77.7 (2022-12-27)
+
+### Chore
+
+ - <csr-id-a38cd49958df82fd65d0a3f13670693f40a1e6b2/> sn_interface-0.16.13/sn_client-0.77.7/sn_node-0.72.24
+
+### Bug Fixes
+
+ - <csr-id-220fd52ab3e1bac776ba74793d5042de220bb315/> set default keep-alive interval to be 1/2 of idle_timeout value set
+   - By default the sn_client keep_alive msgs interval will now be set to 1/2 the
+   value set for the idle_timeout value.
+- Removing unused ClientBuilder::cmd_ack_wait config value.
+- Decreasing the CI timeout for sn_client, sn_api, and CLI tests, to 7mins.
+- New LogMarker::IncomingConnection logged by sn_node.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 5 days passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.13/sn_client-0.77.7/sn_node-0.72.24 ([`a38cd49`](https://github.com/maidsafe/safe_network/commit/a38cd49958df82fd65d0a3f13670693f40a1e6b2))
     - Merge #1924 ([`be2cded`](https://github.com/maidsafe/safe_network/commit/be2cdedb19154adf324782d7178f0e25018cd16c))
     - set default keep-alive interval to be 1/2 of idle_timeout value set ([`220fd52`](https://github.com/maidsafe/safe_network/commit/220fd52ab3e1bac776ba74793d5042de220bb315))
 </details>
 
 ## v0.77.6 (2022-12-22)
+
+<csr-id-6bef36cadd09bba0bff9171a352813e3e860ee2c/>
 
 ### Chore
 
@@ -1208,9 +1281,6 @@ needed, as they keypair itself contains the Arcs we need.
     - Merge #1908 ([`8875a59`](https://github.com/maidsafe/safe_network/commit/8875a59d21db86edf0ca8f4affcc80ad7618231f))
     - verify members in network knowledge are the expected ([`79421d6`](https://github.com/maidsafe/safe_network/commit/79421d660dfcfebc8d8bf3955ee2534cc3d98e2d))
 </details>
-
-<csr-unknown>
-Also some minor improvements to sn_client log msgs.<csr-unknown/>
 
 ## v0.77.4 (2022-12-20)
 
