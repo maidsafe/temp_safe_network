@@ -54,7 +54,7 @@ impl MyNode {
                 NodeMsg::JoinResponse(JoinResponse::Rejected(JoinRejectReason::JoinsDisallowed));
             trace!("{}", LogMarker::SendJoinRejected);
             trace!("Sending {msg:?} to {peer}");
-            return Ok(Some(MyNode::send_node_msg(
+            return Ok(Some(Cmd::send_msg(
                 msg,
                 Peers::Single(peer),
                 context.clone(),
@@ -142,11 +142,7 @@ impl MyNode {
             trace!("{} b", LogMarker::SendJoinAsRelocatedResponse);
 
             trace!("Sending {msg:?} to {peer}");
-            return Some(MyNode::send_node_msg(
-                msg,
-                Peers::Single(peer),
-                context.clone(),
-            ));
+            return Some(Cmd::send_msg(msg, Peers::Single(peer), context.clone()));
         }
 
         if !relocate_details.verify_identity(&peer.name(), &join_request.signature_over_new_name) {
@@ -166,11 +162,7 @@ impl MyNode {
                 msg,
                 peer
             );
-            return Some(MyNode::send_node_msg(
-                msg,
-                Peers::Single(peer),
-                context.clone(),
-            ));
+            return Some(Cmd::send_msg(msg, Peers::Single(peer), context.clone()));
         };
 
         debug!("[NODE WRITE]: join as relocated write...");

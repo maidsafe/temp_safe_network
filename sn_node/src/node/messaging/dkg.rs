@@ -102,7 +102,7 @@ impl MyNode {
 
         // send it to the other participants
         if !others.is_empty() {
-            cmds.push(MyNode::send_node_msg(
+            cmds.push(Cmd::send_msg(
                 node_msg,
                 Peers::Multiple(others),
                 self.context(),
@@ -160,12 +160,12 @@ impl MyNode {
             pub_keys,
             votes,
         };
-        MyNode::send_node_msg(node_msg, Peers::Multiple(recipients), self.context())
+        Cmd::send_msg(node_msg, Peers::Multiple(recipients), self.context())
     }
 
     fn request_dkg_ae(&self, session_id: &DkgSessionId, sender: Peer) -> Cmd {
         let node_msg = NodeMsg::DkgAE(session_id.clone());
-        MyNode::send_node_msg(node_msg, Peers::Single(sender), self.context())
+        Cmd::send_msg(node_msg, Peers::Single(sender), self.context())
     }
 
     fn aggregate_dkg_start(
@@ -291,7 +291,7 @@ impl MyNode {
             sig,
         };
 
-        let cmd = MyNode::send_node_msg(node_msg, Peers::Multiple(peers), self.context());
+        let cmd = Cmd::send_msg(node_msg, Peers::Multiple(peers), self.context());
         Ok(vec![cmd])
     }
 
@@ -558,7 +558,7 @@ impl MyNode {
                 pub_keys,
                 votes: our_votes,
             };
-            let cmd = MyNode::send_node_msg(node_msg, Peers::Single(sender), self.context());
+            let cmd = Cmd::send_msg(node_msg, Peers::Single(sender), self.context());
             Ok(vec![cmd])
         } else {
             Ok(vec![])
@@ -582,7 +582,7 @@ impl MyNode {
             pub_keys,
             votes,
         };
-        let cmd = MyNode::send_node_msg(node_msg, Peers::Single(sender), self.context());
+        let cmd = Cmd::send_msg(node_msg, Peers::Single(sender), self.context());
         Ok(vec![cmd])
     }
 
@@ -668,7 +668,7 @@ impl MyNode {
             pub_key: *pub_key,
             sig: *sig,
         };
-        let cmd = MyNode::send_node_msg(node_msg, Peers::Multiple(peers), self.context());
+        let cmd = Cmd::send_msg(node_msg, Peers::Multiple(peers), self.context());
         vec![cmd]
     }
 
@@ -784,7 +784,7 @@ impl MyNode {
             let current_elders: Vec<_> = self.network_knowledge.section_auth().elders_vec();
             let (other_elders, myself) = self.split_peers_and_self(current_elders);
             let peers = Peers::Multiple(other_elders);
-            cmds.push(MyNode::send_node_msg(msg, peers, self.context()));
+            cmds.push(Cmd::send_msg(msg, peers, self.context()));
 
             // Handle it if we are an elder
             if let Some(elder) = myself {

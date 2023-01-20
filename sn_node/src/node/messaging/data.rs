@@ -259,7 +259,7 @@ impl MyNode {
         if !is_full && !data_batch_is_empty {
             let data_i_have = context.data_storage.data_addrs().await;
             let msg = NodeMsg::NodeDataCmd(NodeDataCmd::SendAnyMissingRelevantData(data_i_have));
-            let cmd = MyNode::send_node_msg(msg, Peers::Single(sender), context.clone());
+            let cmd = Cmd::send_msg(msg, Peers::Single(sender), context.clone());
             cmds.push(cmd);
         }
 

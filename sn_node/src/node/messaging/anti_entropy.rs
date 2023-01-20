@@ -194,7 +194,7 @@ impl MyNode {
             kind: AntiEntropyKind::Update { members },
         };
 
-        MyNode::send_node_msg(ae_msg, recipients, context.clone())
+        Cmd::send_msg(ae_msg, recipients, context.clone())
     }
 
     #[instrument(skip_all)]
@@ -397,7 +397,7 @@ impl MyNode {
         trace!("Resend Original {msg_id:?} to {response_peer:?} with {msg_to_resend:?}");
         trace!("{}", LogMarker::AeResendAfterRedirect);
 
-        cmds.push(MyNode::send_node_msg(
+        cmds.push(Cmd::send_msg(
             msg_to_resend,
             Peers::Single(response_peer),
             latest_context,

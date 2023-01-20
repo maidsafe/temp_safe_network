@@ -65,7 +65,7 @@ impl MyNode {
             proposal: proposal.clone(),
             sig_share: sig_share.clone(),
         };
-        cmds.push(MyNode::send_node_msg(msg, peers, self.context()));
+        cmds.push(Cmd::send_msg(msg, peers, self.context()));
 
         // handle ourselves if we are in the recipients
         if let Some(me) = myself {

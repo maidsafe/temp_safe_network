@@ -74,7 +74,7 @@ impl MyNode {
     pub(crate) fn send_msg_to_our_elders(context: &NodeContext, msg: NodeMsg) -> Cmd {
         let sap = context.network_knowledge.section_auth();
         let recipients = sap.elders_set();
-        MyNode::send_node_msg(msg, Peers::Multiple(recipients), context.clone())
+        Cmd::send_msg(msg, Peers::Multiple(recipients), context.clone())
     }
 
     /// Send a (`NodeMsg`) message to all Elders in our section, await all responses & enqueue
@@ -91,12 +91,6 @@ impl MyNode {
             recipients,
             context,
         }
-    }
-
-    /// Send a (`NodeMsg`) message to a node
-    /// Context is consumed and passed into the SendMsg command
-    pub(crate) fn send_node_msg(msg: NodeMsg, recipients: Peers, context: NodeContext) -> Cmd {
-        Cmd::send_msg(msg, recipients, context)
     }
 
     pub(crate) async fn store_data_and_respond(
