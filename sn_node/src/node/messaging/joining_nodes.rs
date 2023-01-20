@@ -16,7 +16,7 @@ use sn_interface::{
     types::{log_markers::LogMarker, Peer},
 };
 
-use std::sync::Arc;
+use std::{collections::BTreeSet, sync::Arc};
 use tokio::sync::RwLock;
 
 // Message handling
@@ -102,6 +102,13 @@ impl MyNode {
             debug!("Ignoring JoinAsRelocatedRequest from {peer} with invalid relocate proof state: {state:?}");
             return None;
         };
+
+        // Add the peer to our Comm to facilitate communication
+        node.write()
+            .await
+            .comm
+            .add_members(BTreeSet::from([peer]))
+            .await;
 
         let mut shall_retry = false;
 

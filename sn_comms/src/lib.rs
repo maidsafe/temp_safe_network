@@ -194,6 +194,11 @@ impl Comm {
         self.sessions.retain(|p, _| members.contains(p));
     }
 
+    /// Adds the members to the known set of Peers
+    pub async fn add_members(&mut self, members: BTreeSet<Peer>) {
+        self.members.write().await.extend(members);
+    }
+
     /// Sends the payload on a new or existing connection,
     /// or on the provided send stream if any.
     #[tracing::instrument(skip(self, bytes))]

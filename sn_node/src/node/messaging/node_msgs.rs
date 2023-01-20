@@ -208,7 +208,11 @@ impl MyNode {
                 debug!("[NODE WRITE]: Relocated write gottt...");
 
                 trace!("Handling msg: Relocate from {}: {:?}", sender, msg_id);
-                Ok(node.handle_relocate(node_state)?.into_iter().collect())
+                Ok(node
+                    .handle_relocate(node_state)
+                    .await?
+                    .into_iter()
+                    .collect())
             }
             NodeMsg::JoinAsRelocatedResponse(join_response) => {
                 let mut node = node.write().await;

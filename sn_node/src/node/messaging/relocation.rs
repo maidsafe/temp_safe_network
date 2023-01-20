@@ -63,7 +63,7 @@ impl MyNode {
         Ok(cmds)
     }
 
-    pub(crate) fn handle_relocate(
+    pub(crate) async fn handle_relocate(
         &mut self,
         relocate_proof: SectionSigned<NodeState>,
     ) -> Result<Option<Cmd>> {
@@ -114,11 +114,14 @@ impl MyNode {
         let (joining_as_relocated, cmd) = JoiningAsRelocated::start(
             node,
             relocate_proof,
-            bootstrap_addrs,
+            bootstrap_addrs.clone(),
             dst_xorname,
             dst_section_key,
             new_age,
         )?;
+
+        // Add the bootstrap members to the known set of Peers to facilitate communication
+        self.comm.add_members(bootstrap_addrs).await;
 
         self.relocate_state = Some(Box::new(joining_as_relocated));
 
