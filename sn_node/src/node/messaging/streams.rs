@@ -146,7 +146,7 @@ impl MyNode {
         recipients: BTreeSet<Peer>,
     ) -> Result<Vec<Cmd>> {
         let targets_len = recipients.len();
-        debug!("Sending out {msg_id:?} to {targets_len} holder node/s {recipients:?}");
+        debug!("Sending out + awaiting response of {msg_id:?} to {targets_len} holder node/s {recipients:?}");
 
         // TODO: Should we change this func to just return the futures and handlers can decide to wait on all
         // or process as they come in

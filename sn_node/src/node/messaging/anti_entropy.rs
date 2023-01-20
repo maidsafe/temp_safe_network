@@ -312,15 +312,21 @@ impl MyNode {
         };
 
         debug!("[NODE READ] Latest context read");
-        let latest_context = node.read().await.context();
+        // mut here to update comms
+        let mut latest_context = node.read().await.context();
         debug!("[NODE READ] Latest context got.");
+        // Update comms with these new members or we will not be able to send the msg out
+        latest_context
+            .comm
+            .update_members(latest_context.network_knowledge.members())
+            .await;
+
         // Only trigger reorganize data when there is a membership change happens.
         if updated {
             cmds.push(MyNode::ask_for_any_new_data(&latest_context).await);
-        }
 
-        if updated {
             MyNode::write_section_tree(&latest_context);
+
             let prefix = sap.prefix();
             info!("SectionTree written to disk with update for prefix {prefix:?}");
 
