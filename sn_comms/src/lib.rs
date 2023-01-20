@@ -201,7 +201,7 @@ impl Comm {
         // TODO: we could cache the handles above and check them as part of loop...
         let _handle = tokio::spawn(async move {
             match watcher {
-                Ok(Some(watcher)) => {
+                Ok(watcher) => {
                     let (send_was_successful, should_remove) =
                         Self::is_sent(watcher, msg_id, peer).await?;
 
@@ -218,10 +218,6 @@ impl Comm {
                         }
                         Err(Error::FailedSend(peer))
                     }
-                }
-                Ok(None) => {
-                    Ok(())
-                    // no watcher......
                 }
                 Err(error) => {
                     // there is only one type of error returned: [`Error::InvalidState`]
@@ -248,7 +244,7 @@ impl Comm {
     pub async fn send_out_bytes_sync(&self, peer: Peer, msg_id: MsgId, bytes: UsrMsgBytes) {
         let watcher = self.send_to_one(peer, msg_id, bytes).await;
         match watcher {
-            Ok(Some(watcher)) => {
+            Ok(watcher) => {
                 let (send_was_successful, should_remove) = Self::is_sent(watcher, msg_id, peer)
                     .await
                     .expect("Error in is_sent");
@@ -263,7 +259,6 @@ impl Comm {
                     }
                 }
             }
-            Ok(None) => {}
             Err(error) => {
                 error!(
                 "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed as we have disconnected from the peer. (Error is: {})",
@@ -288,16 +283,12 @@ impl Comm {
     ) -> Result<WireMsg> {
         // TODO: tweak messaging to just allow passthrough
         debug!("trying to get {peer:?} session in order to send: {msg_id:?}");
-        if let Some(mut peer) = self.get_or_create(&peer).await {
-            debug!("Session of {peer:?} retrieved for {msg_id:?}");
-            let adult_response_bytes = peer.send_with_bi_return_response(bytes, msg_id).await?;
-            debug!("Peer response from {peer:?} is in for {msg_id:?}");
-            WireMsg::from(adult_response_bytes).map_err(|_| Error::InvalidMessage)
-        } else {
-            debug!("No conn exists or could be created to send this msg on.... {msg_id:?}");
-            // TODO: real error here....
-            Err(Error::PeerSessionChannel)
-        }
+
+        let mut peer = self.get_or_create(&peer).await?;
+        debug!("Session of {peer:?} retrieved for {msg_id:?}");
+        let adult_response_bytes = peer.send_with_bi_return_response(bytes, msg_id).await?;
+        debug!("Peer response from {peer:?} is in for {msg_id:?}");
+        WireMsg::from(adult_response_bytes).map_err(|_| Error::InvalidMessage)
     }
 
     /// Returns (sent success, should remove)
@@ -353,26 +344,28 @@ impl Comm {
 
     /// Get a PeerSession if it already exists, otherwise create and insert
     #[instrument(skip(self))]
-    async fn get_or_create(&self, peer: &Peer) -> Option<PeerSession> {
-        debug!("getting or Creating peer session to: {peer:?}");
-        if let Some(entry) = self.sessions.get(peer) {
-            debug!(" session to: {peer:?} exists");
-            return Some(entry.value().clone());
-        }
-
-        debug!("session to: {peer:?} does not exists");
-        let link = Link::new(*peer, self.our_endpoint.clone(), self.msg_listener.clone());
-        let session = PeerSession::new(link);
-
+    async fn get_or_create(&self, peer: &Peer) -> Result<PeerSession> {
         if self.members.read().await.contains(peer) {
+            debug!("getting or Creating peer session to member: {peer:?}");
+            if let Some(entry) = self.sessions.get(peer) {
+                debug!(" session to: {peer:?} exists");
+                return Ok(entry.value().clone());
+            }
+
+            debug!("session to: {peer:?} does not exists");
+            let link = Link::new(*peer, self.our_endpoint.clone(), self.msg_listener.clone());
+            let session = PeerSession::new(link);
+
             debug!("Peer is a section member, caching session {peer:?}");
             let prev_peer = self.sessions.insert(*peer, session.clone());
             debug!(
                 "inserted session {peer:?}, prev peer was discarded? {:?}",
                 prev_peer.is_some()
             );
+            Ok(session)
+        } else {
+            Err(Error::CreatingConnectionToUnknownNode(*peer))
         }
-        Some(session)
     }
 
     /// Any number of incoming qp2p:Connections can be added.
@@ -432,7 +425,7 @@ impl Comm {
         recipient: Peer,
         msg_id: MsgId,
         bytes: UsrMsgBytes,
-    ) -> Result<Option<SendWatcher>> {
+    ) -> Result<SendWatcher> {
         let bytes_len = {
             let (h, d, p) = bytes.clone();
             h.len() + d.len() + p.len()
@@ -440,13 +433,9 @@ impl Comm {
 
         trace!("Sending message bytes ({bytes_len} bytes) w/ {msg_id:?} to {recipient:?}");
 
-        if let Some(peer) = self.get_or_create(&recipient).await {
-            debug!("Peer session retrieved");
-            Ok(Some(peer.send_using_session(msg_id, bytes).await?))
-        } else {
-            debug!("No client conn exists to send this msg on.... {msg_id:?}");
-            Ok(None)
-        }
+        let peer = self.get_or_create(&recipient).await?;
+        debug!("Peer session retrieved");
+        peer.send_using_session(msg_id, bytes).await
     }
 }
 

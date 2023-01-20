@@ -226,7 +226,24 @@ impl Client {
     /// is stored in each and all of the expected data replica nodes in the section.
     #[cfg(feature = "check-replicas")]
     #[instrument(skip(self), level = "debug")]
-    pub async fn send_query(&self, query: DataQueryVariant) -> Result<QueryResult> {
+    pub async fn send_query(&self, query: DataQueryVariant) -> Result<QueryResult, Error> {
+        match self.query_all_data_replicas(query.clone()).await {
+            Err(Error::DataReplicasCheck(
+                error @ crate::errors::DataReplicasCheckError::DifferentResponses { .. },
+            )) => {
+                warn!("Different responses received for query, we'll retry to send it only once: {error:?}");
+                sleep(tokio::time::Duration::from_secs(10)).await;
+                let response = self.query_all_data_replicas(query).await;
+                debug!("Second attempt to send query to check-replicas: {response:?}");
+                response
+            }
+            other => other,
+        }
+    }
+
+    #[cfg(feature = "check-replicas")]
+    #[instrument(skip(self), level = "debug")]
+    async fn query_all_data_replicas(&self, query: DataQueryVariant) -> Result<QueryResult> {
         use crate::errors::DataReplicasCheckError;
         let span = info_span!("Attempting a query");
         let _ = span.enter();

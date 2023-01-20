@@ -349,10 +349,7 @@ impl MyNode {
         let (bounced_msg, response_peer) = match kind {
             AntiEntropyKind::Update { .. } => {
                 // log the msg as received. Elders track this for other elders in fault detection
-                node.read()
-                    .await
-                    .untrack_node_issue(sender.name(), IssueType::AeProbeMsg);
-                debug!("[NODE READ]: ae update lock received");
+                latest_context.untrack_node_issue(sender.name(), IssueType::AeProbeMsg);
                 return Ok(cmds);
             } // Nope, bail early
             AntiEntropyKind::Retry { bounced_msg } => {
