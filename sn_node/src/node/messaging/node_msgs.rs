@@ -63,7 +63,14 @@ impl MyNode {
                 Err(CommsError::FailedSend(peer)) => {
                     Some(Cmd::HandleFailedSendToNode { peer, msg_id })
                 }
-                _ => None,
+                Err(error) => {
+                    error!("Error in comms for {msg_id:?}: {error:?}");
+                    None
+                }
+                Ok(_) => {
+                    // nothing need be done
+                    None
+                }
             })
             .collect();
 

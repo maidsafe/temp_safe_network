@@ -190,49 +190,28 @@ impl Comm {
         msg_id: MsgId,
         bytes: UsrMsgBytes,
     ) -> Result<()> {
-        let watcher = self.send_to_one(peer, msg_id, bytes).await;
+        let watcher = self.send_to_one(peer, msg_id, bytes).await?;
 
         let sessions = self.sessions.clone();
 
-        // TODO: Is there an optimium we should actually have.
-        // Assuming we dont store clients... can we test for this
         trace!("Sessions known of: {:?}", sessions.len());
 
         // TODO: we could cache the handles above and check them as part of loop...
         let _handle = tokio::spawn(async move {
-            match watcher {
-                Ok(watcher) => {
-                    let (send_was_successful, should_remove) =
-                        Self::is_sent(watcher, msg_id, peer).await?;
+            let (send_was_successful, should_remove) = Self::is_sent(watcher, msg_id, peer).await;
 
-                    if send_was_successful {
-                        trace!("Msg {msg_id:?} sent to {peer:?}");
-                        Ok(())
-                    } else {
-                        if should_remove {
-                            // do cleanup of that peer
-                            let perhaps_session = sessions.remove(&peer);
-                            if let Some((_peer, session)) = perhaps_session {
-                                session.disconnect().await;
-                            }
-                        }
-                        Err(Error::FailedSend(peer))
+            if send_was_successful {
+                trace!("Msg {msg_id:?} sent to {peer:?}");
+                Ok(())
+            } else {
+                if should_remove {
+                    // do cleanup of that peer
+                    let perhaps_session = sessions.remove(&peer);
+                    if let Some((_peer, session)) = perhaps_session {
+                        session.disconnect().await;
                     }
                 }
-                Err(error) => {
-                    // there is only one type of error returned: [`Error::InvalidState`]
-                    // which should not happen (be reachable) if we only access PeerSession from Comm
-                    // The error means we accessed a peer that we disconnected from.
-                    // So, this would potentially be a bug!
-                    warn!("Accessed a disconnected peer: {peer}. This is potentially a bug!");
-
-                    let _peer = sessions.remove(&peer);
-                    error!(
-                        "Sending message (msg_id: {msg_id:?}) to {peer} failed \
-                        as we have disconnected from the peer. (Error is: {error})",
-                    );
-                    Err(Error::FailedSend(peer))
-                }
+                Err(Error::FailedSend(peer))
             }
         });
 
@@ -245,9 +224,8 @@ impl Comm {
         let watcher = self.send_to_one(peer, msg_id, bytes).await;
         match watcher {
             Ok(watcher) => {
-                let (send_was_successful, should_remove) = Self::is_sent(watcher, msg_id, peer)
-                    .await
-                    .expect("Error in is_sent");
+                let (send_was_successful, should_remove) =
+                    Self::is_sent(watcher, msg_id, peer).await;
 
                 if send_was_successful {
                     trace!("Msg {msg_id:?} sent to {peer:?}");
@@ -282,7 +260,7 @@ impl Comm {
         bytes: UsrMsgBytes,
     ) -> Result<WireMsg> {
         // TODO: tweak messaging to just allow passthrough
-        debug!("trying to get {peer:?} session in order to send: {msg_id:?}");
+        debug!("Trying to get {peer:?} session in order to send: {msg_id:?}");
 
         let mut peer = self.get_or_create(&peer).await?;
         debug!("Session of {peer:?} retrieved for {msg_id:?}");
@@ -291,15 +269,16 @@ impl Comm {
         WireMsg::from(adult_response_bytes).map_err(|_| Error::InvalidMessage)
     }
 
+    /// Waits until msg is sent or there's an error
     /// Returns (sent success, should remove)
     /// Should remove occurs if max retries reached
-    async fn is_sent(mut watcher: SendWatcher, msg_id: MsgId, peer: Peer) -> Result<(bool, bool)> {
+    async fn is_sent(mut watcher: SendWatcher, msg_id: MsgId, peer: Peer) -> (bool, bool) {
         // here we can monitor the sending
         // and we now watch the status of the send
         loop {
             match &mut watcher.await_change().await {
                 SendStatus::Sent => {
-                    return Ok((true, false));
+                    return (true, false);
                 }
                 SendStatus::Enqueued => {
                     // this block should be unreachable, as Enqueued is the initial state
@@ -316,7 +295,7 @@ impl Comm {
                         peer.addr(),
                         peer.name(),
                     );
-                    return Ok((false, false));
+                    return (false, false);
                 }
                 SendStatus::TransientError(error) => {
                     // An individual connection could have been lost when we tried to send. This
@@ -336,7 +315,7 @@ impl Comm {
                         peer.addr(),
                         peer.name(),
                     );
-                    return Ok((false, true));
+                    return (false, true);
                 }
             }
         }
@@ -345,8 +324,9 @@ impl Comm {
     /// Get a PeerSession if it already exists, otherwise create and insert
     #[instrument(skip(self))]
     async fn get_or_create(&self, peer: &Peer) -> Result<PeerSession> {
+        debug!("Attempting to get or create peer session to member: {peer:?}");
         if self.members.read().await.contains(peer) {
-            debug!("getting or Creating peer session to member: {peer:?}");
+            debug!("get or creating peer session to member: {peer:?}");
             if let Some(entry) = self.sessions.get(peer) {
                 debug!(" session to: {peer:?} exists");
                 return Ok(entry.value().clone());
@@ -364,6 +344,11 @@ impl Comm {
             );
             Ok(session)
         } else {
+            debug!("Could not connect to external peer: {peer:?}");
+            let existed = self.sessions.remove(peer);
+            if existed.is_some() {
+                debug!("Previous session to {peer:?} was removed");
+            }
             Err(Error::CreatingConnectionToUnknownNode(*peer))
         }
     }
