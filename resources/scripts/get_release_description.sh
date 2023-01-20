@@ -182,7 +182,7 @@ sn_cli_tar_aarch64_checksum=$(sha256sum \
 
 release_description=$(sed "s/__SN_FAULT_DETECTION_VERSION__/$sn_fault_detection_version/g" <<< "$release_description")
 release_description=$(sed "s/__SN_INTERFACE_VERSION__/$sn_interface_version/g" <<< "$release_description")
-release_description=$(sed "s/__SN_COMMS_CHANGELOG_TEXT__/$sn_comms_version/g" <<< "$release_description")
+release_description=$(sed "s/__SN_COMMS_VERSION__/$sn_comms_version/g" <<< "$release_description")
 release_description=$(sed "s/__SN_CLIENT_VERSION__/$sn_client_version/g" <<< "$release_description")
 release_description=$(sed "s/__SN_NODE_VERSION__/$sn_node_version/g" <<< "$release_description")
 release_description=$(sed "s/__SN_API_VERSION__/$sn_api_version/g" <<< "$release_description")
