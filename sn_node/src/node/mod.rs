@@ -347,7 +347,7 @@ mod core {
             let probe = context.network_knowledge.anti_entropy_probe();
             info!("ProbeMsg targets {:?}: {probe:?}", recipients);
 
-            Ok(MyNode::send_system_msg(
+            Ok(MyNode::send_node_msg(
                 probe,
                 Peers::Multiple(recipients),
                 context.clone(),
@@ -368,7 +368,7 @@ mod core {
         //     );
 
         //     let probe = context.network_knowledge.anti_entropy_probe();
-        //     MyNode::send_system_msg(probe, Peers::Multiple(recipients), context.clone())
+        //     MyNode::send_node_msg(probe, Peers::Multiple(recipients), context.clone())
         // }
 
         /// Generates section infos for the best elder candidate among the members at the given generation
