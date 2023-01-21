@@ -120,7 +120,7 @@ mod tests {
     use super::{SectionPeers, SectionsDAG};
     use crate::{
         messaging::system::SectionSigned,
-        network_knowledge::{MembershipState, NodeState, RelocateDetails},
+        network_knowledge::{MembershipState, NodeState, RelocationDst},
         test_utils::{assert_lists, gen_addr, TestKeys},
         types::Peer,
     };
@@ -146,14 +146,9 @@ mod tests {
 
         // adding node set 2 as MembershipState::Relocated
         let sk_2 = bls::SecretKeySet::random(0, &mut thread_rng()).secret_key();
-        let relocate = RelocateDetails {
-            previous_name: XorName::random(&mut rng),
-            dst: XorName::random(&mut rng),
-            dst_section_key: bls::SecretKey::random().public_key(),
-            age: 10,
-        };
-        let nodes_2 =
-            gen_random_signed_node_states(1, MembershipState::Relocated(Box::new(relocate)), &sk_2);
+        let dst = RelocationDst::new(XorName::random(&mut rng));
+
+        let nodes_2 = gen_random_signed_node_states(1, MembershipState::Relocated(dst), &sk_2);
         nodes_2.iter().for_each(|node| {
             section_peers.update(node.clone());
         });
@@ -223,16 +218,9 @@ mod tests {
         let mut section_peers = SectionPeers::default();
         let sk = bls::SecretKeySet::random(0, &mut thread_rng()).secret_key();
         let node_left = gen_random_signed_node_states(1, MembershipState::Left, &sk)[0].clone();
-        let relocate = RelocationDst {
-            previous_name: XorName::random(&mut rng),
-            dst: XorName::random(&mut rng),
-            dst_section_key: bls::SecretKey::random().public_key(),
-            age: 10,
-        };
+        let dst = RelocationDst::new(XorName::random(&mut rng));
         let node_relocated =
-            gen_random_signed_node_states(1, MembershipState::Relocated(Box::new(relocate)), &sk)
-                [0]
-            .clone();
+            gen_random_signed_node_states(1, MembershipState::Relocated(dst), &sk)[0].clone();
 
         assert!(section_peers.update(node_left.clone()));
         assert!(section_peers.update(node_relocated.clone()));
@@ -255,16 +243,9 @@ mod tests {
         let sk = bls::SecretKeySet::random(0, &mut thread_rng()).secret_key();
 
         let node_1 = gen_random_signed_node_states(1, MembershipState::Joined, &sk)[0].clone();
-        let relocate = RelocateDetails {
-            previous_name: XorName::random(&mut rng),
-            dst: XorName::random(&mut rng),
-            dst_section_key: bls::SecretKey::random().public_key(),
-            age: 10,
-        };
+        let dst = RelocationDst::new(XorName::random(&mut rng));
         let node_2 =
-            gen_random_signed_node_states(1, MembershipState::Relocated(Box::new(relocate)), &sk)
-                [0]
-            .clone();
+            gen_random_signed_node_states(1, MembershipState::Relocated(dst), &sk)[0].clone();
         assert!(section_peers.update(node_1.clone()));
         assert!(section_peers.update(node_2.clone()));
 
@@ -295,8 +276,8 @@ mod tests {
             let node_state = match membership_state {
                 MembershipState::Joined => NodeState::joined(peer, None),
                 MembershipState::Left => NodeState::left(peer, None),
-                MembershipState::Relocated(ref details) => {
-                    NodeState::relocated(peer, None, (**details).clone())
+                MembershipState::Relocated(ref dst) => {
+                    NodeState::relocated(peer, None, (*dst).clone())
                 }
             };
             let sig = TestKeys::get_section_signed(secret_key, node_state);

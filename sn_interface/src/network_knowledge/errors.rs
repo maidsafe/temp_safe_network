@@ -47,8 +47,6 @@ pub enum Error {
     InvalidGenesisKey(bls::PublicKey),
     #[error("A signature share is invalid.")]
     InvalidSignatureShare,
-    #[error("A node has invalid relocation details")]
-    InvalidRelocationDetails,
     #[error("The secret key share is missing for public key {0:?}")]
     MissingSecretKeyShare(bls::PublicKey),
     #[error("Invalid payload")]

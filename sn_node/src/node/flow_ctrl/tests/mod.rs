@@ -32,13 +32,13 @@ use sn_interface::{
             ClientDataResponse, ClientMsg, CmdResponse, DataCmd, Error as MessagingDataError,
             SpentbookCmd,
         },
-        system::{AntiEntropyKind, JoinAsRelocatedRequest, NodeDataCmd, NodeMsg},
+        system::{AntiEntropyKind, NodeDataCmd, NodeMsg},
         Dst, MsgType, WireMsg,
     },
     network_knowledge::{
         recommended_section_size, supermajority, Error as NetworkKnowledgeError, MembershipState,
-        MyNodeInfo, NodeState, RelocateDetails, SectionKeysProvider, SectionTreeUpdate,
-        SectionsDAG, MIN_ADULT_AGE,
+        MyNodeInfo, NodeState, RelocationDst, RelocationInfo, RelocationProof, SectionKeysProvider,
+        SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
     },
     test_utils::*,
     types::{keys::ed25519, PublicKey},
@@ -77,22 +77,24 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
         gen_addr(),
     );
 
-    let relocate_details = RelocateDetails {
-        previous_name: relocated_node_old_name,
-        dst: relocated_node_old_name,
-        dst_section_key: section_key,
-        age: relocated_node.age(),
-    };
+    let relocation_dst = RelocationDst::new(relocated_node_old_name);
 
     let node_state = NodeState::relocated(
         relocated_node.peer(),
         Some(relocated_node_old_name),
-        relocate_details,
+        relocation_dst,
     );
-    let relocate_proof = TestKeys::get_section_signed(&sk_set.secret_key(), node_state);
+    let signed_relocation = TestKeys::get_section_signed(&sk_set.secret_key(), node_state);
 
     let signature_over_new_name =
         ed25519::sign(&relocated_node.name().0, &relocated_node_old_keypair);
+
+    let info = RelocationInfo::new(signed_relocation, relocated_node.name());
+    let proof = RelocationProof::new(
+        info,
+        signature_over_new_name,
+        relocated_node_old_keypair.public,
+    );
 
     let wire_msg = WireMsg::single_src_node(
         relocated_node.name(),
@@ -100,11 +102,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
             name: XorName::from(PublicKey::Bls(section_key)),
             section_key,
         },
-        NodeMsg::JoinAsRelocatedRequest(Box::new(JoinAsRelocatedRequest {
-            section_key,
-            relocate_proof,
-            signature_over_new_name,
-        })),
+        NodeMsg::TryJoin(Some(proof)),
     )?;
 
     ProcessAndInspectCmds::new(
@@ -138,8 +136,8 @@ async fn handle_agreement_on_online() -> Result<()> {
     let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
     let sk_set = env.get_secret_key_set(prefix, None);
     let new_peer = gen_peer(MIN_ADULT_AGE);
-    let status = handle_online_cmd(&new_peer, &sk_set, &dispatcher).await?;
-    assert!(status.node_approval_sent);
+    let join_approval_sent = handle_online_cmd(&new_peer, &sk_set, &dispatcher).await?;
+    assert!(join_approval_sent.0);
 
     assert!(dispatcher
         .node()
@@ -595,8 +593,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
             let node_state_proposals = votes.iter().flat_map(|v| v.proposals());
             for node_state in node_state_proposals {
                 assert_eq!(node_state.name(), relocated_peer.name());
-                if let MembershipState::Relocated(relocate_details) = node_state.state() {
-                    assert_eq!(relocate_details.age, relocated_peer.age() + 1);
+                if let MembershipState::Relocated(_dst) = node_state.state() {
                     offline_relocate_sent = true;
                 }
             }

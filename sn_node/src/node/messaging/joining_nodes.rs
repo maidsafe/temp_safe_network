@@ -6,13 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Peers, MyNode, Result};
+use crate::node::{
+    core::NodeContext, flow_ctrl::cmds::Cmd, messaging::Peers, Error, MyNode, Result,
+};
 
 use sn_interface::{
-    messaging::system::{
-        JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectReason, JoinResponse, NodeMsg,
-    },
-    network_knowledge::{MembershipState, NodeState, SectionAuthUtils, MIN_ADULT_AGE, RelocationProof},
+    messaging::system::{JoinRejectReason, JoinResponse, NodeMsg},
+    network_knowledge::{NodeState, RelocationProof, MIN_ADULT_AGE},
     types::{log_markers::LogMarker, Peer},
 };
 
@@ -50,12 +50,15 @@ impl MyNode {
 
             // verify that we know the src key
             let src_key = proof.signed_by();
-            if !context.network_knowledge.verify_section_key_is_known(src_key) {
-                warn!("Unknown source key {src_key}...");
+            if !context
+                .network_knowledge
+                .verify_section_key_is_known(src_key)
+            {
+                warn!("Peer {} is trying to join with signature by unknown source section key {src_key:?}. Message is dropped.", peer.name());
                 return Ok(None);
             }
-            // verify the signatures 
-            proof.verify();
+            // verify the signatures
+            proof.verify()?;
 
             // verify the age
             let name = peer.name();
@@ -64,12 +67,30 @@ impl MyNode {
 
             // We require node name to match the relocation proof age.
             // Which is one less than the age within the relocation proof.
-            if peer_age != (previous_age + 1) {
+            if peer_age != previous_age.saturating_add(1) {
                 info!(
-        		    "Invalid relocation request from {name} - relocation age ({age}) doesn't match peer's age ({peer_age})."
+        		    "Invalid relocation from {name} - peer new age ({peer_age}) should be one more than peer's previous age ({previous_age}), or same if {}.", u8::MAX
         		);
                 return Err(Error::InvalidRelocationDetails);
             }
+
+            // Finally do reachability check
+            // NB: This can be moved out of this clause to also apply to new nodes.
+            if context.comm.is_reachable(&peer.addr()).await.is_err() {
+                let msg = NodeMsg::JoinResponse(JoinResponse::Rejected(
+                    JoinRejectReason::NodeNotReachable(peer.addr()),
+                ));
+                trace!(
+                    "Relocation reachability check, sending {:?} to {}",
+                    msg,
+                    peer
+                );
+                return Ok(Some(Cmd::send_msg(
+                    msg,
+                    Peers::Single(peer),
+                    context.clone(),
+                )));
+            };
 
             Some(proof.previous_name())
         } else {
@@ -78,11 +99,12 @@ impl MyNode {
                 debug!("Unreachable path; {peer} age is invalid: {}. This should be a hard coded value in join logic. Dropping the msg.", peer.age());
                 return Ok(None);
             }
-    
+
             if !context.joins_allowed {
                 debug!("Rejecting join request from {peer} - joins currently not allowed.");
-                let msg =
-                    NodeMsg::JoinResponse(JoinResponse::Rejected(JoinRejectReason::JoinsDisallowed));
+                let msg = NodeMsg::JoinResponse(JoinResponse::Rejected(
+                    JoinRejectReason::JoinsDisallowed,
+                ));
                 trace!("{}", LogMarker::SendJoinRejected);
                 trace!("Sending {msg:?} to {peer}");
                 return Ok(Some(Cmd::send_msg(
@@ -108,106 +130,5 @@ impl MyNode {
     pub(crate) fn verify_infant_node_age(peer: &Peer) -> bool {
         // Age should be MIN_ADULT_AGE for joining infant.
         peer.age() == MIN_ADULT_AGE
-    }
-
-    pub(crate) async fn handle_join_as_relocated_request(
-        node: Arc<RwLock<MyNode>>,
-        context: &NodeContext,
-        peer: Peer,
-        join_request: JoinAsRelocatedRequest,
-    ) -> Option<Cmd> {
-        debug!("Received JoinAsRelocatedRequest {join_request:?} from {peer}");
-
-        let state = join_request.relocate_proof.value.state();
-        let relocate_details = if let MembershipState::Relocated(ref details) = state {
-            // Check for signatures and trust of the relocate_proof
-            if !join_request.relocate_proof.self_verify() {
-                debug!("Ignoring JoinAsRelocatedRequest from {peer} - invalid sig.");
-                return None;
-            }
-            let known_keys = context.network_knowledge.known_keys();
-            if !known_keys.contains(&join_request.relocate_proof.sig.public_key) {
-                debug!("Ignoring JoinAsRelocatedRequest from {peer} - untrusted src.");
-                return None;
-            }
-
-            details
-        } else {
-            debug!("Ignoring JoinAsRelocatedRequest from {peer} with invalid relocate proof state: {state:?}");
-            return None;
-        };
-
-        let mut shall_retry = false;
-
-        // The peer shall match the previous_name to be trusted as relocated
-        if relocate_details.previous_name == peer.name() {
-            debug!("JoinAsRelocatedRequest from {peer} - using old name.");
-            shall_retry = true;
-        }
-
-        let comm = context.comm.clone();
-        let our_prefix = context.network_knowledge.prefix();
-        // TODO: the prefix match shall against the `relocation_details.dst`?
-        if !our_prefix.matches(&peer.name())
-            || join_request.section_key != context.network_knowledge.section_key()
-        {
-            // The relocated node sent first JoinAsRelocatedRequest to the elders of target section,
-            // using its old name. Which could be counted as incorrect here when cross sections?
-            debug!("JoinAsRelocatedRequest from {peer} - name doesn't match our prefix {our_prefix:?}.");
-            shall_retry = true;
-        }
-
-        if shall_retry {
-            let dst_sap = if let Ok(sap) = context
-                .network_knowledge
-                .section_auth_by_name(&relocate_details.dst)
-            {
-                sap
-            } else {
-                warn!(
-                    "Cannot get sap for target section {:?}",
-                    relocate_details.dst
-                );
-                return None;
-            };
-            let msg =
-                NodeMsg::JoinAsRelocatedResponse(Box::new(JoinAsRelocatedResponse::Retry(dst_sap)));
-
-            trace!("{} b", LogMarker::SendJoinAsRelocatedResponse);
-
-            trace!("Sending {msg:?} to {peer}");
-            return Some(Cmd::send_msg(msg, Peers::Single(peer), context.clone()));
-        }
-
-        if !relocate_details.verify_identity(&peer.name(), &join_request.signature_over_new_name) {
-            debug!("Ignoring JoinAsRelocatedRequest from {peer} - invalid node name signature.");
-            return None;
-        };
-
-        // Finally do reachability check
-        if comm.is_reachable(&peer.addr()).await.is_err() {
-            let msg = NodeMsg::JoinAsRelocatedResponse(Box::new(
-                JoinAsRelocatedResponse::NodeNotReachable(peer.addr()),
-            ));
-            trace!("{}", LogMarker::SendJoinAsRelocatedResponse);
-
-            trace!(
-                "Relocation reachability check, sending {:?} to {}",
-                msg,
-                peer
-            );
-            return Some(Cmd::send_msg(msg, Peers::Single(peer), context.clone()));
-        };
-
-        debug!("[NODE WRITE]: join as relocated write...");
-
-        let mut x = node.write().await;
-        debug!("[NODE WRITE]: join as relocated write gottt...");
-
-        // Shall propose as Joined with a new name generated by the relocated node.
-        // Instead of propose as Relocated again.
-        // The relocated node shall already reset to the new name.
-        let new_joined_state = NodeState::joined(peer, Some(relocate_details.previous_name));
-        x.propose_membership_change(new_joined_state)
     }
 }

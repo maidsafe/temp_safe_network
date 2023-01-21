@@ -8,16 +8,14 @@
 
 use crate::node::{
     flow_ctrl::cmds::Cmd,
-    messaging::{Peers, relocation},
-    relocated::JoiningAsRelocated,
-    relocation::{get_nodes_to_relocate, ChurnId, find_nodes_to_relocate},
+    relocation::{find_nodes_to_relocate, ChurnId},
     MyNode, Result,
 };
 
 use sn_interface::{
     elder_count,
-    messaging::system::{NodeMsg, SectionSigned},
-    network_knowledge::{MembershipState, NodeState, node_state::RelocationInfo},
+    messaging::system::SectionSigned,
+    network_knowledge::{node_state::RelocationInfo, MembershipState, NodeState, RelocationProof},
     types::{keys::ed25519, log_markers::LogMarker},
 };
 
@@ -27,7 +25,7 @@ use xor_name::XorName;
 
 // Relocation
 impl MyNode {
-    pub(crate) fn relocate_peers(
+    pub(crate) fn try_relocate_peers(
         &mut self,
         churn_id: ChurnId,
         excluded: BTreeSet<XorName>,
@@ -49,68 +47,84 @@ impl MyNode {
         }
 
         let mut cmds = vec![];
-        for (node_state, relocation_details) in
+        for (node_state, relocation_dst) in
             find_nodes_to_relocate(&self.network_knowledge, &churn_id, excluded)
         {
             debug!(
                 "Relocating {:?} to {} (on churn of {churn_id})",
-                relocation_details.peer(),
-                relocation_details.dst,
+                node_state.peer(),
+                relocation_dst.name(),
             );
 
-            let relocated_node_state = node_state.relocate(relocation_details);
-            cmds.extend(self.propose_membership_change(relocated_node_state));
+            cmds.extend(self.propose_membership_change(node_state.relocate(relocation_dst)));
         }
 
         Ok(cmds)
     }
 
-    pub(crate) fn handle_relocate(
+    pub(crate) fn relocate(
         &mut self,
-        proof: SectionSigned<NodeState>,
+        signed_relocation: SectionSigned<NodeState>,
     ) -> Result<Option<Cmd>> {
-        trace!("Handle relocate {:?}", proof);
         // should be unreachable, but a sanity check
-        let serialized_proof = bincode::serialize(&proof.value)?;
-        if !proof.sig.verify(&serialized_proof) {
+        let serialized = bincode::serialize(&signed_relocation.value)?;
+        if !signed_relocation.sig.verify(&serialized) {
+            warn!("Relocate: Could not verify section signature of our relocation");
             return Err(super::Error::InvalidSignature);
         }
-        if node.name() != proof.peer().name() {
+        if self.name() != signed_relocation.peer().name() {
             // not for us, drop it
-            return Ok(vec![]);
+            warn!("Relocate: The received section signed relocation is not for us.");
+            return Ok(None);
         }
 
         let dst_section =
-            if let MembershipState::Relocated(ref relocation_dst) = relocate_proof.state() {
-                relocate_details.0
+            if let MembershipState::Relocated(relocation_dst) = signed_relocation.state() {
+                *relocation_dst.name()
             } else {
                 debug!(
-                    "Ignoring Relocate msg containing invalid NodeState: {:?}",
-                    relocate_proof.state()
+                    "Relocate: Ignoring msg containing invalid NodeState: {:?}",
+                    signed_relocation.state()
                 );
                 return Ok(None);
             };
-        
+
         trace!("{}", LogMarker::RelocateStart);
-        debug!("Received Relocate message to join the section at {dst_xorname}");
+        debug!("Relocate: Received decision to relocate to other section at {dst_section}");
 
         let original_info = self.info();
 
-        let dst_sap = self.network_knowledge.closest_signed_sap(&dst_section)?;
-        let new_keypair = ed25519::gen_keypair(&dst_sap.prefix().range_inclusive(), original_info.age().saturating_add(1));
+        let dst_sap = self
+            .network_knowledge
+            .closest_signed_sap(&dst_section)
+            .ok_or(super::Error::NoMatchingSection)?;
+        let new_keypair = ed25519::gen_keypair(
+            &dst_sap.prefix().range_inclusive(),
+            original_info.age().saturating_add(1),
+        );
         let new_name = ed25519::name(&new_keypair.public);
 
-        let info = RelocationInfo::new(proof, new_name);
+        let info = RelocationInfo::new(signed_relocation, new_name);
         let serialized_info = bincode::serialize(&info)?;
         // we verify that this new name was actually created by the old name
-        let node_sig = original_info.keypair.sign(&serialized_info);
+        let peer_sig = original_info.keypair.sign(&serialized_info);
+        let new_prefix = dst_sap.prefix();
 
-        // we try shift to the new section
+        // we try switch to the new section
         self.set_new_section(dst_sap, new_keypair)?;
 
-        trace!("Previous name: {:?} shifted to dst section {} as {new_name}. Now trying to join..", original_info.name(), dst_sap.prefix());
+        info!(
+            "Relocation of us as {}: switched section to {new_prefix:?} with new name {new_name}. Now trying to join..",
+            original_info.name(),
+        );
 
-        Ok(MyNode::try_join_section(self.context(), Some(SignedRelocationInfo::new(info, node_sig, original_info.keypair.public))))
+        Ok(MyNode::try_join_section(
+            self.context(),
+            Some(RelocationProof::new(
+                info,
+                peer_sig,
+                original_info.keypair.public,
+            )),
+        ))
     }
-
 }

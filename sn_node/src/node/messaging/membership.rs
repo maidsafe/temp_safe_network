@@ -216,7 +216,7 @@ impl MyNode {
             let excluded_from_relocation =
                 BTreeSet::from_iter(joining_nodes.iter().map(|(n, _)| n.name()));
 
-            cmds.extend(self.relocate_peers(churn_id, excluded_from_relocation)?);
+            cmds.extend(self.try_relocate_peers(churn_id, excluded_from_relocation)?);
         }
 
         // In case the newly joined node is a relocated node, and we have enough elders,

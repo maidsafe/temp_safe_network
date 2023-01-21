@@ -190,44 +190,11 @@ impl MyNode {
                     .await
                     .map(|c| c.into_iter().collect())
             }
-            NodeMsg::Relocate(node_state) => {
+            NodeMsg::Relocate(signed_relocation) => {
                 let mut node = node.write().await;
                 debug!("[NODE WRITE]: Relocated write gottt...");
-
-                trace!("Handling msg: Relocate from {}: {:?}", sender, msg_id);
-                Ok(node.handle_relocate(node_state)?.into_iter().collect())
-            }
-            NodeMsg::JoinAsRelocatedResponse(join_response) => {
-                let mut node = node.write().await;
-                debug!("[NODE WRITE]: JoinAsRelocatedResponse write gottt...");
-                trace!("Handling msg: JoinAsRelocatedResponse from {}", sender);
-                if let Some(ref mut joining_as_relocated) = node.relocate_state {
-                    if let Some(cmd) =
-                        joining_as_relocated.handle_join_response(*join_response, sender.addr())?
-                    {
-                        // Shall switch to the new name whenever generated
-                        if joining_as_relocated.has_new_name() {
-                            let new_node = joining_as_relocated.node.clone();
-                            let new_name = new_node.name();
-                            let previous_name = context.name;
-                            let new_keypair = new_node.keypair;
-
-                            info!(
-                                "Relocation: switching from {:?} to {:?} with keypair {:?}",
-                                previous_name, new_name, new_keypair
-                            );
-                            node.relocate_to(new_keypair, new_name)?;
-                        }
-                        return Ok(vec![cmd]);
-                    }
-                } else {
-                    error!(
-                        "No relocation in progress upon receiving {:?}",
-                        join_response
-                    );
-                }
-
-                Ok(vec![])
+                trace!("Handling relocate msg from {}: {:?}", sender, msg_id);
+                Ok(node.relocate(signed_relocation)?.into_iter().collect())
             }
             NodeMsg::AntiEntropy {
                 section_tree_update,
@@ -289,17 +256,16 @@ impl MyNode {
                         }
 
                         trace!(
-                            "=========>> This node has been approved to join the network at {:?}!",
+                            "=========>> This node has been approved to join the section at {:?}!",
                             target_sap.prefix(),
                         );
 
-                        debug!("[NODE READ]: relocation_state read");
-                        let relocate_state_present = node.read().await.relocate_state.is_some();
-                        debug!("[NODE READ]: relocation_state read got");
-                        if relocate_state_present {
-                            let mut node = node.write().await;
-                            debug!("[NODE WRITE]: relocation_state write got...");
-                            node.relocate_state = None;
+                        if decision
+                            .proposals
+                            .keys()
+                            .filter(|n| n.state() == MembershipState::Joined)
+                            .all(|n| n.previous_name().is_some())
+                        {
                             trace!("{}", LogMarker::RelocateEnd);
                         }
 
@@ -321,22 +287,6 @@ impl MyNode {
                     .handle_handover_anti_entropy(sender, gen)
                     .into_iter()
                     .collect())
-            }
-            NodeMsg::JoinAsRelocatedRequest(join_request) => {
-                trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
-
-                if !context.is_elder
-                    && join_request.section_key == context.network_knowledge.section_key()
-                {
-                    return Ok(vec![]);
-                }
-
-                Ok(
-                    MyNode::handle_join_as_relocated_request(node, &context, sender, *join_request)
-                        .await
-                        .into_iter()
-                        .collect(),
-                )
             }
             NodeMsg::MembershipVotes(votes) => {
                 let mut node = node.write().await;

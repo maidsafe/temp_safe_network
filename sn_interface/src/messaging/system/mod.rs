@@ -8,7 +8,6 @@
 
 mod dkg;
 mod join;
-mod join_as_relocated;
 mod node_msgs;
 mod op_id;
 mod section_sig;
@@ -16,12 +15,11 @@ mod section_sig;
 use super::{data::CmdResponse, MsgId};
 
 use crate::messaging::AuthorityProof;
-use crate::network_knowledge::{NodeState, SapCandidate, SectionTreeUpdate, RelocationProof};
+use crate::network_knowledge::{NodeState, RelocationProof, SapCandidate, SectionTreeUpdate};
 use crate::SectionAuthorityProvider;
 
 pub use dkg::DkgSessionId;
 pub use join::{JoinRejectReason, JoinRequest, JoinResponse};
-pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use node_msgs::{NodeDataCmd, NodeDataQuery, NodeEvent, NodeQueryResponse};
 pub use op_id::OperationId;
 pub use section_sig::{SectionSig, SectionSigShare, SectionSigned};
@@ -97,10 +95,6 @@ pub enum NodeMsg {
     TryJoin(Option<RelocationProof>),
     /// Response to a join request.
     JoinResponse(JoinResponse),
-    /// Sent from a peer to the section requesting to join as relocated from another section
-    JoinAsRelocatedRequest(Box<JoinAsRelocatedRequest>),
-    /// Response to a `JoinAsRelocatedRequest`
-    JoinAsRelocatedResponse(Box<JoinAsRelocatedResponse>),
     /// Sent to the new elder candidates to start the DKG process, along with a sig of the DkgSessionId
     DkgStart(DkgSessionId, SectionSigShare),
     /// Sent when DKG is triggered to other participant
@@ -173,6 +167,13 @@ pub enum NodeMsg {
     NodeDataQuery(NodeDataQuery),
 }
 
+impl NodeMsg {
+    pub fn is_join(&self) -> bool {
+        // we could also differentiate, say if it's a relocation
+        matches!(self, NodeMsg::TryJoin(_))
+    }
+}
+
 /// Messages sent from adults to the elders in response to client queries or commands
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
@@ -218,8 +219,6 @@ impl NodeMsg {
             Self::MembershipVotes(_) => State::Membership,
             Self::TryJoin(_) => State::Join,
             Self::JoinResponse(_) => State::Join,
-            Self::JoinAsRelocatedRequest(_) => State::Join,
-            Self::JoinAsRelocatedResponse(_) => State::Join,
             Self::DkgStart { .. } => State::Dkg,
             Self::DkgEphemeralPubKey { .. } => State::Dkg,
             Self::DkgVotes { .. } => State::Dkg,
@@ -247,12 +246,6 @@ impl Display for NodeMsg {
             Self::MembershipAE { .. } => write!(f, "NodeMsg::MembershipAE"),
             Self::TryJoin(_) => write!(f, "NodeMsg::TryJoin"),
             Self::JoinResponse { .. } => write!(f, "NodeMsg::JoinResponse"),
-            Self::JoinAsRelocatedRequest { .. } => {
-                write!(f, "NodeMsg::JoinAsRelocatedRequest")
-            }
-            Self::JoinAsRelocatedResponse { .. } => {
-                write!(f, "NodeMsg::JoinAsRelocatedResponse")
-            }
             Self::DkgStart { .. } => write!(f, "NodeMsg::DkgStart"),
             Self::DkgEphemeralPubKey { .. } => write!(f, "NodeMsg::DkgEphemeralPubKey"),
             Self::DkgVotes { .. } => write!(f, "NodeMsg::DkgVotes"),

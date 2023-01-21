@@ -8,12 +8,13 @@
 
 mod errors;
 mod node_info;
-pub mod node_state;
-pub mod section_authority_provider;
-pub mod section_keys;
 mod section_peers;
 mod section_tree;
 mod sections_dag;
+
+pub mod node_state;
+pub mod section_authority_provider;
+pub mod section_keys;
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils;
 #[cfg(any(test, feature = "test-utils"))]
@@ -22,7 +23,7 @@ pub use section_tree::test_utils as test_utils_st;
 pub use self::{
     errors::{Error, Result},
     node_info::MyNodeInfo,
-    node_state::{MembershipState, NodeState, RelocationProof, RelocateDetails},
+    node_state::{MembershipState, NodeState, RelocationDst, RelocationInfo, RelocationProof},
     section_authority_provider::{SapCandidate, SectionAuthUtils, SectionAuthorityProvider},
     section_keys::{SectionKeyShare, SectionKeysProvider},
     section_tree::{SectionTree, SectionTreeUpdate},
@@ -200,7 +201,10 @@ impl NetworkKnowledge {
     }
 
     /// update all section info for our new section
-    pub fn set_new_section(&mut self, dst_sap: SectionSigned<SectionAuthorityProvider>) -> Result<()> {
+    pub fn set_new_section(
+        &mut self,
+        dst_sap: SectionSigned<SectionAuthorityProvider>,
+    ) -> Result<()> {
         if self.section_tree().get(&dst_sap.prefix()).is_none() {
             return Err(Error::WrongSection);
         }

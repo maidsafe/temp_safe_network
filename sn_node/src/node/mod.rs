@@ -56,7 +56,6 @@ mod core {
             handover::Handover,
             membership::{elder_candidates, try_split_dkg, Membership},
             messaging::Peers,
-            relocated::JoiningAsRelocated,
             DataStorage, Error, Result, XorName,
         },
         UsedSpace,

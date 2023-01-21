@@ -7,14 +7,17 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::system::SectionSigned;
-use crate::network_knowledge::{NetworkKnowledge, section_has_room_for_node, Error, Result};
+use crate::network_knowledge::{section_has_room_for_node, Error, Result};
 use crate::types::Peer;
 
-use bls::PublicKey as BlsPublicKey;
-use ed25519_dalek::{Signature, Verifier, PublicKey};
+use ed25519_dalek::{PublicKey, Signature, Verifier};
 use hex_fmt::HexFmt;
 use serde::{Deserialize, Serialize};
-use std::{collections::{BTreeMap, BTreeSet}, fmt::{self, Debug, Formatter}, net::SocketAddr};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::{self, Debug, Formatter},
+    net::SocketAddr,
+};
 use xor_name::{Prefix, XorName};
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
@@ -25,7 +28,7 @@ pub enum MembershipState {
     /// Node went offline.
     Left,
     /// Node was relocated to a different section.
-    Relocated(Box<RelocationDst>),
+    Relocated(RelocationDst),
 }
 
 /// Information about a member of our section.
@@ -84,7 +87,7 @@ impl NodeState {
     ) -> Self {
         Self {
             peer,
-            state: MembershipState::Relocated(Box::new(relocation_dst)),
+            state: MembershipState::Relocated(relocation_dst),
             previous_name,
         }
     }
@@ -178,11 +181,9 @@ impl NodeState {
     }
 
     // Convert this info into one with the state changed to `Relocated`.
-    pub fn relocate(self, previous_name: XorName, relocation_dst: RelocationDst) -> Self {
-        let previous_name = Some(previous_name);
+    pub fn relocate(self, relocation_dst: RelocationDst) -> Self {
         Self {
-            state: MembershipState::Relocated(Box::new(relocation_dst)),
-            previous_name,
+            state: MembershipState::Relocated(relocation_dst),
             ..self
         }
     }
@@ -192,6 +193,10 @@ impl NodeState {
 pub struct RelocationDst(XorName);
 
 impl RelocationDst {
+    pub fn new(name: XorName) -> Self {
+        Self(name)
+    }
+
     pub fn name(&self) -> &XorName {
         &self.0
     }
@@ -235,9 +240,13 @@ impl RelocationProof {
     }
 
     pub fn verify(&self) -> Result<()> {
-        let serialized_info = bincode::serialize(&self.info).map_err(|err| Error::InvalidSignature)?;
-        self.peer_key.verify(&serialized_info, &self.peer_sig).map_err(|err| Error::InvalidSignature)?;
-        let serialized_state = bincode::serialize(&self.info.signed_relocation.value).map_err(|err| Error::InvalidSignature)?;
+        let serialized_info =
+            bincode::serialize(&self.info).map_err(|_err| Error::InvalidSignature)?;
+        self.peer_key
+            .verify(&serialized_info, &self.peer_sig)
+            .map_err(|_err| Error::InvalidSignature)?;
+        let serialized_state = bincode::serialize(&self.info.signed_relocation.value)
+            .map_err(|_err| Error::InvalidSignature)?;
         if !self.info.signed_relocation.sig.verify(&serialized_state) {
             Err(Error::InvalidSignature)
         } else {
@@ -256,53 +265,5 @@ impl RelocationProof {
     // ed25519_dalek::Signature has overly verbose debug output, so we provide our own
     pub fn fmt_ed25519(sig: &Signature, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "Signature({:0.10})", HexFmt(sig))
-    }
-}
-
-/// Details of a node that has been relocated
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
-pub struct RelocateDetails {
-    /// Name of the node to relocate (this is the node's name before relocation).
-    pub previous_name: XorName,
-    /// Relocation destination, the node will be relocated to
-    /// a section whose prefix matches this name.
-    pub dst: XorName,
-    /// The BLS key of the destination section used by the relocated node to verify messages.
-    pub dst_section_key: BlsPublicKey,
-    /// The age the node will have post-relocation.
-    pub age: u8,
-}
-
-impl RelocateDetails {
-    /// Constructs RelocateDetails given current network knowledge
-    pub fn with_age(
-        network_knowledge: &NetworkKnowledge,
-        peer: &Peer,
-        dst: XorName,
-        age: u8,
-    ) -> Self {
-        let genesis_key = *network_knowledge.genesis_key();
-
-        let dst_section_key = network_knowledge
-            .section_auth_by_name(&dst)
-            .map_or_else(|_| genesis_key, |section_auth| section_auth.section_key());
-
-        Self {
-            previous_name: peer.name(),
-            dst,
-            dst_section_key,
-            age,
-        }
-    }
-
-    pub fn verify_identity(&self, new_name: &XorName, new_name_sig: &Signature) -> bool {
-        let pub_key = if let Ok(pub_key) = crate::types::keys::ed25519::pub_key(&self.previous_name)
-        {
-            pub_key
-        } else {
-            return false;
-        };
-
-        pub_key.verify(&new_name.0, new_name_sig).is_ok()
     }
 }
