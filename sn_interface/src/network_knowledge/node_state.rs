@@ -210,6 +210,22 @@ impl NodeState {
     }
 }
 
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
+pub struct RelocationInfo {
+    /// Name of the node to relocate (this is the node's name before relocation).
+    pub peer: Peer,
+    pub dst_section: XorName,
+}
+
+impl RelocationInfo {
+    pub fn new(peer: Peer, dst_section: XorName) -> Self {
+        Self {
+            peer,
+            dst_section,
+        }
+    }
+}
+
 /// Details of a node that has been relocated
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct RelocateDetails {

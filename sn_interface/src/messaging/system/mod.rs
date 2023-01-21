@@ -16,6 +16,7 @@ mod section_sig;
 use super::{data::CmdResponse, MsgId};
 
 use crate::messaging::AuthorityProof;
+use crate::network_knowledge::node_state::RelocationInfo;
 use crate::network_knowledge::{NodeState, SapCandidate, SectionTreeUpdate};
 use crate::SectionAuthorityProvider;
 
@@ -97,6 +98,8 @@ pub enum NodeMsg {
     TryJoin,
     /// Response to a join request.
     JoinResponse(JoinResponse),
+    /// 
+    PrepareRelocation(RelocationInfo),
     /// Sent from a peer to the section requesting to join as relocated from another section
     JoinAsRelocatedRequest(Box<JoinAsRelocatedRequest>),
     /// Response to a `JoinAsRelocatedRequest`
@@ -216,7 +219,8 @@ impl NodeMsg {
             Self::Relocate(_) => State::Relocate,
             Self::MembershipAE(_) => State::Membership,
             Self::MembershipVotes(_) => State::Membership,
-            Self::TryJoin => State::Node,
+            Self::TryJoin => State::Join,
+            Self::PrepareRelocation(_) => State::Join,
             Self::JoinResponse(_) => State::Join,
             Self::JoinAsRelocatedRequest(_) => State::Join,
             Self::JoinAsRelocatedResponse(_) => State::Join,
@@ -245,6 +249,7 @@ impl Display for NodeMsg {
             Self::Relocate { .. } => write!(f, "NodeMsg::Relocate"),
             Self::MembershipVotes { .. } => write!(f, "NodeMsg::MembershipVotes"),
             Self::MembershipAE { .. } => write!(f, "NodeMsg::MembershipAE"),
+            Self::PrepareRelocation(_) => write!(f, "NodeMsg::PrepareRelocation"),
             Self::TryJoin { .. } => write!(f, "NodeMsg::TryJoin"),
             Self::JoinResponse { .. } => write!(f, "NodeMsg::JoinResponse"),
             Self::JoinAsRelocatedRequest { .. } => {

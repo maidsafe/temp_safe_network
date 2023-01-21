@@ -124,6 +124,7 @@ mod core {
         pub(crate) fault_cmds_sender: mpsc::Sender<FaultsCmd>,
         // Section administration
         pub(crate) section_proposal_aggregator: SignatureAggregator,
+        pub(crate) relocation_aggregator: SignatureAggregator,
     }
 
     #[derive(custom_debug::Debug, Clone)]
@@ -279,6 +280,7 @@ mod core {
                 elder_promotion_aggregator: SignatureAggregator::default(),
                 handover_request_aggregator: TotalParticipationAggregator::default(),
                 section_proposal_aggregator: SignatureAggregator::default(),
+                relocation_aggregator: SignatureAggregator::default(),
             };
 
             let context = &node.context();

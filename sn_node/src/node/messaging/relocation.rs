@@ -9,13 +9,13 @@
 use crate::node::{
     flow_ctrl::cmds::Cmd,
     relocated::JoiningAsRelocated,
-    relocation::{find_nodes_to_relocate, ChurnId},
-    MyNode, Result,
+    relocation::{ChurnId, get_nodes_to_relocate},
+    MyNode, Result, messaging::Peers,
 };
 
 use sn_interface::{
     elder_count,
-    messaging::system::SectionSigned,
+    messaging::system::{SectionSigned, NodeMsg},
     network_knowledge::{MembershipState, NodeState},
     types::log_markers::LogMarker,
 };
@@ -47,17 +47,24 @@ impl MyNode {
         }
 
         let mut cmds = vec![];
-        for (node_state, relocate_details) in
-            find_nodes_to_relocate(&self.network_knowledge, &churn_id, excluded)
+        let context = self.context();
+        let sap = context.network_knowledge.section_auth();
+        for relocation_info in
+            get_nodes_to_relocate(&context.network_knowledge, &churn_id, excluded)
         {
             debug!(
                 "Relocating {:?} to {} (on churn of {churn_id})",
-                node_state.peer(),
-                relocate_details.dst,
+                relocation_info.peer,
+                relocation_info.dst_section,
             );
 
-            let relocated_node_state = node_state.relocate(relocate_details);
-            cmds.extend(self.propose_membership_change(relocated_node_state));
+            // let relocated_node_state = node_state.relocate(relocate_details);
+            // cmds.extend(self.propose_membership_change(relocated_node_state));
+            
+            let mut recipients = sap.elders_set();
+            recipients.insert(relocation_info.peer);
+            let msg = NodeMsg::PrepareRelocation(relocation_info);
+            cmds.push(Cmd::send_msg(msg, Peers::Multiple(recipients), context.clone()));
         }
 
         Ok(cmds)
