@@ -6,16 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::network_knowledge::NetworkKnowledge;
-use crate::network_knowledge::{section_has_room_for_node, Error, Result};
+use crate::messaging::system::SectionSigned;
+use crate::network_knowledge::{NetworkKnowledge, section_has_room_for_node, Error, Result};
 use crate::types::Peer;
 
 use bls::PublicKey as BlsPublicKey;
-use ed25519_dalek::{Signature, Verifier};
+use ed25519_dalek::{Signature, Verifier, PublicKey};
+use hex_fmt::HexFmt;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
-use std::fmt::{self, Debug, Formatter};
-use std::net::SocketAddr;
+use std::{collections::{BTreeMap, BTreeSet}, fmt::{self, Debug, Formatter}, net::SocketAddr};
 use xor_name::{Prefix, XorName};
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
@@ -26,7 +25,7 @@ pub enum MembershipState {
     /// Node went offline.
     Left,
     /// Node was relocated to a different section.
-    Relocated(Box<RelocateDetails>),
+    Relocated(Box<RelocationDst>),
 }
 
 /// Information about a member of our section.
@@ -55,6 +54,7 @@ impl Debug for NodeState {
         f.finish()
     }
 }
+
 impl NodeState {
     // Creates a `NodeState` in the `Joined` state.
     pub fn joined(peer: Peer, previous_name: Option<XorName>) -> Self {
@@ -80,11 +80,11 @@ impl NodeState {
     pub fn relocated(
         peer: Peer,
         previous_name: Option<XorName>,
-        relocate_details: RelocateDetails,
+        relocation_dst: RelocationDst,
     ) -> Self {
         Self {
             peer,
-            state: MembershipState::Relocated(Box::new(relocate_details)),
+            state: MembershipState::Relocated(Box::new(relocation_dst)),
             previous_name,
         }
     }
@@ -102,8 +102,6 @@ impl NodeState {
             info!("Membership - rejecting node {name}, name doesn't match our prefix {prefix:?}");
             return Err(Error::WrongSection);
         }
-
-        self.validate_relocation_details()?;
 
         match self.state {
             MembershipState::Joined => {
@@ -138,26 +136,6 @@ impl NodeState {
                 }
             }
         }
-    }
-
-    fn validate_relocation_details(&self) -> Result<()> {
-        if let MembershipState::Relocated(details) = &self.state {
-            let name = self.name();
-
-            // We requires the node name matches the relocation details age.
-            // However, for relocation, the node_state was created using old name.
-            // Which is one less than the age within the relocation details.
-            let age = details.age;
-            let state_age = self.age();
-            if age != (state_age + 1) {
-                info!(
-        		    "Invalid relocation request from {name} - relocation age ({age}) doesn't match peer's age ({state_age})."
-        		);
-                return Err(Error::InvalidRelocationDetails);
-            }
-        }
-
-        Ok(())
     }
 
     pub fn peer(&self) -> &Peer {
@@ -200,29 +178,84 @@ impl NodeState {
     }
 
     // Convert this info into one with the state changed to `Relocated`.
-    pub fn relocate(self, relocate_details: RelocateDetails) -> Self {
-        let previous_name = Some(relocate_details.previous_name);
+    pub fn relocate(self, previous_name: XorName, relocation_dst: RelocationDst) -> Self {
+        let previous_name = Some(previous_name);
         Self {
-            state: MembershipState::Relocated(Box::new(relocate_details)),
+            state: MembershipState::Relocated(Box::new(relocation_dst)),
             previous_name,
             ..self
         }
     }
 }
 
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
+pub struct RelocationDst(XorName);
+
+impl RelocationDst {
+    pub fn name(&self) -> &XorName {
+        &self.0
+    }
+}
+
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub struct RelocationInfo {
-    /// Name of the node to relocate (this is the node's name before relocation).
-    pub peer: Peer,
-    pub dst_section: XorName,
+    signed_relocation: SectionSigned<NodeState>,
+    new_name: XorName,
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
+pub struct RelocationProof {
+    info: RelocationInfo,
+    #[serde(with = "serde_bytes")]
+    #[debug(with = "Self::fmt_ed25519")]
+    peer_sig: Signature,
+    peer_key: PublicKey,
 }
 
 impl RelocationInfo {
-    pub fn new(peer: Peer, dst_section: XorName) -> Self {
+    pub fn new(signed_relocation: SectionSigned<NodeState>, new_name: XorName) -> Self {
         Self {
-            peer,
-            dst_section,
+            signed_relocation,
+            new_name,
         }
+    }
+}
+
+impl RelocationProof {
+    pub fn new(info: RelocationInfo, peer_sig: Signature, peer_key: PublicKey) -> Self {
+        Self {
+            info,
+            peer_sig,
+            peer_key,
+        }
+    }
+
+    pub fn signed_by(&self) -> &bls::PublicKey {
+        &self.info.signed_relocation.sig.public_key
+    }
+
+    pub fn verify(&self) -> Result<()> {
+        let serialized_info = bincode::serialize(&self.info).map_err(|err| Error::InvalidSignature)?;
+        self.peer_key.verify(&serialized_info, &self.peer_sig).map_err(|err| Error::InvalidSignature)?;
+        let serialized_state = bincode::serialize(&self.info.signed_relocation.value).map_err(|err| Error::InvalidSignature)?;
+        if !self.info.signed_relocation.sig.verify(&serialized_state) {
+            Err(Error::InvalidSignature)
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn previous_name(&self) -> XorName {
+        self.info.signed_relocation.name()
+    }
+
+    pub fn previous_age(&self) -> u8 {
+        self.info.signed_relocation.age()
+    }
+
+    // ed25519_dalek::Signature has overly verbose debug output, so we provide our own
+    pub fn fmt_ed25519(sig: &Signature, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "Signature({:0.10})", HexFmt(sig))
     }
 }
 

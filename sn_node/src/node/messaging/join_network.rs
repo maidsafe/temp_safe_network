@@ -6,19 +6,19 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{core::NodeContext, flow_ctrl::cmds::Cmd, MyNode};
+use crate::node::{Result, core::NodeContext, flow_ctrl::cmds::Cmd, MyNode};
 
-use sn_interface::messaging::system::NodeMsg;
+use sn_interface::{messaging::system::NodeMsg, network_knowledge::node_state::{RelocateDetails, RelocationProof}, types::SectionSig};
 
 impl MyNode {
-    /// Join the network as new node.
-    pub(crate) fn try_join_network(context: NodeContext) -> Option<Cmd> {
+    /// Join a section.
+    pub(crate) fn try_join_section(context: NodeContext, relocation: Option<RelocationProof>) -> Option<Cmd> {
         if context.network_knowledge.is_section_member(&context.name) {
             None
         } else {
             Some(MyNode::send_msg_to_our_elders_await_responses(
                 context,
-                NodeMsg::TryJoin,
+                NodeMsg::TryJoin(relocation),
             ))
         }
     }

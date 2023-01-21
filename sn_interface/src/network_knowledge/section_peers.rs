@@ -223,7 +223,7 @@ mod tests {
         let mut section_peers = SectionPeers::default();
         let sk = bls::SecretKeySet::random(0, &mut thread_rng()).secret_key();
         let node_left = gen_random_signed_node_states(1, MembershipState::Left, &sk)[0].clone();
-        let relocate = RelocateDetails {
+        let relocate = RelocationDst {
             previous_name: XorName::random(&mut rng),
             dst: XorName::random(&mut rng),
             dst_section_key: bls::SecretKey::random().public_key(),

@@ -12,7 +12,7 @@ use sn_interface::{
     messaging::system::{
         JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectReason, JoinResponse, NodeMsg,
     },
-    network_knowledge::{MembershipState, NodeState, SectionAuthUtils, MIN_ADULT_AGE},
+    network_knowledge::{MembershipState, NodeState, SectionAuthUtils, MIN_ADULT_AGE, RelocationProof},
     types::{log_markers::LogMarker, Peer},
 };
 
@@ -25,6 +25,7 @@ impl MyNode {
         node: Arc<RwLock<MyNode>>,
         context: &NodeContext,
         peer: Peer,
+        relocation: Option<RelocationProof>,
     ) -> Result<Option<Cmd>> {
         debug!("Handling join from {peer:?}");
 
@@ -43,27 +44,60 @@ impl MyNode {
             debug!("Unreachable path; {peer} name doesn't match our prefix. Should be covered by AE. Dropping the msg.");
             return Ok(None);
         }
-        if !MyNode::verify_joining_node_age(&peer) {
-            debug!("Unreachable path; {peer} age is invalid: {}. This should be a hard coded value in join logic. Dropping the msg.", peer.age());
-            return Ok(None);
-        }
 
-        if !context.joins_allowed {
-            debug!("Rejecting join request from {peer} - joins currently not allowed.");
-            let msg =
-                NodeMsg::JoinResponse(JoinResponse::Rejected(JoinRejectReason::JoinsDisallowed));
-            trace!("{}", LogMarker::SendJoinRejected);
-            trace!("Sending {msg:?} to {peer}");
-            return Ok(Some(Cmd::send_msg(
-                msg,
-                Peers::Single(peer),
-                context.clone(),
-            )));
-        }
+        let previous_name = if let Some(proof) = relocation {
+            // Relocation validation
+
+            // verify that we know the src key
+            let src_key = proof.signed_by();
+            if !context.network_knowledge.verify_section_key_is_known(src_key) {
+                warn!("Unknown source key {src_key}...");
+                return Ok(None);
+            }
+            // verify the signatures 
+            proof.verify();
+
+            // verify the age
+            let name = peer.name();
+            let peer_age = peer.age();
+            let previous_age = proof.previous_age();
+
+            // We require node name to match the relocation proof age.
+            // Which is one less than the age within the relocation proof.
+            if peer_age != (previous_age + 1) {
+                info!(
+        		    "Invalid relocation request from {name} - relocation age ({age}) doesn't match peer's age ({peer_age})."
+        		);
+                return Err(Error::InvalidRelocationDetails);
+            }
+
+            Some(proof.previous_name())
+        } else {
+            // infant node validation
+            if !MyNode::verify_infant_node_age(&peer) {
+                debug!("Unreachable path; {peer} age is invalid: {}. This should be a hard coded value in join logic. Dropping the msg.", peer.age());
+                return Ok(None);
+            }
+    
+            if !context.joins_allowed {
+                debug!("Rejecting join request from {peer} - joins currently not allowed.");
+                let msg =
+                    NodeMsg::JoinResponse(JoinResponse::Rejected(JoinRejectReason::JoinsDisallowed));
+                trace!("{}", LogMarker::SendJoinRejected);
+                trace!("Sending {msg:?} to {peer}");
+                return Ok(Some(Cmd::send_msg(
+                    msg,
+                    Peers::Single(peer),
+                    context.clone(),
+                )));
+            }
+
+            None
+        };
 
         // NB: No reachability check has been made here
         // We propose membership
-        let node_state = NodeState::joined(peer, None);
+        let node_state = NodeState::joined(peer, previous_name);
 
         debug!("[NODE WRITE]: join propose membership write...");
         let mut node = node.write().await;
@@ -71,8 +105,8 @@ impl MyNode {
         Ok(node.propose_membership_change(node_state))
     }
 
-    pub(crate) fn verify_joining_node_age(peer: &Peer) -> bool {
-        // Age should be MIN_ADULT_AGE for joining nodes.
+    pub(crate) fn verify_infant_node_age(peer: &Peer) -> bool {
+        // Age should be MIN_ADULT_AGE for joining infant.
         peer.age() == MIN_ADULT_AGE
     }
 

@@ -18,7 +18,7 @@ use sn_comms::Comm;
 use sn_interface::{
     dbcs::gen_genesis_dbc,
     network_knowledge::{NetworkKnowledge, SectionKeyShare, SectionsDAG, GENESIS_DBC_SK},
-    types::{log_markers::LogMarker, Peer},
+    types::{log_markers::LogMarker, Peer}, messaging::system::SectionSigned, SectionAuthorityProvider,
 };
 
 use ed25519_dalek::Keypair;
@@ -58,16 +58,25 @@ impl MyNode {
         Ok((node, genesis_dbc))
     }
 
+    pub(crate) fn set_new_section(
+        &mut self,
+        dst_sap: SectionSigned<SectionAuthorityProvider>,
+        new_keypair: Keypair,
+    ) -> Result<()> {
+        // try to relocate to the section that matches our current name
+        self.network_knowledge.set_new_section(dst_sap)?;
+        self.keypair = Arc::new(new_keypair);
+        Ok(())
+    }
+
     pub(crate) fn relocate_to(
         &mut self,
-        new_keypair: Arc<Keypair>,
         new_name: XorName,
+        new_keypair: Keypair,
     ) -> Result<()> {
         // try to relocate to the section that matches our current name
         self.network_knowledge.relocate_to(new_name)?;
-
-        self.keypair = new_keypair;
-
+        self.keypair = Arc::new(new_keypair);
         Ok(())
     }
 

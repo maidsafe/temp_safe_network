@@ -10,14 +10,16 @@
 
 use sn_interface::{
     elder_count,
-    network_knowledge::{recommended_section_size, NetworkKnowledge, NodeState, RelocateDetails, node_state::RelocationInfo},
+    network_knowledge::{
+        node_state::RelocationInfo, recommended_section_size, NetworkKnowledge, NodeState, RelocateDetails,
+    },
 };
 use std::{
     cmp::min,
     collections::BTreeSet,
     fmt::{self, Display, Formatter},
 };
-use xor_name::{Prefix, XorName};
+use xor_name::XorName;
 
 // Unique identifier for a churn event, which is used to select nodes to relocate.
 pub(crate) struct ChurnId(pub(crate) [u8; bls::SIG_SIZE]);
@@ -32,19 +34,91 @@ impl Display for ChurnId {
     }
 }
 
+// /// Find all nodes to relocate after a churn event and generate the relocation details for them.
+// pub(super) fn get_nodes_to_relocate(
+//     network_knowledge: &NetworkKnowledge,
+//     churn_id: &ChurnId,
+//     excluded: BTreeSet<XorName>,
+// ) -> Vec<RelocationInfo> {
+//     // Find the peers that pass the relocation check and take only the oldest ones to avoid
+//     // relocating too many nodes at the same time.
+//     // Capped by criteria that cannot relocate too many node at once.
+//     let adults = network_knowledge.adults();
+
+//     debug!(
+//         "Getting candidates for relocation, having {:?} adults, recommended section_size {:?}",
+//         adults.len(),
+//         recommended_section_size(),
+//     );
+
+//     if adults.len() < recommended_section_size() {
+//         return vec![];
+//     }
+
+//     let max_reloctions = elder_count() / 2;
+//     let allowed_relocations = min(adults.len() - recommended_section_size(), max_reloctions);
+
+//     // Find the peers that pass the relocation check
+//     let mut candidates: Vec<_> = adults
+//         .into_iter()
+//         .filter(|info| check(info.age(), churn_id))
+//         // the newly joined node shall not be relocated immediately
+//         .filter(|info| !excluded.contains(&info.name()))
+//         .collect();
+//     // To avoid a node to manipulate its name to gain priority of always being first in XorName,
+//     // here we sort the nodes by its distance to the churn_id.
+//     let target_name = XorName::from_content(&churn_id.0);
+//     candidates.sort_by(|lhs, rhs| target_name.cmp_distance(&lhs.name(), &rhs.name()));
+
+//     debug!(
+//         "Got {} relocation candidates: {candidates:?}",
+//         candidates.len()
+//     );
+
+//     let max_age = if let Some(age) = candidates.iter().map(|info| info.age()).max() {
+//         age
+//     } else {
+//         return vec![];
+//     };
+
+//     let mut relocating_nodes = vec![];
+//     for peer in candidates {
+//         if peer.age() == max_age {
+//             let current_prefix = network_knowledge.prefix();
+
+//             let mut dst_section = XorName::from_content_parts(&[&peer.name().0, &churn_id.0]);
+//             if current_prefix.matches(&dst_section) {
+//                 let sibling_prefix = current_prefix.sibling();
+//                 dst_section = sibling_prefix.substituted_in(dst_section);
+//             }
+
+//             relocating_nodes.push(RelocationInfo::new(peer, dst_section));
+//         }
+//     }
+
+//     relocating_nodes
+//         .into_iter()
+//         .take(allowed_relocations)
+//         .collect()
+// }
+
 /// Find all nodes to relocate after a churn event and generate the relocation details for them.
-pub(super) fn get_nodes_to_relocate(
+pub(super) fn find_nodes_to_relocate(
     network_knowledge: &NetworkKnowledge,
     churn_id: &ChurnId,
     excluded: BTreeSet<XorName>,
-) -> Vec<RelocationInfo> {
+) -> Vec<(NodeState, RelocationDetails)> {
     // Find the peers that pass the relocation check and take only the oldest ones to avoid
     // relocating too many nodes at the same time.
     // Capped by criteria that cannot relocate too many node at once.
-    let adults = network_knowledge.adults();
+    let adults = network_knowledge
+        .section_members()
+        .into_iter()
+        .filter(|state| network_knowledge.is_adult(&state.name()))
+        .collect();
 
     debug!(
-        "Getting candidates for relocation, having {:?} adults, recommended section_size {:?}",
+        "Finding relocation candidates, having {:?} members, recommended section_size {:?}",
         adults.len(),
         recommended_section_size(),
     );
@@ -71,7 +145,7 @@ pub(super) fn get_nodes_to_relocate(
     let target_name = XorName::from_content(&churn_id.0);
     candidates.sort_by(|lhs, rhs| target_name.cmp_distance(&lhs.name(), &rhs.name()));
 
-    debug!("Got {} relocation candidates: {candidates:?}", candidates.len());
+    debug!("Finding relocation candidates {candidates:?}");
 
     let max_age = if let Some(age) = candidates.iter().map(|info| info.age()).max() {
         age
@@ -82,85 +156,23 @@ pub(super) fn get_nodes_to_relocate(
     let mut relocating_nodes = vec![];
     for peer in candidates {
         if peer.age() == max_age {
-            let current_prefix = network_knowledge.prefix();
-
-            let mut dst = XorName::from_content_parts(&[&peer.name().0, &churn_id.0]);
-            if current_prefix.matches(&dst) {
-                let sibling_prefix = current_prefix.sibling();
-                dst = sibling_prefix.substituted_in(dst);
-            }
-            
-            relocating_nodes.push(RelocationInfo::new(peer, dst));
-        }
-    }
-
-    relocating_nodes
-        .into_iter()
-        .take(allowed_relocations)
-        .collect()
-}
-
-/// Find all nodes to relocate after a churn event and generate the relocation details for them.
-pub(super) fn find_nodes_to_relocate(
-    network_knowledge: &NetworkKnowledge,
-    churn_id: &ChurnId,
-    excluded: BTreeSet<XorName>,
-) -> Vec<(NodeState, RelocateDetails)> {
-    // Find the peers that pass the relocation check and take only the oldest ones to avoid
-    // relocating too many nodes at the same time.
-    // Capped by criteria that cannot relocate too many node at once.
-    let joined_nodes = network_knowledge.section_members();
-
-    debug!(
-        "Finding relocation candidates, having {:?} members, recommended section_size {:?}",
-        joined_nodes.len(),
-        recommended_section_size(),
-    );
-
-    if joined_nodes.len() < recommended_section_size() {
-        return vec![];
-    }
-
-    let max_reloctions = elder_count() / 2;
-    let allowed_relocations = min(
-        joined_nodes.len() - recommended_section_size(),
-        max_reloctions,
-    );
-
-    // Find the peers that pass the relocation check
-    let mut candidates: Vec<_> = joined_nodes
-        .into_iter()
-        .filter(|info| check(info.age(), churn_id))
-        // the newly joined node shall not be relocated immediately
-        .filter(|info| !excluded.contains(&info.name()))
-        .collect();
-    // To avoid a node to manipulate its name to gain priority of always being first in XorName,
-    // here we sort the nodes by its distance to the churn_id.
-    let target_name = XorName::from_content(&churn_id.0);
-    candidates.sort_by(|lhs, rhs| target_name.cmp_distance(&lhs.name(), &rhs.name()));
-
-    debug!("Finding relocation candidates {candidates:?}");
-
-    let max_age = if let Some(age) = candidates.iter().map(|info| info.age()).max() {
-        age
-    } else {
-        return vec![];
-    };
-
-    let mut relocating_nodes = vec![];
-    for node_state in candidates {
-        if node_state.age() == max_age {
             // In case the candidate is an elder, it shall only got relocated to other sections.
             // This is to avoid this elder cause elder election conflict and extra data replication
             // to the self-section.
-            let is_elder = network_knowledge.is_elder(&node_state.name());
+            
             let current_prefix = network_knowledge.prefix();
+            
+            let mut dst_section = XorName::from_content_parts(&[&peer.name().0, &churn_id.0]);
+            if current_prefix.matches(&dst_section) {
+                let sibling_prefix = current_prefix.sibling();
+                dst_section = sibling_prefix.substituted_in(dst_section);
+            }
 
-            let dst = dst(&node_state.name(), churn_id, is_elder, current_prefix);
             let age = node_state.age().saturating_add(1);
             let relocate_details =
-                RelocateDetails::with_age(network_knowledge, node_state.peer(), dst, age);
-            relocating_nodes.push((node_state, relocate_details));
+                RelocateDetails::with_age(network_knowledge, node_state.peer(), dst_section, age);
+
+            relocating_nodes.push((peer, RelocationInfo::new(peer, dst_section)));
         }
     }
 
@@ -178,20 +190,20 @@ pub(crate) fn check(age: u8, churn_id: &ChurnId) -> bool {
     trailing_zeros(&churn_id.0) >= age as u32
 }
 
-// Compute the destination for the node with `relocating_name` to be relocated to.
-fn dst(
-    relocating_name: &XorName,
-    churn_id: &ChurnId,
-    is_elder: bool,
-    current_prefix: Prefix,
-) -> XorName {
-    let mut dst = XorName::from_content_parts(&[&relocating_name.0, &churn_id.0]);
-    if is_elder && current_prefix.matches(&dst) {
-        let sibling_prefix = current_prefix.sibling();
-        dst = sibling_prefix.substituted_in(dst);
-    }
-    dst
-}
+// // Compute the destination for the node with `relocating_name` to be relocated to.
+// fn dst(
+//     relocating_name: &XorName,
+//     churn_id: &ChurnId,
+//     is_elder: bool,
+//     current_prefix: Prefix,
+// ) -> XorName {
+//     let mut dst = XorName::from_content_parts(&[&relocating_name.0, &churn_id.0]);
+//     if is_elder && current_prefix.matches(&dst) {
+//         let sibling_prefix = current_prefix.sibling();
+//         dst = sibling_prefix.substituted_in(dst);
+//     }
+//     dst
+// }
 
 // Returns the number of trailing zero bits of the bytes slice.
 fn trailing_zeros(bytes: &[u8]) -> u32 {
@@ -215,7 +227,7 @@ mod tests {
 
     use sn_interface::{
         elder_count,
-        network_knowledge::{SectionAuthorityProvider, SectionTree, MIN_ADULT_AGE},
+        network_knowledge::{SectionAuthorityProvider, SectionTree, MIN_ADULT_AGE, NodeState},
         test_utils::TestKeys,
         types::Peer,
     };
@@ -277,7 +289,6 @@ mod tests {
         for peer in &peers {
             let info = NodeState::joined(*peer, None);
             let info = TestKeys::get_section_signed(&sk, info);
-
             assert!(network_knowledge.update_member(info));
         }
 
@@ -286,12 +297,7 @@ mod tests {
             ChurnId(signature_with_trailing_zeros(signature_trailing_zeros as u32).to_bytes());
 
         let relocations =
-            find_nodes_to_relocate(&network_knowledge, &churn_id, BTreeSet::default());
-
-        let relocations: Vec<_> = relocations
-            .into_iter()
-            .map(|(_, details)| details)
-            .collect();
+            get_nodes_to_relocate(&network_knowledge, &churn_id, BTreeSet::default());
 
         let allowed_relocations = if peers.len() > recommended_section_size() {
             min(elder_count() / 2, peers.len() - recommended_section_size())
@@ -302,6 +308,7 @@ mod tests {
         // Only the oldest matching peers should be relocated.
         let expected_relocated_age = peers
             .iter()
+            .filter(|peer| network_knowledge.is_adult(&peer.name()))
             .map(Peer::age)
             .filter(|age| *age <= signature_trailing_zeros)
             .max();
@@ -310,9 +317,10 @@ mod tests {
             .iter()
             .filter(|peer| Some(peer.age()) == expected_relocated_age)
             .collect();
-        let target_name = XorName::from_content(&churn_id.0);
+            
+        let churn_id_name = XorName::from_content(&churn_id.0);
         expected_relocated_peers
-            .sort_by(|lhs, rhs| target_name.cmp_distance(&lhs.name(), &rhs.name()));
+            .sort_by(|lhs, rhs| churn_id_name.cmp_distance(&lhs.name(), &rhs.name()));
         let expected_relocated_peers: Vec<_> = expected_relocated_peers
             .iter()
             .take(allowed_relocations)
@@ -320,10 +328,11 @@ mod tests {
 
         assert_eq!(expected_relocated_peers.len(), relocations.len());
 
-        // Verify the relocate action is correct depending on whether the peer is elder or not.
         // NOTE: `zip` works here, as both collections are sorted by the same criteria.
-        for (peer, details) in expected_relocated_peers.into_iter().zip(relocations) {
-            assert_eq!(peer.name(), details.previous_name);
+        for (peer, info) in expected_relocated_peers.into_iter().zip(relocations) {
+            assert_eq!(peer.name(), info.peer.name());
+            let mut dst_section = XorName::from_content_parts(&[&peer.name().0, &churn_id.0]);
+            assert_eq!(dst_section, info.dst_section);
         }
 
         Ok(())

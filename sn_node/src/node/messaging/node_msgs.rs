@@ -184,9 +184,9 @@ impl MyNode {
         trace!("{:?}: {msg_id:?}", LogMarker::NodeMsgToBeHandled);
 
         match msg {
-            NodeMsg::TryJoin => {
+            NodeMsg::TryJoin(relocation) => {
                 trace!("Handling msg {:?}: TryJoin from {}", msg_id, sender);
-                MyNode::handle_join(node, &context, sender)
+                MyNode::handle_join(node, &context, sender, relocation)
                     .await
                     .map(|c| c.into_iter().collect())
             }

@@ -8,18 +8,20 @@
 
 use crate::node::{
     flow_ctrl::cmds::Cmd,
+    messaging::{Peers, relocation},
     relocated::JoiningAsRelocated,
-    relocation::{ChurnId, get_nodes_to_relocate},
-    MyNode, Result, messaging::Peers,
+    relocation::{get_nodes_to_relocate, ChurnId, find_nodes_to_relocate},
+    MyNode, Result,
 };
 
 use sn_interface::{
     elder_count,
-    messaging::system::{SectionSigned, NodeMsg},
-    network_knowledge::{MembershipState, NodeState},
-    types::log_markers::LogMarker,
+    messaging::system::{NodeMsg, SectionSigned},
+    network_knowledge::{MembershipState, NodeState, node_state::RelocationInfo},
+    types::{keys::ed25519, log_markers::LogMarker},
 };
 
+use ed25519_dalek::Signer;
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
@@ -47,24 +49,17 @@ impl MyNode {
         }
 
         let mut cmds = vec![];
-        let context = self.context();
-        let sap = context.network_knowledge.section_auth();
-        for relocation_info in
-            get_nodes_to_relocate(&context.network_knowledge, &churn_id, excluded)
+        for (node_state, relocation_details) in
+            find_nodes_to_relocate(&self.network_knowledge, &churn_id, excluded)
         {
             debug!(
                 "Relocating {:?} to {} (on churn of {churn_id})",
-                relocation_info.peer,
-                relocation_info.dst_section,
+                relocation_details.peer(),
+                relocation_details.dst,
             );
 
-            // let relocated_node_state = node_state.relocate(relocate_details);
-            // cmds.extend(self.propose_membership_change(relocated_node_state));
-            
-            let mut recipients = sap.elders_set();
-            recipients.insert(relocation_info.peer);
-            let msg = NodeMsg::PrepareRelocation(relocation_info);
-            cmds.push(Cmd::send_msg(msg, Peers::Multiple(recipients), context.clone()));
+            let relocated_node_state = node_state.relocate(relocation_details);
+            cmds.extend(self.propose_membership_change(relocated_node_state));
         }
 
         Ok(cmds)
@@ -72,16 +67,22 @@ impl MyNode {
 
     pub(crate) fn handle_relocate(
         &mut self,
-        relocate_proof: SectionSigned<NodeState>,
+        proof: SectionSigned<NodeState>,
     ) -> Result<Option<Cmd>> {
-        trace!("Handle relocate {:?}", relocate_proof);
-        let (dst_xorname, dst_section_key, new_age) =
-            if let MembershipState::Relocated(ref relocate_details) = relocate_proof.state() {
-                (
-                    relocate_details.dst,
-                    relocate_details.dst_section_key,
-                    relocate_details.age,
-                )
+        trace!("Handle relocate {:?}", proof);
+        // should be unreachable, but a sanity check
+        let serialized_proof = bincode::serialize(&proof.value)?;
+        if !proof.sig.verify(&serialized_proof) {
+            return Err(super::Error::InvalidSignature);
+        }
+        if node.name() != proof.peer().name() {
+            // not for us, drop it
+            return Ok(vec![]);
+        }
+
+        let dst_section =
+            if let MembershipState::Relocated(ref relocation_dst) = relocate_proof.state() {
+                relocate_details.0
             } else {
                 debug!(
                     "Ignoring Relocate msg containing invalid NodeState: {:?}",
@@ -89,46 +90,27 @@ impl MyNode {
                 );
                 return Ok(None);
             };
-
-        let node = self.info();
-        // `relocate_details.dst` is not the name of the relocated node,
-        // but the target section for the peer to be relocated to.
-        // TODO: having an additional field within reolocate_details for that info?
-        // if dst_xorname != node.name() {
-        //     // This `Relocate` message is not for us - it's most likely a duplicate of a previous
-        //     // message that we already handled.
-        //     return Ok(None);
-        // }
-
+        
+        trace!("{}", LogMarker::RelocateStart);
         debug!("Received Relocate message to join the section at {dst_xorname}");
 
-        if self.relocate_state.is_some() {
-            trace!("Ignore Relocate - relocation already in progress");
-            return Ok(None);
-        }
+        let original_info = self.info();
 
-        trace!("Relocation has started. previous_name: {:?}", node.name());
-        trace!("{}", LogMarker::RelocateStart);
+        let dst_sap = self.network_knowledge.closest_signed_sap(&dst_section)?;
+        let new_keypair = ed25519::gen_keypair(&dst_sap.prefix().range_inclusive(), original_info.age().saturating_add(1));
+        let new_name = ed25519::name(&new_keypair.public);
 
-        // Create a new instance of JoiningAsRelocated to start the relocation
-        // flow. This same instance will handle responses till relocation is complete.
-        let bootstrap_addrs =
-            if let Ok(sap) = self.network_knowledge.section_auth_by_name(&dst_xorname) {
-                sap.addresses()
-            } else {
-                self.network_knowledge.section_auth().addresses()
-            };
-        let (joining_as_relocated, cmd) = JoiningAsRelocated::start(
-            node,
-            relocate_proof,
-            bootstrap_addrs,
-            dst_xorname,
-            dst_section_key,
-            new_age,
-        )?;
+        let info = RelocationInfo::new(proof, new_name);
+        let serialized_info = bincode::serialize(&info)?;
+        // we verify that this new name was actually created by the old name
+        let node_sig = original_info.keypair.sign(&serialized_info);
 
-        self.relocate_state = Some(Box::new(joining_as_relocated));
+        // we try shift to the new section
+        self.set_new_section(dst_sap, new_keypair)?;
 
-        Ok(Some(cmd))
+        trace!("Previous name: {:?} shifted to dst section {} as {new_name}. Now trying to join..", original_info.name(), dst_sap.prefix());
+
+        Ok(MyNode::try_join_section(self.context(), Some(SignedRelocationInfo::new(info, node_sig, original_info.keypair.public))))
     }
+
 }

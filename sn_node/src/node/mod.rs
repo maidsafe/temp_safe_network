@@ -22,7 +22,6 @@ mod membership;
 mod messaging;
 mod node_starter;
 mod node_test_api;
-mod relocated;
 mod relocation;
 
 /// Standard channel size, to allow for large swings in throughput
@@ -113,7 +112,6 @@ mod core {
         pub(crate) elder_promotion_aggregator: SignatureAggregator,
         pub(crate) pending_split_sections:
             BTreeMap<Generation, BTreeSet<SectionSigned<SectionAuthorityProvider>>>,
-        pub(crate) relocate_state: Option<Box<JoiningAsRelocated>>,
         // ======================== Elder only ========================
         pub(crate) membership: Option<Membership>,
         // Section handover consensus state (Some for Elders, None for others)
@@ -124,7 +122,6 @@ mod core {
         pub(crate) fault_cmds_sender: mpsc::Sender<FaultsCmd>,
         // Section administration
         pub(crate) section_proposal_aggregator: SignatureAggregator,
-        pub(crate) relocation_aggregator: SignatureAggregator,
     }
 
     #[derive(custom_debug::Debug, Clone)]
@@ -270,7 +267,6 @@ mod core {
                 pending_split_sections: Default::default(),
                 dkg_start_aggregator: SignatureAggregator::default(),
                 dkg_voter: DkgVoter::default(),
-                relocate_state: None,
                 handover_voting: handover,
                 joins_allowed: true,
                 joins_allowed_until_split: false,
@@ -280,7 +276,6 @@ mod core {
                 elder_promotion_aggregator: SignatureAggregator::default(),
                 handover_request_aggregator: TotalParticipationAggregator::default(),
                 section_proposal_aggregator: SignatureAggregator::default(),
-                relocation_aggregator: SignatureAggregator::default(),
             };
 
             let context = &node.context();
