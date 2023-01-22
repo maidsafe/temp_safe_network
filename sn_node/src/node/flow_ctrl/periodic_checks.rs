@@ -57,10 +57,15 @@ impl FlowCtrl {
     pub(super) async fn perform_periodic_checks(&mut self) {
         let (context, membership_context) = {
             let read_locked_node = self.node.read().await;
-            (
-                &read_locked_node.context(),
-                read_locked_node.membership.clone(),
-            )
+            // only clone membership when time has elapsed
+            // otherwise this is a lot of wasted allocations
+            let membership = if self.timestamps.last_vote_check.elapsed() > MISSING_VOTE_INTERVAL {
+                read_locked_node.membership.clone()
+            } else {
+                None
+            };
+
+            (&read_locked_node.context(), membership)
         };
 
         if !context.is_elder {
@@ -135,7 +140,7 @@ impl FlowCtrl {
         //     }
         // }
 
-        if self.timestamps.last_vote_check.elapsed() > MISSING_VOTE_INTERVAL {
+        if membership_context.is_some() {
             debug!(" ----> vote periodics start");
             self.timestamps.last_vote_check = now;
             for cmd in self
