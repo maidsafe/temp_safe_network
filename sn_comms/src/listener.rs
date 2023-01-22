@@ -18,29 +18,14 @@ use std::sync::Arc;
 use tokio::{sync::mpsc, task};
 use tracing::Instrument;
 
-#[derive(Debug)]
-pub(crate) enum ConnectionEvent {
-    ConnectionClosed {
-        peer: Peer,
-        connection: Arc<qp2p::Connection>,
-    },
-}
-
 #[derive(Clone)]
 pub(crate) struct MsgListener {
-    connection_events: mpsc::Sender<ConnectionEvent>,
     receive_msg: mpsc::Sender<MsgFromPeer>,
 }
 
 impl MsgListener {
-    pub(crate) fn new(
-        connection_events: mpsc::Sender<ConnectionEvent>,
-        receive_msg: mpsc::Sender<MsgFromPeer>,
-    ) -> Self {
-        Self {
-            connection_events,
-            receive_msg,
-        }
+    pub(crate) fn new(receive_msg: mpsc::Sender<MsgFromPeer>) -> Self {
+        Self { receive_msg }
     }
 
     #[tracing::instrument(skip_all)]
@@ -81,13 +66,9 @@ impl MsgListener {
                         }
                     };
 
-                    // let mut is_node_join_msg = false;
                     let src_name = match wire_msg.kind() {
                         MsgKind::Client(auth) => auth.public_key.into(),
-                        MsgKind::Node { name, .. } => {
-                            // is_node_join_msg = *is_join;
-                            *name
-                        }
+                        MsgKind::Node { name, .. } => *name,
                         MsgKind::ClientDataResponse(name) | MsgKind::NodeDataResponse(name) => {
                             *name
                         }
@@ -128,17 +109,5 @@ impl MsgListener {
         }
 
         trace!(%conn_id, %remote_address, "{}", LogMarker::ConnectionClosed);
-
-        // remove this closed connection
-        if let Some(peer) = established_peer {
-            trace!("Removing connection {conn_id} with node {established_peer:?} from cache");
-            let _ = self
-                .connection_events
-                .send(ConnectionEvent::ConnectionClosed {
-                    peer,
-                    connection: conn,
-                })
-                .await;
-        }
     }
 }

@@ -12,10 +12,7 @@ use qp2p::UsrMsgBytes;
 use sn_interface::messaging::MsgId;
 
 use custom_debug::Debug;
-use std::{
-    fmt::{self, Formatter},
-    sync::Arc,
-};
+use std::fmt::{self, Formatter};
 use tokio::sync::mpsc;
 
 // TODO: temporarily disable priority while we transition to channels
@@ -29,7 +26,6 @@ const MAX_SENDJOB_RETRIES: usize = 3;
 #[derive(Debug)]
 enum SessionCmd {
     Send(SendJob),
-    RemoveConnection(Arc<qp2p::Connection>),
     Terminate,
 }
 
@@ -49,19 +45,6 @@ impl PeerSession {
         PeerSession {
             channel: sender,
             link,
-        }
-    }
-
-    /// Returns if the underlying link has any connection at all
-    pub(crate) fn has_connections(&self) -> bool {
-        self.link.has_connections()
-    }
-
-    // Remove a connection from a peer
-    pub(crate) async fn remove(&self, conn: Arc<qp2p::Connection>) {
-        let cmd = SessionCmd::RemoveConnection(conn);
-        if let Err(e) = self.channel.send(cmd).await {
-            error!("Error while sending RemoveConnection {e:?}");
         }
     }
 
@@ -152,10 +135,6 @@ impl PeerSessionWorker {
                         continue;
                     }
                 },
-                SessionCmd::RemoveConnection(conn) => {
-                    self.link.remove(conn);
-                    SessionStatus::Ok
-                }
                 SessionCmd::Terminate => SessionStatus::Terminating,
             };
 

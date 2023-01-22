@@ -52,7 +52,7 @@ pub use self::error::{Error, Result};
 
 use self::{
     link::Link,
-    listener::{ConnectionEvent, MsgListener},
+    listener::MsgListener,
     peer_session::{PeerSession, SendStatus, SendWatcher},
 };
 
@@ -61,15 +61,11 @@ use sn_interface::{
     types::{log_markers::LogMarker, Peer},
 };
 
-use qp2p::{Connection, Endpoint, IncomingConnections, SendStream, UsrMsgBytes};
+use qp2p::{Endpoint, IncomingConnections, SendStream, UsrMsgBytes};
 
 use dashmap::DashMap;
 use std::{collections::BTreeSet, net::SocketAddr, sync::Arc, time::Duration};
-use tokio::{
-    sync::mpsc::{self, Receiver, Sender},
-    sync::RwLock,
-    task,
-};
+use tokio::{sync::mpsc::Sender, sync::RwLock, task};
 
 /// Standard channel size, to allow for large swings in throughput
 static STANDARD_CHANNEL_SIZE: usize = 100_000;
@@ -107,17 +103,13 @@ impl Comm {
         let (our_endpoint, incoming_connections, _) =
             Endpoint::new_peer(local_addr, Default::default(), config).await?;
 
-        let (add_connection, conn_events_recv) = mpsc::channel(STANDARD_CHANNEL_SIZE);
-
-        let msg_listener = MsgListener::new(add_connection, incoming_msg_pipe);
+        let msg_listener = MsgListener::new(incoming_msg_pipe);
 
         let comm = Comm {
             our_endpoint,
             outgoing_sessions: Arc::new(DashMap::new()),
             members: Arc::new(RwLock::new(BTreeSet::new())),
         };
-
-        let _ = task::spawn(handle_connection_events(comm.clone(), conn_events_recv));
 
         listen_for_incoming_msgs(msg_listener, incoming_connections);
 
@@ -343,34 +335,12 @@ impl Comm {
             );
             Ok(session)
         } else {
-            debug!("Could not connect to external peer: {peer:?}");
+            debug!("Did not attempt to connect to external peer: {peer:?}");
             let existed = self.outgoing_sessions.remove(peer);
             if existed.is_some() {
                 debug!("Previous session to {peer:?} was removed");
             }
             Err(Error::CreatingConnectionToUnknownNode(*peer))
-        }
-    }
-
-    /// Remove a qp2p:Connection from a peer's session.
-    /// Cleans up the session if no more connections exist
-    async fn remove_conn(&self, peer: &Peer, conn: Arc<Connection>) {
-        debug!(
-            "Removing incoming conn to {peer:?} w/ conn_id : {:?}",
-            conn.id()
-        );
-
-        let mut should_cleanup_session = true;
-        if let Some(entry) = self.outgoing_sessions.get(peer) {
-            let peer_session = entry.value();
-            peer_session.remove(conn).await;
-            if peer_session.has_connections() {
-                should_cleanup_session = false;
-            }
-        }
-
-        if should_cleanup_session {
-            let _dead_peer = self.outgoing_sessions.remove(peer);
         }
     }
 
@@ -392,17 +362,6 @@ impl Comm {
         let peer = self.get_or_create_outgoing_session(&recipient).await?;
         debug!("Peer session retrieved");
         peer.send_using_session(msg_id, bytes).await
-    }
-}
-
-#[tracing::instrument(skip_all)]
-async fn handle_connection_events(comm: Comm, mut conn_events_recv: Receiver<ConnectionEvent>) {
-    while let Some(event) = conn_events_recv.recv().await {
-        match event {
-            ConnectionEvent::ConnectionClosed { peer, connection } => {
-                comm.remove_conn(&peer, connection).await;
-            }
-        }
     }
 }
 
@@ -442,7 +401,11 @@ mod tests {
     use futures::future;
     use qp2p::Config;
     use std::{net::Ipv4Addr, time::Duration};
-    use tokio::{net::UdpSocket, sync::mpsc, time};
+    use tokio::{
+        net::UdpSocket,
+        sync::mpsc::{self, Receiver},
+        time,
+    };
 
     const TIMEOUT: Duration = Duration::from_secs(1);
 
