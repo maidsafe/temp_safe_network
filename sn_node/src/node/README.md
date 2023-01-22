@@ -37,14 +37,12 @@ Note: If there is no response from the network nodes during this to-and-fro exch
 For node ageing, there is also Relocation process to make node having its age increased and name changed correspondently.
 
 The detailed process is as following:
-1. When elder detected a relocation candidate, the elders sign and send the vote SectionStateVote::NodeIsOffline(NodeState::Relocated) to each other.
-2. Once the vote aggregated, elders attempt to propose a membership change of the section signed NodeState.
-3. Once the membership votes aggregated, elders updates its network_knowledge (i.e. remove that node from the active member list) AND send a notification to the relocation candidate.
-4. When the candidate received the notification, it send FIRST JoiningAsRelocatedRequest to the elders of the target section, note this is using the old name
-5. When the target section elders received the request, they respond with their latest sap within JoiningAsRelocatedResponse
-6. When the candidate received the JoiningAsRelocatedResponse, it generate new keypair and switch to it, then send SECOND JoiningAsRelocatedRequest to the elders of the target section, note this is using the new name
-7. When the target section elders received the second request, they start vote for membership change of NodeIsOnline,
-8. Once the vote of NodeIsOnline aggregated, the candidate will receive the notifications and consider the Relocation process completed.
+1. When elders detect relocation candidates, they attempt to propose a membership change of these candidates as `Relocated`.
+2. Once the membership votes aggregate, elders update their network_knowledge (i.e. remove those nodes from the active member list) AND notify relocating nodes with the decision, containing dst section.
+3. When a relocating node receives the notification, it generates a new name and signs it with previous keys.
+4. The relocating node then switches to the dst section and sends a join request.
+5. When the dst section elders receive the join request, they validate the `RelocationProof` and then vote for this node as joined.
+6. Once the vote is aggregated, the relocated node will receive the notifications and consider the relocation process completed.
 
 ## License
 
