@@ -538,7 +538,7 @@ mod core {
         }
 
         /// Updates various state if elders changed.
-        pub(crate) async fn update_on_elder_change(
+        pub(crate) async fn update_on_section_change(
             &mut self,
             old: &NodeContext,
         ) -> Result<Vec<Cmd>> {

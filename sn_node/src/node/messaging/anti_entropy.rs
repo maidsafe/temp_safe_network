@@ -301,10 +301,10 @@ impl MyNode {
                 // always run this, only changes will trigger events
                 cmds.extend(
                     write_locked_node
-                        .update_on_elder_change(&starting_context)
+                        .update_on_section_change(&starting_context)
                         .await?,
                 );
-                debug!("updated for elder change");
+                debug!("updated for section change");
                 updated
             } else {
                 false
@@ -315,14 +315,15 @@ impl MyNode {
         // mut here to update comms
         let mut latest_context = node.read().await.context();
         debug!("[NODE READ] Latest context got.");
-        // Update comms with these new members or we will not be able to send the msg out
-        latest_context
-            .comm
-            .update_valid_comm_targets(latest_context.network_knowledge.members())
-            .await;
 
         // Only trigger reorganize data when there is a membership change happens.
         if updated {
+            // Update comms with these new members or we will not be able to send the msg out
+            latest_context
+                .comm
+                .update_valid_comm_targets(latest_context.network_knowledge.members())
+                .await;
+
             cmds.push(MyNode::ask_for_any_new_data_from_whole_section(&latest_context).await);
 
             MyNode::write_section_tree(&latest_context);

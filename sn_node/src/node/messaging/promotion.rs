@@ -247,7 +247,7 @@ impl MyNode {
                 self.network_knowledge.section_tree()
             );
 
-            let cmds = self.update_on_elder_change(&context).await;
+            let cmds = self.update_on_section_change(&context).await;
             // updates comm with new members and removes connections that are not from our members
             self.comm
                 .update_valid_comm_targets(self.network_knowledge.members())
