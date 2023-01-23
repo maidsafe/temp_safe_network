@@ -6,7 +6,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## v0.16.15 (2023-01-23)
+
+### Refactor
+
+ - <csr-id-e6ec500629844ad2d328d38fff7ebd0f52a8cb12/> use existing join flow
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 3 days passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge #2018 ([`1ee4f75`](https://github.com/maidsafe/safe_network/commit/1ee4f75af4dddb7b2bd18bb60317d3e977e356f7))
+    - use existing join flow ([`e6ec500`](https://github.com/maidsafe/safe_network/commit/e6ec500629844ad2d328d38fff7ebd0f52a8cb12))
+</details>
+
 ## v0.16.14 (2023-01-20)
+
+<csr-id-6f214e2abae8be935652e93edda6d7eec2354af6/>
+<csr-id-7965789548e9e5deb64501a9a774532042ce6c16/>
+<csr-id-3b9304bab92f0715a134ce68afbfd08a7ad31e61/>
+<csr-id-21af053a5be2317be356e760c2b581c0f870a396/>
+<csr-id-027b164f851209f0662e0a84ee839618d95af58d/>
+<csr-id-a33d28e4bc3f11779eaf0bf6cafd67800dbc4e0d/>
+<csr-id-6c0f451646ea5840c79f112868637facdd08293c/>
+<csr-id-33a577f5e52029854757b9093e7b30535a7acabd/>
+<csr-id-b2edff4b5b63b5d8a7905428b2c78b1d26598f07/>
+<csr-id-9f5b5ffb5975810e22c634f171984fcc803062aa/>
+<csr-id-82ac545c7c3bbf1941fe9d9a80dcc2f99ff58a2f/>
 
 ### Chore
 
@@ -21,6 +59,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    Dont return the full data, just the address. No
    need to fill up other nodes as removing this one will trigger
    that flow
+
+### Chore
+
+ - <csr-id-783d62461a65eb7c06b0d4f399b97216b6c75519/> sn_interface-0.16.14/sn_client-0.77.8/sn_node-0.72.25/sn_api-0.75.4/sn_cli-0.68.5
 
 ### New Features
 
@@ -53,9 +95,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 47 commits contributed to the release over the course of 23 calendar days.
- - 23 days passed between releases.
- - 17 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 48 commits contributed to the release over the course of 23 calendar days.
+ - 24 days passed between releases.
+ - 18 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -65,6 +107,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.16.14/sn_client-0.77.8/sn_node-0.72.25/sn_api-0.75.4/sn_cli-0.68.5 ([`783d624`](https://github.com/maidsafe/safe_network/commit/783d62461a65eb7c06b0d4f399b97216b6c75519))
     - Merge #1940 #1982 ([`3bddfdb`](https://github.com/maidsafe/safe_network/commit/3bddfdb6241116144e1e8869c192d20b89ae5534))
     - Merge #1981 ([`85da86c`](https://github.com/maidsafe/safe_network/commit/85da86cd0d4914489fc74125bb7a2655136f3508))
     - refactor(join): use existing msg-flow - Ae checks are made on TryJoin msg. - Elders drop msgs with invalid/unreachable parameters. - Unit tests more of `unit`-style than `e2e`. ([`8f596e9`](https://github.com/maidsafe/safe_network/commit/8f596e914f841839dffe89c67aa090f29bc03109))
@@ -116,6 +159,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.16.13 (2022-12-27)
 
+<csr-id-a38cd49958df82fd65d0a3f13670693f40a1e6b2/>
+
 ### Chore
 
  - <csr-id-a38cd49958df82fd65d0a3f13670693f40a1e6b2/> sn_interface-0.16.13/sn_client-0.77.7/sn_node-0.72.24
@@ -125,9 +170,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-220fd52ab3e1bac776ba74793d5042de220bb315/> set default keep-alive interval to be 1/2 of idle_timeout value set
    - By default the sn_client keep_alive msgs interval will now be set to 1/2 the
    value set for the idle_timeout value.
-- Removing unused ClientBuilder::cmd_ack_wait config value.
-- Decreasing the CI timeout for sn_client, sn_api, and CLI tests, to 7mins.
-- New LogMarker::IncomingConnection logged by sn_node.
 
 ### Commit Statistics
 
@@ -149,6 +191,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Merge #1924 ([`be2cded`](https://github.com/maidsafe/safe_network/commit/be2cdedb19154adf324782d7178f0e25018cd16c))
     - set default keep-alive interval to be 1/2 of idle_timeout value set ([`220fd52`](https://github.com/maidsafe/safe_network/commit/220fd52ab3e1bac776ba74793d5042de220bb315))
 </details>
+
+<csr-unknown>
+Removing unused ClientBuilder::cmd_ack_wait config value.Decreasing the CI timeout for sn_client, sn_api, and CLI tests, to 7mins.New LogMarker::IncomingConnection logged by sn_node.<csr-unknown/>
 
 ## v0.16.12 (2022-12-22)
 
@@ -231,6 +276,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-id-bf159dc0477417bfd35b0f778822dbdeb3dd0023/>
 <csr-id-5ca4e906c3ff3a55cdedcff1203df57f9f5d4767/>
+<csr-id-73e2c106ae61177617f0fbb1ce1306ad3102bf5f/>
 
 ### Refactor
 

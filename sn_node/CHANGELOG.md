@@ -5,22 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.26 (2023-01-23)
+## v0.72.27 (2023-01-23)
 
 ### Chore
 
- - <csr-id-36d818109e2d613221de3dc9f6ed061d04588d5b/> only clone membership when needed
-   this should vastily reduce allocations coming from membership.clone()
-   
-   (which accounts for the vast majority of alloc in a runnning node just now)
+ - <csr-id-2ce413fab1e5fff10593d7f5fcf7c9c41db1f9ff/> update readme
+
+### Refactor
+
+ - <csr-id-e6ec500629844ad2d328d38fff7ebd0f52a8cb12/> use existing join flow
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release over the course of 1 calendar day.
- - 3 days passed between releases.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -30,6 +30,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2018 ([`1ee4f75`](https://github.com/maidsafe/safe_network/commit/1ee4f75af4dddb7b2bd18bb60317d3e977e356f7))
+    - update readme ([`2ce413f`](https://github.com/maidsafe/safe_network/commit/2ce413fab1e5fff10593d7f5fcf7c9c41db1f9ff))
+    - use existing join flow ([`e6ec500`](https://github.com/maidsafe/safe_network/commit/e6ec500629844ad2d328d38fff7ebd0f52a8cb12))
+</details>
+
+## v0.72.26 (2023-01-23)
+
+<csr-id-36d818109e2d613221de3dc9f6ed061d04588d5b/>
+
+### Chore
+
+ - <csr-id-36d818109e2d613221de3dc9f6ed061d04588d5b/> only clone membership when needed
+   this should vastily reduce allocations coming from membership.clone()
+   
+   (which accounts for the vast majority of alloc in a runnning node just now)
+
+### Chore
+
+ - <csr-id-0ab0c302dcc6ce32b0b71d696b0707a2c50cfa3a/> sn_comms-0.1.1/sn_node-0.72.26
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release over the course of 1 calendar day.
+ - 3 days passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_comms-0.1.1/sn_node-0.72.26 ([`0ab0c30`](https://github.com/maidsafe/safe_network/commit/0ab0c302dcc6ce32b0b71d696b0707a2c50cfa3a))
     - Merge #2009 ([`83448f4`](https://github.com/maidsafe/safe_network/commit/83448f43dace53b3357796bf177edb98c3d5803d))
     - only clone membership when needed ([`36d8181`](https://github.com/maidsafe/safe_network/commit/36d818109e2d613221de3dc9f6ed061d04588d5b))
 </details>
@@ -83,6 +120,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-b316262443ba5d38c4879ae9d2f583aba92e501a/>
 <csr-id-efd7b9b9c775eb15b8beddee8286a1f788c2b940/>
 <csr-id-2b6c4a8fcd2cd7b22e6a4b20f1218c859110be62/>
+<csr-id-783d62461a65eb7c06b0d4f399b97216b6c75519/>
 
 ### Chore
 
@@ -162,12 +200,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    a response bi-stream allows us to decouple such logic from the rest, but it also
    allows us to have unit tests within sn_node which verify the outcome of processing
    Cmds without sending any msg over the wire.
-- We are here also changing Cmd::SendMsg to make/restricting it exclusively for
-   sending msgs to nodes over uni-streams.
-- Having these internal sn_node::Cmds to handle sending msg responses to clients
-   and nodes over their bi-stream allow us to decouple such logic from the rest,
-   as well as also allowing us to have unit tests within sn_node which verify the outcome
-   of processing Cmds without sending any msg over the wire.
 
 ### Bug Fixes
 
@@ -368,7 +400,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 <csr-unknown>
- make comm members list thread safeAdds an Arc +  RwLock around the members list adding SendClientResponse, SendNodeResponse, and SendMsgAndAwaitResponse cmds disable unnecessary checks remove PeerSession on ConnectionClosed dont cache joining node peer sessions remove accounting of storage levels<csr-unknown/>
+We are here also changing Cmd::SendMsg to make/restricting it exclusively forsending msgs to nodes over uni-streams.Having these internal sn_node::Cmds to handle sending msg responses to clientsand nodes over their bi-stream allow us to decouple such logic from the rest,as well as also allowing us to have unit tests within sn_node which verify the outcomeof processing Cmds without sending any msg over the wire.<csr-unknown/>
 
 ## v0.72.24 (2022-12-27)
 
@@ -403,9 +435,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Merge #1924 ([`be2cded`](https://github.com/maidsafe/safe_network/commit/be2cdedb19154adf324782d7178f0e25018cd16c))
     - set default keep-alive interval to be 1/2 of idle_timeout value set ([`220fd52`](https://github.com/maidsafe/safe_network/commit/220fd52ab3e1bac776ba74793d5042de220bb315))
 </details>
-
-<csr-unknown>
-Removing unused ClientBuilder::cmd_ack_wait config value.Decreasing the CI timeout for sn_client, sn_api, and CLI tests, to 7mins.New LogMarker::IncomingConnection logged by sn_node.<csr-unknown/>
 
 ## v0.72.23 (2022-12-26)
 
