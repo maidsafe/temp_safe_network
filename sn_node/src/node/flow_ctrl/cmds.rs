@@ -173,16 +173,6 @@ pub(crate) enum Cmd {
         client_stream: SendStream,
         source_client: Peer,
     },
-    /// Performs serialisation and signing and sends the msg after reading NodeContext
-    /// from the node
-    ///
-    /// Currently only used during Join process where Node is not readily available
-    /// DO NOT USE ELSEWHERE
-    SendLockingJoinMsg {
-        msg: NodeMsg,
-        msg_id: MsgId,
-        recipients: Peers,
-    },
     /// Proposes peers as offline
     ProposeVoteNodesOffline(BTreeSet<XorName>),
 }
@@ -199,18 +189,6 @@ impl Cmd {
         }
     }
 
-    /// Special wrapper to trigger SendLockingJoinMsg as NodeContext is unavailable
-    /// during the join process
-    pub(crate) fn send_join_msg(msg: NodeMsg, recipients: Peers) -> Self {
-        let msg_id = MsgId::new();
-        debug!("Sending locking join msg {msg_id:?} {msg:?}");
-        Cmd::SendLockingJoinMsg {
-            msg,
-            msg_id,
-            recipients,
-        }
-    }
-
     pub(crate) fn statemap_state(&self) -> sn_interface::statemap::State {
         use sn_interface::statemap::State;
         match self {
@@ -220,7 +198,6 @@ impl Cmd {
             | Cmd::SendClientResponse { .. }
             | Cmd::SendNodeDataResponse { .. }
             | Cmd::SendMsgAwaitResponseAndRespondToClient { .. } => State::Comms,
-            Cmd::SendLockingJoinMsg { .. } => State::Comms,
             Cmd::HandleFailedSendToNode { .. } => State::Comms,
             Cmd::HandleMsg { .. } => State::HandleMsg,
             Cmd::UpdateNetworkAndHandleValidClientMsg { .. } => State::ClientMsg,
@@ -266,7 +243,6 @@ impl fmt::Display for Cmd {
             Cmd::SendMsgAwaitResponseAndRespondToClient { .. } => {
                 write!(f, "SendMsgAwaitResponseAndRespondToClient")
             }
-            Cmd::SendLockingJoinMsg { .. } => write!(f, "SendLockingJoinMsg"),
             Cmd::EnqueueDataForReplication { .. } => write!(f, "EnqueueDataForReplication"),
             Cmd::TrackNodeIssue { name, issue } => {
                 write!(f, "TrackNodeIssue {:?}, {:?}", name, issue)

@@ -17,15 +17,16 @@ use crate::{
 use sn_comms::Comm;
 use sn_interface::{
     dbcs::gen_genesis_dbc,
+    messaging::system::SectionSigned,
     network_knowledge::{NetworkKnowledge, SectionKeyShare, SectionsDAG, GENESIS_DBC_SK},
     types::{log_markers::LogMarker, Peer},
+    SectionAuthorityProvider,
 };
 
 use ed25519_dalek::Keypair;
 use sn_dbc::Dbc;
 use std::{path::PathBuf, sync::Arc};
 use tokio::sync::mpsc;
-use xor_name::XorName;
 
 impl MyNode {
     pub(crate) async fn first_node(
@@ -58,16 +59,14 @@ impl MyNode {
         Ok((node, genesis_dbc))
     }
 
-    pub(crate) fn relocate_to(
+    pub(crate) fn switch_section(
         &mut self,
-        new_keypair: Arc<Keypair>,
-        new_name: XorName,
+        dst_sap: SectionSigned<SectionAuthorityProvider>,
+        new_keypair: Keypair,
     ) -> Result<()> {
         // try to relocate to the section that matches our current name
-        self.network_knowledge.relocate_to(new_name)?;
-
-        self.keypair = new_keypair;
-
+        self.network_knowledge.switch_section(dst_sap)?;
+        self.keypair = Arc::new(new_keypair);
         Ok(())
     }
 

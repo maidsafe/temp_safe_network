@@ -11,7 +11,7 @@ mod client_msgs;
 mod data;
 mod dkg;
 mod handover;
-mod join_network;
+mod join_section;
 mod joining_nodes;
 mod membership;
 pub(crate) mod node_msgs;
