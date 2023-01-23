@@ -318,7 +318,7 @@ impl MyNode {
         // Update comms with these new members or we will not be able to send the msg out
         latest_context
             .comm
-            .update_members(latest_context.network_knowledge.members())
+            .update_valid_comm_targets(latest_context.network_knowledge.members())
             .await;
 
         // Only trigger reorganize data when there is a membership change happens.
