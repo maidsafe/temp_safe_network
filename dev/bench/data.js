@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1674487948189,
+  "lastUpdate": 1674496123644,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -56776,6 +56776,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 410461505,
             "range": "± 14370197",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "1ee4f75af4dddb7b2bd18bb60317d3e977e356f7",
+          "message": "Merge #2018\n\n2018: refactor(relocation): use existing join flow r=RolandSherwin a=oetyng\n\nThis PR precedes a PR addressing [this issue](https://github.com/maidsafe/safe_network/issues/2011).\r\n\r\nRelocation was previously a separate request/response flow.\r\nThat flow is now removed with this PR.\r\n\r\nNow we use the existing join flow, with an optional parameter of a `RelocationProof`.\r\nThis allows the relocation to use the same `ae` flow that already was implemented for join.\r\n\r\nAdditional changes to note:\r\n- Only adults are relocated.\r\n- The source section no longer increments the age in their vote for `Relocated` of the relocating node.\r\nInstead, the joining node increments its own age, as it generates a new name after it receives the membership decision. It then tries to join the dst section with this new name including the incremented age. The dst section validates that the joiner age is one higher than its previous age (as given by its previous name).\r\n\n\nCo-authored-by: oetyng <oetyng@gmail.com>",
+          "timestamp": "2023-01-23T16:05:39Z",
+          "tree_id": "aaaa7f9eaa629bbcf8cc32bedba957ec913ed278",
+          "url": "https://github.com/maidsafe/safe_network/commit/1ee4f75af4dddb7b2bd18bb60317d3e977e356f7"
+        },
+        "date": 1674496121906,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2215740,
+            "range": "± 12452",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 85119193,
+            "range": "± 1132106",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 103242306,
+            "range": "± 4613471",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 408833929,
+            "range": "± 2604346",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 69486300,
+            "range": "± 3122032",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 82556469,
+            "range": "± 750789",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 326640291,
+            "range": "± 2037480",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 21936575646,
+            "range": "± 80978420",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 39811836,
+            "range": "± 15078420",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2177831915,
+            "range": "± 316247232",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 7653118786,
+            "range": "± 802340195",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 197544561,
+            "range": "± 16298584",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1717148787,
+            "range": "± 144455353",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 6530212589,
+            "range": "± 416907912",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 39893054,
+            "range": "± 592438",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 390237838,
+            "range": "± 2748104",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1501796098,
+            "range": "± 6510629",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 10950455,
+            "range": "± 148280",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 98029262,
+            "range": "± 3538753",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 339070503,
+            "range": "± 2347892",
             "unit": "ns/iter"
           }
         ]
