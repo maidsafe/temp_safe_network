@@ -284,6 +284,9 @@ impl MyNode {
             .update_members(self.network_knowledge.members())
             .await;
 
+        // lets check that we have the correct data now we're changing membership
+        cmds.push(MyNode::ask_for_any_new_data_from_whole_section(&self.context()).await);
+
         Ok(cmds)
     }
 

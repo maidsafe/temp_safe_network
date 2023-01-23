@@ -89,7 +89,7 @@ impl MyNode {
     /// These nodes should send back anything missing (in batches).
     /// Relevant nodes should be all _prior_ neighbours + _new_ elders.
     #[instrument(skip(context))]
-    pub(crate) async fn ask_for_any_new_data(context: &NodeContext) -> Cmd {
+    pub(crate) async fn ask_for_any_new_data_from_whole_section(context: &NodeContext) -> Cmd {
         trace!("{:?}", LogMarker::DataReorganisationUnderway);
         debug!("Querying section for any new data");
         let data_i_have = context.data_storage.data_addrs().await;

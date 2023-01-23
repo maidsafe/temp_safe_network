@@ -323,7 +323,7 @@ impl MyNode {
 
         // Only trigger reorganize data when there is a membership change happens.
         if updated {
-            cmds.push(MyNode::ask_for_any_new_data(&latest_context).await);
+            cmds.push(MyNode::ask_for_any_new_data_from_whole_section(&latest_context).await);
 
             MyNode::write_section_tree(&latest_context);
 

@@ -52,7 +52,7 @@ pub enum LogMarker {
     StoredNewChunk,
     DataResponseReceviedFromAdult,
     ChunkQueryReceviedAtElder,
-    ChunkQueryReceviedAtAdult,
+    ChunkQueryReceviedAtStoringNode,
     // Data reorganisation
     RequestForAnyMissingData,
     DataReorganisationUnderway,
