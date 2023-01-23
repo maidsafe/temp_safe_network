@@ -32,13 +32,13 @@ use sn_interface::{
             ClientDataResponse, ClientMsg, CmdResponse, DataCmd, Error as MessagingDataError,
             SpentbookCmd,
         },
-        system::{AntiEntropyKind, JoinAsRelocatedRequest, NodeDataCmd, NodeMsg},
+        system::{AntiEntropyKind, NodeDataCmd, NodeMsg},
         Dst, MsgType, WireMsg,
     },
     network_knowledge::{
         recommended_section_size, supermajority, Error as NetworkKnowledgeError, MembershipState,
-        MyNodeInfo, NodeState, RelocateDetails, SectionKeysProvider, SectionTreeUpdate,
-        SectionsDAG, MIN_ADULT_AGE,
+        MyNodeInfo, NodeState, RelocationDst, RelocationInfo, RelocationProof, SectionKeysProvider,
+        SectionTreeUpdate, SectionsDAG, MIN_ADULT_AGE,
     },
     test_utils::*,
     types::{keys::ed25519, PublicKey},
@@ -62,63 +62,57 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
 
     let prefix = Prefix::default();
     let env = TestNetworkBuilder::new(thread_rng())
-        .sap(prefix, elder_count(), 0, None, None)
+        .sap(prefix, elder_count(), 1, None, None)
         .build();
-    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
+
     let sk_set = env.get_secret_key_set(prefix, None);
     let section_key = sk_set.public_keys().public_key();
-    let node = dispatcher.node();
-    let node_info = node.read().await.info();
-    let relocated_node_old_name = node_info.name();
-    let relocated_node_old_keypair = node_info.keypair.clone();
 
-    let relocated_node = MyNodeInfo::new(
-        ed25519::gen_keypair(&prefix.range_inclusive(), MIN_ADULT_AGE + 1),
+    let adult_dispatcher = env.get_dispatchers(prefix, 0, 1, None).remove(0);
+    let adult_node = adult_dispatcher.node();
+    let old_info = adult_node.read().await.info();
+    let old_name = old_info.name();
+    let old_keypair = old_info.keypair.clone();
+
+    let new_info = MyNodeInfo::new(
+        ed25519::gen_keypair(&prefix.range_inclusive(), old_info.age() + 1),
         gen_addr(),
     );
 
-    let relocate_details = RelocateDetails {
-        previous_name: relocated_node_old_name,
-        dst: relocated_node_old_name,
-        dst_section_key: section_key,
-        age: relocated_node.age(),
-    };
+    let relocation_dst = RelocationDst::new(xor_name::rand::random());
+    let relocated_state = NodeState::relocated(old_info.peer(), Some(old_name), relocation_dst);
+    let section_signed_state = TestKeys::get_section_signed(&sk_set.secret_key(), relocated_state);
 
-    let node_state = NodeState::relocated(
-        relocated_node.peer(),
-        Some(relocated_node_old_name),
-        relocate_details,
-    );
-    let relocate_proof = TestKeys::get_section_signed(&sk_set.secret_key(), node_state);
+    let info = RelocationInfo::new(section_signed_state, new_info.name());
+    let serialized_info = bincode::serialize(&info)?;
+    let signature_over_new_name = ed25519::sign(&serialized_info, &old_keypair);
 
-    let signature_over_new_name =
-        ed25519::sign(&relocated_node.name().0, &relocated_node_old_keypair);
+    let proof = RelocationProof::new(info, signature_over_new_name, old_keypair.public);
 
     let wire_msg = WireMsg::single_src_node(
-        relocated_node.name(),
+        new_info.name(),
         Dst {
             name: XorName::from(PublicKey::Bls(section_key)),
             section_key,
         },
-        NodeMsg::JoinAsRelocatedRequest(Box::new(JoinAsRelocatedRequest {
-            section_key,
-            relocate_proof,
-            signature_over_new_name,
-        })),
+        NodeMsg::TryJoin(Some(proof)),
     )?;
+
+    let elder_dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
+    let elder_node = elder_dispatcher.node();
 
     ProcessAndInspectCmds::new(
         Cmd::HandleMsg {
-            origin: relocated_node.peer(),
+            origin: new_info.peer(),
             wire_msg,
             send_stream: None,
         },
-        &dispatcher,
+        &elder_dispatcher,
     )
     .process_all()
     .await?;
 
-    assert!(node
+    assert!(elder_node
         .read()
         .await
         .membership
@@ -138,8 +132,8 @@ async fn handle_agreement_on_online() -> Result<()> {
     let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
     let sk_set = env.get_secret_key_set(prefix, None);
     let new_peer = gen_peer(MIN_ADULT_AGE);
-    let status = handle_online_cmd(&new_peer, &sk_set, &dispatcher).await?;
-    assert!(status.node_approval_sent);
+    let join_approval_sent = handle_online_cmd(&new_peer, &sk_set, &dispatcher).await?;
+    assert!(join_approval_sent.0);
 
     assert!(dispatcher
         .node()
@@ -509,11 +503,6 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
-async fn relocation_of_non_elder() -> Result<()> {
-    relocation(RelocatedPeerRole::NonElder).await
-}
-
 /// Create a `SectionStateVote::Online` whose agreement handling triggers relocation of a node with the
 /// given age.
 ///
@@ -541,20 +530,12 @@ fn threshold() -> usize {
     supermajority(elder_count()) - 1
 }
 
-enum RelocatedPeerRole {
-    NonElder,
-    Elder,
-}
-
-async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
+#[tokio::test]
+async fn relocation_decision_is_sent() -> Result<()> {
     init_logger();
 
     let prefix: Prefix = prefix("0");
-    let section_size = match relocated_peer_role {
-        RelocatedPeerRole::Elder => elder_count(),
-        RelocatedPeerRole::NonElder => recommended_section_size(),
-    };
-    let adults = section_size - elder_count();
+    let adults = recommended_section_size() - elder_count();
     let env = TestNetworkBuilder::new(thread_rng())
         .sap(prefix, elder_count(), adults, None, None)
         .build();
@@ -562,19 +543,12 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
     let mut section = env.get_network_knowledge(prefix, None);
     let sk_set = env.get_secret_key_set(prefix, None);
 
-    let relocated_peer = match relocated_peer_role {
-        // our node is elder idx 0, so remove the second elder
-        RelocatedPeerRole::Elder => env.get_peers(prefix, 2, 0, None).remove(1),
-        RelocatedPeerRole::NonElder => {
-            let non_elder_peer = gen_peer_in_prefix(MIN_ADULT_AGE - 1, prefix);
-            let node_state = NodeState::joined(non_elder_peer, None);
-            let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state);
-            assert!(section.update_member(node_state));
-            // update our node with the new network_knowledge
-            dispatcher.node().write().await.network_knowledge = section.clone();
-            non_elder_peer
-        }
-    };
+    let relocated_peer = gen_peer_in_prefix(MIN_ADULT_AGE - 1, prefix);
+    let node_state = NodeState::joined(relocated_peer, None);
+    let node_state = TestKeys::get_section_signed(&sk_set.secret_key(), node_state);
+    assert!(section.update_member(node_state));
+    // update our node with the new network_knowledge
+    dispatcher.node().write().await.network_knowledge = section.clone();
 
     let membership_decision = create_relocation_trigger(&sk_set, relocated_peer.age());
     let mut cmds = ProcessAndInspectCmds::new(
@@ -595,8 +569,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
             let node_state_proposals = votes.iter().flat_map(|v| v.proposals());
             for node_state in node_state_proposals {
                 assert_eq!(node_state.name(), relocated_peer.name());
-                if let MembershipState::Relocated(relocate_details) = node_state.state() {
-                    assert_eq!(relocate_details.age, relocated_peer.age() + 1);
+                if let MembershipState::Relocated(_dst) = node_state.state() {
                     offline_relocate_sent = true;
                 }
             }

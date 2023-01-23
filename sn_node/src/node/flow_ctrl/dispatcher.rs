@@ -45,26 +45,12 @@ impl Dispatcher {
     pub(crate) async fn process_cmd(&self, cmd: Cmd) -> Result<Vec<Cmd>> {
         match cmd {
             Cmd::TryJoinNetwork => {
-                info!("[NODE READ]: getting lock for try_join_network");
+                info!("[NODE READ]: getting lock for try_join_section");
                 let context = self.node().read().await.context();
-                info!("[NODE READ]: got lock for try_join_network");
-                Ok(MyNode::try_join_network(context).into_iter().collect())
-            }
-            // Used purely for locking Join process
-            Cmd::SendLockingJoinMsg {
-                msg,
-                msg_id,
-                recipients,
-            } => {
-                info!("[NODE READ]: getting lock for join sendmsg");
-                let context = self.node().read().await.context();
-                info!("[NODE READ]: got lock for join sendmsg");
-                Ok(vec![Cmd::SendMsg {
-                    msg,
-                    msg_id,
-                    recipients,
-                    context,
-                }])
+                info!("[NODE READ]: got lock for try_join_section");
+                Ok(MyNode::try_join_section(context, None)
+                    .into_iter()
+                    .collect())
             }
             Cmd::SendMsg {
                 msg,

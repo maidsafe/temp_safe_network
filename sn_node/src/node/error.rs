@@ -78,6 +78,8 @@ pub enum Error {
     NoMatchingSection,
     #[error("Node cannot join the network since it is not externally reachable: {0}")]
     NodeNotReachable(SocketAddr),
+    #[error("A node has invalid relocation details")]
+    InvalidRelocationDetails,
     /// Timeout when trying to join the network
     #[error("Timeout when trying to join the network")]
     JoinTimeout,

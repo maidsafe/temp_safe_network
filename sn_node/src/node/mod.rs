@@ -22,7 +22,6 @@ mod membership;
 mod messaging;
 mod node_starter;
 mod node_test_api;
-mod relocated;
 mod relocation;
 
 /// Standard channel size, to allow for large swings in throughput
@@ -57,7 +56,6 @@ mod core {
             handover::Handover,
             membership::{elder_candidates, try_split_dkg, Membership},
             messaging::Peers,
-            relocated::JoiningAsRelocated,
             DataStorage, Error, Result, XorName,
         },
         UsedSpace,
@@ -113,7 +111,6 @@ mod core {
         pub(crate) elder_promotion_aggregator: SignatureAggregator,
         pub(crate) pending_split_sections:
             BTreeMap<Generation, BTreeSet<SectionSigned<SectionAuthorityProvider>>>,
-        pub(crate) relocate_state: Option<Box<JoiningAsRelocated>>,
         // ======================== Elder only ========================
         pub(crate) membership: Option<Membership>,
         // Section handover consensus state (Some for Elders, None for others)
@@ -269,7 +266,6 @@ mod core {
                 pending_split_sections: Default::default(),
                 dkg_start_aggregator: SignatureAggregator::default(),
                 dkg_voter: DkgVoter::default(),
-                relocate_state: None,
                 handover_voting: handover,
                 joins_allowed: true,
                 joins_allowed_until_split: false,

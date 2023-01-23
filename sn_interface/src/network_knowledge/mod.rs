@@ -8,12 +8,13 @@
 
 mod errors;
 mod node_info;
-pub mod node_state;
-pub mod section_authority_provider;
-pub mod section_keys;
 mod section_peers;
 mod section_tree;
 mod sections_dag;
+
+pub mod node_state;
+pub mod section_authority_provider;
+pub mod section_keys;
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils;
 #[cfg(any(test, feature = "test-utils"))]
@@ -22,7 +23,7 @@ pub use section_tree::test_utils as test_utils_st;
 pub use self::{
     errors::{Error, Result},
     node_info::MyNodeInfo,
-    node_state::{MembershipState, NodeState, RelocateDetails},
+    node_state::{MembershipState, NodeState, RelocationDst, RelocationInfo, RelocationProof},
     section_authority_provider::{SapCandidate, SectionAuthUtils, SectionAuthorityProvider},
     section_keys::{SectionKeyShare, SectionKeysProvider},
     section_tree::{SectionTree, SectionTreeUpdate},
@@ -199,12 +200,16 @@ impl NetworkKnowledge {
         Ok((network_knowledge, section_key_share))
     }
 
-    /// update all section info for our new section
-    pub fn relocate_to(&mut self, new_name: XorName) -> Result<()> {
-        let signed_sap = self.section_tree().get_signed_by_name(&new_name)?;
-        debug!("Node was relocated to {:?}", signed_sap.section_key());
-        self.signed_sap = signed_sap;
-
+    /// Switches to use the provided section
+    /// as the section where our node belongs.
+    pub fn switch_section(
+        &mut self,
+        dst_sap: SectionSigned<SectionAuthorityProvider>,
+    ) -> Result<()> {
+        if self.section_tree().get(&dst_sap.prefix()).is_none() {
+            return Err(Error::NoMatchingSection);
+        }
+        self.signed_sap = dst_sap;
         Ok(())
     }
 
@@ -332,12 +337,21 @@ impl NetworkKnowledge {
     pub fn closest_signed_sap(
         &self,
         name: &XorName,
-    ) -> Option<(&SectionSigned<SectionAuthorityProvider>, SectionsDAG)> {
+    ) -> Option<SectionSigned<SectionAuthorityProvider>> {
         let closest_sap = self
             .section_tree
             .closest(name, Some(&self.prefix()))
             // In case the only prefix is ours, we fallback to it.
             .unwrap_or(self.section_tree.get_signed(&self.prefix())?);
+        Some(closest_sap.clone())
+    }
+
+    // Get SAP of a known section with the given prefix, along with its proof chain
+    pub fn closest_signed_sap_with_chain(
+        &self,
+        name: &XorName,
+    ) -> Option<(SectionSigned<SectionAuthorityProvider>, SectionsDAG)> {
+        let closest_sap = self.closest_signed_sap(name)?;
 
         if let Ok(section_chain) = self
             .section_tree

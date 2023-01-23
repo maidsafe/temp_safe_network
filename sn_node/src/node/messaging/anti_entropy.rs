@@ -52,7 +52,7 @@ impl MyNode {
             // we just let the join request handler to deal with it later on.
             // We also skip AE check on Anti-Entropy messages
             let ae_msg = match msg {
-                NodeMsg::AntiEntropy { .. } | NodeMsg::JoinAsRelocatedRequest(_) => {
+                NodeMsg::AntiEntropy { .. } => {
                     trace!("Entropy check skipped for {msg_id:?}, handling message directly");
                     None
                 }
@@ -450,7 +450,9 @@ impl MyNode {
                 "AE: {msg_id:?} prefix not matching. We are: {our_prefix:?}, they sent to: {:?}",
                 dst.name
             );
-            let closest_sap = context.network_knowledge.closest_signed_sap(&dst.name);
+            let closest_sap = context
+                .network_knowledge
+                .closest_signed_sap_with_chain(&dst.name);
             return match closest_sap {
                 Some((signed_sap, proof_chain)) => {
                     info!(
@@ -462,8 +464,7 @@ impl MyNode {
                         "{} {msg_id:?} entropy found. {sender:?} should be updated",
                         LogMarker::AeSendRedirect
                     );
-                    let section_tree_update =
-                        SectionTreeUpdate::new(signed_sap.clone(), proof_chain);
+                    let section_tree_update = SectionTreeUpdate::new(signed_sap, proof_chain);
                     let bounced_msg = wire_msg.serialize()?;
                     let kind = AntiEntropyKind::Redirect { bounced_msg };
 
@@ -727,7 +728,7 @@ mod tests {
             payload,
             MsgKind::Node {
                 name: sender.name(),
-                is_join: matches!(payload_msg, NodeMsg::TryJoin),
+                is_join: payload_msg.is_join(),
             },
             dst,
         ))

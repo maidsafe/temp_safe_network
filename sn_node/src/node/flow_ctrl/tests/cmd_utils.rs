@@ -20,7 +20,7 @@ use sn_interface::{
         system::{JoinResponse, NodeMsg},
         AuthorityProof, ClientAuth, Dst, MsgId, MsgKind,
     },
-    network_knowledge::{test_utils::*, MembershipState, NodeState, RelocateDetails},
+    network_knowledge::{test_utils::*, NodeState},
     types::{Keypair, Peer},
 };
 
@@ -35,16 +35,13 @@ use std::{
 use tokio::sync::mpsc::{error::TryRecvError, Receiver};
 use xor_name::XorName;
 
-pub(crate) struct HandleOnlineStatus {
-    pub(crate) node_approval_sent: bool,
-    pub(crate) relocate_details: Option<RelocateDetails>,
-}
+pub(crate) struct JoinApprovalSent(pub(crate) bool);
 
 pub(crate) async fn handle_online_cmd(
     peer: &Peer,
     sk_set: &bls::SecretKeySet,
     dispatcher: &Dispatcher,
-) -> Result<HandleOnlineStatus> {
+) -> Result<JoinApprovalSent> {
     let node_state = NodeState::joined(*peer, None);
     let membership_decision = section_decision(sk_set, node_state);
 
@@ -53,10 +50,7 @@ pub(crate) async fn handle_online_cmd(
         dispatcher,
     );
 
-    let mut status = HandleOnlineStatus {
-        node_approval_sent: false,
-        relocate_details: None,
-    };
+    let mut approval_sent = JoinApprovalSent(false);
 
     while let Some(cmd) = all_cmds.next().await? {
         let (msg, recipients) = match cmd {
@@ -71,25 +65,13 @@ pub(crate) async fn handle_online_cmd(
                 assert_matches!(recipients, Peers::Multiple(peers) => {
                     assert_eq!(peers, &BTreeSet::from([*peer]));
                 });
-                status.node_approval_sent = true;
-            }
-            NodeMsg::ProposeSectionState {
-                proposal:
-                    sn_interface::messaging::system::SectionStateVote::NodeIsOffline(node_state),
-                ..
-            } => {
-                if let MembershipState::Relocated(details) = node_state.state() {
-                    if details.previous_name != peer.name() {
-                        continue;
-                    }
-                    status.relocate_details = Some(*details.clone());
-                }
+                approval_sent.0 = true;
             }
             _ => continue,
         }
     }
 
-    Ok(status)
+    Ok(approval_sent)
 }
 
 // Process commands, allowing the user to inspect each and all of the intermediate
