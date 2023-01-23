@@ -52,7 +52,7 @@ pub use self::error::{Error, Result};
 
 use self::{
     link::Link,
-    listener::{ConnectionEvent, MsgListener},
+    listener::MsgListener,
     peer_session::{PeerSession, SendStatus, SendWatcher},
 };
 
@@ -61,15 +61,11 @@ use sn_interface::{
     types::{log_markers::LogMarker, Peer},
 };
 
-use qp2p::{Connection, Endpoint, IncomingConnections, SendStream, UsrMsgBytes};
+use qp2p::{Endpoint, IncomingConnections, SendStream, UsrMsgBytes};
 
 use dashmap::DashMap;
 use std::{collections::BTreeSet, net::SocketAddr, sync::Arc, time::Duration};
-use tokio::{
-    sync::mpsc::{self, Receiver, Sender},
-    sync::RwLock,
-    task,
-};
+use tokio::{sync::mpsc::Sender, sync::RwLock, task};
 
 /// Standard channel size, to allow for large swings in throughput
 static STANDARD_CHANNEL_SIZE: usize = 100_000;
@@ -91,8 +87,7 @@ pub struct MsgFromPeer {
 #[derive(Clone)]
 pub struct Comm {
     our_endpoint: Endpoint,
-    msg_listener: MsgListener,
-    sessions: Arc<DashMap<Peer, PeerSession>>,
+    outgoing_sessions: Arc<DashMap<Peer, PeerSession>>,
     members: Arc<RwLock<BTreeSet<Peer>>>,
 }
 
@@ -108,18 +103,13 @@ impl Comm {
         let (our_endpoint, incoming_connections, _) =
             Endpoint::new_peer(local_addr, Default::default(), config).await?;
 
-        let (add_connection, conn_events_recv) = mpsc::channel(STANDARD_CHANNEL_SIZE);
-
-        let msg_listener = MsgListener::new(add_connection, incoming_msg_pipe);
+        let msg_listener = MsgListener::new(incoming_msg_pipe);
 
         let comm = Comm {
             our_endpoint,
-            msg_listener: msg_listener.clone(),
-            sessions: Arc::new(DashMap::new()),
+            outgoing_sessions: Arc::new(DashMap::new()),
             members: Arc::new(RwLock::new(BTreeSet::new())),
         };
-
-        let _ = task::spawn(receive_conns(comm.clone(), conn_events_recv));
 
         listen_for_incoming_msgs(msg_listener, incoming_connections);
 
@@ -178,7 +168,8 @@ impl Comm {
     pub async fn update_members(&mut self, members: BTreeSet<Peer>) {
         let new_members = members.clone();
         *self.members.write().await = members;
-        self.sessions.retain(|p, _| new_members.contains(p));
+        self.outgoing_sessions
+            .retain(|p, _| new_members.contains(p));
     }
 
     /// Sends the payload on a new or existing connection,
@@ -192,7 +183,7 @@ impl Comm {
     ) -> Result<()> {
         let watcher = self.send_to_one(peer, msg_id, bytes).await?;
 
-        let sessions = self.sessions.clone();
+        let sessions = self.outgoing_sessions.clone();
 
         trace!("Sessions known of: {:?}", sessions.len());
 
@@ -231,7 +222,7 @@ impl Comm {
                     trace!("Msg {msg_id:?} sent to {peer:?}");
                 } else if should_remove {
                     // do cleanup of that peer
-                    let perhaps_session = self.sessions.remove(&peer);
+                    let perhaps_session = self.outgoing_sessions.remove(&peer);
                     if let Some((_peer, session)) = perhaps_session {
                         session.disconnect().await;
                     }
@@ -245,7 +236,7 @@ impl Comm {
                 peer.name(),
                 error,
             );
-                let _peer = self.sessions.remove(&peer);
+                let _peer = self.outgoing_sessions.remove(&peer);
             }
         }
     }
@@ -262,7 +253,7 @@ impl Comm {
         // TODO: tweak messaging to just allow passthrough
         debug!("Trying to get {peer:?} session in order to send: {msg_id:?}");
 
-        let mut peer = self.get_or_create(&peer).await?;
+        let mut peer = self.get_or_create_outgoing_session(&peer).await?;
         debug!("Session of {peer:?} retrieved for {msg_id:?}");
         let adult_response_bytes = peer.send_with_bi_return_response(bytes, msg_id).await?;
         debug!("Peer response from {peer:?} is in for {msg_id:?}");
@@ -323,83 +314,33 @@ impl Comm {
 
     /// Get a PeerSession if it already exists, otherwise create and insert
     #[instrument(skip(self))]
-    async fn get_or_create(&self, peer: &Peer) -> Result<PeerSession> {
+    async fn get_or_create_outgoing_session(&self, peer: &Peer) -> Result<PeerSession> {
         debug!("Attempting to get or create peer session to member: {peer:?}");
         if self.members.read().await.contains(peer) {
             debug!("get or creating peer session to member: {peer:?}");
-            if let Some(entry) = self.sessions.get(peer) {
+            if let Some(entry) = self.outgoing_sessions.get(peer) {
                 debug!(" session to: {peer:?} exists");
                 return Ok(entry.value().clone());
             }
 
             debug!("session to: {peer:?} does not exists");
-            let link = Link::new(*peer, self.our_endpoint.clone(), self.msg_listener.clone());
+            let link = Link::new(*peer, self.our_endpoint.clone());
             let session = PeerSession::new(link);
 
             debug!("Peer is a section member, caching session {peer:?}");
-            let prev_peer = self.sessions.insert(*peer, session.clone());
+            let prev_peer = self.outgoing_sessions.insert(*peer, session.clone());
             debug!(
                 "inserted session {peer:?}, prev peer was discarded? {:?}",
                 prev_peer.is_some()
             );
             Ok(session)
         } else {
-            debug!("Could not connect to external peer: {peer:?}");
-            let existed = self.sessions.remove(peer);
+            debug!("Did not attempt to connect to external peer: {peer:?}");
+            let existed = self.outgoing_sessions.remove(peer);
             if existed.is_some() {
                 debug!("Previous session to {peer:?} was removed");
             }
             Err(Error::CreatingConnectionToUnknownNode(*peer))
-        }
-    }
-
-    /// Any number of incoming qp2p:Connections can be added.
-    /// We will eventually converge to the same one in our comms with the peer.
-    async fn add_incoming(&self, peer: &Peer, conn: Arc<Connection>) {
-        debug!(
-            "Adding incoming conn to {peer:?} w/ conn_id : {:?}",
-            conn.id()
-        );
-        if let Some(entry) = self.sessions.get(peer) {
-            // peer already exists
-            let peer_session = entry.value();
-            // add to it
-            peer_session.add(conn).await;
-        } else {
-            // we do not cache connections that are not from our members
-            if self.members.read().await.contains(peer) {
-                let link = Link::new_with(
-                    *peer,
-                    self.our_endpoint.clone(),
-                    self.msg_listener.clone(),
-                    conn,
-                )
-                .await;
-                let session = PeerSession::new(link);
-                let _ = self.sessions.insert(*peer, session);
-            }
-        }
-    }
-
-    /// Remove a qp2p:Connection from a peer's session.
-    /// Cleans up the session if no more connections exist
-    async fn remove_conn(&self, peer: &Peer, conn: Arc<Connection>) {
-        debug!(
-            "Removing incoming conn to {peer:?} w/ conn_id : {:?}",
-            conn.id()
-        );
-
-        let mut should_cleanup_session = true;
-        if let Some(entry) = self.sessions.get(peer) {
-            let peer_session = entry.value();
-            peer_session.remove(conn).await;
-            if peer_session.has_connections() {
-                should_cleanup_session = false;
-            }
-        }
-
-        if should_cleanup_session {
-            let _dead_peer = self.sessions.remove(peer);
         }
     }
 
@@ -418,23 +359,9 @@ impl Comm {
 
         trace!("Sending message bytes ({bytes_len} bytes) w/ {msg_id:?} to {recipient:?}");
 
-        let peer = self.get_or_create(&recipient).await?;
+        let peer = self.get_or_create_outgoing_session(&recipient).await?;
         debug!("Peer session retrieved");
         peer.send_using_session(msg_id, bytes).await
-    }
-}
-
-#[tracing::instrument(skip_all)]
-async fn receive_conns(comm: Comm, mut conn_events_recv: Receiver<ConnectionEvent>) {
-    while let Some(event) = conn_events_recv.recv().await {
-        match event {
-            ConnectionEvent::Connected { peer, connection } => {
-                comm.add_incoming(&peer, connection).await
-            }
-            ConnectionEvent::ConnectionClosed { peer, connection } => {
-                comm.remove_conn(&peer, connection).await;
-            }
-        }
     }
 }
 
@@ -474,7 +401,11 @@ mod tests {
     use futures::future;
     use qp2p::Config;
     use std::{net::Ipv4Addr, time::Duration};
-    use tokio::{net::UdpSocket, sync::mpsc, time};
+    use tokio::{
+        net::UdpSocket,
+        sync::mpsc::{self, Receiver},
+        time,
+    };
 
     const TIMEOUT: Duration = Duration::from_secs(1);
 

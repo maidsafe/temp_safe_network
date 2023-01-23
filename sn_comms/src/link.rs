@@ -6,8 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::MsgListener;
-
 use dashmap::DashMap;
 use qp2p::{Connection, Endpoint, UsrMsgBytes};
 use sn_interface::messaging::MsgId;
@@ -33,46 +31,21 @@ pub(crate) struct Link {
     peer: Peer,
     endpoint: Endpoint,
     pub(crate) connections: LinkConnections,
-    listener: MsgListener,
 }
 
 pub(crate) type LinkConnections = Arc<DashMap<ConnId, Arc<Connection>>>;
 
 impl Link {
-    pub(crate) fn new(peer: Peer, endpoint: Endpoint, listener: MsgListener) -> Self {
+    pub(crate) fn new(peer: Peer, endpoint: Endpoint) -> Self {
         Self {
             peer,
             endpoint,
             connections: Arc::new(DashMap::new()),
-            listener,
         }
-    }
-
-    pub(crate) async fn new_with(
-        peer: Peer,
-        endpoint: Endpoint,
-        listener: MsgListener,
-        conn: Arc<Connection>,
-    ) -> Self {
-        let mut instance = Self::new(peer, endpoint, listener);
-        instance.insert(conn);
-        instance
     }
 
     pub(crate) fn peer(&self) -> &Peer {
         &self.peer
-    }
-
-    pub(crate) fn add(&mut self, conn: Arc<Connection>) {
-        self.insert(conn);
-    }
-
-    pub(crate) fn remove(&mut self, conn: Arc<Connection>) {
-        let conn_id = conn.id();
-        debug!("Removing connection from link store: {conn_id}");
-
-        let _ = self.connections.remove(&conn_id);
-        debug!("Connection REMOVED from link store: {conn_id}");
     }
 
     /// Send a message to the peer using the given configuration.
@@ -251,7 +224,7 @@ impl Link {
         msg_id: MsgId,
     ) -> Result<Arc<Connection>, SendToOneError> {
         debug!("{msg_id:?} create conn attempt to {:?}", self.peer);
-        let (conn, incoming_msgs) = self
+        let (conn, _) = self
             .endpoint
             .connect_to(&self.peer.addr())
             .await
@@ -268,8 +241,6 @@ impl Link {
 
         self.insert(conn.clone());
 
-        self.listener.listen(conn.clone(), incoming_msgs);
-
         Ok(conn)
     }
 
@@ -279,11 +250,6 @@ impl Link {
 
         let _ = self.connections.insert(conn_id.clone(), conn);
         debug!("Connection INSERTED into link store: {conn_id}");
-    }
-
-    /// Returns if the link has any connections cached
-    pub(crate) fn has_connections(&self) -> bool {
-        !self.connections.is_empty()
     }
 }
 
