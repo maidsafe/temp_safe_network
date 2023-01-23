@@ -13,8 +13,7 @@ use sn_interface::{
     types::{log_markers::LogMarker, Peer},
 };
 
-use qp2p::ConnectionIncoming;
-use std::sync::Arc;
+use qp2p::{ConnectionIncoming, IncomingConnections};
 use tokio::{sync::mpsc, task};
 use tracing::Instrument;
 
@@ -29,21 +28,26 @@ impl MsgListener {
     }
 
     #[tracing::instrument(skip_all)]
-    pub(crate) fn listen(&self, conn: Arc<qp2p::Connection>, incoming_msgs: ConnectionIncoming) {
-        let clone = self.clone();
-        let _ = task::spawn(clone.listen_internal(conn, incoming_msgs).in_current_span());
+    pub(crate) fn listen_for_incoming_msgs(self, mut incoming_connections: IncomingConnections) {
+        let _ = task::spawn(async move {
+            while let Some((connection, incoming_msgs)) = incoming_connections.next().await {
+                trace!(
+                    "{}: from {:?} with connection_id {}",
+                    LogMarker::IncomingConnection,
+                    connection.remote_address(),
+                    connection.id()
+                );
+
+                let clone = self.clone();
+                let _ = task::spawn(clone.listen(connection, incoming_msgs).in_current_span());
+            }
+        });
     }
 
     #[tracing::instrument(skip_all)]
-    async fn listen_internal(
-        self,
-        conn: Arc<qp2p::Connection>,
-        mut incoming_msgs: ConnectionIncoming,
-    ) {
+    async fn listen(self, conn: qp2p::Connection, mut incoming_msgs: ConnectionIncoming) {
         let conn_id = conn.id();
         let remote_address = conn.remote_address();
-
-        let mut established_peer = None;
 
         while let Some(result) = incoming_msgs.next_with_stream().await.transpose() {
             match result {
@@ -68,17 +72,12 @@ impl MsgListener {
 
                     let src_name = match wire_msg.kind() {
                         MsgKind::Client(auth) => auth.public_key.into(),
-                        MsgKind::Node { name, .. } => *name,
-                        MsgKind::ClientDataResponse(name) | MsgKind::NodeDataResponse(name) => {
-                            *name
-                        }
+                        MsgKind::Node { name, .. }
+                        | MsgKind::ClientDataResponse(name)
+                        | MsgKind::NodeDataResponse(name) => *name,
                     };
 
                     let peer = Peer::new(src_name, remote_address);
-
-                    if established_peer.is_none() {
-                        established_peer = Some(peer);
-                    }
 
                     let msg_id = wire_msg.msg_id();
                     debug!(
@@ -86,18 +85,15 @@ impl MsgListener {
                     );
 
                     let msg_sender = self.receive_msg.clone();
-
-                    // move this channel sending off thread so we dont hold up incoming msgs at all.
+                    let msg = MsgFromPeer {
+                        sender: peer,
+                        wire_msg,
+                        send_stream,
+                    };
+                    // move this channel sending off thread so we don't hold up incoming msgs at all.
                     let _handle = tokio::spawn(async move {
                         // handle the message first
-                        if let Err(error) = msg_sender
-                            .send(MsgFromPeer {
-                                sender: peer,
-                                wire_msg,
-                                send_stream,
-                            })
-                            .await
-                        {
+                        if let Err(error) = msg_sender.send(msg).await {
                             error!("Error pushing msg {msg_id:?} onto internal msg handling channel: {error:?}");
                         }
                     });

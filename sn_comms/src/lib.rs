@@ -58,14 +58,14 @@ use self::{
 
 use sn_interface::{
     messaging::{MsgId, WireMsg},
-    types::{log_markers::LogMarker, Peer},
+    types::Peer,
 };
 
-use qp2p::{Endpoint, IncomingConnections, SendStream, UsrMsgBytes};
+use qp2p::{Endpoint, SendStream, UsrMsgBytes};
 
 use dashmap::DashMap;
 use std::{collections::BTreeSet, net::SocketAddr, sync::Arc, time::Duration};
-use tokio::{sync::mpsc::Sender, sync::RwLock, task};
+use tokio::sync::mpsc::Sender;
 
 /// Standard channel size, to allow for large swings in throughput
 static STANDARD_CHANNEL_SIZE: usize = 100_000;
@@ -88,7 +88,6 @@ pub struct MsgFromPeer {
 pub struct Comm {
     our_endpoint: Endpoint,
     outgoing_sessions: Arc<DashMap<Peer, PeerSession>>,
-    members: Arc<RwLock<BTreeSet<Peer>>>,
 }
 
 impl Comm {
@@ -104,16 +103,12 @@ impl Comm {
             Endpoint::new_peer(local_addr, Default::default(), config).await?;
 
         let msg_listener = MsgListener::new(incoming_msg_pipe);
+        msg_listener.listen_for_incoming_msgs(incoming_connections);
 
-        let comm = Comm {
+        Ok(Self {
             our_endpoint,
             outgoing_sessions: Arc::new(DashMap::new()),
-            members: Arc::new(RwLock::new(BTreeSet::new())),
-        };
-
-        listen_for_incoming_msgs(msg_listener, incoming_connections);
-
-        Ok(comm)
+        })
     }
 
     /// The socket address of our endpoint.
@@ -166,10 +161,31 @@ impl Comm {
 
     /// Updates cached connections for passed members set only.
     pub async fn update_members(&mut self, members: BTreeSet<Peer>) {
-        let new_members = members.clone();
-        *self.members.write().await = members;
-        self.outgoing_sessions
-            .retain(|p, _| new_members.contains(p));
+        let new_sessions = DashMap::new();
+        let curr_sessions = self.outgoing_sessions.iter().collect::<Vec<_>>();
+
+        // We first call PeerSession::disconnect on those we are dropping,
+        // otherwise we are leaking the PeerSessionWorker tasks.
+        for s in curr_sessions {
+            let peer = s.key();
+            let session = s.value().clone();
+            if members.contains(peer) {
+                let _ = new_sessions.insert(*peer, session);
+            } else {
+                session.disconnect().await;
+            }
+        }
+
+        // Now let's add new sessions for each totally new member
+        members.iter().for_each(|peer| {
+            if new_sessions.get(peer).is_none() {
+                let link = Link::new(*peer, self.our_endpoint.clone());
+                let session = PeerSession::new(link);
+                let _ = new_sessions.insert(*peer, session);
+            }
+        });
+
+        self.outgoing_sessions = Arc::new(new_sessions);
     }
 
     /// Sends the payload on a new or existing connection,
@@ -197,8 +213,7 @@ impl Comm {
             } else {
                 if should_remove {
                     // do cleanup of that peer
-                    let perhaps_session = sessions.remove(&peer);
-                    if let Some((_peer, session)) = perhaps_session {
+                    if let Some((_peer, session)) = sessions.remove(&peer) {
                         session.disconnect().await;
                     }
                 }
@@ -222,21 +237,18 @@ impl Comm {
                     trace!("Msg {msg_id:?} sent to {peer:?}");
                 } else if should_remove {
                     // do cleanup of that peer
-                    let perhaps_session = self.outgoing_sessions.remove(&peer);
-                    if let Some((_peer, session)) = perhaps_session {
-                        session.disconnect().await;
-                    }
+                    self.remove_session(&peer).await;
                 }
             }
             Err(error) => {
                 error!(
-                "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed as we have disconnected from the peer. (Error is: {})",
-                msg_id,
-                peer.addr(),
-                peer.name(),
-                error,
-            );
-                let _peer = self.outgoing_sessions.remove(&peer);
+                    "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed as we have disconnected from the peer. (Error is: {})",
+                    msg_id,
+                    peer.addr(),
+                    peer.name(),
+                    error,
+                );
+                self.remove_session(&peer).await;
             }
         }
     }
@@ -316,30 +328,11 @@ impl Comm {
     #[instrument(skip(self))]
     async fn get_or_create_outgoing_session(&self, peer: &Peer) -> Result<PeerSession> {
         debug!("Attempting to get or create peer session to member: {peer:?}");
-        if self.members.read().await.contains(peer) {
-            debug!("get or creating peer session to member: {peer:?}");
-            if let Some(entry) = self.outgoing_sessions.get(peer) {
-                debug!(" session to: {peer:?} exists");
-                return Ok(entry.value().clone());
-            }
-
-            debug!("session to: {peer:?} does not exists");
-            let link = Link::new(*peer, self.our_endpoint.clone());
-            let session = PeerSession::new(link);
-
-            debug!("Peer is a section member, caching session {peer:?}");
-            let prev_peer = self.outgoing_sessions.insert(*peer, session.clone());
-            debug!(
-                "inserted session {peer:?}, prev peer was discarded? {:?}",
-                prev_peer.is_some()
-            );
-            Ok(session)
+        if let Some(entry) = self.outgoing_sessions.get(peer) {
+            debug!("Session to: {peer:?} exists");
+            Ok(entry.value().clone())
         } else {
             debug!("Did not attempt to connect to external peer: {peer:?}");
-            let existed = self.outgoing_sessions.remove(peer);
-            if existed.is_some() {
-                debug!("Previous session to {peer:?} was removed");
-            }
             Err(Error::CreatingConnectionToUnknownNode(*peer))
         }
     }
@@ -363,25 +356,13 @@ impl Comm {
         debug!("Peer session retrieved");
         peer.send_using_session(msg_id, bytes).await
     }
-}
 
-#[tracing::instrument(skip_all)]
-fn listen_for_incoming_msgs(
-    msg_listener: MsgListener,
-    mut incoming_connections: IncomingConnections,
-) {
-    let _ = task::spawn(async move {
-        while let Some((connection, incoming_msgs)) = incoming_connections.next().await {
-            trace!(
-                "{}: from {:?} with connection_id {}",
-                LogMarker::IncomingConnection,
-                connection.remote_address(),
-                connection.id()
-            );
-
-            msg_listener.listen(Arc::new(connection), incoming_msgs);
+    // Remove a session making sure we terminate the `PeerSessionWorker` task
+    async fn remove_session(&self, peer: &Peer) {
+        if let Some((_peer, session)) = self.outgoing_sessions.remove(peer) {
+            session.disconnect().await;
         }
-    });
+    }
 }
 
 #[cfg(test)]

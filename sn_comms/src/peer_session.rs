@@ -103,13 +103,6 @@ impl fmt::Debug for PeerSession {
     }
 }
 
-/// After processing each `SessionCmd`, we decide whether to keep going
-#[must_use]
-enum SessionStatus {
-    Ok,
-    Terminating,
-}
-
 struct PeerSessionWorker {
     queue: mpsc::Sender<SessionCmd>,
     pub(crate) link: Link,
@@ -125,25 +118,12 @@ impl PeerSessionWorker {
             let peer = *self.link.peer();
             trace!("Processing session {peer:?} cmd: {session_cmd:?}");
 
-            let status = match session_cmd {
-                SessionCmd::Send(job) => match self.send_over_peer_connection(job).await {
-                    Ok(status) => status,
-                    Err(error) => {
-                        error!("session error {error:?}");
-                        // don't breakout here?
-                        // TODO: is this correct?
-                        continue;
-                    }
-                },
-                SessionCmd::Terminate => SessionStatus::Terminating,
-            };
-
-            match status {
-                SessionStatus::Terminating => {
-                    info!("Terminating connection to {:?}", self.link.peer());
+            match session_cmd {
+                SessionCmd::Send(job) => self.send_over_peer_connection(job).await,
+                SessionCmd::Terminate => {
+                    info!("Terminating connection to {peer:?}");
                     break;
                 }
-                SessionStatus::Ok => (),
             }
         }
 
@@ -158,19 +138,19 @@ impl PeerSessionWorker {
         info!("Finished peer session shutdown");
     }
 
-    async fn send_over_peer_connection(&mut self, mut job: SendJob) -> Result<SessionStatus> {
+    async fn send_over_peer_connection(&mut self, mut job: SendJob) {
         let msg_id = job.msg_id;
         trace!("Sending to peer over connection: {msg_id:?}");
 
         if job.connection_retries > MAX_SENDJOB_RETRIES {
             debug!("max retries reached... {msg_id:?}");
             job.reporter.send(SendStatus::MaxRetriesReached);
-            return Ok(SessionStatus::Ok);
+            return;
         }
 
         let queue = self.queue.clone();
         let link_connections = self.link.connections.clone();
-        let conns_count = self.link.connections.len();
+        let conns_count = link_connections.len();
         let the_peer = *self.link.peer();
 
         let mut link = self.link.clone();
@@ -204,7 +184,7 @@ impl PeerSessionWorker {
                     warn!("Failed to re-enqueue job {msg_id:?} after failed connection retrieval error {e:?}");
                 }
 
-                return Ok(SessionStatus::Ok);
+                return;
             }
         };
 
@@ -247,8 +227,6 @@ impl PeerSessionWorker {
                 }
             }
         });
-
-        Ok(SessionStatus::Ok)
     }
 }
 
