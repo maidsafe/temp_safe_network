@@ -5,7 +5,84 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.72.26 (2023-01-23)
+
+### Chore
+
+ - <csr-id-36d818109e2d613221de3dc9f6ed061d04588d5b/> only clone membership when needed
+   this should vastily reduce allocations coming from membership.clone()
+   
+   (which accounts for the vast majority of alloc in a runnning node just now)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release over the course of 1 calendar day.
+ - 3 days passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge #2009 ([`83448f4`](https://github.com/maidsafe/safe_network/commit/83448f43dace53b3357796bf177edb98c3d5803d))
+    - only clone membership when needed ([`36d8181`](https://github.com/maidsafe/safe_network/commit/36d818109e2d613221de3dc9f6ed061d04588d5b))
+</details>
+
 ## v0.72.25 (2023-01-20)
+
+<csr-id-cd9bf5fd5ccac42cd9de028cdaff8e0302498ed0/>
+<csr-id-99a4c43e0131bfc2bf36ff07bef2e476b4e801b9/>
+<csr-id-ad8cb2cfd5387a76b84682e018c02889579935c8/>
+<csr-id-8d2ef1a0f298ef010f478fcd59c5b6c437b7b62f/>
+<csr-id-87cb70eefdc63f80942a2c87ecc3790f76105b91/>
+<csr-id-dc16323849e425e2ca2511f095caee5b0a4af1ab/>
+<csr-id-38d85b391a72a3ee71f705d9b89d6dbc74c041e1/>
+<csr-id-c48a6531cc5246319cf6453ddef4641fbf98ead5/>
+<csr-id-fa65879d11d3e3dc3cd6127a2ac777b32f90afee/>
+<csr-id-dbfa4ac0dd23e76060b8df44c4666a30bb9b317f/>
+<csr-id-27fe2beaa76146b3bd235405f6b49c495214a336/>
+<csr-id-a6c7e2f5860c752dd4ddda0768ec916eb6c25add/>
+<csr-id-7674b9f5609384a35072043a777ac07b18c12bb3/>
+<csr-id-b13f1d7e5e84e42ed076654a159418563a9a1a35/>
+<csr-id-3b9304bab92f0715a134ce68afbfd08a7ad31e61/>
+<csr-id-c0a8eaa0d564d04f856aef9d9e7b5c81a340e512/>
+<csr-id-3b85f2087de40cea8d3e5406837c031a2af96203/>
+<csr-id-fadaa1cd4ecb4ac920c80d7e014f840c5594077f/>
+<csr-id-a578f25afbdd9b32935522df557bf175a792a6a5/>
+<csr-id-a15c20e564600e77de28bad334fdaa4e6aa7fd92/>
+<csr-id-21af053a5be2317be356e760c2b581c0f870a396/>
+<csr-id-00e417037d7be7639e9ccc245d1808396b779ead/>
+<csr-id-027b164f851209f0662e0a84ee839618d95af58d/>
+<csr-id-5ae5a160f8cb29df62b8f0253e53e527129b4689/>
+<csr-id-48a438c5973290c50d80128200812ee93999aabe/>
+<csr-id-a33d28e4bc3f11779eaf0bf6cafd67800dbc4e0d/>
+<csr-id-ea3caf4ff929590137f3c800f29dcdf39cbddc20/>
+<csr-id-6c0f451646ea5840c79f112868637facdd08293c/>
+<csr-id-a14deab2a4a2b127f8f2b32e0aa2c0ab98ead4d2/>
+<csr-id-5c490793e6c434c3c68f276483a33bd330385524/>
+<csr-id-7ead1c15859c0ca5553ab1df310607da8d526f90/>
+<csr-id-542b627d4de792bd69f64f57b0da21c8775ce055/>
+<csr-id-33a577f5e52029854757b9093e7b30535a7acabd/>
+<csr-id-04525595bc5de39f85a128cfb691644b71a3fb79/>
+<csr-id-35f3b27291905cd4c845e6005a07d23f76bc5449/>
+<csr-id-f0b25be00ba4d97539bde19fb524edebc4d1aac5/>
+<csr-id-ce13490ef261cde3e6888a0da4b84b9d0f2be3bc/>
+<csr-id-96169a7fbab950b40dc87ff433a9e348709eae1a/>
+<csr-id-9aaf91bfedd9fcf040f18e0762ff2cbbc03b4d6f/>
+<csr-id-61834d8abf8e946768e2c958ca2159979497f782/>
+<csr-id-b2edff4b5b63b5d8a7905428b2c78b1d26598f07/>
+<csr-id-9f5b5ffb5975810e22c634f171984fcc803062aa/>
+<csr-id-29562f26b3d9a10f72651c58df022db6b827b002/>
+<csr-id-82ac545c7c3bbf1941fe9d9a80dcc2f99ff58a2f/>
+<csr-id-b316262443ba5d38c4879ae9d2f583aba92e501a/>
+<csr-id-efd7b9b9c775eb15b8beddee8286a1f788c2b940/>
+<csr-id-2b6c4a8fcd2cd7b22e6a4b20f1218c859110be62/>
 
 ### Chore
 
@@ -57,7 +134,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-35f3b27291905cd4c845e6005a07d23f76bc5449/> remove outdated comment
  - <csr-id-f0b25be00ba4d97539bde19fb524edebc4d1aac5/> remove unused argument
 
+### Chore
+
+ - <csr-id-783d62461a65eb7c06b0d4f399b97216b6c75519/> sn_interface-0.16.14/sn_client-0.77.8/sn_node-0.72.25/sn_api-0.75.4/sn_cli-0.68.5
+
 ### New Features
+
+<csr-id-5f8a446a1c8a2798f708b4c792c2fe3553c4d135/>
+<csr-id-d095ae1096560b26a218224863e7abf48218b543/>
+<csr-id-c51029ed2e46f8a89f5162bde99c8852e8b7cfd7/>
+<csr-id-a4cad278abd1504011678e8cc176f1c7df77493e/>
+<csr-id-3cb993982488dfae10ff20bd73db72edec1d8cd3/>
+<csr-id-4e9826c656e8763e888825ee2511e806a6e34928/>
 
  - <csr-id-74b5e7794a213b70db7231c31b68cee340976119/> check elder scores against elders only, non elders against non elders
  - <csr-id-ee90905abcf228d3a9d468ff0bb89a598cb0290d/> extra relocation criterias when relocate elder related node
@@ -74,19 +162,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    a response bi-stream allows us to decouple such logic from the rest, but it also
    allows us to have unit tests within sn_node which verify the outcome of processing
    Cmds without sending any msg over the wire.
-   - We are here also changing Cmd::SendMsg to make/restricting it exclusively for
+- We are here also changing Cmd::SendMsg to make/restricting it exclusively for
    sending msgs to nodes over uni-streams.
- - <csr-id-5f8a446a1c8a2798f708b4c792c2fe3553c4d135/> make comm members list thread safe
-   Adds an Arc +  RwLock around the members list
- - <csr-id-d095ae1096560b26a218224863e7abf48218b543/> adding SendClientResponse, SendNodeResponse, and SendMsgAndAwaitResponse cmds
-   - Having these internal sn_node::Cmds to handle sending msg responses to clients
+- Having these internal sn_node::Cmds to handle sending msg responses to clients
    and nodes over their bi-stream allow us to decouple such logic from the rest,
    as well as also allowing us to have unit tests within sn_node which verify the outcome
    of processing Cmds without sending any msg over the wire.
- - <csr-id-c51029ed2e46f8a89f5162bde99c8852e8b7cfd7/> disable unnecessary checks
- - <csr-id-a4cad278abd1504011678e8cc176f1c7df77493e/> remove PeerSession on ConnectionClosed
- - <csr-id-3cb993982488dfae10ff20bd73db72edec1d8cd3/> dont cache joining node peer sessions
- - <csr-id-4e9826c656e8763e888825ee2511e806a6e34928/> remove accounting of storage levels
 
 ### Bug Fixes
 
@@ -137,9 +218,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 134 commits contributed to the release over the course of 23 calendar days.
- - 23 days passed between releases.
- - 69 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 135 commits contributed to the release over the course of 23 calendar days.
+ - 24 days passed between releases.
+ - 70 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -149,6 +230,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.16.14/sn_client-0.77.8/sn_node-0.72.25/sn_api-0.75.4/sn_cli-0.68.5 ([`783d624`](https://github.com/maidsafe/safe_network/commit/783d62461a65eb7c06b0d4f399b97216b6c75519))
     - Merge #2008 ([`ffac6c6`](https://github.com/maidsafe/safe_network/commit/ffac6c68dc0612a41aa74c533231a63006c22b22))
     - update comm members on AE msg in ([`28cdebb`](https://github.com/maidsafe/safe_network/commit/28cdebb4b05c5d64dcbe8dfb39a72c88fd2c28bd))
     - Merge #1997 #1998 #2002 ([`0c968ad`](https://github.com/maidsafe/safe_network/commit/0c968ad50d9e9dada3f5f5488bd1708fddadef72))
@@ -285,7 +367,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - add tiny delay to bidi retry ([`233d0bb`](https://github.com/maidsafe/safe_network/commit/233d0bbfdd31873dd26401e916805f937fa0e7c0))
 </details>
 
+<csr-unknown>
+ make comm members list thread safeAdds an Arc +  RwLock around the members list adding SendClientResponse, SendNodeResponse, and SendMsgAndAwaitResponse cmds disable unnecessary checks remove PeerSession on ConnectionClosed dont cache joining node peer sessions remove accounting of storage levels<csr-unknown/>
+
 ## v0.72.24 (2022-12-27)
+
+<csr-id-a38cd49958df82fd65d0a3f13670693f40a1e6b2/>
 
 ### Chore
 
@@ -296,9 +383,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-220fd52ab3e1bac776ba74793d5042de220bb315/> set default keep-alive interval to be 1/2 of idle_timeout value set
    - By default the sn_client keep_alive msgs interval will now be set to 1/2 the
    value set for the idle_timeout value.
-- Removing unused ClientBuilder::cmd_ack_wait config value.
-- Decreasing the CI timeout for sn_client, sn_api, and CLI tests, to 7mins.
-- New LogMarker::IncomingConnection logged by sn_node.
 
 ### Commit Statistics
 
@@ -319,6 +403,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Merge #1924 ([`be2cded`](https://github.com/maidsafe/safe_network/commit/be2cdedb19154adf324782d7178f0e25018cd16c))
     - set default keep-alive interval to be 1/2 of idle_timeout value set ([`220fd52`](https://github.com/maidsafe/safe_network/commit/220fd52ab3e1bac776ba74793d5042de220bb315))
 </details>
+
+<csr-unknown>
+Removing unused ClientBuilder::cmd_ack_wait config value.Decreasing the CI timeout for sn_client, sn_api, and CLI tests, to 7mins.New LogMarker::IncomingConnection logged by sn_node.<csr-unknown/>
 
 ## v0.72.23 (2022-12-26)
 
