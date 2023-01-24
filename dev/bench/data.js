@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1674496276072,
+  "lastUpdate": 1674597860589,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -57064,6 +57064,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 348179780,
             "range": "± 2235394",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "fc0aa8062c0003a9ac3c263d4ea01111b5e6a8d3",
+          "message": "Merge #2024\n\n2024: feat(relocation): add retry for relocating node r=davidrusu a=oetyng\n\nWhen a node is joining with a relocation proof, they could be rejected by one reason only: `AddressNotReachable`. This is because the other reject reason, `JoinsDisallowed`, does not apply to relocated nodes, making this state `unreachable`.\r\n\r\nAddress not reachable is an irrecoverable error, and therefore a node has to change their port configuration before starting a node again. However, this specific issue should be validated long before a relocation, by which this state is also considered `unreachable`.\r\n\r\nBeyond those, and tampered proofs, it's just regular timeouts. \r\n\r\nSo this feature allows a joining node with a relocation proof, to retry when the join times out.\r\n\r\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\n\nCo-authored-by: oetyng <oetyng@gmail.com>",
+          "timestamp": "2023-01-24T20:14:49Z",
+          "tree_id": "4bba4b7a837d707f1b95d99e620f1a256b8b18ef",
+          "url": "https://github.com/maidsafe/safe_network/commit/fc0aa8062c0003a9ac3c263d4ea01111b5e6a8d3"
+        },
+        "date": 1674597858613,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2357246,
+            "range": "± 61613",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 85587928,
+            "range": "± 2881961",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 107736726,
+            "range": "± 2978880",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 399577783,
+            "range": "± 5565608",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 70219805,
+            "range": "± 676819",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 88714106,
+            "range": "± 892520",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 324854468,
+            "range": "± 1874359",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 24904364181,
+            "range": "± 534377015",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 48134972,
+            "range": "± 12833408",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2189314008,
+            "range": "± 787535564",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 6559069248,
+            "range": "± 691780980",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 158768218,
+            "range": "± 7379665",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 2773928655,
+            "range": "± 435896236",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 9952056706,
+            "range": "± 1491620306",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 46545112,
+            "range": "± 1508244",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 441775197,
+            "range": "± 7547649",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1723327897,
+            "range": "± 55549785",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11766248,
+            "range": "± 256917",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 97129990,
+            "range": "± 3712741",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 331197050,
+            "range": "± 4163499",
             "unit": "ns/iter"
           }
         ]
