@@ -117,13 +117,10 @@ impl MyNode {
             original_info.name(),
         );
 
-        Ok(MyNode::try_join_section(
-            self.context(),
-            Some(RelocationProof::new(
-                info,
-                node_sig,
-                original_info.keypair.public,
-            )),
-        ))
+        let proof = RelocationProof::new(info, node_sig, original_info.keypair.public);
+        // we cache the proof so that we can retry if the join times out
+        self.relocation_proof = Some(proof.clone());
+
+        Ok(MyNode::try_join_section(self.context(), Some(proof)))
     }
 }

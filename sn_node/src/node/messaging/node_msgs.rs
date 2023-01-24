@@ -280,6 +280,8 @@ impl MyNode {
                             .filter(|n| n.name() == context.name)
                             .any(|n| n.previous_name().is_some())
                         {
+                            // We could clear the cached relocation proof here,
+                            // but we have the periodic check doing it, so no need to duplicate the logic.
                             trace!("{}", LogMarker::RelocateEnd);
                         }
 

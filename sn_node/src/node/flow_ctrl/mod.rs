@@ -40,9 +40,11 @@ use tokio::sync::{mpsc, RwLock};
 use xor_name::XorName;
 
 /// Sent via the rejoin_network_tx to restart the join process.
+/// This would only occur when joins are not allowed, or non-recoverable states.
 #[derive(Debug)]
 pub enum RejoinReason {
     /// Happens when trying to join; we will wait a moment and then try again.
+    /// NB: Relocated nodes that try to join, are accepted even if joins are disallowed.
     JoinsDisallowed,
     /// Happens when already part of the network; we need to start from scratch.
     RemovedFromSection,

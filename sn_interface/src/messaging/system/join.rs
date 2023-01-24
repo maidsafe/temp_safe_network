@@ -43,6 +43,7 @@ pub enum JoinResponse {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum JoinRejectReason {
     /// No new peers are currently accepted for joining
+    /// NB: Relocated nodes that try to join, are accepted even if joins are disallowed.
     JoinsDisallowed,
     /// The requesting node is not externally reachable
     NodeNotReachable(SocketAddr),

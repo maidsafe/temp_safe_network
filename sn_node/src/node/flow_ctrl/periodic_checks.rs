@@ -19,6 +19,7 @@ use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tokio::{sync::RwLock, time::Instant};
 
 const PROBE_INTERVAL: Duration = Duration::from_secs(300);
+const RELOCATION_TIMEOUT_SECS: Duration = Duration::from_secs(60);
 const MISSING_VOTE_INTERVAL: Duration = Duration::from_secs(5);
 const MISSING_DKG_MSG_INTERVAL: Duration = Duration::from_secs(5);
 // const SECTION_PROBE_INTERVAL: Duration = Duration::from_secs(300);
@@ -36,6 +37,7 @@ pub(super) struct PeriodicChecksTimestamps {
     last_vote_check: Instant,
     last_dkg_msg_check: Instant,
     last_fault_check: Instant,
+    last_relocation_retry_check: Instant,
 }
 
 impl PeriodicChecksTimestamps {
@@ -48,6 +50,7 @@ impl PeriodicChecksTimestamps {
             last_vote_check: Instant::now(),
             last_dkg_msg_check: Instant::now(),
             last_fault_check: Instant::now(),
+            last_relocation_retry_check: Instant::now(),
         }
     }
 }
@@ -163,6 +166,27 @@ impl FlowCtrl {
         if self.timestamps.last_fault_check.elapsed() > FAULT_CHECK_INTERVAL {
             self.timestamps.last_fault_check = now;
             cmds.extend(self.vote_out_faulty_nodes().await);
+        }
+
+        // This check keeps relocation retrying if it times out.
+        if let Some(proof) = &context.relocation_proof {
+            if !context.network_knowledge.is_section_member(&context.name) {
+                if self.timestamps.last_relocation_retry_check.elapsed() > RELOCATION_TIMEOUT_SECS {
+                    self.timestamps.last_relocation_retry_check = Instant::now();
+                    cmds.push(MyNode::send_msg_to_our_elders_await_responses(
+                        context.clone(),
+                        NodeMsg::TryJoin(Some(proof.clone())),
+                    ));
+                }
+            } else {
+                {
+                    trace!("{}", LogMarker::RelocateEnd);
+                    debug!("We've joined a section, dropping the relocation proof.");
+                    let mut node = self.node.write().await;
+                    debug!("[NODE WRITE]: handling relocation periodic check write gottt...");
+                    node.relocation_proof = None;
+                }
+            }
         }
 
         for cmd in cmds {
