@@ -63,6 +63,7 @@ impl MyNode {
             // Verify the age..
             MyNode::verify_relocated_age(&peer, &proof)?;
 
+            // NB: Relocated nodes that try to join, are accepted even if joins are disallowed.
             Some(proof.previous_name())
         } else {
             // New node ->

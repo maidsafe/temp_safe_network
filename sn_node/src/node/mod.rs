@@ -70,8 +70,8 @@ mod core {
             AuthorityProof, SectionSig,
         },
         network_knowledge::{
-            supermajority, MyNodeInfo, NetworkKnowledge, NodeState, SectionAuthorityProvider,
-            SectionKeyShare, SectionKeysProvider,
+            supermajority, MyNodeInfo, NetworkKnowledge, NodeState, RelocationProof,
+            SectionAuthorityProvider, SectionKeyShare, SectionKeysProvider,
         },
         types::{keys::ed25519::Digest256, log_markers::LogMarker},
     };
@@ -121,6 +121,7 @@ mod core {
         pub(crate) fault_cmds_sender: mpsc::Sender<FaultsCmd>,
         // Section administration
         pub(crate) section_proposal_aggregator: SignatureAggregator,
+        pub(crate) relocation_proof: Option<RelocationProof>,
     }
 
     #[derive(custom_debug::Debug, Clone)]
@@ -139,6 +140,7 @@ mod core {
         pub(crate) joins_allowed_until_split: bool,
         #[debug(skip)]
         pub(crate) fault_cmds_sender: mpsc::Sender<FaultsCmd>,
+        pub(crate) relocation_proof: Option<RelocationProof>,
     }
 
     impl NodeContext {
@@ -203,6 +205,7 @@ mod core {
                 joins_allowed_until_split: self.joins_allowed_until_split,
                 data_storage: self.data_storage.clone(),
                 fault_cmds_sender: self.fault_cmds_sender.clone(),
+                relocation_proof: self.relocation_proof.clone(),
             }
         }
 
@@ -275,6 +278,7 @@ mod core {
                 elder_promotion_aggregator: SignatureAggregator::default(),
                 handover_request_aggregator: TotalParticipationAggregator::default(),
                 section_proposal_aggregator: SignatureAggregator::default(),
+                relocation_proof: None,
             };
 
             let context = &node.context();
