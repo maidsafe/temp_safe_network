@@ -5,22 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.27 (2023-01-23)
+## v0.72.28 (2023-01-24)
 
-### Chore
+### New Features
 
- - <csr-id-2ce413fab1e5fff10593d7f5fcf7c9c41db1f9ff/> update readme
-
-### Refactor
-
- - <csr-id-e6ec500629844ad2d328d38fff7ebd0f52a8cb12/> use existing join flow
+ - <csr-id-908ee34d116e2a9e5250d3044f9dbe1c6d471ecc/> add retry for relocating node
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 1 day passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -30,6 +27,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2024 ([`fc0aa80`](https://github.com/maidsafe/safe_network/commit/fc0aa8062c0003a9ac3c263d4ea01111b5e6a8d3))
+    - add retry for relocating node ([`908ee34`](https://github.com/maidsafe/safe_network/commit/908ee34d116e2a9e5250d3044f9dbe1c6d471ecc))
+</details>
+
+## v0.72.27 (2023-01-23)
+
+<csr-id-2ce413fab1e5fff10593d7f5fcf7c9c41db1f9ff/>
+<csr-id-e6ec500629844ad2d328d38fff7ebd0f52a8cb12/>
+
+### Chore
+
+ - <csr-id-2ce413fab1e5fff10593d7f5fcf7c9c41db1f9ff/> update readme
+
+### Chore
+
+ - <csr-id-c94a953dddfcb20bf65d4bb34448dc2752a019c5/> sn_interface-0.16.15/sn_node-0.72.27
+
+### Refactor
+
+ - <csr-id-e6ec500629844ad2d328d38fff7ebd0f52a8cb12/> use existing join flow
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.15/sn_node-0.72.27 ([`c94a953`](https://github.com/maidsafe/safe_network/commit/c94a953dddfcb20bf65d4bb34448dc2752a019c5))
     - Merge #2018 ([`1ee4f75`](https://github.com/maidsafe/safe_network/commit/1ee4f75af4dddb7b2bd18bb60317d3e977e356f7))
     - update readme ([`2ce413f`](https://github.com/maidsafe/safe_network/commit/2ce413fab1e5fff10593d7f5fcf7c9c41db1f9ff))
     - use existing join flow ([`e6ec500`](https://github.com/maidsafe/safe_network/commit/e6ec500629844ad2d328d38fff7ebd0f52a8cb12))
@@ -38,6 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.72.26 (2023-01-23)
 
 <csr-id-36d818109e2d613221de3dc9f6ed061d04588d5b/>
+<csr-id-0ab0c302dcc6ce32b0b71d696b0707a2c50cfa3a/>
 
 ### Chore
 
@@ -398,9 +433,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Merge #1929 ([`a6a2bdd`](https://github.com/maidsafe/safe_network/commit/a6a2bdd2ce6569dae2a6fe5927fd2a94bcaa4927))
     - add tiny delay to bidi retry ([`233d0bb`](https://github.com/maidsafe/safe_network/commit/233d0bbfdd31873dd26401e916805f937fa0e7c0))
 </details>
-
-<csr-unknown>
-We are here also changing Cmd::SendMsg to make/restricting it exclusively forsending msgs to nodes over uni-streams.Having these internal sn_node::Cmds to handle sending msg responses to clientsand nodes over their bi-stream allow us to decouple such logic from the rest,as well as also allowing us to have unit tests within sn_node which verify the outcomeof processing Cmds without sending any msg over the wire.<csr-unknown/>
 
 ## v0.72.24 (2022-12-27)
 
