@@ -211,7 +211,7 @@ mod core {
 
         #[allow(clippy::too_many_arguments)]
         pub(crate) async fn new(
-            mut comm: Comm,
+            comm: Comm,
             keypair: Arc<Keypair>, //todo: Keypair, only test design blocks this
             network_knowledge: NetworkKnowledge,
             section_key_share: Option<SectionKeyShare>,

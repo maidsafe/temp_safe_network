@@ -58,14 +58,14 @@ use self::{
 
 use sn_interface::{
     messaging::{MsgId, WireMsg},
-    types::{log_markers::LogMarker, Peer},
+    types::Peer,
 };
 
-use qp2p::{Endpoint, IncomingConnections, SendStream, UsrMsgBytes};
+use qp2p::{Endpoint, SendStream, UsrMsgBytes};
 
 use dashmap::DashMap;
-use std::{collections::BTreeSet, net::SocketAddr, sync::Arc, time::Duration};
-use tokio::{sync::mpsc::Sender, sync::RwLock, task};
+use std::{collections::BTreeSet, net::SocketAddr, sync::Arc};
+use tokio::sync::mpsc::Sender;
 
 /// Standard channel size, to allow for large swings in throughput
 static STANDARD_CHANNEL_SIZE: usize = 100_000;
@@ -87,8 +87,7 @@ pub struct MsgFromPeer {
 #[derive(Clone)]
 pub struct Comm {
     our_endpoint: Endpoint,
-    outgoing_sessions: Arc<DashMap<Peer, PeerSession>>,
-    members: Arc<RwLock<BTreeSet<Peer>>>,
+    sessions: Arc<DashMap<Peer, PeerSession>>,
 }
 
 impl Comm {
@@ -104,16 +103,12 @@ impl Comm {
             Endpoint::new_peer(local_addr, Default::default(), config).await?;
 
         let msg_listener = MsgListener::new(incoming_msg_pipe);
+        msg_listener.listen_for_incoming_msgs(incoming_connections);
 
-        let comm = Comm {
+        Ok(Self {
             our_endpoint,
-            outgoing_sessions: Arc::new(DashMap::new()),
-            members: Arc::new(RwLock::new(BTreeSet::new())),
-        };
-
-        listen_for_incoming_msgs(msg_listener, incoming_connections);
-
-        Ok(comm)
+            sessions: Arc::new(DashMap::new()),
+        })
     }
 
     /// The socket address of our endpoint.
@@ -138,9 +133,7 @@ impl Comm {
     /// <https://github.com/rust-lang/rust/issues/59168#issuecomment-962214945>
     #[cfg(not(any(test, feature = "test")))]
     pub async fn is_reachable(&self, peer: &SocketAddr) -> Result<(), Error> {
-        let qp2p_config = qp2p::Config {
-            ..Default::default()
-        };
+        let qp2p_config = qp2p::Config::default();
 
         let connectivity_endpoint =
             Endpoint::new_client((self.our_endpoint.local_addr().ip(), 0), qp2p_config)?;
@@ -165,11 +158,21 @@ impl Comm {
     }
 
     /// Updates cached connections for passed members set only.
-    pub async fn update_valid_comm_targets(&mut self, members: BTreeSet<Peer>) {
-        let new_members = members.clone();
-        *self.members.write().await = members;
-        self.outgoing_sessions
-            .retain(|p, _| new_members.contains(p));
+    pub async fn update_valid_comm_targets(&self, members: BTreeSet<Peer>) {
+        // Let's drop all sessions that don't belong to any of the new members.
+        self.sessions.retain(|p, _| members.contains(p));
+
+        // Now let's add new sessions for each fresh new member. We never remove
+        // sessions from this container unless this function is invoked again by the user,
+        // even if we failed to send using all peer session's connections, we keep the session
+        // as it's our source of truth for known and connectable peers.
+        members.iter().for_each(|peer| {
+            if self.sessions.get(peer).is_none() {
+                let link = Link::new(*peer, self.our_endpoint.clone());
+                let session = PeerSession::new(link);
+                let _ = self.sessions.insert(*peer, session);
+            }
+        });
     }
 
     /// Sends the payload on a new or existing connection,
@@ -183,25 +186,17 @@ impl Comm {
     ) -> Result<()> {
         let watcher = self.send_to_one(peer, msg_id, bytes).await?;
 
-        let sessions = self.outgoing_sessions.clone();
+        let sessions = self.sessions.clone();
 
         trace!("Sessions known of: {:?}", sessions.len());
 
         // TODO: we could cache the handles above and check them as part of loop...
         let _handle = tokio::spawn(async move {
-            let (send_was_successful, should_remove) = Self::is_sent(watcher, msg_id, peer).await;
-
+            let send_was_successful = Self::is_sent(watcher, msg_id, peer).await;
             if send_was_successful {
                 trace!("Msg {msg_id:?} sent to {peer:?}");
                 Ok(())
             } else {
-                if should_remove {
-                    // do cleanup of that peer
-                    let perhaps_session = sessions.remove(&peer);
-                    if let Some((_peer, session)) = perhaps_session {
-                        session.disconnect().await;
-                    }
-                }
                 Err(Error::FailedSend(peer))
             }
         });
@@ -215,34 +210,24 @@ impl Comm {
         let watcher = self.send_to_one(peer, msg_id, bytes).await;
         match watcher {
             Ok(watcher) => {
-                let (send_was_successful, should_remove) =
-                    Self::is_sent(watcher, msg_id, peer).await;
-
+                let send_was_successful = Self::is_sent(watcher, msg_id, peer).await;
                 if send_was_successful {
                     trace!("Msg {msg_id:?} sent to {peer:?}");
-                } else if should_remove {
-                    // do cleanup of that peer
-                    let perhaps_session = self.outgoing_sessions.remove(&peer);
-                    if let Some((_peer, session)) = perhaps_session {
-                        session.disconnect().await;
-                    }
                 }
             }
             Err(error) => {
                 error!(
-                "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed as we have disconnected from the peer. (Error is: {})",
-                msg_id,
-                peer.addr(),
-                peer.name(),
-                error,
-            );
-                let _peer = self.outgoing_sessions.remove(&peer);
+                    "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed as we have disconnected from the peer. (Error is: {})",
+                    msg_id,
+                    peer.addr(),
+                    peer.name(),
+                    error,
+                );
             }
         }
     }
 
-    /// Sends the payload on a new bidi-stream and returns
-    /// the response.
+    /// Sends the payload on a new bidi-stream and returns the response.
     #[tracing::instrument(skip(self, bytes))]
     pub async fn send_out_bytes_to_peer_and_return_response(
         &self,
@@ -253,23 +238,22 @@ impl Comm {
         // TODO: tweak messaging to just allow passthrough
         debug!("Trying to get {peer:?} session in order to send: {msg_id:?}");
 
-        let mut peer = self.get_or_create_outgoing_session(&peer).await?;
+        let mut peer = self.get_session(&peer).await?;
         debug!("Session of {peer:?} retrieved for {msg_id:?}");
         let adult_response_bytes = peer.send_with_bi_return_response(bytes, msg_id).await?;
         debug!("Peer response from {peer:?} is in for {msg_id:?}");
         WireMsg::from(adult_response_bytes).map_err(|_| Error::InvalidMessage)
     }
 
-    /// Waits until msg is sent or there's an error
-    /// Returns (sent success, should remove)
-    /// Should remove occurs if max retries reached
-    async fn is_sent(mut watcher: SendWatcher, msg_id: MsgId, peer: Peer) -> (bool, bool) {
+    /// Waits until msg is sent or there's an error.
+    /// Returns `true` if sent succedeed.
+    async fn is_sent(mut watcher: SendWatcher, msg_id: MsgId, peer: Peer) -> bool {
         // here we can monitor the sending
         // and we now watch the status of the send
         loop {
             match &mut watcher.await_change().await {
                 SendStatus::Sent => {
-                    return (true, false);
+                    return true;
                 }
                 SendStatus::Enqueued => {
                     // this block should be unreachable, as Enqueued is the initial state
@@ -286,7 +270,7 @@ impl Comm {
                         peer.addr(),
                         peer.name(),
                     );
-                    return (false, false);
+                    return false;
                 }
                 SendStatus::TransientError(error) => {
                     // An individual connection could have been lost when we tried to send. This
@@ -296,7 +280,6 @@ impl Comm {
                     // Retries are managed by the peer session, where it will open a new
                     // connection.
                     debug!("Transient error when sending to peer {}: {}", peer, error);
-                    tokio::time::sleep(Duration::from_millis(50)).await;
                     continue; // moves on to awaiting a new change
                 }
                 SendStatus::MaxRetriesReached => {
@@ -306,40 +289,21 @@ impl Comm {
                         peer.addr(),
                         peer.name(),
                     );
-                    return (false, true);
+                    return false;
                 }
             }
         }
     }
 
-    /// Get a PeerSession if it already exists, otherwise create and insert
+    /// Get a PeerSession
     #[instrument(skip(self))]
-    async fn get_or_create_outgoing_session(&self, peer: &Peer) -> Result<PeerSession> {
+    async fn get_session(&self, peer: &Peer) -> Result<PeerSession> {
         debug!("Attempting to get or create peer session to member: {peer:?}");
-        if self.members.read().await.contains(peer) {
-            debug!("get or creating peer session to member: {peer:?}");
-            if let Some(entry) = self.outgoing_sessions.get(peer) {
-                debug!(" session to: {peer:?} exists");
-                return Ok(entry.value().clone());
-            }
-
-            debug!("session to: {peer:?} does not exists");
-            let link = Link::new(*peer, self.our_endpoint.clone());
-            let session = PeerSession::new(link);
-
-            debug!("Peer is a section member, caching session {peer:?}");
-            let prev_peer = self.outgoing_sessions.insert(*peer, session.clone());
-            debug!(
-                "inserted session {peer:?}, prev peer was discarded? {:?}",
-                prev_peer.is_some()
-            );
-            Ok(session)
+        if let Some(entry) = self.sessions.get(peer) {
+            debug!("Session to: {peer:?} exists");
+            Ok(entry.value().clone())
         } else {
             debug!("Did not attempt to connect to external peer: {peer:?}");
-            let existed = self.outgoing_sessions.remove(peer);
-            if existed.is_some() {
-                debug!("Previous session to {peer:?} was removed");
-            }
             Err(Error::CreatingConnectionToUnknownNode(*peer))
         }
     }
@@ -352,36 +316,15 @@ impl Comm {
         msg_id: MsgId,
         bytes: UsrMsgBytes,
     ) -> Result<SendWatcher> {
-        let bytes_len = {
-            let (h, d, p) = bytes.clone();
-            h.len() + d.len() + p.len()
-        };
+        let (h, d, p) = &bytes;
+        let bytes_len = h.len() + d.len() + p.len();
 
         trace!("Sending message bytes ({bytes_len} bytes) w/ {msg_id:?} to {recipient:?}");
 
-        let peer = self.get_or_create_outgoing_session(&recipient).await?;
+        let peer = self.get_session(&recipient).await?;
         debug!("Peer session retrieved");
         peer.send_using_session(msg_id, bytes).await
     }
-}
-
-#[tracing::instrument(skip_all)]
-fn listen_for_incoming_msgs(
-    msg_listener: MsgListener,
-    mut incoming_connections: IncomingConnections,
-) {
-    let _ = task::spawn(async move {
-        while let Some((connection, incoming_msgs)) = incoming_connections.next().await {
-            trace!(
-                "{}: from {:?} with connection_id {}",
-                LogMarker::IncomingConnection,
-                connection.remote_address(),
-                connection.id()
-            );
-
-            msg_listener.listen(Arc::new(connection), incoming_msgs);
-        }
-    });
 }
 
 #[cfg(test)]

@@ -313,7 +313,7 @@ impl MyNode {
 
         debug!("[NODE READ] Latest context read");
         // mut here to update comms
-        let mut latest_context = node.read().await.context();
+        let latest_context = node.read().await.context();
         debug!("[NODE READ] Latest context got.");
 
         // Only trigger reorganize data when there is a membership change happens.
