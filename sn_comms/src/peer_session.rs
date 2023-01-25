@@ -23,15 +23,9 @@ use tokio::sync::mpsc;
 /// for section nodes, which in turn kicks off fault tracking
 const MAX_SENDJOB_RETRIES: usize = 3;
 
-#[derive(Debug)]
-enum SessionCmd {
-    Send(SendJob),
-    Terminate,
-}
-
 #[derive(Clone)]
 pub(crate) struct PeerSession {
-    channel: mpsc::Sender<SessionCmd>,
+    channel: mpsc::Sender<SendJob>,
     link: Link,
 }
 
@@ -39,6 +33,8 @@ impl PeerSession {
     pub(crate) fn new(link: Link) -> PeerSession {
         let (sender, receiver) = mpsc::channel(STANDARD_CHANNEL_SIZE);
 
+        // Spawn the peer session worker, which will stop automatically when
+        // the PeerSession is dropped as the channel will be dropped too.
         let _ =
             tokio::task::spawn(PeerSessionWorker::new(link.clone(), sender.clone()).run(receiver));
 
@@ -82,18 +78,12 @@ impl PeerSession {
         };
 
         self.channel
-            .send(SessionCmd::Send(job))
+            .send(job)
             .await
             .map_err(|_| Error::PeerSessionChannel)?;
 
         trace!("Send job sent to PeerSessionWorker: {msg_id:?}");
         Ok(watcher)
-    }
-
-    pub(crate) async fn disconnect(self) {
-        if let Err(e) = self.channel.send(SessionCmd::Terminate).await {
-            error!("Error while sending Terminate command: {e:?}");
-        }
     }
 }
 
@@ -103,48 +93,21 @@ impl fmt::Debug for PeerSession {
     }
 }
 
-/// After processing each `SessionCmd`, we decide whether to keep going
-#[must_use]
-enum SessionStatus {
-    Ok,
-    Terminating,
-}
-
 struct PeerSessionWorker {
-    queue: mpsc::Sender<SessionCmd>,
+    queue: mpsc::Sender<SendJob>,
     pub(crate) link: Link,
 }
 
 impl PeerSessionWorker {
-    fn new(link: Link, queue: mpsc::Sender<SessionCmd>) -> Self {
+    fn new(link: Link, queue: mpsc::Sender<SendJob>) -> Self {
         Self { queue, link }
     }
 
-    async fn run(mut self, mut channel: mpsc::Receiver<SessionCmd>) {
-        while let Some(session_cmd) = channel.recv().await {
+    async fn run(mut self, mut channel: mpsc::Receiver<SendJob>) {
+        while let Some(job) = channel.recv().await {
             let peer = *self.link.peer();
-            trace!("Processing session {peer:?} cmd: {session_cmd:?}");
-
-            let status = match session_cmd {
-                SessionCmd::Send(job) => match self.send_over_peer_connection(job).await {
-                    Ok(status) => status,
-                    Err(error) => {
-                        error!("session error {error:?}");
-                        // don't breakout here?
-                        // TODO: is this correct?
-                        continue;
-                    }
-                },
-                SessionCmd::Terminate => SessionStatus::Terminating,
-            };
-
-            match status {
-                SessionStatus::Terminating => {
-                    info!("Terminating connection to {:?}", self.link.peer());
-                    break;
-                }
-                SessionStatus::Ok => (),
-            }
+            trace!("Processing session {peer:?} cmd: {job:?}");
+            self.send_over_peer_connection(job).await;
         }
 
         // close the channel to prevent senders adding more messages.
@@ -158,19 +121,19 @@ impl PeerSessionWorker {
         info!("Finished peer session shutdown");
     }
 
-    async fn send_over_peer_connection(&mut self, mut job: SendJob) -> Result<SessionStatus> {
+    async fn send_over_peer_connection(&mut self, mut job: SendJob) {
         let msg_id = job.msg_id;
         trace!("Sending to peer over connection: {msg_id:?}");
 
         if job.connection_retries > MAX_SENDJOB_RETRIES {
             debug!("max retries reached... {msg_id:?}");
             job.reporter.send(SendStatus::MaxRetriesReached);
-            return Ok(SessionStatus::Ok);
+            return;
         }
 
         let queue = self.queue.clone();
         let link_connections = self.link.connections.clone();
-        let conns_count = self.link.connections.len();
+        let conns_count = link_connections.len();
         let the_peer = *self.link.peer();
 
         let mut link = self.link.clone();
@@ -200,11 +163,11 @@ impl PeerSessionWorker {
 
                 // we await here in case the connection is fresh and has not yet been added
                 tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-                if let Err(e) = queue.send(SessionCmd::Send(job)).await {
+                if let Err(e) = queue.send(job).await {
                     warn!("Failed to re-enqueue job {msg_id:?} after failed connection retrieval error {e:?}");
                 }
 
-                return Ok(SessionStatus::Ok);
+                return;
             }
         };
 
@@ -241,14 +204,12 @@ impl PeerSessionWorker {
                     job.reporter
                         .send(SendStatus::TransientError(format!("{err:?}")));
 
-                    if let Err(e) = queue.send(SessionCmd::Send(job)).await {
+                    if let Err(e) = queue.send(job).await {
                         warn!("Failed to re-enqueue job {msg_id:?} after transient error {e:?}");
                     }
                 }
             }
         });
-
-        Ok(SessionStatus::Ok)
     }
 }
 
