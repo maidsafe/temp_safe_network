@@ -200,9 +200,7 @@ impl MyNode {
             MyNode::write_section_tree(&context);
 
             // updates comm with new members and removes connections that are not from our members
-            self.comm
-                .update_valid_comm_targets(self.network_knowledge.members())
-                .await;
+            self.comm.set_comm_targets(self.network_knowledge.members());
         }
         Ok(cmds)
     }
@@ -249,9 +247,7 @@ impl MyNode {
 
             let cmds = self.update_on_section_change(&context).await;
             // updates comm with new members and removes connections that are not from our members
-            self.comm
-                .update_valid_comm_targets(self.network_knowledge.members())
-                .await;
+            self.comm.set_comm_targets(self.network_knowledge.members());
 
             cmds
         } else {

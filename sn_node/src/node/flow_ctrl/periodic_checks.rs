@@ -192,13 +192,11 @@ impl FlowCtrl {
                     ));
                 }
             } else {
-                {
-                    trace!("{}", LogMarker::RelocateEnd);
-                    debug!("We've joined a section, dropping the relocation proof.");
-                    let mut node = self.node.write().await;
-                    debug!("[NODE WRITE]: handling relocation periodic check write gottt...");
-                    node.relocation_proof = None;
-                }
+                trace!("{}", LogMarker::RelocateEnd);
+                debug!("We've joined a section, dropping the relocation proof.");
+                let mut node = self.node.write().await;
+                debug!("[NODE WRITE]: handling relocation periodic check write gottt...");
+                node.relocation_proof = None;
             }
         }
 

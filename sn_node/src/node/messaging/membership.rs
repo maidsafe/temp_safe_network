@@ -265,9 +265,7 @@ impl MyNode {
         self.log_network_stats();
 
         // updates comm with new members and removes connections that are not from our members
-        self.comm
-            .update_valid_comm_targets(self.network_knowledge.members())
-            .await;
+        self.comm.set_comm_targets(self.network_knowledge.members());
 
         // lets check that we have the correct data now we're changing membership
         cmds.push(MyNode::ask_for_any_new_data_from_whole_section(&self.context()).await);

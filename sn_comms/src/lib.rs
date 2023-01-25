@@ -157,16 +157,17 @@ impl Comm {
         self.our_endpoint.close()
     }
 
-    /// Updates cached connections for passed members set only.
-    pub async fn update_valid_comm_targets(&self, members: BTreeSet<Peer>) {
-        // Let's drop all sessions that don't belong to any of the new members.
-        self.sessions.retain(|p, _| members.contains(p));
-
-        // Now let's add new sessions for each fresh new member. We never remove
-        // sessions from this container unless this function is invoked again by the user,
-        // even if we failed to send using all peer session's connections, we keep the session
+    /// Sets the available targets to be only those in the passed in set.
+    pub fn set_comm_targets(&self, targets: BTreeSet<Peer>) {
+        // We only remove sessions by calling this function,
+        // No removals are made even if we failed to send using all peer session's connections,
         // as it's our source of truth for known and connectable peers.
-        members.iter().for_each(|peer| {
+
+        // Drops sessions that not among the targets.
+        self.sessions.retain(|p, _| targets.contains(p));
+
+        // Adds new sessions for each new target.
+        targets.iter().for_each(|peer| {
             if self.sessions.get(peer).is_none() {
                 let link = Link::new(*peer, self.our_endpoint.clone());
                 let session = PeerSession::new(link);
