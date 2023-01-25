@@ -20,7 +20,7 @@ use sn_consensus::{Decision, Generation, SignedVote, VoteResponse};
 use sn_interface::{
     elder_count,
     messaging::system::{JoinResponse, NodeMsg, SectionSig, SectionSigned},
-    network_knowledge::{MembershipState, NodeState},
+    network_knowledge::{split_threshold, MembershipState, NodeState},
     types::{log_markers::LogMarker, Peer},
 };
 
@@ -221,13 +221,10 @@ impl MyNode {
 
         // In case the newly joined node is a relocated node, and we have enough elders,
         // we don't try to promote it even if it is qualified.
-        let we_have_enough_elders = self.network_knowledge.elders().len() == elder_count();
-        let everything_joined_was_relocated = joining_nodes
-            .iter()
-            .all(|(node_state, _sig)| node_state.previous_name().is_some());
-        let we_should_look_for_new_elders =
-            !(we_have_enough_elders && everything_joined_was_relocated);
-        if we_should_look_for_new_elders {
+        let not_enough_elders = self.network_knowledge.elders().len() < elder_count();
+        let enough_members_to_split = self.network_knowledge.members().len() >= split_threshold();
+
+        if not_enough_elders || enough_members_to_split {
             cmds.extend(self.trigger_dkg()?);
         }
 

@@ -85,6 +85,13 @@ pub fn recommended_section_size() -> usize {
     2 * elder_count()
 }
 
+/// The section will keep adding nodes when requested by the upper layers, until it can split.
+/// A split happens at earliest after this threshold is passed, if both post-split sections would
+/// have `recommended_section_size` number of nodes.
+pub fn split_threshold() -> usize {
+    2 * recommended_section_size()
+}
+
 /// `SuperMajority` of a given group (i.e. > 2/3)
 #[inline]
 pub const fn supermajority(group_size: usize) -> usize {
