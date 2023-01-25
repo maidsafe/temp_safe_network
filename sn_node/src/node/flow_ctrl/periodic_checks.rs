@@ -53,11 +53,24 @@ impl PeriodicChecksTimestamps {
             last_relocation_retry_check: Instant::now(),
         }
     }
+
+    /// Check if any of the periodic checks have elapsed
+    pub(crate) fn something_expired(&self) -> bool {
+        self.last_vote_check.elapsed() > MISSING_VOTE_INTERVAL
+            || self.last_probe.elapsed() > PROBE_INTERVAL
+            || self.last_dkg_msg_check.elapsed() > MISSING_DKG_MSG_INTERVAL
+            || self.last_fault_check.elapsed() > FAULT_CHECK_INTERVAL
+            || self.last_relocation_retry_check.elapsed() > RELOCATION_TIMEOUT_SECS
+    }
 }
 
 impl FlowCtrl {
     /// Generate and fire commands for all types of periodic checks
     pub(super) async fn perform_periodic_checks(&mut self) {
+        if !self.timestamps.something_expired() {
+            return;
+        }
+
         let (context, membership_context) = {
             let read_locked_node = self.node.read().await;
             // only clone membership when time has elapsed
