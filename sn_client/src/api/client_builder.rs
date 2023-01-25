@@ -128,7 +128,6 @@ impl ClientBuilder {
     /// - `[Self::keypair]` and `[Self::dbc_owner]` are randomly generated
     /// - `[Self::query_timeout`] and `[Self::cmd_timeout]` default to [`DEFAULT_QUERY_CMD_TIMEOUT`]
     /// - `[Self::max_backoff_interval`] defaults to [`DEFAULT_MAX_QUERY_CMD_BACKOFF_INTERVAL`]
-    /// - [`qp2p::Config`] will default to it's [`Default`] impl
     /// - Network contacts file will be read from a standard location
     pub async fn build(self) -> Result<Client, Error> {
         let max_backoff_interval = self
