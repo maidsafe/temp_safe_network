@@ -102,11 +102,7 @@ impl MyNode {
                         // We'll send a membership AE request to see if they can help us catch up.
                         debug!("{:?}", LogMarker::MembershipSendingAeUpdateRequest);
                         let msg = NodeMsg::MembershipAE(membership.generation());
-                        cmds.push(MyNode::send_system_msg(
-                            msg,
-                            Peers::Single(peer),
-                            self.context(),
-                        ));
+                        cmds.push(Cmd::send_msg(msg, Peers::Single(peer), self.context()));
                         // return the vec w/ the AE cmd there so as not to loop and generate AE for
                         // any subsequent commands
                         return Ok(cmds);
@@ -160,7 +156,7 @@ impl MyNode {
             match membership.anti_entropy(gen) {
                 Ok(catchup_votes) => {
                     debug!("Sending catchup votes to {peer:?}");
-                    Some(MyNode::send_system_msg(
+                    Some(Cmd::send_msg(
                         NodeMsg::MembershipVotes(catchup_votes),
                         Peers::Single(peer),
                         node_context,
@@ -337,7 +333,7 @@ impl MyNode {
         let msg = NodeMsg::JoinResponse(JoinResponse::Approved(decision));
 
         trace!("{}", LogMarker::SendNodeApproval);
-        MyNode::send_system_msg(msg, Peers::Multiple(peers), self.context())
+        Cmd::send_msg(msg, Peers::Multiple(peers), self.context())
     }
 
     pub(crate) fn handle_node_left(
@@ -370,11 +366,7 @@ impl MyNode {
             let peer = *node_state.peer();
             info!("Notify relocation to node {:?}", peer);
             let msg = NodeMsg::Relocate(node_state);
-            Some(MyNode::send_system_msg(
-                msg,
-                Peers::Single(peer),
-                self.context(),
-            ))
+            Some(Cmd::send_msg(msg, Peers::Single(peer), self.context()))
         } else {
             None
         }
