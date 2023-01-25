@@ -5,19 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.28 (2023-01-24)
-
-### New Features
-
- - <csr-id-908ee34d116e2a9e5250d3044f9dbe1c6d471ecc/> add retry for relocating node
+## v0.72.29 (2023-01-25)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 1 day passed between releases.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -27,14 +22,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2017 ([`e477211`](https://github.com/maidsafe/safe_network/commit/e477211cf09db52b8eacbc3266bb43321525b0f1))
+</details>
+
+## v0.72.28 (2023-01-24)
+
+### Chore
+
+ - <csr-id-6acbe4920d9d3a7db88e76a21e026bdee04e9584/> sn_interface-0.16.16/sn_node-0.72.28
+ - <csr-id-2051fee1584ee2e4a8b7693ea96f18031c3a2a81/> remove unnecessary indirection
+
+### New Features
+
+ - <csr-id-908ee34d116e2a9e5250d3044f9dbe1c6d471ecc/> add retry for relocating node
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release over the course of 1 calendar day.
+ - 1 day passed between releases.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.16/sn_node-0.72.28 ([`6acbe49`](https://github.com/maidsafe/safe_network/commit/6acbe4920d9d3a7db88e76a21e026bdee04e9584))
     - Merge #2024 ([`fc0aa80`](https://github.com/maidsafe/safe_network/commit/fc0aa8062c0003a9ac3c263d4ea01111b5e6a8d3))
     - add retry for relocating node ([`908ee34`](https://github.com/maidsafe/safe_network/commit/908ee34d116e2a9e5250d3044f9dbe1c6d471ecc))
+    - remove unnecessary indirection ([`2051fee`](https://github.com/maidsafe/safe_network/commit/2051fee1584ee2e4a8b7693ea96f18031c3a2a81))
 </details>
 
 ## v0.72.27 (2023-01-23)
 
 <csr-id-2ce413fab1e5fff10593d7f5fcf7c9c41db1f9ff/>
 <csr-id-e6ec500629844ad2d328d38fff7ebd0f52a8cb12/>
+<csr-id-c94a953dddfcb20bf65d4bb34448dc2752a019c5/>
 
 ### Chore
 
