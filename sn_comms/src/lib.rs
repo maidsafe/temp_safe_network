@@ -165,7 +165,7 @@ impl Comm {
     }
 
     /// Updates cached connections for passed members set only.
-    pub async fn update_members(&mut self, members: BTreeSet<Peer>) {
+    pub async fn update_valid_comm_targets(&mut self, members: BTreeSet<Peer>) {
         let new_members = members.clone();
         *self.members.write().await = members;
         self.outgoing_sessions

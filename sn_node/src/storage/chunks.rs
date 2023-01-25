@@ -108,7 +108,10 @@ impl ChunkStorage {
 
     // Read chunk from local store and return NodeQueryResponse
     pub(super) async fn get(&self, address: &ChunkAddress) -> NodeQueryResponse {
-        trace!("{:?} {address:?}", LogMarker::ChunkQueryReceviedAtAdult);
+        trace!(
+            "{:?} {address:?}",
+            LogMarker::ChunkQueryReceviedAtStoringNode
+        );
         NodeQueryResponse::GetChunk(self.get_chunk(address).await.map_err(|error| error.into()))
     }
 

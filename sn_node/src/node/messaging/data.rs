@@ -258,9 +258,15 @@ impl MyNode {
         // exchanges, until there is no more data missing on this node.
         if !is_full && !data_batch_is_empty {
             let data_i_have = context.data_storage.data_addrs().await;
+            trace!(
+                "{:?} - as batch was not empty",
+                LogMarker::DataReorganisationUnderway
+            );
             let msg = NodeMsg::NodeDataCmd(NodeDataCmd::SendAnyMissingRelevantData(data_i_have));
             let cmd = Cmd::send_msg(msg, Peers::Single(sender), context.clone());
             cmds.push(cmd);
+        } else if is_full {
+            warn!("Not attempting further retrieval of missing data as we are full");
         }
 
         Ok(cmds)

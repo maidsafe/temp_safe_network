@@ -220,7 +220,8 @@ mod core {
             fault_cmds_sender: mpsc::Sender<FaultsCmd>,
         ) -> Result<Self> {
             let addr = comm.socket_addr();
-            comm.update_members(network_knowledge.members()).await;
+            comm.update_valid_comm_targets(network_knowledge.members())
+                .await;
             let membership = if let Some(key) = section_key_share.clone() {
                 let n_elders = network_knowledge.signed_sap().elder_count();
 
@@ -537,7 +538,7 @@ mod core {
         }
 
         /// Updates various state if elders changed.
-        pub(crate) async fn update_on_elder_change(
+        pub(crate) async fn update_on_section_change(
             &mut self,
             old: &NodeContext,
         ) -> Result<Vec<Cmd>> {
@@ -549,16 +550,16 @@ mod core {
 
             let mut cmds = vec![];
 
-            // clean up DKG sessions 5 generations older than current
-            // `session_id.section_chain_len + 5 < current_chain_len`
+            // clean up DKG sessions 2 generations older than current
+            // `session_id.section_chain_len + 2 < current_chain_len`
             // we voluntarily keep the previous DKG rounds
             // so lagging elder candidates can still get responses to their gossip.
-            // At generation+5, they are likely not going to be elders anymore so we can safely discard it
+            // At generation+2, they are likely not going to be elders anymore so we can safely discard it
             let current_chain_len = self.network_knowledge.section_chain_len();
             let old_hashes = Vec::from_iter(
                 self.dkg_sessions_info
                     .iter()
-                    .filter(|(_, info)| info.session_id.section_chain_len + 5 < current_chain_len)
+                    .filter(|(_, info)| info.session_id.section_chain_len + 2 < current_chain_len)
                     .map(|(hash, _)| *hash),
             );
             for hash in old_hashes {
