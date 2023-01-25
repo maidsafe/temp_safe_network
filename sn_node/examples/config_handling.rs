@@ -91,18 +91,6 @@ async fn main() -> Result<()> {
         assert!(config.first);
     }
 
-    if command_line_args.max_msg_size_allowed.is_some() {
-        assert_eq!(
-            command_line_args.max_msg_size_allowed,
-            config.max_msg_size_allowed
-        )
-    } else {
-        assert_eq!(
-            file_config.max_msg_size_allowed,
-            config.max_msg_size_allowed
-        )
-    }
-
     clear_disk_config().await?;
 
     Ok(())

@@ -293,7 +293,6 @@ mod tests {
     #[tokio::test]
     async fn failed_send() -> Result<()> {
         let (tx, _rx) = mpsc::channel(1);
-        // FIXME: We used to pass idle_timeout 1ms to qp2p from here, how to?
         let comm = Comm::new(local_addr(), tx).await?;
 
         let invalid_peer = get_invalid_peer().await?;

@@ -26,10 +26,6 @@ pub(crate) const DEFAULT_MAX_CAPACITY: usize = 2 * DEFAULT_MIN_CAPACITY;
 const CONFIG_FILE: &str = "node.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 
-// In the absence of any (QUIC) keep-alive messages, connections will be closed
-// if they remain idle for at least this duration.
-const DEFAULT_IDLE_TIMEOUT_MSEC: u64 = 70_000;
-
 /// Node configuration
 #[derive(Default, Clone, Debug, Serialize, Deserialize, clap::StructOpt)]
 #[clap(rename_all = "kebab-case", bin_name = "sn_node", version)]
@@ -109,26 +105,6 @@ pub struct Config {
     /// e.g. Digital Ocean droplets.
     #[clap(long)]
     pub skip_auto_port_forwarding: bool,
-    /// This is the maximum message size we'll allow the peer to send to us. Any bigger message and
-    /// we'll error out probably shutting down the connection to the peer. If none supplied we'll
-    /// default to the documented constant.
-    #[clap(long)]
-    pub max_msg_size_allowed: Option<u32>,
-    /// If we hear nothing from the peer in the given interval we declare it offline to us. If none
-    /// supplied we'll default to the documented constant.
-    ///
-    /// The interval is in milliseconds. A value of 0 disables this feature.
-    #[clap(long)]
-    pub idle_timeout_msec: Option<u64>,
-    /// Interval to send keep-alives if we are idling so that the peer does not disconnect from us
-    /// declaring us offline. If none is supplied we'll default to the documented constant.
-    ///
-    /// The interval is in milliseconds. A value of 0 disables this feature.
-    #[clap(long)]
-    pub keep_alive_interval_msec: Option<u32>,
-    /// Duration of a UPnP port mapping.
-    #[clap(long)]
-    pub upnp_lease_duration: Option<u32>,
 }
 
 impl Config {
@@ -234,23 +210,6 @@ impl Config {
         if config.local_addr.is_some() {
             self.local_addr = config.local_addr;
         }
-
-        // if config.public_addr.is_some() {
-        //     self.public_addr = config.public_addr;
-        // }
-
-        if config.max_msg_size_allowed.is_some() {
-            self.max_msg_size_allowed = config.max_msg_size_allowed;
-        }
-
-        match config.idle_timeout_msec {
-            Some(t) => self.idle_timeout_msec = Some(t),
-            None => self.idle_timeout_msec = Some(DEFAULT_IDLE_TIMEOUT_MSEC),
-        }
-
-        if config.keep_alive_interval_msec.is_some() {
-            self.keep_alive_interval_msec = config.keep_alive_interval_msec;
-        }
     }
 
     /// The address to be credited when this node farms `SafeCoin`.
@@ -314,20 +273,6 @@ impl Config {
         self.local_addr
             .unwrap_or_else(|| SocketAddr::from((std::net::Ipv4Addr::UNSPECIFIED, 0)))
     }
-
-    // /// Network configuration options.
-    // pub fn network_config(&self) -> NetworkConfig {
-    //     let mut network_config = NetworkConfig::default();
-    //     if let Some(t) = self.idle_timeout_msec {
-    //         network_config.idle_timeout = Some(Duration::from_millis(t));
-    //     }
-
-    //     if let Some(t) = self.keep_alive_interval_msec {
-    //         network_config.keep_alive_interval = Some(Duration::from_millis(t.into()));
-    //     }
-
-    //     network_config
-    // }
 
     /// Get the completions option
     pub fn completions(&self) -> &Option<String> {
