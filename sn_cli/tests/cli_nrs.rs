@@ -31,8 +31,7 @@ fn nrs_register_should_register_a_topname() -> Result<()> {
     safe_cmd(&config_dir, ["nrs", "register", &topname], Some(0))?
         .assert()
         .stdout(predicate::str::contains(format!(
-            "New NRS Map created for \"safe://{}\"",
-            topname
+            "New NRS Map created for \"safe://{topname}\"",
         )));
     Ok(())
 }
@@ -56,12 +55,10 @@ fn nrs_register_should_register_a_topname_with_a_versioned_content_link() -> Res
     )?
     .assert()
     .stdout(predicate::str::contains(format!(
-        "New NRS Map created for \"safe://{}\"",
-        topname
+        "New NRS Map created for \"safe://{topname}\"",
     )))
     .stdout(predicate::str::contains(format!(
-        "The entry points to {}",
-        url
+        "The entry points to {url}",
     )));
     Ok(())
 }
@@ -84,7 +81,7 @@ fn nrs_register_should_register_a_topname_with_an_immutable_content_link() -> Re
         .link()
         .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?;
     let url = SafeUrl::from_url(test_md_file_link)?;
-    println!("processed_files = {:?}", processed_files);
+    println!("processed_files = {processed_files:?}");
 
     let topname = get_random_string();
     safe_cmd(
@@ -94,12 +91,10 @@ fn nrs_register_should_register_a_topname_with_an_immutable_content_link() -> Re
     )?
     .assert()
     .stdout(predicate::str::contains(format!(
-        "New NRS Map created for \"safe://{}\"",
-        topname
+        "New NRS Map created for \"safe://{topname}\"",
     )))
     .stdout(predicate::str::contains(format!(
-        "The entry points to {}",
-        url
+        "The entry points to {url}",
     )));
     Ok(())
 }
@@ -164,8 +159,7 @@ fn nrs_register_should_return_an_error_if_the_topname_already_exists() -> Result
     safe_cmd(&config_dir, ["nrs", "register", &topname], Some(1))?
         .assert()
         .stderr(predicate::str::contains(format!(
-            "Could not register topname {}. That name is already taken.",
-            topname
+            "Could not register topname {topname}. That name is already taken.",
         )))
         .stderr(predicate::str::contains(
             "Try the command again with a different name.",
@@ -269,8 +263,7 @@ fn nrs_add_should_add_a_subname_and_set_it_as_the_default_for_the_topname() -> R
     .assert()
     .stdout(predicate::str::contains("Existing NRS Map updated"))
     .stdout(predicate::str::contains(format!(
-        "This link was also set as the default location for {}",
-        topname
+        "This link was also set as the default location for {topname}",
     )))
     .stdout(predicate::str::contains("+"))
     .stdout(predicate::str::contains(&public_name))
@@ -554,20 +547,17 @@ fn nrs_remove_should_remove_a_subname() -> Result<()> {
 fn nrs_remove_should_return_an_error_for_a_non_existent_topname() -> Result<()> {
     let config_dir = use_isolated_safe_config_dir()?;
     let topname = get_random_string();
-    let public_name = format!("test.{}", &topname);
+    let public_name = format!("test.{topname}");
     safe_cmd(&config_dir, ["nrs", "remove", &public_name], Some(1))?
         .assert()
         .stderr(predicate::str::contains(format!(
-            "Failed to remove {}.",
-            public_name
+            "Failed to remove {public_name}.",
         )))
         .stderr(predicate::str::contains(format!(
-            "The topname {} is likely not registered in Safe NRS",
-            topname
+            "The topname {topname} is likely not registered in Safe NRS",
         )))
         .stderr(predicate::str::contains(format!(
-            "Try the command again or verify that {} is a registered topname.",
-            topname
+            "Try the command again or verify that {topname} is a registered topname.",
         )));
     Ok(())
 }

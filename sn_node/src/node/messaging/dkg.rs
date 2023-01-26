@@ -878,7 +878,7 @@ mod tests {
                             let dkg_cmds = dispatcher.process_cmd(cmd).await?;
                             verify_dkg_outcome_cmds(dkg_cmds);
                         } else {
-                            panic!("got a different cmd {:?}", cmd);
+                            panic!("got a different cmd {cmd:?}");
                         }
                     }
                 }
@@ -1028,7 +1028,7 @@ mod tests {
                                 }
                             }
                         } else {
-                            panic!("got a different cmd {:?}", cmd);
+                            panic!("got a different cmd {cmd:?}");
                         }
                     }
                 }
@@ -1086,7 +1086,7 @@ mod tests {
                             let filter = BTreeSet::from([dead_node]);
                             dispatcher.mock_send_msg(cmd, Some(filter)).await;
                         } else {
-                            panic!("got a different cmd {:?}", cmd);
+                            panic!("got a different cmd {cmd:?}");
                         }
                     }
                 }
@@ -1160,7 +1160,7 @@ mod tests {
                             let dkg_cmds = dispatcher.process_cmd(cmd).await?;
                             verify_dkg_outcome_cmds(dkg_cmds);
                         } else {
-                            panic!("got a different cmd {:?}", cmd);
+                            panic!("got a different cmd {cmd:?}");
                         }
                     }
                 }

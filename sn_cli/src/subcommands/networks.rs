@@ -57,14 +57,11 @@ pub async fn networks_commander(
 ) -> Result<()> {
     match cmd {
         Some(NetworksSubCommands::Switch { network_name }) => {
-            let msg = format!("Switching to '{}' network...", network_name);
+            let msg = format!("Switching to '{network_name}' network...");
             debug!("{}", msg);
-            println!("{}", msg);
+            println!("{msg}");
             config.switch_to_network(&network_name).await?;
-            println!(
-                "Successfully switched to '{}' network in your system!",
-                network_name
-            );
+            println!("Successfully switched to '{network_name}' network in your system!",);
         }
         Some(NetworksSubCommands::Check {}) => {
             println!("Checking current Network Map...");
@@ -80,10 +77,9 @@ pub async fn networks_commander(
             println!();
             match matched_network {
                 Some(name) => {
-                    println!("'{}' network matched!", name);
+                    println!("'{name}' network matched!");
                     println!(
-                        "The default Network Map matches '{}' network as per current config",
-                        name
+                        "The default Network Map matches '{name}' network as per current config"
                     );
                 }
                 None => {
@@ -110,8 +106,7 @@ pub async fn networks_commander(
                     .await?
             };
             println!(
-                "Network '{}' was added to the list. Network Map is located at '{}'",
-                network_name, net_info
+                "Network '{network_name}' was added to the list. Network Map is located at '{net_info}'",
             );
         }
         Some(NetworksSubCommands::Remove { network_name }) => {
@@ -119,17 +114,17 @@ pub async fn networks_commander(
         }
         Some(NetworksSubCommands::Sections { network_name }) => {
             let (network_contacts, location) = if let Some(name) = network_name {
-                println!("Network sections information for '{}':", name);
+                println!("Network sections information for '{name}':");
                 config.read_network_contacts(&name).await?
             } else {
                 println!("Network sections information for default network:");
                 config.read_default_network_contacts().await?
             };
-            println!("Read from: {}", location);
+            println!("Read from: {location}");
             println!();
 
             let genesis_key = network_contacts.genesis_key();
-            println!("Genesis Key: {:?}", genesis_key);
+            println!("Genesis Key: {genesis_key:?}");
             println!();
 
             println!("Sections:");
@@ -140,7 +135,7 @@ pub async fn networks_commander(
                 let section_key = sap.section_key();
                 println!("Prefix '{}'", sap.prefix());
                 println!("----------------------------------");
-                println!("Section key: {:?}", section_key);
+                println!("Section key: {section_key:?}");
                 println!(
                     "Section keys chain: {:?}",
                     sections_dag.partial_dag(genesis_key, &section_key)?

@@ -60,12 +60,12 @@ pub enum MsgType {
 impl Display for MsgType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Node { msg, .. } => write!(f, "MsgType::Node({})", msg),
-            Self::Client { msg, .. } => write!(f, "MsgType::Client({})", msg),
+            Self::Node { msg, .. } => write!(f, "MsgType::Node({msg})"),
+            Self::Client { msg, .. } => write!(f, "MsgType::Client({msg})"),
             Self::ClientDataResponse { msg, .. } => {
-                write!(f, "MsgType::ClientDataResponse({})", msg)
+                write!(f, "MsgType::ClientDataResponse({msg})")
             }
-            Self::NodeDataResponse { msg, .. } => write!(f, "MsgType::NodeDataResponse({})", msg),
+            Self::NodeDataResponse { msg, .. } => write!(f, "MsgType::NodeDataResponse({msg})"),
         }
     }
 }

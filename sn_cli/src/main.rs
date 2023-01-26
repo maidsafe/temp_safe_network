@@ -79,7 +79,7 @@ async fn main() -> Result<(), Report> {
         let _ = writeln!(error_msg);
         let _ = writeln!(error_msg, "In order to improve the software, we rely on people to submit reports.\n\nThank you kindly!");
 
-        eprintln!("{}", error_msg);
+        eprintln!("{error_msg}");
     }));
 
     run().await

@@ -88,14 +88,14 @@ impl UrlParts {
         // Parsing twice is inefficient, so there is room for improvement
         // later to standardize on a single parser.
         let parsing_url = Url::parse(url).map_err(|parse_err| {
-            let msg = format!("Problem parsing the URL \"{}\": {}", url, parse_err);
+            let msg = format!("Problem parsing the URL \"{url}\": {parse_err}");
             Error::InvalidXorUrl(msg)
         })?;
 
         // Validate the url scheme is 'safe'
         let scheme = parsing_url.scheme().to_string();
         if scheme != URL_SCHEME {
-            let msg = format!("invalid scheme: '{}'. expected: '{}'", scheme, URL_SCHEME);
+            let msg = format!("invalid scheme: '{scheme}'. expected: '{URL_SCHEME}'");
             return Err(Error::InvalidXorUrl(msg));
         }
 
@@ -158,7 +158,7 @@ impl UrlParts {
         // This could be improved/optimized at a later time.
         let http_url = url.replacen("safe://", "http://", 1);
         let uri = HttpUri::new(&http_url).map_err(|parse_err| {
-            let msg = format!("Problem parsing the URL \"{}\": {:?}", url, parse_err);
+            let msg = format!("Problem parsing the URL \"{url}\": {parse_err:?}");
             Error::InvalidXorUrl(msg)
         })?;
         let path = uri.resource.path.to_string();

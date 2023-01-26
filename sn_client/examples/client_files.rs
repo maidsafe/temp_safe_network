@@ -19,21 +19,21 @@ async fn main() -> Result<()> {
     let client = Client::builder().build().await?;
 
     let pk = client.public_key();
-    println!("Client Public Key: {}", pk);
+    println!("Client Public Key: {pk}");
 
     let bytes = random_bytes(self_encryption::MIN_ENCRYPTABLE_BYTES);
     println!("Storing {} bytes..", bytes.len());
 
     let address = client.upload(bytes).await?;
-    println!("Bytes stored at address: {:?}", address);
+    println!("Bytes stored at address: {address:?}");
 
     let delay = 5;
-    println!("Reading bytes from the network in {} secs...", delay);
+    println!("Reading bytes from the network in {delay} secs...");
     sleep(Duration::from_secs(delay)).await;
 
     println!("...reading bytes from the network now...");
     let _bytes = client.read_bytes(address).await?;
-    println!("Bytes read from {:?}", address);
+    println!("Bytes read from {address:?}");
 
     println!();
 

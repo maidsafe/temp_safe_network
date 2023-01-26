@@ -240,9 +240,9 @@ impl DkgVoter {
                 return Err(Error::DoubleKeyAttackDetected(
                     key_owner,
                     Box::new(key),
-                    key_sig,
+                    Box::new(key_sig),
                     Box::new(*already_had),
-                    *old_sig,
+                    Box::new(*old_sig),
                 ));
             } else {
                 debug!(

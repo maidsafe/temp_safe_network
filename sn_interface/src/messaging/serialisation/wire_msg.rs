@@ -56,8 +56,7 @@ impl WireMsg {
         let mut bytes = BytesMut::new().writer();
         rmp_serde::encode::write(&mut bytes, &msg).map_err(|err| {
             Error::Serialisation(format!(
-                "could not serialize message payload with Msgpack: {}",
-                err
+                "could not serialize message payload with Msgpack: {err}",
             ))
         })?;
 
@@ -69,8 +68,7 @@ impl WireMsg {
 
         rmp_serde::encode::write(&mut bytes, dst).map_err(|err| {
             Error::Serialisation(format!(
-                "could not serialize dst payload with Msgpack: {}",
-                err
+                "could not serialize dst payload with Msgpack: {err}",
             ))
         })?;
 
@@ -118,8 +116,7 @@ impl WireMsg {
         let header = WireMsgHeader::from(header_bytes.clone())?;
         let dst: Dst = rmp_serde::from_slice(&dst_bytes).map_err(|err| {
             Error::FailedToParse(format!(
-                "Message dst couldn't be deserialized from the dst bytes: {}",
-                err
+                "Message dst couldn't be deserialized from the dst bytes: {err}",
             ))
         })?;
 
@@ -197,7 +194,7 @@ impl WireMsg {
         match self.header.msg_envelope.kind.clone() {
             MsgKind::Client(auth) => {
                 let msg: ClientMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
-                    Error::FailedToParse(format!("Data message payload as Msgpack: {}", err))
+                    Error::FailedToParse(format!("Data message payload as Msgpack: {err}"))
                 })?;
 
                 let auth = AuthorityProof::verify(auth, &self.payload)?;
@@ -212,7 +209,7 @@ impl WireMsg {
             MsgKind::ClientDataResponse(_) => {
                 let msg: ClientDataResponse =
                     rmp_serde::from_slice(&self.payload).map_err(|err| {
-                        Error::FailedToParse(format!("Data message payload as Msgpack: {}", err))
+                        Error::FailedToParse(format!("Data message payload as Msgpack: {err}"))
                     })?;
 
                 Ok(MsgType::ClientDataResponse {
@@ -222,7 +219,7 @@ impl WireMsg {
             }
             MsgKind::Node { .. } => {
                 let msg: NodeMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
-                    Error::FailedToParse(format!("Node signed message payload as Msgpack: {}", err))
+                    Error::FailedToParse(format!("Node signed message payload as Msgpack: {err}"))
                 })?;
 
                 Ok(MsgType::Node {
@@ -234,7 +231,7 @@ impl WireMsg {
             MsgKind::NodeDataResponse(_) => {
                 let msg: NodeDataResponse =
                     rmp_serde::from_slice(&self.payload).map_err(|err| {
-                        Error::FailedToParse(format!("Data message payload as Msgpack: {}", err))
+                        Error::FailedToParse(format!("Data message payload as Msgpack: {err}"))
                     })?;
 
                 Ok(MsgType::NodeDataResponse {

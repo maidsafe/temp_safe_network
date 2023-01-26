@@ -123,12 +123,12 @@ fn files_put_should_create_sub_folder_in_container_when_destination_is_used() ->
     let mut safeurl = SafeUrl::from_url(files_container_xor)?;
     safeurl.set_path("/aha/test.md");
     let file_cat = safe_cmd_stdout(&config_dir, ["cat", &safeurl.to_string()], Some(0))?;
-    let contents = std::fs::read_to_string(format!("{}/test.md", TEST_FOLDER))?;
+    let contents = std::fs::read_to_string(format!("{TEST_FOLDER}/test.md"))?;
     assert_eq!(file_cat, contents);
 
     safeurl.set_path("/aha/subfolder/subexists.md");
     let subfile_cat = safe_cmd_stdout(&config_dir, ["cat", &safeurl.to_string()], Some(0))?;
-    let contents = std::fs::read_to_string(format!("{}/subexists.md", TEST_FOLDER_SUBFOLDER))?;
+    let contents = std::fs::read_to_string(format!("{TEST_FOLDER_SUBFOLDER}/subexists.md"))?;
     assert_eq!(subfile_cat, contents.trim());
     Ok(())
 }
@@ -203,13 +203,13 @@ fn files_put_should_upload_directory_contents_in_container_when_no_trailing_slas
     let mut safeurl = SafeUrl::from_url(files_container_xor)?;
     safeurl.set_path("/test.md");
     let file_cat = safe_cmd_stdout(&config_dir, ["cat", &safeurl.to_string()], Some(0))?;
-    let contents = std::fs::read_to_string(format!("{}/test.md", TEST_FOLDER))?;
+    let contents = std::fs::read_to_string(format!("{TEST_FOLDER}/test.md"))?;
     assert_eq!(file_cat, contents);
 
     let mut safeurl = SafeUrl::from_url(files_container_xor)?;
     safeurl.set_path("/subfolder/subexists.md");
     let subfile_cat = safe_cmd_stdout(&config_dir, ["cat", &safeurl.to_string()], Some(0))?;
-    let contents = std::fs::read_to_string(format!("{}/subexists.md", TEST_FOLDER_SUBFOLDER))?;
+    let contents = std::fs::read_to_string(format!("{TEST_FOLDER_SUBFOLDER}/subexists.md"))?;
     assert_eq!(subfile_cat, contents.trim());
     Ok(())
 }
@@ -234,13 +234,13 @@ fn files_put_should_upload_directory_contents_in_container_subfolder_when_traili
     let mut safeurl = SafeUrl::from_url(files_container_xor)?;
     safeurl.set_path("/testdata/test.md");
     let file_cat = safe_cmd_stdout(&config_dir, ["cat", &safeurl.to_string()], Some(0))?;
-    let contents = std::fs::read_to_string(format!("{}/test.md", TEST_FOLDER))?;
+    let contents = std::fs::read_to_string(format!("{TEST_FOLDER}/test.md"))?;
     assert_eq!(file_cat, contents);
 
     let mut safeurl = SafeUrl::from_url(files_container_xor)?;
     safeurl.set_path("/testdata/subfolder/subexists.md");
     let subfile_cat = safe_cmd_stdout(&config_dir, ["cat", &safeurl.to_string()], Some(0))?;
-    let contents = std::fs::read_to_string(format!("{}/subexists.md", TEST_FOLDER_SUBFOLDER))?;
+    let contents = std::fs::read_to_string(format!("{TEST_FOLDER_SUBFOLDER}/subexists.md"))?;
     assert_eq!(subfile_cat, contents.trim());
     Ok(())
 }
@@ -583,7 +583,7 @@ fn files_sync_should_update_nrs_url_to_point_to_new_version_when_update_nrs_arg_
 
     //// but in version 0 of the NRS name it should still link to version 0 of the FilesContainer
     //// where all files should still be there
-    let versioned_nrsurl = format!("{}?v={}", nrsurl, nrs_version);
+    let versioned_nrsurl = format!("{nrsurl}?v={nrs_version}");
     let output = safe_cmd_stdout(&config_dir, ["cat", &versioned_nrsurl, "--json"], Some(0))?;
     let (xorurl, files_map) = parse_files_container_output(&output)?;
     assert_eq!(xorurl, versioned_nrsurl);
@@ -644,7 +644,7 @@ fn files_sync_should_not_update_nrs_url_to_point_to_new_version() -> Result<()> 
     // where all files should still be there
     let output = safe_cmd_stdout(&config_dir, ["cat", &nrsurl, "--json"], Some(0))?;
     let (xorurl, files_map) = parse_files_container_output(&output)?;
-    assert_eq!(xorurl, format!("safe://{}", nrsurl));
+    assert_eq!(xorurl, format!("safe://{nrsurl}"));
     assert_eq!(files_map.len(), orig_directory_file_count);
     Ok(())
 }
@@ -663,7 +663,7 @@ fn files_sync_should_not_update_nrs_url_to_point_to_new_version_when_url_has_saf
     assert_eq!(processed_files.len(), orig_directory_file_count);
 
     let site_name = get_random_string();
-    let nrsurl = format!("safe://{}", site_name);
+    let nrsurl = format!("safe://{site_name}");
     safe_cmd(
         &config_dir,
         [
@@ -725,12 +725,7 @@ fn files_add_should_add_a_file_to_container_with_the_name_on_the_url_path() -> R
     safeurl.set_content_version(None);
     safe_cmd(
         &config_dir,
-        [
-            "files",
-            "add",
-            TEST_FILE,
-            &format!("{}/new_test.md", safeurl),
-        ],
+        ["files", "add", TEST_FILE, &format!("{safeurl}/new_test.md")],
         Some(0),
     )?;
 
@@ -758,7 +753,7 @@ fn files_add_should_not_add_file_when_dry_run_is_used() -> Result<(), Report> {
             "files",
             "add",
             TEST_FILE,
-            &format!("{}/new_test.md", safeurl),
+            &format!("{safeurl}/new_test.md"),
             "--dry-run",
         ],
         Some(0),
@@ -840,19 +835,19 @@ fn files_ls_should_list_the_contents_of_a_container() -> Result<()> {
     assert_eq!(xorurl, container_xorurl_no_version);
     assert_eq!(files_map.len(), 8);
     assert_eq!(
-        processed_files[Path::new(&format!("{}.hidden.txt", TEST_FOLDER))].link(),
+        processed_files[Path::new(&format!("{TEST_FOLDER}.hidden.txt"))].link(),
         Some(&files_map[".hidden.txt"]["link"]),
     );
     assert_eq!(
-        processed_files[Path::new(&format!("{}another.md", TEST_FOLDER))].link(),
+        processed_files[Path::new(&format!("{TEST_FOLDER}another.md"))].link(),
         Some(&files_map["another.md"]["link"]),
     );
     assert_eq!(
-        processed_files[Path::new(&format!("{}noextension", TEST_FOLDER))].link(),
+        processed_files[Path::new(&format!("{TEST_FOLDER}noextension"))].link(),
         Some(&files_map["noextension"]["link"]),
     );
     assert_eq!(
-        processed_files[Path::new(&format!("{}test.md", TEST_FOLDER))].link(),
+        processed_files[Path::new(&format!("{TEST_FOLDER}test.md"))].link(),
         Some(&files_map["test.md"]["link"]),
     );
 
@@ -872,14 +867,14 @@ fn files_ls_should_list_the_contents_of_a_container() -> Result<()> {
     assert_eq!(xorurl, subfolder_path);
     assert_eq!(files_map.len(), 2);
     assert_eq!(
-        processed_files[Path::new(&format!("{}sub2.md", TEST_FOLDER_SUBFOLDER))].link(),
+        processed_files[Path::new(&format!("{TEST_FOLDER_SUBFOLDER}sub2.md"))].link(),
         Some(&files_map["sub2.md"]["link"]),
     );
 
     let sub2_len = get_file_len(format!("{}/{}", TEST_FOLDER_SUBFOLDER, "sub2.md"))?;
     assert_eq!(files_map["sub2.md"]["size"], sub2_len.to_string());
     assert_eq!(
-        processed_files[Path::new(&format!("{}subexists.md", TEST_FOLDER_SUBFOLDER))].link(),
+        processed_files[Path::new(&format!("{TEST_FOLDER_SUBFOLDER}subexists.md"))].link(),
         Some(&files_map["subexists.md"]["link"]),
     );
 
@@ -936,7 +931,7 @@ fn files_ls_should_list_single_file_when_target_is_single_file() -> Result<()> {
     )?;
 
     let (_xorurl, files_map) = parse_files_container_output(&files_ls_output)?;
-    let subexists_len = get_file_len(format!("{}/subexists.md", TEST_FOLDER_SUBFOLDER))?;
+    let subexists_len = get_file_len(format!("{TEST_FOLDER_SUBFOLDER}/subexists.md"))?;
     assert_eq!(files_map.len(), 1);
     assert_eq!(files_map["subexists.md"]["size"], subexists_len.to_string());
 
@@ -976,7 +971,7 @@ fn files_ls_should_list_contents_of_sub_folder_when_nrs_url_has_the_path_of_the_
 
     let output = safe_cmd_stdout(
         &config_dir,
-        ["files", "ls", &format!("{}/subfolder", nrsurl), "--json"],
+        ["files", "ls", &format!("{nrsurl}/subfolder"), "--json"],
         Some(0),
     )?;
     let (_xorurl, files_map) = parse_files_container_output(&output)?;

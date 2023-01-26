@@ -41,13 +41,13 @@ fn dog_should_resolve_files_container_from_nrs_url_without_safe_prefix() -> Resu
     let dog_output = safe_cmd_stdout(&config_dir, ["dog", &nrsurl, "--json"], Some(0))?;
     let (url, mut content, _): (String, Vec<SafeData>, DataReplicasReport) =
         serde_json::from_str(&dog_output).expect("Failed to parse output of `safe dog` on file");
-    assert_eq!(url, format!("safe://{}", nrsurl));
+    assert_eq!(url, format!("safe://{nrsurl}"));
 
     if let Some(SafeData::FilesContainer { resolved_from, .. }) = content.pop() {
         assert_eq!(resolved_from, container_xorurl);
         Ok(())
     } else {
-        panic!("Content retrieved was unexpected: {:?}", content);
+        panic!("Content retrieved was unexpected: {content:?}");
     }
 }
 
@@ -58,7 +58,7 @@ fn dog_should_resolve_files_container_from_nrs_url_with_safe_prefix() -> Result<
     let (container_xorurl, _) = parse_files_put_or_sync_output(&content)?;
 
     let site_name = get_random_string();
-    let nrsurl = format!("safe://{}", site_name);
+    let nrsurl = format!("safe://{site_name}");
     safe_cmd(
         &config_dir,
         ["nrs", "register", &site_name, "-l", &container_xorurl],
@@ -74,7 +74,7 @@ fn dog_should_resolve_files_container_from_nrs_url_with_safe_prefix() -> Result<
         assert_eq!(resolved_from, container_xorurl);
         Ok(())
     } else {
-        panic!("Content retrieved was unexpected: {:?}", content);
+        panic!("Content retrieved was unexpected: {content:?}");
     }
 }
 
@@ -102,13 +102,13 @@ fn dog_should_resolve_files_container_using_json_compact_output_from_nrs_url() -
     )?;
     let (url, mut content, _): (String, Vec<SafeData>, DataReplicasReport) =
         serde_json::from_str(&dog_output).expect("Failed to parse output of `safe dog`");
-    assert_eq!(url, format!("safe://{}", nrsurl));
+    assert_eq!(url, format!("safe://{nrsurl}"));
 
     if let Some(SafeData::FilesContainer { resolved_from, .. }) = content.pop() {
         assert_eq!(resolved_from, container_xorurl);
         Ok(())
     } else {
-        panic!("Content retrieved was unexpected: {:?}", content);
+        panic!("Content retrieved was unexpected: {content:?}");
     }
 }
 
@@ -127,13 +127,13 @@ fn dog_should_resolve_files_container_using_yaml_output_from_nrs_url() -> Result
     let dog_output = safe_cmd_stdout(&config_dir, ["dog", &nrsurl, "--output=yaml"], Some(0))?;
     let (url, mut content, _): (String, Vec<SafeData>, DataReplicasReport) =
         serde_yaml::from_str(&dog_output).expect("Failed to parse output of `safe dog`");
-    assert_eq!(url, format!("safe://{}", nrsurl));
+    assert_eq!(url, format!("safe://{nrsurl}"));
 
     if let Some(SafeData::FilesContainer { resolved_from, .. }) = content.pop() {
         assert_eq!(resolved_from, container_xorurl);
         Ok(())
     } else {
-        panic!("Content retrieved was unexpected: {:?}", content);
+        panic!("Content retrieved was unexpected: {content:?}");
     }
 }
 
@@ -147,8 +147,7 @@ fn dog_should_resolve_wallet_from_xor_url() -> Result<()> {
         .assert()
         .stdout(predicate::str::contains("= Wallet ="))
         .stdout(predicate::str::contains(format!(
-            "XOR-URL: {}",
-            wallet_xorurl
+            "XOR-URL: {wallet_xorurl}"
         )))
         .stdout(predicate::str::contains("Native data type: Register"));
 
@@ -176,7 +175,7 @@ fn dog_should_resolve_nrs_container_from_nrs_url() -> Result<()> {
         .ok_or_else(|| eyre!("should have link"))?;
 
     let site_name = get_random_string();
-    let container_xorurl = SafeUrl::from_url(&format!("safe://{}", site_name))?.to_xorurl_string();
+    let container_xorurl = SafeUrl::from_url(&format!("safe://{site_name}"))?.to_xorurl_string();
     safe_cmd(
         &config_dir,
         [
@@ -214,16 +213,13 @@ fn dog_should_resolve_nrs_container_from_nrs_url() -> Result<()> {
     safe_cmd(&config_dir, ["dog", &container_xorurl], Some(0))?
         .assert()
         .stdout(predicate::str::contains(format!(
-            "{site_name}: {}",
-            files_container_xor
+            "{site_name}: {files_container_xor}",
         )))
         .stdout(predicate::str::contains(format!(
-            "test.{site_name}: {}",
-            test_file_link
+            "test.{site_name}: {test_file_link}",
         )))
         .stdout(predicate::str::contains(format!(
-            "another.{site_name}: {}",
-            another_file_link
+            "another.{site_name}: {another_file_link}",
         )));
     Ok(())
 }

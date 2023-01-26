@@ -62,8 +62,8 @@ impl std::str::FromStr for XorUrlBase {
             "base32" => Ok(Self::Base32),
             "base64" => Ok(Self::Base64),
             other => Err(Error::InvalidInput(format!(
-                "Invalid XOR URL base encoding: {}. Supported values are base32z, base32, and base64",
-                other
+                "Invalid XOR URL base encoding: {other}. Supported values are base32z, base32, and base64",
+
             ))),
         }
     }
@@ -71,7 +71,7 @@ impl std::str::FromStr for XorUrlBase {
 
 impl fmt::Display for XorUrlBase {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -117,7 +117,7 @@ pub enum ContentType {
 
 impl std::fmt::Display for ContentType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -144,7 +144,7 @@ impl ContentType {
             Self::Multimap => Ok(4),
             Self::MediaType(media_type) => match MEDIA_TYPE_CODES.get(media_type) {
                 Some(media_type_code) => Ok(*media_type_code),
-                None => Err(Error::UnsupportedMediaType(format!("Media-type '{}' not supported. You can use 'ContentType::Raw' as the 'content_type' for this type of content", media_type))),
+                None => Err(Error::UnsupportedMediaType(format!("Media-type '{media_type}' not supported. You can use 'ContentType::Raw' as the 'content_type' for this type of content"))),
             },
         }
     }
@@ -167,7 +167,7 @@ pub enum DataType {
 
 impl std::fmt::Display for DataType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -299,7 +299,7 @@ impl SafeUrl {
                 return Err(Error::InvalidInput(msg));
             }
             // Validate that nrs_name hash matches xor_name
-            let tmpurl = format!("{}{}", URL_PROTOCOL, nh);
+            let tmpurl = format!("{URL_PROTOCOL}{nh}");
             let parts = UrlParts::parse(&tmpurl, false)?;
             let hashed_name = Self::xor_name_from_nrs_string(&parts.top_name);
             if &hashed_name != address.name() {
@@ -428,7 +428,7 @@ impl SafeUrl {
         let parts = UrlParts::parse(xorurl, true)?;
 
         let (_base, xorurl_bytes): (Base, Vec<u8>) = base_decode(&parts.top_name)
-            .map_err(|err| Error::InvalidXorUrl(format!("Failed to decode XOR-URL: {:?}", err)))?;
+            .map_err(|err| Error::InvalidXorUrl(format!("Failed to decode XOR-URL: {err:?}")))?;
 
         let type_tag_offset = XOR_NAME_BYTES_OFFSET + XOR_NAME_LEN; // offset where to find the type tag bytes
 
@@ -453,8 +453,7 @@ impl SafeUrl {
         let encoding_version: u64 = u64::from(u8_version);
         if encoding_version != XOR_URL_VERSION_1 {
             return Err(Error::InvalidXorUrl(format!(
-                "Invalid or unsupported XOR-URL encoding version: {}",
-                encoding_version
+                "Invalid or unsupported XOR-URL encoding version: {encoding_version}",
             )));
         }
 
@@ -470,8 +469,7 @@ impl SafeUrl {
                 Some(media_type_str) => ContentType::MediaType((*media_type_str).to_string()),
                 None => {
                     return Err(Error::InvalidXorUrl(format!(
-                        "Invalid content type encoded in the XOR-URL string: {}",
-                        other
+                        "Invalid content type encoded in the XOR-URL string: {other}",
                     )))
                 }
             },
@@ -801,7 +799,7 @@ impl SafeUrl {
         if qs.is_empty() {
             qs.to_string()
         } else {
-            format!("?{}", qs)
+            format!("?{qs}")
         }
     }
 
@@ -934,7 +932,7 @@ impl SafeUrl {
         if include_subnames {
             let sub_names = self.sub_names();
             let sep = if sub_names.is_empty() { "" } else { "." };
-            format!("{}{}{}", sub_names, sep, top_name)
+            format!("{sub_names}{sep}{top_name}")
         } else {
             top_name
         }
@@ -944,7 +942,7 @@ impl SafeUrl {
     pub fn url_percent_decode(s: &str) -> Result<String> {
         match urlencoding::decode(s) {
             Ok(c) => Ok(c),
-            Err(e) => Err(Error::InvalidInput(format!("{:#?}", e))),
+            Err(e) => Err(Error::InvalidInput(format!("{e:#?}"))),
         }
     }
 
@@ -981,11 +979,11 @@ impl SafeUrl {
 
     // utility to generate a dummy url from a query string.
     fn query_string_to_url(query_str: &str) -> Result<Url> {
-        let dummy = format!("file://dummy?{}", query_str);
+        let dummy = format!("file://dummy?{query_str}");
         match Url::parse(&dummy) {
             Ok(u) => Ok(u),
             Err(_e) => {
-                let msg = format!("Invalid query string: {}", query_str);
+                let msg = format!("Invalid query string: {query_str}");
                 Err(Error::InvalidInput(msg))
             }
         }
@@ -1020,8 +1018,7 @@ impl SafeUrl {
         if let Some(version_str) = version_option {
             let version = version_str.parse::<VersionHash>().map_err(|_e| {
                 let msg = format!(
-                    "{} param could not be parsed as VersionHash. invalid: '{}'",
-                    URL_VERSION_QUERY_NAME, version_str
+                    "{URL_VERSION_QUERY_NAME} param could not be parsed as VersionHash. invalid: '{version_str}'",
                 );
                 Error::InvalidInput(msg)
             })?;
@@ -1071,7 +1068,7 @@ impl SafeUrl {
         let new_path = new_parts.join("/");
 
         let separator = if new_path.is_empty() { "" } else { "/" };
-        self.path = format!("{}{}", separator, new_path);
+        self.path = format!("{separator}{new_path}");
     }
 
     // utility to query a key from a query string, percent-decoded.
@@ -1133,7 +1130,7 @@ impl fmt::Display for SafeUrl {
         } else {
             self.to_xorurl_string()
         };
-        write!(fmt, "{}", buf)
+        write!(fmt, "{buf}")
     }
 }
 
@@ -1302,7 +1299,7 @@ mod tests {
         let random_hash = EntryHash(rand::thread_rng().gen::<[u8; 32]>());
         let content_version = VersionHash::from(&random_hash);
         let query_string = "k1=v1&k2=v2";
-        let query_string_v = format!("{}&v={}", query_string, content_version);
+        let query_string_v = format!("{query_string}&v={content_version}");
         let fragment = "myfragment";
         let address = DataAddress::bytes(xor_name);
         let xorurl = SafeUrl::new(
@@ -1338,7 +1335,7 @@ mod tests {
         let xorurl = SafeUrl::from_register(xor_name, type_tag, ContentType::Wallet)?
             .encode(XorUrlBase::Base32z);
 
-        let xorurl_with_path = format!("{}/subfolder/file", xorurl);
+        let xorurl_with_path = format!("{xorurl}/subfolder/file");
         let url_with_path = SafeUrl::from_url(&xorurl_with_path)?;
         assert_eq!(xorurl_with_path, url_with_path.encode(XorUrlBase::Base32z));
         assert_eq!("/subfolder/file", url_with_path.path());
@@ -1551,10 +1548,7 @@ mod tests {
         assert_eq!(x.content_version(), Some(version_hash));
         assert_eq!(
             x.to_string(),
-            format!(
-                "safe://myname?name=John+Doe&name=Jane+Doe&v={}",
-                version_hash
-            )
+            format!("safe://myname?name=John+Doe&name=Jane+Doe&v={version_hash}",)
         );
 
         x.set_content_version(None);
@@ -1573,8 +1567,7 @@ mod tests {
         let mut x = SafeUrl::from_url("safe://domain/path/to/my%20file.txt")?;
         let mut u = Url::parse("safe://domain/path/to/my%20file.txt").map_err(|e| {
             Error::InvalidInput(format!(
-                "Unexpectedly failed to parse with third-party Url::parse: {}",
-                e
+                "Unexpectedly failed to parse with third-party Url::parse: {e}",
             ))
         })?;
 
@@ -1647,8 +1640,8 @@ mod tests {
         let xorurl_version_hash = VersionHash::from(&random_hash);
 
         // These two are equivalent.  ie, the xorurl is the result of nrs.to_xorurl_string()
-        let nrsurl = format!("safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v={}&name=John+Doe#somefragment", nrsurl_version_hash);
-        let xorurl = format!("safe://my.sub.hnyydyiixsfrqix9aoqg97jebuzc6748uc8rykhdd5hjrtg5o4xso9jmggbqh/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v={}&name=John+Doe#somefragment", xorurl_version_hash);
+        let nrsurl = format!("safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v={nrsurl_version_hash}&name=John+Doe#somefragment", );
+        let xorurl = format!("safe://my.sub.hnyydyiixsfrqix9aoqg97jebuzc6748uc8rykhdd5hjrtg5o4xso9jmggbqh/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v={xorurl_version_hash}&name=John+Doe#somefragment");
 
         let nrs = SafeUrl::from_url(&nrsurl)?;
         let xor = SafeUrl::from_url(&xorurl)?;
@@ -1682,17 +1675,11 @@ mod tests {
 
         assert_eq!(
             nrs.query_string(),
-            format!(
-                "this=that&this=other&color=blue&v={}&name=John+Doe",
-                nrsurl_version_hash
-            )
+            format!("this=that&this=other&color=blue&v={nrsurl_version_hash}&name=John+Doe",)
         );
         assert_eq!(
             xor.query_string(),
-            format!(
-                "this=that&this=other&color=blue&v={}&name=John+Doe",
-                xorurl_version_hash
-            )
+            format!("this=that&this=other&color=blue&v={xorurl_version_hash}&name=John+Doe",)
         );
 
         assert_eq!(nrs.fragment(), "somefragment");

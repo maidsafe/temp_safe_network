@@ -13,10 +13,7 @@ use crate::node::handover::Error as HandoverError;
 use sn_dbc::Error as DbcError;
 use sn_interface::{
     dbcs::Error as GenesisError,
-    messaging::{
-        data::{DataQuery, Error as ErrorMsg},
-        system::DkgSessionId,
-    },
+    messaging::{data::Error as ErrorMsg, system::DkgSessionId},
     types::DataAddress,
 };
 
@@ -121,9 +118,9 @@ pub enum Error {
     DoubleKeyAttackDetected(
         XorName,
         Box<bls::PublicKey>,
-        Signature,
+        Box<Signature>,
         Box<bls::PublicKey>,
-        Signature,
+        Box<Signature>,
     ),
     /// Dkg error
     #[error("DKG error: {0}")]
@@ -145,7 +142,7 @@ pub enum Error {
     Bincode(#[from] bincode::Error),
     /// Network client message error.
     #[error("Network client message error:: {0}")]
-    ClientMsg(#[from] sn_interface::messaging::data::Error),
+    ClientMsg(#[from] Box<sn_interface::messaging::data::Error>),
     /// Network data error.
     #[error("Network data error:: {0}")]
     NetworkData(#[from] sn_interface::types::Error),
@@ -207,9 +204,6 @@ pub enum Error {
     /// Error thrown by DBC public API
     #[error("DbcError: {0}")]
     DbcError(#[from] DbcError),
-    /// Cannot handle more queries at this point
-    #[error("Cannot handle more queries at this point: {0:?}")]
-    CannotHandleQuery(DataQuery),
     #[error("BLS error: {0}")]
     BlsError(#[from] bls::Error),
     #[cfg(feature = "otlp")]
@@ -243,9 +237,13 @@ impl From<Error> for ErrorMsg {
                 ErrorMsg::SpentProofUnknownSectionKey(unknown_section_key)
             }
             Error::NetworkData(error) => error.into(),
-            other => {
-                ErrorMsg::InvalidOperation(format!("Failed to perform operation: {:?}", other))
-            }
+            other => ErrorMsg::InvalidOperation(format!("Failed to perform operation: {other:?}")),
         }
+    }
+}
+
+impl From<sn_interface::messaging::data::Error> for Error {
+    fn from(error: sn_interface::messaging::data::Error) -> Error {
+        Error::ClientMsg(Box::new(error))
     }
 }

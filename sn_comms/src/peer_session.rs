@@ -35,7 +35,7 @@ impl PeerSession {
 
         // Spawn the peer session worker, which will stop automatically when
         // the PeerSession is dropped as the channel will be dropped too.
-        let _ =
+        let _handle =
             tokio::task::spawn(PeerSessionWorker::new(link.clone(), sender.clone()).run(receiver));
 
         PeerSession {
