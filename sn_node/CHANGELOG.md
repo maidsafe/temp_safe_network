@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.29 (2023-01-25)
+## v0.72.31 (2023-01-26)
 
 ### Commit Statistics
 
@@ -22,10 +22,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2004 ([`5883fb6`](https://github.com/maidsafe/safe_network/commit/5883fb65d1e9491cd0271457637968facd2a40d9))
+</details>
+
+## v0.72.30 (2023-01-25)
+
+### Chore
+
+ - <csr-id-a4d295ccdddea3d4d11bca5eb0236a5447c75633/> sn_interface-0.16.17/sn_comms-0.1.2/sn_node-0.72.30
+ - <csr-id-a24c1d2301cfc94b2c6456e0e8d3f9f86cec0cbf/> prevent unnecessary clones in periodics
+   We check if anything has expired before we grab context
+
+### New Features
+
+ - <csr-id-1b23b6d4c233ed5e337a85f864fcc403c4f5e5b4/> set custom otlp service name
+
+### Refactor
+
+ - <csr-id-6ba7b5a12ed8d15fb807524ee90dc250068c1004/> removing Comm::members and unnecessary private types
+   - We now use Comm::sessions as the list of members we keep sessions with,
+   which is updated only when the user wants to update the set of known peers.
+   - Removing unnecessary PeerSession's SessionStatus, disconnect fn, and SessionCmd.
+   - Never remove sessions from Comm::sessions unless the set of known members is
+   updated/changed by the user. Even if we failed to send using all peer session's connections,
+   we keep the session since it's been set as a known and connectable peer.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 8 commits contributed to the release.
+ - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.17/sn_comms-0.1.2/sn_node-0.72.30 ([`a4d295c`](https://github.com/maidsafe/safe_network/commit/a4d295ccdddea3d4d11bca5eb0236a5447c75633))
+    - Merge #2022 ([`3a99b2b`](https://github.com/maidsafe/safe_network/commit/3a99b2b616cfd3a90d271868e502d795790b2af0))
+    - removing Comm::members and unnecessary private types ([`6ba7b5a`](https://github.com/maidsafe/safe_network/commit/6ba7b5a12ed8d15fb807524ee90dc250068c1004))
+    - Merge #2027 ([`36fa5dd`](https://github.com/maidsafe/safe_network/commit/36fa5ddac4964e8b8f1ab85f90e2bdbffda7c132))
+    - prevent unnecessary clones in periodics ([`a24c1d2`](https://github.com/maidsafe/safe_network/commit/a24c1d2301cfc94b2c6456e0e8d3f9f86cec0cbf))
+    - Merge #2026 ([`abb98b7`](https://github.com/maidsafe/safe_network/commit/abb98b7b2dfecc2f76e027d3c7aae9ec22525bb9))
+    - set custom otlp service name ([`1b23b6d`](https://github.com/maidsafe/safe_network/commit/1b23b6d4c233ed5e337a85f864fcc403c4f5e5b4))
+    - Merge #2016 #2019 #2023 ([`c8e5746`](https://github.com/maidsafe/safe_network/commit/c8e574687ea74ed1adb69a722afe6bff734c19ad))
+</details>
+
+## v0.72.29 (2023-01-25)
+
+### Chore
+
+ - <csr-id-8fae01400e9c0c4808860d1596d47c704f4656ed/> sn_node-0.72.29
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_node-0.72.29 ([`8fae014`](https://github.com/maidsafe/safe_network/commit/8fae01400e9c0c4808860d1596d47c704f4656ed))
     - Merge #2017 ([`e477211`](https://github.com/maidsafe/safe_network/commit/e477211cf09db52b8eacbc3266bb43321525b0f1))
 </details>
 
 ## v0.72.28 (2023-01-24)
+
+<csr-id-6acbe4920d9d3a7db88e76a21e026bdee04e9584/>
+<csr-id-2051fee1584ee2e4a8b7693ea96f18031c3a2a81/>
 
 ### Chore
 
@@ -35,14 +110,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New Features
 
  - <csr-id-908ee34d116e2a9e5250d3044f9dbe1c6d471ecc/> add retry for relocating node
+ - <csr-id-5257295c18fd98d383bd70bbbe1fd3de1d0f9ea7/> reduce the amount of old DKG sessions we keep
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 4 commits contributed to the release over the course of 1 calendar day.
+ - 5 commits contributed to the release over the course of 1 calendar day.
  - 1 day passed between releases.
- - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -55,6 +131,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - sn_interface-0.16.16/sn_node-0.72.28 ([`6acbe49`](https://github.com/maidsafe/safe_network/commit/6acbe4920d9d3a7db88e76a21e026bdee04e9584))
     - Merge #2024 ([`fc0aa80`](https://github.com/maidsafe/safe_network/commit/fc0aa8062c0003a9ac3c263d4ea01111b5e6a8d3))
     - add retry for relocating node ([`908ee34`](https://github.com/maidsafe/safe_network/commit/908ee34d116e2a9e5250d3044f9dbe1c6d471ecc))
+    - reduce the amount of old DKG sessions we keep ([`5257295`](https://github.com/maidsafe/safe_network/commit/5257295c18fd98d383bd70bbbe1fd3de1d0f9ea7))
     - remove unnecessary indirection ([`2051fee`](https://github.com/maidsafe/safe_network/commit/2051fee1584ee2e4a8b7693ea96f18031c3a2a81))
 </details>
 
@@ -109,6 +186,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    
    (which accounts for the vast majority of alloc in a runnning node just now)
 
+### Bug Fixes
+
+ - <csr-id-0f1ac79146aac0d0cea11644cca75b68012fa23d/> as elder request missing data on any membership update
+
+### Chore
+
+ - <csr-id-203a8aace09111748e8b9913fa683e0c5ea6e69a/> small renaming tweaks for clarity
+ - <csr-id-12a6620525a5767d906037a74caf0e38af3da596/> rename update_members to update_valid_comm_targets for clarity
+ - <csr-id-40d91af58413368c79fb3d794cb1776bea44c4c4/> only clone membership when needed
+   this should vastly reduce allocations coming from
+   membership.clone()
+   (which accounts for the vast majority of alloc in
+   a runnning node just now)
+
 ### Chore
 
  - <csr-id-0ab0c302dcc6ce32b0b71d696b0707a2c50cfa3a/> sn_comms-0.1.1/sn_node-0.72.26
@@ -117,9 +208,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release over the course of 1 calendar day.
+ - 7 commits contributed to the release over the course of 1 calendar day.
  - 3 days passed between releases.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -131,7 +222,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  * **Uncategorized**
     - sn_comms-0.1.1/sn_node-0.72.26 ([`0ab0c30`](https://github.com/maidsafe/safe_network/commit/0ab0c302dcc6ce32b0b71d696b0707a2c50cfa3a))
     - Merge #2009 ([`83448f4`](https://github.com/maidsafe/safe_network/commit/83448f43dace53b3357796bf177edb98c3d5803d))
+    - small renaming tweaks for clarity ([`203a8aa`](https://github.com/maidsafe/safe_network/commit/203a8aace09111748e8b9913fa683e0c5ea6e69a))
+    - rename update_members to update_valid_comm_targets for clarity ([`12a6620`](https://github.com/maidsafe/safe_network/commit/12a6620525a5767d906037a74caf0e38af3da596))
+    - as elder request missing data on any membership update ([`0f1ac79`](https://github.com/maidsafe/safe_network/commit/0f1ac79146aac0d0cea11644cca75b68012fa23d))
     - only clone membership when needed ([`36d8181`](https://github.com/maidsafe/safe_network/commit/36d818109e2d613221de3dc9f6ed061d04588d5b))
+    - only clone membership when needed ([`40d91af`](https://github.com/maidsafe/safe_network/commit/40d91af58413368c79fb3d794cb1776bea44c4c4))
 </details>
 
 ## v0.72.25 (2023-01-20)
@@ -282,6 +377,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-233d0bbfdd31873dd26401e916805f937fa0e7c0/> add tiny delay to bidi retry
    This should allow DashMap to be in sync and prevent a harsh loop
    killing us here (as it has done)
+ - <csr-id-cfe3a8b6c6bd437a4ef1505f2a906041da7ca632/> always run the DKG checks on membership decision
 
 ### Refactor
 
@@ -313,9 +409,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 135 commits contributed to the release over the course of 23 calendar days.
+ - 136 commits contributed to the release over the course of 23 calendar days.
  - 24 days passed between releases.
- - 70 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 71 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -328,6 +424,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - sn_interface-0.16.14/sn_client-0.77.8/sn_node-0.72.25/sn_api-0.75.4/sn_cli-0.68.5 ([`783d624`](https://github.com/maidsafe/safe_network/commit/783d62461a65eb7c06b0d4f399b97216b6c75519))
     - Merge #2008 ([`ffac6c6`](https://github.com/maidsafe/safe_network/commit/ffac6c68dc0612a41aa74c533231a63006c22b22))
     - update comm members on AE msg in ([`28cdebb`](https://github.com/maidsafe/safe_network/commit/28cdebb4b05c5d64dcbe8dfb39a72c88fd2c28bd))
+    - always run the DKG checks on membership decision ([`cfe3a8b`](https://github.com/maidsafe/safe_network/commit/cfe3a8b6c6bd437a4ef1505f2a906041da7ca632))
     - Merge #1997 #1998 #2002 ([`0c968ad`](https://github.com/maidsafe/safe_network/commit/0c968ad50d9e9dada3f5f5488bd1708fddadef72))
     - Merge #1994 ([`0ef2344`](https://github.com/maidsafe/safe_network/commit/0ef2344d9e57b46d1a364d2cc56f85edd945f762))
     - remove readlock where we have context ([`cd9bf5f`](https://github.com/maidsafe/safe_network/commit/cd9bf5fd5ccac42cd9de028cdaff8e0302498ed0))
