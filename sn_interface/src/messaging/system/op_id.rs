@@ -29,7 +29,7 @@ impl Display for OperationId {
 
 impl Debug for OperationId {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self)
+        write!(formatter, "{self}")
     }
 }
 

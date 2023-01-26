@@ -51,13 +51,13 @@ where
 
     let qjsonrpc_client =
         ClientEndpoint::new(cert_path, Some(SN_AUTHD_CONNECTION_IDLE_TIMEOUT), false).map_err(
-            |err| Error::AuthdClientError(format!("Failed to create client endpoint: {}", err)),
+            |err| Error::AuthdClientError(format!("Failed to create client endpoint: {err}")),
         )?;
 
     let runtime = match runtime::Handle::try_current() {
         Ok(r) => r,
         Err(_) => runtime::Runtime::new()
-            .map_err(|err| Error::AuthdClientError(format!("Failed to create runtime: {}", err)))?
+            .map_err(|err| Error::AuthdClientError(format!("Failed to create runtime: {err}")))?
             .handle()
             .clone(),
     };
@@ -65,17 +65,14 @@ where
         let _ = runtime.enter();
         qjsonrpc_client
             .bind()
-            .map_err(|err| Error::AuthdClientError(format!("Failed to bind endpoint: {}", err)))?
+            .map_err(|err| Error::AuthdClientError(format!("Failed to bind endpoint: {err}")))?
     };
 
     outgoing_conn
         .connect(dst_endpoint, None)
         .await
         .map_err(|err| {
-            Error::AuthdClientError(format!(
-                "Failed to establish connection with authd: {}",
-                err
-            ))
+            Error::AuthdClientError(format!("Failed to establish connection with authd: {err}",))
         })?
         // Send request and await for response
         .send(method, params)

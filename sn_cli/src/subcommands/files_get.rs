@@ -65,8 +65,7 @@ impl std::str::FromStr for FileExistsAction {
             "preserve" => Ok(Self::Preserve),
             "ask" => Ok(Self::Ask),
             other => Err(format!(
-                "'{}' not supported. Supported values are ask, preserve, and overwrite",
-                other
+                "'{other}' not supported. Supported values are ask, preserve, and overwrite",
             )),
         }
     }
@@ -87,8 +86,7 @@ impl std::str::FromStr for ProgressIndicator {
             "text" => Ok(Self::Text),
             "none" => Ok(Self::None),
             other => Err(format!(
-                "'{}' not supported. Supported values are bars, text, and none",
-                other
+                "'{other}' not supported. Supported values are bars, text, and none",
             )),
         }
     }
@@ -169,7 +167,7 @@ pub async fn process_get_command(
 
                         warn!("Skipping file \"{}\". {}", status.path_local.display(), msg);
                         if atty::is(atty::Stream::Stderr) {
-                            eprintln!("Warning: {}", msg);
+                            eprintln!("Warning: {msg}");
                         }
                         overwrite = false;
                     }
@@ -288,7 +286,7 @@ fn print_status(status: &FilesGetStatus) {
 // TODO: make i18n friendly.
 fn prompt_yes_no(prompt_msg: &str, default: &str) -> bool {
     let yes_no = "[Y/n]";
-    let msg = format!("{}{}: ", prompt_msg, yes_no);
+    let msg = format!("{prompt_msg}{yes_no}: ");
     loop {
         let choice = match prompt_user(&msg, "") {
             Ok(input) => input.to_uppercase(),
@@ -408,10 +406,7 @@ fn find_root_path(destpath: &str, sourcepath: &str, source_is_single_file: bool)
                 root.push(fname);
             }
         } else {
-            let msg = format!(
-                "cannot overwrite non-directory '{}' with a directory",
-                destpath
-            );
+            let msg = format!("cannot overwrite non-directory '{destpath}' with a directory",);
             bail!(msg);
         }
     }
@@ -476,7 +471,7 @@ async fn files_map_get_files(
         let size_str = details.getattr("size")?;
         let size: u64 = size_str
             .parse()
-            .context(format!("Invalid file size: {} for {}", size_str, path))?;
+            .context(format!("Invalid file size: {size_str} for {path}"))?;
 
         // Setup status to notify our caller of progress in callback.
         let mut status = FilesGetStatus {
@@ -511,7 +506,7 @@ async fn files_map_get_files(
             Some(p) => p,
             None => {
                 let msg = "Could not get parent directory";
-                processed_files.insert(path.to_string(), ("E".to_string(), format!("<{}>", msg)));
+                processed_files.insert(path.to_string(), ("E".to_string(), format!("<{msg}>")));
                 warn!("Skipping file \"{}\". {}", path, msg);
                 continue;
             }
@@ -564,7 +559,7 @@ fn create_symlink_worker(
                 link.display(),
                 target.display()
             ),
-            format!("{:?}", e),
+            format!("{e:?}"),
         )
     })
 }
@@ -602,7 +597,7 @@ fn create_symlink(target: &Path, link: &Path, target_type: &str) -> ApiResult<()
         Err((msg, os_err)) => {
             warn!("{}", msg);
             warn!("{}", os_err);
-            println!("{}", msg);
+            println!("{msg}");
         }
     }
 

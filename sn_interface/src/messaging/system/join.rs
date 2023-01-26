@@ -51,6 +51,6 @@ pub enum JoinRejectReason {
 
 impl fmt::Display for JoinRejectReason {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }

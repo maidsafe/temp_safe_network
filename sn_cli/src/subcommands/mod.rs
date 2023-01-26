@@ -41,8 +41,7 @@ impl std::str::FromStr for OutputFmt {
             "yaml" => Ok(Self::Yaml),
             other => {
                 Err(format!(
-                    "Output serialisation format '{}' not supported. Supported values are json, jsoncompact, and yaml",
-                    other
+                    "Output serialisation format '{other}' not supported. Supported values are json, jsoncompact, and yaml",
                 ))
             }
         }

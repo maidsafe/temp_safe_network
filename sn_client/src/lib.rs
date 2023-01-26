@@ -47,6 +47,7 @@
     clippy::unicode_not_nfc,
     clippy::unwrap_used
 )]
+#![allow(clippy::result_large_err, clippy::uninlined_format_args)]
 
 #[macro_use]
 extern crate tracing;

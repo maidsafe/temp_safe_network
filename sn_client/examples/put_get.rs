@@ -76,7 +76,7 @@ pub async fn run_chunk_soak() -> Result<()> {
     let start_putting = Instant::now();
     futures::future::join_all(put_tasks).await;
     let duration = start_putting.elapsed();
-    println!("Time elapsed in while putting all data is: {:?}", duration);
+    println!("Time elapsed in while putting all data is: {duration:?}");
 
     assert_eq!(
         all_data_put.read().await.len(),
@@ -91,7 +91,7 @@ pub async fn run_chunk_soak() -> Result<()> {
     let start_reading = Instant::now();
 
     for (address, known_hash) in all_data_put.read().await.iter().as_ref() {
-        println!("...reading bytes at address {:?} ...", address);
+        println!("...reading bytes at address {address:?} ...");
         let mut bytes = client.read_bytes(*address).await;
 
         let mut attempts = 1;
@@ -99,10 +99,7 @@ pub async fn run_chunk_soak() -> Result<()> {
             attempts += 1;
             // do some retries to ensure we're not just timing out by chance
             sleep(Duration::from_secs(1)).await;
-            println!(
-                "attempt #{attempts}...reading bytes at address {:?} ...",
-                address
-            );
+            println!("attempt #{attempts}...reading bytes at address {address:?} ...",);
 
             bytes = client.read_bytes(*address).await;
         }
@@ -110,7 +107,7 @@ pub async fn run_chunk_soak() -> Result<()> {
         let bytes = bytes?;
 
         let bytes_len_mbs = bytes.len() / (1024 * 1024);
-        println!("{bytes_len_mbs}mbs read from {:?}:", address);
+        println!("{bytes_len_mbs}mbs read from {address:?}:");
 
         let mut hasher = Sha3::v256();
         let mut data_hash = [0; 32];
@@ -122,7 +119,7 @@ pub async fn run_chunk_soak() -> Result<()> {
 
     let duration = start_reading.elapsed();
 
-    println!("Time elapsed in while reading all data: {:?}", duration);
+    println!("Time elapsed in while reading all data: {duration:?}");
 
     println!("All okay");
 
@@ -151,18 +148,15 @@ async fn upload_data_using_client(client: Client, iteration: usize) -> Result<(X
     let bytes_len = bytes.len();
 
     println!("==================== Upload iteration {iteration:?} ======================= ");
-    println!("Storing bytes.len : {bytes_len:?} w/ hash {:?}", output);
+    println!("Storing bytes.len : {bytes_len:?} w/ hash {output:?}");
 
     let start_putting = Instant::now();
     let address = client.upload(bytes).await?;
     let duration = start_putting.elapsed();
 
-    println!(
-        "Time elapsed in while putting {bytes_len_mbs}mbs: {:?}",
-        duration
-    );
+    println!("Time elapsed in while putting {bytes_len_mbs}mbs: {duration:?}",);
 
-    println!("Bytes stored at xorname: {:?}", address);
+    println!("Bytes stored at xorname: {address:?}");
 
     Ok((address, output))
 }

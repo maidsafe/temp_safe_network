@@ -51,8 +51,7 @@ async fn wallet_deposit_should_deposit_a_bearer_dbc() -> Result<()> {
     )?
     .assert()
     .stdout(format!(
-        "Spendable DBC deposited ({} safecoins) with name 'my-first-dbc' in wallet located at \"{}\"\n",
-        balance, wallet_xorurl
+        "Spendable DBC deposited ({balance} safecoins) with name 'my-first-dbc' in wallet located at \"{wallet_xorurl}\"\n",
     ))
     .success();
 
@@ -83,8 +82,7 @@ async fn wallet_deposit_should_deposit_a_dbc_from_a_file() -> Result<()> {
     )?
     .assert()
     .stdout(format!(
-        "Spendable DBC deposited ({} safecoins) with name 'my-first-dbc' in wallet located at \"{}\"\n",
-        balance, wallet_xorurl
+        "Spendable DBC deposited ({balance} safecoins) with name 'my-first-dbc' in wallet located at \"{wallet_xorurl}\"\n",
     ))
     .success();
 
@@ -118,8 +116,7 @@ async fn wallet_deposit_should_deposit_a_dbc_from_a_file_with_whitespace_at_the_
     )?
     .assert()
     .stdout(format!(
-        "Spendable DBC deposited ({} safecoins) with name 'my-first-dbc' in wallet located at \"{}\"\n",
-        balance, wallet_xorurl
+        "Spendable DBC deposited ({balance} safecoins) with name 'my-first-dbc' in wallet located at \"{wallet_xorurl}\"\n",
     ))
     .success();
 
@@ -252,8 +249,7 @@ async fn wallet_deposit_should_deposit_an_owned_dbc_with_configured_secret_key()
     )?
     .assert()
     .stdout(format!(
-        "Spendable DBC deposited (3.150000000 safecoins) with name 'reissued-dbc' in wallet located at \"{}\"\n",
-         wallet_xorurl
+        "Spendable DBC deposited (3.150000000 safecoins) with name 'reissued-dbc' in wallet located at \"{wallet_xorurl}\"\n",
     ))
     .success();
     Ok(())
@@ -316,8 +312,7 @@ async fn wallet_deposit_should_deposit_an_owned_dbc_with_secret_key_arg() -> Res
     )?
     .assert()
     .stdout(format!(
-        "Spendable DBC deposited (7.150000000 safecoins) with name 'reissued-dbc' in wallet located at \"{}\"\n",
-         wallet_xorurl
+        "Spendable DBC deposited (7.150000000 safecoins) with name 'reissued-dbc' in wallet located at \"{wallet_xorurl}\"\n",
     ))
     .success();
     Ok(())
@@ -491,8 +486,7 @@ async fn wallet_balance_should_report_the_balance_of_a_wallet() -> Result<()> {
     safe_cmd(&config_dir, ["wallet", "balance", &wallet_xorurl], Some(0))?
         .assert()
         .stdout(format!(
-            "Wallet at \"{}\" has a total balance of {} safecoins\n",
-            wallet_xorurl, balance
+            "Wallet at \"{wallet_xorurl}\" has a total balance of {balance} safecoins\n",
         ))
         .success();
 
@@ -580,8 +574,7 @@ async fn wallet_reissue_should_reissue_an_owned_dbc_from_a_deposited_dbc() -> Re
         "Reissued DBC with 2.15 safecoins.",
     ))
     .stdout(predicate::str::contains(format!(
-        "This DBC is owned by public key {}",
-        pk_hex
+        "This DBC is owned by public key {pk_hex}",
     )))
     .success();
 
@@ -630,8 +623,7 @@ async fn wallet_reissue_with_owned_arg_should_reissue_with_configured_public_key
         "Reissued DBC with 0.15 safecoins.",
     ))
     .stdout(predicate::str::contains(format!(
-        "This DBC is owned by public key {}",
-        pk_hex
+        "This DBC is owned by public key {pk_hex}",
     )))
     .success();
 
@@ -899,8 +891,7 @@ async fn wallet_deposit_spent_bearer_dbc_force() -> Result<()> {
     ))
     .stdout(predicate::str::contains(
         format!(
-            "Spendable DBC deposited ({} safecoins) with name 'spent-bearer-dbc' in wallet located at \"{}\"\n",
-            balance, wallet_xorurl
+            "Spendable DBC deposited ({balance} safecoins) with name 'spent-bearer-dbc' in wallet located at \"{wallet_xorurl}\"\n",
         )
     ))
     .success();
@@ -961,8 +952,7 @@ async fn wallet_deposit_spent_owned_dbc_force() -> Result<()> {
     ))
     .stdout(predicate::str::contains(
         format!(
-            "Spendable DBC deposited ({} safecoins) with name 'spent-owned-dbc' in wallet located at \"{}\"\n",
-            balance, wallet_xorurl
+            "Spendable DBC deposited ({balance} safecoins) with name 'spent-owned-dbc' in wallet located at \"{wallet_xorurl}\"\n",
         )
     ))
     .success();
@@ -1117,8 +1107,7 @@ async fn wallet_deposit_dbc_reissued_to_file() -> Result<()> {
     .assert()
     .stdout(predicate::str::contains(
         format!(
-            "Spendable DBC deposited (0.111000000 safecoins) with name 'dbc-reissued-to-file' in wallet located at \"{}\"\n",
-            wallet_xorurl
+            "Spendable DBC deposited (0.111000000 safecoins) with name 'dbc-reissued-to-file' in wallet located at \"{wallet_xorurl}\"\n",
         )
     ))
     .success();

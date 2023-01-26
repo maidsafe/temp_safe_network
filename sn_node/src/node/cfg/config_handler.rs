@@ -436,7 +436,7 @@ impl Config {
 }
 
 fn parse_public_addr(public_addr: &str) -> Result<SocketAddr, String> {
-    let public_addr: SocketAddr = public_addr.parse().map_err(|err| format!("{}", err))?;
+    let public_addr: SocketAddr = public_addr.parse().map_err(|err| format!("{err}"))?;
 
     if public_addr.ip().is_unspecified() {
         return Err("Cannot use unspecified IP for public address. \

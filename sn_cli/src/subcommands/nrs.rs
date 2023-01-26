@@ -122,8 +122,7 @@ async fn run_register_subcommand(
                 )),
             NrsNameAlreadyExists(_) => Err(eyre!(error)
                 .wrap_err(format!(
-                    "Could not register topname {}. That name is already taken.",
-                    name
+                    "Could not register topname {name}. That name is already taken.",
                 ))
                 .suggestion("Try the command again with a different name.")),
             _ => Err(eyre!(error)),
@@ -195,7 +194,7 @@ async fn run_remove_subcommand(name: String, safe: &Safe, output_fmt: OutputFmt)
                 .to_string();
             print_summary(
                 output_fmt,
-                &format!("NRS Map updated (version {})", version),
+                &format!("NRS Map updated (version {version})"),
                 "".to_string(),
                 &SafeUrl::from_url(&format!("safe://{}", url.top_name()))?.to_xorurl_string(),
                 &url,
@@ -211,12 +210,10 @@ async fn run_remove_subcommand(name: String, safe: &Safe, output_fmt: OutputFmt)
                 let topname = get_topname_from_public_name(&name)?;
                 Err(eyre!(error)
                     .wrap_err(format!(
-                        "Failed to remove {}. The topname {} is likely not registered in Safe NRS.",
-                        name, topname
+                        "Failed to remove {name}. The topname {topname} is likely not registered in Safe NRS.",
                     ))
                     .suggestion(format!(
-                        "Try the command again or verify that {} is a registered topname.",
-                        topname
+                        "Try the command again or verify that {topname} is a registered topname.",
                     )))
             }
             _ => Err(eyre!(error)),
@@ -282,7 +279,7 @@ fn print_summary(
         let mut table = Table::new();
         let (change, top_name, url) = processed_entry;
         table.add_row(&vec![change, top_name, url]);
-        println!("{}", header);
+        println!("{header}");
         if !summary.is_empty() {
             println!("{}", summary.trim());
         }
@@ -299,12 +296,7 @@ fn get_topname_from_public_name(public_name: &str) -> Result<String> {
     let mut parts = public_name.split('.');
     let topname = parts
         .next_back()
-        .ok_or_else(|| {
-            eyre!(format!(
-                "Could not parse topname from public name {}",
-                public_name
-            ))
-        })?
+        .ok_or_else(|| eyre!("Could not parse topname from public name {}", public_name))?
         .to_string();
     Ok(topname)
 }

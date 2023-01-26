@@ -195,17 +195,15 @@ impl Safe {
         public_name: &str,
         version: Option<VersionHash>,
     ) -> Result<NrsMap> {
-        let url = SafeUrl::from_url(&format!("safe://{}", public_name))?;
+        let url = SafeUrl::from_url(&format!("safe://{public_name}"))?;
         let mut multimap = match self.fetch_multimap(&url).await {
             Ok(s) => Ok(s),
             Err(Error::EmptyContent(_)) => Ok(BTreeSet::new()),
             Err(Error::ContentNotFound(e)) => Err(Error::ContentNotFound(format!(
-                "No Nrs Map entry found at {}: {}",
-                url, e
+                "No Nrs Map entry found at {url}: {e}",
             ))),
             Err(e) => Err(Error::NetDataError(format!(
-                "Failed to get Nrs Map entries: {}",
-                e
+                "Failed to get Nrs Map entries: {e}"
             ))),
         }?;
 
@@ -313,24 +311,22 @@ fn set_nrs_url_props(url: &mut SafeUrl, entry_hash: EntryHash) -> Result<()> {
 }
 
 fn validate_nrs_top_name(top_name: &str) -> Result<SafeUrl> {
-    let url = SafeUrl::from_url(&format!("safe://{}", top_name))?;
+    let url = SafeUrl::from_url(&format!("safe://{top_name}"))?;
     if url.top_name() != top_name {
         return Err(Error::InvalidInput(format!(
-            "The NRS top name \"{}\" is invalid because it contains url parts. Please \
-                remove any path, version or subnames.",
-            top_name
+            "The NRS top name \"{top_name}\" is invalid because it contains url parts. Please \
+            remove any path, version or subnames.",
         )));
     }
     Ok(url)
 }
 
 fn validate_nrs_public_name(public_name: &str) -> Result<SafeUrl> {
-    let url = SafeUrl::from_url(&format!("safe://{}", public_name))?;
+    let url = SafeUrl::from_url(&format!("safe://{public_name}"))?;
     if url.public_name() != public_name {
         return Err(Error::InvalidInput(format!(
-            "The NRS public name \"{}\" is invalid because it contains url parts. Please \
-                remove any path or version.",
-            public_name
+            "The NRS public name \"{public_name}\" is invalid because it contains url parts. \
+            Please remove any path or version.",
         )));
     }
     Ok(url)
@@ -347,13 +343,11 @@ fn validate_nrs_url(link: &SafeUrl) -> Result<()> {
             || content_type == ContentType::NrsMapContainer
         {
             return Err(Error::UnversionedContentError(format!(
-                "{} content is versionable. NRS requires the supplied link to specify a version hash.",
-                content_type
+                "{content_type} content is versionable. NRS requires the supplied link to specify a version hash.",
             )));
         } else if data_type == DataType::Register {
             return Err(Error::UnversionedContentError(format!(
-                "{} content is versionable. NRS requires the supplied link to specify a version hash.",
-                data_type
+                "{data_type} content is versionable. NRS requires the supplied link to specify a version hash.",
             )));
         }
     }
@@ -392,8 +386,8 @@ mod tests {
         let invalid_top_name = "atffdgasd/d";
         assert_matches!(
             safe.nrs_create(invalid_top_name).await, Err(Error::InvalidInput(err))
-            if err ==  format!("The NRS top name \"{}\" is invalid because it contains url parts. \
-            Please remove any path, version or subnames.", invalid_top_name)
+            if err ==  format!("The NRS top name \"{invalid_top_name}\" is invalid because \
+            it contains url parts. Please remove any path, version or subnames.")
         );
         Ok(())
     }
@@ -427,10 +421,10 @@ mod tests {
         let nrs_map = safe.nrs_get_subnames_map(&site_name, None).await?;
         assert_eq!(nrs_map.map.len(), 1);
         assert_eq!(
-            *nrs_map.map.get(&site_name).ok_or_else(|| anyhow!(format!(
+            *nrs_map.map.get(&site_name).ok_or_else(|| anyhow!(
                 "'{}' subname should have been present in retrieved NRS map",
                 site_name
-            )))?,
+            ))?,
             files_container.url
         );
         Ok(())
@@ -595,8 +589,8 @@ mod tests {
             .await;
         assert_matches!(
             result, Err(Error::InvalidInput(err))
-            if err == format!("The NRS public name \"{}\" is invalid because it contains url parts. \
-            Please remove any path or version.", public_name)
+            if err == format!("The NRS public name \"{public_name}\" is invalid because \
+            it contains url parts. Please remove any path or version.")
         );
         Ok(())
     }
@@ -927,7 +921,7 @@ mod tests {
 
         safe.nrs_create(&site_name).await?;
         safe.nrs_associate(
-            &format!("test.{}", site_name),
+            &format!("test.{site_name}"),
             &files_container["/testdata/test.md"],
         )
         .await?;

@@ -79,7 +79,7 @@ impl DataStorage {
         if self.has_reached_min_capacity() {
             let chunk_storage = self.chunks.clone();
             // run this on another thread, since it can be a bit heavy
-            let _ = tokio::task::spawn(async move {
+            let _handle = tokio::task::spawn(async move {
                 let chunk_addr_to_remove = chunk_storage
                     .addrs()
                     .into_iter()
@@ -237,7 +237,7 @@ impl DataStorage {
 // - and a BIT_TREE_DEPTH of `6`
 // returns the path `ROOT_PATH/0/1/0/0/0/1`
 fn prefix_tree_path(root: &Path, xorname: XorName) -> PathBuf {
-    let bin = format!("{:b}", xorname);
+    let bin = format!("{xorname:b}");
     let prefix_dir_path: PathBuf = bin.chars().take(BIT_TREE_DEPTH).map(String::from).collect();
     root.join(prefix_dir_path)
 }

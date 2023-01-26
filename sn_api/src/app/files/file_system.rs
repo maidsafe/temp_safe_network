@@ -22,7 +22,7 @@ const MAX_RECURSIVE_DEPTH: usize = 10_000;
 // Upload a file to the Network
 pub(crate) async fn upload_file_to_net(safe: &Safe, path: &Path) -> Result<XorUrl> {
     let data = fs::read(path).map_err(|err| {
-        Error::InvalidInput(format!("Failed to read file from local location: {}", err))
+        Error::InvalidInput(format!("Failed to read file from local location: {err}"))
     })?;
     let data = Bytes::from(data);
 
@@ -129,7 +129,7 @@ pub(crate) async fn file_system_dir_walk(
                                 info!("Skipping file \"{}\". {}", normalised_path.display(), err);
                                 processed_files.insert(
                                     normalised_path,
-                                    FilesMapChange::Failed(format!("{}", err)),
+                                    FilesMapChange::Failed(format!("{err}")),
                                 );
                             }
                         }
@@ -140,7 +140,7 @@ pub(crate) async fn file_system_dir_walk(
                         "Skipping file \"{}\" since no metadata could be read from local location: {:?}",
                         normalised_path.display(), err);
                     processed_files
-                        .insert(normalised_path, FilesMapChange::Failed(format!("{}", err)));
+                        .insert(normalised_path, FilesMapChange::Failed(format!("{err}")));
                 }
             }
         }
@@ -191,7 +191,7 @@ pub(crate) async fn file_system_single_file(
             }
             Err(err) => {
                 info!("Skipping file \"{}\". {}", normalised_path.display(), err);
-                processed_files.insert(normalised_path, FilesMapChange::Failed(format!("{}", err)));
+                processed_files.insert(normalised_path, FilesMapChange::Failed(format!("{err}")));
             }
         };
         Ok(processed_files)

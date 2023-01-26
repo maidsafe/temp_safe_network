@@ -44,14 +44,12 @@ impl PublicKey {
     pub fn ed25519_from_hex(hex: &str) -> Result<Self> {
         let bytes = hex::decode(hex).map_err(|err| {
             Error::FailedToParse(format!(
-                "Couldn't parse ed25519 public key bytes from hex: {}",
-                err
+                "Couldn't parse ed25519 public key bytes from hex: {err}",
             ))
         })?;
         let pk = ed25519_dalek::PublicKey::from_bytes(bytes.as_ref()).map_err(|err| {
             Error::FailedToParse(format!(
-                "Couldn't parse ed25519 public key from bytes: {}",
-                err
+                "Couldn't parse ed25519 public key from bytes: {err}",
             ))
         })?;
         Ok(Self::from(pk))
@@ -63,8 +61,7 @@ impl PublicKey {
     pub fn bls_from_hex(hex: &str) -> Result<Self> {
         let bytes = hex::decode(hex).map_err(|err| {
             Error::FailedToParse(format!(
-                "Couldn't parse BLS public key bytes from hex: {}",
-                err
+                "Couldn't parse BLS public key bytes from hex: {err}",
             ))
         })?;
         let bytes_fixed_len: [u8; bls::PK_SIZE] = bytes.as_slice().try_into()
@@ -74,8 +71,7 @@ impl PublicKey {
             )))?;
         let pk = bls::PublicKey::from_bytes(bytes_fixed_len).map_err(|err| {
             Error::FailedToParse(format!(
-                "Couldn't parse BLS public key from fixed-length byte array: {}",
-                err
+                "Couldn't parse BLS public key from fixed-length byte array: {err}",
             ))
         })?;
         Ok(Self::from(pk))

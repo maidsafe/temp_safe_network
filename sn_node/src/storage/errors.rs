@@ -40,7 +40,7 @@ pub enum Error {
     UnsupportedDataType(DataAddress),
     /// Data owner provided is invalid.
     #[error("Provided PublicKey could not validate signature {0:?}")]
-    InvalidSignature(PublicKey),
+    InvalidSignature(Box<PublicKey>),
     /// I/O error.
     #[error("I/O error: {0}")]
     Io(#[from] io::Error),
@@ -55,7 +55,7 @@ pub enum Error {
     NetworkData(#[from] sn_interface::types::Error),
     /// Messaging error.
     #[error("Messaging error:: {0}")]
-    Messaging(#[from] sn_interface::messaging::data::Error),
+    Messaging(#[from] Box<sn_interface::messaging::data::Error>),
     /// No filename found
     #[error("Path contains no file name: {0}")]
     NoFilename(PathBuf),
@@ -85,9 +85,13 @@ impl From<Error> for ErrorMsg {
             }
             Error::DataExists(address) => ErrorMsg::DataExists(address),
             Error::NetworkData(error) => error.into(),
-            other => {
-                ErrorMsg::InvalidOperation(format!("Failed to perform operation: {:?}", other))
-            }
+            other => ErrorMsg::InvalidOperation(format!("Failed to perform operation: {other:?}")),
         }
+    }
+}
+
+impl From<sn_interface::messaging::data::Error> for Error {
+    fn from(error: sn_interface::messaging::data::Error) -> Error {
+        Error::Messaging(Box::new(error))
     }
 }

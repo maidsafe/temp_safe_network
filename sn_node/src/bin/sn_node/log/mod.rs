@@ -30,7 +30,7 @@ impl TracingLayers {
         let fmt_layer = tracing_fmt::layer().with_ansi(false);
 
         if let Some(log_dir) = config.log_dir() {
-            println!("Starting logging to directory: {:?}", log_dir);
+            println!("Starting logging to directory: {log_dir:?}");
 
             let (non_blocking, worker_guard) = appender::file_rotater(
                 log_dir,

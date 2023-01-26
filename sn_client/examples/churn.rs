@@ -182,23 +182,20 @@ pub async fn run_split() -> Result<()> {
     let client = Client::builder().build().await?;
 
     for (address, hash) in all_data_put {
-        println!("...reading bytes at address {:?} ...", address);
+        println!("...reading bytes at address {address:?} ...");
         let mut bytes = client.read_bytes(address).await;
 
         let mut attempts = 0;
         while bytes.is_err() && attempts < 10 {
             attempts += 1;
-            println!(
-                "another attempt {attempts} ...reading bytes at address {:?} ...",
-                address
-            );
+            println!("another attempt {attempts} ...reading bytes at address {address:?} ...",);
             // do some retries to ensure we're not just timing out by chance
             sleep(Duration::from_millis(100)).await;
             bytes = client.read_bytes(address).await;
         }
 
         let bytes = bytes?;
-        println!("Bytes read from {:?}:", address);
+        println!("Bytes read from {address:?}:");
 
         let mut hasher = Sha3::v256();
         let mut output = [0; 32];
@@ -223,13 +220,13 @@ async fn upload_data() -> Result<(XorName, [u8; 32])> {
     hasher.update(&bytes);
     hasher.finalize(&mut output);
 
-    println!("Storing bytes w/ hash {:?}", output);
+    println!("Storing bytes w/ hash {output:?}");
 
     let address = client.upload(bytes).await?;
-    println!("Bytes stored at address: {:?}", address);
+    println!("Bytes stored at address: {address:?}");
 
     let delay = 300;
-    println!("Reading bytes from the network in {} millisecs...", delay);
+    println!("Reading bytes from the network in {delay} millisecs...");
     sleep(Duration::from_millis(delay)).await;
 
     println!("...reading bytes from the network now...");
@@ -245,7 +242,7 @@ async fn upload_data() -> Result<(XorName, [u8; 32])> {
 
     let _bytes = bytes?;
 
-    println!("Bytes successfully read from {:?}:", address);
+    println!("Bytes successfully read from {address:?}:");
 
     Ok((address, output))
 }

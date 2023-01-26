@@ -176,7 +176,7 @@ mod tests {
 
             match result {
                 Ok(None) => (),
-                _ => panic!("unexpected result: {:?}", result),
+                _ => panic!("unexpected result: {result:?}"),
             }
         }
 
@@ -192,7 +192,7 @@ mod tests {
 
         match result {
             Ok(None) => Ok(()),
-            _ => panic!("unexpected result: {:?}", result),
+            _ => panic!("unexpected result: {result:?}"),
         }
     }
 
@@ -213,7 +213,7 @@ mod tests {
 
             match result {
                 Ok(None) => (),
-                _ => panic!("unexpected result: {:?}", result),
+                _ => panic!("unexpected result: {result:?}"),
             }
         }
 
@@ -229,7 +229,7 @@ mod tests {
 
         match result {
             Ok(None) => Ok(()),
-            _ => panic!("unexpected result: {:?}", result),
+            _ => panic!("unexpected result: {result:?}"),
         }
     }
 
@@ -254,7 +254,7 @@ mod tests {
 
         match result {
             Err(AggregatorError::InvalidSigShare) => (),
-            _ => panic!("unexpected result: {:?}", result),
+            _ => panic!("unexpected result: {result:?}"),
         }
 
         // The invalid share doesn't spoil the aggregation - we can still aggregate once enough

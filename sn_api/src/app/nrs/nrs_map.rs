@@ -66,8 +66,7 @@ impl NrsMap {
                 debug!("NRS: No link found for public name: {}", public_name);
                 if self.public_name_contains_subname(public_name) {
                     return Err(Error::ContentError(format!(
-                        "Link not found in NRS Map Container for public name: \"{}\"",
-                        public_name
+                        "Link not found in NRS Map Container for public name: \"{public_name}\""
                     )));
                 }
                 Ok(None)

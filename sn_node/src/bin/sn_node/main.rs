@@ -93,7 +93,7 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
                     exit(0);
                 }
             }
-            Err(e) => println!("Updating node failed: {:?}", e),
+            Err(e) => println!("Updating node failed: {e:?}"),
         }
 
         if config.update_only() {
@@ -139,8 +139,7 @@ fn create_runtime_and_node(config: &Config) -> Result<()> {
 
                         if !config.is_first() && x > 0.6 {
                             println!(
-                               "\n =========== [Chaos] (PID: {our_pid}): Startup chaos crash w/ x of: {}. ============== \n",
-                               x
+                               "\n =========== [Chaos] (PID: {our_pid}): Startup chaos crash w/ x of: {x}. ============== \n",
                            );
 
                             // tiny sleep so testnet doesn't detect a faulty node and exit
@@ -269,7 +268,7 @@ fn update() -> Result<Status, Box<dyn (::std::error::Error)>> {
 fn gen_completions_for_shell(shell: Shell, mut cmd: clap::Command) -> Result<Vec<u8>, String> {
     // Get exe path
     let exe_path =
-        std::env::current_exe().map_err(|err| format!("Can't get the exec path: {}", err))?;
+        std::env::current_exe().map_err(|err| format!("Can't get the exec path: {err}"))?;
 
     // get filename without preceding path as std::ffi::OsStr (C string)
     let exec_name_ffi = match exe_path.file_name() {
@@ -287,8 +286,7 @@ fn gen_completions_for_shell(shell: Shell, mut cmd: clap::Command) -> Result<Vec
         Some(v) => v.to_string(),
         None => {
             return Err(format!(
-                "Can't decode unicode in executable name '{:?}'",
-                exec_name_ffi
+                "Can't decode unicode in executable name '{exec_name_ffi:?}'",
             ))
         }
     };

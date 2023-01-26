@@ -88,7 +88,7 @@ pub async fn wallet_commander(
             let wallet_xorurl = safe.wallet_create().await?;
 
             if OutputFmt::Pretty == output_fmt {
-                println!("Wallet created at: \"{}\"", wallet_xorurl);
+                println!("Wallet created at: \"{wallet_xorurl}\"");
             } else {
                 println!("{}", serialise_output(&wallet_xorurl, output_fmt));
             }
@@ -104,12 +104,9 @@ pub async fn wallet_commander(
             let balance = safe.wallet_balance(&target).await?;
 
             if OutputFmt::Pretty == output_fmt {
-                println!(
-                    "Wallet at \"{}\" has a total balance of {} safecoins",
-                    target, balance
-                );
+                println!("Wallet at \"{target}\" has a total balance of {balance} safecoins",);
             } else {
-                println!("{}", balance);
+                println!("{balance}");
             }
 
             Ok(())
@@ -192,8 +189,7 @@ pub async fn wallet_commander(
 
             if OutputFmt::Pretty == output_fmt {
                 println!(
-                    "Spendable DBC deposited ({} safecoins) with name '{}' in wallet located at \"{}\"",
-                    balance, name, wallet_url
+                    "Spendable DBC deposited ({balance} safecoins) with name '{name}' in wallet located at \"{wallet_url}\"",
                 );
             } else {
                 println!("{}", serialise_output(&(wallet_url, name), output_fmt));
@@ -255,10 +251,10 @@ pub async fn wallet_commander(
             };
 
             if OutputFmt::Pretty == output_fmt {
-                println!("Reissued DBC with {} safecoins.", amount);
+                println!("Reissued DBC with {amount} safecoins.");
                 if print_out_dbc {
                     println!("-------- DBC DATA --------");
-                    println!("{}", dbc_hex);
+                    println!("{dbc_hex}");
                     println!("--------------------------");
                 }
 
@@ -268,7 +264,7 @@ pub async fn wallet_commander(
                     println!("This is a bearer DBC that can be spent by anyone.");
                 }
             } else if print_out_dbc {
-                println!("{}", dbc_hex);
+                println!("{dbc_hex}");
             }
 
             Ok(())

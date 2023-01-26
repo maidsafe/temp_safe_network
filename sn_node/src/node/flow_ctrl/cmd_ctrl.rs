@@ -56,7 +56,7 @@ impl CmdCtrl {
         }
 
         let dispatcher = self.dispatcher.clone();
-        let _ = tokio::task::spawn(async move {
+        let _handle = tokio::task::spawn(async move {
             trace!("Spawned process for cmd {cmd:?}, id: {id:?}");
 
             #[cfg(feature = "statemap")]

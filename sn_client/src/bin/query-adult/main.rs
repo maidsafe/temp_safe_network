@@ -1,3 +1,5 @@
+#![allow(clippy::uninlined_format_args)]
+
 use bytes::Bytes;
 use clap::Parser;
 use eyre::{eyre, Result};
