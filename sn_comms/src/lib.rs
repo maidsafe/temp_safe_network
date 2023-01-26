@@ -93,7 +93,10 @@ impl Comm {
         local_addr: SocketAddr,
         incoming_msg_pipe: Sender<MsgFromPeer>,
     ) -> Result<Self> {
-        let (our_endpoint, incoming_connections) = Endpoint::builder().addr(local_addr).server()?;
+        let (our_endpoint, incoming_connections) = Endpoint::builder()
+            .addr(local_addr)
+            .idle_timeout(70_000)
+            .server()?;
 
         let msg_listener = MsgListener::new(incoming_msg_pipe);
         msg_listener.listen_for_incoming_msgs(incoming_connections);
@@ -321,8 +324,10 @@ mod tests {
         let (tx, _rx) = mpsc::channel(1);
         let send_comm = Comm::new(local_addr(), tx).await?;
 
-        let (recv_endpoint, mut incoming_connections) =
-            Endpoint::builder().addr(local_addr()).server()?;
+        let (recv_endpoint, mut incoming_connections) = Endpoint::builder()
+            .addr(local_addr())
+            .idle_timeout(70_000)
+            .server()?;
         let recv_addr = recv_endpoint.local_addr();
         let name = xor_name::rand::random();
         let peer = Peer::new(name, recv_addr);
@@ -429,8 +434,10 @@ mod tests {
     }
 
     async fn new_peer() -> Result<(Peer, Receiver<UsrMsgBytes>)> {
-        let (endpoint, mut incoming_connections) =
-            Endpoint::builder().addr(local_addr()).server()?;
+        let (endpoint, mut incoming_connections) = Endpoint::builder()
+            .addr(local_addr())
+            .idle_timeout(70_000)
+            .server()?;
         let addr = endpoint.local_addr();
 
         let (tx, rx) = mpsc::channel(1);
