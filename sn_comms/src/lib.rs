@@ -44,14 +44,15 @@
 extern crate tracing;
 
 mod error;
-mod link;
 mod listener;
 mod peer_session;
 
-pub use self::error::{Error, Result};
+pub use self::{
+    error::{Error, Result},
+    peer_session::PeerSessionError,
+};
 
 use self::{
-    link::Link,
     listener::MsgListener,
     peer_session::{PeerSession, SendStatus, SendWatcher},
 };
@@ -169,8 +170,7 @@ impl Comm {
         // Adds new sessions for each new target.
         targets.iter().for_each(|peer| {
             if self.sessions.get(peer).is_none() {
-                let link = Link::new(*peer, self.our_endpoint.clone());
-                let session = PeerSession::new(link);
+                let session = PeerSession::new(*peer, self.our_endpoint.clone());
                 let _ = self.sessions.insert(*peer, session);
             }
         });
