@@ -321,7 +321,7 @@ mod tests {
         let (peer1, mut rx1) = new_peer().await?;
 
         // add peers as known members
-        comm.update_valid_comm_targets([peer0, peer1].into()).await;
+        comm.set_comm_targets([peer0, peer1].into());
 
         let peer0_msg = new_test_msg(dst(peer0))?;
         let peer1_msg = new_test_msg(dst(peer1))?;
@@ -367,7 +367,7 @@ mod tests {
         assert_matches!(result, Err(Error::CreatingConnectionToUnknownNode(peer)) => assert_eq!(peer.addr(), invalid_addr));
 
         // let's add the peer as a known member and check again
-        comm.update_valid_comm_targets([invalid_peer].into()).await;
+        comm.set_comm_targets([invalid_peer].into());
 
         let result = comm
             .send_out_bytes(invalid_peer, msg.msg_id(), msg.serialize()?)
@@ -390,7 +390,7 @@ mod tests {
         let msg0 = new_test_msg(dst(peer))?;
 
         // add peer as a known member
-        send_comm.update_valid_comm_targets([peer].into()).await;
+        send_comm.set_comm_targets([peer].into());
 
         send_comm
             .send_out_bytes(peer, msg0.msg_id(), msg0.serialize()?)
@@ -441,7 +441,7 @@ mod tests {
         let msg = new_test_msg(dst(peer))?;
 
         // add peer as a known member
-        comm1.update_valid_comm_targets([peer].into()).await;
+        comm1.set_comm_targets([peer].into());
 
         // Send a message to establish the connection
         comm1
