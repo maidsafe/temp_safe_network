@@ -425,8 +425,6 @@ mod tests {
             section_sig: section_auth.clone(), // obtained after presenting a valid payment to the network
         };
 
-        // ReplicatedData::RegisterWrite(reg_cmd)
-
         let replicated_register = ReplicatedData::RegisterWrite(cmd);
 
         let pk = PublicKey::Bls(bls::SecretKey::random().public_key());
@@ -521,10 +519,6 @@ mod tests {
                                 // do nothing
                                 Ok(())
                             }
-                            Err(Error::DataExists(_)) => {
-                                // also do nothing
-                                Ok(())
-                            }
                             Err(other_error) => Err(other_error),
                         }
                     })?;
@@ -544,21 +538,13 @@ mod tests {
                     let user = User::Anyone;
                     let stored_res = runtime.block_on(storage.query(&query, user));
                     let model_res = model.get(&key);
-
-                    match model_res {
-                        Some(m_res) => {
-                            if let NodeQueryResponse::GetChunk(Ok(s_chunk)) = stored_res {
-                                if let ReplicatedData::Chunk(m_chunk) = m_res {
-                                    assert_eq!(*m_chunk, s_chunk);
-                                }
-                            } else {
-                                return Err(Error::ChunkNotFound(key));
+                    if let Some(m_res) = model_res {
+                        if let NodeQueryResponse::GetChunk(Ok(s_chunk)) = stored_res {
+                            if let ReplicatedData::Chunk(m_chunk) = m_res {
+                                assert_eq!(*m_chunk, s_chunk);
                             }
-                        }
-                        None => {
-                            if let NodeQueryResponse::GetChunk(Ok(_)) = stored_res {
-                                return Err(Error::DataExists(DataAddress::Bytes(addr)));
-                            }
+                        } else {
+                            return Err(Error::ChunkNotFound(key));
                         }
                     }
                 }
@@ -567,34 +553,20 @@ mod tests {
                     let addr = DataAddress::Bytes(ChunkAddress(key));
                     let stored_data = runtime.block_on(storage.get_from_local_store(&addr));
                     let model_data = model.get(&key);
-
-                    match model_data {
-                        Some(m_data) => {
-                            if let Ok(s_data) = stored_data {
-                                assert_eq!(*m_data, s_data);
-                            } else {
-                                return Err(Error::ChunkNotFound(key));
-                            }
-                        }
-                        None => {
-                            if stored_data.is_ok() {
-                                return Err(Error::DataExists(addr));
-                            }
+                    if let Some(m_data) = model_data {
+                        if let Ok(s_data) = stored_data {
+                            assert_eq!(*m_data, s_data);
+                        } else {
+                            return Err(Error::ChunkNotFound(key));
                         }
                     }
                 }
                 Op::Remove(idx) => {
                     let key = get_xor_name(&model, idx % (model.len() + 1));
                     let addr = DataAddress::Bytes(ChunkAddress(key));
-
                     let storage_res = runtime.block_on(storage.remove(&addr));
-                    match model.remove(&key) {
-                        Some(_) => storage_res?,
-                        None => {
-                            if storage_res.is_ok() {
-                                return Err(Error::DataExists(addr));
-                            }
-                        }
+                    if model.remove(&key).is_some() {
+                        storage_res?
                     }
                 }
             }
