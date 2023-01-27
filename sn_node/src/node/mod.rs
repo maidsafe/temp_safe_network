@@ -220,8 +220,8 @@ mod core {
             fault_cmds_sender: mpsc::Sender<FaultsCmd>,
         ) -> Result<Self> {
             let addr = comm.socket_addr();
-            comm.update_valid_comm_targets(network_knowledge.members())
-                .await;
+            comm.set_comm_targets(network_knowledge.members());
+
             let membership = if let Some(key) = section_key_share.clone() {
                 let n_elders = network_knowledge.signed_sap().elder_count();
 

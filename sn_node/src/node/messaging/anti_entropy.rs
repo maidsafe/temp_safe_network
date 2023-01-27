@@ -321,8 +321,7 @@ impl MyNode {
             // Update comms with these new members or we will not be able to send the msg out
             latest_context
                 .comm
-                .update_valid_comm_targets(latest_context.network_knowledge.members())
-                .await;
+                .set_comm_targets(latest_context.network_knowledge.members());
 
             cmds.push(MyNode::ask_for_any_new_data_from_whole_section(&latest_context).await);
 

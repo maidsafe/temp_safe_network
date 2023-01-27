@@ -157,16 +157,17 @@ impl Comm {
         self.our_endpoint.close()
     }
 
-    /// Updates cached connections for passed members set only.
-    pub async fn update_valid_comm_targets(&self, members: BTreeSet<Peer>) {
-        // Let's drop all sessions that don't belong to any of the new members.
-        self.sessions.retain(|p, _| members.contains(p));
-
-        // Now let's add new sessions for each fresh new member. We never remove
-        // sessions from this container unless this function is invoked again by the user,
-        // even if we failed to send using all peer session's connections, we keep the session
+    /// Sets the available targets to be only those in the passed in set.
+    pub fn set_comm_targets(&self, targets: BTreeSet<Peer>) {
+        // We only remove sessions by calling this function,
+        // No removals are made even if we failed to send using all peer session's connections,
         // as it's our source of truth for known and connectable peers.
-        members.iter().for_each(|peer| {
+
+        // Drops sessions that not among the targets.
+        self.sessions.retain(|p, _| targets.contains(p));
+
+        // Adds new sessions for each new target.
+        targets.iter().for_each(|peer| {
             if self.sessions.get(peer).is_none() {
                 let link = Link::new(*peer, self.our_endpoint.clone());
                 let session = PeerSession::new(link);
@@ -320,7 +321,7 @@ mod tests {
         let (peer1, mut rx1) = new_peer().await?;
 
         // add peers as known members
-        comm.update_valid_comm_targets([peer0, peer1].into()).await;
+        comm.set_comm_targets([peer0, peer1].into());
 
         let peer0_msg = new_test_msg(dst(peer0))?;
         let peer1_msg = new_test_msg(dst(peer1))?;
@@ -366,7 +367,7 @@ mod tests {
         assert_matches!(result, Err(Error::CreatingConnectionToUnknownNode(peer)) => assert_eq!(peer.addr(), invalid_addr));
 
         // let's add the peer as a known member and check again
-        comm.update_valid_comm_targets([invalid_peer].into()).await;
+        comm.set_comm_targets([invalid_peer].into());
 
         let result = comm
             .send_out_bytes(invalid_peer, msg.msg_id(), msg.serialize()?)
@@ -389,7 +390,7 @@ mod tests {
         let msg0 = new_test_msg(dst(peer))?;
 
         // add peer as a known member
-        send_comm.update_valid_comm_targets([peer].into()).await;
+        send_comm.set_comm_targets([peer].into());
 
         send_comm
             .send_out_bytes(peer, msg0.msg_id(), msg0.serialize()?)
@@ -440,7 +441,7 @@ mod tests {
         let msg = new_test_msg(dst(peer))?;
 
         // add peer as a known member
-        comm1.update_valid_comm_targets([peer].into()).await;
+        comm1.set_comm_targets([peer].into());
 
         // Send a message to establish the connection
         comm1
