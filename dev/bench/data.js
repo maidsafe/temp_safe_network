@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1674802821754,
+  "lastUpdate": 1674810663214,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -59368,6 +59368,150 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/chunk keys/4000",
             "value": 379263991,
             "range": "± 17418789",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "06581d1ebbb23f432610d48bb3b773c742c0baaa",
+          "message": "Merge #2033 #2034\n\n2033: Revert \"feat: reduce the amount of old DKG sessions we keep\" r=joshuef a=joshuef\n\nThis reverts commit 5257295c18fd98d383bd70bbbe1fd3de1d0f9ea7.\r\n\r\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\n\n2034: chore(node): remove a dkg vote clone only for logging. r=joshuef a=joshuef\n\nWrites the debug to a var and uses that instead.\r\nDkg vote clones are a low hanging mem fruit\r\n\r\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\n\nCo-authored-by: Josh Wilson <joshuef@gmail.com>\nCo-authored-by: joshuef <joshuef@gmail.com>",
+          "timestamp": "2023-01-27T07:37:42Z",
+          "tree_id": "9b9ce4b29aa443ec0036d28ccf3884731b3257a5",
+          "url": "https://github.com/maidsafe/safe_network/commit/06581d1ebbb23f432610d48bb3b773c742c0baaa"
+        },
+        "date": 1674810660440,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "serialize/serialize for sending",
+            "value": 2336075,
+            "range": "± 111968",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 88820259,
+            "range": "± 1363975",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 108912305,
+            "range": "± 4545660",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 451076513,
+            "range": "± 9211186",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 71622508,
+            "range": "± 11381920",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 87488452,
+            "range": "± 1620029",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 360707598,
+            "range": "± 8700788",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "register-edit-sampling/register_edits/1000",
+            "value": 22999111133,
+            "range": "± 351376405",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 46482797,
+            "range": "± 24778771",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 2471977245,
+            "range": "± 186760595",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 9572374500,
+            "range": "± 557541674",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 236764287,
+            "range": "± 11690752",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 2474813396,
+            "range": "± 158675968",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 9287103704,
+            "range": "± 410067897",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 45382361,
+            "range": "± 856252",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 421831051,
+            "range": "± 8338596",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 1613384047,
+            "range": "± 35966486",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11824627,
+            "range": "± 285066",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 100347357,
+            "range": "± 4403864",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 344868688,
+            "range": "± 8788515",
             "unit": "ns/iter"
           }
         ]
