@@ -5,17 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.34 (2023-01-27)
+## v0.72.35 (2023-01-27)
 
 ### Chore
 
- - <csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/> fix issues reported by new clippy
+ - <csr-id-03d9c561c7259351310ede6e4cfb6e78822d728a/> add mean to std dev to get threshold
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
+ - 1 commit contributed to the release.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -26,12 +26,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - add mean to std dev to get threshold ([`03d9c56`](https://github.com/maidsafe/safe_network/commit/03d9c561c7259351310ede6e4cfb6e78822d728a))
+</details>
+
+## v0.72.34 (2023-01-27)
+
+<csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/>
+
+### Chore
+
+ - <csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/> fix issues reported by new clippy
+
+### Chore
+
+ - <csr-id-01ff2ccf45dfc9d45c5ad540144d7a4a640830fc/> sn_interface-0.16.18/sn_comms-0.1.4/sn_client-0.77.9/sn_node-0.72.34/sn_api-0.75.5/sn_cli-0.68.6
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.18/sn_comms-0.1.4/sn_client-0.77.9/sn_node-0.72.34/sn_api-0.75.5/sn_cli-0.68.6 ([`01ff2cc`](https://github.com/maidsafe/safe_network/commit/01ff2ccf45dfc9d45c5ad540144d7a4a640830fc))
     - Merge #2033 #2034 ([`06581d1`](https://github.com/maidsafe/safe_network/commit/06581d1ebbb23f432610d48bb3b773c742c0baaa))
     - Merge branch 'main' into RevertDkgCache ([`24ff625`](https://github.com/maidsafe/safe_network/commit/24ff6257f85922090cfaa5fa83044082d3ef8dab))
     - fix issues reported by new clippy ([`6b92351`](https://github.com/maidsafe/safe_network/commit/6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916))
 </details>
 
 ## v0.72.33 (2023-01-26)
+
+<csr-id-d51dd695437dac1695447491d4f298334b7e0fd1/>
+<csr-id-2e1061a08e591767eedc837369ada0843ce62701/>
 
 ### Chore
 
@@ -45,7 +79,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-42f2c3709af96207b10b711878d03d42781bfdba/> send_out_bytes was not reporting send failures
    - sn_comms::Comm::send_out_bytes was spawning a task when sending a msg,
    now it's the caller's duty to do so if ever required.
-- Run sn_comms unit tests in CI/Bors.
 
 ### Commit Statistics
 
@@ -68,6 +101,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Merge #2025 ([`4baaae3`](https://github.com/maidsafe/safe_network/commit/4baaae3022d0295715e58f6f74bac3c6b2547be1))
     - send_out_bytes was not reporting send failures ([`42f2c37`](https://github.com/maidsafe/safe_network/commit/42f2c3709af96207b10b711878d03d42781bfdba))
 </details>
+
+<csr-unknown>
+Run sn_comms unit tests in CI/Bors.<csr-unknown/>
 
 ## v0.72.32 (2023-01-26)
 

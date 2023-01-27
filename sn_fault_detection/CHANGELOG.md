@@ -5,6 +5,107 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.15.1 (2023-01-27)
+
+### Chore
+
+ - <csr-id-3cf38457737bd6dd27ce3037ee5b2a2329df3f78/> update test msg quantities
+ - <csr-id-03d9c561c7259351310ede6e4cfb6e78822d728a/> add mean to std dev to get threshold
+ - <csr-id-783d62461a65eb7c06b0d4f399b97216b6c75519/> sn_interface-0.16.14/sn_client-0.77.8/sn_node-0.72.25/sn_api-0.75.4/sn_cli-0.68.5
+ - <csr-id-8d2ef1a0f298ef010f478fcd59c5b6c437b7b62f/> clarify comments and ensure sorted output of faulty nodes
+   other misc cleanup
+ - <csr-id-87cb70eefdc63f80942a2c87ecc3790f76105b91/> clarify naming of elders/non elders
+ - <csr-id-dc16323849e425e2ca2511f095caee5b0a4af1ab/> store elders in fault detection
+ - <csr-id-38d85b391a72a3ee71f705d9b89d6dbc74c041e1/> rename Knowledge -> NetworkKnowledge for clarity
+ - <csr-id-7674b9f5609384a35072043a777ac07b18c12bb3/> sort faulty nodes by fault level
+ - <csr-id-b13f1d7e5e84e42ed076654a159418563a9a1a35/> remove OpId for failed request tracking
+   We use bidi now, so we can report after any failure, no need for
+   double accounting
+ - <csr-id-21af053a5be2317be356e760c2b581c0f870a396/> happy new year 2023
+
+### New Features
+
+ - <csr-id-74b5e7794a213b70db7231c31b68cee340976119/> check elder scores against elders only, non elders against non elders
+ - <csr-id-f072aae9155cf833ce3a0f304496f43f6862dff4/> add ElderVoting issue type and track on section proposal votes outgoing
+ - <csr-id-addd2f806e81be1f04599fa556216b61ee5b8138/> enable removing knowledge issues
+   This should allow us to track voted proposals more easily
+   and weed out nodes that consistently dont vote
+ - <csr-id-2862f1cb9a60dcf4b4d22349c90d303bbb1e8305/> update values based on latest network
+   remove threshold concepts and use std_dev only
+   remove bogus tests where we rely on unreal network assumptions
+   (ie, we wont have only one AE probe msg failing... and if we do, then we should start consider
+   ing it a failure...
+
+### Bug Fixes
+
+ - <csr-id-3d0a359004de49d95378929903aeb71fa12d83c0/> ensure std dev cannot be rounded down
+
+### Test
+
+ - <csr-id-6144129d5cae1edf8850e41890044acf7804b299/> simplify failure check, make msgs target only one node
+   Previously we had messages mapping to several nodes depending on the issue type...
+   But actually, the msg counts are for _all_ nodes, so this was unuecessarily
+   levelling the field regardless of node quality.
+   
+   Now one message goes to one node, and it's one failure test.
+   Which means we see more realisitic variance in scores and the stats will
+   not be quite as arbitrary
+ - <csr-id-852716257efac7453f01e7404e254dd5481a40e4/> increase msg counts and rate of good failure
+ - <csr-id-2b6c4a8fcd2cd7b22e6a4b20f1218c859110be62/> add ElderVoting to the startup msg count
+   Adds ElderVoting as a msg that can fail to aid detection of bad elders.
+ - <csr-id-c503d722b9d3bf3325d564bd28d7df695dd70e95/> update to take only one node per fault
+   4 was an assumption of data msgs, but many of those even are not going to
+   data_copy_count, so we can relax this and just pass more messages for non
+   probe/dkg test msgs
+   
+   This also removes invalid portion of tests w/ less than 7 elders in DKG, as
+   that's a startup case where all nodes should be trusted, and only serves to
+   complicate the tests
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 27 commits contributed to the release over the course of 30 calendar days.
+ - 19 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - update test msg quantities ([`3cf3845`](https://github.com/maidsafe/safe_network/commit/3cf38457737bd6dd27ce3037ee5b2a2329df3f78))
+    - add mean to std dev to get threshold ([`03d9c56`](https://github.com/maidsafe/safe_network/commit/03d9c561c7259351310ede6e4cfb6e78822d728a))
+    - simplify failure check, make msgs target only one node ([`6144129`](https://github.com/maidsafe/safe_network/commit/6144129d5cae1edf8850e41890044acf7804b299))
+    - sn_interface-0.16.14/sn_client-0.77.8/sn_node-0.72.25/sn_api-0.75.4/sn_cli-0.68.5 ([`783d624`](https://github.com/maidsafe/safe_network/commit/783d62461a65eb7c06b0d4f399b97216b6c75519))
+    - Merge #1987 ([`1bf3c65`](https://github.com/maidsafe/safe_network/commit/1bf3c65dda02489297e98fb27ce3cf4a241ebf48))
+    - increase msg counts and rate of good failure ([`8527162`](https://github.com/maidsafe/safe_network/commit/852716257efac7453f01e7404e254dd5481a40e4))
+    - clarify comments and ensure sorted output of faulty nodes ([`8d2ef1a`](https://github.com/maidsafe/safe_network/commit/8d2ef1a0f298ef010f478fcd59c5b6c437b7b62f))
+    - check elder scores against elders only, non elders against non elders ([`74b5e77`](https://github.com/maidsafe/safe_network/commit/74b5e7794a213b70db7231c31b68cee340976119))
+    - clarify naming of elders/non elders ([`87cb70e`](https://github.com/maidsafe/safe_network/commit/87cb70eefdc63f80942a2c87ecc3790f76105b91))
+    - store elders in fault detection ([`dc16323`](https://github.com/maidsafe/safe_network/commit/dc16323849e425e2ca2511f095caee5b0a4af1ab))
+    - ensure std dev cannot be rounded down ([`3d0a359`](https://github.com/maidsafe/safe_network/commit/3d0a359004de49d95378929903aeb71fa12d83c0))
+    - Merge #1984 ([`dd07ad0`](https://github.com/maidsafe/safe_network/commit/dd07ad03a6112504c65c52a39aba0379b19c886c))
+    - add ElderVoting to the startup msg count ([`2b6c4a8`](https://github.com/maidsafe/safe_network/commit/2b6c4a8fcd2cd7b22e6a4b20f1218c859110be62))
+    - add ElderVoting issue type and track on section proposal votes outgoing ([`f072aae`](https://github.com/maidsafe/safe_network/commit/f072aae9155cf833ce3a0f304496f43f6862dff4))
+    - rename Knowledge -> NetworkKnowledge for clarity ([`38d85b3`](https://github.com/maidsafe/safe_network/commit/38d85b391a72a3ee71f705d9b89d6dbc74c041e1))
+    - enable removing knowledge issues ([`addd2f8`](https://github.com/maidsafe/safe_network/commit/addd2f806e81be1f04599fa556216b61ee5b8138))
+    - Merge #1961 ([`7da114b`](https://github.com/maidsafe/safe_network/commit/7da114b75cdb2a919506b0800ece860cb3e6df3e))
+    - update to take only one node per fault ([`c503d72`](https://github.com/maidsafe/safe_network/commit/c503d722b9d3bf3325d564bd28d7df695dd70e95))
+    - update values based on latest network ([`2862f1c`](https://github.com/maidsafe/safe_network/commit/2862f1cb9a60dcf4b4d22349c90d303bbb1e8305))
+    - sort faulty nodes by fault level ([`7674b9f`](https://github.com/maidsafe/safe_network/commit/7674b9f5609384a35072043a777ac07b18c12bb3))
+    - Merge #1958 ([`d3355bc`](https://github.com/maidsafe/safe_network/commit/d3355bc3c47e3f68517dfc62c01f647571bd1f73))
+    - remove OpId for failed request tracking ([`b13f1d7`](https://github.com/maidsafe/safe_network/commit/b13f1d7e5e84e42ed076654a159418563a9a1a35))
+    - Merge #1951 ([`24ca31f`](https://github.com/maidsafe/safe_network/commit/24ca31fd53c570c7c97849b74ded850c05273353))
+    - happy new year 2023 ([`21af053`](https://github.com/maidsafe/safe_network/commit/21af053a5be2317be356e760c2b581c0f870a396))
+    - Merge branch 'main' into proposal_refactor ([`0bc7f94`](https://github.com/maidsafe/safe_network/commit/0bc7f94c72c374d667a9b455c4f4f1830366e4a4))
+    - Merge #1873 ([`8be1563`](https://github.com/maidsafe/safe_network/commit/8be1563fcddde2323ae2f892687dc76f253f3fb2))
+    - chore(naming): rename dysfunction - Uses the more common vocabulary in fault tolerance area. ([`f68073f`](https://github.com/maidsafe/safe_network/commit/f68073f2897894375f5a09b870e2bfe4e03c3b10))
+</details>
+
 ## v0.15.0 (2023-01-20)
 
 <csr-id-5e81ac4fb8a2312eb546a4b86e71be05df7c4e26/>
@@ -12,6 +113,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-5cbae9c10e9f1d4302d041a864bfee83d47834e0/>
 <csr-id-b6474691ea6af5ee441b02f6cb9c3cf2b8f97459/>
 <csr-id-a973b62a8ef48acc92af8735e7e7bcac94e0092f/>
+<csr-id-852716257efac7453f01e7404e254dd5481a40e4/>
+<csr-id-2b6c4a8fcd2cd7b22e6a4b20f1218c859110be62/>
+<csr-id-c503d722b9d3bf3325d564bd28d7df695dd70e95/>
+<csr-id-8d2ef1a0f298ef010f478fcd59c5b6c437b7b62f/>
+<csr-id-87cb70eefdc63f80942a2c87ecc3790f76105b91/>
+<csr-id-dc16323849e425e2ca2511f095caee5b0a4af1ab/>
+<csr-id-38d85b391a72a3ee71f705d9b89d6dbc74c041e1/>
+<csr-id-7674b9f5609384a35072043a777ac07b18c12bb3/>
+<csr-id-b13f1d7e5e84e42ed076654a159418563a9a1a35/>
+<csr-id-21af053a5be2317be356e760c2b581c0f870a396/>
 
 ### Chore
 
@@ -74,46 +185,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - Remove peers from pending data queries when response was obtained from Adults
    - Removing correlation id from SystemMsg node query/response
    - Redefine system::NodeQueryResponse type just as an alias to data::QueryResponse
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 23 commits contributed to the release over the course of 23 calendar days.
- - 15 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - Merge #1987 ([`1bf3c65`](https://github.com/maidsafe/safe_network/commit/1bf3c65dda02489297e98fb27ce3cf4a241ebf48))
-    - increase msg counts and rate of good failure ([`8527162`](https://github.com/maidsafe/safe_network/commit/852716257efac7453f01e7404e254dd5481a40e4))
-    - clarify comments and ensure sorted output of faulty nodes ([`8d2ef1a`](https://github.com/maidsafe/safe_network/commit/8d2ef1a0f298ef010f478fcd59c5b6c437b7b62f))
-    - check elder scores against elders only, non elders against non elders ([`74b5e77`](https://github.com/maidsafe/safe_network/commit/74b5e7794a213b70db7231c31b68cee340976119))
-    - clarify naming of elders/non elders ([`87cb70e`](https://github.com/maidsafe/safe_network/commit/87cb70eefdc63f80942a2c87ecc3790f76105b91))
-    - store elders in fault detection ([`dc16323`](https://github.com/maidsafe/safe_network/commit/dc16323849e425e2ca2511f095caee5b0a4af1ab))
-    - ensure std dev cannot be rounded down ([`3d0a359`](https://github.com/maidsafe/safe_network/commit/3d0a359004de49d95378929903aeb71fa12d83c0))
-    - Merge #1984 ([`dd07ad0`](https://github.com/maidsafe/safe_network/commit/dd07ad03a6112504c65c52a39aba0379b19c886c))
-    - add ElderVoting to the startup msg count ([`2b6c4a8`](https://github.com/maidsafe/safe_network/commit/2b6c4a8fcd2cd7b22e6a4b20f1218c859110be62))
-    - add ElderVoting issue type and track on section proposal votes outgoing ([`f072aae`](https://github.com/maidsafe/safe_network/commit/f072aae9155cf833ce3a0f304496f43f6862dff4))
-    - rename Knowledge -> NetworkKnowledge for clarity ([`38d85b3`](https://github.com/maidsafe/safe_network/commit/38d85b391a72a3ee71f705d9b89d6dbc74c041e1))
-    - enable removing knowledge issues ([`addd2f8`](https://github.com/maidsafe/safe_network/commit/addd2f806e81be1f04599fa556216b61ee5b8138))
-    - Merge #1961 ([`7da114b`](https://github.com/maidsafe/safe_network/commit/7da114b75cdb2a919506b0800ece860cb3e6df3e))
-    - update to take only one node per fault ([`c503d72`](https://github.com/maidsafe/safe_network/commit/c503d722b9d3bf3325d564bd28d7df695dd70e95))
-    - update values based on latest network ([`2862f1c`](https://github.com/maidsafe/safe_network/commit/2862f1cb9a60dcf4b4d22349c90d303bbb1e8305))
-    - sort faulty nodes by fault level ([`7674b9f`](https://github.com/maidsafe/safe_network/commit/7674b9f5609384a35072043a777ac07b18c12bb3))
-    - Merge #1958 ([`d3355bc`](https://github.com/maidsafe/safe_network/commit/d3355bc3c47e3f68517dfc62c01f647571bd1f73))
-    - remove OpId for failed request tracking ([`b13f1d7`](https://github.com/maidsafe/safe_network/commit/b13f1d7e5e84e42ed076654a159418563a9a1a35))
-    - Merge #1951 ([`24ca31f`](https://github.com/maidsafe/safe_network/commit/24ca31fd53c570c7c97849b74ded850c05273353))
-    - happy new year 2023 ([`21af053`](https://github.com/maidsafe/safe_network/commit/21af053a5be2317be356e760c2b581c0f870a396))
-    - Merge branch 'main' into proposal_refactor ([`0bc7f94`](https://github.com/maidsafe/safe_network/commit/0bc7f94c72c374d667a9b455c4f4f1830366e4a4))
-    - Merge #1873 ([`8be1563`](https://github.com/maidsafe/safe_network/commit/8be1563fcddde2323ae2f892687dc76f253f3fb2))
-    - chore(naming): rename dysfunction - Uses the more common vocabulary in fault tolerance area. ([`f68073f`](https://github.com/maidsafe/safe_network/commit/f68073f2897894375f5a09b870e2bfe4e03c3b10))
-</details>
 
 ## v0.14.0 (2022-09-19)
 
