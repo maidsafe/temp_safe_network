@@ -579,7 +579,7 @@ fn create_symlink_worker(
         (format!("Could not create symlink: {} --> {}\nPerhaps try 'Run as Administrator' or enable Windows Developer mode.",
             link.display(),
             target.display()),
-         format!("{:?}", e)
+         format!("{e:?}")
         )
     )
 }

@@ -208,7 +208,9 @@ fn kill_nodes(exec_name: &str) -> Result<()> {
     let output = Command::new("killall")
         .arg(exec_name)
         .output()
-        .wrap_err_with(|| format!("Error when atempting to stop nodes ({exec_name}) processes",))?;
+        .wrap_err_with(
+            || format!("Error when attempting to stop nodes ({exec_name}) processes",),
+        )?;
 
     if output.status.success() {
         println!("Success, all processes instances of {exec_name} were stopped!",);
@@ -227,18 +229,10 @@ fn kill_nodes(exec_name: &str) -> Result<()> {
     let output = Command::new("taskkill")
         .args(["/F", "/IM", exec_name])
         .output()
-        .wrap_err_with(|| {
-            format!(
-                "Error when atempting to stop nodes ({}) processes",
-                exec_name
-            )
-        })?;
+        .wrap_err_with(|| format!("Error when attempting to stop nodes ({exec_name}) processes"))?;
 
     if output.status.success() {
-        println!(
-            "Success, all processes instances of {} were stopped!",
-            exec_name
-        );
+        println!("Success, all processes instances of {exec_name} were stopped!");
         Ok(())
     } else {
         Err(eyre!(
