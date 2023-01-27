@@ -3856,7 +3856,7 @@ dependencies = [
 
 [[package]]
 name = "sn_cli"
-version = "0.68.6"
+version = "0.68.7"
 dependencies = [
  "ansi_term",
  "assert_cmd",

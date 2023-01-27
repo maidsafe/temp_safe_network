@@ -4,18 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.68.6 (2023-01-27)
+## v0.68.7 (2023-01-27)
 
 ### Chore
 
- - <csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/> fix issues reported by new clippy
+ - <csr-id-846b1080944a229000b152513c0e2ed840bc9033/> fix additional issues from updated clippy
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
- - 6 days passed between releases.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -26,6 +25,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2037 ([`6e11b79`](https://github.com/maidsafe/safe_network/commit/6e11b793c1c311cf1c57f40c89825abb78b8baa4))
+    - fix additional issues from updated clippy ([`846b108`](https://github.com/maidsafe/safe_network/commit/846b1080944a229000b152513c0e2ed840bc9033))
+</details>
+
+## v0.68.6 (2023-01-27)
+
+<csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/>
+
+### Chore
+
+ - <csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/> fix issues reported by new clippy
+
+### Chore
+
+ - <csr-id-01ff2ccf45dfc9d45c5ad540144d7a4a640830fc/> sn_interface-0.16.18/sn_comms-0.1.4/sn_client-0.77.9/sn_node-0.72.34/sn_api-0.75.5/sn_cli-0.68.6
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 6 days passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.18/sn_comms-0.1.4/sn_client-0.77.9/sn_node-0.72.34/sn_api-0.75.5/sn_cli-0.68.6 ([`01ff2cc`](https://github.com/maidsafe/safe_network/commit/01ff2ccf45dfc9d45c5ad540144d7a4a640830fc))
+    - Merge branch 'main' into chore-comms-remove-unused-async ([`e92dd49`](https://github.com/maidsafe/safe_network/commit/e92dd49f38f9b56c7276e86ba79f7fd8f816af76))
     - Merge branch 'main' into RevertDkgCache ([`24ff625`](https://github.com/maidsafe/safe_network/commit/24ff6257f85922090cfaa5fa83044082d3ef8dab))
     - fix issues reported by new clippy ([`6b92351`](https://github.com/maidsafe/safe_network/commit/6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916))
 </details>
@@ -33,6 +66,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## v0.68.5 (2023-01-20)
 
 <csr-id-21af053a5be2317be356e760c2b581c0f870a396/>
+<csr-id-783d62461a65eb7c06b0d4f399b97216b6c75519/>
 
 ### Chore
 
@@ -50,10 +84,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - <csr-id-a8b4af0eaf8295b8506086c24bca05fe3d0f0320/> support non-pretty printing output for '--replicas' dog command arg
    - Also adding a test to CLI '--replicas' dog cmd argument verifying success and
    failures are correctly reported after they are returned by the network.
-- Exposing also an `sn_api` public API to fetch a file from a specified set of
-   data replicas indexes and a `SafeUrl`.
-- Adding `--replicas` arg to CLI `dog` command which allows the user to perform
-   a check on several data replicas for the content being targeted by specifying their indexes.
 
 ### Commit Statistics
 
@@ -89,7 +119,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 </details>
 
 <csr-unknown>
- expose a public API to query chunks to specific data replicas print networks as json<csr-unknown/>
+Exposing also an sn_api public API to fetch a file from a specified set ofdata replicas indexes and a SafeUrl.Adding --replicas arg to CLI dog command which allows the user to performa check on several data replicas for the content being targeted by specifying their indexes.<csr-unknown/>
 
 ## v0.68.4 (2022-12-22)
 
@@ -156,9 +186,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     - Merge #1848 ([`ddaf857`](https://github.com/maidsafe/safe_network/commit/ddaf8571749c142e9960407cfd9cfa94231a36ad))
     - genesis_sap is required to create the `SectionTree` ([`22402ca`](https://github.com/maidsafe/safe_network/commit/22402ca6acb0215ecfe9b1fdbf306c0f9cb87d95))
 </details>
-
-<csr-unknown>
-This can be fixed by accepting the genesis sap while creating the tree.<csr-unknown/>
 
 ## v0.68.2 (2022-12-16)
 
