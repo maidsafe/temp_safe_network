@@ -85,7 +85,7 @@ walkdir = "2"
 xor_name = "~5.0.0"
 
 [dependencies.tokio]
-version = "1.17.0"
+version = "1.23.1"
 features = ["fs", "io-util", "macros", "rt", "rt-multi-thread", "sync"]
 
 [dev-dependencies]

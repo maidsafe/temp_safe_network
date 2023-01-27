@@ -56,7 +56,7 @@ uluru="3.0.0"
 xor_name = "~5.0.0"
 
 [dependencies.tokio]
-version = "^1.19"
+version = "^1.23"
 features = ["fs", "io-util", "macros", "rt", "rt-multi-thread", "sync"]
 
 [dev-dependencies]
