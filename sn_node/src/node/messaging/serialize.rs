@@ -37,6 +37,7 @@ impl MyNode {
         let kind = MsgKind::Node {
             name: our_node_name,
             is_join: msg.is_join(),
+            is_ae: msg.is_ae(),
         };
         Ok((kind, payload))
     }
