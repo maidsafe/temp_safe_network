@@ -17,7 +17,6 @@ mod membership;
 pub(crate) mod node_msgs;
 mod promotion;
 mod relocation;
-mod section_state;
 mod serialize;
 mod signature;
 mod streams;

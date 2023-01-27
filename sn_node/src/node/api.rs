@@ -83,6 +83,7 @@ impl MyNode {
         self.network_knowledge.is_elder(&self.info().name())
     }
 
+    #[cfg(test)]
     pub(crate) fn is_not_elder(&self) -> bool {
         !self.is_elder()
     }

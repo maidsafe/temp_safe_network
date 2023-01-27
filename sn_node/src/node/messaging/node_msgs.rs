@@ -322,28 +322,6 @@ impl MyNode {
                 .into_iter()
                 .collect())
             }
-            NodeMsg::ProposeSectionState {
-                proposal,
-                sig_share,
-            } => {
-                let mut node = node.write().await;
-                debug!("[NODE WRITE]: ProposeSectionState write.");
-                if node.is_not_elder() {
-                    trace!(
-                        "Adult handling a ProposeSectionState msg from {}: {:?}",
-                        sender,
-                        msg_id
-                    );
-                }
-
-                trace!(
-                    "Handling ProposeSectionState msg: {proposal:?} from {}: {:?}",
-                    sender,
-                    msg_id
-                );
-                node.untrack_node_issue(sender.name(), IssueType::ElderVoting);
-                node.handle_section_state_proposal(msg_id, proposal, sig_share, sender)
-            }
             NodeMsg::DkgStart(session_id, elder_sig) => {
                 trace!(
                     "Handling msg: DkgStart s{} {:?}: {} elders from {}",

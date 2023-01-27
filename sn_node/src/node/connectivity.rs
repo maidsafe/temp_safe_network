@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{flow_ctrl::cmds::Cmd, MyNode, Result, SectionStateVote};
+use crate::node::{flow_ctrl::cmds::Cmd, MyNode, Result};
 use sn_fault_detection::IssueType;
 use std::{collections::BTreeSet, net::SocketAddr};
 use xor_name::XorName;
@@ -26,24 +26,11 @@ impl MyNode {
     }
 
     pub(crate) fn cast_offline_proposals(&mut self, names: &BTreeSet<XorName>) -> Result<Vec<Cmd>> {
-        // Don't send the `Offline` proposal to the peer being lost as that send would fail,
-        // triggering a chain of further `Offline` proposals.
-        let elders: Vec<_> = self
-            .network_knowledge
-            .section_auth()
-            .elders()
-            .filter(|peer| !names.contains(&peer.name()))
-            .cloned()
-            .collect();
         let mut result: Vec<Cmd> = Vec::new();
         for name in names.iter() {
             if let Some(info) = self.network_knowledge.get_section_member(name) {
-                let info = info.leave()?;
-                if let Ok(cmds) = self.send_section_state_proposal(
-                    elders.clone(),
-                    SectionStateVote::NodeIsOffline(info),
-                ) {
-                    result.extend(cmds);
+                if let Some(cmd) = self.propose_membership_change(info.leave()?) {
+                    result.push(cmd);
                 }
             }
         }

@@ -57,18 +57,6 @@ pub enum AntiEntropyKind {
     Update { members: SectionPeers },
 }
 
-/// A vote about the state of the section
-/// This can be a result of seeing a node go offline or deciding wether we want to accept new nodes
-/// Anything where we need section authority before action can be taken
-/// Section State Proposals are sent by elders to elders
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum SectionStateVote {
-    /// Vote to remove a node from our section
-    NodeIsOffline(NodeState),
-    /// Vote to change whether new nodes are allowed to join our section
-    JoinsAllowed(bool),
-}
-
 #[derive(Clone, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
 #[allow(clippy::large_enum_variant, clippy::derive_partial_eq_without_eq)]
 /// Message sent over the among nodes
@@ -152,13 +140,6 @@ pub enum NodeMsg {
         /// BLS signature share of an Elder over the sap1's pubkey
         sig_share1: SectionSigShare,
     },
-    /// Elders votes among themselves regarding SectionStates of joins_allowed and voting nodes off
-    /// Once fully aggregated in the SectionStateVote aggregator, the proposal is accepted
-    ProposeSectionState {
-        proposal: SectionStateVote,
-        /// BLS signature share of an Elder over the vote
-        sig_share: SectionSigShare,
-    },
     /// Node events are Node to Elder events about something that happened on a Node.
     NodeEvent(NodeEvent),
     /// Data cmds are orders to perform some data operation, only sent internally in the network.
@@ -228,7 +209,6 @@ impl NodeMsg {
             Self::HandoverAE(_) => State::Handover,
             Self::SectionHandoverPromotion { .. } => State::Handover,
             Self::SectionSplitPromotion { .. } => State::Handover,
-            Self::ProposeSectionState { .. } => State::Propose,
             Self::NodeEvent(_) => State::Node,
             Self::NodeDataCmd(_) => State::Node,
             Self::NodeDataQuery(_) => State::Node,
@@ -255,7 +235,6 @@ impl Display for NodeMsg {
             Self::HandoverAE { .. } => write!(f, "NodeMsg::HandoverAE"),
             Self::SectionHandoverPromotion { .. } => write!(f, "NodeMsg::SectionHandoverPromotion"),
             Self::SectionSplitPromotion { .. } => write!(f, "NodeMsg::SectionSplitPromotion"),
-            Self::ProposeSectionState { .. } => write!(f, "NodeMsg::ProposeSectionState"),
             Self::NodeEvent { .. } => write!(f, "NodeMsg::NodeEvent"),
             Self::NodeDataCmd { .. } => write!(f, "NodeMsg::NodeCmd"),
             Self::NodeDataQuery { .. } => write!(f, "NodeMsg::NodeQuery"),

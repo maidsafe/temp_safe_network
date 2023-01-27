@@ -814,7 +814,7 @@ mod tests {
         init_logger,
         messaging::{
             signature_aggregator::SignatureAggregator,
-            system::{DkgSessionId, NodeMsg, SectionStateVote},
+            system::{DkgSessionId, NodeMsg},
             MsgType, SectionSigShare,
         },
         network_knowledge::{supermajority, NodeState, SectionKeyShare, SectionsDAG},
@@ -1014,15 +1014,10 @@ mod tests {
                                 // Since the dkg session is for the same prefix, the
                                 // lagging node should just complete the elder handover
                                 // without requesting handover.
-                                assert_eq!(cmds.len(), 2);
+                                assert_eq!(cmds.len(), 1);
                                 for cmd in cmds {
                                     let msg = assert_matches!(cmd, Cmd::SendMsg { msg, .. } => msg);
-
                                     match msg {
-                                        NodeMsg::ProposeSectionState {
-                                            proposal: SectionStateVote::JoinsAllowed(..),
-                                            ..
-                                        } => (),
                                         NodeMsg::AntiEntropy { .. } => (),
                                         msg => panic!("Unexpected msg {msg}"),
                                     }

@@ -17,7 +17,7 @@ use crate::node::{
         tests::network_builder::{TestNetwork, TestNetworkBuilder},
     },
     messaging::Peers,
-    relocation_check, ChurnId, Cmd, Error, SectionStateVote,
+    relocation_check, ChurnId, Cmd, Error,
 };
 use cmd_utils::{handle_online_cmd, ProcessAndInspectCmds};
 
@@ -262,77 +262,6 @@ async fn handle_join_request_of_rejoined_node() -> Result<()> {
     // A rejoining node will always be rejected
     assert!(join_cmd.is_none()); // no cmd signals this membership proposal was dropped.
     assert!(!dispatcher
-        .node()
-        .read()
-        .await
-        .membership
-        .as_ref()
-        .ok_or_else(|| eyre!("Membership for the node must be set"))?
-        .is_churn_in_progress());
-    Ok(())
-}
-
-#[tokio::test]
-async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
-    init_logger();
-    let _span = tracing::info_span!("handle_agreement_on_offline_of_non_elder").entered();
-    let prefix = Prefix::default();
-    let env = TestNetworkBuilder::new(thread_rng())
-        .sap(prefix, elder_count(), 1, None, None)
-        .build();
-    let dispatcher = env.get_dispatchers(prefix, 1, 0, None).remove(0);
-    let sk_set = env.get_secret_key_set(prefix, None);
-
-    // get the node state of the non_elder node
-    let node_state = env.get_nodes(prefix, 0, 1, None).remove(0).info().peer();
-    let node_state = NodeState::left(node_state, None);
-
-    let proposal = SectionStateVote::NodeIsOffline(node_state.clone());
-    let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &get_single_sig(&proposal));
-
-    ProcessAndInspectCmds::new(
-        Cmd::HandleSectionDecisionAgreement { proposal, sig },
-        &dispatcher,
-    )
-    .process_all()
-    .await?;
-
-    assert!(!dispatcher
-        .node()
-        .read()
-        .await
-        .network_knowledge()
-        .section_members()
-        .contains(&node_state));
-    Ok(())
-}
-
-#[tokio::test]
-async fn handle_agreement_on_offline_of_elder() -> Result<()> {
-    let prefix = Prefix::default();
-    let env = TestNetworkBuilder::new(thread_rng())
-        .sap(prefix, elder_count(), 0, None, None)
-        .build();
-    let mut elders = env.get_dispatchers(prefix, 2, 0, None);
-    let dispatcher = elders.remove(0);
-    let sk_set = env.get_secret_key_set(prefix, None);
-
-    let remove_elder = elders.remove(0).node().read().await.info().peer();
-    let remove_elder = NodeState::left(remove_elder, None);
-
-    // Handle agreement on the Offline proposal
-    let proposal = SectionStateVote::NodeIsOffline(remove_elder.clone());
-    let sig = TestKeys::get_section_sig_bytes(&sk_set.secret_key(), &get_single_sig(&proposal));
-
-    ProcessAndInspectCmds::new(
-        Cmd::HandleSectionDecisionAgreement { proposal, sig },
-        &dispatcher,
-    )
-    .process_all()
-    .await?;
-
-    // Verify we initiated a membership churn
-    assert!(dispatcher
         .node()
         .read()
         .await
@@ -1080,8 +1009,4 @@ async fn spentbook_spend_with_updated_network_knowledge_should_update_the_node()
     );
 
     Ok(())
-}
-
-fn get_single_sig(proposal: &SectionStateVote) -> Vec<u8> {
-    bincode::serialize(proposal).expect("Failed to serialize")
 }

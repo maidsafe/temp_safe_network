@@ -67,8 +67,6 @@ pub struct FaultDetection {
     pub communication_issues: TimedTracker,
     /// The dkg issues logged against a node, along with a timestamp to expire after some time.
     pub dkg_issues: TimedTracker,
-    /// The elder voting issues logged against a node, along with a timestamp to expire after some time.
-    pub elder_voting_issues: TimedTracker,
     /// The probe issues logged against a node and as yet unfulfilled, along with a timestamp to expire after some time.
     pub probe_issues: TimedTracker,
     /// The network knowledge issues logged against a node, along with a timestamp.
@@ -94,7 +92,6 @@ impl FaultDetection {
             elders,
             communication_issues: BTreeMap::new(),
             dkg_issues: BTreeMap::new(),
-            elder_voting_issues: BTreeMap::new(),
             probe_issues: BTreeMap::new(),
             network_knowledge_issues: BTreeMap::new(),
             unfulfilled_ops: BTreeMap::new(),
@@ -116,10 +113,6 @@ impl FaultDetection {
         match issue_type {
             IssueType::Dkg => {
                 let queue = self.dkg_issues.entry(node_id).or_default();
-                queue.push_back(Instant::now());
-            }
-            IssueType::ElderVoting => {
-                let queue = self.elder_voting_issues.entry(node_id).or_default();
                 queue.push_back(Instant::now());
             }
             IssueType::AeProbeMsg => {
@@ -153,25 +146,6 @@ impl FaultDetection {
                 trace!("Pending dkg session removed for node: {:?}", node_id,);
             } else {
                 trace!("No Pending dkg session found for node: {:?}", node_id);
-            }
-        }
-    }
-
-    /// Removes a Knowledge issue from the node liveness records.
-    pub fn elder_vote_received(&mut self, node_id: &NodeIdentifier) {
-        trace!(
-            "Attempting to remove logged elder_vote issue for {:?}",
-            node_id,
-        );
-
-        if let Some(v) = self.elder_voting_issues.get_mut(node_id) {
-            // only remove the first instance from the vec
-            let prev = v.pop_front();
-
-            if prev.is_some() {
-                trace!("Pending elder_vote issue removed for node: {:?}", node_id,);
-            } else {
-                trace!("No Pending elder_vote issue found for node: {:?}", node_id);
             }
         }
     }
@@ -241,7 +215,6 @@ impl FaultDetection {
             let _ = self.communication_issues.remove(node);
             let _ = self.network_knowledge_issues.remove(node);
             let _ = self.dkg_issues.remove(node);
-            let _ = self.elder_voting_issues.remove(node);
             let _ = self.probe_issues.remove(node);
             let _ = self.unfulfilled_ops.remove(node);
         }
