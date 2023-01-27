@@ -4,31 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.68.5 (2023-01-20)
+## v0.68.6 (2023-01-27)
 
 ### Chore
 
- - <csr-id-21af053a5be2317be356e760c2b581c0f870a396/> happy new year 2023
-
-### New Features
-
- - <csr-id-a8b4af0eaf8295b8506086c24bca05fe3d0f0320/> support non-pretty printing output for '--replicas' dog command arg
-   - Also adding a test to CLI '--replicas' dog cmd argument verifying success and
-   failures are correctly reported after they are returned by the network.
- - <csr-id-cf6daa778c1d4278b444f1a61da3513506c14ea9/> expose a public API to query chunks to specific data replicas
-   - Exposing also an `sn_api` public API to fetch a file from a specified set of
-   data replicas indexes and a `SafeUrl`.
-   - Adding `--replicas` arg to CLI `dog` command which allows the user to perform
-   a check on several data replicas for the content being targeted by specifying their indexes.
- - <csr-id-af19e546e3f4443ffb31c8630ae0eb43396a4bac/> print networks as json
+ - <csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/> fix issues reported by new clippy
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 14 commits contributed to the release over the course of 23 calendar days.
- - 28 days passed between releases.
- - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 6 days passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -38,6 +26,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge branch 'main' into RevertDkgCache ([`24ff625`](https://github.com/maidsafe/safe_network/commit/24ff6257f85922090cfaa5fa83044082d3ef8dab))
+    - fix issues reported by new clippy ([`6b92351`](https://github.com/maidsafe/safe_network/commit/6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916))
+</details>
+
+## v0.68.5 (2023-01-20)
+
+<csr-id-21af053a5be2317be356e760c2b581c0f870a396/>
+
+### Chore
+
+ - <csr-id-21af053a5be2317be356e760c2b581c0f870a396/> happy new year 2023
+
+### Chore
+
+ - <csr-id-783d62461a65eb7c06b0d4f399b97216b6c75519/> sn_interface-0.16.14/sn_client-0.77.8/sn_node-0.72.25/sn_api-0.75.4/sn_cli-0.68.5
+
+### New Features
+
+<csr-id-cf6daa778c1d4278b444f1a61da3513506c14ea9/>
+<csr-id-af19e546e3f4443ffb31c8630ae0eb43396a4bac/>
+
+ - <csr-id-a8b4af0eaf8295b8506086c24bca05fe3d0f0320/> support non-pretty printing output for '--replicas' dog command arg
+   - Also adding a test to CLI '--replicas' dog cmd argument verifying success and
+   failures are correctly reported after they are returned by the network.
+- Exposing also an `sn_api` public API to fetch a file from a specified set of
+   data replicas indexes and a `SafeUrl`.
+- Adding `--replicas` arg to CLI `dog` command which allows the user to perform
+   a check on several data replicas for the content being targeted by specifying their indexes.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 15 commits contributed to the release over the course of 23 calendar days.
+ - 28 days passed between releases.
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.14/sn_client-0.77.8/sn_node-0.72.25/sn_api-0.75.4/sn_cli-0.68.5 ([`783d624`](https://github.com/maidsafe/safe_network/commit/783d62461a65eb7c06b0d4f399b97216b6c75519))
     - Merge #1964 ([`6f08edb`](https://github.com/maidsafe/safe_network/commit/6f08edb32a0e93c879ddd13cda1abc6e6b098889))
     - support non-pretty printing output for '--replicas' dog command arg ([`a8b4af0`](https://github.com/maidsafe/safe_network/commit/a8b4af0eaf8295b8506086c24bca05fe3d0f0320))
     - expose a public API to query chunks to specific data replicas ([`cf6daa7`](https://github.com/maidsafe/safe_network/commit/cf6daa778c1d4278b444f1a61da3513506c14ea9))
@@ -54,7 +88,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     - chore(naming): rename dysfunction - Uses the more common vocabulary in fault tolerance area. ([`f68073f`](https://github.com/maidsafe/safe_network/commit/f68073f2897894375f5a09b870e2bfe4e03c3b10))
 </details>
 
+<csr-unknown>
+ expose a public API to query chunks to specific data replicas print networks as json<csr-unknown/>
+
 ## v0.68.4 (2022-12-22)
+
+<csr-id-4ddc75277726d5d752ff5340c5d885622d76b990/>
+<csr-id-046224649bbbbd2f160cc69b8320a1b127284600/>
 
 ### Chore
 
@@ -84,6 +124,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v0.68.3 (2022-12-20)
 
+<csr-id-a6addd1dde96833d6629e75b418ac2a244ab31f3/>
+
 ### Chore
 
  - <csr-id-a6addd1dde96833d6629e75b418ac2a244ab31f3/> sn_interface-0.16.7/sn_client-0.77.3/sn_node-0.72.11/sn_api-0.75.3/sn_cli-0.68.3
@@ -93,7 +135,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - <csr-id-22402ca6acb0215ecfe9b1fdbf306c0f9cb87d95/> genesis_sap is required to create the `SectionTree`
    - The fields of the tree are assumed to be in sync. But it is not the
    case for a newly created tree.
-- This can be fixed by accepting the genesis sap while creating the tree.
 
 ### Commit Statistics
 
@@ -115,6 +156,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     - Merge #1848 ([`ddaf857`](https://github.com/maidsafe/safe_network/commit/ddaf8571749c142e9960407cfd9cfa94231a36ad))
     - genesis_sap is required to create the `SectionTree` ([`22402ca`](https://github.com/maidsafe/safe_network/commit/22402ca6acb0215ecfe9b1fdbf306c0f9cb87d95))
 </details>
+
+<csr-unknown>
+This can be fixed by accepting the genesis sap while creating the tree.<csr-unknown/>
 
 ## v0.68.2 (2022-12-16)
 

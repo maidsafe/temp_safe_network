@@ -5,14 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.1.3 (2023-01-26)
+## v0.1.4 (2023-01-27)
 
-### Bug Fixes
+### Chore
 
- - <csr-id-42f2c3709af96207b10b711878d03d42781bfdba/> send_out_bytes was not reporting send failures
-   - sn_comms::Comm::send_out_bytes was spawning a task when sending a msg,
-   now it's the caller's duty to do so if ever required.
-   - Run sn_comms unit tests in CI/Bors.
+ - <csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/> fix issues reported by new clippy
 
 ### Commit Statistics
 
@@ -29,11 +26,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge branch 'main' into RevertDkgCache ([`24ff625`](https://github.com/maidsafe/safe_network/commit/24ff6257f85922090cfaa5fa83044082d3ef8dab))
+    - fix issues reported by new clippy ([`6b92351`](https://github.com/maidsafe/safe_network/commit/6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916))
+</details>
+
+## v0.1.3 (2023-01-26)
+
+### Chore
+
+ - <csr-id-d51dd695437dac1695447491d4f298334b7e0fd1/> sn_comms-0.1.3/sn_node-0.72.33
+
+### Bug Fixes
+
+ - <csr-id-42f2c3709af96207b10b711878d03d42781bfdba/> send_out_bytes was not reporting send failures
+   - sn_comms::Comm::send_out_bytes was spawning a task when sending a msg,
+   now it's the caller's duty to do so if ever required.
+- Run sn_comms unit tests in CI/Bors.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_comms-0.1.3/sn_node-0.72.33 ([`d51dd69`](https://github.com/maidsafe/safe_network/commit/d51dd695437dac1695447491d4f298334b7e0fd1))
     - Merge #2025 ([`4baaae3`](https://github.com/maidsafe/safe_network/commit/4baaae3022d0295715e58f6f74bac3c6b2547be1))
     - send_out_bytes was not reporting send failures ([`42f2c37`](https://github.com/maidsafe/safe_network/commit/42f2c3709af96207b10b711878d03d42781bfdba))
 </details>
 
 ## v0.1.2 (2023-01-25)
+
+<csr-id-a4d295ccdddea3d4d11bca5eb0236a5447c75633/>
+<csr-id-6ba7b5a12ed8d15fb807524ee90dc250068c1004/>
 
 ### Chore
 
@@ -81,6 +114,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-dbfa4ac0dd23e76060b8df44c4666a30bb9b317f/>
 <csr-id-a86d5ad1f352c9000488197ece8edb716941d601/>
 <csr-id-9aaf91bfedd9fcf040f18e0762ff2cbbc03b4d6f/>
+<csr-id-0ab0c302dcc6ce32b0b71d696b0707a2c50cfa3a/>
+<csr-id-12a6620525a5767d906037a74caf0e38af3da596/>
 
 ### Chore
 
@@ -109,8 +144,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    a response bi-stream allows us to decouple such logic from the rest, but it also
    allows us to have unit tests within sn_node which verify the outcome of processing
    Cmds without sending any msg over the wire.
-- We are here also changing Cmd::SendMsg to make/restricting it exclusively for
-   sending msgs to nodes over uni-streams.
 
 ### Bug Fixes
 
@@ -167,6 +200,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - make a new crate for comm ([`a86d5ad`](https://github.com/maidsafe/safe_network/commit/a86d5ad1f352c9000488197ece8edb716941d601))
 </details>
 
+<csr-unknown>
+We are here also changing Cmd::SendMsg to make/restricting it exclusively forsending msgs to nodes over uni-streams.<csr-unknown/>
+
 ## v0.1.0 (2023-01-20)
 
 <csr-id-95ae6f9e8e30184a24465a35626288af64d7995e/>
@@ -209,4 +245,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-unknown>
 We are here also changing Cmd::SendMsg to make/restricting it exclusively forsending msgs to nodes over uni-streams.<csr-unknown/>
+<csr-unknown/>
 

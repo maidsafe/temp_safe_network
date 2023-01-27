@@ -5,20 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.33 (2023-01-26)
+## v0.72.34 (2023-01-27)
 
-### Bug Fixes
+### Chore
 
- - <csr-id-42f2c3709af96207b10b711878d03d42781bfdba/> send_out_bytes was not reporting send failures
-   - sn_comms::Comm::send_out_bytes was spawning a task when sending a msg,
-   now it's the caller's duty to do so if ever required.
-   - Run sn_comms unit tests in CI/Bors.
+ - <csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/> fix issues reported by new clippy
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
+ - 3 commits contributed to the release.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -29,6 +26,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2033 #2034 ([`06581d1`](https://github.com/maidsafe/safe_network/commit/06581d1ebbb23f432610d48bb3b773c742c0baaa))
+    - Merge branch 'main' into RevertDkgCache ([`24ff625`](https://github.com/maidsafe/safe_network/commit/24ff6257f85922090cfaa5fa83044082d3ef8dab))
+    - fix issues reported by new clippy ([`6b92351`](https://github.com/maidsafe/safe_network/commit/6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916))
+</details>
+
+## v0.72.33 (2023-01-26)
+
+### Chore
+
+ - <csr-id-d51dd695437dac1695447491d4f298334b7e0fd1/> sn_comms-0.1.3/sn_node-0.72.33
+ - <csr-id-2e1061a08e591767eedc837369ada0843ce62701/> remove a dkg vote clone only for logging
+   Writes the debug to a var and uses that instead.
+   Dkg vote clones are a low hanging mem fruit
+
+### Bug Fixes
+
+ - <csr-id-42f2c3709af96207b10b711878d03d42781bfdba/> send_out_bytes was not reporting send failures
+   - sn_comms::Comm::send_out_bytes was spawning a task when sending a msg,
+   now it's the caller's duty to do so if ever required.
+- Run sn_comms unit tests in CI/Bors.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 5 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_comms-0.1.3/sn_node-0.72.33 ([`d51dd69`](https://github.com/maidsafe/safe_network/commit/d51dd695437dac1695447491d4f298334b7e0fd1))
+    - remove a dkg vote clone only for logging ([`2e1061a`](https://github.com/maidsafe/safe_network/commit/2e1061a08e591767eedc837369ada0843ce62701))
+    - Revert "feat: reduce the amount of old DKG sessions we keep" ([`98d0a11`](https://github.com/maidsafe/safe_network/commit/98d0a11fca1db889c33b04a72c78d0a5b952e65b))
     - Merge #2025 ([`4baaae3`](https://github.com/maidsafe/safe_network/commit/4baaae3022d0295715e58f6f74bac3c6b2547be1))
     - send_out_bytes was not reporting send failures ([`42f2c37`](https://github.com/maidsafe/safe_network/commit/42f2c3709af96207b10b711878d03d42781bfdba))
 </details>
@@ -36,6 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.72.32 (2023-01-26)
 
 <csr-id-f31f3fcc09c503eeb8a580f73b126030da8e11a4/>
+<csr-id-6ccbaa335378fd02a93447b67b9dec61c17ea1d0/>
 
 ### Chore
 

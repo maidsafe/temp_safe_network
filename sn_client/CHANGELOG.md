@@ -1113,7 +1113,37 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
+## v0.77.9 (2023-01-27)
+
+### Chore
+
+ - <csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/> fix issues reported by new clippy
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 6 days passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge branch 'main' into RevertDkgCache ([`24ff625`](https://github.com/maidsafe/safe_network/commit/24ff6257f85922090cfaa5fa83044082d3ef8dab))
+    - fix issues reported by new clippy ([`6b92351`](https://github.com/maidsafe/safe_network/commit/6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916))
+</details>
+
 ## v0.77.8 (2023-01-20)
+
+<csr-id-21af053a5be2317be356e760c2b581c0f870a396/>
+<csr-id-4b1bc4edfad3ad25711a4833181a629746abba19/>
+<csr-id-04525595bc5de39f85a128cfb691644b71a3fb79/>
 
 ### Chore
 
@@ -1125,30 +1155,34 @@ needed, as they keypair itself contains the Arcs we need.
    need more time (when under stress) to send back a response before closing them.
    - Setting sn_client default idle_timeout to match query/cmd timeout values.
 
+### Chore
+
+ - <csr-id-783d62461a65eb7c06b0d4f399b97216b6c75519/> sn_interface-0.16.14/sn_client-0.77.8/sn_node-0.72.25/sn_api-0.75.4/sn_cli-0.68.5
+
 ### New Features
 
  - <csr-id-cf6daa778c1d4278b444f1a61da3513506c14ea9/> expose a public API to query chunks to specific data replicas
    - Exposing also an `sn_api` public API to fetch a file from a specified set of
    data replicas indexes and a `SafeUrl`.
-   - Adding `--replicas` arg to CLI `dog` command which allows the user to perform
+- Adding `--replicas` arg to CLI `dog` command which allows the user to perform
    a check on several data replicas for the content being targeted by specifying their indexes.
 
 ### Bug Fixes
 
  - <csr-id-986ef817c053c4b5d8de78d13429fa85244228d9/> retry only once when check-replicas test query fails due to diff responses
    - Run e2e sn_client tests in multi-threaded mode.
-   - Retrying a test query only once, and only if the failure was due to receiving
+- Retrying a test query only once, and only if the failure was due to receiving
    different responses from the data replicas, which may be due to a temporary out
    of sync. We've seen this very occasionally in CI.
-   - Wait for stream to be finished to consider msg was sent successfully by sn_client.
+- Wait for stream to be finished to consider msg was sent successfully by sn_client.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 19 commits contributed to the release over the course of 23 calendar days.
- - 23 days passed between releases.
- - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 20 commits contributed to the release over the course of 23 calendar days.
+ - 24 days passed between releases.
+ - 6 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -1158,6 +1192,7 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.16.14/sn_client-0.77.8/sn_node-0.72.25/sn_api-0.75.4/sn_cli-0.68.5 ([`783d624`](https://github.com/maidsafe/safe_network/commit/783d62461a65eb7c06b0d4f399b97216b6c75519))
     - Merge #1930 #1993 ([`1d2a822`](https://github.com/maidsafe/safe_network/commit/1d2a8220f77743b03ff85c6a7083b8ee22534f44))
     - retry only once when check-replicas test query fails due to diff responses ([`986ef81`](https://github.com/maidsafe/safe_network/commit/986ef817c053c4b5d8de78d13429fa85244228d9))
     - Merge #1964 ([`6f08edb`](https://github.com/maidsafe/safe_network/commit/6f08edb32a0e93c879ddd13cda1abc6e6b098889))
@@ -1181,6 +1216,8 @@ needed, as they keypair itself contains the Arcs we need.
 
 ## v0.77.7 (2022-12-27)
 
+<csr-id-a38cd49958df82fd65d0a3f13670693f40a1e6b2/>
+
 ### Chore
 
  - <csr-id-a38cd49958df82fd65d0a3f13670693f40a1e6b2/> sn_interface-0.16.13/sn_client-0.77.7/sn_node-0.72.24
@@ -1190,9 +1227,6 @@ needed, as they keypair itself contains the Arcs we need.
  - <csr-id-220fd52ab3e1bac776ba74793d5042de220bb315/> set default keep-alive interval to be 1/2 of idle_timeout value set
    - By default the sn_client keep_alive msgs interval will now be set to 1/2 the
    value set for the idle_timeout value.
-- Removing unused ClientBuilder::cmd_ack_wait config value.
-- Decreasing the CI timeout for sn_client, sn_api, and CLI tests, to 7mins.
-- New LogMarker::IncomingConnection logged by sn_node.
 
 ### Commit Statistics
 
@@ -1214,6 +1248,9 @@ needed, as they keypair itself contains the Arcs we need.
     - Merge #1924 ([`be2cded`](https://github.com/maidsafe/safe_network/commit/be2cdedb19154adf324782d7178f0e25018cd16c))
     - set default keep-alive interval to be 1/2 of idle_timeout value set ([`220fd52`](https://github.com/maidsafe/safe_network/commit/220fd52ab3e1bac776ba74793d5042de220bb315))
 </details>
+
+<csr-unknown>
+Removing unused ClientBuilder::cmd_ack_wait config value.Decreasing the CI timeout for sn_client, sn_api, and CLI tests, to 7mins.New LogMarker::IncomingConnection logged by sn_node.<csr-unknown/>
 
 ## v0.77.6 (2022-12-22)
 
