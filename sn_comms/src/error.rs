@@ -6,8 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::peer_session::PeerSessionError;
-
 use sn_interface::types::Peer;
 use thiserror::Error;
 
@@ -21,8 +19,6 @@ pub enum Error {
     /// Any unknown node comms should be bidi, initiated by the other side
     #[error("Attempted to create a connection to an unknown node: {0:?}")]
     CreatingConnectionToUnknownNode(Peer),
-    #[error("Peer channel errored")]
-    PeerSessionChannel,
     #[error("Cannot connect to the endpoint: {0}")]
     CannotConnectEndpoint(#[from] qp2p::EndpointError),
     #[error("Address not reachable: {0}")]
@@ -31,9 +27,6 @@ pub enum Error {
     InvalidMessage,
     #[error("Failed to send a message to {0}")]
     FailedSend(Peer),
-    /// Error Sending Cmd in to node for processing
-    #[error("Error sending Cmd to node {0:?} for processing.")]
-    SendError(#[from] PeerSessionError),
 }
 
 impl From<qp2p::ClientEndpointError> for Error {

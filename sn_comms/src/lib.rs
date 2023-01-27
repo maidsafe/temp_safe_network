@@ -47,15 +47,9 @@ mod error;
 mod listener;
 mod peer_session;
 
-pub use self::{
-    error::{Error, Result},
-    peer_session::PeerSessionError,
-};
+pub use self::error::{Error, Result};
 
-use self::{
-    listener::MsgListener,
-    peer_session::{PeerSession, SendStatus, SendWatcher},
-};
+use self::{listener::MsgListener, peer_session::PeerSession};
 
 use sn_interface::{
     messaging::{MsgId, WireMsg},
@@ -195,20 +189,15 @@ impl Comm {
         trace!("Sessions known of: {:?}", sessions.len());
 
         match peer_session.send(msg_id, bytes).await {
-            Ok(watcher) => {
-                if Self::is_sent(watcher, msg_id, peer).await {
-                    trace!("Msg {msg_id:?} sent to {peer:?}");
-                    return Ok(());
-                }
+            Ok(()) => {
+                trace!("Msg {msg_id:?} sent to {peer:?}");
+                Ok(())
             }
             Err(error) => {
-                error!(
-                    "Sending message (msg_id: {msg_id:?}) to {peer:?} failed as \
-                    we have disconnected from the peer. (Error is: {error})",
-                );
+                error!("Sending message (msg_id: {msg_id:?}) to {peer:?} failed: {error}");
+                Err(Error::FailedSend(peer))
             }
         }
-        Err(Error::FailedSend(peer))
     }
 
     /// Sends the payload on a new bidi-stream and returns the response.
@@ -222,55 +211,17 @@ impl Comm {
         // TODO: tweak messaging to just allow passthrough
         debug!("Trying to get {peer:?} session in order to send: {msg_id:?}");
 
-        let mut peer = self.get_session(&peer).await?;
+        let mut session = self.get_session(&peer).await?;
         debug!("Session of {peer:?} retrieved for {msg_id:?}");
-        let adult_response_bytes = peer.send_with_bi_return_response(bytes, msg_id).await?;
+        let adult_response_bytes = session
+            .send_with_bi_return_response(bytes, msg_id)
+            .await
+            .map_err(|err| {
+                error!("Failed sending {msg_id:?} to {peer:?}: {err:?}");
+                Error::FailedSend(peer)
+            })?;
         debug!("Peer response from {peer:?} is in for {msg_id:?}");
         WireMsg::from(adult_response_bytes).map_err(|_| Error::InvalidMessage)
-    }
-
-    /// Waits until msg is sent or there's an error.
-    /// Returns `true` if sent succedeed.
-    async fn is_sent(mut watcher: SendWatcher, msg_id: MsgId, peer: Peer) -> bool {
-        // here we can monitor the sending
-        // and we now watch the status of the send
-        loop {
-            match &mut watcher.await_change().await {
-                SendStatus::Sent => {
-                    return true;
-                }
-                SendStatus::Enqueued => {
-                    // this block should be unreachable, as Enqueued is the initial state
-                    // but let's handle it anyway..
-                    continue; // moves on to awaiting a new change
-                }
-                SendStatus::WatcherDropped => {
-                    // the send job is dropped for some reason,
-                    // that happens when the peer session dropped
-                    // or the msg was sent, meaning the send didn't actually fail,
-                    error!(
-                        "Sending message (msg_id: {msg_id:?}) to {peer:?} possibly failed, as monitoring of the send job was aborted",
-                    );
-                    return false;
-                }
-                SendStatus::TransientError(error) => {
-                    // An individual connection could have been lost when we tried to send. This
-                    // could indicate the connection timed out whilst it was held, or some other
-                    // transient connection issue. We don't treat this as a failed send, but we
-                    // do sleep a little longer here.
-                    // Retries are managed by the peer session, where it will open a new
-                    // connection.
-                    debug!("Transient error when sending to peer {peer}: {error}");
-                    continue; // moves on to awaiting a new change
-                }
-                SendStatus::MaxRetriesReached => {
-                    error!(
-                        "Sending message (msg_id: {msg_id:?}) to {peer:?} failed, as we've reached maximum retries",
-                    );
-                    return false;
-                }
-            }
-        }
     }
 
     /// Get a PeerSession
