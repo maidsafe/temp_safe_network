@@ -222,7 +222,7 @@ fn cat_should_display_file_contents_when_nrs_url_has_version() -> Result<()> {
     let (_, nrs_url, _) = parse_nrs_register_output(&output)?;
     let version = nrs_url.content_version();
 
-    let mut nrs_url = SafeUrl::from_url(&format!("safe://{}", public_name))?;
+    let mut nrs_url = SafeUrl::from_url(&format!("safe://{public_name}"))?;
     nrs_url.set_content_version(version);
     safe_cmd(&config_dir, ["cat", &nrs_url.to_string()], Some(0))?
         .assert()
@@ -299,7 +299,7 @@ fn cat_should_display_file_contents_when_nrs_url_points_to_file() -> Result<()> 
         Some(0),
     )?;
 
-    let nrs_url = SafeUrl::from_url(&format!("safe://{}", public_name))?;
+    let nrs_url = SafeUrl::from_url(&format!("safe://{public_name}"))?;
     safe_cmd(&config_dir, ["cat", &nrs_url.to_string()], Some(0))?
         .assert()
         .stdout(predicate::str::contains("exists"));
@@ -345,8 +345,7 @@ async fn cat_should_display_wallet_balances() -> Result<()> {
     safe_cmd(&config_dir, ["cat", &wallet_xorurl], Some(0))?
         .assert()
         .stdout(predicate::str::contains(format!(
-            "Spendable balances of wallet at \"{}\":",
-            wallet_xorurl
+            "Spendable balances of wallet at \"{wallet_xorurl}\":",
         )))
         .stdout(predicate::str::contains("my-first-dbc"))
         .stdout(predicate::str::contains(balance.to_string()))
@@ -501,7 +500,7 @@ fn cat_should_display_nrs_map_container_contents() -> Result<()> {
         .ok_or_else(|| eyre!("should have link"))?;
 
     let site_name = get_random_string();
-    let container_xorurl = SafeUrl::from_url(&format!("safe://{}", site_name))?.to_xorurl_string();
+    let container_xorurl = SafeUrl::from_url(&format!("safe://{site_name}"))?.to_xorurl_string();
     safe_cmd(
         &config_dir,
         [
@@ -539,16 +538,13 @@ fn cat_should_display_nrs_map_container_contents() -> Result<()> {
     safe_cmd(&config_dir, ["cat", &container_xorurl], Some(0))?
         .assert()
         .stdout(predicate::str::contains(format!(
-            "{site_name}: {}",
-            files_container_xor
+            "{site_name}: {files_container_xor}",
         )))
         .stdout(predicate::str::contains(format!(
-            "test.{site_name}: {}",
-            test_file_link
+            "test.{site_name}: {test_file_link}",
         )))
         .stdout(predicate::str::contains(format!(
-            "another.{site_name}: {}",
-            another_file_link
+            "another.{site_name}: {another_file_link}",
         )));
 
     Ok(())

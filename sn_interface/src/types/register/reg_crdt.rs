@@ -30,7 +30,7 @@ pub struct EntryHash(pub crdts::merkle_reg::Hash);
 
 impl Debug for EntryHash {
     fn fmt(&self, formatter: &mut Formatter) -> FmtResult {
-        write!(formatter, "{}", self)
+        write!(formatter, "{self}")
     }
 }
 
@@ -73,7 +73,7 @@ impl Display for RegisterCrdt {
             if i > 0 {
                 write!(f, ", ")?;
             }
-            write!(f, "<{:?}>", entry,)?;
+            write!(f, "<{entry:?}>")?;
         }
         write!(f, ")")
     }

@@ -29,7 +29,7 @@ impl RealPath for FilesMap {
 
         // Ensure input is an absolute path
         if &fpath[0..1] != "/" {
-            let msg = format!("Relative path not supported. {}", fpath);
+            let msg = format!("Relative path not supported. {fpath}");
             return Err(Error::InvalidInput(msg));
         }
 
@@ -70,8 +70,7 @@ impl RealPath for FilesMap {
                                 let target_str = &fileitem.getattr("symlink_target")?;
                                 if target_str.is_empty() {
                                     let msg = format!(
-                                        "Invalid/corrupted symlink '{}'. missing target.",
-                                        tmppath
+                                        "Invalid/corrupted symlink '{tmppath}'. missing target.",
                                     );
                                     return Err(Error::ContentNotFound(msg));
                                 }

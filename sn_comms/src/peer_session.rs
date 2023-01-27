@@ -35,7 +35,7 @@ impl PeerSession {
 
         // Spawn the peer session worker, which will stop automatically when
         // the PeerSession is dropped as the channel will be dropped too.
-        let _ =
+        let _handle =
             tokio::task::spawn(PeerSessionWorker::new(link.clone(), sender.clone()).run(receiver));
 
         PeerSession {
@@ -44,7 +44,7 @@ impl PeerSession {
         }
     }
 
-    /// Sends out a UsrMsg on a bidi connection and awaits response bytes
+    /// Sends out a UsrMsg on a bidi connection and awaits response bytes.
     /// As such this may be long running if response is returned slowly.
     /// This manages retries over bidi connection attempts
     pub(crate) async fn send_with_bi_return_response(
@@ -63,11 +63,7 @@ impl PeerSession {
     }
 
     #[instrument(skip(self, bytes))]
-    pub(crate) async fn send_using_session(
-        &self,
-        msg_id: MsgId,
-        bytes: UsrMsgBytes,
-    ) -> Result<SendWatcher> {
+    pub(crate) async fn send(&self, msg_id: MsgId, bytes: UsrMsgBytes) -> Result<SendWatcher> {
         let (watcher, reporter) = status_watching();
 
         let job = SendJob {

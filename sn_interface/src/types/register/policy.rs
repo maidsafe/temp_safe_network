@@ -75,8 +75,8 @@ impl Policy {
                 .or_else(|| self.is_action_allowed_by_user(&User::Anyone, action))
             {
                 Some(true) => Ok(()),
-                Some(false) => Err(Error::AccessDenied(requester)),
-                None => Err(Error::AccessDenied(requester)),
+                Some(false) => Err(Error::AccessDenied(Box::new(requester))),
+                None => Err(Error::AccessDenied(Box::new(requester))),
             }
         }
     }

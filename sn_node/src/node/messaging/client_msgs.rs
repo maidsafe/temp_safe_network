@@ -320,10 +320,7 @@ impl MyNode {
             .flat_map(|(k, v)| if &k == key_image { v } else { vec![] })
             .collect();
         if public_commitments.is_empty() {
-            let msg = format!(
-                "There are no commitments for the given key image {:?}",
-                key_image
-            );
+            let msg = format!("There are no commitments for the given key image {key_image:?}",);
             debug!("Dropping spend request: {msg}");
             return Err(Error::SpentbookError(msg));
         }
@@ -361,8 +358,7 @@ impl MyNode {
         let mut entry = vec![].writer();
         rmp_serde::encode::write(&mut entry, spent_proof_share).map_err(|err| {
             Error::SpentbookError(format!(
-                "Failed to serialise SpentProofShare to insert it into the spentbook (Register): {:?}",
-                err
+                "Failed to serialise SpentProofShare to insert it into the spentbook (Register): {err:?}",
             ))
         })?;
 

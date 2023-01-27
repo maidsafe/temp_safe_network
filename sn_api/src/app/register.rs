@@ -59,10 +59,7 @@ impl Safe {
             .create_register(xorname, tag, policy(owner))
             .await
             .map_err(|e| {
-                Error::NetDataError(format!(
-                    "Failed to prepare store Register operation: {:?}",
-                    e
-                ))
+                Error::NetDataError(format!("Failed to prepare store Register operation: {e:?}",))
             })?;
 
         client.publish_register_ops(op_batch).await?;
@@ -109,18 +106,16 @@ impl Safe {
                 match client.read_register(address).await {
                     Ok(entry) => Ok(entry),
                     Err(ClientError::NetworkDataError(SafeNdError::NoSuchEntry(_))) => Err(
-                        Error::EmptyContent(format!("Empty Register found at \"{}\"", url)),
+                        Error::EmptyContent(format!("Empty Register found at \"{url}\"")),
                     ),
                     Err(ClientError::ErrorMsg {
                         source: ErrorMsg::AccessDenied(_),
                         ..
                     }) => Err(Error::AccessDenied(format!(
-                        "Couldn't read entry from Register found at \"{}\"",
-                        url
+                        "Couldn't read entry from Register found at \"{url}\"",
                     ))),
                     Err(err) => Err(Error::NetDataError(format!(
-                        "Failed to read latest value from Register data: {:?}",
-                        err
+                        "Failed to read latest value from Register data: {err:?}",
                     ))),
                 }
             }
@@ -132,12 +127,10 @@ impl Safe {
                 Ok(data)
             }
             Err(Error::EmptyContent(_)) => Err(Error::EmptyContent(format!(
-                "Register found at \"{}\" was empty",
-                url
+                "Register found at \"{url}\" was empty",
             ))),
             Err(Error::ContentNotFound(_)) => Err(Error::ContentNotFound(format!(
-                "No Register found at \"{}\"",
-                url
+                "No Register found at \"{url}\"",
             ))),
             other_err => other_err,
         }
@@ -165,9 +158,8 @@ impl Safe {
                     Error::HashNotFound(hash)
                 } else {
                     Error::NetDataError(format!(
-                        "Failed to retrieve entry with hash '{}' from Register data: {:?}",
+                        "Failed to retrieve entry with hash '{}' from Register data: {err:?}",
                         hex::encode(hash.0),
-                        err
                     ))
                 }
             })
@@ -200,14 +192,12 @@ impl Safe {
                 },
             ) => {
                 return Err(Error::AccessDenied(format!(
-                    "Couldn't write data on Register found at \"{}\"",
-                    url
+                    "Couldn't write data on Register found at \"{url}\"",
                 )));
             }
             Err(err) => {
                 return Err(Error::NetDataError(format!(
-                    "Failed to write data on Register: {:?}",
-                    err
+                    "Failed to write data on Register: {err:?}"
                 )));
             }
         };
@@ -222,9 +212,8 @@ impl Safe {
             DataAddress::Register(reg_address) => reg_address,
             other => {
                 return Err(Error::ContentError(format!(
-                    "The url {} has an {:?} address. \
+                    "The url {url} has an {other:?} address. \
                     To fetch register entries, this url must refer to a register.",
-                    url, other
                 )))
             }
         };
@@ -289,7 +278,7 @@ mod tests {
             Err(Error::AccessDenied(msg)) => {
                 assert_eq!(
                     msg,
-                    format!("Couldn't write data on Register found at \"{}\"", xorurl)
+                    format!("Couldn't write data on Register found at \"{xorurl}\"")
                 );
             }
             Err(err) => bail!("Error returned is not the expected: {:?}", err),

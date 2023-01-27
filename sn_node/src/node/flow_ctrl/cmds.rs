@@ -223,7 +223,7 @@ impl fmt::Display for Cmd {
                 write!(f, "HandleMsg {:?}", wire_msg.msg_id())
             }
             Cmd::UpdateNetworkAndHandleValidClientMsg { msg_id, msg, .. } => {
-                write!(f, "UpdateAndHandleValidClientMsg {:?}: {:?}", msg_id, msg)
+                write!(f, "UpdateAndHandleValidClientMsg {msg_id:?}: {msg:?}")
             }
             Cmd::HandleFailedSendToNode { peer, msg_id } => {
                 write!(f, "HandlePeerFailedSend({:?}, {:?})", peer.name(), msg_id)
@@ -245,7 +245,7 @@ impl fmt::Display for Cmd {
             }
             Cmd::EnqueueDataForReplication { .. } => write!(f, "EnqueueDataForReplication"),
             Cmd::TrackNodeIssue { name, issue } => {
-                write!(f, "TrackNodeIssue {:?}, {:?}", name, issue)
+                write!(f, "TrackNodeIssue {name:?}, {issue:?}")
             }
             Cmd::ProposeVoteNodesOffline(_) => write!(f, "ProposeOffline"),
             Cmd::SetJoinsAllowed { .. } => write!(f, "SetJoinsAllowed"),

@@ -201,7 +201,7 @@ impl Safe {
             safe_data_vec.push(safe_data);
 
             if indirections_limit == 0 {
-                return Err(Error::ContentError(format!("The maximum number of indirections ({}) was reached when trying to resolve the URL provided", INDIRECTION_LIMIT)));
+                return Err(Error::ContentError(format!("The maximum number of indirections ({INDIRECTION_LIMIT}) was reached when trying to resolve the URL provided")));
             }
 
             indirections_limit -= 1;
@@ -339,7 +339,7 @@ mod tests {
         safe_url.set_content_version(Some(version0));
         let site_name = random_nrs_name();
         let _ = safe.nrs_add(&site_name, &safe_url).await?;
-        let nrs_url = format!("safe://{}", site_name);
+        let nrs_url = format!("safe://{site_name}");
 
         let content = safe.fetch(&nrs_url, None).await?;
 
@@ -404,7 +404,7 @@ mod tests {
         let (nrs_resolution_url, did_create) =
             safe.nrs_add(&site_name, &files_container_url).await?;
         assert!(did_create);
-        let nrs_url = format!("safe://{}", site_name);
+        let nrs_url = format!("safe://{site_name}");
 
         // this should resolve to a FilesContainer
         let content = safe.fetch(&nrs_url, None).await?;
@@ -583,7 +583,7 @@ mod tests {
         safe_url.set_content_version(Some(version0));
         let site_name = random_nrs_name();
         let _ = safe.nrs_add(&site_name, &safe_url).await?;
-        let nrs_url = format!("safe://{}/test.md", site_name);
+        let nrs_url = format!("safe://{site_name}/test.md");
 
         // read a local file content (for comparison)
         let mut file = File::open("./testdata/test.md")
@@ -678,7 +678,7 @@ mod tests {
             }
             Err(Error::ContentError(msg)) => assert_eq!(
                 msg,
-                format!("Cannot get relative path of Immutable Data \"{}\"", path)
+                format!("Cannot get relative path of Immutable Data \"{path}\"")
             ),
             other => bail!("Error returned is not the expected one: {:?}", other),
         };
@@ -694,7 +694,7 @@ mod tests {
             Err(Error::ContentError(msg)) => {
                 assert_eq!(
                     msg,
-                    format!("Cannot get relative path of Immutable Data \"{}\"", path)
+                    format!("Cannot get relative path of Immutable Data \"{path}\"")
                 );
                 Ok(())
             }

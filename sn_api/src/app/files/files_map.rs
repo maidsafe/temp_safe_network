@@ -80,7 +80,7 @@ impl GetAttr for FileInfo {
     fn getattr(&self, key: &str) -> Result<&str> {
         match self.get(key) {
             Some(v) => Ok(v),
-            None => Err(Error::EntryNotFound(format!("key not found: {}", key))),
+            None => Err(Error::EntryNotFound(format!("key not found: {key}"))),
         }
     }
 }
@@ -125,7 +125,7 @@ pub(crate) async fn add_or_update_file_item(
             info!("Skipping file \"{}\": {:?}", file_link.unwrap_or(""), err);
             processed_files.insert(
                 file_name.to_path_buf(),
-                FilesMapChange::Failed(format!("{}", err)),
+                FilesMapChange::Failed(format!("{err}")),
             );
 
             false
@@ -194,14 +194,12 @@ pub(crate) fn file_map_for_path(files_map: FilesMap, path: &str) -> Result<Files
     if let Some(file_info) = files_map.get(&realpath) {
         let file_type = file_info.get("type").ok_or_else(|| {
             Error::ContentError(format!(
-                "corrupt FileInfo: missing a \"type\" property at: {}",
-                path
+                "corrupt FileInfo: missing a \"type\" property at: {path}"
             ))
         })?;
         if FileMeta::filetype_is_symlink(file_type) {
             return Err(Error::ContentError(format!(
-                "symlink should not be present in resolved real path: {}",
-                realpath
+                "symlink should not be present in resolved real path: {realpath}"
             )));
         } else if FileMeta::filetype_is_file(file_type) {
             return Ok(files_map);
@@ -230,8 +228,7 @@ pub(crate) fn get_file_link_and_metadata(
     if let Some(file_info) = files_map.get(&realpath) {
         let file_type = file_info.get("type").ok_or_else(|| {
             Error::ContentError(format!(
-                "corrupt FileInfo: missing a \"type\" property at: {}",
-                path
+                "corrupt FileInfo: missing a \"type\" property at: {path}",
             ))
         })?;
 
@@ -239,8 +236,7 @@ pub(crate) fn get_file_link_and_metadata(
             // get link
             let link = file_info.get("link").ok_or_else(|| {
                 Error::ContentError(format!(
-                    "corrupt FileInfo: missing a \"link\" property at path: {}",
-                    path
+                    "corrupt FileInfo: missing a \"link\" property at path: {path}",
                 ))
             })?;
 
@@ -261,7 +257,7 @@ pub(crate) fn get_file_link_and_metadata(
 fn filesmap_chroot(urlpath: &str, files_map: &FilesMap) -> Result<FilesMap> {
     let mut filtered_filesmap = FilesMap::default();
     let folder_path = if !urlpath.ends_with('/') {
-        format!("{}/", urlpath)
+        format!("{urlpath}/")
     } else {
         urlpath.to_string()
     };
@@ -275,8 +271,7 @@ fn filesmap_chroot(urlpath: &str, files_map: &FilesMap) -> Result<FilesMap> {
 
     if filtered_filesmap.is_empty() {
         Err(Error::ContentError(format!(
-            "no data found for path: {}",
-            folder_path
+            "no data found for path: {folder_path}"
         )))
     } else {
         Ok(filtered_filesmap)

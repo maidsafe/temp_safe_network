@@ -54,7 +54,7 @@ fn setup_completions_dumpone(shell: Shell, output_fmt: OutputFmt) -> Result<()> 
         // will be serialized as a string.  no object container.
         match std::str::from_utf8(&buf) {
             Ok(v) => println!("{}", serialise_output(v, output_fmt)),
-            Err(e) => println!("Invalid UTF-8 sequence: {}", e),
+            Err(err) => println!("Invalid UTF-8 sequence: {err}"),
         };
     }
 
@@ -72,7 +72,7 @@ fn setup_completions_dumpall(output_fmt: OutputFmt) -> Result<()> {
         for shell in shells {
             let buf = gen_completions_for_shell(*shell)?;
 
-            println!("--- {} ---", shell);
+            println!("--- {shell} ---");
 
             std::io::stdout()
                 .write_all(&buf)
@@ -90,7 +90,7 @@ fn setup_completions_dumpall(output_fmt: OutputFmt) -> Result<()> {
                 Ok(v) => {
                     map.insert(shell.to_string(), serde_json::json!(v));
                 }
-                Err(e) => println!("Invalid UTF-8 sequence: {}", e),
+                Err(err) => println!("Invalid UTF-8 sequence: {err}"),
             };
         }
 

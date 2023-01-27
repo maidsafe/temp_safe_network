@@ -66,8 +66,8 @@ pub enum ClientMsg {
 impl Display for ClientMsg {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Cmd(cmd) => write!(f, "ClientMsg::Cmd({:?})", cmd),
-            Self::Query(query) => write!(f, "ClientMsg::Query({:?})", query),
+            Self::Cmd(cmd) => write!(f, "ClientMsg::Cmd({cmd:?})"),
+            Self::Query(query) => write!(f, "ClientMsg::Query({query:?})"),
         }
     }
 }
@@ -347,7 +347,7 @@ mod tests {
         if let Some(key) = gen_keys().first() {
             let errored_response =
                 QueryResponse::GetRegister(Err(Error::AccessDenied(User::Key(*key))));
-            assert!(format!("{:?}", errored_response).contains("GetRegister(Err(AccessDenied("));
+            assert!(format!("{errored_response:?}").contains("GetRegister(Err(AccessDenied("));
             Ok(())
         } else {
             Err(eyre!("Could not generate public key"))
@@ -395,8 +395,7 @@ mod tests {
             let deserialized_msg: ClientMsg =
                 rmp_serde::from_slice(&serialised_cmd).map_err(|err| {
                     crate::messaging::Error::FailedToParse(format!(
-                        "Data message payload as Msgpack: {}",
-                        err
+                        "Data message payload as Msgpack: {err}",
                     ))
                 })?;
             assert_eq!(original_msg, deserialized_msg);

@@ -290,7 +290,7 @@ impl RegisterStorage {
                 let _ = auth
                     .clone()
                     .verify_authority(serialize(op)?)
-                    .or(Err(Error::InvalidSignature(public_key)))?;
+                    .or(Err(Error::InvalidSignature(Box::new(public_key))))?;
 
                 trace!("Creating new register: {:?}", cmd.dst_address());
                 // let's do a final check, let's try to apply all cmds to it,
@@ -328,7 +328,7 @@ impl RegisterStorage {
                 let _ = auth
                     .clone()
                     .verify_authority(serialize(op)?)
-                    .or(Err(Error::InvalidSignature(public_key)))?;
+                    .or(Err(Error::InvalidSignature(Box::new(public_key))))?;
 
                 info!("Editing Register: {:?}", addr);
                 register.check_permissions(Action::Write, Some(User::Key(public_key)))?;
@@ -746,7 +746,7 @@ mod test {
                 assert_eq!(reg.address(), &addr, "Should have same address!");
                 assert_eq!(reg.owner(), authority, "Should have same owner!");
             }
-            e => panic!("Could not read! {:?}", e),
+            e => panic!("Could not read! {e:?}"),
         }
 
         Ok(())
@@ -773,9 +773,9 @@ mod test {
                 assert_eq!(e, sn_interface::messaging::data::Error::NoSuchEntry(hash))
             }
             NodeQueryResponse::GetRegisterEntry(Ok(entry)) => {
-                panic!("Should not exist any entry for random hash! {:?}", entry)
+                panic!("Should not exist any entry for random hash! {entry:?}")
             }
-            e => panic!("Could not read! {:?}", e),
+            e => panic!("Could not read! {e:?}"),
         }
 
         Ok(())
@@ -804,11 +804,10 @@ mod test {
             NodeQueryResponse::GetRegisterUserPermissions(Err(e)) => {
                 assert_eq!(e, sn_interface::messaging::data::Error::NoSuchUser(user))
             }
-            NodeQueryResponse::GetRegisterUserPermissions(Ok(perms)) => panic!(
-                "Should not exist any permissions for random user! {:?}",
-                perms
-            ),
-            e => panic!("Could not read! {:?}", e),
+            NodeQueryResponse::GetRegisterUserPermissions(Ok(perms)) => {
+                panic!("Should not exist any permissions for random user! {perms:?}",)
+            }
+            e => panic!("Could not read! {e:?}"),
         }
 
         Ok(())

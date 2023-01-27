@@ -37,9 +37,8 @@ async fn main() -> Result<()> {
     // The 'files_container_create_from' API returns (among other information) the
     // XOR-URL of the FilesContainer where the file was uplaoded to
     println!(
-        "\nFile '{}' uploaded to Safe at {}",
+        "\nFile '{}' uploaded to Safe at {xorurl}",
         file_path.display(),
-        xorurl
     );
 
     // We give the network a moment to make sure nodes get in sync
@@ -50,7 +49,7 @@ async fn main() -> Result<()> {
     // i.e. safe://<FilesContainer XOR-URL>/<file name>
     let mut url = SafeUrl::from_url(&xorurl)?;
     url.set_path(FILE_TO_UPLOAD);
-    println!("\nRetrieving file from {} ...\n", url);
+    println!("\nRetrieving file from {url} ...\n");
 
     // Now we can simly fetch the file using `fetch` API,
     // it will return not only thee content of the file
@@ -63,7 +62,7 @@ async fn main() -> Result<()> {
             String::from_utf8(data.chunk().to_vec())?
         );
     } else {
-        println!("Failed to retrieve file, obtained: {:?}", fetched);
+        println!("Failed to retrieve file, obtained: {fetched:?}");
     }
 
     Ok(())

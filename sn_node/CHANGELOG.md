@@ -5,11 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.32 (2023-01-26)
+## v0.72.33 (2023-01-26)
 
-### Chore
+### Bug Fixes
 
- - <csr-id-f31f3fcc09c503eeb8a580f73b126030da8e11a4/> further reduce membership clones
+ - <csr-id-42f2c3709af96207b10b711878d03d42781bfdba/> send_out_bytes was not reporting send failures
+   - sn_comms::Comm::send_out_bytes was spawning a task when sending a msg,
+   now it's the caller's duty to do so if ever required.
+   - Run sn_comms unit tests in CI/Bors.
 
 ### Commit Statistics
 
@@ -26,11 +29,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2025 ([`4baaae3`](https://github.com/maidsafe/safe_network/commit/4baaae3022d0295715e58f6f74bac3c6b2547be1))
+    - send_out_bytes was not reporting send failures ([`42f2c37`](https://github.com/maidsafe/safe_network/commit/42f2c3709af96207b10b711878d03d42781bfdba))
+</details>
+
+## v0.72.32 (2023-01-26)
+
+<csr-id-f31f3fcc09c503eeb8a580f73b126030da8e11a4/>
+
+### Chore
+
+ - <csr-id-f31f3fcc09c503eeb8a580f73b126030da8e11a4/> further reduce membership clones
+
+### Chore
+
+ - <csr-id-6ccbaa335378fd02a93447b67b9dec61c17ea1d0/> sn_node-0.72.32
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_node-0.72.32 ([`6ccbaa3`](https://github.com/maidsafe/safe_network/commit/6ccbaa335378fd02a93447b67b9dec61c17ea1d0))
     - Merge #2032 ([`cb2ffd1`](https://github.com/maidsafe/safe_network/commit/cb2ffd1853e24d713fdec54cefde84028628d9b0))
     - further reduce membership clones ([`f31f3fc`](https://github.com/maidsafe/safe_network/commit/f31f3fcc09c503eeb8a580f73b126030da8e11a4))
 </details>
 
 ## v0.72.31 (2023-01-26)
+
+<csr-id-d0d6d8fcf20da2d0a8fc6b63cd7cc78f17258baf/>
 
 ### Chore
 

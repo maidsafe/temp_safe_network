@@ -30,7 +30,7 @@ pub fn notice_dry_run() {
 
 // Converts the XOR name bytes into a hex encoded string
 pub fn xorname_to_hex(xorname: &XorName) -> String {
-    xorname.0.iter().map(|b| format!("{:02x}", b)).collect()
+    xorname.0.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 // Read the argument string from the STDIN if is not an arg provided
@@ -75,11 +75,11 @@ pub fn read_stdin_response() -> Result<String> {
 // Outputs a message and then reads from stdin
 pub fn get_from_stdin(message: Option<&str>) -> Result<Vec<u8>> {
     let the_message = message.unwrap_or("...awaiting data from STDIN stream...");
-    println!("{}", &the_message);
+    println!("{the_message}");
     let mut buffer = Vec::new();
     match std::io::stdin().read_to_end(&mut buffer) {
         Ok(size) => {
-            debug!("Read ({} bytes) from STDIN", size);
+            debug!("Read ({size} bytes) from STDIN");
             Ok(buffer)
         }
         Err(_) => bail!("Failed to read from STDIN stream".to_string()),
@@ -88,7 +88,7 @@ pub fn get_from_stdin(message: Option<&str>) -> Result<Vec<u8>> {
 
 // Prompt the user with the message provided
 pub fn prompt_user(prompt_msg: &str, error_msg: &str) -> Result<String> {
-    print!("{}", prompt_msg);
+    print!("{prompt_msg}");
     let _ = stdout().flush();
     let buf = read_stdin_response()?;
     if buf.is_empty() {
@@ -105,12 +105,9 @@ pub fn get_secret_key(key_xorurl: &str, sk: Option<String>, msg: &str) -> Result
 
     if sk.is_empty() {
         let msg = if key_xorurl.is_empty() {
-            format!("Enter secret key corresponding to {}: ", msg)
+            format!("Enter secret key corresponding to {msg}: ")
         } else {
-            format!(
-                "Enter secret key corresponding to public key at \"{}\": ",
-                key_xorurl
-            )
+            format!("Enter secret key corresponding to public key at \"{key_xorurl}\": ",)
         };
         sk = prompt_user(&msg, "Invalid input")?;
     }
@@ -119,7 +116,7 @@ pub fn get_secret_key(key_xorurl: &str, sk: Option<String>, msg: &str) -> Result
 }
 
 pub fn processed_files_err_report<T: std::fmt::Display>(err: &T) -> (String, String) {
-    ("E".to_string(), format!("<{}>", err))
+    ("E".to_string(), format!("<{err}>"))
 }
 
 pub fn gen_processed_files_table(
@@ -234,7 +231,7 @@ pub fn print_nrs_map(nrs_map: &NrsMap) {
     println!("Listing NRS map contents:");
     let summary = nrs_map.get_map_summary();
     for (pub_name, link) in summary.iter() {
-        println!("{}: {}", pub_name, link);
+        println!("{pub_name}: {link}");
     }
 }
 
@@ -270,7 +267,7 @@ pub fn div_or<X: Float>(num: X, den: X, default: X) -> X {
 /// If the user hasn't prefixed the link with `safe://`, we'll do that for them here.
 pub fn get_target_url(link: &str) -> Result<SafeUrl> {
     if !link.starts_with("safe://") {
-        return Ok(SafeUrl::from_url(&format!("safe://{}", link))?);
+        return Ok(SafeUrl::from_url(&format!("safe://{link}"))?);
     }
     Ok(SafeUrl::from_url(link)?)
 }

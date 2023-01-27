@@ -89,17 +89,17 @@ impl fmt::Display for NetworkInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Local(path, genesis_key) => {
-                if let Some(gk) = genesis_key {
-                    write!(f, "{:?}, path: {:?}", gk, path)
+                if let Some(key) = genesis_key {
+                    write!(f, "{key:?}, path: {path:?}")
                 } else {
-                    write!(f, "{:?}", path)
+                    write!(f, "{path:?}")
                 }
             }
             Self::Remote(url, genesis_key) => {
-                if let Some(gk) = genesis_key {
-                    write!(f, "{:?}, url: {:?}", gk, url)
+                if let Some(key) = genesis_key {
+                    write!(f, "{key:?}, url: {url:?}")
                 } else {
-                    write!(f, "{}", url)
+                    write!(f, "{url}")
                 }
             }
         }
@@ -228,7 +228,7 @@ impl Config {
             match net_info {
                 NetworkInfo::Local(path, ref mut genesis_key) => {
                     match genesis_key {
-                        Some(gk) => match dir_files_checklist.get_mut(format!("{:?}", gk).as_str())
+                        Some(key) => match dir_files_checklist.get_mut(format!("{key:?}").as_str())
                         {
                             Some(present) => *present = true,
                             None => {
@@ -264,7 +264,7 @@ impl Config {
                     }
                 }
                 NetworkInfo::Remote(url, ref mut genesis_key) => match genesis_key {
-                    Some(gk) => match dir_files_checklist.get_mut(format!("{:?}", gk).as_str()) {
+                    Some(key) => match dir_files_checklist.get_mut(format!("{key:?}").as_str()) {
                         Some(present) => *present = true,
                         None => {
                             let url = Url::parse(url)?;
@@ -311,7 +311,7 @@ impl Config {
                 if let Ok(network_contacts) = Self::retrieve_local_network_contacts(&path).await {
                     let genesis_key = *network_contacts.genesis_key();
                     self.settings.networks.insert(
-                        format!("{:?}", genesis_key),
+                        format!("{genesis_key:?}"),
                         NetworkInfo::Local(path, Some(genesis_key)),
                     );
                 }
@@ -394,8 +394,8 @@ impl Config {
         match self.settings.networks.remove(name) {
             Some(NetworkInfo::Local(_, genesis_key)) => {
                 self.write_settings_to_file().await?;
-                if let Some(gk) = genesis_key {
-                    let network_contacts_path = self.network_contacts_dir.join(format!("{:?}", gk));
+                if let Some(key) = genesis_key {
+                    let network_contacts_path = self.network_contacts_dir.join(format!("{key:?}"));
                     if fs::remove_file(&network_contacts_path).await.is_err() {
                         println!(
                             "Failed to remove network map from {}",
@@ -407,8 +407,8 @@ impl Config {
             }
             Some(NetworkInfo::Remote(_, genesis_key)) => {
                 self.write_settings_to_file().await?;
-                if let Some(gk) = genesis_key {
-                    let network_contacts_path = self.network_contacts_dir.join(format!("{:?}", gk));
+                if let Some(key) = genesis_key {
+                    let network_contacts_path = self.network_contacts_dir.join(format!("{key:?}"));
                     if fs::remove_file(&network_contacts_path).await.is_err() {
                         println!(
                             "Failed to remove network map from {}",
@@ -417,7 +417,7 @@ impl Config {
                     }
                 }
             }
-            None => println!("No network with name '{}' was found in config", name),
+            None => println!("No network with name '{name}' was found in config"),
         }
         if fs::remove_file(
             &self
@@ -430,7 +430,7 @@ impl Config {
             debug!("Cannot remove default SectionTree!");
         };
         debug!("Network '{}' removed from config", name);
-        println!("Network '{}' was removed from the config", name);
+        println!("Network '{name}' was removed from the config");
 
         Ok(())
     }
@@ -483,11 +483,11 @@ impl Config {
                 }
             }
             let (simplified_net_info, gk) = match net_info {
-                NetworkInfo::Local(path, gk) => (format!("Local: {:?}", path), gk),
-                NetworkInfo::Remote(url, gk) => (format!("Remote: {:?}", url), gk),
+                NetworkInfo::Local(path, gk) => (format!("Local: {path:?}"), gk),
+                NetworkInfo::Remote(url, gk) => (format!("Remote: {url:?}"), gk),
             };
             let genesis_key = if let Some(key) = gk {
-                format!("{:?}", key)
+                format!("{key:?}")
             } else {
                 "".to_string()
             };
@@ -545,7 +545,7 @@ impl Config {
     }
 
     pub async fn set_default_network_contacts(&self, genesis_key: &BlsPublicKey) -> Result<()> {
-        let network_contacts_file = self.network_contacts_dir.join(format!("{:?}", genesis_key));
+        let network_contacts_file = self.network_contacts_dir.join(format!("{genesis_key:?}"));
         let default_network_contacts = self
             .network_contacts_dir
             .join(DEFAULT_NETWORK_CONTACTS_FILE_NAME);
@@ -790,7 +790,7 @@ pub mod test_utils {
 
                 // same gk can be present if multiple network entries in settings points
                 // to the same network contacts file
-                let _ = network_contacts_checklist.insert(format!("{:?}", genesis_key), false);
+                let _ = network_contacts_checklist.insert(format!("{genesis_key:?}"), false);
             }
 
             // mark them as true if the same entries are found in the network_contacts_dir

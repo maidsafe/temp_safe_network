@@ -78,8 +78,7 @@ impl Safe {
         debug!("Inserting '{:?}' into Multimap at {}", entry, multimap_url);
         let serialised_entry = rmp_serde::to_vec_named(&entry).map_err(|err| {
             Error::Serialisation(format!(
-                "Couldn't serialise the Multimap entry '{:?}': {:?}",
-                entry, err
+                "Couldn't serialise the Multimap entry '{entry:?}': {err:?}",
             ))
         })?;
 
@@ -89,9 +88,8 @@ impl Safe {
             DataAddress::Register(reg_address) => reg_address,
             other => {
                 return Err(Error::InvalidXorUrl(format!(
-                    "The Multimap Url {} has an {:?} address.\
+                    "The Multimap Url {multimap_url} has an {other:?} address.\
                     To insert an entry into a multimap, the address must be a register address.",
-                    multimap_url, other
                 )))
             }
         };
@@ -126,9 +124,8 @@ impl Safe {
             DataAddress::Register(reg_address) => reg_address,
             other => {
                 return Err(Error::InvalidXorUrl(format!(
-                    "The multimap url {} has an {:?} address.\
+                    "The multimap url {url} has an {other:?} address.\
                     To remove an entry from a multimap, the address must be a register address.",
-                    url, other
                 )))
             }
         };
@@ -158,17 +155,14 @@ impl Safe {
                 Ok(data)
             }
             Err(Error::EmptyContent(_)) => Err(Error::EmptyContent(format!(
-                "Multimap found at \"{}\" was empty",
-                safeurl
+                "Multimap found at \"{safeurl}\" was empty"
             ))),
             Err(Error::ContentNotFound(_)) => Err(Error::ContentNotFound(format!(
-                "No Multimap found at \"{}\"",
-                safeurl
+                "No Multimap found at \"{safeurl}\""
             ))),
             Err(Error::AccessDenied(_)) => {
                 return Err(Error::AccessDenied(format!(
-                    "Couldn't read Multimap found at \"{}\"",
-                    safeurl
+                    "Couldn't read Multimap found at \"{safeurl}\""
                 )))
             }
             other => other,
@@ -202,8 +196,7 @@ impl Safe {
                 Ok(data)
             }
             Err(Error::EmptyContent(_)) => Err(Error::EmptyContent(format!(
-                "Multimap found at \"{}\" was empty",
-                safeurl
+                "Multimap found at \"{safeurl}\" was empty"
             ))),
             Err(Error::ContentNotFound(_)) => Err(Error::ContentNotFound(
                 "No Multimap found at this address".to_string(),
@@ -214,8 +207,7 @@ impl Safe {
         // We parse the entry in the Register as a 'MultimapKeyValue'
         if entry == MULTIMAP_REMOVED_MARK {
             Err(Error::EmptyContent(format!(
-                "Entry found at \"{}\" is a tombstone (deletion marker)",
-                safeurl
+                "Entry found at \"{safeurl}\" is a tombstone (deletion marker)",
             )))
         } else {
             let key_val = Self::decode_multimap_entry(&entry)?;
@@ -225,7 +217,7 @@ impl Safe {
 
     fn decode_multimap_entry(entry: &[u8]) -> Result<MultimapKeyValue> {
         rmp_serde::from_slice(entry)
-            .map_err(|err| Error::ContentError(format!("Couldn't parse Multimap entry: {:?}", err)))
+            .map_err(|err| Error::ContentError(format!("Couldn't parse Multimap entry: {err:?}")))
     }
 }
 
