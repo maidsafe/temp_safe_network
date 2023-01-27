@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::peer_session::PeerSessionError;
+
 use sn_interface::types::Peer;
 use thiserror::Error;
 
@@ -31,7 +33,7 @@ pub enum Error {
     FailedSend(Peer),
     /// Error Sending Cmd in to node for processing
     #[error("Error sending Cmd to node {0:?} for processing.")]
-    SendError(Peer),
+    SendError(#[from] PeerSessionError),
 }
 
 impl From<qp2p::ClientEndpointError> for Error {
