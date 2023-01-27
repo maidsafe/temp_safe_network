@@ -5,11 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.1.6 (2023-01-27)
+## v0.1.7 (2023-01-27)
 
 ### Refactor
 
- - <csr-id-0304e4904dd901cbf24643a5803a190c87c2048d/> simplifying complexity by removing Link mod
+ - <csr-id-4fa50e710c65dc4298f85f6eb01a3575155417d6/> removing unnecessary SendStatus and SendWatcher
 
 ### Commit Statistics
 
@@ -26,11 +26,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2038 ([`8f1c443`](https://github.com/maidsafe/safe_network/commit/8f1c443a29f794da6a0412eab87672281c3a4d4b))
+    - removing unnecessary SendStatus and SendWatcher ([`4fa50e7`](https://github.com/maidsafe/safe_network/commit/4fa50e710c65dc4298f85f6eb01a3575155417d6))
+</details>
+
+## v0.1.6 (2023-01-27)
+
+<csr-id-0304e4904dd901cbf24643a5803a190c87c2048d/>
+
+### Refactor
+
+ - <csr-id-0304e4904dd901cbf24643a5803a190c87c2048d/> simplifying complexity by removing Link mod
+
+### Chore
+
+ - <csr-id-e990f883bec55e5e3c73a3b074428c42d2538785/> sn_comms-0.1.6/sn_node-0.72.37
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_comms-0.1.6/sn_node-0.72.37 ([`e990f88`](https://github.com/maidsafe/safe_network/commit/e990f883bec55e5e3c73a3b074428c42d2538785))
     - Merge #2013 #2029 ([`3456929`](https://github.com/maidsafe/safe_network/commit/3456929564e00303315da6b458d5fc4f97422301))
     - simplifying complexity by removing Link mod ([`0304e49`](https://github.com/maidsafe/safe_network/commit/0304e4904dd901cbf24643a5803a190c87c2048d))
 </details>
 
 ## v0.1.5 (2023-01-27)
+
+<csr-id-12f9f764dc821d78b39073fe007a3a6ac32d70cb/>
 
 ### Chore
 
@@ -63,6 +97,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.1.4 (2023-01-27)
 
 <csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/>
+<csr-id-01ff2ccf45dfc9d45c5ad540144d7a4a640830fc/>
 
 ### Chore
 
@@ -127,9 +162,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - send_out_bytes was not reporting send failures ([`42f2c37`](https://github.com/maidsafe/safe_network/commit/42f2c3709af96207b10b711878d03d42781bfdba))
     - chore(comm): remove unused async - Also shortens fn name and clarifies docs a bit. ([`3eced25`](https://github.com/maidsafe/safe_network/commit/3eced25805febe313d3d612756931fd52b0d67b0))
 </details>
-
-<csr-unknown>
-Run sn_comms unit tests in CI/Bors.<csr-unknown/>
 
 ## v0.1.2 (2023-01-25)
 

@@ -5,11 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.37 (2023-01-27)
+## v0.72.38 (2023-01-27)
 
-### Chore
+### Refactor
 
- - <csr-id-c28ce487b26144187687083eac6edb1ddf030266/> update cargo deps
+ - <csr-id-4fa50e710c65dc4298f85f6eb01a3575155417d6/> removing unnecessary SendStatus and SendWatcher
 
 ### Commit Statistics
 
@@ -26,11 +26,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2038 ([`8f1c443`](https://github.com/maidsafe/safe_network/commit/8f1c443a29f794da6a0412eab87672281c3a4d4b))
+    - removing unnecessary SendStatus and SendWatcher ([`4fa50e7`](https://github.com/maidsafe/safe_network/commit/4fa50e710c65dc4298f85f6eb01a3575155417d6))
+</details>
+
+## v0.72.37 (2023-01-27)
+
+<csr-id-c28ce487b26144187687083eac6edb1ddf030266/>
+
+### Chore
+
+ - <csr-id-c28ce487b26144187687083eac6edb1ddf030266/> update cargo deps
+
+### Chore
+
+ - <csr-id-e990f883bec55e5e3c73a3b074428c42d2538785/> sn_comms-0.1.6/sn_node-0.72.37
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_comms-0.1.6/sn_node-0.72.37 ([`e990f88`](https://github.com/maidsafe/safe_network/commit/e990f883bec55e5e3c73a3b074428c42d2538785))
     - Merge #2013 #2029 ([`3456929`](https://github.com/maidsafe/safe_network/commit/3456929564e00303315da6b458d5fc4f97422301))
     - update cargo deps ([`c28ce48`](https://github.com/maidsafe/safe_network/commit/c28ce487b26144187687083eac6edb1ddf030266))
 </details>
 
 ## v0.72.36 (2023-01-27)
+
+<csr-id-12f9f764dc821d78b39073fe007a3a6ac32d70cb/>
 
 ### Chore
 
