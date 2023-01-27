@@ -217,7 +217,7 @@ impl MyNode {
             }
             Ok(Err(comms_err)) => {
                 error!("{msg_id:?} Error when sending request to holder node {peer:?}, marking node as faulty: {comms_err:?}");
-                if let CommsError::SendError(_) = comms_err {
+                if let CommsError::FailedSend(peer) = comms_err {
                     output_cmds.push(Cmd::TrackNodeIssue {
                         name: peer.name(),
                         issue: IssueType::Communication,
