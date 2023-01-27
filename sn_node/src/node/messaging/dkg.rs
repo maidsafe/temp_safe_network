@@ -480,10 +480,11 @@ impl MyNode {
         let mut is_old_gossip = true;
         let their_votes_len = votes.len();
         for v in votes {
-            match self.dkg_voter.handle_dkg_vote(session_id, v.clone()) {
+            let v_string = format!("{v:?}");
+            match self.dkg_voter.handle_dkg_vote(session_id, v) {
                 Ok(vote_responses) => {
                     debug!(
-                        "Dkg s{}: {:?} after: {v:?}",
+                        "Dkg s{}: {:?} after: {v_string}",
                         session_id.sh(),
                         vote_responses,
                     );
@@ -505,7 +506,7 @@ impl MyNode {
                 }
                 Err(err) => {
                     error!(
-                        "Error processing DKG vote s{} id:{our_id:?} {v:?} from {sender:?}: {err:?}",
+                        "Error processing DKG vote s{} id:{our_id:?} {v_string} from {sender:?}: {err:?}",
                         session_id.sh()
                     );
                 }
