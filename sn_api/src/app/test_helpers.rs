@@ -40,7 +40,7 @@ const REISSUED_DBC_MAX_BALANCE: u64 = 100_000_000_000;
 lazy_static! {
     pub static ref GENESIS_DBC: Dbc = match read_genesis_dbc_from_first_node() {
         Ok(dbc) => dbc,
-        Err(err) => panic!("Failed to read genesis DBC for tests: {:?}", err),
+        Err(err) => panic!("Failed to read genesis DBC for tests: {err:?}"),
     };
 }
 
@@ -66,7 +66,7 @@ pub async fn get_next_bearer_dbc() -> Result<(Dbc, Token)> {
         static ref REISSUED_DBCS: AsyncOnce<Vec<(Dbc, Token)>> = AsyncOnce::new(async {
             match reissue_bearer_dbcs().await {
                 Ok(dbcs) => dbcs,
-                Err(err) => panic!("Failed to reissue DBCs from genesis DBC: {:?}", err),
+                Err(err) => panic!("Failed to reissue DBCs from genesis DBC: {err:?}"),
             }
         });
     }
@@ -182,10 +182,7 @@ pub async fn new_safe_instance() -> Result<Safe> {
     init_logger();
     let credentials = match var(TEST_AUTH_CREDENTIALS) {
         Ok(val) => serde_json::from_str(&val).with_context(|| {
-            format!(
-                "Failed to parse credentials read from {} env var",
-                TEST_AUTH_CREDENTIALS
-            )
+            format!("Failed to parse credentials read from {TEST_AUTH_CREDENTIALS} env var",)
         })?,
         Err(_) => Keypair::new_ed25519(),
     };
@@ -197,10 +194,7 @@ pub async fn new_safe_instance_with_dbc_owner(secret_key: &str) -> Result<(Safe,
     init_logger();
     let credentials = match var(TEST_AUTH_CREDENTIALS) {
         Ok(val) => serde_json::from_str(&val).with_context(|| {
-            format!(
-                "Failed to parse credentials read from {} env var",
-                TEST_AUTH_CREDENTIALS
-            )
+            format!("Failed to parse credentials read from {TEST_AUTH_CREDENTIALS} env var",)
         })?,
         Err(_) => Keypair::new_ed25519(),
     };

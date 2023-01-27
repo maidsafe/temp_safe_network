@@ -29,7 +29,7 @@ impl MsgListener {
 
     #[tracing::instrument(skip_all)]
     pub(crate) fn listen_for_incoming_msgs(self, mut incoming_connections: IncomingConnections) {
-        let _ = task::spawn(async move {
+        let _handle = task::spawn(async move {
             while let Some((connection, incoming_msgs)) = incoming_connections.next().await {
                 trace!(
                     "{}: from {:?} with connection_id {}",
@@ -39,7 +39,8 @@ impl MsgListener {
                 );
 
                 let clone = self.clone();
-                let _ = task::spawn(clone.listen(connection, incoming_msgs).in_current_span());
+                let _handle =
+                    task::spawn(clone.listen(connection, incoming_msgs).in_current_span());
             }
         });
     }

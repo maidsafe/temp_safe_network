@@ -188,20 +188,17 @@ impl Safe {
             Ok(entries) => entries,
             Err(Error::AccessDenied(_)) => {
                 return Err(Error::AccessDenied(format!(
-                    "Couldn't read wallet found at \"{}\"",
-                    safeurl
+                    "Couldn't read wallet found at \"{safeurl}\"",
                 )))
             }
             Err(Error::ContentNotFound(_)) => {
                 return Err(Error::ContentNotFound(format!(
-                    "No wallet found at {}",
-                    safeurl
+                    "No wallet found at {safeurl}",
                 )))
             }
             Err(err) => {
                 return Err(Error::ContentError(format!(
-                    "Failed to read balances from wallet: {}",
-                    err
+                    "Failed to read balances from wallet: {err}",
                 )))
             }
         };
@@ -252,8 +249,8 @@ impl Safe {
             match total_balance.checked_add(balance) {
                 None => {
                     return Err(Error::ContentError(format!(
-                        "Failed to calculate total balance due to overflow when adding {} to {}",
-                        balance, total_balance
+                        "Failed to calculate total balance due to overflow when adding {balance} to {total_balance}",
+
                     )))
                 }
                 Some(new_total_balance) => total_balance = new_total_balance,
@@ -432,8 +429,7 @@ impl Safe {
 
         let dbc_bytes = Bytes::from(rmp_serde::to_vec_named(dbc).map_err(|err| {
             Error::Serialisation(format!(
-                "Failed to serialise DBC to insert it into the wallet: {:?}",
-                err
+                "Failed to serialise DBC to insert it into the wallet: {err:?}",
             ))
         })?);
 
@@ -814,7 +810,7 @@ mod tests {
         for i in 0..5 {
             safe.wallet_deposit(
                 &wallet_xorurl,
-                Some(&format!("my-dbc-#{}", i)),
+                Some(&format!("my-dbc-#{i}")),
                 &GENESIS_DBC,
                 None,
             )
@@ -890,7 +886,7 @@ mod tests {
             Err(Error::AccessDenied(msg)) => {
                 assert_eq!(
                     msg,
-                    format!("Couldn't read wallet found at \"{}\"", wallet_xorurl)
+                    format!("Couldn't read wallet found at \"{wallet_xorurl}\"")
                 );
                 Ok(())
             }
@@ -1213,8 +1209,7 @@ mod tests {
                     msg,
                     format!(
                         "Failed to perform operation: SpentbookError(\"Spent proof \
-                        signature {:?} is invalid\")",
-                        random_pk
+                        signature {random_pk:?} is invalid\")",
                     )
                 );
                 Ok(())

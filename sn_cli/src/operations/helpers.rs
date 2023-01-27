@@ -40,8 +40,7 @@ pub fn download_and_install_node(
         .current_version(env!("CARGO_PKG_VERSION"))
         .build()
         .wrap_err(format!(
-            "Error fetching list of releases for maidsafe/{} repository",
-            repo_name
+            "Error fetching list of releases for maidsafe/{repo_name} repository",
         ))?;
     let version = if let Some(version) = version {
         version
@@ -73,9 +72,9 @@ fn download_and_install_bin(
     version: &str,
     exec_file_name: &str,
 ) -> Result<String> {
-    println!("Downloading sn_node version: {}", version);
+    println!("Downloading sn_node version: {version}");
     let tmp_dir = std::env::temp_dir();
-    let archive_file_name = format!("sn_node-{}-{}.tar.gz", version, target);
+    let archive_file_name = format!("sn_node-{version}-{target}.tar.gz");
     let tmp_tarball_path = tmp_dir.join(&archive_file_name);
     let tmp_tarball = File::create(&tmp_tarball_path).wrap_err_with(|| {
         format!(
@@ -84,12 +83,12 @@ fn download_and_install_bin(
         )
     })?;
 
-    let download_url = format!("{}/{}", BASE_DOWNLOAD_URL, archive_file_name);
-    println!("Downloading {}...", download_url);
+    let download_url = format!("{BASE_DOWNLOAD_URL}/{archive_file_name}");
+    println!("Downloading {download_url}...");
     self_update::Download::from_url(&download_url)
         .show_progress(true)
         .download_to(&tmp_tarball)
-        .wrap_err_with(|| format!("Error downloading release from '{}'", download_url))?;
+        .wrap_err_with(|| format!("Error downloading release from '{download_url}'"))?;
 
     if !target_path.exists() {
         println!("Creating '{}' folder", target_path.display());
@@ -175,12 +174,7 @@ fn get_version_from_release_version(release_version: &str) -> Result<String> {
     parts.next();
     let version = parts
         .next()
-        .ok_or_else(|| {
-            eyre!(format!(
-                "Could not parse version number from {}",
-                release_version
-            ))
-        })?
+        .ok_or_else(|| eyre!("Could not parse version number from {}", release_version))?
         .to_string();
     Ok(version)
 }

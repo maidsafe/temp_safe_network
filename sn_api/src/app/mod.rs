@@ -99,7 +99,7 @@ impl Safe {
         }
 
         self.client = Some(b.build().await.map_err(|err| {
-            Error::ConnectionError(format!("Failed to connect to the SAFE Network: {:?}", err))
+            Error::ConnectionError(format!("Failed to connect to the SAFE Network: {err:?}"))
         })?);
 
         debug!("Successfully connected to the Network!!!");

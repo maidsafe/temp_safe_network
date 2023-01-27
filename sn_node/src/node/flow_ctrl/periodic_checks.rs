@@ -71,18 +71,7 @@ impl FlowCtrl {
             return;
         }
 
-        let (context, membership_context) = {
-            let read_locked_node = self.node.read().await;
-            // only clone membership when time has elapsed
-            // otherwise this is a lot of wasted allocations
-            let membership = if self.timestamps.last_vote_check.elapsed() > MISSING_VOTE_INTERVAL {
-                read_locked_node.membership.clone()
-            } else {
-                None
-            };
-
-            (&read_locked_node.context(), membership)
-        };
+        let context = self.node.read().await.context();
 
         if !context.is_elder {
             // self.enqueue_cmds_for_adult_periodic_checks(context).await;
@@ -92,8 +81,7 @@ impl FlowCtrl {
             return;
         }
 
-        self.enqueue_cmds_for_elder_periodic_checks(context, membership_context)
-            .await;
+        self.enqueue_cmds_for_elder_periodic_checks(&context).await;
     }
 
     // /// Periodic tasks run for adults only
@@ -114,11 +102,7 @@ impl FlowCtrl {
     // }
 
     /// Periodic tasks run for elders only
-    async fn enqueue_cmds_for_elder_periodic_checks(
-        &mut self,
-        context: &NodeContext,
-        membership_context: Option<Membership>,
-    ) {
+    async fn enqueue_cmds_for_elder_periodic_checks(&mut self, context: &NodeContext) {
         let now = Instant::now();
         let mut cmds = vec![];
 
@@ -156,11 +140,13 @@ impl FlowCtrl {
         //     }
         // }
 
-        if membership_context.is_some() {
-            debug!(" ----> vote periodics start");
+        if self.timestamps.last_vote_check.elapsed() > MISSING_VOTE_INTERVAL {
             self.timestamps.last_vote_check = now;
+            let read_locked_node = self.node.read().await;
+
+            debug!(" ----> vote periodics start");
             for cmd in self
-                .check_for_missed_votes(context, membership_context)
+                .check_for_missed_votes(context, &read_locked_node.membership)
                 .await
             {
                 cmds.push(cmd);
@@ -297,7 +283,7 @@ impl FlowCtrl {
     async fn check_for_missed_votes(
         &self,
         context: &NodeContext,
-        membership_context: Option<Membership>,
+        membership_context: &Option<Membership>,
     ) -> Vec<Cmd> {
         info!("Checking for missed votes");
         let mut cmds = vec![];
@@ -309,7 +295,7 @@ impl FlowCtrl {
                 if time.elapsed() >= MISSING_VOTE_INTERVAL {
                     debug!("Vote consensus appears stalled...");
                     if let Some(cmd) =
-                        MyNode::membership_gossip_votes(context, &membership_context).await
+                        MyNode::membership_gossip_votes(context, membership_context).await
                     {
                         trace!("Vote resending cmd: {cmd:?}");
 

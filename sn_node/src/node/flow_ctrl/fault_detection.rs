@@ -35,7 +35,7 @@ impl FlowCtrl {
     ) -> Receiver<Vec<XorName>> {
         let (fault_nodes_sender, faulty_nodes_receiver) = mpsc::channel(STANDARD_CHANNEL_SIZE);
 
-        let _ = tokio::task::spawn(async move {
+        let _handle = tokio::task::spawn(async move {
             while let Some(cmd) = fault_cmds_from_node.recv().await {
                 match cmd {
                     FaultsCmd::AddNode(node) => tracker.add_new_node(node),

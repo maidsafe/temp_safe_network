@@ -50,7 +50,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     let client = match runtime.block_on(create_client()) {
         Ok(client) => client,
         Err(err) => {
-            println!("Failed to create client with {:?}", err);
+            println!("Failed to create client with {err:?}");
             return;
         }
     };

@@ -113,7 +113,9 @@ impl Register {
 
     /// Return user permissions, if applicable.
     pub fn permissions(&self, user: User) -> Result<Permissions> {
-        self.policy.permissions(user).ok_or(Error::NoSuchUser(user))
+        self.policy
+            .permissions(user)
+            .ok_or(Error::NoSuchUser(Box::new(user)))
     }
 
     /// Return the policy.
@@ -409,7 +411,7 @@ mod tests {
         let random_user = User::Key(random_keypair.public_key());
         assert_eq!(
             replica2.permissions(random_user),
-            Err(Error::NoSuchUser(random_user))
+            Err(Error::NoSuchUser(Box::new(random_user)))
         );
 
         Ok(())

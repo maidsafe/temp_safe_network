@@ -120,17 +120,14 @@ impl FlowCtrl {
             timestamps: PeriodicChecksTimestamps::now(),
         };
 
-        let _ =
-            tokio::task::spawn(
-                async move { flow_ctrl.process_messages_and_periodic_checks().await },
-            );
+        let _handle = tokio::task::spawn(flow_ctrl.process_messages_and_periodic_checks());
 
         let cmd_channel = cmd_sender_channel.clone();
         let cmd_channel_for_msgs = cmd_sender_channel.clone();
 
         let node_arc_for_replication = cmd_ctrl.node();
         // start a new thread to kick off incoming cmds
-        let _ = tokio::task::spawn(async move {
+        let _handle = tokio::task::spawn(async move {
             // Get a stable identifier for statemap naming. This is NOT the node's current name.
             // It's the initial name... but will not change for the entire statemap
             while let Some((cmd, cmd_id)) = incoming_cmds_from_apis.recv().await {
@@ -155,7 +152,7 @@ impl FlowCtrl {
         .await;
 
         // start a new thread to convert msgs to Cmds
-        let _ = tokio::task::spawn(async move {
+        let _handle = tokio::task::spawn(async move {
             while let Some(peer_msg) = incoming_msg_events.recv().await {
                 let cmd = match Self::handle_new_msg_event(peer_msg).await {
                     Ok(cmd) => cmd,
@@ -182,7 +179,7 @@ impl FlowCtrl {
         cmd_channel: mpsc::Sender<(Cmd, Vec<usize>)>,
     ) {
         // start a new thread to kick off data replication
-        let _ = tokio::task::spawn(async move {
+        let _handle = tokio::task::spawn(async move {
             // is there a simple way to dedupe common data going to many peers?
             // is any overhead reduction worth the increased complexity?
             while let Some((data_addresses, peer)) = data_replication_receiver.recv().await {
@@ -190,7 +187,7 @@ impl FlowCtrl {
                 let the_node = node_arc.clone();
                 let data_storage = node_data_storage.clone();
                 // move replication off thread so we don't block the receiver
-                let _ = tokio::task::spawn(async move {
+                let _handle = tokio::task::spawn(async move {
                     debug!(
                         "{:?} Data {:?} to: {:?}",
                         LogMarker::SendingMissingReplicatedData,

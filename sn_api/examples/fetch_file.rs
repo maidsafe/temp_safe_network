@@ -27,14 +27,14 @@ async fn main() -> Result<()> {
         .ok_or_else(|| eyre!("No Safe network contact socket address provided"))?;
     let network_addr: SocketAddr = network_contact
         .parse()
-        .map_err(|err| eyre!("Invalid Safe network contact socket address: {}", err))?;
-    println!("Safe network to be contacted at {}", network_addr);
+        .map_err(|err| eyre!("Invalid Safe network contact socket address: {err}"))?;
+    println!("Safe network to be contacted at {network_addr}");
 
     // Read URL from second argument passed
     let url = args_received
         .next()
         .ok_or_else(|| eyre!("No Safe URL provided as argument"))?;
-    println!("Fetching file from Safe with URL: {}", url);
+    println!("Fetching file from Safe with URL: {url}");
 
     // The Safe instance is what will give us access to the network API.
     let safe = Safe::connected(None, None, None, None).await?;
@@ -48,10 +48,10 @@ async fn main() -> Result<()> {
     match safe.fetch(&url, None).await {
         Ok(SafeData::PublicFile { data, .. }) => {
             let data = String::from_utf8(data.chunk().to_vec())?;
-            println!("File content retrieved:\n{}", data);
+            println!("File content retrieved:\n{data}");
         }
-        Ok(other) => println!("Failed to retrieve file, instead obtained: {:?}", other),
-        Err(err) => println!("Failed to retrieve file: {:?}", err),
+        Ok(other) => println!("Failed to retrieve file, instead obtained: {other:?}"),
+        Err(err) => println!("Failed to retrieve file: {err:?}"),
     }
 
     Ok(())

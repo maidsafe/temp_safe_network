@@ -799,7 +799,7 @@ mod core {
                 .clone()
                 .join(SECTION_TREE_FILE_NAME);
 
-            let _ = tokio::spawn(async move {
+            let _handle = tokio::spawn(async move {
                 if let Err(err) = section_tree.write_to_disk(&path).await {
                     error!(
                         "Error writing SectionTree to `{}` dir: {:?}",

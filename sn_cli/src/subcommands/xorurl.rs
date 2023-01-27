@@ -45,10 +45,10 @@ pub fn xorurl_commander(
                 } else {
                     ("XOR-URL", "<unknown>")
                 };
-                println!("Information decoded from SafeUrl: {}", url);
-                println!("UrlType: {}", urltype);
+                println!("Information decoded from SafeUrl: {url}");
+                println!("UrlType: {urltype}");
                 println!("Xorname: {}", xorname_to_hex(&safeurl.xorname()));
-                println!("Public Name: {}", public_name);
+                println!("Public Name: {public_name}");
                 if safeurl.is_nrsurl() {
                     println!("Top Name: {}", safeurl.top_name());
                 }
@@ -73,16 +73,16 @@ pub fn xorurl_commander(
         XorurlSubCommands::Pk { pk } => {
             let public_key = PublicKey::ed25519_from_hex(&pk)
                 .or_else(|_| PublicKey::bls_from_hex(&pk))
-                .map_err(|_| eyre!("Invalid (Ed25519/BLS) public key bytes: {}", pk))?;
+                .map_err(|_| eyre!("Invalid (Ed25519/BLS) public key bytes: {pk}"))?;
 
             let xorname = XorName::from(public_key);
             let xorurl = SafeUrl::from_safekey(xorname)?.encode(xorurl_base);
 
             // Now let's just print out the SafeKey xorurl
             if OutputFmt::Pretty == output_fmt {
-                println!("SafeKey XOR-URL: {}", xorurl);
+                println!("SafeKey XOR-URL: {xorurl}");
             } else {
-                println!("{}", xorurl);
+                println!("{xorurl}");
             }
         }
     }
@@ -110,14 +110,14 @@ pub async fn xorurl_of_files(
             println!("No files were processed");
         } else {
             let (table, success_count) = gen_processed_files_table(&processed_files, false);
-            println!("{} file/s processed:", success_count);
+            println!("{success_count} file/s processed:");
             println!("{table}");
         }
     } else {
         let mut list = Vec::<(String, String)>::new();
         for (file_name, change) in processed_files {
             let link = match change {
-                FilesMapChange::Failed(err) => format!("<{}>", err),
+                FilesMapChange::Failed(err) => format!("<{err}>"),
                 FilesMapChange::Added(link)
                 | FilesMapChange::Updated(link)
                 | FilesMapChange::Removed(link) => link,

@@ -155,7 +155,7 @@ async fn main() -> Result<()> {
                         .ok_or_else(|| eyre!("Command exited with error"))
                 })
                 .wrap_err_with(|| {
-                    format!("Failed to run build command with args: {:?}", build_args)
+                    format!("Failed to run build command with args: {build_args:?}")
                 })?;
             info!("sn_node built successfully");
         }

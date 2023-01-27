@@ -181,7 +181,7 @@ impl Safe {
                     },
                     safe_url
                 )),
-                err => Error::NetDataError(format!("Failed to get current version: {}", err)),
+                err => Error::NetDataError(format!("Failed to get current version: {err}")),
             })?;
 
         // take the 1st entry (TODO Multiple entries)
@@ -206,8 +206,7 @@ impl Safe {
         let serialised_files_map = self.fetch_data(&files_map_url, None).await?;
         let files_map = serde_json::from_slice(serialised_files_map.chunk()).map_err(|err| {
             Error::ContentError(format!(
-                "Couldn't deserialise the FilesMap stored in the FilesContainer: {:?}",
-                err
+                "Couldn't deserialise the FilesMap stored in the FilesContainer: {err:?}"
             ))
         })?;
         debug!("Files map retrieved.... {:?}", &version);
@@ -471,8 +470,7 @@ impl Safe {
             Some(info) => info,
             None => {
                 return Err(Error::EmptyContent(format!(
-                    "FilesContainer found at \"{}\" was empty",
-                    safe_url
+                    "FilesContainer found at \"{safe_url}\" was empty"
                 )))
             }
         };
@@ -609,8 +607,7 @@ impl Safe {
                     Ok(ContentType::MediaType(media_type_str.to_string()))
                 } else {
                     Err(Error::InvalidMediaType(format!(
-                        "Media-type '{}' not supported. You can pass 'None' as the 'media_type' for this content to be treated as raw",
-                        media_type_str
+                        "Media-type '{media_type_str}' not supported. You can pass 'None' as the 'media_type' for this content to be treated as raw",
                     )))
                 }
             },
@@ -658,7 +655,7 @@ impl Safe {
     pub(crate) async fn fetch_data(&self, safe_url: &SafeUrl, range: Range) -> Result<Bytes> {
         match safe_url.data_type() {
             DataType::File => self.get_bytes(safe_url.xorname(), range).await,
-            other => Err(Error::ContentError(format!("{}", other))),
+            other => Err(Error::ContentError(format!("{other}"))),
         }
     }
 
@@ -809,11 +806,11 @@ fn get_base_paths(location: &Path, dst_path: Option<&Path>) -> (String, String) 
             // Location is a folder, then append it to dst path
             let parts_vec: Vec<&str> = location_base_path.split('/').collect();
             let dir_name = parts_vec[parts_vec.len() - 1];
-            format!("{}{}", new_dst_path, dir_name)
+            format!("{new_dst_path}{dir_name}")
         }
     } else {
         // Then just append an ending '/'
-        format!("{}/", new_dst_path)
+        format!("{new_dst_path}/")
     };
 
     (location_base_path, dst_base_path)
@@ -936,7 +933,7 @@ async fn files_map_sync(
 
                         processed_files.insert(
                             local_file_name.clone(),
-                            FilesMapChange::Failed(format!("{}", err_type)),
+                            FilesMapChange::Failed(format!("{err_type}")),
                         );
                         info!("Skipping file \"{}\" since a file named \"{}\" with {} content already exists on target. You can use the 'force' flag to replace the existing file with the new one", local_file_name.display(), normalised_file_name, comp_str);
                     }
@@ -1020,13 +1017,13 @@ async fn files_map_add_link(
             info!("Skipping file \"{}\". {}", file_link, err);
             processed_files.insert(
                 PathBuf::from(file_link),
-                FilesMapChange::Failed(format!("{}", err)),
+                FilesMapChange::Failed(format!("{err}")),
             );
             return Ok((processed_files, files_map, success_count));
         }
         Ok(safe_url) => match safe_url.content_type() {
             ContentType::MediaType(media_type) => media_type,
-            other => format!("{}", other),
+            other => format!("{other}"),
         },
     };
 
@@ -1799,7 +1796,7 @@ mod tests {
             Err(Error::InvalidInput(msg)) => {
                 assert_eq!(
                     msg,
-                    format!("The target URL cannot contain a version: {}", xorurl)
+                    format!("The target URL cannot contain a version: {xorurl}")
                 );
                 Ok(())
             }
@@ -2283,10 +2280,7 @@ mod tests {
             Err(Error::VersionNotFound(msg)) => {
                 assert_eq!(
                     msg,
-                    format!(
-                        "Version '{}' is invalid for FilesContainer found at \"{}\"",
-                        version_hash, safe_url
-                    )
+                    format!("Version '{version_hash}' is invalid for FilesContainer found at \"{safe_url}\"")
                 );
                 Ok(())
             }

@@ -114,8 +114,8 @@ async fn new_node(
         let our_conn_info_json = serde_json::to_string(&our_conn_info)
             .unwrap_or_else(|_| "Failed to serialize connection info".into());
         println!(
-            "Node PID: {:?}, prefix: {:?}, name: {:?}, age: {}, connection info:\n{}",
-            our_pid, node_prefix, node_name, node_age, our_conn_info_json,
+            "Node PID: {our_pid:?}, prefix: {node_prefix:?}, \
+            name: {node_name:?}, age: {node_age}, connection info:\n{our_conn_info_json}",
         );
         info!(
             "Node PID: {:?}, prefix: {:?}, name: {:?}, age: {}, connection info: {}",
