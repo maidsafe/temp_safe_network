@@ -5,11 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.1.4 (2023-01-27)
+## v0.1.6 (2023-01-27)
 
-### Chore
+### Refactor
 
- - <csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/> fix issues reported by new clippy
+ - <csr-id-0304e4904dd901cbf24643a5803a190c87c2048d/> simplifying complexity by removing Link mod
 
 ### Commit Statistics
 
@@ -26,22 +26,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - Merge branch 'main' into RevertDkgCache ([`24ff625`](https://github.com/maidsafe/safe_network/commit/24ff6257f85922090cfaa5fa83044082d3ef8dab))
-    - fix issues reported by new clippy ([`6b92351`](https://github.com/maidsafe/safe_network/commit/6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916))
+    - Merge #2013 #2029 ([`3456929`](https://github.com/maidsafe/safe_network/commit/3456929564e00303315da6b458d5fc4f97422301))
+    - simplifying complexity by removing Link mod ([`0304e49`](https://github.com/maidsafe/safe_network/commit/0304e4904dd901cbf24643a5803a190c87c2048d))
 </details>
 
-## v0.1.3 (2023-01-26)
+## v0.1.5 (2023-01-27)
 
 ### Chore
 
- - <csr-id-d51dd695437dac1695447491d4f298334b7e0fd1/> sn_comms-0.1.3/sn_node-0.72.33
+ - <csr-id-12f9f764dc821d78b39073fe007a3a6ac32d70cb/> sn_comms-0.1.5/sn_node-0.72.36
 
 ### Bug Fixes
 
- - <csr-id-42f2c3709af96207b10b711878d03d42781bfdba/> send_out_bytes was not reporting send failures
-   - sn_comms::Comm::send_out_bytes was spawning a task when sending a msg,
-   now it's the caller's duty to do so if ever required.
-- Run sn_comms unit tests in CI/Bors.
+ - <csr-id-a450e56be02410e00521afa1b4070f0de014c0ab/> merge issues
 
 ### Commit Statistics
 
@@ -58,10 +55,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_comms-0.1.5/sn_node-0.72.36 ([`12f9f76`](https://github.com/maidsafe/safe_network/commit/12f9f764dc821d78b39073fe007a3a6ac32d70cb))
+    - Merge #2031 ([`96d8799`](https://github.com/maidsafe/safe_network/commit/96d8799cf10510c9d3514fdd9f6fdfc628568da3))
+    - merge issues ([`a450e56`](https://github.com/maidsafe/safe_network/commit/a450e56be02410e00521afa1b4070f0de014c0ab))
+</details>
+
+## v0.1.4 (2023-01-27)
+
+<csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/>
+
+### Chore
+
+ - <csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/> fix issues reported by new clippy
+
+### Chore
+
+ - <csr-id-01ff2ccf45dfc9d45c5ad540144d7a4a640830fc/> sn_interface-0.16.18/sn_comms-0.1.4/sn_client-0.77.9/sn_node-0.72.34/sn_api-0.75.5/sn_cli-0.68.6
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.18/sn_comms-0.1.4/sn_client-0.77.9/sn_node-0.72.34/sn_api-0.75.5/sn_cli-0.68.6 ([`01ff2cc`](https://github.com/maidsafe/safe_network/commit/01ff2ccf45dfc9d45c5ad540144d7a4a640830fc))
+    - Merge branch 'main' into chore-comms-remove-unused-async ([`e92dd49`](https://github.com/maidsafe/safe_network/commit/e92dd49f38f9b56c7276e86ba79f7fd8f816af76))
+    - Merge branch 'main' into RevertDkgCache ([`24ff625`](https://github.com/maidsafe/safe_network/commit/24ff6257f85922090cfaa5fa83044082d3ef8dab))
+    - fix issues reported by new clippy ([`6b92351`](https://github.com/maidsafe/safe_network/commit/6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916))
+</details>
+
+## v0.1.3 (2023-01-26)
+
+<csr-id-d51dd695437dac1695447491d4f298334b7e0fd1/>
+
+### Chore
+
+ - <csr-id-d51dd695437dac1695447491d4f298334b7e0fd1/> sn_comms-0.1.3/sn_node-0.72.33
+
+### Bug Fixes
+
+ - <csr-id-42f2c3709af96207b10b711878d03d42781bfdba/> send_out_bytes was not reporting send failures
+   - sn_comms::Comm::send_out_bytes was spawning a task when sending a msg,
+   now it's the caller's duty to do so if ever required.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
     - sn_comms-0.1.3/sn_node-0.72.33 ([`d51dd69`](https://github.com/maidsafe/safe_network/commit/d51dd695437dac1695447491d4f298334b7e0fd1))
     - Merge #2025 ([`4baaae3`](https://github.com/maidsafe/safe_network/commit/4baaae3022d0295715e58f6f74bac3c6b2547be1))
     - send_out_bytes was not reporting send failures ([`42f2c37`](https://github.com/maidsafe/safe_network/commit/42f2c3709af96207b10b711878d03d42781bfdba))
+    - chore(comm): remove unused async - Also shortens fn name and clarifies docs a bit. ([`3eced25`](https://github.com/maidsafe/safe_network/commit/3eced25805febe313d3d612756931fd52b0d67b0))
 </details>
+
+<csr-unknown>
+Run sn_comms unit tests in CI/Bors.<csr-unknown/>
 
 ## v0.1.2 (2023-01-25)
 
@@ -199,9 +267,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - replace node comms with sn_comms ([`dbfa4ac`](https://github.com/maidsafe/safe_network/commit/dbfa4ac0dd23e76060b8df44c4666a30bb9b317f))
     - make a new crate for comm ([`a86d5ad`](https://github.com/maidsafe/safe_network/commit/a86d5ad1f352c9000488197ece8edb716941d601))
 </details>
-
-<csr-unknown>
-We are here also changing Cmd::SendMsg to make/restricting it exclusively forsending msgs to nodes over uni-streams.<csr-unknown/>
 
 ## v0.1.0 (2023-01-20)
 

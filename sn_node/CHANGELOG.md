@@ -5,14 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.36 (2023-01-27)
+## v0.72.37 (2023-01-27)
+
+### Chore
+
+ - <csr-id-c28ce487b26144187687083eac6edb1ddf030266/> update cargo deps
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -22,12 +26,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2013 #2029 ([`3456929`](https://github.com/maidsafe/safe_network/commit/3456929564e00303315da6b458d5fc4f97422301))
+    - update cargo deps ([`c28ce48`](https://github.com/maidsafe/safe_network/commit/c28ce487b26144187687083eac6edb1ddf030266))
+</details>
+
+## v0.72.36 (2023-01-27)
+
+### Chore
+
+ - <csr-id-12f9f764dc821d78b39073fe007a3a6ac32d70cb/> sn_comms-0.1.5/sn_node-0.72.36
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_comms-0.1.5/sn_node-0.72.36 ([`12f9f76`](https://github.com/maidsafe/safe_network/commit/12f9f764dc821d78b39073fe007a3a6ac32d70cb))
     - Merge #2031 ([`96d8799`](https://github.com/maidsafe/safe_network/commit/96d8799cf10510c9d3514fdd9f6fdfc628568da3))
 </details>
 
 ## v0.72.35 (2023-01-27)
 
 <csr-id-03d9c561c7259351310ede6e4cfb6e78822d728a/>
+<csr-id-81fe669f11343259bd167b75a8bfb004b4b83090/>
 
 ### Chore
 
