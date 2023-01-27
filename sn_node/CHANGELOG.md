@@ -5,18 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.35 (2023-01-27)
-
-### Chore
-
- - <csr-id-03d9c561c7259351310ede6e4cfb6e78822d728a/> add mean to std dev to get threshold
+## v0.72.36 (2023-01-27)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -26,12 +22,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2031 ([`96d8799`](https://github.com/maidsafe/safe_network/commit/96d8799cf10510c9d3514fdd9f6fdfc628568da3))
+</details>
+
+## v0.72.35 (2023-01-27)
+
+<csr-id-03d9c561c7259351310ede6e4cfb6e78822d728a/>
+
+### Chore
+
+ - <csr-id-03d9c561c7259351310ede6e4cfb6e78822d728a/> add mean to std dev to get threshold
+
+### Chore
+
+ - <csr-id-81fe669f11343259bd167b75a8bfb004b4b83090/> sn_fault_detection-0.15.1/sn_node-0.72.35
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_fault_detection-0.15.1/sn_node-0.72.35 ([`81fe669`](https://github.com/maidsafe/safe_network/commit/81fe669f11343259bd167b75a8bfb004b4b83090))
     - add mean to std dev to get threshold ([`03d9c56`](https://github.com/maidsafe/safe_network/commit/03d9c561c7259351310ede6e4cfb6e78822d728a))
 </details>
 
 ## v0.72.34 (2023-01-27)
 
 <csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/>
+<csr-id-01ff2ccf45dfc9d45c5ad540144d7a4a640830fc/>
 
 ### Chore
 
@@ -45,7 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 4 commits contributed to the release.
+ - 5 commits contributed to the release.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -57,6 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - sn_interface-0.16.18/sn_comms-0.1.4/sn_client-0.77.9/sn_node-0.72.34/sn_api-0.75.5/sn_cli-0.68.6 ([`01ff2cc`](https://github.com/maidsafe/safe_network/commit/01ff2ccf45dfc9d45c5ad540144d7a4a640830fc))
+    - Merge branch 'main' into chore-comms-remove-unused-async ([`e92dd49`](https://github.com/maidsafe/safe_network/commit/e92dd49f38f9b56c7276e86ba79f7fd8f816af76))
     - Merge #2033 #2034 ([`06581d1`](https://github.com/maidsafe/safe_network/commit/06581d1ebbb23f432610d48bb3b773c742c0baaa))
     - Merge branch 'main' into RevertDkgCache ([`24ff625`](https://github.com/maidsafe/safe_network/commit/24ff6257f85922090cfaa5fa83044082d3ef8dab))
     - fix issues reported by new clippy ([`6b92351`](https://github.com/maidsafe/safe_network/commit/6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916))
@@ -102,9 +131,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - send_out_bytes was not reporting send failures ([`42f2c37`](https://github.com/maidsafe/safe_network/commit/42f2c3709af96207b10b711878d03d42781bfdba))
 </details>
 
-<csr-unknown>
-Run sn_comms unit tests in CI/Bors.<csr-unknown/>
-
 ## v0.72.32 (2023-01-26)
 
 <csr-id-f31f3fcc09c503eeb8a580f73b126030da8e11a4/>
@@ -122,7 +148,7 @@ Run sn_comms unit tests in CI/Bors.<csr-unknown/>
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
+ - 4 commits contributed to the release.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -135,6 +161,7 @@ Run sn_comms unit tests in CI/Bors.<csr-unknown/>
  * **Uncategorized**
     - sn_node-0.72.32 ([`6ccbaa3`](https://github.com/maidsafe/safe_network/commit/6ccbaa335378fd02a93447b67b9dec61c17ea1d0))
     - Merge #2032 ([`cb2ffd1`](https://github.com/maidsafe/safe_network/commit/cb2ffd1853e24d713fdec54cefde84028628d9b0))
+    - chore(comm): remove unused async - Also shortens fn name and clarifies docs a bit. ([`3eced25`](https://github.com/maidsafe/safe_network/commit/3eced25805febe313d3d612756931fd52b0d67b0))
     - further reduce membership clones ([`f31f3fc`](https://github.com/maidsafe/safe_network/commit/f31f3fcc09c503eeb8a580f73b126030da8e11a4))
 </details>
 
