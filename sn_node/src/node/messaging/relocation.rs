@@ -442,7 +442,7 @@ mod tests {
                 // Allow the node to receive msgs from others
                 tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
-                while let Some(msg) = get_next_msg(comm_rx) {
+                while let Some(msg) = get_next_msg(comm_rx).await {
                     let cmds = dispatcher
                         .test_handle_msg_from_peer(msg, msg_counter, Some(name))
                         .await;
