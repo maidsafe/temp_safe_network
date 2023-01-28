@@ -258,7 +258,8 @@ impl Dispatcher {
 }
 
 // Receive the next `MsgFromPeer` if the buffer is not empty. Returns None if the buffer is currently empty
-pub(crate) fn get_next_msg(comm_rx: &mut Receiver<CommEvent>) -> Option<MsgFromPeer> {
+pub(crate) async fn get_next_msg(comm_rx: &mut Receiver<CommEvent>) -> Option<MsgFromPeer> {
+    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     match comm_rx.try_recv() {
         Ok(CommEvent::Msg(msg)) => Some(msg),
         Ok(_) => None,

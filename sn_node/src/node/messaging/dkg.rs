@@ -861,7 +861,7 @@ mod tests {
                 // used to check if the buffer is empty during the first iteration of the buffer.
                 // If all the node buffers are empty during the first try, break out of main loop
                 let mut empty_at_first_try = true;
-                while let Some(msg) = get_next_msg(comm_rx) {
+                while let Some(msg) = get_next_msg(comm_rx).await {
                     if empty_at_first_try {
                         empty_at_first_try = false;
                     }
@@ -925,7 +925,7 @@ mod tests {
                 // used to check if the buffer is empty during the first iteration of the buffer.
                 // If all the node buffers are empty during the first try, break out of main loop
                 let mut empty_at_first_try = true;
-                while let Some(msg) = get_next_msg(comm_rx) {
+                while let Some(msg) = get_next_msg(comm_rx).await {
                     if empty_at_first_try {
                         empty_at_first_try = false;
                     }
@@ -1076,7 +1076,7 @@ mod tests {
                 // used to check if the buffer is empty during the first iteration of the buffer.
                 // If all the node buffers are empty during the first try, break out of main loop
                 let mut empty_at_first_try = true;
-                while let Some(msg) = get_next_msg(comm_rx) {
+                while let Some(msg) = get_next_msg(comm_rx).await {
                     if empty_at_first_try {
                         empty_at_first_try = false;
                     }
@@ -1129,7 +1129,7 @@ mod tests {
                 // used to check if the buffer is empty during the first iteration of the buffer.
                 // If all the node buffers are empty during the first try, break out of main loop
                 let mut empty_at_first_try = true;
-                while let Some(msg) = get_next_msg(comm_rx) {
+                while let Some(msg) = get_next_msg(comm_rx).await {
                     if empty_at_first_try {
                         empty_at_first_try = false;
                     }
