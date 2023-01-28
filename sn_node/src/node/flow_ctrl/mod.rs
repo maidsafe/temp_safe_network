@@ -241,7 +241,7 @@ impl FlowCtrl {
                             );
                         } else {
                             trace!(
-                                "{:?} from {sender:?}, unknown length due to serialization issued.",
+                                "{:?} from {sender:?}, unknown length due to serialization issues.",
                                 LogMarker::MsgReceived,
                             );
                         }

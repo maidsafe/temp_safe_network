@@ -9,17 +9,21 @@
 use crate::node::{core::NodeContext, Cmd, Error, MyNode, Result};
 
 use sn_interface::{
-    messaging::{data::ClientDataResponse, system::NodeMsg, Dst, MsgId, MsgKind, WireMsg},
+    messaging::{
+        data::ClientDataResponse,
+        system::{NodeMsg, NodeMsgType},
+        Dst, MsgId, MsgKind, WireMsg,
+    },
     types::Peer,
 };
 
-use qp2p::SendStream;
-use xor_name::XorName;
-
 use bytes::Bytes;
 use lazy_static::lazy_static;
-use std::{collections::BTreeSet, env::var, str::FromStr};
-use tokio::time::Duration;
+use qp2p::SendStream;
+use rayon::prelude::{IntoParallelIterator, ParallelIterator};
+use std::{collections::BTreeSet, env::var, str::FromStr, sync::Arc};
+use tokio::{sync::RwLock, time::Duration};
+use xor_name::XorName;
 
 /// Environment variable to set timeout value (in seconds) for data queries
 /// forwarded to Adults. Default value (`NODE_RESPONSE_DEFAULT_TIMEOUT`) is otherwise used.
@@ -137,12 +141,13 @@ impl MyNode {
 
         debug!("Sending out {msg_id:?} to {targets_len} holder node/s {targets:?}");
 
-        let mut dst = *wire_msg.dst();
-
-        let node_bytes = targets
-            .into_iter()
+        let node_bytes: Vec<_> = targets
+            .into_par_iter()
             .filter_map(|target| {
-                dst.name = target.name();
+                let dst = Dst {
+                    name: target.name(),
+                    section_key: context.network_knowledge.section_key(),
+                };
                 wire_msg
                     .serialize_with_new_dst(&dst)
                     .ok()
@@ -150,15 +155,14 @@ impl MyNode {
             })
             .collect();
 
-        use sn_interface::messaging::system::NodeMsgType::*;
         let msg_type = match wire_msg.kind() {
             MsgKind::Client {
                 query_index: Some(_),
                 ..
-            } => DataQuery,
+            } => NodeMsgType::DataQuery,
             MsgKind::Client {
                 query_index: None, ..
-            } => StoreData,
+            } => NodeMsgType::StoreData,
             _ => return Err(Error::InvalidMessage),
         };
 
@@ -167,12 +171,18 @@ impl MyNode {
                 name: source_client.name(),
                 section_key: context.network_knowledge.section_key(),
             },
-            client_stream,
+            Arc::new(RwLock::new(client_stream)),
         );
 
-        context
-            .comm
-            .send_and_respond_on_stream(msg_id, msg_type, node_bytes, dst_stream);
+        for (peer, bytes) in node_bytes {
+            context.comm.send_and_respond_on_stream(
+                msg_id,
+                msg_type,
+                peer,
+                bytes,
+                dst_stream.clone(),
+            );
+        }
 
         Ok(())
     }
