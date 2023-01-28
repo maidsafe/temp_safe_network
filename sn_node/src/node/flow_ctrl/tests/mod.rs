@@ -21,7 +21,7 @@ use crate::node::{
 };
 use cmd_utils::{handle_online_cmd, ProcessAndInspectCmds};
 
-use sn_comms::MsgFromPeer;
+use sn_comms::{CommEvent, MsgFromPeer};
 use sn_consensus::Decision;
 use sn_dbc::Hash;
 use sn_interface::{
@@ -606,7 +606,7 @@ async fn msg_to_self() -> Result<()> {
 
     assert!(cmds.is_empty());
 
-    let msg_type = assert_matches!(comm_rx.recv().await, Some(MsgFromPeer { sender, wire_msg, .. }) => {
+    let msg_type = assert_matches!(comm_rx.recv().await, Some(CommEvent::Msg(MsgFromPeer { sender, wire_msg, .. })) => {
         assert_eq!(sender.addr(), info.addr);
         assert_matches!(wire_msg.into_msg(), Ok(msg_type) => msg_type)
     });

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use sn_interface::types::Peer;
+use sn_interface::messaging::MsgId;
 use thiserror::Error;
 
 /// The type returned by the `sn_routing` message handling methods.
@@ -17,16 +17,16 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[allow(missing_docs)]
 pub enum Error {
     /// Any unknown node comms should be bidi, initiated by the other side
-    #[error("Attempted to create a connection to an unknown node: {0:?}")]
-    CreatingConnectionToUnknownNode(Peer),
+    #[error("Attempted to create a connection for msg {0:?} to unknown node.")]
+    ConnectingToUnknownNode(MsgId),
     #[error("Cannot connect to the endpoint: {0}")]
     CannotConnectEndpoint(#[from] qp2p::EndpointError),
     #[error("Address not reachable: {0}")]
     AddressNotReachable(#[from] qp2p::RpcError),
-    #[error("Content of a received message is inconsistent.")]
-    InvalidMessage,
-    #[error("Failed to send a message to {0}")]
-    FailedSend(Peer),
+    #[error("Content of received msg {0:?} is invalid.")]
+    InvalidMsgReceived(MsgId),
+    #[error("Failed to send msg {0:?}")]
+    FailedSend(MsgId),
 }
 
 impl From<qp2p::SendError> for Error {

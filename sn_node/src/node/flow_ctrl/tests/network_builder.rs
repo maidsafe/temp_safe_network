@@ -5,7 +5,7 @@ use crate::{
     UsedSpace,
 };
 
-use sn_comms::{Comm, MsgFromPeer};
+use sn_comms::{Comm, CommEvent};
 use sn_interface::{
     elder_count,
     messaging::system::SectionSigned,
@@ -39,7 +39,7 @@ pub(crate) static TEST_EVENT_CHANNEL_SIZE: usize = 20;
 // The default elder age pattern
 pub(crate) const ELDER_AGE_PATTERN: &[u8] = &[50, 45, 40, 35, 30, 25, 20];
 // the Rx channel for each node
-pub(crate) type TestCommRx = BTreeMap<PublicKey, Option<Receiver<MsgFromPeer>>>;
+pub(crate) type TestCommRx = BTreeMap<PublicKey, Option<Receiver<CommEvent>>>;
 
 #[derive(Clone, Debug)]
 enum TestMemberType {
@@ -143,10 +143,9 @@ impl<R: RngCore> TestNetworkBuilder<R> {
                 TestMemberType::Adult
             };
 
-            let (tx, rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
             let socket_addr: SocketAddr = (Ipv4Addr::LOCALHOST, 0).into();
-            let comm = futures::executor::block_on(Comm::new(socket_addr, tx))
-                .expect("failed to create Comm");
+            let (comm, rx) =
+                futures::executor::block_on(Comm::new(socket_addr)).expect("failed to create Comm");
             let mut node = node.clone();
             node.addr = comm.socket_addr();
 
@@ -629,7 +628,7 @@ impl TestNetwork {
     /// Take the `mspc::Receiver` for a given node. The receiver will be moved out of the `TestNetwork`.
     ///
     /// Will panic if called more than once for a single node or if the `node_pk` is not part of the `TestNetwork`
-    pub(crate) fn take_comm_rx(&mut self, node_pk: PublicKey) -> Receiver<MsgFromPeer> {
+    pub(crate) fn take_comm_rx(&mut self, node_pk: PublicKey) -> Receiver<CommEvent> {
         match self.receivers.entry(node_pk) {
             Entry::Vacant(_) => {
                 panic!("Something went wrong, the key must be present in self.receivers")
@@ -794,13 +793,12 @@ impl TestNetwork {
     pub(crate) fn gen_info(
         age: u8,
         prefix: Option<Prefix>,
-    ) -> (MyNodeInfo, Comm, Receiver<MsgFromPeer>) {
+    ) -> (MyNodeInfo, Comm, Receiver<CommEvent>) {
         let handle = Handle::current();
         let _ = handle.enter();
-        let (tx, rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
         let socket_addr: SocketAddr = (Ipv4Addr::LOCALHOST, 0).into();
-        let comm = futures::executor::block_on(Comm::new(socket_addr, tx))
-            .expect("failed  to create comm");
+        let (comm, rx) =
+            futures::executor::block_on(Comm::new(socket_addr)).expect("failed  to create comm");
         let info = MyNodeInfo::new(
             gen_keypair(&prefix.unwrap_or_default().range_inclusive(), age),
             comm.socket_addr(),
