@@ -78,10 +78,10 @@ pub(crate) enum Cmd {
         #[debug(skip)]
         context: NodeContext,
     },
-    /// Handle peer that's been detected as lost.
-    HandleFailedSendToNode {
+    /// Handle comms error.
+    HandleCommsError {
         peer: Peer,
-        msg_id: MsgId,
+        error: sn_comms::Error,
     },
     /// Handle agreement on a proposal.
     HandleSectionDecisionAgreement {
@@ -126,7 +126,7 @@ pub(crate) enum Cmd {
         context: NodeContext,
     },
     /// Performs serialisation and signing and sends the msg over a bidi connection
-    /// and then enqueues any response returned
+    /// and then enqueues any response returned.
     SendMsgEnqueueAnyResponse {
         msg: NodeMsg,
         msg_id: MsgId,
@@ -186,7 +186,7 @@ impl Cmd {
             | Cmd::SendNodeMsgResponse { .. }
             | Cmd::SendMsgAwaitResponseAndRespondToClient { .. }
             | Cmd::SendClientResponse { .. } => State::Comms,
-            Cmd::HandleFailedSendToNode { .. } => State::Comms,
+            Cmd::HandleCommsError { .. } => State::Comms,
             Cmd::HandleMsg { .. } => State::HandleMsg,
             Cmd::UpdateNetworkAndHandleValidClientMsg { .. } => State::ClientMsg,
             Cmd::TrackNodeIssue { .. } => State::FaultDetection,
@@ -213,8 +213,8 @@ impl fmt::Display for Cmd {
             Cmd::UpdateNetworkAndHandleValidClientMsg { msg_id, msg, .. } => {
                 write!(f, "UpdateAndHandleValidClientMsg {msg_id:?}: {msg:?}")
             }
-            Cmd::HandleFailedSendToNode { peer, msg_id } => {
-                write!(f, "HandlePeerFailedSend({:?}, {:?})", peer.name(), msg_id)
+            Cmd::HandleCommsError { peer, error } => {
+                write!(f, "HandleCommsError({:?}, {:?})", peer.name(), error)
             }
             Cmd::HandleSectionDecisionAgreement { .. } => {
                 write!(f, "HandleSectionDecisionAgreement")

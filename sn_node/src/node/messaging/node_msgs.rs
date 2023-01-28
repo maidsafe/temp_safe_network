@@ -13,7 +13,7 @@ use crate::{
     storage::{Error as StorageError, StorageLevel},
 };
 
-use sn_comms::Error as CommsError;
+use sn_fault_detection::IssueType;
 use sn_interface::{
     messaging::{
         data::{ClientDataResponse, CmdResponse},
@@ -25,21 +25,18 @@ use sn_interface::{
 };
 
 use qp2p::{SendStream, UsrMsgBytes};
-use sn_fault_detection::IssueType;
-use xor_name::XorName;
-
-use std::collections::BTreeSet;
-use std::sync::Arc;
+use std::{collections::BTreeSet, sync::Arc};
 use tokio::sync::RwLock;
+use xor_name::XorName;
 
 impl MyNode {
     /// Send a (`NodeMsg`) message to peers
-    pub(crate) async fn send_msg(
+    pub(crate) fn send_msg(
         msg: NodeMsg,
         msg_id: MsgId,
         recipients: Peers,
         context: NodeContext,
-    ) -> Result<Vec<Cmd>> {
+    ) -> Result<()> {
         debug!("Sending msg: {msg_id:?}");
         let peer_msgs = into_msg_bytes(
             &context.network_knowledge,
@@ -49,49 +46,24 @@ impl MyNode {
             recipients,
         )?;
 
-        let comm = context.comm.clone();
-        let tasks = peer_msgs
+        peer_msgs
             .into_iter()
-            .map(|(peer, msg)| comm.send_out_bytes(peer, msg_id, msg));
-        let results = futures::future::join_all(tasks).await;
+            .for_each(|(peer, msg)| context.comm.send_out_bytes(peer, msg_id, msg));
 
-        // Any failed sends are tracked via Cmd::HandlePeerFailedSend, which will track issues for any peers
-        // in the section (otherwise ignoring failed send to out of section nodes or clients)
-        let cmds = results
-            .into_iter()
-            .filter_map(|result| match result {
-                Err(CommsError::FailedSend(peer)) => {
-                    Some(Cmd::HandleFailedSendToNode { peer, msg_id })
-                }
-                Err(error) => {
-                    error!("Error in comms for {msg_id:?}: {error:?}");
-                    None
-                }
-                Ok(_) => {
-                    // nothing need be done
-                    None
-                }
-            })
-            .collect();
-
-        Ok(cmds)
+        Ok(())
     }
 
     /// Send a (`NodeMsg`) message to all Elders in our section
-    pub(crate) fn send_msg_to_our_elders(context: &NodeContext, msg: NodeMsg) -> Cmd {
+    pub(crate) fn send_to_elders(context: &NodeContext, msg: NodeMsg) -> Cmd {
         let sap = context.network_knowledge.section_auth();
         let recipients = sap.elders_set();
         Cmd::send_msg(msg, Peers::Multiple(recipients), context.clone())
     }
 
     /// Send a (`NodeMsg`) message to all Elders in our section, await all responses & enqueue
-    pub(crate) fn send_msg_to_our_elders_await_responses(
-        context: NodeContext,
-        msg: NodeMsg,
-    ) -> Cmd {
+    pub(crate) fn send_to_elders_await_responses(context: NodeContext, msg: NodeMsg) -> Cmd {
         let sap = context.network_knowledge.section_auth();
         let recipients = sap.elders_set();
-
         Cmd::SendMsgEnqueueAnyResponse {
             msg,
             msg_id: MsgId::new(),
@@ -148,7 +120,7 @@ impl MyNode {
                     cmds.push(Cmd::SetJoinsAllowedUntilSplit(true));
                 }
 
-                cmds.push(MyNode::send_msg_to_our_elders(context, msg));
+                cmds.push(MyNode::send_to_elders(context, msg));
                 CmdResponse::err(data, StorageError::NotEnoughSpace.into())?
             }
             Err(error) => {

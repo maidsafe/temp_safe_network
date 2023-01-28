@@ -860,7 +860,7 @@ mod tests {
         },
     };
 
-    use sn_comms::MsgFromPeer;
+    use sn_comms::CommEvent;
     use sn_interface::{
         init_logger,
         messaging::{
@@ -1108,7 +1108,7 @@ mod tests {
         rng: impl RngCore,
     ) -> (
         BTreeMap<XorName, Dispatcher>,
-        BTreeMap<XorName, mpsc::Receiver<MsgFromPeer>>,
+        BTreeMap<XorName, mpsc::Receiver<CommEvent>>,
         SecretKeySet,
     ) {
         let mut env = TestNetworkBuilder::new(rng)

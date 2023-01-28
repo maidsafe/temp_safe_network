@@ -38,6 +38,7 @@ pub enum LogMarker {
     VotedOffline,
     // Messaging
     ClientMsgToBeForwarded,
+    MsgReceived,
     ClientMsgToBeHandled,
     NodeMsgToBeHandled,
     // Membership
@@ -64,7 +65,6 @@ pub enum LogMarker {
     RegisterQueryReceivedAtElder,
     RegisterQueryReceivedAtAdult,
     // Routing cmds
-    DispatchHandleMsgCmd,
     CmdHandlingSpawned,
     CmdProcessStart,
     CmdProcessEnd,

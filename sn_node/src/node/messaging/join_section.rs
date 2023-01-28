@@ -19,7 +19,7 @@ impl MyNode {
         if context.network_knowledge.is_section_member(&context.name) {
             None
         } else {
-            Some(MyNode::send_msg_to_our_elders_await_responses(
+            Some(MyNode::send_to_elders_await_responses(
                 context,
                 NodeMsg::TryJoin(relocation),
             ))
@@ -40,7 +40,7 @@ mod tests {
         MIN_ADULT_AGE,
     };
 
-    use sn_comms::MsgFromPeer;
+    use sn_comms::CommEvent;
     use sn_interface::{
         elder_count, init_logger,
         messaging::system::{JoinRejectReason, JoinResponse},
@@ -413,7 +413,7 @@ mod tests {
         (network_knowledge, section)
     }
 
-    async fn connect_flows(node: MyNode, incoming_msg_receiver: Receiver<MsgFromPeer>) -> TestNode {
+    async fn connect_flows(node: MyNode, incoming_msg_receiver: Receiver<CommEvent>) -> TestNode {
         let node = Arc::new(RwLock::new(node));
         let (dispatcher, data_replication_receiver) = Dispatcher::new(node.clone());
         let cmd_ctrl = CmdCtrl::new(dispatcher);

@@ -25,10 +25,10 @@ use crate::node::{
         fault_detection::{FaultChannels, FaultsCmd},
     },
     messaging::Peers,
-    MyNode, Result, STANDARD_CHANNEL_SIZE,
+    MyNode, STANDARD_CHANNEL_SIZE,
 };
 
-use sn_comms::MsgFromPeer;
+use sn_comms::{CommEvent, MsgFromPeer};
 use sn_fault_detection::FaultDetection;
 use sn_interface::{
     messaging::system::{JoinRejectReason, NodeDataCmd, NodeMsg},
@@ -36,7 +36,10 @@ use sn_interface::{
 };
 
 use std::{collections::BTreeSet, net::SocketAddr, sync::Arc};
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{
+    mpsc::{self, Receiver, Sender},
+    RwLock,
+};
 use xor_name::XorName;
 
 /// Sent via the rejoin_network_tx to restart the join process.
@@ -66,7 +69,7 @@ impl RejoinReason {
 /// Periodically triggers other Cmd Processes (eg health checks, fault detection etc)
 pub(crate) struct FlowCtrl {
     node: Arc<RwLock<MyNode>>,
-    cmd_sender_channel: mpsc::Sender<(Cmd, Vec<usize>)>,
+    cmd_sender_channel: Sender<(Cmd, Vec<usize>)>,
     fault_channels: FaultChannels,
     timestamps: PeriodicChecksTimestamps,
 }
@@ -76,13 +79,10 @@ impl FlowCtrl {
     /// returning the channel where it can receive commands on
     pub(crate) async fn start(
         cmd_ctrl: CmdCtrl,
-        mut incoming_msg_events: mpsc::Receiver<MsgFromPeer>,
-        data_replication_receiver: mpsc::Receiver<(Vec<DataAddress>, Peer)>,
-        fault_cmds_channels: (mpsc::Sender<FaultsCmd>, mpsc::Receiver<FaultsCmd>),
-    ) -> (
-        mpsc::Sender<(Cmd, Vec<usize>)>,
-        mpsc::Receiver<RejoinReason>,
-    ) {
+        incoming_msg_events: Receiver<CommEvent>,
+        data_replication_receiver: Receiver<(Vec<DataAddress>, Peer)>,
+        fault_cmds_channels: (Sender<FaultsCmd>, Receiver<FaultsCmd>),
+    ) -> (Sender<(Cmd, Vec<usize>)>, Receiver<RejoinReason>) {
         trace!("[NODE READ]: flowctrl node context lock got");
         let node_context = cmd_ctrl.node().read().await.context();
         let (cmd_sender_channel, mut incoming_cmds_from_apis) =
@@ -151,22 +151,7 @@ impl FlowCtrl {
         )
         .await;
 
-        // start a new thread to convert msgs to Cmds
-        let _handle = tokio::task::spawn(async move {
-            while let Some(peer_msg) = incoming_msg_events.recv().await {
-                let cmd = match Self::handle_new_msg_event(peer_msg) {
-                    Ok(cmd) => cmd,
-                    Err(error) => {
-                        error!("Could not handle incoming msg event: {error:?}");
-                        continue;
-                    }
-                };
-
-                if let Err(error) = cmd_channel_for_msgs.send((cmd, vec![])).await {
-                    error!("Error sending msg onto cmd channel {error:?}");
-                }
-            }
-        });
+        Self::listen_for_comm_events(incoming_msg_events, cmd_channel_for_msgs);
 
         (cmd_sender_channel, rejoin_network_rx)
     }
@@ -175,8 +160,8 @@ impl FlowCtrl {
     async fn send_out_data_for_replication(
         node_arc: Arc<RwLock<MyNode>>,
         node_data_storage: DataStorage,
-        mut data_replication_receiver: mpsc::Receiver<(Vec<DataAddress>, Peer)>,
-        cmd_channel: mpsc::Sender<(Cmd, Vec<usize>)>,
+        mut data_replication_receiver: Receiver<(Vec<DataAddress>, Peer)>,
+        cmd_channel: Sender<(Cmd, Vec<usize>)>,
     ) {
         // start a new thread to kick off data replication
         let _handle = tokio::task::spawn(async move {
@@ -231,20 +216,48 @@ impl FlowCtrl {
         }
     }
 
-    // Listen for a new incoming connection event and handle it.
-    fn handle_new_msg_event(msg: MsgFromPeer) -> Result<Cmd> {
-        let MsgFromPeer {
-            sender,
-            wire_msg,
-            send_stream,
-        } = msg;
+    // starts a new thread to convert comm event to cmds
+    fn listen_for_comm_events(
+        mut incoming_msg_events: Receiver<CommEvent>,
+        cmd_channel_for_msgs: Sender<(Cmd, Vec<usize>)>,
+    ) {
+        let _handle = tokio::task::spawn(async move {
+            while let Some(event) = incoming_msg_events.recv().await {
+                let cmd = match event {
+                    CommEvent::Error { peer, error } => Cmd::HandleCommsError { peer, error },
+                    CommEvent::Msg(MsgFromPeer {
+                        sender,
+                        wire_msg,
+                        send_stream,
+                    }) => {
+                        if let Ok((header, dst, payload)) = wire_msg.serialize() {
+                            let original_bytes_len = header.len() + dst.len() + payload.len();
+                            let span =
+                                trace_span!("handle_message", ?sender, msg_id = ?wire_msg.msg_id());
+                            let _span_guard = span.enter();
+                            trace!(
+                                "{:?} from {sender:?} length {original_bytes_len}",
+                                LogMarker::MsgReceived,
+                            );
+                        } else {
+                            trace!(
+                                "{:?} from {sender:?}, unknown length due to serialization issued.",
+                                LogMarker::MsgReceived,
+                            );
+                        }
 
-        trace!("{:?} from {sender:?}", LogMarker::DispatchHandleMsgCmd,);
+                        Cmd::HandleMsg {
+                            origin: sender,
+                            wire_msg,
+                            send_stream,
+                        }
+                    }
+                };
 
-        Ok(Cmd::HandleMsg {
-            origin: sender,
-            wire_msg,
-            send_stream,
-        })
+                if let Err(error) = cmd_channel_for_msgs.send((cmd, vec![])).await {
+                    error!("Error sending msg onto cmd channel {error:?}");
+                }
+            }
+        });
     }
 }
