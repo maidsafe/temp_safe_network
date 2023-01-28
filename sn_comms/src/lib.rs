@@ -65,9 +65,13 @@ use qp2p::{Endpoint, SendStream, UsrMsgBytes};
 use std::{
     collections::{BTreeMap, BTreeSet},
     net::SocketAddr,
+    sync::Arc,
 };
 use tokio::{
-    sync::mpsc::{self, Receiver, Sender},
+    sync::{
+        mpsc::{self, Receiver, Sender},
+        RwLock,
+    },
     task,
 };
 
@@ -106,9 +110,10 @@ enum CommCmd {
     SendAndRespondOnStream {
         msg_id: MsgId,
         msg_type: NodeMsgType,
+        peer: Peer,
         #[debug(skip)]
-        node_bytes: BTreeMap<Peer, UsrMsgBytes>,
-        dst_stream: (Dst, SendStream),
+        bytes: UsrMsgBytes,
+        dst_stream: (Dst, Arc<RwLock<SendStream>>),
     },
 }
 
@@ -197,7 +202,7 @@ impl Comm {
         });
     }
 
-    /// Sends the payload on a new bidi-stream and returns the response.
+    /// Sends the payload on a new bidi-stream and pushes the response onto the comm event channel.
     #[tracing::instrument(skip(self, bytes))]
     pub fn send_with_bi_response(&self, peer: Peer, msg_id: MsgId, bytes: UsrMsgBytes) {
         let sender = self.cmd_sender.clone();
@@ -212,14 +217,15 @@ impl Comm {
         });
     }
 
-    /// Sends the payload on a new bidi-stream and returns the response.
-    #[tracing::instrument(skip(node_bytes))]
+    /// Sends the payload on new bidi-streams and sends the responses on the dst stream.
+    #[tracing::instrument(skip(bytes))]
     pub fn send_and_respond_on_stream(
         &self,
         msg_id: MsgId,
         msg_type: NodeMsgType,
-        node_bytes: BTreeMap<Peer, UsrMsgBytes>,
-        dst_stream: (Dst, SendStream),
+        peer: Peer,
+        bytes: UsrMsgBytes,
+        dst_stream: (Dst, Arc<RwLock<SendStream>>),
     ) {
         let sender = self.cmd_sender.clone();
         let _handle = task::spawn(async move {
@@ -227,35 +233,13 @@ impl Comm {
                 .send(CommCmd::SendAndRespondOnStream {
                     msg_id,
                     msg_type,
-                    node_bytes,
+                    peer,
+                    bytes,
                     dst_stream,
                 })
                 .await
         });
     }
-
-    // /// Sends the payload on a new bidi-stream and returns the response.
-    // #[tracing::instrument(skip(bytes))]
-    // pub async fn send_out_bytes_to_peer_and_return_response(
-    //     &self,
-    //     peer: Peer,
-    //     msg_id: MsgId,
-    //     bytes: UsrMsgBytes,
-    // ) -> Result<WireMsg> {
-    //     let sender = self.cmd_sender.clone();
-    //     let _ = task::spawn(async move {
-    //         sender
-    //             .send(CommCmd::SendAndRespondOnStream {
-    //                 msg_id,
-    //                 node_bytes: BTreeMap::from([(peer, bytes)]),
-    //                 client_stream,
-    //                 dst,
-    //             })
-    //             .await
-    //     });
-
-    //     unimplemented!();
-    // }
 }
 
 fn process_cmds(
@@ -265,7 +249,6 @@ fn process_cmds(
 ) {
     let _handle = task::spawn(async move {
         let mut sessions = BTreeMap::<Peer, PeerSession>::new();
-        // let sessions = Arc::new(DashMap::<Peer, PeerSession>::new());
         while let Some(cmd) = update_receiver.recv().await {
             trace!("Comms cmd handling: {cmd:?}");
             match cmd {
@@ -307,7 +290,6 @@ fn process_cmds(
                     msg_id,
                     bytes,
                 } => {
-                    // TODO: use `NODE_RESPONSE_TIMEOUT`
                     let session = match sessions.get(&peer) {
                         Some(session) => session.clone(),
                         None => {
@@ -327,28 +309,30 @@ fn process_cmds(
                 CommCmd::SendAndRespondOnStream {
                     msg_id,
                     msg_type,
-                    node_bytes,
+                    peer,
+                    bytes,
                     dst_stream,
                 } => {
-                    let node_bytes = node_bytes
-                        .into_iter()
-                        .filter_map(|(peer, bytes)| {
-                            debug!("Trying to get {peer:?} session in order to send: {msg_id:?}", );
-                            match sessions.get(&peer) {
-                                Some(session) => Some((session.clone(), bytes)),
-                                None => {
-                                    error!(
-                                        "Sending message (msg_id: {msg_id:?}) to {peer:?} failed: unknown node."
-                                    );
-                                    send_error(peer, Error::ConnectingToUnknownNode(msg_id), comm_events.clone());
-                                    None
-                                }
-                            }
-                        }).collect();
+                    debug!("Trying to get {peer:?} session in order to send: {msg_id:?}",);
+                    let session = match sessions.get(&peer) {
+                        Some(session) => session.clone(),
+                        None => {
+                            error!(
+                                "Sending message (msg_id: {msg_id:?}) to {peer:?} failed: unknown node."
+                            );
+                            send_error(
+                                peer,
+                                Error::ConnectingToUnknownNode(msg_id),
+                                comm_events.clone(),
+                            );
+                            continue;
+                        }
+                    };
                     send_and_respond_on_stream(
                         msg_id,
                         msg_type,
-                        node_bytes,
+                        session,
+                        bytes,
                         dst_stream,
                         comm_events.clone(),
                     );
@@ -387,6 +371,7 @@ fn send_with_bi_response(
         let bytes_len = h.len() + d.len() + p.len();
         let peer = session.peer();
         trace!("Sending message bytes ({bytes_len} bytes) w/ {msg_id:?} to {peer:?}");
+        // do we need to use `NODE_RESPONSE_TIMEOUT`?
         let node_response_bytes = match session.send_with_bi_return_response(bytes, msg_id).await {
             Ok(response_bytes) => {
                 debug!("Peer response from {peer:?} is in for {msg_id:?}");
@@ -413,65 +398,54 @@ fn send_with_bi_response(
 fn send_and_respond_on_stream(
     msg_id: MsgId,
     msg_type: NodeMsgType,
-    node_bytes: Vec<(PeerSession, UsrMsgBytes)>,
-    dst_stream: (Dst, SendStream),
+    session: PeerSession,
+    bytes: UsrMsgBytes,
+    dst_stream: (Dst, Arc<RwLock<SendStream>>),
     comm_events: Sender<CommEvent>,
 ) {
     let _handle = task::spawn(async move {
-        // responses from those we send to
-        let mut all_received = vec![];
+        let peer = session.peer();
+        let (dst, stream) = dst_stream;
 
-        for (session, bytes) in node_bytes {
-            let peer = session.peer();
-            let node_response_bytes =
-                match session.send_with_bi_return_response(bytes, msg_id).await {
-                    Ok(response_bytes) => response_bytes,
-                    Err(error) => {
-                        error!("Failed sending {msg_id:?} to {peer:?}: {error:?}");
-                        send_error(peer, Error::FailedSend(msg_id), comm_events.clone());
-                        // continue with next node
-                        continue;
-                    }
-                };
+        // do we need to use `NODE_RESPONSE_TIMEOUT`?
+        let node_response_bytes = match session.send_with_bi_return_response(bytes, msg_id).await {
+            Ok(response_bytes) => response_bytes,
+            Err(error) => {
+                error!("Failed sending {msg_id:?} to {peer:?}: {error:?}");
+                send_error(peer, Error::FailedSend(msg_id), comm_events.clone());
+                return;
+            }
+        };
 
-            debug!("Response from node {peer:?} is in for {msg_id:?}");
+        debug!("Response from node {peer:?} is in for {msg_id:?}");
 
-            match WireMsg::from(node_response_bytes) {
-                Ok(received) => {
-                    match received.into_msg() {
-                        Ok(msg) => all_received.push((msg, peer)),
-                        Err(_error) => {
-                            send_error(
-                                peer,
-                                Error::InvalidMsgReceived(msg_id),
-                                comm_events.clone(),
-                            );
-                            // continue with next received msg
-                        }
-                    };
-                }
-                Err(error) => {
-                    error!("Failed sending {msg_id:?} to {peer:?}: {error:?}");
+        let received = match WireMsg::from(node_response_bytes) {
+            Ok(received) => match received.into_msg() {
+                Ok(msg) => msg,
+                Err(_error) => {
                     send_error(peer, Error::InvalidMsgReceived(msg_id), comm_events.clone());
-                    // continue with next received msg
+                    return;
                 }
-            };
-        }
+            },
+            Err(error) => {
+                error!("Failed sending {msg_id:?} to {peer:?}: {error:?}");
+                send_error(peer, Error::InvalidMsgReceived(msg_id), comm_events.clone());
+                return;
+            }
+        };
 
-        let (dst, mut stream) = dst_stream;
-        for (received, peer) in all_received {
-            match map_to_client_response(msg_type, msg_id, received, dst) {
-                Some(bytes) => match stream.send_user_msg(bytes).await {
-                    Ok(()) => (),
+        match map_to_client_response(msg_type, msg_id, received, dst) {
+            Some(bytes) => {
+                let mut stream = stream.write().await;
+                match stream.send_user_msg(bytes).await {
+                    Ok(()) => trace!("Response from node {peer:?} for {msg_id:?} sent to client."),
                     Err(error) => {
                         send_error(peer, Error::from(error), comm_events.clone());
-                        // continue with next received msg
                     }
-                },
-                None => {
-                    send_error(peer, Error::InvalidMsgReceived(msg_id), comm_events.clone());
-                    // continue with next received msg
                 }
+            }
+            None => {
+                send_error(peer, Error::InvalidMsgReceived(msg_id), comm_events.clone());
             }
         }
     });
