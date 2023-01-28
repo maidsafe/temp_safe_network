@@ -57,13 +57,19 @@ impl Dispatcher {
                 msg_id,
                 recipients,
                 context,
-            } => MyNode::send_msg(msg, msg_id, recipients, context).await,
-            Cmd::SendMsgEnqueueAnyResponse {
+            } => {
+                MyNode::send_msg(msg, msg_id, recipients, context)?;
+                Ok(vec![])
+            }
+            Cmd::SendMsgWithBiResponse {
                 msg,
                 msg_id,
                 recipients,
                 context,
-            } => MyNode::send_msg_enqueue_any_response(msg, msg_id, context, recipients).await,
+            } => {
+                MyNode::send_msg_with_bi_response(msg, msg_id, context, recipients)?;
+                Ok(vec![])
+            }
             Cmd::SendMsgAwaitResponseAndRespondToClient {
                 msg_id,
                 msg,
@@ -79,8 +85,8 @@ impl Dispatcher {
                     targets,
                     client_stream,
                     source_client,
-                )
-                .await
+                )?;
+                Ok(vec![])
             }
             Cmd::SendNodeMsgResponse {
                 msg,
@@ -88,41 +94,44 @@ impl Dispatcher {
                 recipient,
                 send_stream,
                 context,
-            } => MyNode::send_node_msg_response(msg, msg_id, recipient, context, send_stream).await,
+            } => Ok(
+                MyNode::send_node_msg_response(msg, msg_id, recipient, context, send_stream)
+                    .await?
+                    .into_iter()
+                    .collect(),
+            ),
             Cmd::SendClientResponse {
                 msg,
                 correlation_id,
                 send_stream,
                 context,
                 source_client,
-            } => {
-                MyNode::send_client_response(
-                    msg,
-                    correlation_id,
-                    send_stream,
-                    context,
-                    source_client,
-                )
-                .await?;
-                Ok(vec![])
-            }
+            } => Ok(MyNode::send_client_response(
+                msg,
+                correlation_id,
+                send_stream,
+                context,
+                source_client,
+            )
+            .await?
+            .into_iter()
+            .collect()),
             Cmd::SendNodeDataResponse {
                 msg,
                 correlation_id,
                 send_stream,
                 context,
                 requesting_peer,
-            } => {
-                MyNode::send_node_data_response(
-                    msg,
-                    correlation_id,
-                    send_stream,
-                    context,
-                    requesting_peer,
-                )
-                .await?;
-                Ok(vec![])
-            }
+            } => Ok(MyNode::send_node_data_response(
+                msg,
+                correlation_id,
+                send_stream,
+                context,
+                requesting_peer,
+            )
+            .await?
+            .into_iter()
+            .collect()),
             Cmd::TrackNodeIssue { name, issue } => {
                 let node = self.node.read().await;
                 debug!("[NODE READ]: fault tracking read got");
@@ -191,11 +200,11 @@ impl Dispatcher {
                 node.handle_new_sections_agreement(sap1, sig1, sap2, sig2)
                     .await
             }
-            Cmd::HandleFailedSendToNode { peer, msg_id } => {
-                warn!("Message sending failed to {peer}, for {msg_id:?}");
+            Cmd::HandleCommsError { peer, error } => {
+                trace!("Comms error {error}");
                 let node = self.node.read().await;
-                debug!("[NODE READ]: HandleFailedSendToNode agreements read got...");
-                node.handle_failed_send(&peer.addr());
+                debug!("[NODE READ]: HandleCommsError read got...");
+                node.handle_comms_error(peer, error);
                 Ok(vec![])
             }
             Cmd::HandleDkgOutcome {

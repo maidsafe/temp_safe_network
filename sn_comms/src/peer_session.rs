@@ -67,6 +67,10 @@ impl PeerSession {
         }
     }
 
+    pub(crate) fn peer(&self) -> Peer {
+        self.peer
+    }
+
     /// Sends out a UsrMsg on a bidi connection and awaits response bytes.
     /// As such this may be long running if response is returned slowly.
     /// When sending a msg to a peer, if it fails with an existing
@@ -75,7 +79,7 @@ impl PeerSession {
     /// b. or it cleaned them all up from the cache creating a new connection
     ///    to the peer as last attempt.
     pub(crate) async fn send_with_bi_return_response(
-        &mut self,
+        &self,
         bytes: UsrMsgBytes,
         msg_id: MsgId,
     ) -> Result<UsrMsgBytes, PeerSessionError> {

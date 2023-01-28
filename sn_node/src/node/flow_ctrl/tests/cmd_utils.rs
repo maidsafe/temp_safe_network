@@ -12,7 +12,7 @@ use crate::node::{
     Cmd, MyNode,
 };
 
-use sn_comms::MsgFromPeer;
+use sn_comms::{CommEvent, MsgFromPeer};
 use sn_interface::{
     messaging::{
         data::ClientMsg,
@@ -108,7 +108,7 @@ impl<'a> ProcessAndInspectCmds<'a> {
     pub(crate) async fn new_from_client_msg(
         msg: ClientMsg,
         dispatcher: &'a Dispatcher,
-        mut comm_rx: Receiver<MsgFromPeer>,
+        mut comm_rx: Receiver<CommEvent>,
     ) -> crate::node::error::Result<ProcessAndInspectCmds> {
         let context = dispatcher.node().read().await.context();
         let (msg_id, serialised_payload, msg_kind, auth) = get_client_msg_parts_for_handling(&msg)?;
@@ -139,10 +139,10 @@ impl<'a> ProcessAndInspectCmds<'a> {
         send_stream.send_user_msg(user_msg).await?;
 
         match comm_rx.recv().await {
-            Some(MsgFromPeer {
+            Some(CommEvent::Msg(MsgFromPeer {
                 send_stream: Some(send_stream),
                 ..
-            }) => {
+            })) => {
                 let cmds =
                     MyNode::handle_valid_client_msg(context, msg_id, msg, auth, peer, send_stream)
                         .await?;
@@ -237,7 +237,7 @@ impl Dispatcher {
             let peer_msgs = into_msg_bytes(
                 &context.network_knowledge,
                 context.name,
-                msg.clone(),
+                msg,
                 msg_id,
                 recipients,
             )
@@ -249,10 +249,7 @@ impl Dispatcher {
                         continue;
                     }
                 }
-
-                if let Err(err) = context.comm.send_out_bytes(peer, msg_id, msg_bytes).await {
-                    info!("Failed to send {msg} to {}: {err:?}", peer.name());
-                }
+                context.comm.send_out_bytes(peer, msg_id, msg_bytes);
             }
         } else {
             panic!("mock_send_msg expects Cmd::SendMsg, got {cmd:?}");
@@ -261,9 +258,10 @@ impl Dispatcher {
 }
 
 // Receive the next `MsgFromPeer` if the buffer is not empty. Returns None if the buffer is currently empty
-pub(crate) fn get_next_msg(comm_rx: &mut Receiver<MsgFromPeer>) -> Option<MsgFromPeer> {
+pub(crate) fn get_next_msg(comm_rx: &mut Receiver<CommEvent>) -> Option<MsgFromPeer> {
     match comm_rx.try_recv() {
-        Ok(msg) => Some(msg),
+        Ok(CommEvent::Msg(msg)) => Some(msg),
+        Ok(_) => None,
         Err(TryRecvError::Empty) => None,
         Err(TryRecvError::Disconnected) => panic!("the comm_rx channel is closed"),
     }

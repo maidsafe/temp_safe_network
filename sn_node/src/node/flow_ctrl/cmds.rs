@@ -78,10 +78,10 @@ pub(crate) enum Cmd {
         #[debug(skip)]
         context: NodeContext,
     },
-    /// Handle peer that's been detected as lost.
-    HandleFailedSendToNode {
+    /// Handle comms error.
+    HandleCommsError {
         peer: Peer,
-        msg_id: MsgId,
+        error: sn_comms::Error,
     },
     /// Handle agreement on a proposal.
     HandleSectionDecisionAgreement {
@@ -126,8 +126,8 @@ pub(crate) enum Cmd {
         context: NodeContext,
     },
     /// Performs serialisation and signing and sends the msg over a bidi connection
-    /// and then enqueues any response returned
-    SendMsgEnqueueAnyResponse {
+    /// and then enqueues any response returned.
+    SendMsgWithBiResponse {
         msg: NodeMsg,
         msg_id: MsgId,
         recipients: BTreeSet<Peer>,
@@ -193,12 +193,12 @@ impl Cmd {
         use sn_interface::statemap::State;
         match self {
             Cmd::SendMsg { .. }
-            | Cmd::SendMsgEnqueueAnyResponse { .. }
+            | Cmd::SendMsgWithBiResponse { .. }
             | Cmd::SendNodeMsgResponse { .. }
             | Cmd::SendClientResponse { .. }
             | Cmd::SendNodeDataResponse { .. }
             | Cmd::SendMsgAwaitResponseAndRespondToClient { .. } => State::Comms,
-            Cmd::HandleFailedSendToNode { .. } => State::Comms,
+            Cmd::HandleCommsError { .. } => State::Comms,
             Cmd::HandleMsg { .. } => State::HandleMsg,
             Cmd::UpdateNetworkAndHandleValidClientMsg { .. } => State::ClientMsg,
             Cmd::TrackNodeIssue { .. } => State::FaultDetection,
@@ -225,8 +225,8 @@ impl fmt::Display for Cmd {
             Cmd::UpdateNetworkAndHandleValidClientMsg { msg_id, msg, .. } => {
                 write!(f, "UpdateAndHandleValidClientMsg {msg_id:?}: {msg:?}")
             }
-            Cmd::HandleFailedSendToNode { peer, msg_id } => {
-                write!(f, "HandlePeerFailedSend({:?}, {:?})", peer.name(), msg_id)
+            Cmd::HandleCommsError { peer, error } => {
+                write!(f, "HandleCommsError({:?}, {:?})", peer.name(), error)
             }
             Cmd::HandleSectionDecisionAgreement { .. } => {
                 write!(f, "HandleSectionDecisionAgreement")
@@ -236,7 +236,7 @@ impl fmt::Display for Cmd {
             Cmd::HandleMembershipDecision(_) => write!(f, "HandleMembershipDecision"),
             Cmd::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
             Cmd::SendMsg { .. } => write!(f, "SendMsg"),
-            Cmd::SendMsgEnqueueAnyResponse { .. } => write!(f, "SendMsgEnqueueAnyResponse"),
+            Cmd::SendMsgWithBiResponse { .. } => write!(f, "SendMsgWithBiResponse"),
             Cmd::SendNodeMsgResponse { .. } => write!(f, "SendNodeMsgResponse"),
             Cmd::SendClientResponse { .. } => write!(f, "SendClientResponse"),
             Cmd::SendNodeDataResponse { .. } => write!(f, "SendNodeDataResponse"),

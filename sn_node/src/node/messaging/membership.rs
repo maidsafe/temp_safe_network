@@ -44,7 +44,7 @@ impl MyNode {
                     return None;
                 }
             };
-            Some(MyNode::send_msg_to_our_elders(
+            Some(MyNode::send_to_elders(
                 context,
                 NodeMsg::MembershipVotes(vec![membership_vote]),
             ))
@@ -64,8 +64,7 @@ impl MyNode {
         if let Some(membership) = membership_context {
             trace!("{}", LogMarker::GossippingMembershipVotes);
             if let Ok(ae_votes) = membership.anti_entropy(membership.generation()) {
-                let cmd =
-                    MyNode::send_msg_to_our_elders(context, NodeMsg::MembershipVotes(ae_votes));
+                let cmd = MyNode::send_to_elders(context, NodeMsg::MembershipVotes(ae_votes));
                 return Some(cmd);
             }
         }
@@ -131,7 +130,7 @@ impl MyNode {
             };
 
             if let Some(vote_msg) = vote_broadcast {
-                cmds.push(MyNode::send_msg_to_our_elders(context, vote_msg));
+                cmds.push(MyNode::send_to_elders(context, vote_msg));
             }
         }
 

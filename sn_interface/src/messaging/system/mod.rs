@@ -69,6 +69,12 @@ pub enum SectionStateVote {
     JoinsAllowed(bool),
 }
 
+#[derive(Clone, Copy, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
+pub enum NodeMsgType {
+    DataQuery,
+    StoreData,
+}
+
 #[derive(Clone, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
 #[allow(clippy::large_enum_variant, clippy::derive_partial_eq_without_eq)]
 /// Message sent over the among nodes

@@ -139,11 +139,10 @@ async fn bootstrap_node(
     CmdChannel,
     mpsc::Receiver<RejoinReason>,
 )> {
-    let (incoming_msg_pipe, incoming_msg_receiver) = mpsc::channel(STANDARD_CHANNEL_SIZE);
     let (fault_cmds_sender, fault_cmds_receiver) =
         mpsc::channel::<FaultsCmd>(STANDARD_CHANNEL_SIZE);
 
-    let comm = Comm::new(config.local_addr(), incoming_msg_pipe).await?;
+    let (comm, incoming_msg_receiver) = Comm::new(config.local_addr()).await?;
 
     let node = if config.is_first() {
         start_genesis_node(
