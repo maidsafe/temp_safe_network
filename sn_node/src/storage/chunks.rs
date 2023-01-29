@@ -10,7 +10,7 @@ use super::{list_files_in, prefix_tree_path, used_space::StorageLevel, Error, Re
 
 use sn_interface::{
     messaging::system::NodeQueryResponse,
-    types::{log_markers::LogMarker, Chunk, ChunkAddress, DataAddress},
+    types::{log_markers::LogMarker, Chunk, ChunkAddress},
 };
 
 use bytes::Bytes;
@@ -127,7 +127,7 @@ impl ChunkStorage {
                 self, addr
             );
             // Nothing more to do here
-            return Err(Error::DataExists(DataAddress::Bytes(*addr)));
+            return Ok(StorageLevel::NoChange);
         }
 
         // Cheap extra security check for space (prone to race conditions)

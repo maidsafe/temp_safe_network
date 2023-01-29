@@ -32,9 +32,6 @@ pub enum Error {
     /// Chunk not found.
     #[error("Chunk not found: {0:?}")]
     ChunkNotFound(XorName),
-    /// Data already exists for this node
-    #[error("Data already exists at this node: {0:?}")]
-    DataExists(DataAddress),
     /// Storage not supported for type of data address
     #[error("Storage not supported for type of data address: {0:?}")]
     UnsupportedDataType(DataAddress),
@@ -83,7 +80,6 @@ impl From<Error> for ErrorMsg {
             Error::ChunkNotFound(xorname) => {
                 ErrorMsg::DataNotFound(DataAddress::Bytes(ChunkAddress(xorname)))
             }
-            Error::DataExists(address) => ErrorMsg::DataExists(address),
             Error::NetworkData(error) => error.into(),
             other => ErrorMsg::InvalidOperation(format!("Failed to perform operation: {other:?}")),
         }

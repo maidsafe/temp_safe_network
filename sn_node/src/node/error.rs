@@ -14,7 +14,6 @@ use sn_dbc::Error as DbcError;
 use sn_interface::{
     dbcs::Error as GenesisError,
     messaging::{data::Error as ErrorMsg, system::DkgSessionId},
-    types::DataAddress,
 };
 
 use ed25519::Signature;
@@ -128,9 +127,6 @@ pub enum Error {
     /// We don't have a dkg state for this dkg session id
     #[error("No dkg state for session: {0:?}")]
     NoDkgStateForSession(DkgSessionId),
-    /// Chunk already exists for this node
-    #[error("Data already exists at this node: {0:?}")]
-    DataExists(DataAddress),
     /// I/O error.
     #[error("I/O error: {0}")]
     Io(#[from] io::Error),
@@ -232,7 +228,6 @@ impl From<Error> for ErrorMsg {
                 expected,
                 found,
             },
-            Error::DataExists(address) => ErrorMsg::DataExists(address),
             Error::SpentProofUnknownSectionKey(unknown_section_key) => {
                 ErrorMsg::SpentProofUnknownSectionKey(unknown_section_key)
             }

@@ -23,8 +23,7 @@ use sn_interface::{
     },
     types::{
         register::{Action, EntryHash, Permissions, Policy, Register, User},
-        DataAddress, Keypair, PublicKey, RegisterAddress, ReplicatedRegisterLog,
-        SPENTBOOK_TYPE_TAG,
+        Keypair, PublicKey, RegisterAddress, ReplicatedRegisterLog, SPENTBOOK_TYPE_TAG,
     },
 };
 
@@ -281,7 +280,8 @@ impl RegisterStorage {
         // cmd let's verify it's valid before accepting it, however 'Edits cmds' cannot be
         // verified untill we have the `Register create` cmd.
         match (stored_reg.state.as_mut(), cmd) {
-            (Some(ref mut register), cmd) => self.apply(cmd, register).await?,
+            (Some(_), RegisterCmd::Create { .. }) => return Ok(()), // no op, since already created
+            (Some(ref mut register), RegisterCmd::Edit(_)) => self.apply(cmd, register).await?,
             (None, RegisterCmd::Create { cmd, .. }) => {
                 // the target Register is not in our store or we don't have the 'Register create',
                 // let's verify the create cmd we received is valid and try to apply stored cmds we may have.
@@ -322,7 +322,7 @@ impl RegisterStorage {
         }
 
         match cmd {
-            RegisterCmd::Create { .. } => Err(Error::DataExists(DataAddress::Register(addr))),
+            RegisterCmd::Create { .. } => Ok(()),
             RegisterCmd::Edit(SignedRegisterEdit { op, auth }) => {
                 let public_key = auth.public_key;
                 let _ = auth
@@ -412,7 +412,9 @@ fn section_sig() -> SectionSig {
 
 #[cfg(test)]
 mod test {
-    use super::{create_reg_w_policy, Error, RegisterStorage, UsedSpace};
+    use crate::storage::StorageLevel;
+
+    use super::{create_reg_w_policy, RegisterStorage, UsedSpace};
     use sn_interface::{
         messaging::{
             data::{EditRegister, RegisterCmd, RegisterQuery, SignedRegisterEdit},
@@ -421,12 +423,12 @@ mod test {
         },
         types::{
             register::{EntryHash, Policy, Register, User},
-            DataAddress, Keypair,
+            Keypair,
         },
     };
 
     use bincode::serialize;
-    use eyre::{bail, eyre, Result};
+    use eyre::{bail, Result};
     use rand::{distributions::Alphanumeric, Rng};
     use std::collections::BTreeSet;
     use tempfile::tempdir;
@@ -535,16 +537,16 @@ mod test {
         assert_eq!(stored_reg.op_log_path, log_path);
         assert_eq!(stored_reg.state.as_ref().map(|reg| reg.size()), Some(0));
 
-        // apply the create cmd again should fail with DataExists
+        // apply the create cmd again should change nothing
         match store
             .try_to_apply_cmd_against_register_state(&cmd_create, &mut stored_reg)
             .await
         {
-            Ok(()) => bail!("An error should occur for this test case"),
-            Err(Error::DataExists(DataAddress::Register(reported_addr))) => {
-                assert_eq!(addr, reported_addr)
-            }
-            Err(err) => bail!("A Error::DataExists variant was expected: {:?}", err),
+            Ok(()) => (),
+            Err(err) => bail!(
+                "An error should not occur when applying create cmd again: {:?}",
+                err
+            ),
         }
 
         // let's now apply an edit cmd
@@ -635,16 +637,16 @@ mod test {
         assert_eq!(stored_reg.op_log_path, log_path);
         assert_eq!(stored_reg.state.as_ref().map(|reg| reg.size()), Some(1));
 
-        // apply the create cmd again should fail with DataExists
+        // apply the create cmd again should change nothing
         match store
             .try_to_apply_cmd_against_register_state(&cmd_create, &mut stored_reg)
             .await
         {
-            Ok(()) => bail!("An error should occur for this test case"),
-            Err(Error::DataExists(DataAddress::Register(reported_addr))) => {
-                assert_eq!(addr, reported_addr)
-            }
-            Err(err) => bail!("A Error::DataExists variant was expected: {:?}", err),
+            Ok(()) => (),
+            Err(err) => bail!(
+                "An error should not occur when applying create cmd again: {:?}",
+                err
+            ),
         }
 
         Ok(())
@@ -669,19 +671,16 @@ mod test {
             e => bail!("Could not read register! {:?}", e),
         }
 
+        // apply the create cmd again should change nothing
         match store.write(&cmd).await {
-            Ok(_) => Err(eyre!("An error should occur for this test case")),
-            Err(error @ Error::DataExists(_)) => {
-                assert_eq!(
-                    error.to_string(),
-                    format!(
-                        "Data already exists at this node: {:?}",
-                        DataAddress::Register(address)
-                    )
-                );
-                Ok(())
+            Ok(StorageLevel::NoChange) => Ok(()),
+            Ok(StorageLevel::Updated(_)) => {
+                bail!("Storage level should not change when applying create cmd again.")
             }
-            Err(err) => Err(eyre!("A Error::DataExists variant was expected: {:?}", err)),
+            Err(err) => bail!(
+                "An error should not occur when applying create cmd again: {:?}",
+                err
+            ),
         }
     }
 
@@ -701,17 +700,16 @@ mod test {
             let _ = store.write(&cmd_edit).await?;
         }
 
-        // should fail to write same register again
+        // create cmd should be idempotent
         match store.write(&cmd_create).await {
-            Ok(_) => bail!("An error should occur for this test case"),
-            Err(error @ Error::DataExists(_)) => assert_eq!(
-                error.to_string(),
-                format!(
-                    "Data already exists at this node: {:?}",
-                    DataAddress::Register(addr)
-                )
+            Ok(StorageLevel::NoChange) => (),
+            Ok(StorageLevel::Updated(_)) => {
+                bail!("Storage level should not change when applying create cmd again.")
+            }
+            Err(err) => bail!(
+                "An error should not occur when applying create cmd again: {:?}",
+                err
             ),
-            Err(err) => bail!("A Error::DataExists variant was expected: {:?}", err),
         }
 
         // export Registers, get all data we held in storage
@@ -725,17 +723,16 @@ mod test {
         }
 
         // assert the same tests hold as for the first store
-        // should fail to write same register again, also on this new store
+        // create cmd should be idempotent, also on this new store
         match new_store.write(&cmd_create).await {
-            Ok(_) => bail!("An error should occur for this test case"),
-            Err(error @ Error::DataExists(_)) => assert_eq!(
-                error.to_string(),
-                format!(
-                    "Data already exists at this node: {:?}",
-                    DataAddress::Register(addr)
-                )
+            Ok(StorageLevel::NoChange) => (),
+            Ok(StorageLevel::Updated(_)) => {
+                bail!("Storage level should not change when applying create cmd again.")
+            }
+            Err(err) => bail!(
+                "An error should not occur when applying create cmd again: {:?}",
+                err
             ),
-            Err(err) => bail!("A Error::DataExists variant was expected: {:?}", err),
         }
 
         // should be able to read the same value from this new store also
