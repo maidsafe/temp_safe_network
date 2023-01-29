@@ -193,7 +193,7 @@ impl WireMsg {
     /// Deserialize the payload from this `WireMsg` returning a `MsgType` instance.
     pub fn into_msg(&self) -> Result<MsgType> {
         match self.header.msg_envelope.kind.clone() {
-            MsgKind::Client(auth) => {
+            MsgKind::Client { auth, .. } => {
                 let msg: ClientMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Data message payload as Msgpack: {err}"))
                 })?;
@@ -346,7 +346,11 @@ mod tests {
             signature: src_client_keypair.sign(&payload),
         };
         let auth_proof = AuthorityProof::verify(auth.clone(), &payload)?;
-        let kind = MsgKind::Client(auth);
+        let kind = MsgKind::Client {
+            auth,
+            is_spend: false,
+            query_index: None,
+        };
 
         let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
         let serialized = wire_msg.serialize()?;

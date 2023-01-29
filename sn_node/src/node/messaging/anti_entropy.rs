@@ -308,7 +308,7 @@ impl MyNode {
     ) -> Result<Vec<Cmd>> {
         let msg_id = wire_msg.msg_id();
         match wire_msg.kind() {
-            MsgKind::Client(_) => {
+            MsgKind::Client { .. } => {
                 if let Some(stream) = send_stream {
                     let original_msg = wire_msg.serialize()?;
                     Ok(vec![MyNode::gen_ae_response_cmd_to_client(

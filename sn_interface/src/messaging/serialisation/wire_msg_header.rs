@@ -74,19 +74,10 @@ lazy_static! {
 
 impl WireMsgHeader {
     // Instantiate a WireMsgHeader as per current supported version.
-    pub fn new(
-        msg_id: MsgId,
-        auth: MsgKind,
-        // dst: Dst,
-    ) -> Self {
+    pub fn new(msg_id: MsgId, auth: MsgKind) -> Self {
         Self {
-            //header_size: Self::max_size(),
             version: MESSAGING_PROTO_VERSION,
-            msg_envelope: MsgEnvelope {
-                msg_id,
-                kind: auth,
-                // dst,
-            },
+            msg_envelope: MsgEnvelope { msg_id, kind: auth },
         }
     }
 

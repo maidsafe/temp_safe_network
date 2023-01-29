@@ -97,6 +97,15 @@ impl Session {
                 };
 
             match resp_msg {
+                ClientDataResponse::CommunicationIssues(err) => {
+                    break MsgResponse::Failure(
+                        peer.addr(),
+                        Error::CmdError {
+                            source: err,
+                            msg_id: correlation_id,
+                        },
+                    )
+                }
                 ClientDataResponse::QueryResponse {
                     response,
                     correlation_id,
@@ -201,11 +210,23 @@ impl Session {
         // deterministically sent to closest elder based upon the initial sender index
         let target_elder = ordered_elders.get(src_peer_index);
 
+        let query_index = match &client_msg {
+            ClientMsg::Query(msg) => Some(msg.node_index),
+            _ => None,
+        };
         // there should always be one
         if let Some(elder) = target_elder {
             let payload = WireMsg::serialize_msg_payload(&client_msg)?;
-            let wire_msg =
-                WireMsg::new_msg(msg_id, payload, MsgKind::Client(auth.into_inner()), dst);
+            let wire_msg = WireMsg::new_msg(
+                msg_id,
+                payload,
+                MsgKind::Client {
+                    auth: auth.into_inner(),
+                    is_spend: false,
+                    query_index,
+                },
+                dst,
+            );
             let bytes = wire_msg.serialize()?;
 
             debug!("{msg_id:?} AE bounced msg going out again. Resending original message (sent to index {src_peer_index:?} peer: {src_peer:?}) to new section elder {elder:?}");

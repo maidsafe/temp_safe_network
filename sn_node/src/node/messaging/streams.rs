@@ -11,11 +11,7 @@ use crate::node::{core::NodeContext, Cmd, Error, MyNode, Result};
 use sn_comms::Error as CommsError;
 use sn_fault_detection::IssueType;
 use sn_interface::{
-    messaging::{
-        data::{ClientDataResponse, CmdResponse},
-        system::{NodeDataCmd, NodeDataResponse, NodeMsg},
-        Dst, MsgId, MsgKind, MsgType, WireMsg,
-    },
+    messaging::{data::ClientDataResponse, system::NodeMsg, Dst, MsgId, MsgKind, WireMsg},
     types::Peer,
 };
 
@@ -117,26 +113,6 @@ impl MyNode {
         .await
     }
 
-    pub(crate) async fn send_node_data_response(
-        msg: NodeDataResponse,
-        correlation_id: MsgId,
-        send_stream: SendStream,
-        context: NodeContext,
-        requesting_peer: Peer,
-    ) -> Result<()> {
-        trace!("Sending node response msg for {correlation_id:?}");
-        let (kind, payload) = MyNode::serialize_node_data_response(context.name, &msg)?;
-        send_msg_on_stream(
-            context.network_knowledge.section_key(),
-            payload,
-            kind,
-            send_stream,
-            requesting_peer,
-            correlation_id,
-        )
-        .await
-    }
-
     /// Sends a msg via comms, and listens for any response
     /// The response is returned to be handled via the dispatcher (though a response is not necessarily expected)
     pub(crate) async fn send_msg_enqueue_any_response(
@@ -166,7 +142,7 @@ impl MyNode {
                 // });
             }
             Ok(Ok(wire_msg)) => {
-                debug!("Response in from {peer:?} for {msg_id:?}: {wire_msg:?}");
+                debug!("Unexpected response in from {peer:?} for {msg_id:?}: {wire_msg:?}");
 
                 output_cmds.push(Cmd::HandleMsg { origin: peer, wire_msg, send_stream: None });
             }
@@ -181,18 +157,26 @@ impl MyNode {
 
         Ok(output_cmds)
     }
+
+    /// Send out msg and await response to forward on to client
     pub(crate) async fn send_msg_await_response_and_send_to_client(
-        msg_id: MsgId,
-        msg: NodeMsg,
+        wire_msg: WireMsg,
         context: NodeContext,
         targets: BTreeSet<Peer>,
         client_stream: SendStream,
         source_client: Peer,
     ) -> Result<Vec<Cmd>> {
+        let msg_id = wire_msg.msg_id();
         let targets_len = targets.len();
+
         debug!("Sending out {msg_id:?} to {targets_len} holder node/s {targets:?}");
-        let results =
-            send_to_target_peers_and_await_responses(msg_id, &msg, targets, &context).await?;
+        let results = send_wiremsg_to_target_peers_and_await_responses(
+            msg_id,
+            wire_msg.clone(),
+            targets,
+            &context,
+        )
+        .await?;
 
         let mut output_cmds = vec![];
         let mut success_count = 0;
@@ -211,7 +195,7 @@ impl MyNode {
                 // TODO: report timeout error to client?
             }
             Ok(Ok(response)) => {
-                debug!("Response in from {peer:?} for {msg_id:?}: {response:?}");
+                debug!("Expected response in from {peer:?} for {msg_id:?}: {response:?}");
                 success_count += 1;
                 last_success_response = Some(response);
             }
@@ -235,14 +219,17 @@ impl MyNode {
 
         if success_count == targets_len {
             if let Some(response) = last_success_response {
-                output_cmds.extend(build_and_send_response_to_client(
-                    msg_id,
-                    msg,
-                    context,
-                    Ok(response.into_msg()?),
+                let response_kind = response.kind().clone();
+                // TODO: Keep this as cmd
+                send_msg_on_stream(
+                    context.network_knowledge.section_key(),
+                    response.payload,
+                    response_kind,
                     client_stream,
                     source_client,
-                ));
+                    msg_id,
+                )
+                .await?;
             } else {
                 // This should not be possible with above checks
                 error!("No valid response to send from all responses for {msg_id:?}");
@@ -250,14 +237,17 @@ impl MyNode {
         } else {
             error!("Request to holder node/s was not completely successful for {msg_id:?}");
             if let Some(error) = last_error {
-                output_cmds.extend(build_and_send_response_to_client(
-                    msg_id,
+                debug!("Error error being returned to client {source_client:?}: {error:?}");
+                let msg = ClientDataResponse::CommunicationIssues(
+                    sn_interface::types::DataError::CouldNotContactAllStorageNodes(msg_id),
+                );
+                output_cmds.push(Cmd::SendClientResponse {
                     msg,
+                    correlation_id: msg_id,
+                    send_stream: client_stream,
                     context,
-                    Err(error),
-                    client_stream,
                     source_client,
-                ));
+                })
             }
         }
 
@@ -265,89 +255,43 @@ impl MyNode {
     }
 }
 
-/// Verify what kind of response was received, and if that's the expected type based on
-/// the type of msg sent to the nodes, then forward the corresponding response to the client
-fn build_and_send_response_to_client(
-    correlation_id: MsgId,
-    msg_sent: NodeMsg,
-    context: NodeContext,
-    response: Result<MsgType>,
-    send_stream: SendStream,
-    source_client: Peer,
-) -> Vec<Cmd> {
-    let msg = match msg_sent {
-        NodeMsg::NodeDataQuery(query) => {
-            match response {
-                Ok(MsgType::NodeDataResponse {
-                    msg: NodeDataResponse::QueryResponse { response, .. },
-                    ..
-                }) => {
-                    // We sent a data query and we received a query response,
-                    // so let's forward it to the client
-                    debug!("{correlation_id:?} sending query response back to client");
-                    ClientDataResponse::QueryResponse {
-                        response,
-                        correlation_id,
-                    }
-                }
-                Ok(other_resp) => {
-                    // TODO: handle this bad response
-                    error!("Unexpected response to query from node for {correlation_id:?}: {other_resp:?}");
-                    return vec![];
-                }
-                Err(err) => ClientDataResponse::QueryResponse {
-                    response: query.query.to_error_response(err.into()),
-                    correlation_id,
-                },
-            }
-        }
-        NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(replicated_data)) => {
-            match response {
-                Ok(MsgType::NodeDataResponse {
-                    msg: NodeDataResponse::CmdResponse { response, .. },
-                    ..
-                }) => {
-                    // We sent a data cmd to store client data and we received a
-                    // cmd response, so let's forward it to the client
-                    debug!("{correlation_id:?} sending cmd response ACK back to client");
-                    ClientDataResponse::CmdResponse {
-                        response,
-                        correlation_id,
-                    }
-                }
-                Ok(other_resp) => {
-                    // TODO: handle this bad response
-                    error!("Unexpected response to cmd from node for {correlation_id:?}: {other_resp:?}");
-                    return vec![];
-                }
-                Err(err) => {
-                    match CmdResponse::err(replicated_data, err.into()) {
-                        Ok(response) => ClientDataResponse::CmdResponse {
-                            response,
-                            correlation_id,
-                        },
-                        Err(err) => {
-                            error!("Failed to generate cmd error response for {correlation_id:?}: {err:?}");
-                            return vec![];
-                        }
-                    }
-                }
-            }
-        }
-        other_msg_sent => {
-            // this shouldn't happen as we don't send other type of msg with Cmd::SendMsgAwaitResponseAndRespondToClient
-            error!("Unexpected type of msg sent to holder node/s for {correlation_id:?}: {other_msg_sent:?}");
-            return vec![];
-        }
-    };
+// Send a msg to each of the targets, and await for the responses from all of them
+async fn send_wiremsg_to_target_peers_and_await_responses(
+    msg_id: MsgId,
+    wire_msg: WireMsg,
+    targets: BTreeSet<Peer>,
+    context: &NodeContext,
+) -> Result<Vec<(Peer, Result<Result<WireMsg, CommsError>, Elapsed>)>> {
+    // let (kind, payload) = MyNode::serialize_node_msg(context.name, )?;
 
-    vec![Cmd::SendClientResponse {
-        msg,
-        correlation_id,
-        send_stream,
-        context,
-        source_client,
-    }]
+    // We create a Dst with random dst name, but we'll update it accordingly for each target
+    let mut dst = *wire_msg.dst();
+    // let mut wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
+    // let _bytes = wire_msg.serialize()?;
+
+    let mut send_tasks = vec![];
+    for target in targets {
+        dst.name = target.name();
+        let bytes_to_node = wire_msg.serialize_with_new_dst(&dst)?;
+
+        let comm = context.comm.clone();
+        info!("About to send {msg_id:?} to holder node: {target:?}");
+
+        send_tasks.push(
+            async move {
+                let outcome = timeout(*NODE_RESPONSE_TIMEOUT, async {
+                    comm.send_out_bytes_to_peer_and_return_response(target, msg_id, bytes_to_node)
+                        .await
+                })
+                .await;
+
+                (target, outcome)
+            }
+            .boxed(),
+        );
+    }
+
+    Ok(futures::future::join_all(send_tasks).await)
 }
 
 // Send a msg to each of the targets, and await for the responses from all of them
@@ -364,8 +308,8 @@ async fn send_to_target_peers_and_await_responses(
         name: XorName::default(),
         section_key: context.network_knowledge.section_key(),
     };
-    let mut wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
-    let _bytes = wire_msg.serialize_and_cache_bytes()?;
+    let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
+    let _bytes = wire_msg.serialize()?;
 
     let mut send_tasks = vec![];
     for target in targets {

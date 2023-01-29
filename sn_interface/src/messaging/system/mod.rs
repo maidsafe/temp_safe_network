@@ -20,7 +20,7 @@ use crate::SectionAuthorityProvider;
 
 pub use dkg::DkgSessionId;
 pub use join::{JoinRejectReason, JoinRequest, JoinResponse};
-pub use node_msgs::{NodeDataCmd, NodeDataQuery, NodeEvent, NodeQueryResponse};
+pub use node_msgs::{NodeDataCmd, NodeEvent, NodeQueryResponse};
 pub use op_id::OperationId;
 pub use section_sig::{SectionSig, SectionSigShare, SectionSigned};
 
@@ -163,8 +163,6 @@ pub enum NodeMsg {
     NodeEvent(NodeEvent),
     /// Data cmds are orders to perform some data operation, only sent internally in the network.
     NodeDataCmd(NodeDataCmd),
-    /// Data queries is a read-only operation.
-    NodeDataQuery(NodeDataQuery),
 }
 
 impl NodeMsg {
@@ -234,7 +232,6 @@ impl NodeMsg {
             Self::ProposeSectionState { .. } => State::Propose,
             Self::NodeEvent(_) => State::Node,
             Self::NodeDataCmd(_) => State::Node,
-            Self::NodeDataQuery(_) => State::Node,
         }
     }
 }
@@ -261,7 +258,6 @@ impl Display for NodeMsg {
             Self::ProposeSectionState { .. } => write!(f, "NodeMsg::ProposeSectionState"),
             Self::NodeEvent { .. } => write!(f, "NodeMsg::NodeEvent"),
             Self::NodeDataCmd { .. } => write!(f, "NodeMsg::NodeCmd"),
-            Self::NodeDataQuery { .. } => write!(f, "NodeMsg::NodeQuery"),
         }
     }
 }

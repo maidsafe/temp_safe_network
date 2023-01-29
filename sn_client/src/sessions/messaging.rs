@@ -74,7 +74,7 @@ impl Session {
         dst_address: XorName,
         auth: ClientAuth,
         payload: Bytes,
-        needs_super_majority: bool,
+        is_spend: bool,
     ) -> Result<()> {
         let endpoint = self.endpoint.clone();
         // TODO: Consider other approach: Keep a session per section!
@@ -92,7 +92,12 @@ impl Session {
             name: dst_address,
             section_key: section_pk,
         };
-        let kind = MsgKind::Client(auth);
+
+        let kind = MsgKind::Client {
+            auth,
+            is_spend,
+            query_index: None,
+        };
         let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
         let log_line = |elders_len_s: String| {
@@ -102,7 +107,7 @@ impl Session {
             )
         };
 
-        if needs_super_majority {
+        if is_spend {
             log_line(format!("{elders_len}"));
             self.send_msg_and_check_acks(msg_id, elders.clone(), wire_msg)
                 .await
@@ -351,7 +356,12 @@ impl Session {
             name: dst,
             section_key: section_pk,
         };
-        let kind = MsgKind::Client(auth);
+        let kind = MsgKind::Client {
+            auth,
+            is_spend: false,
+            // TODO: remove this from DataQuery
+            query_index: Some(query.node_index),
+        };
         let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
 
         let send_query_tasks = self.send_msg(elders.clone(), wire_msg).await?;

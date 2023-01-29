@@ -239,14 +239,8 @@ impl FlowCtrl {
             send_stream,
         } = msg;
 
-        let (header, dst, payload) = wire_msg.serialize()?;
-        let original_bytes_len = header.len() + dst.len() + payload.len();
-
-        let span = trace_span!("handle_message", ?sender, msg_id = ?wire_msg.msg_id());
-        let _span_guard = span.enter();
-
         trace!(
-            "{:?} from {sender:?} length {original_bytes_len}",
+            "{:?} from {sender:?}", // length {original_bytes_len}",
             LogMarker::DispatchHandleMsgCmd,
         );
 

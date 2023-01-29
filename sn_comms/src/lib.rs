@@ -393,7 +393,11 @@ mod tests {
         Ok(WireMsg::new_msg(
             MsgId::new(),
             payload,
-            MsgKind::Client(auth),
+            MsgKind::Client {
+                auth,
+                is_spend: false,
+                query_index: None,
+            },
             dst,
         ))
     }

@@ -1342,7 +1342,7 @@ mod tests {
                 msg.wire_msg.into_msg().expect("Failed to deserialize wire_msg"),
                 MsgType::Node { msg_id, msg, .. } => (msg_id, msg)
             );
-            MyNode::handle_valid_node_msg(self.node(), context, msg_id, msg, origin, None)
+            MyNode::handle_node_msg(self.node(), context, msg_id, msg, origin, None)
                 .await
                 .expect("Error while handling node msg")
         }

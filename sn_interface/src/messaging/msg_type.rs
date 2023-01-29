@@ -48,7 +48,7 @@ pub enum MsgType {
         /// the message
         msg: NodeMsg,
     },
-    /// The response to a NodeDataCmd or NodeDataQuery, containing the result.
+    /// The response to a NodeDataCmd, containing the result.
     NodeDataResponse {
         /// Message ID
         msg_id: MsgId,

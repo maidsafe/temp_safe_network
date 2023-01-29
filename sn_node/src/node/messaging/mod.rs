@@ -27,8 +27,8 @@ use crate::node::{flow_ctrl::cmds::Cmd, Error, MyNode, Result};
 
 use qp2p::SendStream;
 use sn_interface::{
-    messaging::{MsgType, WireMsg},
-    types::Peer,
+    messaging::{MsgKind, MsgType, WireMsg},
+    types::{log_markers::LogMarker, Peer},
 };
 
 use std::{collections::BTreeSet, sync::Arc};
@@ -65,7 +65,7 @@ impl IntoIterator for Peers {
 
 // Message handling
 impl MyNode {
-    #[instrument(skip(node))]
+    #[instrument(skip(node, wire_msg, send_stream))]
     pub(crate) async fn handle_msg(
         node: Arc<RwLock<MyNode>>,
         origin: Peer,
@@ -75,10 +75,14 @@ impl MyNode {
         let msg_id = wire_msg.msg_id();
         let msg_kind = wire_msg.kind();
 
-        trace!("Handling msg {msg_id:?}. Checking for AE first...");
+        trace!("Handling msg {msg_id:?}. from {origin:?} Checking for AE first...");
 
         let context = node.read().await.context();
         trace!("[NODE READ]: Handle msg read lock attempt success");
+
+        // alternatively we could flag in msg kind for this...
+        // todo: this peer is actually client + forwarder ip....
+        let is_for_us = wire_msg.dst().name == context.name || msg_kind.is_client_spend();
 
         // first check for AE, if this isn't an ae msg itself
         if !msg_kind.is_ae_msg() {
@@ -97,6 +101,26 @@ impl MyNode {
             }
         }
 
+        debug!(
+            "{msg_id:?} Members.... dst: {:?}: us: {:?}",
+            wire_msg.dst().name,
+            context.name
+        );
+
+        // if it's not directly for us, but is a node msg, it's perhaps for the section, and so we handle it as normal
+        if !is_for_us {
+            if let MsgKind::Client { .. } = msg_kind {
+                let Some(stream) = send_stream else {
+                    return Err(Error::NoClientResponseStream);
+                };
+
+                trace!("{:?}: {msg_id:?} ", LogMarker::ClientMsgToBeForwarded);
+                let cmd =
+                    MyNode::forward_data_and_respond_to_client(context, wire_msg, origin, stream);
+                return Ok(vec![cmd]);
+            }
+        }
+
         // Deserialize the payload of the incoming message
         let msg_type = match wire_msg.into_msg() {
             Ok(msg_type) => msg_type,
@@ -106,20 +130,23 @@ impl MyNode {
             }
         };
 
+        // if we got here, we are the destination
         match msg_type {
             MsgType::Node { msg, .. } => {
-                MyNode::handle_valid_node_msg(node, context, msg_id, msg, origin, send_stream).await
+                MyNode::handle_node_msg(node, context, msg_id, msg, origin, send_stream).await
             }
             MsgType::Client {
                 msg_id, msg, auth, ..
             } => {
-                debug!("Valid client msg {msg_id:?}");
+                info!("Client msg {msg_id:?} reached its destination.");
 
+                // TODO: clarify this err w/ peer
                 let Some(stream) = send_stream else {
+                    error!("No stream for client tho....");
                     return Err(Error::NoClientResponseStream);
                 };
 
-                MyNode::handle_valid_client_msg(context, msg_id, msg, auth, origin, stream)
+                MyNode::handle_client_msg_for_us(context, msg_id, msg, auth, origin, stream).await
             }
             other @ MsgType::ClientDataResponse { .. } => {
                 error!(

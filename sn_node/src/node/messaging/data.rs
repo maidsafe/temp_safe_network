@@ -7,148 +7,59 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    core::NodeContext, flow_ctrl::fault_detection::FaultsCmd, messaging::Peers, Cmd, Error, MyNode,
-    Result,
+    core::NodeContext, flow_ctrl::fault_detection::FaultsCmd, messaging::Peers, Cmd, MyNode, Result,
 };
 use crate::storage::{Error as StorageError, StorageLevel};
 
+use sn_interface::messaging::{MsgId, MsgKind, WireMsg};
 use sn_interface::{
     data_copy_count,
-    messaging::{
-        data::{DataCmd, DataQuery},
-        system::{NodeDataCmd, NodeDataQuery, NodeEvent, NodeMsg, OperationId},
-        AuthorityProof, ClientAuth, MsgId,
-    },
+    messaging::system::{NodeDataCmd, NodeEvent, NodeMsg},
     types::{log_markers::LogMarker, Keypair, Peer, PublicKey, ReplicatedData},
 };
 
 use qp2p::SendStream;
 use xor_name::XorName;
 
-use bytes::Bytes;
 use itertools::Itertools;
 use std::collections::BTreeSet;
 use tracing::info;
 
 impl MyNode {
-    // Instruct data holders to store the data awaiting for their confirmation response to ack the client
-    pub(crate) fn store_data_at_nodes_and_ack_to_client(
-        context: NodeContext,
-        data_cmd: DataCmd,
-        data: ReplicatedData,
-        msg_id: MsgId,
-        client_stream: SendStream,
-        source_client: Peer,
-    ) -> Result<Vec<Cmd>> {
-        let data_name = data.name();
-        let targets = Self::target_data_holders(&context, data_name);
-
-        // make sure the expected replication factor is achieved
-        if data_copy_count() > targets.len() {
-            error!("InsufficientNodeCount for storing data reliably for {msg_id:?}");
-            let error = Error::InsufficientNodeCount {
-                prefix: context.network_knowledge.prefix(),
-                expected: data_copy_count() as u8,
-                found: targets.len() as u8,
-            };
-
-            debug!("Will send error response back to client");
-
-            let cmd = MyNode::send_cmd_error_response_over_stream(
-                context,
-                data_cmd,
-                error,
-                msg_id,
-                client_stream,
-                source_client,
-            );
-            return Ok(vec![cmd]);
-        }
-
-        info!("Replicating data from {msg_id:?} {data_name:?} to holders: {targets:?}");
-
-        // TODO: general ReplicateData flow could go bidi?
-        // Right now we've a new msg for just one datum.
-        // Atm that's perhaps more bother than its worth..
-        let msg = NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data));
-
-        let cmd = Cmd::SendMsgAwaitResponseAndRespondToClient {
-            msg_id,
-            msg,
-            context,
-            targets,
-            client_stream,
-            source_client,
-        };
-
-        Ok(vec![cmd])
-    }
-
     /// Find target node, sends a bidi msg, awaiting response, and then sends this on to the client
-    pub(crate) fn read_data_and_respond_to_client(
+    pub(crate) fn forward_data_and_respond_to_client(
         context: NodeContext,
-        query: DataQuery,
-        msg_id: MsgId,
-        auth: AuthorityProof<ClientAuth>,
+        wire_msg: WireMsg,
         source_client: Peer,
         client_stream: SendStream,
-    ) -> Result<Vec<Cmd>> {
+    ) -> Cmd {
         // We accept that we might be sending a WireMsg to ourselves.
         // The extra load is not that big. But we can optimize this later if necessary.
 
         // We generate the operation id to track the response from the node
         // by using the query msg id, which shall be unique per query.
-        let operation_id = OperationId::from(&Bytes::copy_from_slice(msg_id.as_ref()));
-        let address = query.variant.address();
-        trace!(
-            "{:?} preparing to query other nodes for data at {address:?} with op_id: {operation_id:?}",
-            LogMarker::DataQueryReceviedAtElder,
-        );
 
-        let targets = Self::target_data_holders(&context, *address.name());
+        let target_addr = wire_msg.dst().name;
 
-        // We accept the chance that we will be querying an Elder that the client already queried directly.
-        // The extra load is not that big. But we can optimize this later if necessary.
-
-        // Query only the nth node
-        let recipient = if let Some(peer) = targets.iter().nth(query.node_index) {
-            *peer
-        } else {
-            debug!("No targets found for {msg_id:?}");
-            let error = Error::InsufficientNodeCount {
-                prefix: context.network_knowledge.prefix(),
-                expected: query.node_index as u8 + 1,
-                found: targets.len() as u8,
-            };
-
-            let cmd = MyNode::send_query_error_response_over_stream(
-                context,
-                error,
-                &query.variant,
-                source_client,
-                msg_id,
-                client_stream,
-            );
-            return Ok(vec![cmd]);
+        let kind = wire_msg.kind();
+        let query_index = match kind {
+            MsgKind::Client {
+                auth: _,
+                is_spend: _,
+                query_index,
+            } => *query_index,
+            _ => None,
         };
 
-        // Form a msg to the node
-        let msg = NodeMsg::NodeDataQuery(NodeDataQuery {
-            query: query.variant,
-            auth: auth.into_inner(),
-            operation_id,
-        });
+        let targets = Self::target_data_holders(&context, target_addr, query_index);
 
-        let cmd = Cmd::SendMsgAwaitResponseAndRespondToClient {
-            msg_id,
-            msg,
+        Cmd::SendMsgAwaitResponseAndRespondToClient {
+            wire_msg,
             context,
-            targets: BTreeSet::from([recipient]),
+            targets,
             client_stream,
             source_client,
-        };
-
-        Ok(vec![cmd])
+        }
     }
 
     /// Registered holders not present in provided list of members
@@ -176,9 +87,52 @@ impl MyNode {
         };
     }
 
+    /// Serialise NodeMsg and select targets to send out NodeData msg for storing spentbook
+    /// on storage nodes.
+    ///
+    /// The response is forwarded back on to the client
+    pub(crate) async fn forward_on_spentbook_cmd(
+        data: ReplicatedData,
+        context: &NodeContext,
+        msg_id: MsgId,
+        origin: Peer,
+        send_stream: SendStream,
+    ) -> Result<Vec<Cmd>> {
+        debug!("{msg_id:?} Forwarding on RegisterCmd for Spentbook msg");
+        let name = *data.address().name();
+        let node_msg = NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data));
+        let section_key = context
+            .network_knowledge
+            .section_auth_by_name(&name)?
+            .section_key();
+        let dst = sn_interface::messaging::Dst { name, section_key };
+        let (kind, payload) = MyNode::serialize_node_msg(context.name, &node_msg)?;
+        let wire_msg = WireMsg::new_msg(msg_id, payload, kind, dst);
+
+        // return Ok(vec![Cmd::Send])
+        let targets = MyNode::target_data_holders(context, name, None);
+        debug!(
+            "{msg_id:?} Forwarding on RegisterCmd for Spentbook msg to data holders: {targets:?}"
+        );
+
+        let context = context.clone();
+        MyNode::send_msg_await_response_and_send_to_client(
+            wire_msg,
+            context,
+            targets,
+            send_stream,
+            origin,
+        )
+        .await
+    }
+
     /// Used to fetch the list of holders for given name of data.
     /// Sorts members by closeness to data address, returns data_copy_count of them
-    fn target_data_holders(context: &NodeContext, target: XorName) -> BTreeSet<Peer> {
+    fn target_data_holders(
+        context: &NodeContext,
+        target: XorName,
+        query_index: Option<usize>,
+    ) -> BTreeSet<Peer> {
         // TODO: reuse our_members_sorted_by_distance_to API when core is merged into upper layer
         let members = context.network_knowledge.members();
 
@@ -188,6 +142,16 @@ impl MyNode {
             .into_iter()
             .sorted_by(|lhs, rhs| target.cmp_distance(&lhs.name(), &rhs.name()))
             .take(data_copy_count())
+            .enumerate()
+            .filter(|(i, _peer)| {
+                if let Some(index) = query_index {
+                    i == &index
+                } else {
+                    // always return them
+                    true
+                }
+            })
+            .map(|(_i, p)| p)
             .collect::<BTreeSet<_>>();
 
         trace!("Target holders of {:?} are : {:?}", target, candidates,);

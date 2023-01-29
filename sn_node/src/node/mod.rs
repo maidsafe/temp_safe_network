@@ -355,23 +355,6 @@ mod core {
             ))
         }
 
-        // /// Generates a SectionProbeMsg with our current knowledge,
-        // /// targetting our section elders.
-        // /// Even if we're up to date, we expect a response.
-        // pub(crate) fn generate_section_probe_msg(context: &NodeContext) -> Cmd {
-        //     let our_section = context.network_knowledge.section_auth();
-        //     let recipients = our_section.elders_set();
-
-        //     info!(
-        //         "ProbeMsg target our section {:?} recipients {:?}",
-        //         our_section.prefix(),
-        //         recipients,
-        //     );
-
-        //     let probe = context.network_knowledge.anti_entropy_probe();
-        //     Cmd::send_msg(probe, Peers::Multiple(recipients), context.clone())
-        // }
-
         /// Generates section infos for the best elder candidate among the members at the given generation
         /// Returns a set of candidate `DkgSessionId`'s.
         pub(crate) fn best_elder_candidates_at_gen(
