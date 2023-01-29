@@ -5,18 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.38 (2023-01-27)
-
-### Refactor
-
- - <csr-id-4fa50e710c65dc4298f85f6eb01a3575155417d6/> removing unnecessary SendStatus and SendWatcher
+## v0.72.39 (2023-01-29)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release over the course of 1 calendar day.
+ - 1 day passed between releases.
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -26,6 +23,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2041 ([`09fba13`](https://github.com/maidsafe/safe_network/commit/09fba13281fa7dadf810975c257e33fcc1f127f6))
+    - fix(storage): make data exists not be an error - The data storage is idempotent, and it's not an error that data already exists. ([`ce6718c`](https://github.com/maidsafe/safe_network/commit/ce6718ca0bcfb9e1a6eaf2729559b9b8ef148d7c))
+</details>
+
+## v0.72.38 (2023-01-27)
+
+<csr-id-4fa50e710c65dc4298f85f6eb01a3575155417d6/>
+
+### Refactor
+
+ - <csr-id-4fa50e710c65dc4298f85f6eb01a3575155417d6/> removing unnecessary SendStatus and SendWatcher
+
+### Chore
+
+ - <csr-id-acfc8c88d5fbc15f46d76535c058c60b6d20433a/> sn_comms-0.1.7/sn_node-0.72.38
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_comms-0.1.7/sn_node-0.72.38 ([`acfc8c8`](https://github.com/maidsafe/safe_network/commit/acfc8c88d5fbc15f46d76535c058c60b6d20433a))
     - Merge #2038 ([`8f1c443`](https://github.com/maidsafe/safe_network/commit/8f1c443a29f794da6a0412eab87672281c3a4d4b))
     - removing unnecessary SendStatus and SendWatcher ([`4fa50e7`](https://github.com/maidsafe/safe_network/commit/4fa50e710c65dc4298f85f6eb01a3575155417d6))
 </details>
@@ -33,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.72.37 (2023-01-27)
 
 <csr-id-c28ce487b26144187687083eac6edb1ddf030266/>
+<csr-id-e990f883bec55e5e3c73a3b074428c42d2538785/>
 
 ### Chore
 

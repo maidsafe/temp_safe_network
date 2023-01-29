@@ -6,19 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.16.18 (2023-01-27)
-
-### Chore
-
- - <csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/> fix issues reported by new clippy
+## v0.16.19 (2023-01-29)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 1 day passed between releases.
- - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release over the course of 1 calendar day.
+ - 2 days passed between releases.
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -28,11 +24,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2041 ([`09fba13`](https://github.com/maidsafe/safe_network/commit/09fba13281fa7dadf810975c257e33fcc1f127f6))
+    - fix(storage): make data exists not be an error - The data storage is idempotent, and it's not an error that data already exists. ([`ce6718c`](https://github.com/maidsafe/safe_network/commit/ce6718ca0bcfb9e1a6eaf2729559b9b8ef148d7c))
+</details>
+
+## v0.16.18 (2023-01-27)
+
+<csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/>
+
+### Chore
+
+ - <csr-id-6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916/> fix issues reported by new clippy
+
+### Chore
+
+ - <csr-id-01ff2ccf45dfc9d45c5ad540144d7a4a640830fc/> sn_interface-0.16.18/sn_comms-0.1.4/sn_client-0.77.9/sn_node-0.72.34/sn_api-0.75.5/sn_cli-0.68.6
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 1 day passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.18/sn_comms-0.1.4/sn_client-0.77.9/sn_node-0.72.34/sn_api-0.75.5/sn_cli-0.68.6 ([`01ff2cc`](https://github.com/maidsafe/safe_network/commit/01ff2ccf45dfc9d45c5ad540144d7a4a640830fc))
+    - Merge branch 'main' into chore-comms-remove-unused-async ([`e92dd49`](https://github.com/maidsafe/safe_network/commit/e92dd49f38f9b56c7276e86ba79f7fd8f816af76))
     - Merge branch 'main' into RevertDkgCache ([`24ff625`](https://github.com/maidsafe/safe_network/commit/24ff6257f85922090cfaa5fa83044082d3ef8dab))
     - fix issues reported by new clippy ([`6b92351`](https://github.com/maidsafe/safe_network/commit/6b923515f0f0cd1b0d1a4ed51d3ca418e41d9916))
 </details>
 
 ## v0.16.17 (2023-01-25)
+
+<csr-id-a4d295ccdddea3d4d11bca5eb0236a5447c75633/>
 
 ### Chore
 
