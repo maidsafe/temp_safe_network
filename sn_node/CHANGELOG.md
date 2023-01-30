@@ -5,15 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.39 (2023-01-29)
+## v0.72.40 (2023-01-30)
+
+### Chore
+
+ - <csr-id-89b6344e590a22894f88fc643ff8aa2c7aab2464/> remove extra dkg trigger
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release over the course of 1 calendar day.
- - 1 day passed between releases.
- - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -23,6 +26,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2044 ([`716167c`](https://github.com/maidsafe/safe_network/commit/716167cf801b7036a6d91653b4254c20a9bfe1d2))
+    - remove extra dkg trigger ([`89b6344`](https://github.com/maidsafe/safe_network/commit/89b6344e590a22894f88fc643ff8aa2c7aab2464))
+</details>
+
+## v0.72.39 (2023-01-29)
+
+### Chore
+
+ - <csr-id-4ea2b420b5c6390bd894505e3c71cb5e673244b8/> sn_interface-0.16.19/sn_node-0.72.39
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release over the course of 1 calendar day.
+ - 1 day passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.16.19/sn_node-0.72.39 ([`4ea2b42`](https://github.com/maidsafe/safe_network/commit/4ea2b420b5c6390bd894505e3c71cb5e673244b8))
     - Merge #2041 ([`09fba13`](https://github.com/maidsafe/safe_network/commit/09fba13281fa7dadf810975c257e33fcc1f127f6))
     - fix(storage): make data exists not be an error - The data storage is idempotent, and it's not an error that data already exists. ([`ce6718c`](https://github.com/maidsafe/safe_network/commit/ce6718ca0bcfb9e1a6eaf2729559b9b8ef148d7c))
 </details>
@@ -30,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.72.38 (2023-01-27)
 
 <csr-id-4fa50e710c65dc4298f85f6eb01a3575155417d6/>
+<csr-id-acfc8c88d5fbc15f46d76535c058c60b6d20433a/>
 
 ### Refactor
 
