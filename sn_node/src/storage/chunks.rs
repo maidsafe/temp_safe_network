@@ -6,7 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{list_files_in, prefix_tree_path, used_space::StorageLevel, Error, Result, UsedSpace};
+use super::{
+    /*list_files_in,*/ prefix_tree_path, used_space::StorageLevel, Error, Result, UsedSpace,
+};
 
 use sn_interface::{
     messaging::system::NodeQueryResponse,
@@ -14,16 +16,15 @@ use sn_interface::{
 };
 
 use bytes::Bytes;
+use dashmap::DashMap;
 use hex::FromHex;
 use std::{
     fmt::{self, Display, Formatter},
-    io::{self, ErrorKind},
+    //io::{self, ErrorKind},
     path::{Path, PathBuf},
+    sync::Arc,
 };
-use tokio::{
-    fs::{create_dir_all, metadata, read, remove_file, File},
-    io::AsyncWriteExt,
-};
+use tokio::fs::metadata;
 use tracing::info;
 use xor_name::XorName;
 
@@ -34,6 +35,7 @@ const CHUNKS_STORE_DIR_NAME: &str = "chunks";
 pub(super) struct ChunkStorage {
     file_store_path: PathBuf,
     used_space: UsedSpace,
+    cache: Arc<DashMap<PathBuf, Bytes>>,
 }
 
 impl ChunkStorage {
@@ -46,13 +48,23 @@ impl ChunkStorage {
         Ok(Self {
             file_store_path: path.join(CHUNKS_STORE_DIR_NAME),
             used_space,
+            cache: Arc::new(DashMap::new()),
         })
     }
 
     pub(super) fn addrs(&self) -> Vec<ChunkAddress> {
+        /* CACHE-ONLY
         list_files_in(&self.file_store_path)
             .iter()
             .filter_map(|filepath| Self::chunk_filepath_to_address(filepath).ok())
+            .collect()
+        */
+        self.cache
+            .iter()
+            .filter_map(|entry| {
+                let filepath = entry.key();
+                Self::chunk_filepath_to_address(filepath).ok()
+            })
             .collect()
     }
 
@@ -67,42 +79,57 @@ impl ChunkStorage {
         Ok(ChunkAddress(xorname))
     }
 
-    fn chunk_addr_to_filepath(&self, addr: &ChunkAddress) -> Result<PathBuf> {
+    fn chunk_addr_to_filepath(&self, addr: &ChunkAddress) -> PathBuf {
         let xorname = *addr.name();
         let path = prefix_tree_path(&self.file_store_path, xorname);
         let filename = hex::encode(xorname);
-        Ok(path.join(filename))
+        path.join(filename)
     }
 
     pub(super) async fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
         trace!("Removing chunk, {:?}", address);
-        let filepath = self.chunk_addr_to_filepath(address)?;
+        let filepath = self.chunk_addr_to_filepath(address);
         let meta = metadata(filepath.clone()).await?;
+        /* CACHE-ONLY
         remove_file(filepath).await?;
+        */
+        let _ = self.cache.remove(&filepath);
+        // CACHE-ONLY
+
         self.used_space.decrease(meta.len() as usize);
         Ok(())
     }
 
     pub(super) async fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
-        debug!("Getting chunk {:?}", address);
-
-        let file_path = self.chunk_addr_to_filepath(address)?;
-        match read(file_path).await {
-            Ok(bytes) => {
-                let chunk = Chunk::new(Bytes::from(bytes));
+        let filepath = self.chunk_addr_to_filepath(address);
+        debug!("Getting chunk {:?} at {}", address, filepath.display());
+        /* CACHE-ONLY
+        match read(filepath).await {
+        */
+        let cached_bytes = self.cache.get(&filepath);
+        // CACHE-ONLY
+        match cached_bytes {
+            Some(bytes) => {
+                let chunk = Chunk::new(bytes.to_vec().into());
                 if chunk.address() != address {
                     // This can happen if the content read is empty, or incomplete,
                     // possibly due to an issue with the OS synchronising to disk,
                     // resulting in a mismatch with recreated address of the Chunk.
-                    Err(Error::ChunkNotFound(*address.name()))
+                    Err(Error::ChunkAddrMismatch {
+                        addr: *address,
+                        chunk_addr: *chunk.address(),
+                    })
                 } else {
                     Ok(chunk)
                 }
             }
+            /*
             Err(io_error @ io::Error { .. }) if io_error.kind() == ErrorKind::NotFound => {
                 Err(Error::ChunkNotFound(*address.name()))
             }
             Err(other) => Err(other.into()),
+            */
+            None => Err(Error::ChunkNotFound(*address.name())),
         }
     }
 
@@ -119,8 +146,9 @@ impl ChunkStorage {
     #[instrument(skip_all)]
     pub(super) async fn store(&self, chunk: &Chunk) -> Result<StorageLevel> {
         let addr = chunk.address();
-        let filepath = self.chunk_addr_to_filepath(addr)?;
+        let filepath = self.chunk_addr_to_filepath(addr);
 
+        /* CACHE-ONLY
         if filepath.exists() {
             info!(
                 "{}: Chunk data already exists, not storing: {:?}",
@@ -129,6 +157,7 @@ impl ChunkStorage {
             // Nothing more to do here
             return Ok(StorageLevel::NoChange);
         }
+        */
 
         // Cheap extra security check for space (prone to race conditions)
         // just so we don't go too much overboard
@@ -139,6 +168,7 @@ impl ChunkStorage {
 
         // Store the data on disk
         trace!("{:?} {addr:?}", LogMarker::StoringChunk);
+        /* CACHE-ONLY
         if let Some(dirs) = filepath.parent() {
             create_dir_all(dirs).await?;
         }
@@ -149,9 +179,21 @@ impl ChunkStorage {
         // Let's sync up OS data to disk to reduce the chances of
         // concurrent reading failing by reading an empty/incomplete file
         file.sync_data().await?;
+        */
+        if self
+            .cache
+            .insert(filepath.clone(), chunk.value().clone())
+            .is_some()
+        {
+            info!("{self}: Chunk data already existed: {addr:?}");
+        }
 
         let storage_level = self.used_space.increase(chunk.value().len());
-        trace!("{:?} {addr:?}", LogMarker::StoredNewChunk);
+        trace!(
+            "{:?} {addr:?} at {}",
+            LogMarker::StoredNewChunk,
+            filepath.display()
+        );
 
         Ok(storage_level)
     }
@@ -224,12 +266,14 @@ mod tests {
         let address = chunk.address();
 
         // create chunk file but with empty content
-        let filepath = storage.chunk_addr_to_filepath(address)?;
+        /*
+        let filepath = storage.chunk_addr_to_filepath(address);
         if let Some(dirs) = filepath.parent() {
             create_dir_all(dirs).await?;
         }
         let mut file = File::create(&filepath).await?;
         file.write_all(b"").await?;
+        */
 
         // trying to read the chunk shall return ChunkNotFound error since
         // its content shouldn't match chunk address

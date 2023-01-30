@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{list_files_in, prefix_tree_path, Error, Result, StorageLevel};
+use super::{/*list_files_in,*/ prefix_tree_path, Error, Result, StorageLevel};
 
 use crate::UsedSpace;
 
@@ -20,14 +20,16 @@ use sn_interface::{
 };
 
 use bincode::serialize;
+use bytes::Bytes;
+use dashmap::DashMap;
 use std::{
     collections::{btree_map::Entry, BTreeMap},
     mem::size_of,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 use tiny_keccak::{Hasher, Sha3};
-use tokio::fs::{create_dir_all, metadata, read, remove_file, File};
-use tokio::io::AsyncWriteExt;
+use tokio::fs::metadata;
 use xor_name::XorName;
 
 // Deterministic Id for a register Cmd, takes into account the underlying cmd, and all sigs
@@ -47,6 +49,7 @@ pub(super) struct StoredRegister {
 pub(super) struct RegisterStore {
     file_store_path: PathBuf,
     used_space: UsedSpace,
+    cache: Arc<DashMap<PathBuf, Bytes>>,
 }
 
 impl RegisterStore {
@@ -59,6 +62,7 @@ impl RegisterStore {
         Ok(Self {
             file_store_path,
             used_space,
+            cache: Arc::new(DashMap::new()),
         })
     }
 
@@ -74,18 +78,36 @@ impl RegisterStore {
     }
 
     pub(super) async fn list_all_reg_addrs(&self) -> Vec<RegisterAddress> {
-        trace!("Listening all register addrs");
+        trace!("Listing all register addrs");
+        /* CACHE-ONLY
         let iter = list_files_in(&self.file_store_path)
             .into_iter()
             .filter_map(|e| e.parent().map(|parent| (parent.to_path_buf(), e.clone())));
+        */
+        let iter: Vec<(PathBuf, Bytes)> = self
+            .cache
+            .iter()
+            .filter_map(|entry| {
+                let filepath = entry.key();
+                let serialized_data = entry.value();
+                filepath
+                    .parent()
+                    .map(|parent| (parent.to_path_buf(), serialized_data.clone()))
+            })
+            .collect();
 
         let mut addrs = BTreeMap::<PathBuf, RegisterAddress>::new();
-        for (parent, op_file) in iter {
+        for (parent, bytes) in iter {
             if let Entry::Vacant(vacant) = addrs.entry(parent) {
+                /* CACHE-ONLY
                 if let Ok(Ok(cmd)) = read(op_file)
                     .await
                     .map(|serialized_data| deserialise::<RegisterCmd>(&serialized_data))
                 {
+                    let _existing = vacant.insert(cmd.dst_address());
+                }
+                */
+                if let Ok(cmd) = deserialise::<RegisterCmd>(&bytes) {
                     let _existing = vacant.insert(cmd.dst_address());
                 }
             }
@@ -98,7 +120,10 @@ impl RegisterStore {
     pub(super) async fn delete_data(&self, addr: &RegisterAddress) -> Result<()> {
         let filepath = self.address_to_filepath(addr)?;
         let meta = metadata(filepath.clone()).await?;
+        /* CACHE-ONLY
         remove_file(filepath).await?;
+        */
+        let _ = self.cache.remove(&filepath);
         self.used_space.decrease(meta.len() as usize);
         Ok(())
     }
@@ -116,6 +141,7 @@ impl RegisterStore {
             op_log_path: path.clone(),
         };
 
+        /* CACHE-ONLY
         if !path.exists() {
             trace!(
                 "Register log path for {addr:?} does not exist yet: {}",
@@ -123,14 +149,36 @@ impl RegisterStore {
             );
             return Ok(stored_reg);
         }
+        */
 
         trace!("Register log path for {addr:?} exists: {}", path.display());
+        /* CACHE-ONLY
         for filepath in list_files_in(&path) {
             match read(&filepath)
                 .await
                 .map(|serialized_data| deserialise::<RegisterCmd>(&serialized_data))
             {
-                Ok(Ok(reg_cmd)) => {
+        */
+        let entries: Vec<_> = self
+            .cache
+            .iter()
+            .filter_map(|entry| {
+                let filepath = entry.key();
+                if filepath.starts_with(&path) {
+                    let serialized_data = entry.value();
+                    Some((
+                        filepath.clone(),
+                        deserialise::<RegisterCmd>(serialized_data),
+                    ))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        for (filepath, res) in entries {
+            match res {
+                Ok(reg_cmd) => {
                     stored_reg.op_log.push(reg_cmd.clone());
 
                     if let RegisterCmd::Create { cmd, .. } = reg_cmd {
@@ -171,7 +219,9 @@ impl RegisterStore {
             return Ok(StorageLevel::NoChange);
         }
 
+        /* CACHE-ONLY
         create_dir_all(path).await?;
+        */
 
         let mut last_err = None;
         let mut storage_level = StorageLevel::NoChange;
@@ -241,18 +291,29 @@ impl RegisterStore {
         };
 
         // it's deterministic, so they are exactly the same op so we can leave
-        if path.exists() {
+        if self.cache.contains_key(&path) {
             trace!("RegisterCmd exists on disk for {addr:?}, entry hash: {entry_hash:?}, so was not written: {cmd:?}");
             return Ok(StorageLevel::NoChange);
         }
 
+        /* CACHE-ONLY
         let mut file = File::create(&path).await?;
+        */
 
         let serialized_data = serialise(cmd)?;
+        /*
         file.write_all(&serialized_data).await?;
         // Let's sync up OS data to disk to reduce the chances of
         // concurrent reading failing by reading an empty/incomplete file
         file.sync_data().await?;
+        */
+        if self
+            .cache
+            .insert(path.clone(), Bytes::from(serialized_data))
+            .is_some()
+        {
+            trace!("RegisterCmd existed on disk for {addr:?}, entry hash: {entry_hash:?}: {cmd:?}");
+        }
 
         let storage_level = self.used_space.increase(required_space);
 
