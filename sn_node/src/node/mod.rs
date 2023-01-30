@@ -597,8 +597,6 @@ mod core {
                 if let Ok(key) = self.section_keys_provider.key_share(&sap.section_key()) {
                     // The section-key has changed, we are now able to function as an elder.
                     if self.initialize_elder_state(key) {
-                        cmds.extend(self.trigger_dkg()?);
-
                         // Whenever there is an elders change, casting a round of joins_allowed
                         // proposals to sync this particular state.
                         cmds.extend(self.propose_section_state(SectionStateVote::JoinsAllowed(
