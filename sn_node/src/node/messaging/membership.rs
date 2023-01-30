@@ -89,12 +89,9 @@ impl MyNode {
         let mut cmds = vec![];
 
         for signed_vote in signed_votes {
-            let mut vote_broadcast = None;
             if let Some(membership) = self.membership.as_mut() {
-                let (vote_response, decision) = match membership
-                    .handle_signed_vote(signed_vote, &prefix)
-                {
-                    Ok(result) => result,
+                let results = match membership.handle_signed_vote(signed_vote, &prefix) {
+                    Ok(results) => results,
                     Err(membership::Error::RequestAntiEntropy) => {
                         debug!("Membership - We are behind the voter, requesting AE");
                         // We hit an error while processing this vote, perhaps we are missing information.
@@ -112,27 +109,29 @@ impl MyNode {
                     }
                 };
 
-                match vote_response {
-                    VoteResponse::Broadcast(response_vote) => {
-                        vote_broadcast = Some(NodeMsg::MembershipVotes(vec![response_vote]));
-                    }
-                    VoteResponse::WaitingForMoreVotes => {
-                        // do nothing
-                    }
-                };
+                for (vote_response, decision) in results {
+                    let mut vote_broadcast = None;
+                    match vote_response {
+                        VoteResponse::Broadcast(response_vote) => {
+                            vote_broadcast = Some(NodeMsg::MembershipVotes(vec![response_vote]));
+                        }
+                        VoteResponse::WaitingForMoreVotes => {
+                            // do nothing
+                        }
+                    };
 
-                if let Some(decision) = decision {
-                    cmds.push(Cmd::HandleMembershipDecision(decision));
+                    if let Some(decision) = decision {
+                        cmds.push(Cmd::HandleMembershipDecision(decision));
+                    }
+                    if let Some(vote_msg) = vote_broadcast {
+                        cmds.push(MyNode::send_msg_to_our_elders(context, vote_msg));
+                    }
                 }
             } else {
                 error!(
                     "Attempted to handle membership vote when we don't yet have a membership instance"
                 );
             };
-
-            if let Some(vote_msg) = vote_broadcast {
-                cmds.push(MyNode::send_msg_to_our_elders(context, vote_msg));
-            }
         }
 
         Ok(cmds)

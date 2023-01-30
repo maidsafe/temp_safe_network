@@ -115,7 +115,7 @@ impl Register {
     pub fn permissions(&self, user: User) -> Result<Permissions> {
         self.policy
             .permissions(user)
-            .ok_or(Error::NoSuchUser(Box::new(user)))
+            .ok_or_else(|| Error::NoSuchUser(Box::new(user)))
     }
 
     /// Return the policy.

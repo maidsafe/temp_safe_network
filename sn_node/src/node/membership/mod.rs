@@ -22,6 +22,9 @@ use std::time::Instant;
 use thiserror::Error;
 use xor_name::{Prefix, XorName};
 
+type MembershipHandleVoteResult =
+    Result<Vec<(VoteResponse<NodeState>, Option<Decision<NodeState>>)>>;
+
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("Consensus error while processing vote {0}")]
@@ -142,6 +145,7 @@ pub(crate) struct Membership {
     history: BTreeMap<Generation, (Decision<NodeState>, Consensus<NodeState>)>,
     // last membership vote timestamp
     last_received_vote_time: Option<Instant>,
+    invalid_votes_cache: Vec<NodeState>,
 }
 
 impl Membership {
@@ -159,6 +163,7 @@ impl Membership {
             gen: 0,
             history: BTreeMap::default(),
             last_received_vote_time: None,
+            invalid_votes_cache: Vec::new(),
         }
     }
 
@@ -295,7 +300,7 @@ impl Membership {
         info!("[{}] proposing {:?}", self.id(), node_state);
         let vote = Vote {
             gen: self.gen + 1,
-            ballot: Ballot::Propose(node_state),
+            ballot: Ballot::Propose(node_state.clone()),
             faults: self.consensus.faults(),
         };
         let signed_vote = self.sign_vote(vote)?;
@@ -304,15 +309,23 @@ impl Membership {
         // where the name of the node_state is using old_name, and won't match the relocate_details
         // within the node_state, hence fail the `expected age` check.
         self.validate_proposals(&signed_vote, prefix)?;
+
         if let Err(e) = signed_vote.detect_byzantine_faults(
             &self.consensus.elders,
             &self.consensus.votes,
             &self.consensus.processed_votes_cache,
         ) {
+            // For the concurrent situation, a voter could cast two votes during one generation.
+            // This will be considered as `VoteChange` error by the Consensus.
+            // In that case, the validation-failed vote shall be cached.
+            // Once the current generation concensused, the cached votes shall be:
+            //   1, if concluded in the current generation, just ignore the vote.
+            //   2, if not concluded in the current generation, cast with new generation.
             error!(
                 "Attempted invalid proposal: {e:?}. (Genereation for attempted proposal is: {:?})",
                 self.gen + 1
             );
+            self.invalid_votes_cache.push(node_state);
             return Err(Error::InvalidProposal);
         }
 
@@ -354,13 +367,14 @@ impl Membership {
         &mut self,
         signed_vote: SignedVote<NodeState>,
         prefix: &Prefix,
-    ) -> Result<(VoteResponse<NodeState>, Option<Decision<NodeState>>)> {
+    ) -> MembershipHandleVoteResult {
         self.validate_proposals(&signed_vote, prefix)?;
 
         let vote_gen = signed_vote.vote.gen;
         let is_ongoing_consensus = vote_gen == self.gen + 1;
         let consensus = self.consensus_at_gen_mut(vote_gen)?;
         let is_fresh_vote = !consensus.processed_votes_cache.contains(&signed_vote.sig);
+        let mut result = Vec::new();
 
         info!(
             "Membership - accepted signed vote from voter {:?}",
@@ -408,8 +422,27 @@ impl Membership {
 
             None
         };
+        let got_a_decision = decision.is_some();
+        result.push((vote_response, decision));
 
-        Ok((vote_response, decision))
+        if got_a_decision {
+            // In case there is a decision reached, the cached votes shall be checked
+            // against it to decide whether shall be casted in new generation.
+            for node_state in std::mem::take(&mut self.invalid_votes_cache) {
+                trace!("Membership vote recast {node_state:?} after a decision");
+                let vote = Vote {
+                    gen: self.gen + 1,
+                    ballot: Ballot::Propose(node_state),
+                    faults: self.consensus.faults(),
+                };
+                let signed_vote = self.sign_vote(vote)?;
+                if let Ok(response) = self.consensus.handle_signed_vote(signed_vote) {
+                    result.push((response, None));
+                }
+            }
+        }
+
+        Ok(result)
     }
 
     fn sign_vote(&self, vote: Vote<NodeState>) -> Result<SignedVote<NodeState>> {

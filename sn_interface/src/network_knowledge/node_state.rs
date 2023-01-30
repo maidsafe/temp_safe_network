@@ -207,7 +207,7 @@ impl RelocationDst {
 /// The relocation info contains the dst (in `NodeState`),
 /// the old name, the new name and the source section signature
 /// over the fact that the section considered the node to be relocated.
-#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug)]
 pub struct RelocationInfo {
     signed_relocation: SectionSigned<NodeState>,
     new_name: XorName,
@@ -218,7 +218,7 @@ pub struct RelocationInfo {
 ///
 /// NB: Upper layers will need to verify that said section is also a known section,
 /// only then is the relocation fully valid.
-#[derive(Clone, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, custom_debug::Debug)]
 pub struct RelocationProof {
     info: RelocationInfo,
     // This sig proves that the new name was actually created by the node holding the old keys.
