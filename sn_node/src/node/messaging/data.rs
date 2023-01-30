@@ -72,7 +72,7 @@ impl MyNode {
         // Atm that's perhaps more bother than its worth..
         let msg = NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data));
 
-        let cmd = Cmd::SendMsgAwaitResponseAndRespondToClient {
+        let cmd = Cmd::SendAndForwardResponseToClient {
             msg_id,
             msg,
             context,
@@ -139,7 +139,7 @@ impl MyNode {
             operation_id,
         });
 
-        let cmd = Cmd::SendMsgAwaitResponseAndRespondToClient {
+        let cmd = Cmd::SendAndForwardResponseToClient {
             msg_id,
             msg,
             context,

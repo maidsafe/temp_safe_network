@@ -26,16 +26,16 @@ impl MyNode {
                 );
             }
             CannotConnectEndpoint(_err) => {
-                debug!("Cannot connect to endpoint: {}", peer);
+                trace!("Cannot connect to endpoint: {}", peer);
             }
             AddressNotReachable(_err) => {
-                debug!("Address not reachable: {}", peer);
+                trace!("Address not reachable: {}", peer);
             }
             FailedSend(msg_id) => {
-                debug!("Could not send {msg_id:?}, lost known peer: {}", peer);
+                trace!("Could not send {msg_id:?}, lost known peer: {}", peer);
             }
             InvalidMsgReceived(msg_id) => {
-                debug!("Invalid msg {msg_id:?} received from {}.", peer);
+                trace!("Invalid msg {msg_id:?} received from {}.", peer);
             }
         }
         // Track comms issue if this is a peer we know and care about
