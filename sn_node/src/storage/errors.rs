@@ -59,7 +59,13 @@ pub enum Error {
     /// Invalid filename
     #[error("Invalid chunk filename: {0}")]
     InvalidFilename(PathBuf),
-    /// Register command/op destinaation adddress mistmatch
+    /// Chunk adddress mistmatch
+    #[error("Chunk address ({addr:?}) doesn't match stored Chunk address: {chunk_addr:?}")]
+    ChunkAddrMismatch {
+        addr: ChunkAddress,
+        chunk_addr: ChunkAddress,
+    },
+    /// Register command/op destination adddress mistmatch
     #[error(
         "Register command destination address ({cmd_dst_addr:?}) doesn't match stored Register address: {reg_addr:?}"
     )]

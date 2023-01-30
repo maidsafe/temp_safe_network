@@ -242,6 +242,7 @@ fn prefix_tree_path(root: &Path, xorname: XorName) -> PathBuf {
     root.join(prefix_dir_path)
 }
 
+#[allow(dead_code)]
 fn list_files_in(path: &Path) -> Vec<PathBuf> {
     if !path.exists() {
         return vec![];
