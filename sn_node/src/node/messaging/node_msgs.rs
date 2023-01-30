@@ -64,7 +64,7 @@ impl MyNode {
     pub(crate) fn send_to_elders_await_responses(context: NodeContext, msg: NodeMsg) -> Cmd {
         let sap = context.network_knowledge.section_auth();
         let recipients = sap.elders_set();
-        Cmd::SendMsgWithBiResponse {
+        Cmd::SendAndEnqueueAnyResponse {
             msg,
             msg_id: MsgId::new(),
             recipients,

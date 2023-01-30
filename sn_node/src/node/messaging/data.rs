@@ -71,7 +71,7 @@ impl MyNode {
         // Atm that's perhaps more bother than its worth..
         let msg = NodeMsg::NodeDataCmd(NodeDataCmd::StoreData(data));
 
-        let cmd = Cmd::SendMsgAwaitResponseAndRespondToClient {
+        let cmd = Cmd::SendAndForwardResponseToClient {
             msg_id,
             msg,
             context,
@@ -137,7 +137,7 @@ impl MyNode {
             auth: auth.into_inner(),
         });
 
-        let cmd = Cmd::SendMsgAwaitResponseAndRespondToClient {
+        let cmd = Cmd::SendAndForwardResponseToClient {
             msg_id,
             msg,
             context,

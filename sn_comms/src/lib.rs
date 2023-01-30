@@ -92,31 +92,6 @@ pub enum CommEvent {
     },
 }
 
-/// Internal comm cmds.
-#[derive(custom_debug::Debug)]
-enum CommCmd {
-    Send {
-        msg_id: MsgId,
-        peer: Peer,
-        #[debug(skip)]
-        bytes: UsrMsgBytes,
-    },
-    SetTargets(BTreeSet<Peer>),
-    SendWithBiResponse {
-        peer: Peer,
-        msg_id: MsgId,
-        bytes: UsrMsgBytes,
-    },
-    SendAndRespondOnStream {
-        msg_id: MsgId,
-        msg_type: NodeMsgType,
-        peer: Peer,
-        #[debug(skip)]
-        bytes: UsrMsgBytes,
-        dst_stream: (Dst, Arc<RwLock<SendStream>>),
-    },
-}
-
 /// A msg received on the wire.
 #[derive(Debug)]
 pub struct MsgFromPeer {
@@ -149,7 +124,7 @@ impl Comm {
             .server()?;
 
         trace!("Creating comms..");
-        // comm_events_receiver will be used by upper layer to receive all msgs comming in from the network
+        // comm_events_receiver will be used by upper layer to receive all msgs coming in from the network
         let (comm_events_sender, comm_events_receiver) = mpsc::channel(STANDARD_CHANNEL_SIZE);
         let (cmd_sender, cmd_receiver) = mpsc::channel(STANDARD_CHANNEL_SIZE);
 
@@ -182,42 +157,31 @@ impl Comm {
         // We only remove sessions by calling this function,
         // No removals are made even if we failed to send using all peer session's connections,
         // as it's our source of truth for known and connectable peers.
-        let sender = self.cmd_sender.clone();
-        let _handle = task::spawn(async move { sender.send(CommCmd::SetTargets(targets)).await });
+        self.send_cmd(CommCmd::SetTargets(targets))
     }
 
     /// Sends the payload on a new or existing connection.
     #[tracing::instrument(skip(self, bytes))]
     pub fn send_out_bytes(&self, peer: Peer, msg_id: MsgId, bytes: UsrMsgBytes) {
-        let sender = self.cmd_sender.clone();
-        let _handle = task::spawn(async move {
-            sender
-                .send(CommCmd::Send {
-                    msg_id,
-                    peer,
-                    bytes,
-                })
-                .await
-        });
+        self.send_cmd(CommCmd::Send {
+            msg_id,
+            peer,
+            bytes,
+        })
     }
 
     /// Sends the payload on a new bidi-stream and pushes the response onto the comm event channel.
     #[tracing::instrument(skip(self, bytes))]
-    pub fn send_with_bi_response(&self, peer: Peer, msg_id: MsgId, bytes: UsrMsgBytes) {
-        let sender = self.cmd_sender.clone();
-        let _handle = task::spawn(async move {
-            sender
-                .send(CommCmd::SendWithBiResponse {
-                    msg_id,
-                    peer,
-                    bytes,
-                })
-                .await
-        });
+    pub fn send_and_return_response(&self, peer: Peer, msg_id: MsgId, bytes: UsrMsgBytes) {
+        self.send_cmd(CommCmd::SendAndReturnResponse {
+            msg_id,
+            peer,
+            bytes,
+        })
     }
 
-    /// Sends the payload on new bidi-streams and sends the responses on the dst stream.
-    #[tracing::instrument(skip(bytes))]
+    /// Sends the payload on new bidi-stream to noe and sends the response on the dst stream.
+    #[tracing::instrument(skip(self, bytes))]
     pub fn send_and_respond_on_stream(
         &self,
         msg_id: MsgId,
@@ -226,34 +190,65 @@ impl Comm {
         bytes: UsrMsgBytes,
         dst_stream: (Dst, Arc<RwLock<SendStream>>),
     ) {
+        self.send_cmd(CommCmd::SendAndRespondOnStream {
+            msg_id,
+            msg_type,
+            peer,
+            bytes,
+            dst_stream,
+        })
+    }
+
+    fn send_cmd(&self, cmd: CommCmd) {
         let sender = self.cmd_sender.clone();
         let _handle = task::spawn(async move {
-            sender
-                .send(CommCmd::SendAndRespondOnStream {
-                    msg_id,
-                    msg_type,
-                    peer,
-                    bytes,
-                    dst_stream,
-                })
-                .await
+            let error_msg = format!("Failed to send {cmd:?} on comm cmd channel ");
+            if let Err(error) = sender.send(cmd).await {
+                error!("{error_msg} due to {error}.");
+            }
         });
     }
 }
 
+/// Internal comm cmds.
+#[derive(custom_debug::Debug)]
+enum CommCmd {
+    Send {
+        msg_id: MsgId,
+        peer: Peer,
+        #[debug(skip)]
+        bytes: UsrMsgBytes,
+    },
+    SetTargets(BTreeSet<Peer>),
+    SendAndReturnResponse {
+        peer: Peer,
+        msg_id: MsgId,
+        #[debug(skip)]
+        bytes: UsrMsgBytes,
+    },
+    SendAndRespondOnStream {
+        msg_id: MsgId,
+        msg_type: NodeMsgType,
+        peer: Peer,
+        #[debug(skip)]
+        bytes: UsrMsgBytes,
+        dst_stream: (Dst, Arc<RwLock<SendStream>>),
+    },
+}
+
 fn process_cmds(
     our_endpoint: Endpoint,
-    mut update_receiver: Receiver<CommCmd>,
+    mut cmd_receiver: Receiver<CommCmd>,
     comm_events: Sender<CommEvent>,
 ) {
     let _handle = task::spawn(async move {
         let mut sessions = BTreeMap::<Peer, PeerSession>::new();
-        while let Some(cmd) = update_receiver.recv().await {
+        while let Some(cmd) = cmd_receiver.recv().await {
             trace!("Comms cmd handling: {cmd:?}");
             match cmd {
                 // This is the only place that mutates `sessions`.
                 CommCmd::SetTargets(targets) => {
-                    // Drops sessions that not among the targets.
+                    // Drops sessions that are not among the targets.
                     sessions.retain(|p, _| targets.contains(p));
                     // Adds new sessions for each new target.
                     targets.iter().for_each(|peer| {
@@ -268,42 +263,20 @@ fn process_cmds(
                     peer,
                     bytes,
                 } => {
-                    let session = match sessions.get(&peer) {
-                        Some(session) => session.clone(),
-                        None => {
-                            error!(
-                                "Sending message (msg_id: {msg_id:?}) to {peer:?} failed: unknown node."
-                            );
-                            send_error(
-                                peer,
-                                Error::ConnectingToUnknownNode(msg_id),
-                                comm_events.clone(),
-                            );
-                            continue;
-                        }
-                    };
-                    send(msg_id, session, bytes, comm_events.clone());
+                    if let Some(session) = get_session(msg_id, peer, &sessions, comm_events.clone())
+                    {
+                        send(msg_id, session, bytes, comm_events.clone())
+                    }
                 }
-                CommCmd::SendWithBiResponse {
+                CommCmd::SendAndReturnResponse {
                     peer,
                     msg_id,
                     bytes,
                 } => {
-                    let session = match sessions.get(&peer) {
-                        Some(session) => session.clone(),
-                        None => {
-                            error!(
-                                "Sending message (msg_id: {msg_id:?}) to {peer:?} failed: unknown node."
-                            );
-                            send_error(
-                                peer,
-                                Error::ConnectingToUnknownNode(msg_id),
-                                comm_events.clone(),
-                            );
-                            continue;
-                        }
-                    };
-                    send_with_bi_response(msg_id, session, bytes, comm_events.clone());
+                    if let Some(session) = get_session(msg_id, peer, &sessions, comm_events.clone())
+                    {
+                        send_and_return_response(msg_id, session, bytes, comm_events.clone())
+                    }
                 }
                 CommCmd::SendAndRespondOnStream {
                     msg_id,
@@ -312,35 +285,41 @@ fn process_cmds(
                     bytes,
                     dst_stream,
                 } => {
-                    debug!("Trying to get {peer:?} session in order to send: {msg_id:?}",);
-                    let session = match sessions.get(&peer) {
-                        Some(session) => session.clone(),
-                        None => {
-                            error!(
-                                "Sending message (msg_id: {msg_id:?}) to {peer:?} failed: unknown node."
-                            );
-                            send_error(
-                                peer,
-                                Error::ConnectingToUnknownNode(msg_id),
-                                comm_events.clone(),
-                            );
-                            continue;
-                        }
-                    };
-                    send_and_respond_on_stream(
-                        msg_id,
-                        msg_type,
-                        session,
-                        bytes,
-                        dst_stream,
-                        comm_events.clone(),
-                    );
+                    if let Some(session) = get_session(msg_id, peer, &sessions, comm_events.clone())
+                    {
+                        send_and_respond_on_stream(
+                            msg_id,
+                            msg_type,
+                            session,
+                            bytes,
+                            dst_stream,
+                            comm_events.clone(),
+                        )
+                    }
                 }
             }
         }
     });
 }
 
+fn get_session(
+    msg_id: MsgId,
+    peer: Peer,
+    sessions: &BTreeMap<Peer, PeerSession>,
+    comm_events: Sender<CommEvent>,
+) -> Option<PeerSession> {
+    debug!("Trying to get {peer:?} session in order to send: {msg_id:?}");
+    match sessions.get(&peer) {
+        Some(session) => Some(session.clone()),
+        None => {
+            error!("Sending message (msg_id: {msg_id:?}) to {peer:?} failed: unknown node.");
+            send_error(peer, Error::ConnectingToUnknownNode(msg_id), comm_events);
+            None
+        }
+    }
+}
+
+#[tracing::instrument(skip_all)]
 fn send(msg_id: MsgId, session: PeerSession, bytes: UsrMsgBytes, comm_events: Sender<CommEvent>) {
     let _handle = task::spawn(async move {
         let (h, d, p) = &bytes;
@@ -359,7 +338,8 @@ fn send(msg_id: MsgId, session: PeerSession, bytes: UsrMsgBytes, comm_events: Se
     });
 }
 
-fn send_with_bi_response(
+#[tracing::instrument(skip_all)]
+fn send_and_return_response(
     msg_id: MsgId,
     session: PeerSession,
     bytes: UsrMsgBytes,
@@ -394,6 +374,7 @@ fn send_with_bi_response(
     });
 }
 
+#[tracing::instrument(skip_all)]
 fn send_and_respond_on_stream(
     msg_id: MsgId,
     msg_type: NodeMsgType,
@@ -452,6 +433,7 @@ fn send_and_respond_on_stream(
 
 /// Verify what kind of response was received, and if that's the expected type based on
 /// the type of msg sent to the nodes, then return the corresponding response to the client.
+#[tracing::instrument(skip_all)]
 fn map_to_client_response(
     sent: NodeMsgType,
     correlation_id: MsgId,
@@ -512,9 +494,8 @@ fn send_error(peer: Peer, error: Error, comm_events: Sender<CommEvent>) {
     let _handle = task::spawn(async move {
         let error_msg =
             format!("Failed to send error {error} of peer {peer} on comm event channel ");
-        match comm_events.send(CommEvent::Error { peer, error }).await {
-            Ok(()) => (),
-            Err(err) => error!("{error_msg} due to {err}."),
+        if let Err(err) = comm_events.send(CommEvent::Error { peer, error }).await {
+            error!("{error_msg} due to {err}.")
         }
     });
 }
