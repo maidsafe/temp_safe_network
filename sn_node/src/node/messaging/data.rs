@@ -104,7 +104,7 @@ impl MyNode {
             }
         }
 
-        Cmd::SendMsgAwaitResponseAndRespondToClient {
+        Cmd::SendAndForwardResponseToClient {
             wire_msg,
             context,
             targets,
@@ -167,7 +167,7 @@ impl MyNode {
 
         let context = context.clone();
 
-        Ok(vec![Cmd::SendMsgAwaitResponseAndRespondToClient {
+        Ok(vec![Cmd::SendAndForwardResponseToClient {
             wire_msg,
             context,
             targets,

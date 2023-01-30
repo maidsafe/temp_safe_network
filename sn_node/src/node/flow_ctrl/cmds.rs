@@ -154,7 +154,7 @@ pub(crate) enum Cmd {
     },
     /// Performs serialisation and sends the msg to the peer node over a new bi-stream,
     /// awaiting for a response which is forwarded to the client.
-    SendMsgAwaitResponseAndRespondToClient {
+    SendAndForwardResponseToClient {
         wire_msg: WireMsg,
         #[debug(skip)]
         context: NodeContext,
@@ -184,8 +184,8 @@ impl Cmd {
             Cmd::SendMsg { .. }
             | Cmd::SendMsgEnqueueAnyResponse { .. }
             | Cmd::SendNodeMsgResponse { .. }
-            | Cmd::SendMsgAwaitResponseAndRespondToClient { .. }
-            | Cmd::SendClientResponse { .. } => State::Comms,
+            | Cmd::SendClientResponse { .. }
+            | Cmd::SendAndForwardResponseToClient { .. } => State::Comms,
             Cmd::HandleCommsError { .. } => State::Comms,
             Cmd::HandleMsg { .. } => State::HandleMsg,
             Cmd::UpdateNetworkAndHandleValidClientMsg { .. } => State::ClientMsg,
@@ -226,8 +226,8 @@ impl fmt::Display for Cmd {
             Cmd::SendMsg { .. } => write!(f, "SendMsg"),
             Cmd::SendMsgEnqueueAnyResponse { .. } => write!(f, "SendMsgEnqueueAnyResponse"),
             Cmd::SendNodeMsgResponse { .. } => write!(f, "SendNodeMsgResponse"),
-            Cmd::SendMsgAwaitResponseAndRespondToClient { .. } => {
-                write!(f, "SendMsgAwaitResponseAndRespondToClient")
+            Cmd::SendAndForwardResponseToClient { .. } => {
+                write!(f, "SendAndForwardResponseToClient")
             }
             Cmd::SendClientResponse { .. } => write!(f, "SendClientResponse"),
             Cmd::EnqueueDataForReplication { .. } => write!(f, "EnqueueDataForReplication"),

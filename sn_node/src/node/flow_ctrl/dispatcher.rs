@@ -67,17 +67,17 @@ impl Dispatcher {
                 recipients,
                 context,
             } => {
-                MyNode::send_msg_with_bi_response(msg, msg_id, context, recipients)?;
+                MyNode::send_and_enqueue_any_response(msg, msg_id, context, recipients)?;
                 Ok(vec![])
             }
-            Cmd::SendMsgAwaitResponseAndRespondToClient {
+            Cmd::SendAndForwardResponseToClient {
                 wire_msg,
                 context,
                 targets,
                 client_stream,
                 source_client,
             } => {
-                MyNode::send_msg_await_response_and_send_to_client(
+                MyNode::send_and_forward_response_to_client(
                     wire_msg,
                     context,
                     targets,

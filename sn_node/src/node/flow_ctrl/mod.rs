@@ -240,6 +240,7 @@ impl FlowCtrl {
                                 LogMarker::MsgReceived,
                             );
                         } else {
+                            // this should be unreachable
                             trace!(
                                 "{:?} from {sender:?}, unknown length due to serialization issues.",
                                 LogMarker::MsgReceived,

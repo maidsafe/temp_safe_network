@@ -96,9 +96,9 @@ impl MyNode {
         .await
     }
 
-    /// Sends a msg via comms, and listens for any response
+    /// Sends a msg, and listens for any response
     /// The response is returned to be handled via the dispatcher (though a response is not necessarily expected)
-    pub(crate) fn send_msg_with_bi_response(
+    pub(crate) fn send_and_enqueue_any_response(
         msg: NodeMsg,
         msg_id: MsgId,
         context: NodeContext,
@@ -122,14 +122,14 @@ impl MyNode {
             let bytes_to_node = wire_msg.serialize_with_new_dst(&dst)?;
             let comm = context.comm.clone();
             info!("About to send {msg_id:?} to holder node: {target:?}");
-            comm.send_with_bi_response(target, msg_id, bytes_to_node);
+            comm.send_and_return_response(target, msg_id, bytes_to_node);
         }
 
         Ok(())
     }
 
     /// Send out msg and await response to forward on to client
-    pub(crate) fn send_msg_await_response_and_send_to_client(
+    pub(crate) fn send_and_forward_response_to_client(
         wire_msg: WireMsg,
         context: NodeContext,
         targets: BTreeSet<Peer>,
