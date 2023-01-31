@@ -89,27 +89,6 @@ impl MyNode {
             None
         };
 
-        // Finally do reachability check
-        // NB: This was temporarily not applied to new nodes, therefore
-        // we only apply it for relocated nodes for now.
-        if previous_name.is_some() && context.comm.is_reachable(&peer.addr()).await.is_err() {
-            let msg = NodeMsg::JoinResponse(JoinResponse::Rejected(
-                JoinRejectReason::NodeNotReachable(peer.addr()),
-            ));
-            trace!(
-                "Relocation reachability check, sending {:?} to {}",
-                msg,
-                peer
-            );
-            return Ok(Some(Cmd::send_msg(
-                msg,
-                Peers::Single(peer),
-                context.clone(),
-            )));
-        };
-
-        // NB: No reachability check has been made for new nodes.
-
         // We propose membership
         let node_state = NodeState::joined(peer, previous_name);
 

@@ -112,42 +112,6 @@ impl Comm {
         self.our_endpoint.local_addr()
     }
 
-    /// Fake function used as replacement for testing only.
-    ///
-    /// NB: Testing this from an external crate will require referencing
-    /// this crate with the feature "test", otherwise this fn will not be called.
-    /// <https://github.com/rust-lang/rust/issues/59168#issuecomment-962214945>
-    #[cfg(any(test, feature = "test"))]
-    pub async fn is_reachable(&self, _peer: &SocketAddr) -> Result<(), Error> {
-        Ok(())
-    }
-
-    /// Tests whether the peer is reachable.
-    ///
-    /// NB: If testing comms from an external crate, this fn will be called instead
-    /// of the intended test fn above, unless referencing this crate with the feature "test".
-    /// <https://github.com/rust-lang/rust/issues/59168#issuecomment-962214945>
-    #[cfg(not(any(test, feature = "test")))]
-    pub async fn is_reachable(&self, peer: &SocketAddr) -> Result<(), Error> {
-        let qp2p_config = qp2p::Config::default();
-
-        let connectivity_endpoint =
-            Endpoint::new_client((self.our_endpoint.local_addr().ip(), 0), qp2p_config)?;
-
-        let result = connectivity_endpoint
-            .is_reachable(peer)
-            .await
-            .map_err(|err| {
-                info!("Peer {peer} is NOT externally reachable: {err:?}");
-                err.into()
-            })
-            .map(|()| {
-                info!("Peer {peer} is externally reachable.");
-            });
-        connectivity_endpoint.close();
-        result
-    }
-
     /// Closes the endpoint.
     pub fn close_endpoint(&self) {
         self.our_endpoint.close()
