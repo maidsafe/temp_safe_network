@@ -4030,7 +4030,7 @@ dependencies = [
 
 [[package]]
 name = "sn_fault_detection"
-version = "0.15.1"
+version = "0.15.2"
 dependencies = [
  "eyre",
  "itertools",
@@ -4044,7 +4044,7 @@ dependencies = [
 
 [[package]]
 name = "sn_interface"
-version = "0.16.19"
+version = "0.16.20"
 dependencies = [
  "base64 0.13.1",
  "bincode",
@@ -4107,7 +4107,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.72.40"
+version = "0.72.41"
 dependencies = [
  "assert_matches",
  "base64 0.13.1",

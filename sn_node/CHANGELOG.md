@@ -5,17 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.72.40 (2023-01-30)
+## v0.72.41 (2023-01-31)
 
-### Chore
+### New Features
 
- - <csr-id-89b6344e590a22894f88fc643ff8aa2c7aab2464/> remove extra dkg trigger
+ - <csr-id-6153fcf52e02551443642d60a13e48de28e2ed3d/> perform ae before we deserialise msgs
+   This removes unnecessary work
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
+ - 1 day passed between releases.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -26,11 +28,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #2039 ([`5b27450`](https://github.com/maidsafe/safe_network/commit/5b2745051d91eb3a4b6b8e575258b5c93ab81b04))
+    - perform ae before we deserialise msgs ([`6153fcf`](https://github.com/maidsafe/safe_network/commit/6153fcf52e02551443642d60a13e48de28e2ed3d))
+</details>
+
+## v0.72.40 (2023-01-30)
+
+<csr-id-89b6344e590a22894f88fc643ff8aa2c7aab2464/>
+
+### Chore
+
+ - <csr-id-89b6344e590a22894f88fc643ff8aa2c7aab2464/> remove extra dkg trigger
+
+### Chore
+
+ - <csr-id-3377f4b4142e324bb769d4666f3ac127354bb107/> sn_node-0.72.40
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_node-0.72.40 ([`3377f4b`](https://github.com/maidsafe/safe_network/commit/3377f4b4142e324bb769d4666f3ac127354bb107))
     - Merge #2044 ([`716167c`](https://github.com/maidsafe/safe_network/commit/716167cf801b7036a6d91653b4254c20a9bfe1d2))
     - remove extra dkg trigger ([`89b6344`](https://github.com/maidsafe/safe_network/commit/89b6344e590a22894f88fc643ff8aa2c7aab2464))
 </details>
 
 ## v0.72.39 (2023-01-29)
+
+<csr-id-4ea2b420b5c6390bd894505e3c71cb5e673244b8/>
 
 ### Chore
 

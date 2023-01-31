@@ -5,7 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.15.2 (2023-01-31)
+
+### New Features
+
+ - <csr-id-6153fcf52e02551443642d60a13e48de28e2ed3d/> perform ae before we deserialise msgs
+   This removes unnecessary work
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 4 days passed between releases.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge #2039 ([`5b27450`](https://github.com/maidsafe/safe_network/commit/5b2745051d91eb3a4b6b8e575258b5c93ab81b04))
+    - perform ae before we deserialise msgs ([`6153fcf`](https://github.com/maidsafe/safe_network/commit/6153fcf52e02551443642d60a13e48de28e2ed3d))
+</details>
+
 ## v0.15.1 (2023-01-27)
+
+<csr-id-3cf38457737bd6dd27ce3037ee5b2a2329df3f78/>
+<csr-id-03d9c561c7259351310ede6e4cfb6e78822d728a/>
+<csr-id-783d62461a65eb7c06b0d4f399b97216b6c75519/>
+<csr-id-8d2ef1a0f298ef010f478fcd59c5b6c437b7b62f/>
+<csr-id-87cb70eefdc63f80942a2c87ecc3790f76105b91/>
+<csr-id-dc16323849e425e2ca2511f095caee5b0a4af1ab/>
+<csr-id-38d85b391a72a3ee71f705d9b89d6dbc74c041e1/>
+<csr-id-7674b9f5609384a35072043a777ac07b18c12bb3/>
+<csr-id-b13f1d7e5e84e42ed076654a159418563a9a1a35/>
+<csr-id-21af053a5be2317be356e760c2b581c0f870a396/>
+<csr-id-6144129d5cae1edf8850e41890044acf7804b299/>
+<csr-id-852716257efac7453f01e7404e254dd5481a40e4/>
+<csr-id-2b6c4a8fcd2cd7b22e6a4b20f1218c859110be62/>
+<csr-id-c503d722b9d3bf3325d564bd28d7df695dd70e95/>
 
 ### Chore
 
@@ -22,6 +64,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    We use bidi now, so we can report after any failure, no need for
    double accounting
  - <csr-id-21af053a5be2317be356e760c2b581c0f870a396/> happy new year 2023
+
+### Chore
+
+ - <csr-id-81fe669f11343259bd167b75a8bfb004b4b83090/> sn_fault_detection-0.15.1/sn_node-0.72.35
 
 ### New Features
 
@@ -66,8 +112,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 27 commits contributed to the release over the course of 30 calendar days.
- - 19 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 28 commits contributed to the release over the course of 30 calendar days.
+ - 20 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -77,6 +123,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_fault_detection-0.15.1/sn_node-0.72.35 ([`81fe669`](https://github.com/maidsafe/safe_network/commit/81fe669f11343259bd167b75a8bfb004b4b83090))
     - update test msg quantities ([`3cf3845`](https://github.com/maidsafe/safe_network/commit/3cf38457737bd6dd27ce3037ee5b2a2329df3f78))
     - add mean to std dev to get threshold ([`03d9c56`](https://github.com/maidsafe/safe_network/commit/03d9c561c7259351310ede6e4cfb6e78822d728a))
     - simplify failure check, make msgs target only one node ([`6144129`](https://github.com/maidsafe/safe_network/commit/6144129d5cae1edf8850e41890044acf7804b299))
